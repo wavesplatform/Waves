@@ -115,18 +115,20 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     test(s"Try to put incorrect script=$script") {
       for (v <- issueTxSupportedVersions) {
         val json = {
-          val tx = IssueTransaction.selfSigned(
-            TxVersion.V1,
-            firstKeyPair,
-            "1234",
-            "",
-            1,
-            2,
-            false,
-            None,
-            issueFee,
-            System.currentTimeMillis()
-          ).explicitGet()
+          val tx = IssueTransaction
+            .selfSigned(
+              TxVersion.V1,
+              firstKeyPair,
+              "1234",
+              "",
+              1,
+              2,
+              false,
+              None,
+              issueFee,
+              System.currentTimeMillis()
+            )
+            .explicitGet()
           tx.json() ++ Json.obj("script" -> script)
         }
 

@@ -29,7 +29,18 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, Proofs, TxDecimals, TxExchangeAmount, TxExchangePrice, TxNonNegativeAmount, TxPositiveAmount, TxVersion}
+import com.wavesplatform.transaction.{
+  Asset,
+  CreateAliasTransaction,
+  DataTransaction,
+  Proofs,
+  TxDecimals,
+  TxExchangeAmount,
+  TxExchangePrice,
+  TxNonNegativeAmount,
+  TxPositiveAmount,
+  TxVersion
+}
 import org.asynchttpclient.Dsl.{delete => _delete, get => _get, post => _post, put => _put}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants.ResponseStatusCodes.OK_200
@@ -733,22 +744,25 @@ object AsyncHttpApi extends Assertions {
 
     def createAlias(target: KeyPair, alias: String, fee: Long, version: TxVersion = TxVersion.V2): Future[Transaction] =
       signedBroadcast(
-        CreateAliasTransaction.selfSigned(version, target, alias, fee, System.currentTimeMillis())
+        CreateAliasTransaction
+          .selfSigned(version, target, alias, fee, System.currentTimeMillis())
           .explicitGet()
           .json()
       )
 
-    def broadcastExchange(matcher: KeyPair,
-                          order1: Order,
-                          order2: Order,
-                          amount: TxExchangeAmount,
-                          price: TxExchangePrice,
-                          buyMatcherFee: Long,
-                          sellMatcherFee: Long,
-                          fee: Long,
-                          version: Byte,
-                          amountsAsStrings: Boolean = false,
-                          validate: Boolean = true): Future[Transaction] = {
+    def broadcastExchange(
+        matcher: KeyPair,
+        order1: Order,
+        order2: Order,
+        amount: TxExchangeAmount,
+        price: TxExchangePrice,
+        buyMatcherFee: Long,
+        sellMatcherFee: Long,
+        fee: Long,
+        version: Byte,
+        amountsAsStrings: Boolean = false,
+        validate: Boolean = true
+    ): Future[Transaction] = {
       val tx = ExchangeTx(
         version = version,
         order1 = order1,
@@ -938,7 +952,7 @@ object AsyncHttpApi extends Assertions {
 
     def assertBalances(acc: String, balance: Long, effectiveBalance: Long)(implicit pos: Position): Future[Unit] =
       for {
-        newBalance          <- balanceDetails(acc)
+        newBalance <- balanceDetails(acc)
       } yield {
         withClue(s"effective balance of $acc") {
           newBalance.effective shouldBe effectiveBalance

@@ -73,31 +73,45 @@ class AmountAsStringSuite extends BaseTransactionSuite with OverflowBlock {
       .broadcastIssue(exchanger, "exchange asset", "", someAssetAmount, 8, fee = issueFee, reissuable = true, script = None, waitForTx = true)
       .id
     val ts = System.currentTimeMillis()
-    val buyOrder = Order.buy(
-      version = TxVersion.V2,
-      exchanger,
-      exchanger.publicKey,
-      AssetPair.createAssetPair("WAVES", exchAssetId).get,
-      amount,
-      price,
-      ts,
-      ts + Order.MaxLiveTime,
-      matcherFee
-    ).explicitGet()
-    val sellOrder = Order.sell(
-      version = TxVersion.V2,
-      exchanger,
-      exchanger.publicKey,
-      AssetPair.createAssetPair("WAVES", exchAssetId).get,
-      amount,
-      price,
-      ts,
-      ts + Order.MaxLiveTime,
-      matcherFee
-    ).explicitGet()
+    val buyOrder = Order
+      .buy(
+        version = TxVersion.V2,
+        exchanger,
+        exchanger.publicKey,
+        AssetPair.createAssetPair("WAVES", exchAssetId).get,
+        amount,
+        price,
+        ts,
+        ts + Order.MaxLiveTime,
+        matcherFee
+      )
+      .explicitGet()
+    val sellOrder = Order
+      .sell(
+        version = TxVersion.V2,
+        exchanger,
+        exchanger.publicKey,
+        AssetPair.createAssetPair("WAVES", exchAssetId).get,
+        amount,
+        price,
+        ts,
+        ts + Order.MaxLiveTime,
+        matcherFee
+      )
+      .explicitGet()
     nodes.waitForHeightArise()
     val exchangeTx =
-      sender.broadcastExchange(exchanger, buyOrder, sellOrder, TxExchangeAmount.unsafeFrom(amount), TxExchangePrice.unsafeFrom(price), matcherFee, matcherFee, matcherFee, amountsAsStrings = true)
+      sender.broadcastExchange(
+        exchanger,
+        buyOrder,
+        sellOrder,
+        TxExchangeAmount.unsafeFrom(amount),
+        TxExchangePrice.unsafeFrom(price),
+        matcherFee,
+        matcherFee,
+        matcherFee,
+        amountsAsStrings = true
+      )
     checkExchangeTx(exchangeTx)
 
     val utxExchangeTxInfoById = sender.utxById(exchangeTx.id, amountsAsStrings = true)

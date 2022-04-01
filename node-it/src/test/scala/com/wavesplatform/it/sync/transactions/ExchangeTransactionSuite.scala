@@ -17,18 +17,20 @@ import com.wavesplatform.transaction.assets.exchange._
 import play.api.libs.json.{JsNumber, JsObject, JsString, Json}
 
 class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
-  private lazy val exchAsset: IssueTransaction = IssueTransaction.selfSigned(
-    TxVersion.V1,
-    sender = sender.keyPair,
-    "myasset",
-    "my asset description",
-    quantity = someAssetAmount,
-    decimals = 2,
-    reissuable = true,
-    script = None,
-    fee = 1.waves,
-    timestamp = System.currentTimeMillis()
-  ).explicitGet()
+  private lazy val exchAsset: IssueTransaction = IssueTransaction
+    .selfSigned(
+      TxVersion.V1,
+      sender = sender.keyPair,
+      "myasset",
+      "my asset description",
+      quantity = someAssetAmount,
+      decimals = 2,
+      reissuable = true,
+      script = None,
+      fee = 1.waves,
+      timestamp = System.currentTimeMillis()
+    )
+    .explicitGet()
 
   private def acc0 = firstKeyPair
   private def acc1 = secondKeyPair
@@ -71,20 +73,62 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       val protoVersion = exchangeVersion > TxVersion.V2
 
       assertApiError(
-        sender.broadcastExchange(matcher, sell, sell, TxExchangeAmount.unsafeFrom(amount), TxExchangePrice.unsafeFrom(sellPrice), buyFee, sellFee, matcherFee, exchangeVersion, validate = false),
+        sender.broadcastExchange(
+          matcher,
+          sell,
+          sell,
+          TxExchangeAmount.unsafeFrom(amount),
+          TxExchangePrice.unsafeFrom(sellPrice),
+          buyFee,
+          sellFee,
+          matcherFee,
+          exchangeVersion,
+          validate = false
+        ),
         if (protoVersion) CustomValidationError("buyOrder should has OrderType.BUY") else CustomValidationError("order1 should have OrderType.BUY")
       )
 
       assertApiError(
-        sender.broadcastExchange(matcher, buy, buy, TxExchangeAmount.unsafeFrom(amount), TxExchangePrice.unsafeFrom(buyPrice), buyFee, sellFee, matcherFee, exchangeVersion, validate = false),
+        sender.broadcastExchange(
+          matcher,
+          buy,
+          buy,
+          TxExchangeAmount.unsafeFrom(amount),
+          TxExchangePrice.unsafeFrom(buyPrice),
+          buyFee,
+          sellFee,
+          matcherFee,
+          exchangeVersion,
+          validate = false
+        ),
         CustomValidationError("sellOrder should has OrderType.SELL")
       )
 
       assertApiError {
         if (protoVersion)
-          sender.broadcastExchange(matcher, sell, buy, TxExchangeAmount.unsafeFrom(amount), TxExchangePrice.unsafeFrom(sellPrice), buyFee, sellFee, matcherFee, exchangeVersion)
+          sender.broadcastExchange(
+            matcher,
+            sell,
+            buy,
+            TxExchangeAmount.unsafeFrom(amount),
+            TxExchangePrice.unsafeFrom(sellPrice),
+            buyFee,
+            sellFee,
+            matcherFee,
+            exchangeVersion
+          )
         else
-          sender.broadcastExchange(matcher, buy, sell, TxExchangeAmount.unsafeFrom(amount), TxExchangePrice.unsafeFrom(sellPrice), buyFee, sellFee, matcherFee, exchangeVersion)
+          sender.broadcastExchange(
+            matcher,
+            buy,
+            sell,
+            TxExchangeAmount.unsafeFrom(amount),
+            TxExchangePrice.unsafeFrom(sellPrice),
+            buyFee,
+            sellFee,
+            matcherFee,
+            exchangeVersion
+          )
       } { error =>
         error.id shouldBe StateCheckFailed.Id
         error.statusCode shouldBe StateCheckFailed.Code.intValue
@@ -115,18 +159,20 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
     val assetDescription = "my asset description"
 
-    val IssueTx: IssueTransaction = IssueTransaction.selfSigned(
-      TxVersion.V1,
-      buyer,
-      "myasset",
-      assetDescription,
-      quantity = someAssetAmount,
-      decimals = 8,
-      reissuable = true,
-      script = None,
-      fee = 1.waves,
-      timestamp = System.currentTimeMillis()
-    ).explicitGet()
+    val IssueTx: IssueTransaction = IssueTransaction
+      .selfSigned(
+        TxVersion.V1,
+        buyer,
+        "myasset",
+        assetDescription,
+        quantity = someAssetAmount,
+        decimals = 8,
+        reissuable = true,
+        script = None,
+        fee = 1.waves,
+        timestamp = System.currentTimeMillis()
+      )
+      .explicitGet()
 
     val assetId = IssueTx.id()
 
@@ -160,9 +206,13 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       val buyAmount  = 40000000
       val sellAmount = 40000000
       val assetPair  = AssetPair.createAssetPair("WAVES", assetId.toString).get
-      val buy        = Order.buy(o1ver, buyer, matcher.publicKey, assetPair, buyAmount, buyPrice, ts, expirationTimestamp, matcherFee, matcherFeeOrder1).explicitGet()
-      val sell       = Order.sell(o2ver, seller, matcher.publicKey, assetPair, sellAmount, sellPrice, ts, expirationTimestamp, matcherFee, matcherFeeOrder2).explicitGet()
-      val amount     = 40000000
+      val buy = Order
+        .buy(o1ver, buyer, matcher.publicKey, assetPair, buyAmount, buyPrice, ts, expirationTimestamp, matcherFee, matcherFeeOrder1)
+        .explicitGet()
+      val sell = Order
+        .sell(o2ver, seller, matcher.publicKey, assetPair, sellAmount, sellPrice, ts, expirationTimestamp, matcherFee, matcherFeeOrder2)
+        .explicitGet()
+      val amount = 40000000
 
       val tx =
         ExchangeTransaction
@@ -243,9 +293,13 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       Order.buy(4.toByte, buyer, matcher.publicKey, nftWavesPair, amount, nftWavesPrice, ts, expirationTimestamp, matcherFee, Waves).explicitGet()
 
     val sellNftForOtherAsset =
-      Order.sell(4.toByte, buyer, matcher.publicKey, nftOtherAssetPair, amount, nftForAssetPrice, ts, expirationTimestamp, matcherFee, Waves).explicitGet()
+      Order
+        .sell(4.toByte, buyer, matcher.publicKey, nftOtherAssetPair, amount, nftForAssetPrice, ts, expirationTimestamp, matcherFee, Waves)
+        .explicitGet()
     val buyNftForOtherAsset =
-      Order.buy(4.toByte, seller, matcher.publicKey, nftOtherAssetPair, amount, nftForAssetPrice, ts, expirationTimestamp, matcherFee, Waves).explicitGet()
+      Order
+        .buy(4.toByte, seller, matcher.publicKey, nftOtherAssetPair, amount, nftForAssetPrice, ts, expirationTimestamp, matcherFee, Waves)
+        .explicitGet()
 
     val sellerAddress = sellerKeyPair.toAddress.toString
     val sellerBalance = sender.balanceDetails(sellerAddress).regular

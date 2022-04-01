@@ -11,12 +11,7 @@ import com.wavesplatform.utils.ScorexLogging
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest._
 
-trait GrpcIntegrationSuiteWithThreeAddress
-    extends BaseSuite
-    with ScalaFutures
-    with IntegrationPatience
-    with RecoverMethods
-    with ScorexLogging {
+trait GrpcIntegrationSuiteWithThreeAddress extends BaseSuite with ScalaFutures with IntegrationPatience with RecoverMethods with ScorexLogging {
   this: TestSuite with Nodes =>
 
   protected lazy val firstAcc: KeyPair  = KeyPair("first_acc".getBytes("UTF-8"))

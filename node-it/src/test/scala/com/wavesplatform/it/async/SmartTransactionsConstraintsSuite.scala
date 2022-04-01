@@ -54,8 +54,9 @@ class SmartTransactionsConstraintsSuite extends BaseFreeSpec with TransferSendin
       _ <- processRequests(generateTransfersFromAccount(MaxScriptRunsInBlock * 3, smartPrivateKey.toAddress.toString))
       _ <- miner.waitForHeight(5)
       _ <- processRequests(generateTransfersFromAccount(MaxScriptRunsInBlock * 3, smartPrivateKey.toAddress.toString))
-      _ <- scala.concurrent.Future.sequence((0 to 9).map(_ =>
-        processRequests(generateTransfersFromAccount((50 - MaxScriptRunsInBlock / 10), simplePrivateKey.toAddress.toString))))
+      _ <- scala.concurrent.Future.sequence(
+        (0 to 9).map(_ => processRequests(generateTransfersFromAccount((50 - MaxScriptRunsInBlock / 10), simplePrivateKey.toAddress.toString)))
+      )
       _                  <- miner.waitForHeight(6)
       blockWithSetScript <- miner.blockHeadersAt(2)
       restBlocks         <- miner.blockHeadersSeq(3, 4)
@@ -72,7 +73,13 @@ class SmartTransactionsConstraintsSuite extends BaseFreeSpec with TransferSendin
 
   private def setScriptTx(sender: KeyPair) =
     SetScriptTransaction
-      .selfSigned(1.toByte, sender = sender, script = Some(ExprScript(V1, Terms.TRUE, checkSize = false).explicitGet()), fee = 1000000, timestamp = System.currentTimeMillis() - 5.minutes.toMillis)
+      .selfSigned(
+        1.toByte,
+        sender = sender,
+        script = Some(ExprScript(V1, Terms.TRUE, checkSize = false).explicitGet()),
+        fee = 1000000,
+        timestamp = System.currentTimeMillis() - 5.minutes.toMillis
+      )
       .explicitGet()
 
   private def toRequest(tx: SetScriptTransaction): SignedSetScriptRequest = SignedSetScriptRequest(

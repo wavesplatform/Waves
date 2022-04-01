@@ -76,18 +76,20 @@ object CustomFeeTransactionSuite {
   private val defaultAssetQuantity     = 999999999999L
   private val featureCheckBlocksPeriod = 13
 
-  private val assetTx = IssueTransaction.selfSigned(
-    TxVersion.V1,
-    sender = senderKeyPair,
-    "asset",
-    "asset description",
-    quantity = defaultAssetQuantity,
-    decimals = 2,
-    reissuable = false,
-    script = None,
-    fee = 1.waves,
-    timestamp = System.currentTimeMillis()
-  ).explicitGet()
+  private val assetTx = IssueTransaction
+    .selfSigned(
+      TxVersion.V1,
+      sender = senderKeyPair,
+      "asset",
+      "asset description",
+      quantity = defaultAssetQuantity,
+      decimals = 2,
+      reissuable = false,
+      script = None,
+      fee = 1.waves,
+      timestamp = System.currentTimeMillis()
+    )
+    .explicitGet()
 
   private val assetId = assetTx.id()
 

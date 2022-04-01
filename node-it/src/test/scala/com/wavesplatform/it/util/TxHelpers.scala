@@ -16,13 +16,15 @@ import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 
 object TxHelpers {
-  def massTransferBodyBytes(sender: KeyPair,
-                            assetId: Option[String],
-                            transfers: Seq[MassTransferTransactionData.Transfer],
-                            attachment: ByteString,
-                            fee: Long,
-                            timestamp: Long,
-                            version: Int = 1): ByteStr = {
+  def massTransferBodyBytes(
+      sender: KeyPair,
+      assetId: Option[String],
+      transfers: Seq[MassTransferTransactionData.Transfer],
+      attachment: ByteString,
+      fee: Long,
+      timestamp: Long,
+      version: Int = 1
+  ): ByteStr = {
     val bodyBytes = version match {
       case TxVersion.V1 =>
         val transferBytes = transfers.map { t =>

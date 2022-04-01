@@ -24,7 +24,6 @@ import scala.util.Random
 
 class MassTransferTransactionSuite extends BaseTransactionSuite {
 
-
   protected override def beforeAll(): Unit = {
     super.beforeAll()
     // explicitly create an address in node's wallet
@@ -137,10 +136,10 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
 
     for (_ <- massTransferTxSupportedVersions) {
       def request(
-                   transfers: List[Transfer] = List(Transfer(secondAddress, transferAmount)),
-                   fee: Long = calcMassTransferFee(1),
-                   timestamp: Long = System.currentTimeMillis,
-                   attachment: Array[Byte] = Array.emptyByteArray
+          transfers: List[Transfer] = List(Transfer(secondAddress, transferAmount)),
+          fee: Long = calcMassTransferFee(1),
+          timestamp: Long = System.currentTimeMillis,
+          attachment: Array[Byte] = Array.emptyByteArray
       ): (SignedMassTransferRequest, Option[ByteStr]) = {
         val txEi = for {
           parsedTransfers <- MassTransferTransaction.parseTransfersList(transfers)
@@ -174,11 +173,11 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
       def negativeTransferAmountRequest: (SignedMassTransferRequest, Option[ByteStr]) = {
         val recipient = secondKeyPair
 
-        val transfers = List(Transfer(recipient.toAddress.toString, -1))
+        val transfers  = List(Transfer(recipient.toAddress.toString, -1))
         val attachment = ByteStr(Array.emptyByteArray)
-        val fee = calcMassTransferFee(1)
-        val timestamp = System.currentTimeMillis()
-        val version = TxVersion.V1
+        val fee        = calcMassTransferFee(1)
+        val timestamp  = System.currentTimeMillis()
+        val version    = TxVersion.V1
         val mttdTransfers = transfers.map { t =>
           MassTransferTransactionData.Transfer(
             Some(Recipient().withPublicKeyHash(PBRecipients.create(Address.fromPublicKey(recipient.publicKey)).getPublicKeyHash)),
@@ -186,7 +185,8 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
           )
         }
 
-        val bodyBytes = TxHelpers.massTransferBodyBytes(sender.keyPair, None, mttdTransfers, ByteString.copyFrom(attachment.arr), fee, timestamp, version)
+        val bodyBytes =
+          TxHelpers.massTransferBodyBytes(sender.keyPair, None, mttdTransfers, ByteString.copyFrom(attachment.arr), fee, timestamp, version)
 
         (
           SignedMassTransferRequest(

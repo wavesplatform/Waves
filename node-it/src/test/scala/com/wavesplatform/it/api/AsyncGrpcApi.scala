@@ -97,7 +97,7 @@ object AsyncGrpcApi {
       )
 
       script match {
-        case Left(_) => transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.EMPTY)))
+        case Left(_)   => transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.EMPTY)))
         case Right(sc) =>
           // IssueTxSerializer.bodyBytes can't be used here because we must be able to test broadcasting issue transaction with incorrect data
           val baseBytes = Bytes.concat(
@@ -114,7 +114,11 @@ object AsyncGrpcApi {
           val bodyBytes = version match {
             case TxVersion.V1 => Bytes.concat(Array(IssueTransaction.typeId), baseBytes)
             case TxVersion.V2 =>
-              Bytes.concat(Array(IssueTransaction.typeId, version.toByte, chainId), baseBytes, Deser.serializeOptionOfArrayWithLength(sc)(_.bytes().arr))
+              Bytes.concat(
+                Array(IssueTransaction.typeId, version.toByte, chainId),
+                baseBytes,
+                Deser.serializeOptionOfArrayWithLength(sc)(_.bytes().arr)
+              )
             case _ =>
               PBUtils.encodeDeterministic(unsigned)
           }

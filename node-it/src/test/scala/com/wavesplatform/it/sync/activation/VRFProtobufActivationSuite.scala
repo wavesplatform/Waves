@@ -28,8 +28,8 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
       .overrideBase(_.raw(s"waves.blockchain.custom.functionality.min-asset-info-update-interval = $updateInterval"))
       .buildNonConflicting()
 
-  private def senderAcc     = firstKeyPair
-  private def recipientAcc  = secondKeyPair
+  private def senderAcc             = firstKeyPair
+  private def recipientAcc          = secondKeyPair
   private var assetId               = ""
   private var otherAssetId          = ""
   private var secondUpdateAssetTxId = ""
@@ -214,28 +214,32 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     val ts     = System.currentTimeMillis()
     val amount = 1000000
     val price  = 1000
-    val buyOrder = Order.buy(
-      version = TxVersion.V2,
-      sender.keyPair,
-      sender.publicKey,
-      AssetPair.createAssetPair("WAVES", assetId).get,
-      amount,
-      price,
-      ts,
-      ts + Order.MaxLiveTime,
-      matcherFee
-    ).explicitGet()
-    val sellOrder = Order.sell(
-      version = TxVersion.V2,
-      sender.keyPair,
-      sender.publicKey,
-      AssetPair.createAssetPair("WAVES", assetId).get,
-      amount,
-      price,
-      ts,
-      ts + Order.MaxLiveTime,
-      matcherFee
-    ).explicitGet()
+    val buyOrder = Order
+      .buy(
+        version = TxVersion.V2,
+        sender.keyPair,
+        sender.publicKey,
+        AssetPair.createAssetPair("WAVES", assetId).get,
+        amount,
+        price,
+        ts,
+        ts + Order.MaxLiveTime,
+        matcherFee
+      )
+      .explicitGet()
+    val sellOrder = Order
+      .sell(
+        version = TxVersion.V2,
+        sender.keyPair,
+        sender.publicKey,
+        AssetPair.createAssetPair("WAVES", assetId).get,
+        amount,
+        price,
+        ts,
+        ts + Order.MaxLiveTime,
+        matcherFee
+      )
+      .explicitGet()
     (buyOrder, sellOrder)
   }
 }

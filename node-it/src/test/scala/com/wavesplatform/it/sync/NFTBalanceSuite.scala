@@ -157,33 +157,37 @@ object NFTBalanceSuite {
   def fillPortfolio(issuer: KeyPair, nft: Int, simple: Int): (List[IssueTransaction], List[IssueTransaction]) = {
 
     val simpleAssets = List.fill[IssueTransaction](simple) {
-      IssueTransaction.selfSigned(
-        TxVersion.V1,
-        issuer,
-        "SimpleAsset",
-        s"Simple Test Asset ${Random.nextInt(1000)}",
-        1000,
-        8,
-        reissuable = true,
-        script = None,
-        1.waves,
-        System.currentTimeMillis()
-      ).explicitGet()
+      IssueTransaction
+        .selfSigned(
+          TxVersion.V1,
+          issuer,
+          "SimpleAsset",
+          s"Simple Test Asset ${Random.nextInt(1000)}",
+          1000,
+          8,
+          reissuable = true,
+          script = None,
+          1.waves,
+          System.currentTimeMillis()
+        )
+        .explicitGet()
     }
 
     val nonFungibleAssets = List.fill[IssueTransaction](nft) {
-      IssueTransaction.selfSigned(
-        TxVersion.V1,
-        issuer,
-        "NonFungibleAsset",
-        s"NFT Test Asset ${Random.nextInt(1000)}",
-        1,
-        0,
-        reissuable = false,
-        script = None,
-        1.waves,
-        System.currentTimeMillis()
-      ).explicitGet()
+      IssueTransaction
+        .selfSigned(
+          TxVersion.V1,
+          issuer,
+          "NonFungibleAsset",
+          s"NFT Test Asset ${Random.nextInt(1000)}",
+          1,
+          0,
+          reissuable = false,
+          script = None,
+          1.waves,
+          System.currentTimeMillis()
+        )
+        .explicitGet()
     }
 
     (simpleAssets, nonFungibleAssets)

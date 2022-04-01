@@ -290,29 +290,33 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
     val assetPair = AssetPair.createAssetPair("WAVES", tradeAsset)
 
     val ts = ntpTime.getTimestamp()
-    val buyOrder = Order.buy(
-      Order.V4,
-      otherCallerKP,
-      dAppKP.publicKey,
-      assetPair.get,
-      smartMatcherFee,
-      100L,
-      ts,
-      ts + Order.MaxLiveTime,
-      smartMatcherFee
-    ).explicitGet()
+    val buyOrder = Order
+      .buy(
+        Order.V4,
+        otherCallerKP,
+        dAppKP.publicKey,
+        assetPair.get,
+        smartMatcherFee,
+        100L,
+        ts,
+        ts + Order.MaxLiveTime,
+        smartMatcherFee
+      )
+      .explicitGet()
 
-    val sellOrder = Order.sell(
-      Order.V4,
-      callerKP,
-      dAppKP.publicKey,
-      assetPair.get,
-      smartMatcherFee,
-      100L,
-      ts,
-      ts + Order.MaxLiveTime,
-      smartMatcherFee
-    ).explicitGet()
+    val sellOrder = Order
+      .sell(
+        Order.V4,
+        callerKP,
+        dAppKP.publicKey,
+        assetPair.get,
+        smartMatcherFee,
+        100L,
+        ts,
+        ts + Order.MaxLiveTime,
+        smartMatcherFee
+      )
+      .explicitGet()
 
     assertApiError(
       sender.broadcastExchange(
@@ -363,22 +367,10 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
 
     def orders: (Order, Order) = {
       val ts = ntpTime.getTimestamp()
-      val buy = Order.buy(
-        Order.V4,
-        otherCallerKP,
-        dAppKP.publicKey,
-        assetPair,
-        10L,
-        100L,
-        ts,
-        ts + Order.MaxLiveTime,
-        smartMatcherFee,
-        matcherFeeAssetId = IssuedAsset(ByteStr.decodeBase58(feeAsset).get)
-      ).explicitGet()
-      val sell =
-        Order.sell(
+      val buy = Order
+        .buy(
           Order.V4,
-          callerKP,
+          otherCallerKP,
           dAppKP.publicKey,
           assetPair,
           10L,
@@ -387,7 +379,23 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
           ts + Order.MaxLiveTime,
           smartMatcherFee,
           matcherFeeAssetId = IssuedAsset(ByteStr.decodeBase58(feeAsset).get)
-        ).explicitGet()
+        )
+        .explicitGet()
+      val sell =
+        Order
+          .sell(
+            Order.V4,
+            callerKP,
+            dAppKP.publicKey,
+            assetPair,
+            10L,
+            100L,
+            ts,
+            ts + Order.MaxLiveTime,
+            smartMatcherFee,
+            matcherFeeAssetId = IssuedAsset(ByteStr.decodeBase58(feeAsset).get)
+          )
+          .explicitGet()
       (buy, sell)
     }
 

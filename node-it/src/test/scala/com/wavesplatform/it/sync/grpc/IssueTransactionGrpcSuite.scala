@@ -202,8 +202,9 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
     )
   }
 
-  def scriptText(version: Int): Either[Array[Byte], Option[Script]] = Right(version match {
-    case 2 => Some(script)
-    case _ => None
-  })
+  def scriptText(version: Int): Either[Array[Byte], Option[Script]] =
+    Right(version match {
+      case 2 => Some(script)
+      case _ => None
+    })
 }

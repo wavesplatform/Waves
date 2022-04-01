@@ -20,7 +20,18 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxDecimals, TxExchangeAmount, TxMatcherFee, TxOrderPrice, TxPositiveAmount, TxVersion}
+import com.wavesplatform.transaction.{
+  CreateAliasTransaction,
+  DataTransaction,
+  Proofs,
+  Transaction,
+  TxDecimals,
+  TxExchangeAmount,
+  TxMatcherFee,
+  TxOrderPrice,
+  TxPositiveAmount,
+  TxVersion
+}
 import org.scalatest.Informing
 import org.scalatest.prop.TableDrivenPropertyChecks
 
@@ -178,7 +189,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     TxVersion.V2,
     publicKey,
     ByteString.copyFromUtf8("Gigacoin"),
-      ByteString.copyFromUtf8("Gigacoin"),
+    ByteString.copyFromUtf8("Gigacoin"),
     TxPositiveAmount.unsafeFrom(someAssetAmount),
     TxDecimals.unsafeFrom(8.toByte),
     true,

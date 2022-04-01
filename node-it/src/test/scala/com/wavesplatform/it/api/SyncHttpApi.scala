@@ -59,7 +59,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
   implicit class ApiErrorOps(error: ApiError) {
     def assertive(matchMessage: Boolean = false): AssertiveApiError = AssertiveApiError(error.id, error.message, error.code, matchMessage)
-    def assertiveRegex: AssertiveApiError = assertive(matchMessage = true)
+    def assertiveRegex: AssertiveApiError                           = assertive(matchMessage = true)
   }
 
   def assertBadRequestAndResponse[R](f: => R, errorRegex: String): Assertion = Try(f) match {
@@ -397,18 +397,20 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
       maybeWaitForTransaction(sync(async(n).broadcastRequest(tx.json())), wait = waitForTx)
     }
 
-    def broadcastExchange(matcher: KeyPair,
-                          order1: Order,
-                          order2: Order,
-                          amount: TxExchangeAmount,
-                          price: TxExchangePrice,
-                          buyMatcherFee: Long,
-                          sellMatcherFee: Long,
-                          fee: Long,
-                          version: Byte = 2,
-                          waitForTx: Boolean = false,
-                          amountsAsStrings: Boolean = false,
-                          validate: Boolean = true): Transaction = {
+    def broadcastExchange(
+        matcher: KeyPair,
+        order1: Order,
+        order2: Order,
+        amount: TxExchangeAmount,
+        price: TxExchangePrice,
+        buyMatcherFee: Long,
+        sellMatcherFee: Long,
+        fee: Long,
+        version: Byte = 2,
+        waitForTx: Boolean = false,
+        amountsAsStrings: Boolean = false,
+        validate: Boolean = true
+    ): Transaction = {
       maybeWaitForTransaction(
         sync(
           async(n).broadcastExchange(
