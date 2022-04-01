@@ -1,10 +1,11 @@
 package com.wavesplatform.transaction
 
+import com.google.common.collect.Interners
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import net.ceedubs.ficus.readers.ValueReader
-import play.api.libs.json._
+import play.api.libs.json.*
 
 import scala.util.Success
 
@@ -12,7 +13,14 @@ sealed trait Asset
 object Asset {
   final case class IssuedAsset(id: ByteStr) extends Asset {
     override def toString: String = id.toString
+    override def hashCode(): Int = id.hashCode()
   }
+
+  object IssuedAsset {
+    private val interner = Interners.newWeakInterner[IssuedAsset]()
+    def apply(id: ByteStr): IssuedAsset = interner.intern(new IssuedAsset(id))
+  }
+
   case object Waves extends Asset
 
   implicit val assetReads: Reads[IssuedAsset] = Reads {
@@ -53,7 +61,7 @@ object Asset {
   }
 
   def fromCompatId(maybeBStr: Option[ByteStr]): Asset = {
-    maybeBStr.fold[Asset](Waves)(IssuedAsset)
+    maybeBStr.fold[Asset](Waves)(IssuedAsset(_))
   }
 
   implicit class AssetIdOps(private val ai: Asset) extends AnyVal {

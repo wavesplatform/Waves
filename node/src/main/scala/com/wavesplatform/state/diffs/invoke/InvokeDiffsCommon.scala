@@ -205,7 +205,7 @@ object InvokeDiffsCommon {
       )
       _ <- TracedResult(checkOverflow(transferList.map(_.amount))).leftMap(FailedTransactionError.dAppExecution(_, storingComplexity))
 
-      actionAssets = transferList.flatMap(_.assetId).map(IssuedAsset) ++
+      actionAssets = transferList.flatMap(_.assetId).map(IssuedAsset(_)) ++
         reissueList.map(r => IssuedAsset(r.assetId)) ++
         burnList.map(b => IssuedAsset(b.assetId)) ++
         sponsorFeeList.map(sf => IssuedAsset(sf.assetId))
