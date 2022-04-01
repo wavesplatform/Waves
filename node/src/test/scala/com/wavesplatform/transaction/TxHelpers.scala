@@ -145,9 +145,11 @@ object TxHelpers {
                       name: String = "updated_name",
                       desc: String = "updated_desc",
                       sender: KeyPair = defaultSigner,
+                      fee: TxAmount = TestValues.fee,
+                      feeAsset: Asset = Waves,
                       version: TxVersion = TxVersion.V1,
                       chainId: Byte = AddressScheme.current.chainId): UpdateAssetInfoTransaction =
-    UpdateAssetInfoTransaction.selfSigned(version, sender, assetId, name, desc, timestamp, TestValues.fee, Waves, chainId).explicitGet()
+    UpdateAssetInfoTransaction.selfSigned(version, sender, assetId, name, desc, timestamp, fee, feeAsset, chainId).explicitGet()
 
   def orderV3(orderType: OrderType, asset: Asset, feeAsset: Asset): Order = {
     order(orderType, asset, Waves, feeAsset)
