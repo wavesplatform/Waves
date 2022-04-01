@@ -26,7 +26,7 @@ case class InvokeScriptTransaction(
     payments: Seq[Payment],
     fee: TxPositiveAmount,
     feeAssetId: Asset,
-    override val timestamp: TxTimestamp,
+    timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
 ) extends ProvenTransaction
