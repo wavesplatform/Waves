@@ -116,14 +116,14 @@ object ExchangeTransactionDiff {
       )
     }
 
-    val matcherPortfolioE =
+    lazy val matcherPortfolioE =
       Seq(
         getOrderFeePortfolio(tx.buyOrder, tx.buyMatcherFee),
         getOrderFeePortfolio(tx.sellOrder, tx.sellMatcherFee),
         Portfolio.waves(-tx.fee)
       ).foldM(Portfolio())(_.combine(_))
 
-    val feeDiffE =
+    lazy val feeDiffE =
       matcherPortfolioE.flatMap(
         matcherPortfolio =>
           Seq(

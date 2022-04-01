@@ -3,7 +3,6 @@ package com.wavesplatform.api.common
 import com.google.common.collect.AbstractIterator
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.Address
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.{AddressId, DBExt, DBResource, Keys}
 import com.wavesplatform.state.{Portfolio, safeSum}
 import monix.eval.Task
@@ -73,14 +72,10 @@ object BalanceDistribution {
           val adjustedBalanceE = safeSum(balance, pendingPortfolios.get(address).fold(0L)(balanceOf), "Next distribution balance")
           pendingPortfolios -= address
 
-          if (adjustedBalanceE.isRight) {
-            val adjustedBalance = adjustedBalanceE.explicitGet()
-            if (currentHeight <= height && adjustedBalance > 0)
-              Some(address -> adjustedBalance)
-            else
-              findNextBalance()
-          } else
-            findNextBalance()
+          adjustedBalanceE match {
+            case Right(adjustedBalance) if currentHeight <= height && adjustedBalance > 0 => Some(address -> adjustedBalance)
+            case _                                                                        => findNextBalance()
+          }
         }
       }
     }
