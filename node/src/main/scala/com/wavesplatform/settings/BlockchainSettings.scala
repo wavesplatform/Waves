@@ -121,7 +121,8 @@ object FunctionalitySettings {
     estimatorPreCheckHeight = 1847610,
     estimationOverflowFixHeight = 2858710,
     estimatorSumOverflowFixHeight = 2897510,
-    allowMultipleProofsInCreateAliasUntil = 3029980
+    allowMultipleProofsInCreateAliasUntil = 3029980,
+    enforceTransferValidationAfter = 2959447
   )
 
   val TESTNET: FunctionalitySettings = apply(
