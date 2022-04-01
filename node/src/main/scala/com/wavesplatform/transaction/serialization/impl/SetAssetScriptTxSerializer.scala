@@ -1,11 +1,10 @@
 package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
-
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.serialization.{ByteBufferOps, Deser}
-import com.wavesplatform.transaction.TxVersion
+import com.wavesplatform.transaction.{TxPositiveAmount, TxVersion}
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
 import play.api.libs.json.{JsObject, Json}
 
@@ -28,7 +27,7 @@ object SetAssetScriptTxSerializer {
           Array(builder.typeId, version, chainId),
           sender.arr,
           asset.id.arr,
-          Longs.toByteArray(fee),
+          Longs.toByteArray(fee.value),
           Longs.toByteArray(timestamp),
           Deser.serializeOptionOfArrayWithLength(script)(s => s.bytes().arr)
         )
@@ -51,7 +50,7 @@ object SetAssetScriptTxSerializer {
 
     val sender    = buf.getPublicKey
     val asset     = buf.getIssuedAsset
-    val fee       = buf.getLong
+    val fee       = TxPositiveAmount.unsafeFrom(buf.getLong)
     val timestamp = buf.getLong
     val script    = buf.getScript
     val proofs    = buf.getProofs

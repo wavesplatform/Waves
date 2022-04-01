@@ -66,7 +66,7 @@ object NodeConfigs {
     def preactivatedFeatures(f: (Int, Int)*): String = {
       s"""
          |waves.blockchain.custom.functionality.pre-activated-features {
-         ${f.map {case (id, height) => s"|  $id = $height"}.mkString("\n")}
+         ${f.map { case (id, height) => s"|  $id = $height" }.mkString("\n")}
          |}""".stripMargin
     }
     def minAssetInfoUpdateInterval(blocks: Int): String =

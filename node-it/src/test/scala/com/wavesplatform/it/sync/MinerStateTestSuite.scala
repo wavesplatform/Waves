@@ -15,7 +15,7 @@ class MinerStateTestSuite extends BaseFunSuite {
 
   private val transferAmount = 1000.waves
 
-  private def last  = nodes.last
+  private def last = nodes.last
 
   test("node w/o balance can forge blocks after effective balance increase") {
     val newKeyPair = last.createKeyPair()

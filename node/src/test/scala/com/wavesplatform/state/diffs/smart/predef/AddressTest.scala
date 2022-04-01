@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs.smart.predef
 
-import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Testing._
@@ -11,60 +11,52 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart.predef
 import com.wavesplatform.test.PropSpec
+import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.TxValidationError.InvalidAddress
-import org.scalacheck.Gen
 
 class AddressTest extends PropSpec {
   property("should calculate address from public key") {
-    forAll(accountGen) { acc =>
-      val script =
-        s"""
-           | let pk = base58'${acc.publicKey}'
-           | let address = addressFromPublicKey(pk)
-           | address.bytes
-        """.stripMargin
-      runScript(script) shouldBe evaluated(ByteStr(Address.fromPublicKey(acc.publicKey, chainId).bytes))
-    }
+    val acc = TxHelpers.signer(1)
+
+    val script =
+      s"""
+         | let pk = base58'${acc.publicKey}'
+         | let address = addressFromPublicKey(pk)
+         | address.bytes
+      """.stripMargin
+    runScript(script) shouldBe evaluated(ByteStr(Address.fromPublicKey(acc.publicKey, chainId).bytes))
   }
 
   property("should calculate address from bytes") {
-    AddressScheme.current = new AddressScheme { override  val chainId: Byte = predef.chainId }
+    val account = TxHelpers.signer(1)
 
-    forAll(for {
-      account <- accountGen
-      version <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all)
-    } yield (account, version)) {
-      case (account, version) =>
-        val extractFunction = if (version >= V4) "value" else "extract"
-        val address = Address.fromPublicKey(account.publicKey)
-        val script =
-          s"""
+    DirectiveDictionary[StdLibVersion].all.foreach { version =>
+      val extractFunction = if (version >= V4) "value" else "extract"
+      val address         = Address.fromPublicKey(account.publicKey, predef.chainId)
+      val script =
+        s"""
            | let addressString = "$address"
            | let maybeAddress = addressFromString(addressString)
            | let address = $extractFunction(maybeAddress)
            | address.bytes
         """.stripMargin
-        runScript(script, ctxV = version) shouldBe evaluated(ByteStr(Address.fromBytes(address.bytes).explicitGet().bytes))
+      runScript(script, ctxV = version, chainId = predef.chainId) shouldBe evaluated(ByteStr(address.bytes))
     }
   }
 
   property("should calculate address and return bytes without intermediate ref") {
-    AddressScheme.current = new AddressScheme { override  val chainId: Byte = predef.chainId }
+    val account = TxHelpers.signer(1)
 
-    forAll(for {
-      account <- accountGen
-      version <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all)
-    } yield (account, version)) {
-      case (account, version) =>
-        val extractFunction = if (version >= V4) "value" else "extract"
-        val address = Address.fromPublicKey(account.publicKey)
-        val script =
-          s"""
+    DirectiveDictionary[StdLibVersion].all.foreach { version =>
+      val extractFunction = if (version >= V4) "value" else "extract"
+      val address         = Address.fromPublicKey(account.publicKey, predef.chainId)
+      val script =
+        s"""
            | let addressString = "$address"
            | let maybeAddress = addressFromString(addressString)
            | $extractFunction(maybeAddress).bytes
         """.stripMargin
-        runScript(script, ctxV = version) shouldBe evaluated(ByteStr(Address.fromBytes(address.bytes).explicitGet().bytes))
+      runScript(script, ctxV = version, chainId = predef.chainId) shouldBe evaluated(ByteStr(address.bytes))
     }
   }
 
@@ -89,10 +81,8 @@ class AddressTest extends PropSpec {
   }
 
   property("RIDE addressFromString V4 success") {
-    AddressScheme.current = new AddressScheme { override  val chainId: Byte = 'T' }
-
     val base58 = """3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU"""
-    val result = runScript(s""" addressFromString("$base58") """, ctxV = V4)
+    val result = runScript(s""" addressFromString("$base58") """, ctxV = V4, chainId = 'T')
       .explicitGet()
       .asInstanceOf[CaseObj]
     result.caseType.name shouldBe "Address"

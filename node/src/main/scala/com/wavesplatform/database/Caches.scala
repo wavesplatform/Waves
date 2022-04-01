@@ -199,7 +199,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       (orderId, fillInfo) <- diff.orderFills
     } yield orderId -> volumeAndFeeCache.get(orderId).combine(fillInfo)
 
-    val transactionMeta = Seq.newBuilder[(TxMeta, Transaction)]
+    val transactionMeta     = Seq.newBuilder[(TxMeta, Transaction)]
     val addressTransactions = ArrayListMultimap.create[AddressId, TransactionId]()
     for (((id, nti), index) <- diff.transactions.zipWithIndex) {
       transactionIds.put(id, newHeight)

@@ -19,7 +19,7 @@ case class SetAssetScriptTransaction(
     sender: PublicKey,
     asset: IssuedAsset,
     script: Option[Script],
-    fee: TxAmount,
+    fee: TxPositiveAmount,
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
@@ -60,31 +60,36 @@ object SetAssetScriptTransaction extends TransactionParser {
       sender: PublicKey,
       assetId: IssuedAsset,
       script: Option[Script],
-      fee: TxAmount,
+      fee: Long,
       timestamp: TxTimestamp,
       proofs: Proofs,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, SetAssetScriptTransaction] =
-    SetAssetScriptTransaction(version, sender, assetId, script, fee, timestamp, proofs, chainId).validatedEither
+    for {
+      fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
+      tx  <- SetAssetScriptTransaction(version, sender, assetId, script, fee, timestamp, proofs, chainId).validatedEither
+    } yield tx
 
   def signed(
       version: TxVersion,
       sender: PublicKey,
       asset: IssuedAsset,
       script: Option[Script],
-      fee: TxAmount,
+      fee: Long,
       timestamp: TxTimestamp,
-      signer: PrivateKey
+      signer: PrivateKey,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, SetAssetScriptTransaction] =
-    create(version, sender, asset, script, fee, timestamp, Proofs.empty).map(_.signWith(signer))
+    create(version, sender, asset, script, fee, timestamp, Proofs.empty, chainId).map(_.signWith(signer))
 
   def selfSigned(
       version: TxVersion,
       sender: KeyPair,
       asset: IssuedAsset,
       script: Option[Script],
-      fee: TxAmount,
-      timestamp: TxTimestamp
+      fee: Long,
+      timestamp: TxTimestamp,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, SetAssetScriptTransaction] =
-    signed(version, sender.publicKey, asset, script, fee, timestamp, sender.privateKey)
+    signed(version, sender.publicKey, asset, script, fee, timestamp, sender.privateKey, chainId)
 }

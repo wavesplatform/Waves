@@ -80,7 +80,10 @@ object BlockDiffer extends ScorexLogging {
         blockchainWithNewBlock,
         constraint,
         maybePrevBlock.map(_.header.timestamp),
-        Diff.empty.copy(portfolios = Map(block.sender.toAddress -> (minerReward |+| initialFeeFromThisBlock |+| feeFromPreviousBlock))) |+| patchesDiff(blockchainWithNewBlock),
+        Diff.empty
+          .copy(portfolios = Map(block.sender.toAddress -> (minerReward |+| initialFeeFromThisBlock |+| feeFromPreviousBlock))) |+| patchesDiff(
+          blockchainWithNewBlock
+        ),
         stateHeight >= ngHeight,
         block.transactionData,
         verify

@@ -26,10 +26,6 @@ class PBOrdersSpecification extends FlatSpec {
     proofs = Nil
   )
 
-  "PB Order" should "validate chainId" in {
-    intercept[IllegalArgumentException](validate(protoOrder.copy(chainId = 1))).toString should include("Order from other network")
-  }
-
   it should "validate asset pair" in {
     val doubleAssetPair = PBAssetPair(PBAmounts.toPBAssetId(TestValues.asset), PBAmounts.toPBAssetId(TestValues.asset))
     validate(protoOrder.withAssetPair(doubleAssetPair)).toEither shouldBe Left("Invalid AssetPair")
@@ -45,9 +41,9 @@ class PBOrdersSpecification extends FlatSpec {
 
   it should "validate side" in {
     val protoSellOrder = protoOrder.copy(orderSide = PBOrder.Side.SELL)
-    val sellOrder      = PBOrders.vanilla(protoSellOrder)
+    val sellOrder      = PBOrders.vanilla(protoSellOrder).explicitGet()
     val protoBuyOrder  = protoOrder.copy(orderSide = PBOrder.Side.BUY)
-    val buyOrder       = PBOrders.vanilla(protoBuyOrder)
+    val buyOrder       = PBOrders.vanilla(protoBuyOrder).explicitGet()
 
     protoSellOrder.orderSide.isBuy shouldBe false
     protoSellOrder.orderSide.isSell shouldBe true
@@ -57,7 +53,7 @@ class PBOrdersSpecification extends FlatSpec {
     sellOrder.orderType shouldBe OrderType.SELL
     buyOrder.orderType shouldBe OrderType.BUY
 
-    an[IllegalArgumentException] shouldBe thrownBy(PBOrders.vanilla(protoOrder.copy(orderSide = PBOrder.Side.Unrecognized(123))))
+    PBOrders.vanilla(protoOrder.copy(orderSide = PBOrder.Side.Unrecognized(123))) should beLeft
   }
 
   it should "validate version" in {
@@ -78,7 +74,7 @@ class PBOrdersSpecification extends FlatSpec {
         protoOrder.copy(
           proofs = Seq(ByteString.copyFrom(Base58.decode("5f5irpd67tknEkHr9GejWSC7poZGfdaZabV84GjxifxqdtMKfcU8QnhZYBQR9F54GjfTcA8a91DSAb79CTtFoxnd")))
         )
-      )
+      ).explicitGet()
     Verifier.verifyAsEllipticCurveSignature(signed) shouldBe Symbol("right")
 
     val signedV4 = PBOrders
@@ -87,19 +83,19 @@ class PBOrdersSpecification extends FlatSpec {
           version = Order.V4,
           proofs = Seq(ByteString.copyFrom(Base58.decode("2kRQDV8TbSEVe9B2yy8XR8XijYrbxEXTvptxuCr42Vp6u1psZyEzaRj6eAb267zA2Tm5D8EGN8FTMQFGdQDcyNT8")))
         )
-      )
+      ).explicitGet()
 
     Verifier.verifyAsEllipticCurveSignature(signedV4) shouldBe Symbol("right")
   }
 
   it should "handle roundtrip" in {
-    val vanilla                = PBOrders.vanilla(protoOrder)
+    val vanilla                = PBOrders.vanilla(protoOrder).explicitGet()
     val reserializedProtoOrder = PBOrders.protobuf(vanilla)
     reserializedProtoOrder shouldBe protoOrder
   }
 
   private[this] def validate(protoOrder: PBOrder): Validation = {
-    val order = PBOrders.vanilla(protoOrder)
+    val order = PBOrders.vanilla(protoOrder).explicitGet()
     order.isValid(order.timestamp)
   }
 }

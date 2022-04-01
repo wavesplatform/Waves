@@ -9,33 +9,32 @@ import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{Constants, GenesisSettings, GenesisTransactionSettings}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.BlockGen
 import com.wavesplatform.test.FreeSpec
-import org.scalacheck.Gen
 import org.scalactic.source.Position
 
 import scala.concurrent.duration._
 
 class TransactionsByAddressSpec extends FreeSpec with BlockGen with WithDomain {
-  def transferGen(sender: KeyPair, rs: Gen[AddressOrAlias], maxAmount: Long): Gen[TransferTransaction] =
-    for {
-      recipient <- rs
-      t <- Gen.oneOf(
-        transferGeneratorPV2(ntpTime.getTimestamp(), sender, recipient, maxAmount),
-        transferGeneratorP(ntpTime.getTimestamp(), sender, recipient, maxAmount)
-      )
-    } yield t
+  def transfers(sender: KeyPair, rs: AddressOrAlias, amount: Long): Seq[TransferTransaction] =
+    Seq(
+      TxHelpers.transfer(sender, rs, amount),
+      TxHelpers.transfer(sender, rs, amount, version = TxVersion.V1)
+    )
 
   def mkBlock(sender: KeyPair, reference: ByteStr, transactions: Seq[Transaction]): Block =
     Block
       .buildAndSign(3.toByte, ntpNow, reference, 1000, ByteStr(new Array[Byte](32)), transactions, sender, Seq.empty, -1L)
       .explicitGet()
 
-  val gen = for {
-    sender <- accountGen
-    genesisTimestamp = ntpNow
-    genesisBlock = Block
+  val setup: Seq[(KeyPair, KeyPair, KeyPair, Seq[Block])] = {
+    val sender     = TxHelpers.signer(1)
+    val recipient1 = TxHelpers.signer(2)
+    val recipient2 = TxHelpers.signer(3)
+
+    val genesisTimestamp = ntpNow
+    val genesisBlock = Block
       .genesis(
         GenesisSettings(
           genesisTimestamp,
@@ -48,20 +47,21 @@ class TransactionsByAddressSpec extends FreeSpec with BlockGen with WithDomain {
         )
       )
       .explicitGet()
-    recipient1    <- accountGen
-    recipient2    <- accountGen
-    txCount1      <- Gen.choose(10, 50)
-    transactions1 <- Gen.listOfN(txCount1, transferGen(sender, Gen.oneOf(recipient1, recipient2).map(_.toAddress), Constants.TotalWaves / 2 / txCount1))
-    block1 = mkBlock(sender, genesisBlock.id(), transactions1)
-    txCount2      <- Gen.choose(10, 50)
-    transactions2 <- Gen.listOfN(txCount2, transferGen(sender, Gen.oneOf(recipient1, recipient2).map(_.toAddress), Constants.TotalWaves / 2 / txCount2))
-    block2 = mkBlock(sender, block1.id(), transactions2)
-  } yield {
-    (sender, recipient1, recipient2, Seq(genesisBlock, block1, block2))
+    val txCount1 = 20
+    val txCount2 = 30
+
+    Seq(recipient1, recipient2).map { recipient =>
+      val transactions1 = (1 to txCount1 / 2).flatMap(_ => transfers(sender, recipient.toAddress, Constants.TotalWaves / 2 / txCount1))
+      val block1        = mkBlock(sender, genesisBlock.id(), transactions1)
+      val transactions2 = (1 to txCount2 / 2).flatMap(_ => transfers(sender, recipient.toAddress, Constants.TotalWaves / 2 / txCount2))
+      val block2        = mkBlock(sender, block1.id(), transactions2)
+
+      (sender, recipient1, recipient2, Seq(genesisBlock, block1, block2))
+    }
   }
 
   private def test(f: (Address, Seq[Block], Domain) => Unit)(implicit pos: Position): Unit = {
-    forAll(gen) {
+    setup.foreach {
       case (sender, r1, r2, blocks) =>
         withDomain() { d =>
           for (b <- blocks) {
@@ -95,7 +95,7 @@ class TransactionsByAddressSpec extends FreeSpec with BlockGen with WithDomain {
       "with `after`" in test { (sender, blocks, d) =>
         val senderTransactions                                  = collectTransactions(sender, blocks)
         def transactionsAfter(id: ByteStr): Seq[(Int, ByteStr)] = senderTransactions.dropWhile { case (_, txId) => txId != id }.tail
-        forAll(Gen.oneOf(senderTransactions.map(_._2))) { id =>
+        senderTransactions.map(_._2).foreach { id =>
           transactionsAfter(id) shouldEqual d.addressTransactions(sender, Some(id)).map { case (h, tx) => h -> tx.id() }
         }
       }

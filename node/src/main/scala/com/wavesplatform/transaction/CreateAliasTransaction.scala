@@ -17,7 +17,7 @@ final case class CreateAliasTransaction(
     version: TxVersion,
     sender: PublicKey,
     aliasName: String,
-    fee: TxAmount,
+    fee: TxPositiveAmount,
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
@@ -61,23 +61,35 @@ object CreateAliasTransaction extends TransactionParser {
       version: TxVersion,
       sender: PublicKey,
       aliasName: String,
-      fee: TxAmount,
+      fee: Long,
       timestamp: TxTimestamp,
       proofs: Proofs,
       chainId: Byte = AddressScheme.current.chainId
-  ): Either[ValidationError, TransactionT] =
-    CreateAliasTransaction(version, sender, aliasName, fee, timestamp, proofs, chainId).validatedEither
+  ): Either[ValidationError, TransactionT] = {
+    for {
+      fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
+      tx  <- CreateAliasTransaction(version, sender, aliasName, fee, timestamp, proofs, chainId).validatedEither
+    } yield tx
+  }
 
   def signed(
       version: TxVersion,
       sender: PublicKey,
       alias: String,
-      fee: TxAmount,
+      fee: Long,
       timestamp: TxTimestamp,
-      signer: PrivateKey
+      signer: PrivateKey,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, TransactionT] =
-    create(version, sender, alias, fee, timestamp, Nil).map(_.signWith(signer))
+    create(version, sender, alias, fee, timestamp, Nil, chainId).map(_.signWith(signer))
 
-  def selfSigned(version: TxVersion, sender: KeyPair, aliasName: String, fee: TxAmount, timestamp: TxTimestamp): Either[ValidationError, TransactionT] =
-    signed(version, sender.publicKey, aliasName, fee, timestamp, sender.privateKey)
+  def selfSigned(
+      version: TxVersion,
+      sender: KeyPair,
+      aliasName: String,
+      fee: Long,
+      timestamp: TxTimestamp,
+      chainId: Byte = AddressScheme.current.chainId
+  ): Either[ValidationError, TransactionT] =
+    signed(version, sender.publicKey, aliasName, fee, timestamp, sender.privateKey, chainId)
 }

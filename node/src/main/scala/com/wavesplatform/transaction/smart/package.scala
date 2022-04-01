@@ -36,9 +36,13 @@ package object smart {
       scriptContainerAddress: Tthis
   ): AttachedPaymentTarget =
     (ds.scriptType, ds.contentType) match {
-      case (Account, DAppType)                 => DAppTarget
-      case (Account, Expression)               => InvokerScript
-      case (AssetType, Expression) => scriptContainerAddress.eliminate(_ => throw new Exception("Not a AssetId"), _.eliminate(a => AssetScript(ByteStr(a.id)), v => throw new Exception(s"Fail processing tthis value $v")))
-      case _                                      => ???
+      case (Account, DAppType)   => DAppTarget
+      case (Account, Expression) => InvokerScript
+      case (AssetType, Expression) =>
+        scriptContainerAddress.eliminate(
+          _ => throw new Exception("Not a AssetId"),
+          _.eliminate(a => AssetScript(ByteStr(a.id)), v => throw new Exception(s"Fail processing tthis value $v"))
+        )
+      case _ => ???
     }
 }

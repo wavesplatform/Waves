@@ -397,12 +397,13 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
 
     waitForTxs(init)
 
-    val quantity                                        = 1000000000L
-    val initScript: Either[Array[Byte], Option[Script]] = Right(ScriptCompiler.compile("true", ScriptEstimatorV3(fixOverflow = true)).toOption.map(_._1))
-    val amountAsset                                     = sender.broadcastIssue(seller, "Amount asset", quantity, 8, reissuable = true, issueFee, script = initScript)
-    val priceAsset                                      = sender.broadcastIssue(buyer, "Price asset", quantity, 8, reissuable = true, issueFee, script = initScript)
-    val sellMatcherFeeAsset                             = sender.broadcastIssue(matcher, "Seller fee asset", quantity, 8, reissuable = true, issueFee, script = initScript)
-    val buyMatcherFeeAsset                              = sender.broadcastIssue(matcher, "Buyer fee asset", quantity, 8, reissuable = true, issueFee, script = initScript)
+    val quantity = 1000000000L
+    val initScript: Either[Array[Byte], Option[Script]] =
+      Right(ScriptCompiler.compile("true", ScriptEstimatorV3(fixOverflow = true)).toOption.map(_._1))
+    val amountAsset         = sender.broadcastIssue(seller, "Amount asset", quantity, 8, reissuable = true, issueFee, script = initScript)
+    val priceAsset          = sender.broadcastIssue(buyer, "Price asset", quantity, 8, reissuable = true, issueFee, script = initScript)
+    val sellMatcherFeeAsset = sender.broadcastIssue(matcher, "Seller fee asset", quantity, 8, reissuable = true, issueFee, script = initScript)
+    val buyMatcherFeeAsset  = sender.broadcastIssue(matcher, "Buyer fee asset", quantity, 8, reissuable = true, issueFee, script = initScript)
 
     val preconditions = Seq(
       amountAsset,

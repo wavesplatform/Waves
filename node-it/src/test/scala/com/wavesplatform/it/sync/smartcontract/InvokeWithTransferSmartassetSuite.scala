@@ -34,7 +34,11 @@ class InvokeWithTransferSmartassetSuite extends BaseTransactionSuite with Cancel
         |}
                                                 """.stripMargin,
       estimator
-    ).explicitGet()._1.bytes().base64
+    )
+    .explicitGet()
+    ._1
+    .bytes()
+    .base64
 
   private val assetScript = ScriptCompiler
     .compile(
@@ -46,7 +50,11 @@ class InvokeWithTransferSmartassetSuite extends BaseTransactionSuite with Cancel
         |this.issuer.getInteger("x") == 1
                                         """.stripMargin,
       estimator
-    ).explicitGet()._1.bytes().base64
+    )
+    .explicitGet()
+    ._1
+    .bytes()
+    .base64
 
   var issuedAssetId = ""
 
@@ -64,7 +72,7 @@ class InvokeWithTransferSmartassetSuite extends BaseTransactionSuite with Cancel
 
   test("can make transfer") {
     val callerBalance = sender.assetBalance(callerAcc.toAddress.toString, issuedAssetId).balance
-    val dAppBalance = sender.assetBalance(dApp.toAddress.toString, issuedAssetId).balance
+    val dAppBalance   = sender.assetBalance(dApp.toAddress.toString, issuedAssetId).balance
 
     sender
       .invokeScript(

@@ -1,44 +1,65 @@
 package com.wavesplatform.state.diffs
 
 import cats._
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.account.Alias
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.utils.addressTransactions
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, GenesisTransaction, Transaction}
-import org.scalacheck.Gen
+import com.wavesplatform.transaction.lease.LeaseTransaction
+import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, GenesisTransaction, TxHelpers, TxVersion}
 
 class CreateAliasTransactionDiffTest extends PropSpec with WithState {
 
-  val fs =
+  val fs: FunctionalitySettings =
     TestFunctionalitySettings.Enabled.copy(
       preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0)
     )
 
   val preconditionsAndAliasCreations
-      : Gen[(GenesisTransaction, CreateAliasTransaction, CreateAliasTransaction, CreateAliasTransaction, CreateAliasTransaction)] = for {
-    master <- accountGen
-    ts     <- timestampGen
-    genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
-    alias                  <- aliasGen
-    alias2                 <- aliasGen suchThat (_.name != alias.name)
-    fee                    <- smallFeeGen
-    other: KeyPair         <- accountGen
-    aliasTx                <- createAliasGen(master, alias, fee, ts)
-    sameAliasTx            <- createAliasGen(master, alias, fee + 1, ts)
-    sameAliasOtherSenderTx <- createAliasGen(other, alias, fee + 2, ts)
-    anotherAliasTx         <- createAliasGen(master, alias2, fee + 3, ts)
-  } yield (genesis, aliasTx, sameAliasTx, sameAliasOtherSenderTx, anotherAliasTx)
+      : Seq[(GenesisTransaction, CreateAliasTransaction, CreateAliasTransaction, CreateAliasTransaction, CreateAliasTransaction)] = {
+    val master = TxHelpers.signer(1)
+    val other  = TxHelpers.signer(2)
+
+    val fee = 400000
+
+    val genesis = TxHelpers.genesis(master.toAddress)
+    val alias   = Alias.create("alias").explicitGet()
+    val alias2  = Alias.create("alias2").explicitGet()
+    val aliasTxs = Seq(
+      TxHelpers.createAlias(alias.name, master, fee = fee),
+      TxHelpers.createAlias(alias.name, master, fee = fee, version = TxVersion.V1)
+    )
+    val sameAliasTxs = Seq(
+      TxHelpers.createAlias(alias.name, master, fee = fee + 1),
+      TxHelpers.createAlias(alias.name, master, fee = fee + 1, version = TxVersion.V1)
+    )
+    val sameAliasOtherSenderTxs = Seq(
+      TxHelpers.createAlias(alias.name, other, fee = fee + 2),
+      TxHelpers.createAlias(alias.name, other, fee = fee + 2, version = TxVersion.V1)
+    )
+    val anotherAliasTxs = Seq(
+      TxHelpers.createAlias(alias2.name, master, fee = fee + 3),
+      TxHelpers.createAlias(alias2.name, master, fee = fee + 3, version = TxVersion.V1)
+    )
+
+    for {
+      aliasTx                <- aliasTxs
+      sameAliasTx            <- sameAliasTxs
+      sameAliasOtherSenderTx <- sameAliasOtherSenderTxs
+      anotherAliasTx         <- anotherAliasTxs
+    } yield (genesis, aliasTx, sameAliasTx, sameAliasOtherSenderTx, anotherAliasTx)
+  }
 
   property("can create and resolve aliases preserving waves invariant") {
-    forAll(preconditionsAndAliasCreations) {
+    preconditionsAndAliasCreations.foreach {
       case (gen, aliasTx, _, _, anotherAliasTx) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(gen, aliasTx))), TestBlock.create(Seq(anotherAliasTx)), fs) {
           case (blockDiff, newState) =>
@@ -62,7 +83,7 @@ class CreateAliasTransactionDiffTest extends PropSpec with WithState {
   }
 
   property("cannot recreate existing alias") {
-    forAll(preconditionsAndAliasCreations) {
+    preconditionsAndAliasCreations.foreach {
       case (gen, aliasTx, sameAliasTx, sameAliasOtherSenderTx, _) =>
         assertDiffEi(Seq(TestBlock.create(Seq(gen, aliasTx))), TestBlock.create(Seq(sameAliasTx)), fs) { blockDiffEi =>
           blockDiffEi should produce("AlreadyInTheState")
@@ -74,39 +95,44 @@ class CreateAliasTransactionDiffTest extends PropSpec with WithState {
     }
   }
 
-  val preconditionsTransferLease = for {
-    master           <- accountGen
-    aliasedRecipient <- otherAccountGen(candidate = master)
-    ts               <- positiveIntGen
-    gen: GenesisTransaction  = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
-    gen2: GenesisTransaction = GenesisTransaction.create(aliasedRecipient.toAddress, ENOUGH_AMT + 1, ts).explicitGet()
-    issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
-    issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, master).map(_._1)
-    maybeAsset               <- Gen.option(issue1)
-    maybeAsset2              <- Gen.option(issue2)
-    maybeFeeAsset            <- Gen.oneOf(maybeAsset, maybeAsset2)
-    alias                    <- aliasGen
-    fee                      <- smallFeeGen
-    aliasTx = CreateAliasTransaction.selfSigned(Transaction.V2, aliasedRecipient, alias.name, fee, ts).explicitGet()
-    transfer <- transferGeneratorP(
-      master,
-      alias,
-      Asset.fromCompatId(maybeAsset.map(_.id())),
-      Asset.fromCompatId(maybeFeeAsset.map(_.id()))
-    )
-    lease <- leaseAndCancelGeneratorP(master, alias).map(_._1)
-  } yield (gen, gen2, issue1, issue2, aliasTx, transfer, lease)
+  val preconditionsTransferLease
+      : Seq[(Seq[GenesisTransaction], IssueTransaction, IssueTransaction, CreateAliasTransaction, TransferTransaction, LeaseTransaction)] = {
+    val master = TxHelpers.signer(1)
+
+    for {
+      aliasedRecipient <- Seq(master, TxHelpers.signer(2))
+      genesis = Seq(master, aliasedRecipient).map(acc => TxHelpers.genesis(acc.toAddress))
+      issue1  = TxHelpers.issue(master, ENOUGH_AMT, name = "asset1", version = TxVersion.V1)
+      issue2  = TxHelpers.issue(master, ENOUGH_AMT, name = "asset2", version = TxVersion.V1)
+      maybeAsset    <- Seq(None, Some(issue1))
+      maybeAsset2   <- Seq(None, Some(issue2))
+      maybeFeeAsset <- Seq(maybeAsset, maybeAsset2)
+      alias   = Alias.create("alias").explicitGet()
+      aliasTx = TxHelpers.createAlias(alias.name, aliasedRecipient)
+      transfer = TxHelpers.transfer(
+        master,
+        alias,
+        asset = Asset.fromCompatId(maybeAsset.map(_.id())),
+        feeAsset = Asset.fromCompatId(maybeFeeAsset.map(_.id())),
+        version = TxVersion.V1
+      )
+      lease <- Seq(
+        TxHelpers.lease(master, alias),
+        TxHelpers.lease(master, alias, version = TxVersion.V1)
+      )
+    } yield (genesis, issue1, issue2, aliasTx, transfer, lease)
+  }
 
   property("Can transfer to alias") {
-    forAll(preconditionsTransferLease) {
-      case (gen, gen2, issue1, issue2, aliasTx, transfer, _) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(gen, gen2, issue1, issue2, aliasTx))), TestBlock.create(Seq(transfer))) {
+    preconditionsTransferLease.foreach {
+      case (genesis, issue1, issue2, aliasTx, transfer, _) =>
+        assertDiffAndState(Seq(TestBlock.create(genesis :+ issue1 :+ issue2 :+ aliasTx)), TestBlock.create(Seq(transfer))) {
           case (blockDiff, _) =>
             if (transfer.sender.toAddress != aliasTx.sender.toAddress) {
               val recipientPortfolioDiff = blockDiff.portfolios(aliasTx.sender.toAddress)
               transfer.assetId match {
-                case aid @ IssuedAsset(_) => recipientPortfolioDiff shouldBe Portfolio(0, LeaseBalance.empty, Map(aid -> transfer.amount))
-                case Waves                => recipientPortfolioDiff shouldBe Portfolio(transfer.amount, LeaseBalance.empty, Map.empty)
+                case aid @ IssuedAsset(_) => recipientPortfolioDiff shouldBe Portfolio(0, LeaseBalance.empty, Map(aid -> transfer.amount.value))
+                case Waves                => recipientPortfolioDiff shouldBe Portfolio(transfer.amount.value, LeaseBalance.empty, Map.empty)
               }
             }
         }
@@ -114,12 +140,12 @@ class CreateAliasTransactionDiffTest extends PropSpec with WithState {
   }
 
   property("Can lease to alias except for self") {
-    forAll(preconditionsTransferLease) {
-      case (gen, gen2, issue1, issue2, aliasTx, _, lease) =>
-        assertDiffEi(Seq(TestBlock.create(Seq(gen, gen2, issue1, issue2, aliasTx))), TestBlock.create(Seq(lease))) { blockDiffEi =>
+    preconditionsTransferLease.foreach {
+      case (genesis, issue1, issue2, aliasTx, _, lease) =>
+        assertDiffEi(Seq(TestBlock.create(genesis :+ issue1 :+ issue2 :+ aliasTx)), TestBlock.create(Seq(lease))) { blockDiffEi =>
           if (lease.sender.toAddress != aliasTx.sender.toAddress) {
             val recipientPortfolioDiff = blockDiffEi.explicitGet().portfolios(aliasTx.sender.toAddress)
-            recipientPortfolioDiff shouldBe Portfolio(0, LeaseBalance(lease.amount, 0), Map.empty)
+            recipientPortfolioDiff shouldBe Portfolio(0, LeaseBalance(lease.amount.value, 0), Map.empty)
           } else {
             blockDiffEi should produce("Cannot lease to self")
           }

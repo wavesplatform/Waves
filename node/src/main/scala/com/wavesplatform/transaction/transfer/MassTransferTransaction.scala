@@ -23,7 +23,7 @@ case class MassTransferTransaction(
     sender: PublicKey,
     assetId: Asset,
     transfers: Seq[ParsedTransfer],
-    fee: TxAmount,
+    fee: TxPositiveAmount,
     timestamp: TxTimestamp,
     attachment: ByteStr,
     proofs: Proofs,
@@ -78,49 +78,58 @@ object MassTransferTransaction extends TransactionParser {
     implicit val jsonFormat = Json.format[Transfer]
   }
 
-  case class ParsedTransfer(address: AddressOrAlias, amount: Long)
+  case class ParsedTransfer(address: AddressOrAlias, amount: TxNonNegativeAmount)
 
   def create(
       version: TxVersion,
       sender: PublicKey,
       assetId: Asset,
       transfers: Seq[ParsedTransfer],
-      fee: TxAmount,
+      fee: Long,
       timestamp: TxTimestamp,
       attachment: ByteStr,
       proofs: Proofs,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, MassTransferTransaction] =
-    MassTransferTransaction(version, sender, assetId, transfers, fee, timestamp, attachment, proofs, chainId).validatedEither
+    for {
+      fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
+      tx  <- MassTransferTransaction(version, sender, assetId, transfers, fee, timestamp, attachment, proofs, chainId).validatedEither
+    } yield tx
 
   def signed(
       version: TxVersion,
       sender: PublicKey,
       assetId: Asset,
       transfers: Seq[ParsedTransfer],
-      fee: TxAmount,
+      fee: Long,
       timestamp: TxTimestamp,
       attachment: ByteStr,
-      signer: PrivateKey
+      signer: PrivateKey,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, MassTransferTransaction] =
-    create(version, sender, assetId, transfers, fee, timestamp, attachment, Proofs.empty).map(_.signWith(signer))
+    create(version, sender, assetId, transfers, fee, timestamp, attachment, Proofs.empty, chainId).map(_.signWith(signer))
 
   def selfSigned(
       version: TxVersion,
       sender: KeyPair,
       assetId: Asset,
       transfers: Seq[ParsedTransfer],
-      fee: TxAmount,
+      fee: Long,
       timestamp: TxTimestamp,
-      attachment: ByteStr
+      attachment: ByteStr,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, MassTransferTransaction] =
-    signed(version, sender.publicKey, assetId, transfers, fee, timestamp, attachment, sender.privateKey)
+    signed(version, sender.publicKey, assetId, transfers, fee, timestamp, attachment, sender.privateKey, chainId)
 
-  def parseTransfersList(transfers: List[Transfer]): Validation[List[ParsedTransfer]] = {
+  def parseTransfersList(transfers: List[Transfer]): Validation[List[ParsedTransfer]] =
     transfers.traverse {
       case Transfer(recipient, amount) =>
-        AddressOrAlias.fromString(recipient).map(ParsedTransfer(_, amount))
+        for {
+          addressOrAlias <- AddressOrAlias.fromString(recipient)
+          transferAmount <- TxNonNegativeAmount(amount)(NegativeAmount(amount, "asset"))
+        } yield {
+          ParsedTransfer(addressOrAlias, transferAmount)
+        }
     }
-  }
 
 }

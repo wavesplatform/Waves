@@ -8,7 +8,7 @@ import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.grpc._
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.{DBExt, openDB}
+import com.wavesplatform.database.DBExt
 import com.wavesplatform.events.Repo.keyForHeight
 import com.wavesplatform.events.api.grpc.protobuf.BlockchainUpdatesApiGrpc.BlockchainUpdatesApi
 import com.wavesplatform.events.api.grpc.protobuf._
@@ -23,19 +23,19 @@ import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import monix.reactive.subjects.PublishToOneSubject
+import org.iq80.leveldb.DB
 
 import scala.concurrent.Future
 import scala.util.Using
 import scala.util.control.Exception
 
-class Repo(dbDirectory: String, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
+class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
     extends BlockchainUpdatesApi
     with BlockchainUpdateTriggers
     with ScorexLogging {
   private[this] val monitor     = new Object
   private[this] var liquidState = Option.empty[LiquidState]
   private[this] var handlers    = Set.empty[Handler]
-  private[this] val db          = openDB(dbDirectory)
 
   def shutdown(): Unit = monitor.synchronized {
     db.close()
@@ -66,7 +66,7 @@ class Repo(dbDirectory: String, blocksApi: CommonBlocksApi)(implicit s: Schedule
     )
 
     liquidState.foreach(
-      ls => db.put(keyForHeight(ls.keyBlock.height), ls.solidify().protobuf.update(_.append.update(_.block.modify(_.copy(block = None)))).toByteArray)
+      ls => db.put(keyForHeight(ls.keyBlock.height), ls.solidify().protobuf.update(_.append.block.optionalBlock := None).toByteArray)
     )
 
     val ba = BlockAppended.from(block, diff, blockchainBeforeWithMinerReward)
@@ -235,7 +235,7 @@ class Repo(dbDirectory: String, blocksApi: CommonBlocksApi)(implicit s: Schedule
       (new Loader(
         db,
         blocksApi,
-        liquidState.map(ls => ls.keyBlock.height -> ls.keyBlock.id),
+        liquidState.map(ls => (ls.keyBlock.height - 1) -> ls.keyBlock.block.header.reference),
         streamId
       ).loadUpdates(fromHeight) ++
         subject.map(_.protobuf))

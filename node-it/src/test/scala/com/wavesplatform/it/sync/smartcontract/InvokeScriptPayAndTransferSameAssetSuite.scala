@@ -20,8 +20,8 @@ class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with
   private def caller   = secondKeyPair
   private def receiver = thirdKeyPair
 
-  private lazy val dAppAddress: String = dApp.toAddress.toString
-  private lazy val callerAddress: String = caller.toAddress.toString
+  private lazy val dAppAddress: String     = dApp.toAddress.toString
+  private lazy val callerAddress: String   = caller.toAddress.toString
   private lazy val receiverAddress: String = receiver.toAddress.toString
 
   var dAppInitBalance: Long     = 0
@@ -43,12 +43,13 @@ class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with
     rejAssetId = sender.issue(caller, "Reject", "r", assetQuantity, 0, script = smartScript, waitForTx = true).id
   }
 
-
   test("_set script to dApp account and transfer out all waves") {
     val dAppBalance = sender.accountBalances(dAppAddress)._1
     sender.transfer(dApp, callerAddress, dAppBalance - smartMinFee - setScriptFee, smartMinFee, waitForTx = true).id
 
-    val dAppScript        = ScriptCompiler.compile(s"""
+    val dAppScript = ScriptCompiler
+      .compile(
+        s"""
           |{-# STDLIB_VERSION 3 #-}
           |{-# CONTENT_TYPE DAPP #-}
           |
@@ -61,7 +62,11 @@ class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with
           |    TransferSet([ScriptTransfer(receiver, 1, pay.assetId)])
           |  else throw("need payment in WAVES or any Asset")
           |}
-        """.stripMargin, estimator).explicitGet()._1
+        """.stripMargin,
+        estimator
+      )
+      .explicitGet()
+      ._1
     sender.setScript(dApp, Some(dAppScript.bytes().base64), waitForTx = true).id
 
   }
@@ -111,7 +116,8 @@ class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with
     val paymentAmount = 10
     val fee           = smartMinFee + smartFee * 2
 
-    assertApiError(invoke("resendPayment", paymentAmount, issued(rejAssetId), fee),
+    assertApiError(
+      invoke("resendPayment", paymentAmount, issued(rejAssetId), fee),
       AssertiveApiError(TransactionNotAllowedByAssetScript.Id, "Transaction is not allowed by token-script")
     )
   }
@@ -123,7 +129,7 @@ class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with
 
     dAppInitBalance shouldBe 0
 
-    val paymentAmount    = 10
+    val paymentAmount = 10
     invoke("resendPayment", paymentAmount)
 
     sender.accountBalances(dAppAddress)._1 shouldBe dAppInitBalance + paymentAmount - 1
@@ -143,7 +149,8 @@ class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with
         fee = fee,
         waitForTx = true
       )
-      ._1.id
+      ._1
+      .id
   }
 
 }

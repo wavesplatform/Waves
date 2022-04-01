@@ -2,112 +2,76 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
-import com.google.protobuf.ByteString
-import com.wavesplatform.account.Address
-import com.wavesplatform.api.common.CommonAssetsApi.AssetInfo
-import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.api.http.requests.{TransferV1Request, TransferV2Request}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
-import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain, Height, TxMeta}
+import com.wavesplatform.db.WithDomain
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.Domain
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
+import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Height}
 import com.wavesplatform.test._
-import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{RequestGen, TestTime, TestValues}
-import monix.reactive.Observable
-import org.scalacheck.Gen
-import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.concurrent.Eventually
-import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxNonNegativeAmount}
+import com.wavesplatform.{TestTime, TestWallet}
+import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 
-class AssetsRouteSpec
-    extends RouteSpec("/assets")
-    with RequestGen
-    with PathMockFactory
-    with Eventually
-    with RestAPISettingsHelper
-    with PropertyChecks {
-
-  private val wallet     = stub[Wallet]
-  private val blockchain = stub[Blockchain]
-
-  private val seed               = "seed".getBytes("UTF-8")
-  private val senderPrivateKey   = Wallet.generateNewAccount(seed, 0)
-  private val receiverPrivateKey = Wallet.generateNewAccount(seed, 1)
-
-  (wallet.privateKeyAccount _).when(senderPrivateKey.toAddress).onCall((_: Address) => Right(senderPrivateKey)).anyNumberOfTimes()
-
-  private val assetsApi: CommonAssetsApi     = stub[CommonAssetsApi]
-  private val accountsApi: CommonAccountsApi = stub[CommonAccountsApi]
+class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPISettingsHelper with TestWallet {
 
   private val MaxDistributionDepth = 1
-  private val route: Route = AssetsApiRoute(
-    restAPISettings,
-    wallet,
-    DummyTransactionPublisher.accepting,
-    blockchain,
-    new TestTime(),
-    accountsApi,
-    assetsApi,
-    MaxDistributionDepth
-  ).route
+
+  def routeTest[A](f: (Domain, Route) => A): A = withDomain(DomainPresets.RideV4.addFeatures(BlockchainFeatures.ReduceNFTFee)) { d =>
+    f(
+      d,
+      seal(
+        AssetsApiRoute(
+          restAPISettings,
+          testWallet,
+          DummyTransactionPublisher.accepting,
+          d.blockchain,
+          new TestTime(),
+          d.accountsApi,
+          d.assetsApi,
+          MaxDistributionDepth
+        ).route
+      )
+    )
+  }
 
   "/balance/{address}" - {
-    "multiple ids" in {
-      (blockchain.balance _).when(TxHelpers.defaultAddress, *).returning(100)
-      (accountsApi.portfolio _).when(TxHelpers.defaultAddress).returning(Observable(IssuedAsset(ByteStr.decodeBase58("xxx").get) -> 999L))
-      (assetsApi.fullInfo _).when(*).returning {
-        val desc = AssetDescription(
-          ByteStr.empty,
-          TxHelpers.defaultSigner.publicKey,
-          ByteString.EMPTY,
-          ByteString.EMPTY,
-          0,
-          false,
-          BigInt(123),
-          Height(123),
-          None,
-          0L,
-          nft = false
-        )
-        Some(AssetInfo(desc, None, None))
-      }
+    "multiple ids" in routeTest { (d, route) =>
+      val issuer = testWallet.generateNewAccount().get
 
-      route.anyParamTest(routePath(s"/balance/${TxHelpers.defaultAddress}"), "id")("aaa", "bbb") {
+      d.appendBlock(TxHelpers.genesis(issuer.toAddress, 100.waves))
+      val issueTransactions = Seq.tabulate(4) { i =>
+        TxHelpers.issue(issuer, 1000 * (i + 1), 2, name = s"ISSUE_$i")
+      } :+ TxHelpers.issue(issuer, 1, reissuable = false)
+      d.appendBlock(issueTransactions: _*)
+
+      route.anyParamTest(routePath(s"/balance/${issuer.toAddress}"), "id")(issueTransactions.reverseIterator.map(_.id().toString).toSeq: _*) {
         status shouldBe StatusCodes.OK
-        responseAs[JsValue] should matchJson("""
-            |{
-            |  "address" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-            |  "balances" : [ {
-            |    "assetId" : "aaa",
-            |    "reissuable" : false,
-            |    "minSponsoredAssetFee" : null,
-            |    "sponsorBalance" : null,
-            |    "quantity" : 123,
-            |    "issueTransaction" : null,
-            |    "balance" : 100
-            |  }, {
-            |    "assetId" : "bbb",
-            |    "reissuable" : false,
-            |    "minSponsoredAssetFee" : null,
-            |    "sponsorBalance" : null,
-            |    "quantity" : 123,
-            |    "issueTransaction" : null,
-            |    "balance" : 100
-            |  } ]
-            |}
-            |""".stripMargin)
+        (responseAs[JsObject] \ "balances")
+          .as[Seq[JsObject]]
+          .zip(issueTransactions.reverse)
+          .foreach {
+            case (jso, tx) =>
+              (jso \ "balance").as[Long] shouldEqual tx.quantity.value
+              (jso \ "assetId").as[ByteStr] shouldEqual tx.id()
+              (jso \ "reissuable").as[Boolean] shouldBe tx.reissuable
+              (jso \ "minSponsoredAssetFee").asOpt[Long] shouldEqual None
+              (jso \ "sponsorBalance").asOpt[Long] shouldEqual None
+              (jso \ "quantity").as[Long] shouldEqual tx.quantity.value
+              (jso \ "issueTransaction").as[JsObject] shouldEqual tx.json()
+          }
+
       }
 
-      route.anyParamTest(routePath(s"/balance/${TxHelpers.defaultAddress}"), "id")("____", "----") {
+      route.anyParamTest(routePath(s"/balance/${issuer.toAddress}"), "id")("____", "----") {
         status shouldBe StatusCodes.BadRequest
         responseAs[JsValue] should matchJson("""{
                                                |    "error": 116,
@@ -119,7 +83,7 @@ class AssetsRouteSpec
                                                |}""".stripMargin)
       }
 
-      withClue("over limit")(route.anyParamTest(routePath(s"/balance/${TxHelpers.defaultAddress}"), "id")(Seq.fill(101)("aaa"): _*) {
+      withClue("over limit")(route.anyParamTest(routePath(s"/balance/${issuer.toAddress}"), "id")(Seq.fill(101)("aaa"): _*) {
         status shouldBe StatusCodes.BadRequest
         responseAs[JsValue] should matchJson("""{
                                                |  "error" : 10,
@@ -127,183 +91,208 @@ class AssetsRouteSpec
                                                |}""".stripMargin)
       })
 
-      withClue("old GET portfolio")(Get(routePath(s"/balance/${TxHelpers.defaultAddress}")) ~> route ~> check { // portfolio
+      withClue("old GET portfolio does not include NFT")(Get(routePath(s"/balance/${issuer.toAddress}")) ~> route ~> check { // portfolio
         status shouldBe StatusCodes.OK
-        responseAs[JsValue] should matchJson("""{
-                                               |  "address" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                               |  "balances" : [ {
-                                               |    "assetId" : "xxx",
-                                               |    "balance" : 999,
-                                               |    "reissuable" : false,
-                                               |    "minSponsoredAssetFee" : null,
-                                               |    "sponsorBalance" : null,
-                                               |    "quantity" : 123,
-                                               |    "issueTransaction" : null
-                                               |  } ]
-                                               |}""".stripMargin)
+        val allBalances = (responseAs[JsValue] \ "balances")
+          .as[Seq[JsObject]]
+          .map { jso =>
+            (jso \ "assetId").as[ByteStr] -> (jso \ "balance").as[Long]
+          }
+          .toMap
+
+        val balancesAfterIssue = issueTransactions.init.map { it =>
+          it.id() -> it.quantity.value
+        }.toMap
+
+        allBalances shouldEqual balancesAfterIssue
       })
     }
   }
 
   "/transfer" - {
-    def posting[A: Writes](v: A): RouteTestResult = Post(routePath("/transfer"), v).addHeader(ApiKeyHeader) ~> route
+    def posting[A: Writes](route: Route, v: A): RouteTestResult = Post(routePath("/transfer"), v).addHeader(ApiKeyHeader) ~> route
 
-    "accepts TransferRequest" in {
+    "accepts TransferRequest" in routeTest { (_, route) =>
+      val sender    = testWallet.generateNewAccount().get
+      val recipient = testWallet.generateNewAccount().get
       val req = TransferV1Request(
         assetId = None,
         feeAssetId = None,
         amount = 1.waves,
         fee = 0.3.waves,
-        sender = senderPrivateKey.toAddress.toString,
+        sender = sender.toAddress.toString,
         attachment = Some("attachment"),
-        recipient = receiverPrivateKey.toAddress.toString,
+        recipient = recipient.toAddress.toString,
         timestamp = Some(System.currentTimeMillis())
       )
 
-      posting(req) ~> check {
+      posting(route, req) ~> check {
         status shouldBe StatusCodes.OK
 
         responseAs[TransferTransaction]
       }
     }
 
-    "accepts VersionedTransferRequest" in {
+    "accepts VersionedTransferRequest" in routeTest { (_, route) =>
+      val sender    = testWallet.generateNewAccount().get
+      val recipient = testWallet.generateNewAccount().get
       val req = TransferV2Request(
         assetId = None,
         amount = 1.waves,
         feeAssetId = None,
         fee = 0.3.waves,
-        sender = senderPrivateKey.toAddress.toString,
+        sender = sender.toAddress.toString,
         attachment = None,
-        recipient = receiverPrivateKey.toAddress.toString,
+        recipient = recipient.toAddress.toString,
         timestamp = Some(System.currentTimeMillis())
       )
 
-      posting(req) ~> check {
+      posting(route, req) ~> check {
         status shouldBe StatusCodes.OK
         responseAs[TransferV2Request]
       }
     }
 
-    "returns a error if it is not a transfer request" in {
-      val req = issueReq.sample.get
-      posting(req) ~> check {
-        status shouldNot be(StatusCodes.OK)
+    "returns a error if it is not a transfer request" in routeTest { (_, route) =>
+      posting(route, Json.obj("key" -> "value")) ~> check {
+        status shouldBe StatusCodes.BadRequest
       }
     }
   }
 
-  private val smartIssueAndDetailsGen = for {
-    script       <- scriptGen
-    smartAssetTx <- issueV2TransactionGen(_scriptGen = Gen.const(Some(script)))
-  } yield (
-    smartAssetTx,
-    AssetDescription(
-      originTransactionId = smartAssetTx.id(),
-      issuer = smartAssetTx.sender,
-      name = smartAssetTx.name,
-      description = smartAssetTx.description,
-      decimals = smartAssetTx.decimals,
-      reissuable = smartAssetTx.reissuable,
-      totalVolume = smartAssetTx.quantity,
-      lastUpdatedAt = Height @@ 0,
-      script = Some(AssetScriptInfo(script, Script.estimate(script, ScriptEstimatorV1, useContractVerifierLimit = false).explicitGet())),
-      sponsorship = 0,
-      nft = smartAssetTx.decimals == 0 && smartAssetTx.quantity == 1 && !smartAssetTx.reissuable
-    )
-  )
-
-  routePath(s"/details/{id} - smart asset") in forAll(smartIssueAndDetailsGen) {
-    case (smartAssetTx, smartAssetDesc) =>
-      (blockchain.transactionInfo _).when(smartAssetTx.id()).onCall((_: ByteStr) => Some(TxMeta(Height(1), true, 0L) -> smartAssetTx))
-      (blockchain.assetDescription _).when(IssuedAsset(smartAssetTx.id())).onCall((_: IssuedAsset) => Some(smartAssetDesc))
-
-      Get(routePath(s"/details/${smartAssetTx.id().toString}")) ~> route ~> check {
-        val response = responseAs[JsObject]
-        checkResponse(smartAssetTx, smartAssetDesc, response)
-      }
-      Get(routePath(s"/details?id=${smartAssetTx.id().toString}")) ~> route ~> check {
-        val responses = responseAs[List[JsObject]]
-        responses.foreach(response => checkResponse(smartAssetTx, smartAssetDesc, response))
-      }
-      Post(routePath("/details"), Json.obj("ids" -> List(s"${smartAssetTx.id().toString}"))) ~> route ~> check {
-        val responses = responseAs[List[JsObject]]
-        responses.foreach(response => checkResponse(smartAssetTx, smartAssetDesc, response))
-      }
-  }
-
-  routePath("/{assetId}/distribution/{height}/limit/{limit}") in {
-    (() => blockchain.height).when().returning(3)
-    (assetsApi.assetDistribution _).when(TestValues.asset, *, *).returning(Observable(TestValues.address -> 10L))
-
-    Get(routePath(s"/${TestValues.asset.id}/distribution/2/limit/$MaxAddressesPerRequest")) ~> route ~> check {
-      val response = responseAs[JsObject]
-      response shouldBe Json.obj(
-        "hasNext"  -> false,
-        "lastItem" -> TestValues.address.stringRepr,
-        "items" -> Json.obj(
-          TestValues.address.stringRepr -> 10L
+  routePath("/{assetId}/distribution/{height}/limit/{limit}") in routeTest { (d, route) =>
+    val issuer           = testWallet.generateNewAccount().get
+    val issueTransaction = TxHelpers.issue(issuer, 100_0000, 4, "PA_01")
+    d.appendBlock(TxHelpers.genesis(issuer.toAddress, 10.waves))
+    val recipients = testWallet.generateNewAccounts(5)
+    val transfers = recipients.zipWithIndex.map {
+      case (kp, i) => MassTransferTransaction.ParsedTransfer(kp.toAddress, TxNonNegativeAmount.unsafeFrom((i + 1) * 10000))
+    }
+    d.appendBlock(
+      issueTransaction,
+      MassTransferTransaction
+        .selfSigned(
+          2.toByte,
+          issuer,
+          issueTransaction.asset,
+          transfers,
+          0.01.waves,
+          ntpTime.getTimestamp(),
+          ByteStr.empty
         )
+        .explicitGet()
+    )
+
+    d.appendBlock()
+    Get(routePath(s"/${issueTransaction.id()}/distribution/2/limit/$MaxAddressesPerRequest")) ~> route ~> check {
+      val response = responseAs[JsObject]
+      (response \ "items").as[JsObject] shouldBe Json.obj(
+        transfers.map(pt => pt.address.toString -> (pt.amount.value: JsValueWrapper)) :+
+          (issuer.toAddress.toString -> (issueTransaction.quantity.value - transfers.map(_.amount.value).sum: JsValueWrapper)): _*
       )
     }
 
-    Get(routePath(s"/${TestValues.asset.id}/distribution/2/limit/${MaxAddressesPerRequest + 1}")) ~> route ~> check {
+    Get(routePath(s"/${issueTransaction.id()}/distribution/2/limit/${MaxAddressesPerRequest + 1}")) ~> route ~> check {
       responseAs[JsObject] shouldBe Json.obj("error" -> 199, "message" -> s"Limit should be less than or equal to $MaxAddressesPerRequest")
     }
 
-    Get(routePath(s"/${TestValues.asset.id}/distribution/1/limit/1")) ~> route ~> check {
+    Get(routePath(s"/${issueTransaction.id()}/distribution/1/limit/1")) ~> route ~> check {
       responseAs[JsObject] shouldBe Json.obj(
         "error"   -> 199,
-        "message" -> s"Unable to get distribution past height ${blockchain.height - MaxDistributionDepth}"
+        "message" -> s"Unable to get distribution past height ${d.blockchain.height - MaxDistributionDepth}"
       )
     }
   }
 
-  private val sillyIssueAndDetailsGen = for {
-    sillyAssetTx <- issueV2TransactionGen(_scriptGen = Gen.const(None))
-  } yield (
-    sillyAssetTx,
-    AssetDescription(
-      originTransactionId = sillyAssetTx.id(),
-      issuer = sillyAssetTx.sender,
-      name = sillyAssetTx.name,
-      description = sillyAssetTx.description,
-      decimals = sillyAssetTx.decimals,
-      reissuable = sillyAssetTx.reissuable,
-      totalVolume = sillyAssetTx.quantity,
-      lastUpdatedAt = Height @@ 0,
-      script = None,
-      sponsorship = 0,
-      nft = sillyAssetTx.decimals == 0 && sillyAssetTx.quantity == 1 && !sillyAssetTx.reissuable
-    )
+  private val nonNftTestData = Table(
+    ("version", "reissuable", "script"),
+    (1.toByte, false, None),
+    (1.toByte, true, None),
+    (2.toByte, false, None),
+    (2.toByte, true, None),
+    (2.toByte, false, Some(ExprScript(CONST_BOOLEAN(false)).explicitGet())),
+    (2.toByte, true, Some(ExprScript(CONST_BOOLEAN(false)).explicitGet())),
+    (3.toByte, false, None),
+    (3.toByte, true, None),
+    (3.toByte, false, Some(ExprScript(CONST_BOOLEAN(false)).explicitGet())),
+    (3.toByte, true, Some(ExprScript(CONST_BOOLEAN(false)).explicitGet()))
   )
 
-  routePath(s"/details/{id} - non-smart asset") in forAll(sillyIssueAndDetailsGen) {
-    case (sillyAssetTx, sillyAssetDesc) =>
-      (blockchain.transactionInfo _).when(sillyAssetTx.id()).onCall((_: ByteStr) => Some(TxMeta(Height(1), true, 0L) -> sillyAssetTx))
-      (blockchain.assetDescription _).when(IssuedAsset(sillyAssetTx.id())).onCall((_: IssuedAsset) => Some(sillyAssetDesc))
-      Get(routePath(s"/details/${sillyAssetTx.id().toString}")) ~> route ~> check {
-        val response = responseAs[JsObject]
-        checkResponse(sillyAssetTx, sillyAssetDesc, response)
+  routePath(s"/details/{id}") in routeTest { (d, route) =>
+    val sender = testWallet.generateNewAccount().get
+
+    d.appendBlock(GenesisTransaction.create(sender.toAddress, 100.waves, System.currentTimeMillis()).explicitGet())
+
+    forAll(nonNftTestData) {
+      case (version, reissuable, script) =>
+        val name        = s"IA_$version"
+        val description = s"v${version}_${if (reissuable) "" else "non-"}reissuable"
+        val issueTransaction =
+          TxHelpers.issue(sender, 500000, 4, name, reissuable = reissuable, description = description, version = version, script = script)
+
+        d.appendBlock(issueTransaction)
+
+        route.anyParamTest(routePath("/details"), "id")(issueTransaction.id().toString) {
+          status shouldBe StatusCodes.OK
+          checkResponse(
+            issueTransaction,
+            AssetDescription(
+              issueTransaction.id(),
+              sender.publicKey,
+              issueTransaction.name,
+              issueTransaction.description,
+              issueTransaction.decimals.value,
+              reissuable,
+              issueTransaction.quantity.value,
+              Height(d.blockchain.height),
+              script.map(s => AssetScriptInfo(s, 1L)),
+              0L,
+              nft = false
+            ),
+            responseAs[Seq[JsObject]].head
+          )
+        }
+    }
+  }
+
+  routePath("/nft/list") in routeTest { (d, route) =>
+    val issuer = testWallet.generateNewAccount().get
+    val nfts = Seq.tabulate(5) { i =>
+      TxHelpers.issue(issuer, 1, name = s"NFT_0$i", reissuable = false, fee = 0.001.waves)
+    }
+    d.appendBlock(TxHelpers.genesis(issuer.toAddress, 100.waves))
+    val nonNFT = TxHelpers.issue(issuer, 100, 2.toByte)
+    d.appendBlock((nfts :+ nonNFT): _*)
+
+    Get(routePath(s"/balance/${issuer.toAddress}/${nonNFT.id()}")) ~> route ~> check {
+      val balance = responseAs[JsObject]
+      (balance \ "address").as[String] shouldEqual issuer.toAddress.toString
+      (balance \ "balance").as[Long] shouldEqual nonNFT.quantity.value
+      (balance \ "assetId").as[String] shouldEqual nonNFT.id().toString
+    }
+
+    Get(routePath(s"/nft/${issuer.toAddress}/limit/6")) ~> route ~> check {
+      status shouldBe StatusCodes.OK
+      val nftList = responseAs[Seq[JsObject]]
+      nftList.size shouldEqual nfts.size
+      nftList.foreach { jso =>
+        val nftId = (jso \ "assetId").as[ByteStr]
+        val nft   = nfts.find(_.id() == nftId).get
+
+        nft.name.toStringUtf8 shouldEqual (jso \ "name").as[String]
+        nft.timestamp shouldEqual (jso \ "issueTimestamp").as[Long]
+        nft.id() shouldEqual (jso \ "originTransactionId").as[ByteStr]
       }
-      Get(routePath(s"/details?id=${sillyAssetTx.id().toString}")) ~> route ~> check {
-        val responses = responseAs[List[JsObject]]
-        responses.foreach(response => checkResponse(sillyAssetTx, sillyAssetDesc, response))
-      }
-      Post(routePath("/details"), Json.obj("ids" -> List(s"${sillyAssetTx.id().toString}"))) ~> route ~> check {
-        val responses = responseAs[List[JsObject]]
-        responses.foreach(response => checkResponse(sillyAssetTx, sillyAssetDesc, response))
-      }
+    }
   }
 
   private def checkResponse(tx: IssueTransaction, desc: AssetDescription, response: JsObject): Unit = {
     (response \ "assetId").as[String] shouldBe tx.id().toString
-    (response \ "issueHeight").as[Long] shouldBe 1
     (response \ "issueTimestamp").as[Long] shouldBe tx.timestamp
     (response \ "issuer").as[String] shouldBe tx.sender.toAddress.toString
     (response \ "name").as[String] shouldBe tx.name.toStringUtf8
     (response \ "description").as[String] shouldBe tx.description.toStringUtf8
-    (response \ "decimals").as[Int] shouldBe tx.decimals
+    (response \ "decimals").as[Int] shouldBe tx.decimals.value
     (response \ "reissuable").as[Boolean] shouldBe tx.reissuable
     (response \ "quantity").as[BigDecimal] shouldBe desc.totalVolume
     (response \ "minSponsoredAssetFee").asOpt[Long] shouldBe empty

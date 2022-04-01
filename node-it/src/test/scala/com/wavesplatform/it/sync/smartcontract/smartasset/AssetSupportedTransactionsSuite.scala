@@ -1,10 +1,11 @@
 package com.wavesplatform.it.sync.smartcontract.smartasset
 
-import com.wavesplatform.api.http.ApiError.CustomValidationError
+import scala.concurrent.duration._
+
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync.{someAssetAmount, _}
+import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state.IntegerDataEntry
@@ -12,8 +13,6 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.TransferTransaction
-
-import scala.concurrent.duration._
 
 class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
   private val estimator = ScriptEstimatorV2
@@ -175,14 +174,16 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     ).explicitGet()._1.bytes().base64
     sender.setAssetScript(blackAsset, firstKeyPair, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
-    val blackTx = TransferTransaction.selfSigned(
+    val blackTx = TransferTransaction
+      .selfSigned(
         2.toByte,
         secondKeyPair,
         thirdKeyPair.toAddress,
         IssuedAsset(ByteStr.decodeBase58(blackAsset).get),
         1,
         Waves,
-        smartMinFee, ByteStr.empty,
+        smartMinFee,
+        ByteStr.empty,
         System.currentTimeMillis + 1.minutes.toMillis
       )
       .explicitGet()
@@ -195,7 +196,8 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
         IssuedAsset(ByteStr.decodeBase58(blackAsset).get),
         1,
         Waves,
-        smartMinFee, ByteStr.empty,
+        smartMinFee,
+        ByteStr.empty,
         System.currentTimeMillis + 10.minutes.toMillis
       )
       .explicitGet()
@@ -411,12 +413,12 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
     assertApiError(
       sender.reissue(secondKeyPair, assetNonReissue, someAssetAmount, reissuable = true, fee = issueFee + smartFee),
-      CustomValidationError("Asset is not reissuable")
+      AssertiveApiError(112, "State check failed. Reason: Asset was issued by other address")
     )
 
     assertApiError(
       sender.reissue(firstKeyPair, assetNonReissue, someAssetAmount, reissuable = true, fee = issueFee + smartFee),
-      CustomValidationError("Asset is not reissuable")
+      AssertiveApiError(112, "State check failed. Reason: Asset is not reissuable")
     )
   }
 
@@ -441,7 +443,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     assertApiError(sender.burn(firstKeyPair, assetWOSupport, 10, smartMinFee), errNotAllowedByTokenApiError)
     assertApiError(
       sender.reissue(firstKeyPair, assetWOSupport, someAssetAmount, true, issueFee + smartFee),
-      CustomValidationError("Asset is not reissuable")
+      AssertiveApiError(112, "State check failed. Reason: Asset is not reissuable")
     )
 
     val transfers = List(Transfer(firstAddress, 10))

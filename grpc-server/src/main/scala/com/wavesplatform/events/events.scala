@@ -19,7 +19,7 @@ import com.wavesplatform.state.{AccountDataInfo, AssetDescription, AssetScriptIn
 import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxAmount}
+import com.wavesplatform.transaction.{Asset, GenesisTransaction}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -120,7 +120,7 @@ object StateUpdate {
   case class LeaseUpdate(
       leaseId: ByteStr,
       statusAfter: LeaseUpdate.LeaseStatus,
-      amount: TxAmount,
+      amount: Long,
       sender: PublicKey,
       recipient: Address,
       originTransactionId: ByteStr
@@ -526,7 +526,7 @@ object BlockAppended {
     // updatedWavesAmount can change as a result of either genesis transactions or miner rewards
     val updatedWavesAmount = blockchainBeforeWithMinerReward.height match {
       // genesis case
-      case 0 => block.transactionData.collect { case GenesisTransaction(_, amount, _, _, _) => amount }.sum
+      case 0 => block.transactionData.collect { case GenesisTransaction(_, amount, _, _, _) => amount.value }.sum
       // miner reward case
       case height => blockchainBeforeWithMinerReward.wavesAmount(height).toLong
     }
