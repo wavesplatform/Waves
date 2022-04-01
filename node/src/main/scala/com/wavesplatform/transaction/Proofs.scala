@@ -26,7 +26,7 @@ object Proofs {
 
   lazy val empty = new Proofs(Nil)
 
-  private[this] def validate(proofs: Seq[ByteStr]): Either[ValidationError, Unit] = {
+  def validate(proofs: Seq[ByteStr]): Either[ValidationError, Unit] = {
     for {
       _ <- Either.cond(proofs.lengthCompare(MaxProofs) <= 0, (), TooManyProofs(MaxProofs, proofs.length))
       biggestProofSize = if (proofs.nonEmpty) proofs.map(_.arr.length).max else 0
