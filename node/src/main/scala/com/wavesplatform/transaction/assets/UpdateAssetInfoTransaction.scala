@@ -15,16 +15,16 @@ import play.api.libs.json.{JsObject, Json}
 import scala.util.{Failure, Success, Try}
 
 case class UpdateAssetInfoTransaction(
-                                       version: TxVersion,
-                                       sender: PublicKey,
-                                       assetId: IssuedAsset,
-                                       name: String,
-                                       description: String,
-                                       timestamp: TxTimestamp,
-                                       feeAmount: TxPositiveAmount,
-                                       feeAsset: Asset,
-                                       proofs: Proofs,
-                                       chainId: Byte
+    version: TxVersion,
+    sender: PublicKey,
+    assetId: IssuedAsset,
+    name: String,
+    description: String,
+    timestamp: TxTimestamp,
+    feeAmount: TxPositiveAmount,
+    feeAsset: Asset,
+    proofs: Proofs,
+    chainId: Byte
 ) extends VersionedTransaction
     with FastHashId
     with ProvenTransaction
@@ -108,5 +108,6 @@ object UpdateAssetInfoTransaction extends TransactionParser {
       feeAsset: Asset,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, UpdateAssetInfoTransaction] =
-    create(version, sender.publicKey, assetId, name, description, timestamp, feeAmount, feeAsset, Proofs.empty, chainId).map(_.signWith(sender.privateKey))
+    create(version, sender.publicKey, assetId, name, description, timestamp, feeAmount, feeAsset, Proofs.empty, chainId)
+      .map(_.signWith(sender.privateKey))
 }

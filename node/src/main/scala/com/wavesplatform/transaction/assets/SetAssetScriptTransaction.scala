@@ -15,14 +15,14 @@ import play.api.libs.json.JsObject
 import scala.util.Try
 
 case class SetAssetScriptTransaction(
-                                      version: TxVersion,
-                                      sender: PublicKey,
-                                      asset: IssuedAsset,
-                                      script: Option[Script],
-                                      fee: TxPositiveAmount,
-                                      timestamp: TxTimestamp,
-                                      proofs: Proofs,
-                                      chainId: Byte
+    version: TxVersion,
+    sender: PublicKey,
+    asset: IssuedAsset,
+    script: Option[Script],
+    fee: TxPositiveAmount,
+    timestamp: TxTimestamp,
+    proofs: Proofs,
+    chainId: Byte
 ) extends VersionedTransaction
     with ProvenTransaction
     with TxWithFee.InWaves
@@ -67,7 +67,7 @@ object SetAssetScriptTransaction extends TransactionParser {
   ): Either[ValidationError, SetAssetScriptTransaction] =
     for {
       fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
-      tx <- SetAssetScriptTransaction(version, sender, assetId, script, fee, timestamp, proofs, chainId).validatedEither
+      tx  <- SetAssetScriptTransaction(version, sender, assetId, script, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
 
   def signed(

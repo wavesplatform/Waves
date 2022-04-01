@@ -296,8 +296,8 @@ object ApiError {
   }
 
   case class AssetDoesNotExist(assetId: IssuedAsset) extends ApiError {
-    val id: Int = 313
-    val message: String = s"Asset does not exist: $assetId"
+    val id: Int          = 313
+    val message: String  = s"Asset does not exist: $assetId"
     val code: StatusCode = StatusCodes.NotFound
   }
 
@@ -338,8 +338,8 @@ object ApiError {
   }
 
   final case class InvalidDecimals(msg: String) extends ApiError {
-    override val id: Int = InvalidDecimals.Id
-    override val message: String = s"invalid decimals value: $msg, ${TxDecimals.errMsg}"
+    override val id: Int          = InvalidDecimals.Id
+    override val message: String  = s"invalid decimals value: $msg, ${TxDecimals.errMsg}"
     override val code: StatusCode = StatusCodes.BadRequest
   }
 

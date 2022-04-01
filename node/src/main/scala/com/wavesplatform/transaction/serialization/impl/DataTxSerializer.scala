@@ -17,8 +17,7 @@ import scala.util.Try
 object DataTxSerializer {
   def toJson(tx: DataTransaction): JsObject = {
     import tx._
-    BaseTxJson.toJson(tx) ++ Json.obj("data" -> Json.toJson(data)
-    )
+    BaseTxJson.toJson(tx) ++ Json.obj("data" -> Json.toJson(data))
   }
 
   def bodyBytes(tx: DataTransaction): Array[Byte] = {
@@ -79,7 +78,7 @@ object DataTxSerializer {
       case t if t == Type.Boolean.id => BooleanDataEntry(key, buf.get != 0)
       case t if t == Type.Binary.id  => BinaryDataEntry(key, ByteStr(Deser.parseArrayWithLength(buf)))
       case t if t == Type.String.id  => StringDataEntry(key, new String(Deser.parseArrayWithLength(buf), UTF_8))
-      case other           => throw new IllegalArgumentException(s"Unknown type $other")
+      case other                     => throw new IllegalArgumentException(s"Unknown type $other")
     }
   }
 }

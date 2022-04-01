@@ -165,7 +165,9 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
     val issueTransaction = TxHelpers.issue(issuer, 100_0000, 4, "PA_01")
     d.appendBlock(TxHelpers.genesis(issuer.toAddress, 10.waves))
     val recipients = testWallet.generateNewAccounts(5)
-    val transfers  = recipients.zipWithIndex.map { case (kp, i) => MassTransferTransaction.ParsedTransfer(kp.toAddress, TxNonNegativeAmount.unsafeFrom((i + 1) * 10000)) }
+    val transfers = recipients.zipWithIndex.map {
+      case (kp, i) => MassTransferTransaction.ParsedTransfer(kp.toAddress, TxNonNegativeAmount.unsafeFrom((i + 1) * 10000))
+    }
     d.appendBlock(
       issueTransaction,
       MassTransferTransaction

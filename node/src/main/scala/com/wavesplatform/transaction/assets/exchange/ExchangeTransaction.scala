@@ -13,22 +13,24 @@ import play.api.libs.json.JsObject
 
 import scala.util.Try
 
-case class ExchangeTransaction(version: TxVersion,
-                               order1: Order,
-                               order2: Order,
-                               amount: TxExchangeAmount,
-                               price: TxExchangePrice,
-                               buyMatcherFee: Long,
-                               sellMatcherFee: Long,
-                               fee: TxPositiveAmount,
-                               timestamp: Long,
-                               proofs: Proofs,
-                               chainId: Byte) extends VersionedTransaction
-  with ProvenTransaction
-  with TxWithFee.InWaves
-  with FastHashId
-  with SigProofsSwitch
-  with LegacyPBSwitch.V3 {
+case class ExchangeTransaction(
+    version: TxVersion,
+    order1: Order,
+    order2: Order,
+    amount: TxExchangeAmount,
+    price: TxExchangePrice,
+    buyMatcherFee: Long,
+    sellMatcherFee: Long,
+    fee: TxPositiveAmount,
+    timestamp: Long,
+    proofs: Proofs,
+    chainId: Byte
+) extends VersionedTransaction
+    with ProvenTransaction
+    with TxWithFee.InWaves
+    with FastHashId
+    with SigProofsSwitch
+    with LegacyPBSwitch.V3 {
 
   val (buyOrder, sellOrder) = if (order1.orderType == OrderType.BUY) (order1, order2) else (order2, order1)
 
@@ -76,10 +78,10 @@ object ExchangeTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, ExchangeTransaction] =
     for {
-      fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
+      fee    <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
       amount <- TxExchangeAmount(amount)(GenericError(TxExchangeAmount.errMsg))
-      price <- TxExchangePrice(price)(GenericError(TxExchangePrice.errMsg))
-      tx <- ExchangeTransaction(version, order1, order2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs, chainId).validatedEither
+      price  <- TxExchangePrice(price)(GenericError(TxExchangePrice.errMsg))
+      tx     <- ExchangeTransaction(version, order1, order2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
 
   def signed(

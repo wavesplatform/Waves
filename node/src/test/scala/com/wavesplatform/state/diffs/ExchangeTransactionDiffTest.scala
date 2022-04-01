@@ -322,20 +322,21 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       } yield (genesis, issue1, issue2, exchange)
     }
 
-    preconditionsAndExchange.foreach { case (genesis, issue1, issue2, exchange) =>
-      assertDiffAndState(
-        Seq(TestBlock.create(genesis :+ issue1 :+ issue2)),
-        TestBlock.create(Seq(exchange), Block.ProtoBlockVersion),
-        fsWithOrderFeature
-      ) {
-        case (blockDiff, _) =>
-          val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
-          totalPortfolioDiff.balance shouldBe 0
-          totalPortfolioDiff.effectiveBalance shouldBe 0
-          totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
+    preconditionsAndExchange.foreach {
+      case (genesis, issue1, issue2, exchange) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(genesis :+ issue1 :+ issue2)),
+          TestBlock.create(Seq(exchange), Block.ProtoBlockVersion),
+          fsWithOrderFeature
+        ) {
+          case (blockDiff, _) =>
+            val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
+            totalPortfolioDiff.balance shouldBe 0
+            totalPortfolioDiff.effectiveBalance shouldBe 0
+            totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
-          blockDiff.portfolios(exchange.sender.toAddress).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee.value
-      }
+            blockDiff.portfolios(exchange.sender.toAddress).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee.value
+        }
     }
   }
 
@@ -396,30 +397,32 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       } yield (genesis, issue1, issue2, exchange)).distinct
     }
 
-    preconditionsAndExchange.foreach { case (genesis, issue1, issue2, exchange) =>
-      assertDiffAndState(
-        Seq(TestBlock.create(genesis :+ issue1 :+ issue2)),
-        TestBlock.create(Seq(exchange), Block.ProtoBlockVersion),
-        fsWithOrderFeature
-      ) { case (blockDiff, _) =>
-        val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
-        totalPortfolioDiff.balance shouldBe 0
-        totalPortfolioDiff.effectiveBalance shouldBe 0
-        totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
+    preconditionsAndExchange.foreach {
+      case (genesis, issue1, issue2, exchange) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(genesis :+ issue1 :+ issue2)),
+          TestBlock.create(Seq(exchange), Block.ProtoBlockVersion),
+          fsWithOrderFeature
+        ) {
+          case (blockDiff, _) =>
+            val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
+            totalPortfolioDiff.balance shouldBe 0
+            totalPortfolioDiff.effectiveBalance shouldBe 0
+            totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
-        val matcherPortfolio =
-          Monoid.combineAll(blockDiff.portfolios.view.filterKeys(_.stringRepr == exchange.sender.toAddress.stringRepr).values)
+            val matcherPortfolio =
+              Monoid.combineAll(blockDiff.portfolios.view.filterKeys(_.stringRepr == exchange.sender.toAddress.stringRepr).values)
 
-        val restoredMatcherPortfolio =
-          Monoid.combineAll(
-            Seq(
-              ExchangeTransactionDiff.getOrderFeePortfolio(exchange.buyOrder, exchange.buyMatcherFee),
-              ExchangeTransactionDiff.getOrderFeePortfolio(exchange.sellOrder, exchange.sellMatcherFee),
-              wavesPortfolio(-exchange.fee.value)
-            )
-          )
-        matcherPortfolio shouldBe restoredMatcherPortfolio
-      }
+            val restoredMatcherPortfolio =
+              Monoid.combineAll(
+                Seq(
+                  ExchangeTransactionDiff.getOrderFeePortfolio(exchange.buyOrder, exchange.buyMatcherFee),
+                  ExchangeTransactionDiff.getOrderFeePortfolio(exchange.sellOrder, exchange.sellMatcherFee),
+                  wavesPortfolio(-exchange.fee.value)
+                )
+              )
+            matcherPortfolio shouldBe restoredMatcherPortfolio
+        }
     }
   }
 
@@ -508,30 +511,32 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       }
     }
 
-    preconditionsAndExchange.foreach { case (genesis, issue1, issue2, issue3, issue4, exchange) =>
-      assertDiffAndState(
-        Seq(TestBlock.create(genesis :+ issue1 :+ issue2 :+ issue3 :+ issue4)),
-        TestBlock.create(Seq(exchange), Block.ProtoBlockVersion),
-        fsWithOrderFeature
-      ) { case (blockDiff, _) =>
-        val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
-        totalPortfolioDiff.balance shouldBe 0
-        totalPortfolioDiff.effectiveBalance shouldBe 0
-        totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
+    preconditionsAndExchange.foreach {
+      case (genesis, issue1, issue2, issue3, issue4, exchange) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(genesis :+ issue1 :+ issue2 :+ issue3 :+ issue4)),
+          TestBlock.create(Seq(exchange), Block.ProtoBlockVersion),
+          fsWithOrderFeature
+        ) {
+          case (blockDiff, _) =>
+            val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
+            totalPortfolioDiff.balance shouldBe 0
+            totalPortfolioDiff.effectiveBalance shouldBe 0
+            totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
-        val matcherPortfolio =
-          Monoid.combineAll(blockDiff.portfolios.view.filterKeys(_.stringRepr == exchange.sender.toAddress.stringRepr).values)
+            val matcherPortfolio =
+              Monoid.combineAll(blockDiff.portfolios.view.filterKeys(_.stringRepr == exchange.sender.toAddress.stringRepr).values)
 
-        val restoredMatcherPortfolio =
-          Monoid.combineAll(
-            Seq(
-              ExchangeTransactionDiff.getOrderFeePortfolio(exchange.buyOrder, exchange.buyMatcherFee),
-              ExchangeTransactionDiff.getOrderFeePortfolio(exchange.sellOrder, exchange.sellMatcherFee),
-              wavesPortfolio(-exchange.fee.value)
-            )
-          )
-        matcherPortfolio shouldBe restoredMatcherPortfolio
-      }
+            val restoredMatcherPortfolio =
+              Monoid.combineAll(
+                Seq(
+                  ExchangeTransactionDiff.getOrderFeePortfolio(exchange.buyOrder, exchange.buyMatcherFee),
+                  ExchangeTransactionDiff.getOrderFeePortfolio(exchange.sellOrder, exchange.sellMatcherFee),
+                  wavesPortfolio(-exchange.fee.value)
+                )
+              )
+            matcherPortfolio shouldBe restoredMatcherPortfolio
+        }
     }
   }
 
@@ -751,27 +756,29 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       }
     }
 
-    preconditions.foreach { case (genesis, issue, exchange) =>
-      assertDiffAndState(
-        Seq(TestBlock.create(genesis :+ issue)),
-        TestBlock.create(Seq(exchange), Block.ProtoBlockVersion),
-        fsWithOrderFeature
-      ) { case (blockDiff, _) =>
-        val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
-        totalPortfolioDiff.balance shouldBe 0
-        totalPortfolioDiff.effectiveBalance shouldBe 0
-        totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
+    preconditions.foreach {
+      case (genesis, issue, exchange) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(genesis :+ issue)),
+          TestBlock.create(Seq(exchange), Block.ProtoBlockVersion),
+          fsWithOrderFeature
+        ) {
+          case (blockDiff, _) =>
+            val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
+            totalPortfolioDiff.balance shouldBe 0
+            totalPortfolioDiff.effectiveBalance shouldBe 0
+            totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
-        blockDiff.portfolios(exchange.sender.toAddress).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee.value
-      }
+            blockDiff.portfolios(exchange.sender.toAddress).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee.value
+        }
 
-      assertDiffEi(
-        Seq(TestBlock.create(genesis :+ issue)),
-        TestBlock.create(Seq(exchange), Block.ProtoBlockVersion),
-        fsWithBlockV5
-      ) { ei =>
-        ei should produce("AccountBalanceError")
-      }
+        assertDiffEi(
+          Seq(TestBlock.create(genesis :+ issue)),
+          TestBlock.create(Seq(exchange), Block.ProtoBlockVersion),
+          fsWithBlockV5
+        ) { ei =>
+          ei should produce("AccountBalanceError")
+        }
     }
   }
 
@@ -808,7 +815,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     val buy =
       TxHelpers.order(OrderType.BUY, issue.asset, Waves, amount = 1000000L, fee = MatcherFee, sender = buyer, matcher = matcher, version = Order.V1)
     val sell = TxHelpers.order(OrderType.SELL, issue.asset, Waves, fee = MatcherFee, sender = seller, matcher = matcher, version = Order.V1)
-    val tx = createExTx(buy, sell, buy.price.value, matcher)
+    val tx   = createExTx(buy, sell, buy.price.value, matcher)
     assertDiffAndState(Seq(TestBlock.create(genesis :+ issue)), TestBlock.create(Seq(tx)), fs) {
       case (blockDiff, state) =>
         blockDiff.portfolios(tx.sender.toAddress).balance shouldBe tx.buyMatcherFee + tx.sellMatcherFee - tx.fee.value
@@ -946,9 +953,9 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     } yield {
 
       val (genesis, transfers, issueAndScripts, etx, matcher) = smartTradePreconditions(buyerScriptSrc, sellerScriptSrc, txScript)
-      val enoughFee = FeeValidation.ScriptExtraFee + FeeValidation.FeeConstants(ExchangeTransaction.typeId) * FeeValidation.FeeUnit
-      val smallFee  = enoughFee - 1
-      val exchangeWithSmallFee = TxHelpers.exchange(etx.buyOrder, etx.sellOrder, matcher, 1000000, 1000000, 1, 1, fee = smallFee)
+      val enoughFee                                           = FeeValidation.ScriptExtraFee + FeeValidation.FeeConstants(ExchangeTransaction.typeId) * FeeValidation.FeeUnit
+      val smallFee                                            = enoughFee - 1
+      val exchangeWithSmallFee                                = TxHelpers.exchange(etx.buyOrder, etx.sellOrder, matcher, 1000000, 1000000, 1, 1, fee = smallFee)
 
       val exchangeWithEnoughFee = TxHelpers.exchange(etx.buyOrder, etx.sellOrder, matcher, 1000000, 1000000, 1, 1, fee = enoughFee)
 
@@ -1330,7 +1337,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
             fee = TxPositiveAmount.unsafeFrom(fee),
             order1 = tx.order1.copy(version = Order.V4, matcherFee = TxMatcherFee.unsafeFrom(fee)).signWith(buyer.privateKey),
             order2 = tx.order2.copy(version = Order.V4, matcherFee = TxMatcherFee.unsafeFrom(fee)).signWith(seller.privateKey)
-          ).signWith(matcher.privateKey)
+          )
+          .signWith(matcher.privateKey)
         val reversed = fixed
           .copy(
             order1 = fixed.order2,
@@ -1399,15 +1407,17 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         )
       ).map { tx =>
         val sellAmount = quantity
-        val buyAmount = quantity
-        val amount = Math.min(sellAmount, buyAmount) / 1000
-        val exchange = tx.copy(
-          amount = TxExchangeAmount.unsafeFrom(amount),
-          order1 = tx.buyOrder.copy(amount = TxExchangeAmount.unsafeFrom(sellAmount)).signWith(buyer.privateKey),
-          order2 = tx.sellOrder.copy(amount = TxExchangeAmount.unsafeFrom(buyAmount)).signWith(seller.privateKey),
-          buyMatcherFee = (BigInt(tx.fee.value) * amount / buyAmount).toLong,
-          sellMatcherFee = (BigInt(tx.fee.value) * amount / sellAmount).toLong
-        ).signWith(matcher.privateKey)
+        val buyAmount  = quantity
+        val amount     = Math.min(sellAmount, buyAmount) / 1000
+        val exchange = tx
+          .copy(
+            amount = TxExchangeAmount.unsafeFrom(amount),
+            order1 = tx.buyOrder.copy(amount = TxExchangeAmount.unsafeFrom(sellAmount)).signWith(buyer.privateKey),
+            order2 = tx.sellOrder.copy(amount = TxExchangeAmount.unsafeFrom(buyAmount)).signWith(seller.privateKey),
+            buyMatcherFee = (BigInt(tx.fee.value) * amount / buyAmount).toLong,
+            sellMatcherFee = (BigInt(tx.fee.value) * amount / sellAmount).toLong
+          )
+          .signWith(matcher.privateKey)
 
         val buyerBalance   = Map(Waves -> ENOUGH_AMT, issue.asset         -> 0L)
         val sellerBalance  = Map(Waves -> (ENOUGH_AMT - fee), issue.asset -> issue.quantity.value)
@@ -1417,41 +1427,42 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       }
     }
 
-    scenario.foreach { case (exchange, (buyerBalance, sellerBalance, matcherBalance), genesisTxs, throwingScript) =>
-      assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(exchange), Block.ProtoBlockVersion), fsWithOrderFeature) { ei =>
-        ei.left.value
-      }
-      assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(exchange), Block.ProtoBlockVersion), fsWithBlockV5) {
-        case (diff, state) =>
-          diff.scriptsRun shouldBe 0
-          diff.portfolios(exchange.sender.toAddress).balance shouldBe -exchange.fee.value
-          diff.portfolios.get(exchange.buyOrder.sender.toAddress) shouldBe None
-          diff.portfolios.get(exchange.sellOrder.sender.toAddress) shouldBe None
+    scenario.foreach {
+      case (exchange, (buyerBalance, sellerBalance, matcherBalance), genesisTxs, throwingScript) =>
+        assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(exchange), Block.ProtoBlockVersion), fsWithOrderFeature) { ei =>
+          ei.left.value
+        }
+        assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(exchange), Block.ProtoBlockVersion), fsWithBlockV5) {
+          case (diff, state) =>
+            diff.scriptsRun shouldBe 0
+            diff.portfolios(exchange.sender.toAddress).balance shouldBe -exchange.fee.value
+            diff.portfolios.get(exchange.buyOrder.sender.toAddress) shouldBe None
+            diff.portfolios.get(exchange.sellOrder.sender.toAddress) shouldBe None
 
-          diff.scriptsComplexity shouldBe DiffsCommon
-            .countVerifierComplexity(Some(throwingScript), state, isAsset = true)
-            .explicitGet()
-            .get
-            ._2
+            diff.scriptsComplexity shouldBe DiffsCommon
+              .countVerifierComplexity(Some(throwingScript), state, isAsset = true)
+              .explicitGet()
+              .get
+              ._2
 
-          buyerBalance.foreach {
-            case (asset, balance) =>
-              state.balance(exchange.buyOrder.sender.toAddress, asset) shouldBe balance
-          }
-          sellerBalance.foreach {
-            case (asset, balance) =>
-              state.balance(exchange.sellOrder.sender.toAddress, asset) shouldBe balance
-          }
+            buyerBalance.foreach {
+              case (asset, balance) =>
+                state.balance(exchange.buyOrder.sender.toAddress, asset) shouldBe balance
+            }
+            sellerBalance.foreach {
+              case (asset, balance) =>
+                state.balance(exchange.sellOrder.sender.toAddress, asset) shouldBe balance
+            }
 
-          state.balance(exchange.sender.toAddress, Waves) shouldBe matcherBalance(Waves) - exchange.fee.value
-          matcherBalance.collect { case b @ (IssuedAsset(_), _) => b }.foreach {
-            case (asset, balance) =>
-              diff.portfolios(exchange.sender.toAddress).balanceOf(asset) shouldBe 0L
-              state.balance(exchange.sender.toAddress, asset) shouldBe balance
-          }
+            state.balance(exchange.sender.toAddress, Waves) shouldBe matcherBalance(Waves) - exchange.fee.value
+            matcherBalance.collect { case b @ (IssuedAsset(_), _) => b }.foreach {
+              case (asset, balance) =>
+                diff.portfolios(exchange.sender.toAddress).balanceOf(asset) shouldBe 0L
+                state.balance(exchange.sender.toAddress, asset) shouldBe balance
+            }
 
-          state.transactionInfo(exchange.id()).map(r => r._2 -> r._1.succeeded) shouldBe Some((exchange, false))
-      }
+            state.transactionInfo(exchange.id()).map(r => r._2 -> r._1.succeeded) shouldBe Some((exchange, false))
+        }
     }
   }
 
@@ -1608,32 +1619,37 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     val amountAsset = mkIssueTx
     val assetPair   = AssetPair(priceAsset.asset, amountAsset.asset)
 
-    def mkOrder(orderType: OrderType): Order = Order.selfSigned(
-      3.toByte,
-      sender,
-      sender.publicKey,
-      assetPair,
-      orderType,
-      1,
-      1,
-      ntpTime.getTimestamp(),
-      ntpTime.getTimestamp() + 100000,
-      100
-    ).explicitGet()
+    def mkOrder(orderType: OrderType): Order =
+      Order
+        .selfSigned(
+          3.toByte,
+          sender,
+          sender.publicKey,
+          assetPair,
+          orderType,
+          1,
+          1,
+          ntpTime.getTimestamp(),
+          ntpTime.getTimestamp() + 100000,
+          100
+        )
+        .explicitGet()
 
     def mkExchangeTx: ExchangeTransaction =
-      ExchangeTransaction.signed(
-        2.toByte,
-        sender.privateKey,
-        mkOrder(OrderType.BUY),
-        mkOrder(OrderType.SELL),
-        1,
-        1,
-        -9223372036854775807L,
-        -(50.waves + 1),
-        0.003.waves,
-        ntpTime.getTimestamp()
-      ).explicitGet()
+      ExchangeTransaction
+        .signed(
+          2.toByte,
+          sender.privateKey,
+          mkOrder(OrderType.BUY),
+          mkOrder(OrderType.SELL),
+          1,
+          1,
+          -9223372036854775807L,
+          -(50.waves + 1),
+          0.003.waves,
+          ntpTime.getTimestamp()
+        )
+        .explicitGet()
 
     withDomain(DomainPresets.RideV5) { d =>
       d.appendBlock(
@@ -1889,17 +1905,18 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
 
     val buyMatcherFees = getSeqWithPredefinedSum(totalBuyMatcherFeeForExchangeTransactions, sellOrdersCount)
 
-    val exchanges = (sellOrders zip buyMatcherFees).map { case (sellOrder, buyMatcherFee) =>
-      TxHelpers.exchange(
-        order1 = bigBuyOrder,
-        order2 = sellOrder,
-        matcher = matcher,
-        amount = sellOrder.amount.value,
-        price = bigBuyOrder.price.value,
-        buyMatcherFee = buyMatcherFee,
-        sellMatcherFee = sellOrder.matcherFee.value,
-        fee = (bigBuyOrder.matcherFee.value + sellOrder.matcherFee.value) / 2
-      )
+    val exchanges = (sellOrders zip buyMatcherFees).map {
+      case (sellOrder, buyMatcherFee) =>
+        TxHelpers.exchange(
+          order1 = bigBuyOrder,
+          order2 = sellOrder,
+          matcher = matcher,
+          amount = sellOrder.amount.value,
+          price = bigBuyOrder.price.value,
+          buyMatcherFee = buyMatcherFee,
+          sellMatcherFee = sellOrder.matcherFee.value,
+          fee = (bigBuyOrder.matcherFee.value + sellOrder.matcherFee.value) / 2
+        )
     }
 
     (genesis, issue1, issue2, massTransfer, exchanges, bigBuyOrder)

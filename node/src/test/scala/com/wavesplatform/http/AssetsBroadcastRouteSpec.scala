@@ -22,11 +22,7 @@ import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json._
 
-class AssetsBroadcastRouteSpec
-    extends RouteSpec("/assets/broadcast/")
-    with RequestGen
-    with PathMockFactory
-    with RestAPISettingsHelper {
+class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with RequestGen with PathMockFactory with RestAPISettingsHelper {
 
   private[this] val route = AssetsApiRoute(
     restAPISettings,

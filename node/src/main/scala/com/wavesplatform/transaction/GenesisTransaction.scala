@@ -52,7 +52,7 @@ object GenesisTransaction extends TransactionParser {
 
     for {
       amount <- TxNonNegativeAmount(amount)(TxValidationError.NegativeAmount(amount, "waves"))
-      tx <- GenesisTransaction(recipient, amount, timestamp, signature, recipient.chainId).validatedEither
+      tx     <- GenesisTransaction(recipient, amount, timestamp, signature, recipient.chainId).validatedEither
     } yield tx
   }
 }

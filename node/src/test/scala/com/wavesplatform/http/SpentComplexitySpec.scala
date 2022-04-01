@@ -104,7 +104,16 @@ class SpentComplexitySpec
           .explicitGet()
 
         val invokeTx = InvokeScriptTransaction
-          .selfSigned(2.toByte, recipient, sender.toAddress, None, Seq(InvokeScriptTransaction.Payment(50_00L, issue.asset)), 90_0000L, Asset.Waves, ntpTime.getTimestamp())
+          .selfSigned(
+            2.toByte,
+            recipient,
+            sender.toAddress,
+            None,
+            Seq(InvokeScriptTransaction.Payment(50_00L, issue.asset)),
+            90_0000L,
+            Asset.Waves,
+            ntpTime.getTimestamp()
+          )
           .explicitGet()
 
         d.appendBlock(

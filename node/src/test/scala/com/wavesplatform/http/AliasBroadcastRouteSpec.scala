@@ -15,11 +15,7 @@ import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.Json._
 import play.api.libs.json._
 
-class AliasBroadcastRouteSpec
-    extends RouteSpec("/alias/broadcast/")
-    with RequestGen
-    with PathMockFactory
-    with RestAPISettingsHelper {
+class AliasBroadcastRouteSpec extends RouteSpec("/alias/broadcast/") with RequestGen with PathMockFactory with RestAPISettingsHelper {
   private[this] val utxPoolSynchronizer = DummyTransactionPublisher.rejecting(tx => TransactionValidationError(GenericError("foo"), tx))
 
   val route = AliasApiRoute(restAPISettings, stub[CommonTransactionsApi], stub[Wallet], utxPoolSynchronizer, stub[Time], stub[Blockchain]).route

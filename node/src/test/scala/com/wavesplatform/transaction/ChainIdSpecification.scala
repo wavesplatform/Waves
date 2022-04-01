@@ -25,7 +25,9 @@ class ChainIdSpecification extends PropSpec {
   private val addressFromOther = Address.fromBytes(Base58.tryDecodeWithLimit("3P3oxTkpCWJgCr6SJrBzdP5N8jFqHCiy7L2").get, otherChainId).explicitGet()
   private val addressOrAlias   = Gen.oneOf(aliasFromOther, addressFromOther)
 
-  private def addressOrAliasWithVersion(vs: Set[TxVersion]): Gen[(AddressOrAlias, TxVersion, KeyPair, TxPositiveAmount, TxPositiveAmount, TxTimestamp)] =
+  private def addressOrAliasWithVersion(
+      vs: Set[TxVersion]
+  ): Gen[(AddressOrAlias, TxVersion, KeyPair, TxPositiveAmount, TxPositiveAmount, TxTimestamp)] =
     for {
       addressOrAlias <- addressOrAlias
       version        <- Gen.oneOf(vs.toSeq)

@@ -16,14 +16,14 @@ import play.api.libs.json.JsObject
 import scala.util.Try
 
 case class SponsorFeeTransaction(
-                                  version: TxVersion,
-                                  sender: PublicKey,
-                                  asset: IssuedAsset,
-                                  minSponsoredAssetFee: Option[TxPositiveAmount],
-                                  fee: TxPositiveAmount,
-                                  timestamp: TxTimestamp,
-                                  proofs: Proofs,
-                                  chainId: Byte
+    version: TxVersion,
+    sender: PublicKey,
+    asset: IssuedAsset,
+    minSponsoredAssetFee: Option[TxPositiveAmount],
+    fee: TxPositiveAmount,
+    timestamp: TxTimestamp,
+    proofs: Proofs,
+    chainId: Byte
 ) extends ProvenTransaction
     with VersionedTransaction
     with TxWithFee.InWaves
@@ -66,9 +66,9 @@ object SponsorFeeTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, SponsorFeeTransaction] =
     for {
-      fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
+      fee                  <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
       minSponsoredAssetFee <- minSponsoredAssetFee.traverse(fee => TxPositiveAmount(fee)(NegativeMinFee(fee, "asset")))
-      tx <- SponsorFeeTransaction(version, sender, asset, minSponsoredAssetFee, fee, timestamp, proofs, chainId).validatedEither
+      tx                   <- SponsorFeeTransaction(version, sender, asset, minSponsoredAssetFee, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
 
   def signed(

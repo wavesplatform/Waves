@@ -30,7 +30,7 @@ object ExchangeTransactionDiff {
         _ <- Right(())
         smartTradesEnabled = blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading)
         smartAssetsEnabled = blockchain.isFeatureActivated(BlockchainFeatures.SmartAssets)
-        assetsScripted      = assets.values.count(_.flatMap(_.script).isDefined)
+        assetsScripted     = assets.values.count(_.flatMap(_.script).isDefined)
         _ <- Either.cond(
           smartAssetsEnabled || assetsScripted == 0,
           (),
@@ -51,12 +51,12 @@ object ExchangeTransactionDiff {
       } yield (assetsScripted, buyerScripted, sellerScripted)
 
     for {
-      buyerAndSellerScripted          <- smartFeaturesChecks()
-      portfolios <- getPortfolios(blockchain, tx)
-      tx         <- enoughVolume(tx, blockchain)
+      buyerAndSellerScripted <- smartFeaturesChecks()
+      portfolios             <- getPortfolios(blockchain, tx)
+      tx                     <- enoughVolume(tx, blockchain)
       scripts = {
         val (assetsScripted, buyerScripted, sellerScripted) = buyerAndSellerScripted
-        val matcherScripted = Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
+        val matcherScripted                                 = Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
 
         // Don't count before Ride4DApps activation
         val ordersScripted = Seq(buyerScripted, sellerScripted)

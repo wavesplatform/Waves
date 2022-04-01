@@ -42,13 +42,13 @@ class OnlyTransferIsAllowedTest extends PropSpec with WithState {
   }
 
   private def preconditions(typed: EXPR): (GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction) = {
-    val master = TxHelpers.signer(1)
+    val master    = TxHelpers.signer(1)
     val recipient = TxHelpers.signer(2)
 
-    val genesis = TxHelpers.genesis(master.toAddress)
+    val genesis   = TxHelpers.genesis(master.toAddress)
     val setScript = TxHelpers.setScript(master, ExprScript(typed).explicitGet())
-    val transfer = TxHelpers.transfer(master, recipient.toAddress, ENOUGH_AMT / 2)
-    val lease = TxHelpers.lease(master, recipient.toAddress, ENOUGH_AMT / 2)
+    val transfer  = TxHelpers.transfer(master, recipient.toAddress, ENOUGH_AMT / 2)
+    val lease     = TxHelpers.lease(master, recipient.toAddress, ENOUGH_AMT / 2)
 
     (genesis, setScript, lease, transfer)
   }

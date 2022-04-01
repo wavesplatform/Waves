@@ -210,11 +210,14 @@ object InvokeScriptDiff {
                   ).map(TracedResult(_))
                 ).map(
                   result =>
-                    (environment.currentDiff |+| paymentsPartToResolve,
-                     result,
-                     environment.availableActions,
-                     environment.availableData,
-                     environment.availableDataSize))
+                    (
+                      environment.currentDiff |+| paymentsPartToResolve,
+                      result,
+                      environment.availableActions,
+                      environment.availableData,
+                      environment.availableDataSize
+                    )
+                )
               })
             }
             _ = invocationRoot.setLog(log)
@@ -225,11 +228,11 @@ object InvokeScriptDiff {
             newBlockchain = CompositeBlockchain(blockchain, diff)
 
             _ <- traced {
-              val newBalance    = newBlockchain.balance(invoker)
+              val newBalance = newBlockchain.balance(invoker)
               Either.cond(
                 blockchain.height < blockchain.settings.functionalitySettings.syncDAppCheckPaymentsHeight || newBalance >= 0,
                 (),
-                GenericError(balanceError(invoker, newBalance, Waves)),
+                GenericError(balanceError(invoker, newBalance, Waves))
               )
             }
 
@@ -269,7 +272,9 @@ object InvokeScriptDiff {
                       availableActions,
                       availableData,
                       availableDataSize
-                    )))
+                    )
+                  )
+                )
                 diff <- doProcessActions(actions, unusedComplexity)
               } yield (diff, ret, availableActions - actionsCount, availableData - dataCount, availableDataSize - dataSize)
             }
@@ -358,8 +363,9 @@ object InvokeScriptDiff {
               val usedComplexity = startComplexity - unusedComplexity
               FailedTransactionError.dAppExecution(error, usedComplexity, log)
           }
-        )
-        .map { r => InvokeDiffsCommon.checkScriptResultFields(blockchain, r._1); r }
+        ).map { r =>
+          InvokeDiffsCommon.checkScriptResultFields(blockchain, r._1); r
+        }
       )
   }
 }

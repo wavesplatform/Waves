@@ -14,14 +14,14 @@ import play.api.libs.json.JsObject
 import scala.util.Try
 
 final case class BurnTransaction(
-                                  version: TxVersion,
-                                  sender: PublicKey,
-                                  asset: IssuedAsset,
-                                  quantity: TxNonNegativeAmount,
-                                  fee: TxPositiveAmount,
-                                  timestamp: TxTimestamp,
-                                  proofs: Proofs,
-                                  chainId: Byte
+    version: TxVersion,
+    sender: PublicKey,
+    asset: IssuedAsset,
+    quantity: TxNonNegativeAmount,
+    fee: TxPositiveAmount,
+    timestamp: TxTimestamp,
+    proofs: Proofs,
+    chainId: Byte
 ) extends ProvenTransaction
     with VersionedTransaction
     with SigProofsSwitch
@@ -66,8 +66,8 @@ object BurnTransaction extends TransactionParser {
   ): Either[ValidationError, BurnTransaction] =
     for {
       quantity <- TxNonNegativeAmount(quantity)(TxValidationError.NegativeAmount(quantity, "assets"))
-      fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
-      tx <- BurnTransaction(version, sender, asset, quantity, fee, timestamp, proofs, chainId).validatedEither
+      fee      <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
+      tx       <- BurnTransaction(version, sender, asset, quantity, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
 
   def signed(

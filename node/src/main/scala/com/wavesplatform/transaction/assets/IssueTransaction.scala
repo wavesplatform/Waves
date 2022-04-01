@@ -17,18 +17,18 @@ import play.api.libs.json.JsObject
 import scala.util.Try
 
 case class IssueTransaction(
-                             version: TxVersion,
-                             sender: PublicKey,
-                             name: ByteString,
-                             description: ByteString,
-                             quantity: TxPositiveAmount,
-                             decimals: TxDecimals,
-                             reissuable: Boolean,
-                             script: Option[Script],
-                             fee: TxPositiveAmount,
-                             timestamp: TxTimestamp,
-                             proofs: Proofs,
-                             chainId: Byte
+    version: TxVersion,
+    sender: PublicKey,
+    name: ByteString,
+    description: ByteString,
+    quantity: TxPositiveAmount,
+    decimals: TxDecimals,
+    reissuable: Boolean,
+    script: Option[Script],
+    fee: TxPositiveAmount,
+    timestamp: TxTimestamp,
+    proofs: Proofs,
+    chainId: Byte
 ) extends VersionedTransaction
     with ProvenTransaction
     with FastHashId
@@ -76,7 +76,7 @@ object IssueTransaction extends TransactionParser {
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, IssueTransaction] =
     for {
-      fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
+      fee      <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
       quantity <- TxPositiveAmount(quantity)(TxValidationError.NonPositiveAmount(quantity, "assets"))
       decimals <- TxDecimals(decimals)(TxValidationError.InvalidDecimals(decimals))
       tx <- IssueTransaction(
@@ -130,6 +130,6 @@ object IssueTransaction extends TransactionParser {
 
   implicit class IssueTransactionExt(private val tx: IssueTransaction) extends AnyVal {
     def asset: IssuedAsset = IssuedAsset(assetId)
-    def assetId: ByteStr = tx.id()
+    def assetId: ByteStr   = tx.id()
   }
 }

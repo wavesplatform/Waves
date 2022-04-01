@@ -218,11 +218,11 @@ class CommonFunctionsTest extends PropSpec {
   }
 
   property("data constructors") {
-    val sender = TxHelpers.signer(1)
+    val sender    = TxHelpers.signer(1)
     val recipient = TxHelpers.signer(2)
 
     val transfer = TxHelpers.transfer(from = sender, to = recipient.toAddress)
-    val entry = IntegerDataEntry("key", 123L)
+    val entry    = IntegerDataEntry("key", 123L)
 
     val compareClause = (transfer.recipient: @unchecked) match {
       case addr: Address => s"tx.recipient == Address(base58'${addr.stringRepr}')"
@@ -295,7 +295,7 @@ class CommonFunctionsTest extends PropSpec {
   }
 
   private def createMassTransfer(): MassTransferTransaction = {
-    val sender = TxHelpers.signer(1)
+    val sender     = TxHelpers.signer(1)
     val recipients = (1 to 10).map(idx => TxHelpers.address(idx + 1))
     TxHelpers.massTransfer(
       from = sender,

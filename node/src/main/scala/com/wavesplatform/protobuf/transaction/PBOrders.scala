@@ -14,9 +14,9 @@ object PBOrders {
 
   def vanilla(order: PBOrder, version: Int = 0): Either[ValidationError, VanillaOrder] =
     for {
-      amount <- TxExchangeAmount(order.amount)(GenericError(TxExchangeAmount.errMsg))
-      price <- TxOrderPrice(order.price)(GenericError(TxOrderPrice.errMsg))
-      orderType <- vanillaOrderType(order.orderSide)
+      amount     <- TxExchangeAmount(order.amount)(GenericError(TxExchangeAmount.errMsg))
+      price      <- TxOrderPrice(order.price)(GenericError(TxOrderPrice.errMsg))
+      orderType  <- vanillaOrderType(order.orderSide)
       matcherFee <- TxMatcherFee(order.getMatcherFee.longAmount)(GenericError(TxMatcherFee.errMsg))
     } yield {
       VanillaOrder(

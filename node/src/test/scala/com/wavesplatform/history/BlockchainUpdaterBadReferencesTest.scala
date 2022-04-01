@@ -9,9 +9,7 @@ import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.transfer._
 import org.scalacheck.Gen
 
-class BlockchainUpdaterBadReferencesTest
-    extends PropSpec
-    with DomainScenarioDrivenPropertyCheck {
+class BlockchainUpdaterBadReferencesTest extends PropSpec with DomainScenarioDrivenPropertyCheck {
 
   val preconditionsAndPayments: Gen[(GenesisTransaction, TransferTransaction, TransferTransaction, TransferTransaction)] = for {
     master    <- accountGen

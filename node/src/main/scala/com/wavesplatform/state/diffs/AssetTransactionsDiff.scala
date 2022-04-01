@@ -44,11 +44,12 @@ object AssetTransactionsDiff extends ScorexLogging {
         .map(
           script =>
             Diff(
-              portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee.value, lease = LeaseBalance.empty, assets = Map(asset -> tx.quantity.value))),
-              issuedAssets = Map(asset             -> NewAssetInfo(staticInfo, info, volumeInfo)),
-              assetScripts = Map(asset             -> script.map(AssetScriptInfo.tupled)),
+              portfolios =
+                Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee.value, lease = LeaseBalance.empty, assets = Map(asset -> tx.quantity.value))),
+              issuedAssets = Map(asset  -> NewAssetInfo(staticInfo, info, volumeInfo)),
+              assetScripts = Map(asset  -> script.map(AssetScriptInfo.tupled)),
               scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
-          )
+            )
         )
     } yield result
   }
@@ -65,12 +66,11 @@ object AssetTransactionsDiff extends ScorexLogging {
         DiffsCommon.countScriptRuns(blockchain, tx)
       else
         Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
-    } yield
-      Diff(
-        portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee.value, lease = LeaseBalance.empty, assets = Map.empty)),
-        assetScripts = Map(tx.asset          -> script.map(AssetScriptInfo.tupled)),
-        scriptsRun = scriptsRun
-      )
+    } yield Diff(
+      portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee.value, lease = LeaseBalance.empty, assets = Map.empty)),
+      assetScripts = Map(tx.asset          -> script.map(AssetScriptInfo.tupled)),
+      scriptsRun = scriptsRun
+    )
 
   private def checkEstimationOverflow(blockchain: Blockchain, script: Option[(Script, Long)]): Either[GenericError, Unit] =
     if (blockchain.checkEstimationOverflow && script.exists(_._2 < 0))
@@ -117,11 +117,10 @@ object AssetTransactionsDiff extends ScorexLogging {
           )
         )
         updatedInfo = AssetInfo(tx.name, tx.description, Height @@ blockchain.height)
-      } yield
-        Diff(
-          portfolios = Map(tx.sender.toAddress -> portfolioUpdate),
-          updatedAssets = Map(tx.assetId       -> updatedInfo.leftIor),
-          scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
-        )
+      } yield Diff(
+        portfolios = Map(tx.sender.toAddress -> portfolioUpdate),
+        updatedAssets = Map(tx.assetId       -> updatedInfo.leftIor),
+        scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
+      )
     }
 }

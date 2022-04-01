@@ -222,7 +222,7 @@ class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSetti
   }
 
   private def scenario(masterDApp: (Address, Alias) => DApp, serviceDApp: DApp): (Seq[Transaction], InvokeScriptTransaction, Address, Address) = {
-    val master = TxHelpers.signer(0)
+    val master  = TxHelpers.signer(0)
     val invoker = TxHelpers.signer(1)
     val service = TxHelpers.signer(2)
 
@@ -233,11 +233,11 @@ class InvokeScriptV5LimitsTest extends PropSpec with WithState with DBCacheSetti
       TxHelpers.genesis(invoker.toAddress),
       TxHelpers.genesis(service.toAddress)
     )
-    val alias = Alias.create("alias").explicitGet()
-    val aliasTx = TxHelpers.createAlias(alias.name, service, fee)
-    val setMasterScript = TxHelpers.setScript(master, ContractScript(V5, masterDApp(service.toAddress, alias)).explicitGet(), fee)
+    val alias            = Alias.create("alias").explicitGet()
+    val aliasTx          = TxHelpers.createAlias(alias.name, service, fee)
+    val setMasterScript  = TxHelpers.setScript(master, ContractScript(V5, masterDApp(service.toAddress, alias)).explicitGet(), fee)
     val setServiceScript = TxHelpers.setScript(service, ContractScript(V5, serviceDApp).explicitGet(), fee)
-    val preparingTxs = genesis :+ aliasTx :+ setMasterScript :+ setServiceScript
+    val preparingTxs     = genesis :+ aliasTx :+ setMasterScript :+ setServiceScript
 
     val invoke = TxHelpers.invoke(master.toAddress, func = Some("foo"), invoker = invoker, payments = List(Payment(10L, Waves)), fee = fee)
 

@@ -11,7 +11,7 @@ class GenesisTransactionDiffTest extends PropSpec with WithState {
 
   property("fails if height != 1") {
     val genesis = TxHelpers.genesis(TxHelpers.address(1))
-    val height = 2
+    val height  = 2
     GenesisTransactionDiff(height)(genesis) should produce("GenesisTransaction cannot appear in non-initial block")
   }
 

@@ -39,12 +39,7 @@ import org.scalatest.enablers.Length
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class BlockV5Test
-    extends FlatSpec
-    with WithDomain
-    with OptionValues
-    with EitherValues
-    with BlocksTransactionsHelpers {
+class BlockV5Test extends FlatSpec with WithDomain with OptionValues with EitherValues with BlocksTransactionsHelpers {
   import BlockV5Test._
 
   private val testTime = new TestTime(1)

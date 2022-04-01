@@ -127,8 +127,8 @@ class TransactionsRouteSpec
     )
 
   "returns lease details for lease cancel transaction" in {
-    val sender      = testWallet.generateNewAccount().get
-    val recipient   = testWallet.generateNewAccount().get
+    val sender    = testWallet.generateNewAccount().get
+    val recipient = testWallet.generateNewAccount().get
 
     val balances = Seq(
       AddrWithBalance(sender.toAddress, 10.waves),
@@ -787,16 +787,18 @@ class TransactionsRouteSpec
       val seed = new Array[Byte](32)
       Random.nextBytes(seed)
       val sender: KeyPair = KeyPair(seed)
-      val ist = InvokeScriptTransaction.selfSigned(
-        TxVersion.V1,
-        sender,
-        sender.toAddress,
-        None,
-        Seq.empty,
-        500000L,
-        Asset.Waves,
-        testTime.getTimestamp()
-      ).explicitGet()
+      val ist = InvokeScriptTransaction
+        .selfSigned(
+          TxVersion.V1,
+          sender,
+          sender.toAddress,
+          None,
+          Seq.empty,
+          500000L,
+          Asset.Waves,
+          testTime.getTimestamp()
+        )
+        .explicitGet()
       f(sender, ist)
     }
 

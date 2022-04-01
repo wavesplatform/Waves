@@ -202,30 +202,34 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
 
         val (buyV, sellV, exchangeV) = versions
 
-        val buy = Order.buy(
-          buyV,
-          sender1,
-          matcher.publicKey,
-          pair,
-          buyAmount,
-          buyPrice,
-          time,
-          expirationTimestamp,
-          buyMatcherFee,
-          if (buyV == 3) buyerMatcherFeeAssetId else Waves
-        ).explicitGet()
-        val sell = Order.sell(
-          sellV,
-          sender2,
-          matcher.publicKey,
-          pair,
-          sellAmount,
-          sellPrice,
-          time,
-          expirationTimestamp,
-          sellMatcherFee,
-          if (sellV == 3) sellerMatcherFeeAssetId else Waves
-        ).explicitGet()
+        val buy = Order
+          .buy(
+            buyV,
+            sender1,
+            matcher.publicKey,
+            pair,
+            buyAmount,
+            buyPrice,
+            time,
+            expirationTimestamp,
+            buyMatcherFee,
+            if (buyV == 3) buyerMatcherFeeAssetId else Waves
+          )
+          .explicitGet()
+        val sell = Order
+          .sell(
+            sellV,
+            sender2,
+            matcher.publicKey,
+            pair,
+            sellAmount,
+            sellPrice,
+            time,
+            expirationTimestamp,
+            sellMatcherFee,
+            if (sellV == 3) sellerMatcherFeeAssetId else Waves
+          )
+          .explicitGet()
 
         def create(
             matcher: KeyPair = sender1,
@@ -352,31 +356,35 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime {
         val (sellV, buyV, exchangeV) = versions
 
         val sell =
-          Order.sell(
-            sellV,
-            sender2,
-            matcher.publicKey,
-            pair,
-            2,
-            sellPrice,
-            time,
-            expirationTimestamp,
-            matcherFee,
-            if (sellV == 3) sellerMatcherFeeAssetId else Waves
-          ).explicitGet()
+          Order
+            .sell(
+              sellV,
+              sender2,
+              matcher.publicKey,
+              pair,
+              2,
+              sellPrice,
+              time,
+              expirationTimestamp,
+              matcherFee,
+              if (sellV == 3) sellerMatcherFeeAssetId else Waves
+            )
+            .explicitGet()
         val buy =
-          Order.buy(
-            buyV,
-            sender1,
-            matcher.publicKey,
-            pair,
-            1,
-            buyPrice,
-            time,
-            expirationTimestamp,
-            matcherFee,
-            if (buyV == 3) buyerMatcherFeeAssetId else Waves
-          ).explicitGet()
+          Order
+            .buy(
+              buyV,
+              sender1,
+              matcher.publicKey,
+              pair,
+              1,
+              buyPrice,
+              time,
+              expirationTimestamp,
+              matcherFee,
+              if (buyV == 3) buyerMatcherFeeAssetId else Waves
+            )
+            .explicitGet()
 
         createExTx(buy, sell, sellPrice, matcher, exchangeV) shouldBe an[Right[_, _]]
 

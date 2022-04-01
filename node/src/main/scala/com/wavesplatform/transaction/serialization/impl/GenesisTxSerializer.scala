@@ -44,6 +44,12 @@ object GenesisTxSerializer {
     val timestamp = buf.getLong
     val recipient = buf.getAddress()
     val amount    = TxNonNegativeAmount.unsafeFrom(buf.getLong)
-    GenesisTransaction(recipient, amount, timestamp, ByteStr(GenesisTransaction.generateSignature(recipient, amount.value, timestamp)), recipient.chainId)
+    GenesisTransaction(
+      recipient,
+      amount,
+      timestamp,
+      ByteStr(GenesisTransaction.generateSignature(recipient, amount.value, timestamp)),
+      recipient.chainId
+    )
   }
 }

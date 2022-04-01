@@ -13,16 +13,18 @@ import play.api.libs.json.JsObject
 
 import scala.util.Try
 
-final case class CreateAliasTransaction(version: TxVersion,
-                                        sender: PublicKey,
-                                        aliasName: String,
-                                        fee: TxPositiveAmount,
-                                        timestamp: TxTimestamp,
-                                        proofs: Proofs,
-                                        chainId: Byte) extends SigProofsSwitch
-  with VersionedTransaction
-  with TxWithFee.InWaves
-  with LegacyPBSwitch.V3 {
+final case class CreateAliasTransaction(
+    version: TxVersion,
+    sender: PublicKey,
+    aliasName: String,
+    fee: TxPositiveAmount,
+    timestamp: TxTimestamp,
+    proofs: Proofs,
+    chainId: Byte
+) extends SigProofsSwitch
+    with VersionedTransaction
+    with TxWithFee.InWaves
+    with LegacyPBSwitch.V3 {
 
   lazy val alias: Alias = Alias.createWithChainId(aliasName, chainId).explicitGet()
 
@@ -66,7 +68,7 @@ object CreateAliasTransaction extends TransactionParser {
   ): Either[ValidationError, TransactionT] = {
     for {
       fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
-      tx <- CreateAliasTransaction(version, sender, aliasName, fee, timestamp, proofs, chainId).validatedEither
+      tx  <- CreateAliasTransaction(version, sender, aliasName, fee, timestamp, proofs, chainId).validatedEither
     } yield tx
   }
 
@@ -81,6 +83,13 @@ object CreateAliasTransaction extends TransactionParser {
   ): Either[ValidationError, TransactionT] =
     create(version, sender, alias, fee, timestamp, Nil, chainId).map(_.signWith(signer))
 
-  def selfSigned(version: TxVersion, sender: KeyPair, aliasName: String, fee: Long, timestamp: TxTimestamp, chainId: Byte = AddressScheme.current.chainId): Either[ValidationError, TransactionT] =
+  def selfSigned(
+      version: TxVersion,
+      sender: KeyPair,
+      aliasName: String,
+      fee: Long,
+      timestamp: TxTimestamp,
+      chainId: Byte = AddressScheme.current.chainId
+  ): Either[ValidationError, TransactionT] =
     signed(version, sender.publicKey, aliasName, fee, timestamp, sender.privateKey, chainId)
 }

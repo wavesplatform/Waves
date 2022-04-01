@@ -35,7 +35,7 @@ class BlockDifferDetailedDiffTest extends FreeSpec with WithState {
   "BlockDiffer DetailedDiff" - {
     "works in case of one genesis transaction" in {
       val genesisBlock: (Address, Block) = {
-        val master = TxHelpers.signer(1)
+        val master       = TxHelpers.signer(1)
         val genesisBlock = TestBlock.create(System.currentTimeMillis(), Seq(TxHelpers.genesis(master.toAddress)))
         (master.toAddress, genesisBlock)
       }
@@ -60,10 +60,10 @@ class BlockDifferDetailedDiffTest extends FreeSpec with WithState {
         val amount1 = 2.waves
         val amount2 = 1.waves
 
-        val genesis = TxHelpers.genesis(a1.toAddress)
+        val genesis   = TxHelpers.genesis(a1.toAddress)
         val transfer1 = TxHelpers.transfer(a1, a2.toAddress, amount1, fee = transactionFee, version = TxVersion.V1)
         val transfer2 = TxHelpers.transfer(a2, a1.toAddress, amount2, fee = transactionFee, version = TxVersion.V1)
-        val block = TestBlock.create(a1, Seq(genesis, transfer1, transfer2))
+        val block     = TestBlock.create(a1, Seq(genesis, transfer1, transfer2))
 
         (a1.toAddress, a2.toAddress, amount1, amount2, block)
       }
@@ -103,14 +103,14 @@ class BlockDifferDetailedDiffTest extends FreeSpec with WithState {
 
           "with history — 60% from last + 40% from current block" in {
             val blocksNgMiner: (Seq[Block], Block, Address) = {
-              val a1 = TxHelpers.signer(1)
-              val a2 = TxHelpers.signer(2)
+              val a1    = TxHelpers.signer(1)
+              val a2    = TxHelpers.signer(2)
               val miner = TxHelpers.signer(3)
 
               val amount1 = 2.waves
               val amount2 = 1.waves
 
-              val genesis = TxHelpers.genesis(a1.toAddress)
+              val genesis   = TxHelpers.genesis(a1.toAddress)
               val transfer1 = TxHelpers.transfer(a1, a2.toAddress, amount1, fee = transactionFee, version = TxVersion.V1)
               val transfer2 = TxHelpers.transfer(a2, a1.toAddress, amount2, fee = transactionFee, version = TxVersion.V1)
 

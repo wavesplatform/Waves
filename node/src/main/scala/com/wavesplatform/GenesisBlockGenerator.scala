@@ -111,7 +111,8 @@ object GenesisBlockGenerator extends App {
 
   val genesisTxs: Seq[GenesisTransaction] = shares.flatMap {
     case (addrInfo, part) =>
-      TxNonNegativeAmount.from(part)
+      TxNonNegativeAmount
+        .from(part)
         .toOption
         .map(amount => GenesisTransaction(addrInfo.accountAddress, amount, timestamp, ByteStr.empty, settings.chainId.toByte))
   }

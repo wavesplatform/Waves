@@ -17,7 +17,7 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with WithState {
     val genesis = TxHelpers.genesis(master.toAddress)
 
     val emptyBlocksAmt = 10
-    val confirmations = 20
+    val confirmations  = 20
 
     val genesisBlock = block(Seq(genesis))
     val nextBlocks   = List.fill(emptyBlocksAmt - 1)(block(Seq.empty))
@@ -34,10 +34,10 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with WithState {
       val leaser = TxHelpers.signer(2)
 
       val genesis = TxHelpers.genesis(master.toAddress)
-      val xfer1 = TxHelpers.transfer(master, leaser.toAddress, ENOUGH_AMT / 3)
-      val lease1 = TxHelpers.lease(leaser, master.toAddress, xfer1.amount.value - Fee, fee = Fee)
-      val xfer2 = TxHelpers.transfer(master, leaser.toAddress, ENOUGH_AMT / 3)
-      val lease2 = TxHelpers.lease(leaser, master.toAddress, xfer2.amount.value - Fee, fee = Fee)
+      val xfer1   = TxHelpers.transfer(master, leaser.toAddress, ENOUGH_AMT / 3)
+      val lease1  = TxHelpers.lease(leaser, master.toAddress, xfer1.amount.value - Fee, fee = Fee)
+      val xfer2   = TxHelpers.transfer(master, leaser.toAddress, ENOUGH_AMT / 3)
+      val lease2  = TxHelpers.lease(leaser, master.toAddress, xfer2.amount.value - Fee, fee = Fee)
 
       (leaser, genesis, xfer1, lease1, xfer2, lease2)
     }

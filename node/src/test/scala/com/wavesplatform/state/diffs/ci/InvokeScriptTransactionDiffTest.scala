@@ -60,14 +60,14 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       .foreach(v => withDomain(settingsFor(v))(assertion(v, _)))
 
   private def testDiffTraced(preconditions: Seq[Block], block: Block, from: StdLibVersion = V3, to: StdLibVersion = lastVersion)(
-    assertion: ((StdLibVersion, TracedResult[ValidationError, Diff])) => Unit
+      assertion: ((StdLibVersion, TracedResult[ValidationError, Diff])) => Unit
   ): Unit =
     allVersions
       .filter(v => v >= from && v <= to)
       .foreach(v => assertDiffEiTraced(preconditions, block, settingsFor(v).blockchainSettings.functionalitySettings)(r => assertion((v, r))))
 
   private def testDiff(preconditions: Seq[Block], block: Block, from: StdLibVersion = V3, to: StdLibVersion = lastVersion)(
-    assertion: Either[ValidationError, Diff] => Unit
+      assertion: Either[ValidationError, Diff] => Unit
   ): Unit =
     testDiffTraced(preconditions, block, from, to)(assertion.compose(_._2.resultE))
 
@@ -1238,7 +1238,9 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
           case (diff, state) =>
             diff.scriptsRun shouldBe 0
             diff.portfolios(invoke.sender.toAddress).balanceOf(invoke.feeAssetId)
-            state.balance(invoke.sender.toAddress, invoke.feeAssetId) shouldBe invoke.feeAssetId.fold(g2Tx.amount.value)(_ => sponsorIssue.quantity.value) - invoke.fee.value
+            state.balance(invoke.sender.toAddress, invoke.feeAssetId) shouldBe invoke.feeAssetId.fold(g2Tx.amount.value)(
+              _ => sponsorIssue.quantity.value
+            ) - invoke.fee.value
             state.transactionInfo(invoke.id()).map(r => r._2 -> r._1.succeeded) shouldBe Some((invoke, false))
         }
     }

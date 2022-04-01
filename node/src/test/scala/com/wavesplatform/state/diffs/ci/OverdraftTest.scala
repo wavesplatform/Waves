@@ -21,8 +21,8 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 
 class OverdraftTest extends PropSpec with WithState {
-  private val InvokeFee    = FeeConstants(InvokeScriptTransaction.typeId) * FeeValidation.FeeUnit
-  private val IssueFee     = FeeConstants(IssueTransaction.typeId) * FeeValidation.FeeUnit
+  private val InvokeFee = FeeConstants(InvokeScriptTransaction.typeId) * FeeValidation.FeeUnit
+  private val IssueFee  = FeeConstants(IssueTransaction.typeId) * FeeValidation.FeeUnit
 
   private val dAppVersions: List[StdLibVersion] =
     DirectiveDictionary[StdLibVersion].all
@@ -52,40 +52,43 @@ class OverdraftTest extends PropSpec with WithState {
   }
 
   property("insufficient fee") {
-    dAppVersionWithSettings.foreach { case (version, settings) =>
-      val (genesis, setDApp, ci, _) = paymentPreconditions(withEnoughFee = false, withPayment = false, emptyResultDApp(version))
+    dAppVersionWithSettings.foreach {
+      case (version, settings) =>
+        val (genesis, setDApp, ci, _) = paymentPreconditions(withEnoughFee = false, withPayment = false, emptyResultDApp(version))
 
-      assertDiffEi(Seq(TestBlock.create(genesis :+ setDApp)), TestBlock.create(Seq(ci)), settings) { r =>
-        if (settings.preActivatedFeatures.contains(BlockchainFeatures.BlockV5.id))
-          r should produce("AccountBalanceError")
-        else
-          r should produce(
-            s"Fee in WAVES for InvokeScriptTransaction (1 in WAVES) does not exceed minimal value of $InvokeFee WAVES"
-          )
-      }
+        assertDiffEi(Seq(TestBlock.create(genesis :+ setDApp)), TestBlock.create(Seq(ci)), settings) { r =>
+          if (settings.preActivatedFeatures.contains(BlockchainFeatures.BlockV5.id))
+            r should produce("AccountBalanceError")
+          else
+            r should produce(
+              s"Fee in WAVES for InvokeScriptTransaction (1 in WAVES) does not exceed minimal value of $InvokeFee WAVES"
+            )
+        }
     }
   }
 
   property("overdraft") {
-    dAppVersionWithSettings.foreach { case (version, settings) =>
-      val (genesis, setDApp, ci, _) = paymentPreconditions(withEnoughFee = true, withPayment = false, payingDApp(version))
+    dAppVersionWithSettings.foreach {
+      case (version, settings) =>
+        val (genesis, setDApp, ci, _) = paymentPreconditions(withEnoughFee = true, withPayment = false, payingDApp(version))
 
-      assertDiffEi(Seq(TestBlock.create(genesis :+ setDApp)), TestBlock.create(Seq(ci)), settings) { r =>
-        if (settings.preActivatedFeatures.contains(BlockchainFeatures.BlockV5.id))
-          r should produce("AccountBalanceError")
-        else
-          r.explicitGet()
-      }
+        assertDiffEi(Seq(TestBlock.create(genesis :+ setDApp)), TestBlock.create(Seq(ci)), settings) { r =>
+          if (settings.preActivatedFeatures.contains(BlockchainFeatures.BlockV5.id))
+            r should produce("AccountBalanceError")
+          else
+            r.explicitGet()
+        }
     }
   }
 
   property("overdraft with payment V3") {
-    dAppVersionWithSettings.foreach { case (_, settings) =>
-      val (genesis, setDApp, ci, issue) = paymentPreconditions(withEnoughFee = true, withPayment = true, payingDApp(V3))
+    dAppVersionWithSettings.foreach {
+      case (_, settings) =>
+        val (genesis, setDApp, ci, issue) = paymentPreconditions(withEnoughFee = true, withPayment = true, payingDApp(V3))
 
-      assertDiffEi(Seq(TestBlock.create(genesis ++ List(setDApp, issue))), TestBlock.create(Seq(ci)), settings) {
-        _ should produce("leads to negative waves balance to (at least) temporary negative state")
-      }
+        assertDiffEi(Seq(TestBlock.create(genesis ++ List(setDApp, issue))), TestBlock.create(Seq(ci)), settings) {
+          _ should produce("leads to negative waves balance to (at least) temporary negative state")
+        }
     }
   }
 
@@ -101,19 +104,19 @@ class OverdraftTest extends PropSpec with WithState {
 
   property("attach unexisting tokens using multiple payment") {
     dAppVersions.foreach { version =>
-      val master = TxHelpers.signer(0)
+      val master  = TxHelpers.signer(0)
       val invoker = TxHelpers.signer(1)
 
       val genesis = Seq(
         TxHelpers.genesis(master.toAddress),
         TxHelpers.genesis(invoker.toAddress)
       )
-      val issue = TxHelpers.issue(invoker)
+      val issue   = TxHelpers.issue(invoker)
       val setDApp = TxHelpers.setScript(master, payingAssetDApp(version, issue.assetId))
 
       val count    = ContractLimits.MaxAttachedPaymentAmount
       val payments = (1 to count).map(_ => Payment(issue.quantity.value / count + 1, IssuedAsset(issue.id())))
-      val invoke = TxHelpers.invoke(master.toAddress, func = None, invoker = invoker, payments = payments)
+      val invoke   = TxHelpers.invoke(master.toAddress, func = None, invoker = invoker, payments = payments)
 
       assertDiffEi(Seq(TestBlock.create(genesis ++ List(setDApp, issue))), TestBlock.create(Seq(invoke)), allActivatedSettings) {
         _ should produce("Attempt to transfer unavailable funds: Transaction application leads to negative asset")
@@ -121,10 +124,12 @@ class OverdraftTest extends PropSpec with WithState {
     }
   }
 
-  private def paymentPreconditions(withEnoughFee: Boolean,
-                                   withPayment: Boolean,
-                                   dApp: Script): (Seq[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, IssueTransaction) = {
-    val master = TxHelpers.signer(0)
+  private def paymentPreconditions(
+      withEnoughFee: Boolean,
+      withPayment: Boolean,
+      dApp: Script
+  ): (Seq[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, IssueTransaction) = {
+    val master  = TxHelpers.signer(0)
     val invoker = TxHelpers.signer(1)
 
     val genesis = Seq(
@@ -132,7 +137,7 @@ class OverdraftTest extends PropSpec with WithState {
       TxHelpers.genesis(invoker.toAddress, if (withPayment) IssueFee else 0)
     )
     val setDApp = TxHelpers.setScript(master, dApp)
-    val issue = TxHelpers.issue(invoker, fee = IssueFee)
+    val issue   = TxHelpers.issue(invoker, fee = IssueFee)
 
     val invoke = TxHelpers.invoke(
       dApp = master.toAddress,

@@ -8,7 +8,8 @@ import org.iq80.leveldb.{CompressionType, DB, DBFactory, Options}
 class LevelDBJNADBFactory extends DBFactory {
   private[this] def openJnaDatabase(path: File, options: Options): LevelDB = {
     val opts = LevelDBJNADBFactory.toJNAOptions(options)
-    try new LevelDB(path.toString, opts) finally opts.close()
+    try new LevelDB(path.toString, opts)
+    finally opts.close()
   }
 
   override def open(path: File, options: Options): DB = {
@@ -18,12 +19,14 @@ class LevelDBJNADBFactory extends DBFactory {
 
   override def destroy(path: File, options: Options): Unit = {
     val options1 = LevelDBJNADBFactory.toJNAOptions(options)
-    try LevelDB.destroy(path.toString, options1) finally options1.close()
+    try LevelDB.destroy(path.toString, options1)
+    finally options1.close()
   }
 
   override def repair(path: File, options: Options): Unit = {
     val options1 = LevelDBJNADBFactory.toJNAOptions(options)
-    try LevelDB.repair(path.toString, options1) finally options1.close()
+    try LevelDB.repair(path.toString, options1)
+    finally options1.close()
   }
 }
 
@@ -33,7 +36,7 @@ private object LevelDBJNADBFactory {
     opts.setBlockRestartInterval(o1.blockRestartInterval())
     opts.setBlockSize(o1.blockSize())
     opts.setCompressionType(o1.compressionType() match {
-      case CompressionType.NONE => LevelDBCompressionType.NoCompression
+      case CompressionType.NONE   => LevelDBCompressionType.NoCompression
       case CompressionType.SNAPPY => LevelDBCompressionType.SnappyCompression
     })
     opts.setCreateIfMissing(o1.createIfMissing())

@@ -118,17 +118,17 @@ object OrderJson {
       (JsPath \ "orderType").read[OrderType] and
       (JsPath \ "amount").read[Long].map(TxExchangeAmount.from).flatMapResult {
         case Right(amount) => JsSuccess(amount)
-        case _ => JsError(TxExchangeAmount.errMsg)
+        case _             => JsError(TxExchangeAmount.errMsg)
       } and
       (JsPath \ "price").read[Long].map(TxOrderPrice.from).flatMapResult {
         case Right(price) => JsSuccess(price)
-        case _ => JsError(TxOrderPrice.errMsg)
+        case _            => JsError(TxOrderPrice.errMsg)
       } and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "expiration").read[Long] and
       (JsPath \ "matcherFee").read[Long].map(TxMatcherFee.from).flatMapResult {
         case Right(fee) => JsSuccess(fee)
-        case _ => JsError(TxMatcherFee.errMsg)
+        case _          => JsError(TxMatcherFee.errMsg)
       } and
       (JsPath \ "signature").readNullable[Array[Byte]] and
       (JsPath \ "proofs").readNullable[Array[Array[Byte]]] and
@@ -143,17 +143,17 @@ object OrderJson {
       (JsPath \ "orderType").read[OrderType] and
       (JsPath \ "amount").read[Long].map(TxExchangeAmount.from).flatMapResult {
         case Right(amount) => JsSuccess(amount)
-        case _ => JsError(TxExchangeAmount.errMsg)
+        case _             => JsError(TxExchangeAmount.errMsg)
       } and
       (JsPath \ "price").read[Long].map(TxOrderPrice.from).flatMapResult {
         case Right(price) => JsSuccess(price)
-        case _ => JsError(TxOrderPrice.errMsg)
+        case _            => JsError(TxOrderPrice.errMsg)
       } and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "expiration").read[Long] and
       (JsPath \ "matcherFee").read[Long].map(TxMatcherFee.from).flatMapResult {
         case Right(fee) => JsSuccess(fee)
-        case _ => JsError(TxMatcherFee.errMsg)
+        case _          => JsError(TxMatcherFee.errMsg)
       } and
       (JsPath \ "signature").readNullable[Array[Byte]] and
       (JsPath \ "proofs").readNullable[Array[Array[Byte]]] and
@@ -168,7 +168,7 @@ object OrderJson {
     case jsOrder @ JsObject(map) =>
       map.getOrElse("version", JsNumber(1)) match {
         case JsNumber(x) if x.byteValue >= Order.V3 => orderV3V4Reads.reads(jsOrder)
-        case _                                        => orderV1V2Reads.reads(jsOrder)
+        case _                                      => orderV1V2Reads.reads(jsOrder)
       }
     case invalidOrder => JsError(s"Can't parse invalid order $invalidOrder")
   }

@@ -102,29 +102,46 @@ class CreateAliasTransactionSpecification extends PropSpec with WithDomain {
   }
 
   property("Multiple proofs") {
-    withDomain(DomainPresets.RideV5.copy(
-      blockchainSettings = DomainPresets.RideV5.blockchainSettings.copy(
-        functionalitySettings = DomainPresets.RideV5.blockchainSettings.functionalitySettings.copy(
-          allowMultipleProofsInCreateAliasUntil = 2
+    withDomain(
+      DomainPresets.RideV5.copy(
+        blockchainSettings = DomainPresets.RideV5.blockchainSettings.copy(
+          functionalitySettings = DomainPresets.RideV5.blockchainSettings.functionalitySettings.copy(
+            allowMultipleProofsInCreateAliasUntil = 2
+          )
         )
       )
-    )) { d =>
+    ) { d =>
       val sender = KeyPair(Longs.toByteArray(Random.nextLong()))
       d.appendBlock(
         GenesisTransaction.create(sender.toAddress, 100.waves, System.currentTimeMillis()).explicitGet(),
-        SetScriptTransaction.selfSigned(2.toByte, sender, Some(TestCompiler(V5).compileExpression(
-          """{-# STDLIB_VERSION 5 #-}
+        SetScriptTransaction
+          .selfSigned(
+            2.toByte,
+            sender,
+            Some(TestCompiler(V5).compileExpression("""{-# STDLIB_VERSION 5 #-}
             |{-# CONTENT_TYPE EXPRESSION #-}
             |{-# SCRIPT_TYPE ACCOUNT #-}
             |
             |true
-            |""".stripMargin)), 0.01.waves, System.currentTimeMillis()).explicitGet()
+            |""".stripMargin)),
+            0.01.waves,
+            System.currentTimeMillis()
+          )
+          .explicitGet()
       )
 
       val kp1 = KeyPair(Longs.toByteArray(Random.nextLong()))
       val kp2 = KeyPair(Longs.toByteArray(Random.nextLong()))
 
-      val cat = CreateAliasTransaction(3.toByte, sender.publicKey, "abc12345", TxPositiveAmount.unsafeFrom(0.001.waves), System.currentTimeMillis(), Proofs.empty, 'T'.toByte)
+      val cat = CreateAliasTransaction(
+        3.toByte,
+        sender.publicKey,
+        "abc12345",
+        TxPositiveAmount.unsafeFrom(0.001.waves),
+        System.currentTimeMillis(),
+        Proofs.empty,
+        'T'.toByte
+      )
       val signedCreateAlias = cat.copy(
         proofs = cat.signWith(kp1.privateKey).proofs.proofs ++ cat.signWith(kp2.privateKey).proofs.proofs
       )
@@ -134,7 +151,15 @@ class CreateAliasTransactionSpecification extends PropSpec with WithDomain {
 
       d.appendBlock()
 
-      val cat2 = CreateAliasTransaction(3.toByte, sender.publicKey, "xyz12345", TxPositiveAmount.unsafeFrom(0.001.waves), System.currentTimeMillis(), Proofs.empty, 'T'.toByte)
+      val cat2 = CreateAliasTransaction(
+        3.toByte,
+        sender.publicKey,
+        "xyz12345",
+        TxPositiveAmount.unsafeFrom(0.001.waves),
+        System.currentTimeMillis(),
+        Proofs.empty,
+        'T'.toByte
+      )
       val signedCreateAlias2 = cat2.copy(
         proofs = cat.signWith(kp1.privateKey).proofs.proofs ++ cat.signWith(kp2.privateKey).proofs.proofs
       )

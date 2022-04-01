@@ -29,12 +29,11 @@ object SetScriptTransactionDiff {
             AccountScriptInfo(tx.sender, script, verifierComplexity, callableComplexities)
         }
         .traverseTap(checkOverflow(blockchain, _))
-    } yield
-      Diff(
-        portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee.value, LeaseBalance.empty, Map.empty)),
-        scripts = Map(tx.sender.toAddress    -> scriptWithComplexities),
-        scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
-      )
+    } yield Diff(
+      portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee.value, LeaseBalance.empty, Map.empty)),
+      scripts = Map(tx.sender.toAddress    -> scriptWithComplexities),
+      scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
+    )
 
   def estimate(
       blockchain: Blockchain,
@@ -60,22 +59,22 @@ object SetScriptTransactionDiff {
       version: StdLibVersion,
       dApp: DApp
   ): Either[String, List[(Long, Map[String, Long])]] =
-    ScriptEstimator.all(fixOverflow = blockchain.checkEstimationOverflow)
+    ScriptEstimator
+      .all(fixOverflow = blockchain.checkEstimationOverflow)
       .drop(blockchain.estimator.version)
       .traverse(
         se =>
           ContractScript
             .estimateComplexityExact(version, dApp, se)
-            .map { case ((_, maxComplexity), complexities) => (maxComplexity, complexities) })
+            .map { case ((_, maxComplexity), complexities) => (maxComplexity, complexities) }
+      )
 
   private def checkOverflow(blockchain: Blockchain, s: AccountScriptInfo): Either[GenericError, Unit] =
     if (blockchain.checkEstimationOverflow)
       if (s.verifierComplexity < 0)
         Left(GenericError("Unexpected negative verifier complexity"))
       else
-        s.complexitiesByEstimator
-          .values
-          .flatten
+        s.complexitiesByEstimator.values.flatten
           .collectFirst { case (name, complexity) if complexity < 0 => GenericError(s"Unexpected negative callable `$name` complexity") }
           .toLeft(())
     else

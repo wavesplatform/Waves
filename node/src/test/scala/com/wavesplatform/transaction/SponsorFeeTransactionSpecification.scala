@@ -155,18 +155,20 @@ class SponsorFeeTransactionSpecification extends PropSpec with WithState {
       for {
         sender                                                                       <- accountGen
         (_, assetName, description, quantity, decimals, reissuable, iFee, timestamp) <- issueParamGen
-        issue = IssueTransaction.selfSigned(
-          TxVersion.V1,
-          sender,
-          new String(assetName),
-          new String(description),
-          quantity,
-          decimals,
-          reissuable = reissuable,
-          script = None,
-          iFee,
-          timestamp
-        ).explicitGet()
+        issue = IssueTransaction
+          .selfSigned(
+            TxVersion.V1,
+            sender,
+            new String(assetName),
+            new String(description),
+            quantity,
+            decimals,
+            reissuable = reissuable,
+            script = None,
+            iFee,
+            timestamp
+          )
+          .explicitGet()
         minFee <- smallFeeGen
         assetId = issue.assetId
       } yield SponsorFeeTransaction.selfSigned(1.toByte, sender, IssuedAsset(assetId), Some(minFee), fee, timestamp) should produce(
@@ -180,18 +182,20 @@ class SponsorFeeTransactionSpecification extends PropSpec with WithState {
       for {
         sender                                                                       <- accountGen
         (_, assetName, description, quantity, decimals, reissuable, iFee, timestamp) <- issueParamGen
-        issue = IssueTransaction.selfSigned(
-          TxVersion.V1,
-          sender,
-          new String(assetName),
-          new String(description),
-          quantity,
-          decimals,
-          reissuable = reissuable,
-          script = None,
-          iFee,
-          timestamp
-        ).explicitGet()
+        issue = IssueTransaction
+          .selfSigned(
+            TxVersion.V1,
+            sender,
+            new String(assetName),
+            new String(description),
+            quantity,
+            decimals,
+            reissuable = reissuable,
+            script = None,
+            iFee,
+            timestamp
+          )
+          .explicitGet()
         minFee  = None
         assetId = issue.assetId
       } yield SponsorFeeTransaction.selfSigned(1.toByte, sender, IssuedAsset(assetId), minFee, fee, timestamp) should produce("insufficient fee")
@@ -202,7 +206,8 @@ class SponsorFeeTransactionSpecification extends PropSpec with WithState {
     val setup = for {
       (acc, name, desc, quantity, decimals, reissuable, fee, ts) <- issueParamGen
       genesis = GenesisTransaction.create(acc.toAddress, ENOUGH_AMT, ts).explicitGet()
-      issue = IssueTransaction.selfSigned(TxVersion.V1, acc, new String(name), new String(desc), quantity, decimals, reissuable, script = None, fee, ts)
+      issue = IssueTransaction
+        .selfSigned(TxVersion.V1, acc, new String(name), new String(desc), quantity, decimals, reissuable, script = None, fee, ts)
         .explicitGet()
       minFee <- Gen.choose(1L, issue.quantity.value)
       sponsor = SponsorFeeTransaction.selfSigned(1.toByte, acc, IssuedAsset(issue.id()), Some(minFee), One, ts).explicitGet()
@@ -228,7 +233,8 @@ class SponsorFeeTransactionSpecification extends PropSpec with WithState {
     val setup = for {
       (acc, name, desc, quantity, decimals, reissuable, fee, ts) <- issueParamGen
       genesis = GenesisTransaction.create(acc.toAddress, ENOUGH_AMT, ts).explicitGet()
-      issue = IssueTransaction.selfSigned(TxVersion.V1, acc, new String(name), new String(desc), quantity, decimals, reissuable, script = None, fee, ts)
+      issue = IssueTransaction
+        .selfSigned(TxVersion.V1, acc, new String(name), new String(desc), quantity, decimals, reissuable, script = None, fee, ts)
         .explicitGet()
       minFee <- Gen.choose(1000000L, issue.quantity.value)
       sponsor = SponsorFeeTransaction.selfSigned(1.toByte, acc, IssuedAsset(issue.id()), Some(minFee), One, ts).explicitGet()
@@ -257,7 +263,8 @@ class SponsorFeeTransactionSpecification extends PropSpec with WithState {
     val setup = for {
       (acc, name, desc, quantity, decimals, reissuable, fee, ts) <- issueParamGen
       genesis = GenesisTransaction.create(acc.toAddress, ENOUGH_AMT, ts).explicitGet()
-      issue = IssueTransaction.selfSigned(TxVersion.V1, acc, new String(name), new String(desc), quantity, decimals, reissuable, script = None, fee, ts)
+      issue = IssueTransaction
+        .selfSigned(TxVersion.V1, acc, new String(name), new String(desc), quantity, decimals, reissuable, script = None, fee, ts)
         .explicitGet()
       minFee <- Gen.choose(1, issue.quantity.value / 11)
 
@@ -288,7 +295,8 @@ class SponsorFeeTransactionSpecification extends PropSpec with WithState {
     val setup = for {
       (acc, name, desc, quantity, decimals, reissuable, fee, ts) <- issueParamGen
       genesis = GenesisTransaction.create(acc.toAddress, ENOUGH_AMT, ts).explicitGet()
-      issue = IssueTransaction.selfSigned(TxVersion.V1, acc, new String(name), new String(desc), quantity, decimals, reissuable, script = None, fee, ts)
+      issue = IssueTransaction
+        .selfSigned(TxVersion.V1, acc, new String(name), new String(desc), quantity, decimals, reissuable, script = None, fee, ts)
         .explicitGet()
       minSponsoredAssetFee <- Gen.choose(1, issue.quantity.value / 11)
       minFee               <- Gen.choose(One / 1000, One - 1)

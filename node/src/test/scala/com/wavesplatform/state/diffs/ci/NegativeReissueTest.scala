@@ -35,14 +35,14 @@ class NegativeReissueTest extends PropSpec with WithDomain {
       .copy(syncDAppCheckTransfersHeight = 4)
 
   property("negative reissue quantity") {
-    for(bigComplexity <- Seq(false, true)) {
+    for (bigComplexity <- Seq(false, true)) {
       val invoker = TxHelpers.signer(0)
-      val dApp = TxHelpers.signer(1)
+      val dApp    = TxHelpers.signer(1)
 
       val balances = AddrWithBalance.enoughBalances(invoker, dApp)
 
-      val issue = TxHelpers.issue(dApp, 100)
-      val asset = IssuedAsset(issue.id.value())
+      val issue     = TxHelpers.issue(dApp, 100)
+      val asset     = IssuedAsset(issue.id.value())
       val setScript = TxHelpers.setScript(dApp, dAppScript(asset, bigComplexity))
 
       val preparingTxs = Seq(issue, setScript)

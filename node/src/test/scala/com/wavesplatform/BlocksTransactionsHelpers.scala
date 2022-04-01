@@ -75,18 +75,20 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     def nftIssue(from: KeyPair, timestamp: Gen[Long] = timestampGen): Gen[IssueTransaction] =
       for {
         timestamp <- timestamp
-      } yield IssueTransaction.selfSigned(
-        TxVersion.V1,
-        from,
-        "test",
-        "",
-        1,
-        0,
-        reissuable = false,
-        script = None,
-        100000000L,
-        timestamp
-      ).explicitGet()
+      } yield IssueTransaction
+        .selfSigned(
+          TxVersion.V1,
+          from,
+          "test",
+          "",
+          1,
+          0,
+          reissuable = false,
+          script = None,
+          100000000L,
+          timestamp
+        )
+        .explicitGet()
 
     def setScript(from: KeyPair, script: Script, timestamp: Gen[Long] = timestampGen): Gen[SetScriptTransaction] =
       for {

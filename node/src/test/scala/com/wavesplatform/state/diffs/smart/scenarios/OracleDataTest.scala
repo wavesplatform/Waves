@@ -24,18 +24,18 @@ class OracleDataTest extends PropSpec with WithState {
   val preconditions: (Seq[GenesisTransaction], CreateAliasTransaction, SetScriptTransaction, DataTransaction, TransferTransaction) = {
     val master = TxHelpers.signer(1)
     val oracle = TxHelpers.signer(2)
-    val alice = TxHelpers.signer(3)
+    val alice  = TxHelpers.signer(3)
 
-    val genesis = Seq(master, oracle).map(acc => TxHelpers.genesis(acc.toAddress))
-    val alias = Alias.create("alias").explicitGet()
+    val genesis     = Seq(master, oracle).map(acc => TxHelpers.genesis(acc.toAddress))
+    val alias       = Alias.create("alias").explicitGet()
     val createAlias = TxHelpers.createAlias(alias.name, oracle)
 
-    val long = IntegerDataEntry("long", 1)
-    val bool = BooleanDataEntry("bool", true)
-    val bin = BinaryDataEntry("bin", ByteStr.fromLong(1))
-    val str = StringDataEntry("str", "test_str")
-    val dataTx = TxHelpers.data(oracle, Seq(long, bool, bin, str))
-    val allFieldsRequiredScript = s"""
+    val long                           = IntegerDataEntry("long", 1)
+    val bool                           = BooleanDataEntry("bool", true)
+    val bin                            = BinaryDataEntry("bin", ByteStr.fromLong(1))
+    val str                            = StringDataEntry("str", "test_str")
+    val dataTx                         = TxHelpers.data(oracle, Seq(long, bool, bin, str))
+    val allFieldsRequiredScript        = s"""
                                    | match tx {
                                    | case t : DataTransaction =>
                                    |   let txId = match extract(transactionById(t.id)) {
@@ -56,7 +56,7 @@ class OracleDataTest extends PropSpec with WithState {
     val untypedAllFieldsRequiredScript = Parser.parseExpr(allFieldsRequiredScript).get.value
     val typedAllFieldsRequiredScript =
       ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedAllFieldsRequiredScript).explicitGet()._1
-    val setScript = TxHelpers.setScript(master, ExprScript(typedAllFieldsRequiredScript).explicitGet())
+    val setScript            = TxHelpers.setScript(master, ExprScript(typedAllFieldsRequiredScript).explicitGet())
     val transferFromScripted = TxHelpers.transfer(master, alice.toAddress)
 
     (genesis, createAlias, setScript, dataTx, transferFromScripted)

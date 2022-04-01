@@ -333,7 +333,13 @@ object PBTransactions {
     val signature = proofs.toSignature
     data match {
       case Data.Genesis(GenesisTransactionData(recipient, amount, `empty`)) =>
-        vt.GenesisTransaction(PBRecipients.toAddress(recipient.toByteArray, chainId).explicitGet(), TxNonNegativeAmount.unsafeFrom(amount), timestamp, signature, chainId)
+        vt.GenesisTransaction(
+          PBRecipients.toAddress(recipient.toByteArray, chainId).explicitGet(),
+          TxNonNegativeAmount.unsafeFrom(amount),
+          timestamp,
+          signature,
+          chainId
+        )
 
       case Data.Payment(PaymentTransactionData(recipient, amount, `empty`)) =>
         vt.PaymentTransaction(
@@ -402,7 +408,16 @@ object PBTransactions {
         )
 
       case Data.Burn(BurnTransactionData(Some(Amount(assetId, amount, `empty`)), `empty`)) =>
-        vt.assets.BurnTransaction(version.toByte, sender, IssuedAsset(assetId.toByteStr), TxNonNegativeAmount.unsafeFrom(amount), TxPositiveAmount.unsafeFrom(feeAmount), timestamp, proofs, chainId)
+        vt.assets.BurnTransaction(
+          version.toByte,
+          sender,
+          IssuedAsset(assetId.toByteStr),
+          TxNonNegativeAmount.unsafeFrom(amount),
+          TxPositiveAmount.unsafeFrom(feeAmount),
+          timestamp,
+          proofs,
+          chainId
+        )
 
       case Data.SetAssetScript(SetAssetScriptTransactionData(assetId, script, `empty`)) =>
         vt.assets.SetAssetScriptTransaction(
@@ -458,14 +473,24 @@ object PBTransactions {
         )
 
       case Data.DataTransaction(dt) =>
-        vt.DataTransaction(version.toByte, sender, dt.data.toList.map(toVanillaDataEntry), TxPositiveAmount.unsafeFrom(feeAmount), timestamp, proofs, chainId)
+        vt.DataTransaction(
+          version.toByte,
+          sender,
+          dt.data.toList.map(toVanillaDataEntry),
+          TxPositiveAmount.unsafeFrom(feeAmount),
+          timestamp,
+          proofs,
+          chainId
+        )
 
       case Data.MassTransfer(mt) =>
         vt.transfer.MassTransferTransaction(
           version.toByte,
           sender,
           PBAmounts.toVanillaAssetId(mt.assetId),
-          mt.transfers.flatMap(t => t.getRecipient.toAddressOrAlias(chainId).toOption.map(ParsedTransfer(_, TxNonNegativeAmount.unsafeFrom(t.amount)))).toList,
+          mt.transfers
+            .flatMap(t => t.getRecipient.toAddressOrAlias(chainId).toOption.map(ParsedTransfer(_, TxNonNegativeAmount.unsafeFrom(t.amount))))
+            .toList,
           TxPositiveAmount.unsafeFrom(feeAmount),
           timestamp,
           mt.attachment.toByteStr,

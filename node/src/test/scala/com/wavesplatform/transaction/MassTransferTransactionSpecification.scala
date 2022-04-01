@@ -107,11 +107,17 @@ class MassTransferTransactionSpecification extends PropSpec {
         val negativeFeeEi = create(1.toByte, sender, assetId, feeOverflow, -100, timestamp, attachment, proofs)
         negativeFeeEi shouldBe Left(TxValidationError.InsufficientFee)
 
-        val differentChainIds = Seq(ParsedTransfer(sender.toAddress, TxNonNegativeAmount.unsafeFrom(100)), ParsedTransfer(sender.toAddress('?'.toByte), TxNonNegativeAmount.unsafeFrom(100)))
-        val invalidChainIdEi  = create(1.toByte, sender, assetId, differentChainIds, 100, timestamp, attachment, proofs)
+        val differentChainIds = Seq(
+          ParsedTransfer(sender.toAddress, TxNonNegativeAmount.unsafeFrom(100)),
+          ParsedTransfer(sender.toAddress('?'.toByte), TxNonNegativeAmount.unsafeFrom(100))
+        )
+        val invalidChainIdEi = create(1.toByte, sender, assetId, differentChainIds, 100, timestamp, attachment, proofs)
         invalidChainIdEi should produce("One of chain ids not match")
 
-        val otherChainIds         = Seq(ParsedTransfer(sender.toAddress('?'.toByte), TxNonNegativeAmount.unsafeFrom(100)), ParsedTransfer(sender.toAddress('?'.toByte), TxNonNegativeAmount.unsafeFrom(100)))
+        val otherChainIds = Seq(
+          ParsedTransfer(sender.toAddress('?'.toByte), TxNonNegativeAmount.unsafeFrom(100)),
+          ParsedTransfer(sender.toAddress('?'.toByte), TxNonNegativeAmount.unsafeFrom(100))
+        )
         val invalidOtherChainIdEi = create(1.toByte, sender, assetId, otherChainIds, 100, timestamp, attachment, proofs)
         invalidOtherChainIdEi should produce("One of chain ids not match")
     }

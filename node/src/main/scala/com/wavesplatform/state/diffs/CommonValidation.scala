@@ -80,8 +80,9 @@ object CommonValidation {
                 s"${blockchain.balance(ptx.sender.toAddress, Waves)} is less than ${ptx.amount.value + ptx.fee.value}"
             )
           )
-        case ttx: TransferTransaction     => checkTransfer(ttx.sender.toAddress, ttx.assetId, ttx.amount.value, ttx.feeAssetId, ttx.fee.value)
-        case mtx: MassTransferTransaction => checkTransfer(mtx.sender.toAddress, mtx.assetId, mtx.transfers.map(_.amount.value).sum, Waves, mtx.fee.value)
+        case ttx: TransferTransaction => checkTransfer(ttx.sender.toAddress, ttx.assetId, ttx.amount.value, ttx.feeAssetId, ttx.fee.value)
+        case mtx: MassTransferTransaction =>
+          checkTransfer(mtx.sender.toAddress, mtx.assetId, mtx.transfers.map(_.amount.value).sum, Waves, mtx.fee.value)
         case citx: InvokeScriptTransaction =>
           val foldPayments: Iterable[Payment] => Iterable[Payment] =
             if (blockchain.useCorrectPaymentCheck)

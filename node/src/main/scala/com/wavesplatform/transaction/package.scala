@@ -38,7 +38,7 @@ package object transaction {
   type TxNonNegativeAmount = Long Refined NonNegative
   object TxNonNegativeAmount extends RefinedTypeOps[TxNonNegativeAmount, Long]
 
-  type TxDecimals = Byte Refined Interval.Closed[0, IssueTransaction.MaxAssetDecimals.type ]
+  type TxDecimals = Byte Refined Interval.Closed[0, IssueTransaction.MaxAssetDecimals.type]
   object TxDecimals extends RefinedTypeOps[TxDecimals, Byte] {
     val errMsg = s"decimals should be in interval [0; ${IssueTransaction.MaxAssetDecimals}]"
   }
@@ -48,17 +48,17 @@ package object transaction {
     val errMsg = "price should be > 0"
   }
 
-  type TxExchangeAmount = Long Refined Interval.OpenClosed[0, Order.MaxAmount.type ]
+  type TxExchangeAmount = Long Refined Interval.OpenClosed[0, Order.MaxAmount.type]
   object TxExchangeAmount extends RefinedTypeOps[TxExchangeAmount, Long] {
     val errMsg = s"amount should be in interval (0; ${Order.MaxAmount}]"
   }
 
-  type TxExchangePrice = Long Refined Interval.OpenClosed[0, Order.MaxAmount.type ]
+  type TxExchangePrice = Long Refined Interval.OpenClosed[0, Order.MaxAmount.type]
   object TxExchangePrice extends RefinedTypeOps[TxExchangePrice, Long] {
     val errMsg = s"price should be in interval (0; ${Order.MaxAmount}]"
   }
 
-  type TxMatcherFee = Long Refined Interval.Open[0, Order.MaxAmount.type ]
+  type TxMatcherFee = Long Refined Interval.Open[0, Order.MaxAmount.type]
   object TxMatcherFee extends RefinedTypeOps[TxMatcherFee, Long] {
     val errMsg = s"matcher fee should be in interval (0; ${Order.MaxAmount})"
   }

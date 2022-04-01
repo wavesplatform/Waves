@@ -21,7 +21,8 @@ object LeaseTxSerializer {
 
   def bodyBytes(tx: LeaseTransaction): Array[Byte] = {
     import tx._
-    val baseBytes = Bytes.concat(sender.arr, recipient.bytes, Longs.toByteArray(amount.value), Longs.toByteArray(fee.value), Longs.toByteArray(timestamp))
+    val baseBytes =
+      Bytes.concat(sender.arr, recipient.bytes, Longs.toByteArray(amount.value), Longs.toByteArray(fee.value), Longs.toByteArray(timestamp))
 
     version match {
       case TxVersion.V1 => Bytes.concat(Array(typeId), baseBytes)

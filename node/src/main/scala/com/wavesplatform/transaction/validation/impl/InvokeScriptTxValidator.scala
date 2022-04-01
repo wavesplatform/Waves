@@ -36,7 +36,7 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
     val callableNameSize =
       funcCallOpt match {
         case Some(FUNCTION_CALL(FunctionHeader.User(internalName, _), _)) => internalName.utf8Bytes.length
-        case _ => 0
+        case _                                                            => 0
       }
 
     V.seq(tx)(
@@ -50,8 +50,7 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
         GenericError(s"Callable function name size = $callableNameSize bytes must be less than ${ContractLimits.MaxDeclarationNameInBytes}")
       ),
       checkAmounts(payments),
-      Try(checkLength)
-        .toEither
+      Try(checkLength).toEither
         .leftMap(err => GenericError(err.getMessage))
         .filterOrElse(identity, TooBigArray)
         .toValidatedNel

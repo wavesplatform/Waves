@@ -18,11 +18,7 @@ import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.Json._
 import play.api.libs.json._
 
-class LeaseBroadcastRouteSpec
-    extends RouteSpec("/leasing/broadcast/")
-    with RequestGen
-    with PathMockFactory
-    with RestAPISettingsHelper {
+class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with RequestGen with PathMockFactory with RestAPISettingsHelper {
   private[this] val publisher = DummyTransactionPublisher.rejecting(t => TransactionValidationError(GenericError("foo"), t))
   private[this] val route     = LeaseApiRoute(restAPISettings, stub[Wallet], stub[Blockchain], publisher, stub[Time], stub[CommonAccountsApi]).route
   "returns StateCheckFailed" - {
