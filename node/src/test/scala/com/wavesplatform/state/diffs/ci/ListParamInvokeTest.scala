@@ -31,16 +31,26 @@ class ListParamInvokeTest extends PropSpec with WithState with Inside {
         List(
           CallableFunction(
             CallableAnnotation("i"),
-            FUNC("f", List("args"),
+            FUNC(
+              "f",
+              List("args"),
               FUNCTION_CALL(
                 Native(FunctionIds.CREATE_LIST),
                 List(
-                  FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("entry1").explicitGet(), FUNCTION_CALL(Native(FunctionIds.GET_LIST), List(REF("args"), CONST_LONG(0))))),
+                  FUNCTION_CALL(
+                    User("DataEntry"),
+                    List(CONST_STRING("entry1").explicitGet(), FUNCTION_CALL(Native(FunctionIds.GET_LIST), List(REF("args"), CONST_LONG(0))))
+                  ),
                   FUNCTION_CALL(
                     Native(FunctionIds.CREATE_LIST),
                     List(
-                      FUNCTION_CALL(User("DataEntry"), List(CONST_STRING("entry2").explicitGet(), FUNCTION_CALL(Native(FunctionIds.GET_LIST), List(REF("args"), CONST_LONG(1))))),
-                      REF("nil")))
+                      FUNCTION_CALL(
+                        User("DataEntry"),
+                        List(CONST_STRING("entry2").explicitGet(), FUNCTION_CALL(Native(FunctionIds.GET_LIST), List(REF("args"), CONST_LONG(1))))
+                      ),
+                      REF("nil")
+                    )
+                  )
                 )
               )
             )
@@ -65,7 +75,7 @@ class ListParamInvokeTest extends PropSpec with WithState with Inside {
   }
 
   private def paymentPreconditions(dApp: Script): (Seq[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, Address) = {
-    val master = TxHelpers.signer(0)
+    val master  = TxHelpers.signer(0)
     val invoker = TxHelpers.signer(1)
 
     val genesis = Seq(
@@ -88,7 +98,6 @@ class ListParamInvokeTest extends PropSpec with WithState with Inside {
   private def dApp(version: StdLibVersion): Script = {
     val result =
       if (version == V3)
-
         """
           |WriteSet([
           |  DataEntry("entry1", args[0]),
@@ -122,7 +131,7 @@ class ListParamInvokeTest extends PropSpec with WithState with Inside {
     val parameters = Seq(
       BlockchainFeatures.SmartAccounts,
       BlockchainFeatures.SmartAssets,
-      BlockchainFeatures.Ride4DApps,
+      BlockchainFeatures.Ride4DApps
     ) ++ v4ForkO
     TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = parameters.map(_.id -> 0).toMap)
   }

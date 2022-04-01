@@ -180,25 +180,30 @@ class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
   private val dAppVersionsBeforeActivation = versionsBeforeActivation.filter(_ >= V3)
 
   private val scenario = {
-    val recipient = TxHelpers.signer(0)
-    val invoker = TxHelpers.signer(1)
+    val recipient  = TxHelpers.signer(0)
+    val invoker    = TxHelpers.signer(1)
     val accWithFix = (1 to allVersions.size).map(idx => TxHelpers.signer(idx + 1)).zip(allVersions).toList
-    val accWithNoFix = (1 to versionsBeforeActivation.size).map(idx => TxHelpers.signer(idx + allVersions.size + 1)).zip(versionsBeforeActivation).toList
-    val dAppWithFix = (1 to allDAppVersions.size).map(idx => TxHelpers.signer(idx + allVersions.size + versionsBeforeActivation.size + 1)).zip(allDAppVersions).toList
-    val dAppWithNoFix = (1 to dAppVersionsBeforeActivation.size).map(idx => TxHelpers.signer(idx + allVersions.size + versionsBeforeActivation.size + allDAppVersions.size + 1)).zip(dAppVersionsBeforeActivation).toList
+    val accWithNoFix =
+      (1 to versionsBeforeActivation.size).map(idx => TxHelpers.signer(idx + allVersions.size + 1)).zip(versionsBeforeActivation).toList
+    val dAppWithFix =
+      (1 to allDAppVersions.size).map(idx => TxHelpers.signer(idx + allVersions.size + versionsBeforeActivation.size + 1)).zip(allDAppVersions).toList
+    val dAppWithNoFix = (1 to dAppVersionsBeforeActivation.size)
+      .map(idx => TxHelpers.signer(idx + allVersions.size + versionsBeforeActivation.size + allDAppVersions.size + 1))
+      .zip(dAppVersionsBeforeActivation)
+      .toList
 
     val balances = (accWithFix ::: accWithNoFix ::: dAppWithFix ::: dAppWithNoFix)
       .map { case (acc, _) => AddrWithBalance(acc.toAddress) }
     val invokerBalance = AddrWithBalance(invoker.toAddress)
 
-    val setNoFix = accWithNoFix.map { case (acc, v) => TxHelpers.setScript(acc, checkNoFixScript(v)) }
-    val setFix = accWithFix.map { case (acc, v) => TxHelpers.setScript(acc, checkFixScript(v)) }
+    val setNoFix     = accWithNoFix.map { case (acc, v)  => TxHelpers.setScript(acc, checkNoFixScript(v)) }
+    val setFix       = accWithFix.map { case (acc, v)    => TxHelpers.setScript(acc, checkFixScript(v)) }
     val setNoFixDApp = dAppWithNoFix.map { case (acc, v) => TxHelpers.setScript(acc, checkNoFixDAppScript(v)) }
-    val setFixDApp = dAppWithFix.map { case (acc, v) => TxHelpers.setScript(acc, checkFixDAppScript(v)) }
+    val setFixDApp   = dAppWithFix.map { case (acc, v)   => TxHelpers.setScript(acc, checkFixDAppScript(v)) }
 
-    val checkFix = accWithFix.map { case (acc, _) => TxHelpers.transfer(acc, recipient.toAddress, 1) }
-    val checkNoFix = () => accWithNoFix.map { case (acc, _) => TxHelpers.transfer(acc, recipient.toAddress, 1) }
-    val checkFixDApp = dAppWithFix.map { case (acc, _) => TxHelpers.invoke(acc.toAddress, func = None, invoker = invoker) }
+    val checkFix       = accWithFix.map { case (acc, _) => TxHelpers.transfer(acc, recipient.toAddress, 1) }
+    val checkNoFix     = () => accWithNoFix.map { case (acc, _) => TxHelpers.transfer(acc, recipient.toAddress, 1) }
+    val checkFixDApp   = dAppWithFix.map { case (acc, _) => TxHelpers.invoke(acc.toAddress, func = None, invoker = invoker) }
     val checkNoFixDApp = () => dAppWithNoFix.map { case (acc, _) => TxHelpers.invoke(acc.toAddress, func = None, invoker = invoker) }
 
     (invokerBalance :: balances, setNoFix, setFix, checkFix, checkNoFix, setNoFixDApp, setFixDApp, checkFixDApp, checkNoFixDApp)

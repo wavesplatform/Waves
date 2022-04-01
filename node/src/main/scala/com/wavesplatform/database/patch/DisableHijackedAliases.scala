@@ -11,7 +11,6 @@ case object DisableHijackedAliases extends PatchDataLoader {
     case _   => 0
   }
 
-
   def apply(rw: RW): Set[Alias] = {
     val aliases = readPatchData[Set[String]]().map(Alias.create(_).explicitGet())
     rw.put(Keys.disabledAliases, aliases)

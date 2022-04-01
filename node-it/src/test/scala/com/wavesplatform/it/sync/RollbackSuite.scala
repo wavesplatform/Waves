@@ -1,18 +1,10 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.state.{BooleanDataEntry, IntegerDataEntry, StringDataEntry}
-import com.wavesplatform.test._
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Proofs, TxVersion}
+import com.wavesplatform.state.{BooleanDataEntry, IntegerDataEntry}
+import com.wavesplatform.transaction.TxVersion
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.concurrent.Await
@@ -29,7 +21,7 @@ class RollbackSuite extends BaseFunSuite with TransferSending with TableDrivenPr
       .withSpecial(1, _.nonMiner)
       .buildNonConflicting()
 
-  private lazy val nodeAddresses        = nodeConfigs.map(_.getString("address")).toSet
+  private lazy val nodeAddresses = nodeConfigs.map(_.getString("address")).toSet
 
   private def notMinerAddress: String = notMiner.address
 

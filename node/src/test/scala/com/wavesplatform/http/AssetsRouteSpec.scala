@@ -16,7 +16,7 @@ import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Height}
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers}
+import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxNonNegativeAmount}
 import com.wavesplatform.{TestTime, TestWallet}
 import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
@@ -60,12 +60,12 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
           .zip(issueTransactions.reverse)
           .foreach {
             case (jso, tx) =>
-              (jso \ "balance").as[Long] shouldEqual tx.quantity
+              (jso \ "balance").as[Long] shouldEqual tx.quantity.value
               (jso \ "assetId").as[ByteStr] shouldEqual tx.id()
               (jso \ "reissuable").as[Boolean] shouldBe tx.reissuable
               (jso \ "minSponsoredAssetFee").asOpt[Long] shouldEqual None
               (jso \ "sponsorBalance").asOpt[Long] shouldEqual None
-              (jso \ "quantity").as[Long] shouldEqual tx.quantity
+              (jso \ "quantity").as[Long] shouldEqual tx.quantity.value
               (jso \ "issueTransaction").as[JsObject] shouldEqual tx.json()
           }
 
@@ -101,7 +101,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
           .toMap
 
         val balancesAfterIssue = issueTransactions.init.map { it =>
-          it.id() -> it.quantity
+          it.id() -> it.quantity.value
         }.toMap
 
         allBalances shouldEqual balancesAfterIssue
@@ -165,7 +165,9 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
     val issueTransaction = TxHelpers.issue(issuer, 100_0000, 4, "PA_01")
     d.appendBlock(TxHelpers.genesis(issuer.toAddress, 10.waves))
     val recipients = testWallet.generateNewAccounts(5)
-    val transfers  = recipients.zipWithIndex.map { case (kp, i) => MassTransferTransaction.ParsedTransfer(kp.toAddress, (i + 1) * 10000) }
+    val transfers = recipients.zipWithIndex.map {
+      case (kp, i) => MassTransferTransaction.ParsedTransfer(kp.toAddress, TxNonNegativeAmount.unsafeFrom((i + 1) * 10000))
+    }
     d.appendBlock(
       issueTransaction,
       MassTransferTransaction
@@ -185,8 +187,8 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
     Get(routePath(s"/${issueTransaction.id()}/distribution/2/limit/$MaxAddressesPerRequest")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "items").as[JsObject] shouldBe Json.obj(
-        transfers.map(pt => pt.address.toString -> (pt.amount: JsValueWrapper)) :+
-          (issuer.toAddress.toString -> (issueTransaction.quantity - transfers.map(_.amount).sum: JsValueWrapper)): _*
+        transfers.map(pt => pt.address.toString -> (pt.amount.value: JsValueWrapper)) :+
+          (issuer.toAddress.toString -> (issueTransaction.quantity.value - transfers.map(_.amount.value).sum: JsValueWrapper)): _*
       )
     }
 
@@ -239,9 +241,9 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
               sender.publicKey,
               issueTransaction.name,
               issueTransaction.description,
-              issueTransaction.decimals,
+              issueTransaction.decimals.value,
               reissuable,
-              issueTransaction.quantity,
+              issueTransaction.quantity.value,
               Height(d.blockchain.height),
               script.map(s => AssetScriptInfo(s, 1L)),
               0L,
@@ -265,7 +267,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
     Get(routePath(s"/balance/${issuer.toAddress}/${nonNFT.id()}")) ~> route ~> check {
       val balance = responseAs[JsObject]
       (balance \ "address").as[String] shouldEqual issuer.toAddress.toString
-      (balance \ "balance").as[Long] shouldEqual nonNFT.quantity
+      (balance \ "balance").as[Long] shouldEqual nonNFT.quantity.value
       (balance \ "assetId").as[String] shouldEqual nonNFT.id().toString
     }
 
@@ -290,7 +292,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
     (response \ "issuer").as[String] shouldBe tx.sender.toAddress.toString
     (response \ "name").as[String] shouldBe tx.name.toStringUtf8
     (response \ "description").as[String] shouldBe tx.description.toStringUtf8
-    (response \ "decimals").as[Int] shouldBe tx.decimals
+    (response \ "decimals").as[Int] shouldBe tx.decimals.value
     (response \ "reissuable").as[Boolean] shouldBe tx.reissuable
     (response \ "quantity").as[BigDecimal] shouldBe desc.totalVolume
     (response \ "minSponsoredAssetFee").asOpt[Long] shouldBe empty

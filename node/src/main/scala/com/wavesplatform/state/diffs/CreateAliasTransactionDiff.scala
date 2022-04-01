@@ -17,7 +17,7 @@ object CreateAliasTransactionDiff {
     else
       Right(
         Diff(
-          portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)),
+          portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee.value, LeaseBalance.empty, Map.empty)),
           aliases = Map(tx.alias               -> tx.sender.toAddress),
           scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
         )

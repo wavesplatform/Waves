@@ -3,7 +3,9 @@ package com.wavesplatform.transaction.assets.exchange
 import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import com.wavesplatform.transaction.serialization.impl.OrderSerializer
@@ -21,11 +23,11 @@ case class Order(
     matcherPublicKey: PublicKey,
     assetPair: AssetPair,
     orderType: OrderType,
-    amount: TxAmount,
-    price: TxAmount,
+    amount: TxExchangeAmount,
+    price: TxOrderPrice,
     timestamp: TxTimestamp,
     expiration: TxTimestamp,
-    matcherFee: TxAmount,
+    matcherFee: TxMatcherFee,
     matcherFeeAssetId: Asset = Waves,
     proofs: Proofs = Proofs.empty
 ) extends Proven {
@@ -34,26 +36,17 @@ case class Order(
   val sender: PublicKey = senderPublicKey
 
   def isValid(atTime: Long): Validation = {
-    isValidAmount(amount, price) &&
     assetPair.isValid &&
-    (matcherFee > 0) :| "matcherFee should be > 0" &&
-    (matcherFee < MaxAmount) :| "matcherFee too large" &&
     (timestamp > 0) :| "timestamp should be > 0" &&
     (expiration - atTime <= MaxLiveTime) :| "expiration should be earlier than 30 days" &&
     (expiration >= atTime) :| "expiration should be > currentTime" &&
     (matcherFeeAssetId == Waves || version >= Order.V3) :| "matcherFeeAssetId should be waves"
   }
 
-  def isValidAmount(matchAmount: Long, matchPrice: Long): Validation = {
-    (matchAmount > 0) :| "amount should be > 0" &&
-    (matchPrice > 0) :| "price should be > 0" &&
-    (matchAmount < MaxAmount) :| "amount too large"
-  }
-
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(OrderSerializer.bodyBytes(this))
-  val id: Coeval[ByteStr] = Coeval.evalOnce(ByteStr(crypto.fastHash(bodyBytes())))
-  val idStr: Coeval[String] = Coeval.evalOnce(id().toString)
-  val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(OrderSerializer.toBytes(this))
+  val id: Coeval[ByteStr]            = Coeval.evalOnce(ByteStr(crypto.fastHash(bodyBytes())))
+  val idStr: Coeval[String]          = Coeval.evalOnce(id().toString)
+  val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(OrderSerializer.toBytes(this))
 
   def getReceiveAssetId: Asset = orderType match {
     case OrderType.BUY  => assetPair.amountAsset
@@ -98,44 +91,49 @@ object Order {
       matcher: PublicKey,
       assetPair: AssetPair,
       orderType: OrderType,
-      amount: TxAmount,
-      price: TxAmount,
+      amount: Long,
+      price: Long,
       timestamp: TxTimestamp,
       expiration: TxTimestamp,
-      matcherFee: TxAmount,
+      matcherFee: Long,
       matcherFeeAssetId: Asset = Asset.Waves
-  ): Order =
-    Order(version, sender.publicKey, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId).signWith(sender.privateKey)
+  ): Either[ValidationError, Order] =
+    for {
+      amount     <- TxExchangeAmount(amount)(GenericError(s"Order validation error: ${TxExchangeAmount.errMsg}"))
+      price      <- TxOrderPrice(price)(GenericError(s"Order validation error: ${TxOrderPrice.errMsg}"))
+      matcherFee <- TxMatcherFee(matcherFee)(GenericError(s"Order validation error: ${TxMatcherFee.errMsg}"))
+    } yield {
+      Order(version, sender.publicKey, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId)
+        .signWith(sender.privateKey)
+    }
 
   def buy(
       version: TxVersion,
       sender: KeyPair,
       matcher: PublicKey,
       pair: AssetPair,
-      amount: TxAmount,
-      price: TxAmount,
+      amount: Long,
+      price: Long,
       timestamp: TxTimestamp,
       expiration: TxTimestamp,
-      matcherFee: TxAmount,
+      matcherFee: Long,
       matcherFeeAssetId: Asset = Waves
-  ): Order = {
+  ): Either[ValidationError, Order] =
     Order.selfSigned(version, sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId)
-  }
 
   def sell(
       version: TxVersion,
       sender: KeyPair,
       matcher: PublicKey,
       pair: AssetPair,
-      amount: TxAmount,
-      price: TxAmount,
+      amount: Long,
+      price: Long,
       timestamp: TxTimestamp,
       expiration: TxTimestamp,
-      matcherFee: TxAmount,
+      matcherFee: Long,
       matcherFeeAssetId: Asset = Waves
-  ): Order = {
+  ): Either[ValidationError, Order] =
     Order.selfSigned(version, sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId)
-  }
 
   def parseBytes(version: Version, bytes: Array[Byte]): Try[Order] =
     OrderSerializer.parseBytes(version, bytes)

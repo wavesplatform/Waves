@@ -10,7 +10,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError.{GenericError, InsufficientFee, OrderValidationError}
+import com.wavesplatform.transaction.TxValidationError.{GenericError, OrderValidationError}
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
 
 object ExchangeTransactionDiff {
@@ -30,7 +30,7 @@ object ExchangeTransactionDiff {
         _ <- Right(())
         smartTradesEnabled = blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading)
         smartAssetsEnabled = blockchain.isFeatureActivated(BlockchainFeatures.SmartAssets)
-        assetsScripted      = assets.values.count(_.flatMap(_.script).isDefined)
+        assetsScripted     = assets.values.count(_.flatMap(_.script).isDefined)
         _ <- Either.cond(
           smartAssetsEnabled || assetsScripted == 0,
           (),
@@ -51,12 +51,12 @@ object ExchangeTransactionDiff {
       } yield (assetsScripted, buyerScripted, sellerScripted)
 
     for {
-      buyerAndSellerScripted          <- smartFeaturesChecks()
-      portfolios <- getPortfolios(blockchain, tx)
-      tx         <- enoughVolume(tx, blockchain)
+      buyerAndSellerScripted <- smartFeaturesChecks()
+      portfolios             <- getPortfolios(blockchain, tx)
+      tx                     <- enoughVolume(tx, blockchain)
       scripts = {
         val (assetsScripted, buyerScripted, sellerScripted) = buyerAndSellerScripted
-        val matcherScripted = Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
+        val matcherScripted                                 = Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
 
         // Don't count before Ride4DApps activation
         val ordersScripted = Seq(buyerScripted, sellerScripted)
@@ -71,8 +71,8 @@ object ExchangeTransactionDiff {
       Diff(
         portfolios = portfolios,
         orderFills = Map(
-          tx.buyOrder.id()  -> VolumeAndFee(tx.amount, tx.buyMatcherFee),
-          tx.sellOrder.id() -> VolumeAndFee(tx.amount, tx.sellMatcherFee)
+          tx.buyOrder.id()  -> VolumeAndFee(tx.amount.value, tx.buyMatcherFee),
+          tx.sellOrder.id() -> VolumeAndFee(tx.amount.value, tx.sellMatcherFee)
         ),
         scriptsRun = scripts
       )
@@ -87,15 +87,14 @@ object ExchangeTransactionDiff {
         }.toEither.leftMap(x => GenericError(x.getMessage))
 
       def orderPrice(order: Order, amountDecimals: Int, priceDecimals: Int) =
-        if (tx.version >= TxVersion.V3 && order.version < Order.V4) convertPrice(order.price, amountDecimals, priceDecimals)
-        else Right(order.price)
+        if (tx.version >= TxVersion.V3 && order.version < Order.V4) convertPrice(order.price.value, amountDecimals, priceDecimals)
+        else Right(order.price.value)
 
       for {
-        _              <- Either.cond(tx.price != 0L, (), GenericError("price should be > 0"))
         buyOrderPrice  <- orderPrice(tx.buyOrder, amountDecimals, priceDecimals)
         sellOrderPrice <- orderPrice(tx.sellOrder, amountDecimals, priceDecimals)
-        _              <- Either.cond(tx.price <= buyOrderPrice, (), GenericError("price should be <= buyOrder.price"))
-        _              <- Either.cond(tx.price >= sellOrderPrice, (), GenericError("price should be >= sellOrder.price"))
+        _              <- Either.cond(tx.price.value <= buyOrderPrice, (), GenericError("price should be <= buyOrder.price"))
+        _              <- Either.cond(tx.price.value >= sellOrderPrice, (), GenericError("price should be >= sellOrder.price"))
       } yield ()
     }
 
@@ -121,7 +120,7 @@ object ExchangeTransactionDiff {
         Seq(
           getOrderFeePortfolio(tx.buyOrder, tx.buyMatcherFee),
           getOrderFeePortfolio(tx.sellOrder, tx.sellMatcherFee),
-          Portfolio.waves(-tx.fee)
+          Portfolio.waves(-tx.fee.value)
         )
       )
 
@@ -135,19 +134,18 @@ object ExchangeTransactionDiff {
 
     for {
       _ <- Either.cond(
-        blockchain.height < blockchain.settings.functionalitySettings.forbidNegativeMatcherFee ||
-          tx.buyMatcherFee >= 0 && tx.sellMatcherFee >= 0,
+        tx.buyMatcherFee >= 0 && tx.sellMatcherFee >= 0,
         (),
-        InsufficientFee("Matcher fee can not be negative")
+        GenericError("Matcher fee can not be negative")
       )
       _ <- Either.cond(assets.values.forall(_.isDefined), (), GenericError("Assets should be issued before they can be traded"))
       amountDecimals = if (tx.version < TxVersion.V3) 8 else tx.buyOrder.assetPair.amountAsset.fold(8)(ia => assets(ia).fold(8)(_.decimals))
       priceDecimals  = if (tx.version < TxVersion.V3) 8 else tx.buyOrder.assetPair.priceAsset.fold(8)(ia => assets(ia).fold(8)(_.decimals))
       _                     <- isPriceValid(amountDecimals, priceDecimals)
-      buyPriceAssetChange   <- getSpendAmount(tx.buyOrder, amountDecimals, priceDecimals, tx.amount, tx.price).map(-_)
-      buyAmountAssetChange  <- getReceiveAmount(tx.buyOrder, amountDecimals, priceDecimals, tx.amount, tx.price)
-      sellPriceAssetChange  <- getReceiveAmount(tx.sellOrder, amountDecimals, priceDecimals, tx.amount, tx.price)
-      sellAmountAssetChange <- getSpendAmount(tx.sellOrder, amountDecimals, priceDecimals, tx.amount, tx.price).map(-_)
+      buyPriceAssetChange   <- getSpendAmount(tx.buyOrder, amountDecimals, priceDecimals, tx.amount.value, tx.price.value).map(-_)
+      buyAmountAssetChange  <- getReceiveAmount(tx.buyOrder, amountDecimals, priceDecimals, tx.amount.value, tx.price.value)
+      sellPriceAssetChange  <- getReceiveAmount(tx.sellOrder, amountDecimals, priceDecimals, tx.amount.value, tx.price.value)
+      sellAmountAssetChange <- getSpendAmount(tx.sellOrder, amountDecimals, priceDecimals, tx.amount.value, tx.price.value).map(-_)
       priceDiff  = getAssetDiff(tx.buyOrder.assetPair.priceAsset, buyPriceAssetChange, sellPriceAssetChange)
       amountDiff = getAssetDiff(tx.buyOrder.assetPair.amountAsset, buyAmountAssetChange, sellAmountAssetChange)
     } yield Monoid.combineAll(Seq(feeDiff, priceDiff, amountDiff))
@@ -158,11 +156,11 @@ object ExchangeTransactionDiff {
     val filledBuy  = blockchain.filledVolumeAndFee(exTrans.buyOrder.id())
     val filledSell = blockchain.filledVolumeAndFee(exTrans.sellOrder.id())
 
-    val buyTotal  = filledBuy.volume + exTrans.amount
-    val sellTotal = filledSell.volume + exTrans.amount
+    val buyTotal  = filledBuy.volume + exTrans.amount.value
+    val sellTotal = filledSell.volume + exTrans.amount.value
 
-    lazy val buyAmountValid  = exTrans.buyOrder.amount >= buyTotal
-    lazy val sellAmountValid = exTrans.sellOrder.amount >= sellTotal
+    lazy val buyAmountValid  = exTrans.buyOrder.amount.value >= buyTotal
+    lazy val sellAmountValid = exTrans.sellOrder.amount.value >= sellTotal
 
     def isFeeValid(feeTotal: Long, amountTotal: Long, maxfee: Long, maxAmount: Long, order: Order): Boolean = {
       feeTotal <= (order match {
@@ -175,8 +173,8 @@ object ExchangeTransactionDiff {
       isFeeValid(
         feeTotal = filledBuy.fee + exTrans.buyMatcherFee,
         amountTotal = buyTotal,
-        maxfee = exTrans.buyOrder.matcherFee,
-        maxAmount = exTrans.buyOrder.amount,
+        maxfee = exTrans.buyOrder.matcherFee.value,
+        maxAmount = exTrans.buyOrder.amount.value,
         order = exTrans.buyOrder
       )
 
@@ -184,8 +182,8 @@ object ExchangeTransactionDiff {
       isFeeValid(
         feeTotal = filledSell.fee + exTrans.sellMatcherFee,
         amountTotal = sellTotal,
-        maxfee = exTrans.sellOrder.matcherFee,
-        maxAmount = exTrans.sellOrder.amount,
+        maxfee = exTrans.sellOrder.matcherFee.value,
+        maxAmount = exTrans.sellOrder.amount.value,
         order = exTrans.sellOrder
       )
 
@@ -208,7 +206,7 @@ object ExchangeTransactionDiff {
       if (order.orderType == OrderType.SELL) matchAmount
       else {
         val spend = (BigDecimal(matchAmount) * matchPrice * BigDecimal(10).pow(priceDecimals - amountDecimals - 8)).toBigInt
-        if (order.getSpendAssetId == Waves && !(spend + order.matcherFee).isValidLong) {
+        if (order.getSpendAssetId == Waves && !(spend + order.matcherFee.value).isValidLong) {
           throw new ArithmeticException("BigInteger out of long range")
         } else spend.bigInteger.longValueExact()
       }

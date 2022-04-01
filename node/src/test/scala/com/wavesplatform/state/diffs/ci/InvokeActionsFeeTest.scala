@@ -34,8 +34,7 @@ class InvokeActionsFeeTest extends PropSpec with Inside with WithState with DBCa
     )
 
   private def dApp(asset: IssuedAsset): Script =
-    TestCompiler(V4).compileContract(
-      s"""
+    TestCompiler(V4).compileContract(s"""
          | @Callable(i)
          | func default() =
          |  [

@@ -359,7 +359,7 @@ object TransactionsApiRoute {
       originTransactionId: ByteStr,
       sender: Address,
       recipient: Address,
-      amount: TxAmount,
+      amount: Long,
       height: Int,
       status: LeaseStatus = LeaseStatus.active,
       cancelHeight: Option[Int] = None,

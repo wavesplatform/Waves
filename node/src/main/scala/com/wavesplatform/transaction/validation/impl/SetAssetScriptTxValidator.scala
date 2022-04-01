@@ -16,8 +16,7 @@ object SetAssetScriptTxValidator extends TxValidator[SetAssetScriptTransaction] 
       V.cond(
         script.isDefined,
         GenericError("Cannot set empty script")
-      ),
-      V.fee(fee)
+      )
     )
   }
 }

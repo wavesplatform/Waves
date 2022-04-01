@@ -26,5 +26,11 @@ object CachedDAppCTX {
     }).toMap
 
   def get(version: StdLibVersion, blockchain: Blockchain): InvariableContext =
-    cache((version, blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls), blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckPaymentsHeight))
+    cache(
+      (
+        version,
+        blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls),
+        blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckPaymentsHeight
+      )
+    )
 }

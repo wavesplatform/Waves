@@ -21,11 +21,22 @@ class RebroadcastTransactionSuite extends BaseTransactionSuite with NodesFromDoc
   override protected def nodeConfigs: Seq[Config] =
     Seq(configWithRebroadcastAllowed.withFallback(Miners.head), configWithRebroadcastAllowed.withFallback(NotMiner))
 
-  private def nodeAIsMiner: Node = nodes.head
+  private def nodeAIsMiner: Node    = nodes.head
   private def nodeBIsNotMiner: Node = nodes.last
 
   test("should rebroadcast a transaction if that's allowed in config") {
-    val tx = TransferTransaction.selfSigned(2.toByte, nodeAIsMiner.keyPair, Address.fromString(nodeBIsNotMiner.address).explicitGet(), Waves, transferAmount, Waves, minFee, ByteStr.empty,  System.currentTimeMillis())
+    val tx = TransferTransaction
+      .selfSigned(
+        2.toByte,
+        nodeAIsMiner.keyPair,
+        Address.fromString(nodeBIsNotMiner.address).explicitGet(),
+        Waves,
+        transferAmount,
+        Waves,
+        minFee,
+        ByteStr.empty,
+        System.currentTimeMillis()
+      )
       .explicitGet()
       .json()
 
@@ -44,7 +55,17 @@ class RebroadcastTransactionSuite extends BaseTransactionSuite with NodesFromDoc
     dockerNodes().foreach(docker.restartNode(_, configWithRebroadcastNotAllowed))
 
     val tx = TransferTransaction
-      .selfSigned(2.toByte, nodeAIsMiner.keyPair, Address.fromString(nodeBIsNotMiner.address).explicitGet(), Waves, transferAmount, Waves, minFee, ByteStr.empty,  System.currentTimeMillis())
+      .selfSigned(
+        2.toByte,
+        nodeAIsMiner.keyPair,
+        Address.fromString(nodeBIsNotMiner.address).explicitGet(),
+        Waves,
+        transferAmount,
+        Waves,
+        minFee,
+        ByteStr.empty,
+        System.currentTimeMillis()
+      )
       .explicitGet()
       .json()
 
@@ -62,14 +83,27 @@ class RebroadcastTransactionSuite extends BaseTransactionSuite with NodesFromDoc
 
   test("should not broadcast a transaction if there are not enough peers") {
     val tx = TransferTransaction
-      .selfSigned(2.toByte, nodeAIsMiner.keyPair, Address.fromString(nodeBIsNotMiner.address).explicitGet(), Waves, transferAmount, Waves, minFee, ByteStr.empty,  System.currentTimeMillis())
+      .selfSigned(
+        2.toByte,
+        nodeAIsMiner.keyPair,
+        Address.fromString(nodeBIsNotMiner.address).explicitGet(),
+        Waves,
+        transferAmount,
+        Waves,
+        minFee,
+        ByteStr.empty,
+        System.currentTimeMillis()
+      )
       .explicitGet()
       .json()
 
     val testNode = dockerNodes().last
     try {
       docker.restartNode(testNode, configWithMinimumPeers(999))
-      assertApiError(testNode.signedBroadcast(tx), CustomValidationError("There are not enough connections with peers \\(\\d+\\) to accept transaction").assertiveRegex)
+      assertApiError(
+        testNode.signedBroadcast(tx),
+        CustomValidationError("There are not enough connections with peers \\(\\d+\\) to accept transaction").assertiveRegex
+      )
     } finally {
       docker.restartNode(testNode, configWithMinimumPeers(0))
     }

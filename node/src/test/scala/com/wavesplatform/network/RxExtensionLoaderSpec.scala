@@ -25,11 +25,14 @@ class RxExtensionLoaderSpec extends FreeSpec with RxScheduler with BlockGen {
   override def testSchedulerName: String = "test-rx-extension-loader"
 
   private def withExtensionLoader(lastBlockIds: Seq[ByteStr] = Seq.empty, timeOut: FiniteDuration = 1.day, applier: Applier = simpleApplier)(
-      f: (InMemoryInvalidBlockStorage,
+      f: (
+          InMemoryInvalidBlockStorage,
           PS[(Channel, Block)],
           PS[(Channel, Signatures)],
           PS[ChannelClosedAndSyncWith],
-          Observable[(Channel, Block)]) => Any) = {
+          Observable[(Channel, Block)]
+      ) => Any
+  ) = {
     val blocks          = PS[(Channel, Block)]()
     val sigs            = PS[(Channel, Signatures)]()
     val ccsw            = PS[ChannelClosedAndSyncWith]()
@@ -38,7 +41,8 @@ class RxExtensionLoaderSpec extends FreeSpec with RxScheduler with BlockGen {
     val invBlockStorage = new InMemoryInvalidBlockStorage
     val (singleBlocks, _, _) =
       RxExtensionLoader(timeOut, Coeval(lastBlockIds.reverse.take(MaxRollback)), op, invBlockStorage, blocks, sigs, ccsw, testScheduler, timeout)(
-        applier)
+        applier
+      )
 
     try {
       f(invBlockStorage, blocks, sigs, ccsw, singleBlocks)
@@ -134,7 +138,7 @@ class RxExtensionLoaderSpec extends FreeSpec with RxScheduler with BlockGen {
       Task {
         applied = true
         Right(None)
-    }
+      }
     withExtensionLoader(Seq.tabulate(100)(byteStr), applier = successfulApplier) { (_, blocks, sigs, ccsw, _) =>
       val ch = new EmbeddedChannel()
       test(for {

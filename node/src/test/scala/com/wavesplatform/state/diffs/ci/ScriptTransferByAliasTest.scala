@@ -67,16 +67,16 @@ class ScriptTransferByAliasTest extends PropSpec with WithDomain {
   }
 
   property(s"ScriptTransfer alias recipient is mapped correctly after ${BlockchainFeatures.SynchronousCalls} activation") {
-    val dAppAcc = TxHelpers.signer(0)
-    val invoker = TxHelpers.signer(1)
+    val dAppAcc  = TxHelpers.signer(0)
+    val invoker  = TxHelpers.signer(1)
     val receiver = TxHelpers.signer(2)
 
     val balances = AddrWithBalance.enoughBalances(dAppAcc, invoker, receiver)
 
-    val createAlias = TxHelpers.createAlias(alias, receiver)
-    val issue = TxHelpers.issue(dAppAcc, ENOUGH_AMT, script = Some(verifier))
-    val asset = IssuedAsset(issue.id())
-    val setDApp = TxHelpers.setScript(dAppAcc, dApp(asset))
+    val createAlias  = TxHelpers.createAlias(alias, receiver)
+    val issue        = TxHelpers.issue(dAppAcc, ENOUGH_AMT, script = Some(verifier))
+    val asset        = IssuedAsset(issue.id())
+    val setDApp      = TxHelpers.setScript(dAppAcc, dApp(asset))
     val preparingTxs = Seq(createAlias, issue, setDApp)
 
     val invoke1 = TxHelpers.invoke(dAppAcc.toAddress, func = None, invoker = invoker, fee = TxHelpers.ciFee(sc = 1))

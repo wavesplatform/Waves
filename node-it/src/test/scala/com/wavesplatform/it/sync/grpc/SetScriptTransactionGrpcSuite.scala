@@ -11,7 +11,14 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.protobuf.Amount
-import com.wavesplatform.protobuf.transaction.{PBTransactions, Recipient, SetScriptTransactionData, SignedTransaction, TransferTransactionData, Transaction => PBTransaction}
+import com.wavesplatform.protobuf.transaction.{
+  PBTransactions,
+  Recipient,
+  SetScriptTransactionData,
+  SignedTransaction,
+  TransferTransactionData,
+  Transaction => PBTransaction
+}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import io.grpc.Status.Code
 
@@ -34,10 +41,16 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
         }
       """.stripMargin
 
-      val script           = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
-      val scriptComplexity = Script.estimate(Script.fromBase64String(script.bytes().base64).explicitGet(), ScriptEstimatorV3(fixOverflow = true), useContractVerifierLimit = true).explicitGet()
-      val setScriptTx      = sender.setScript(contract, Right(Some(script)), setScriptFee, waitForTx = true)
-      val setScriptTxId    = PBTransactions.vanilla(setScriptTx).explicitGet().id().toString
+      val script = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
+      val scriptComplexity = Script
+        .estimate(
+          Script.fromBase64String(script.bytes().base64).explicitGet(),
+          ScriptEstimatorV3(fixOverflow = true),
+          useContractVerifierLimit = true
+        )
+        .explicitGet()
+      val setScriptTx   = sender.setScript(contract, Right(Some(script)), setScriptFee, waitForTx = true)
+      val setScriptTxId = PBTransactions.vanilla(setScriptTx).explicitGet().id().toString
 
       val scriptInfo = sender.scriptInfo(contractAddr)
 
@@ -82,9 +95,13 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
         )
       )
       val sig1 =
-        ByteString.copyFrom(crypto.sign(secondAcc.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsignedTransfer))).explicitGet().bodyBytes()).arr)
+        ByteString.copyFrom(
+          crypto.sign(secondAcc.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsignedTransfer))).explicitGet().bodyBytes()).arr
+        )
       val sig2 =
-        ByteString.copyFrom(crypto.sign(thirdAcc.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsignedTransfer))).explicitGet().bodyBytes()).arr)
+        ByteString.copyFrom(
+          crypto.sign(thirdAcc.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsignedTransfer))).explicitGet().bodyBytes()).arr
+        )
 
       sender.broadcast(unsignedTransfer, Seq(sig1, sig2), waitForTx = true)
       sender.wavesBalance(contractAddr).available shouldBe firstBalance - transferAmount - transferFee
@@ -104,9 +121,13 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
         data = PBTransaction.Data.SetScript(SetScriptTransactionData())
       )
       val sig1 =
-        ByteString.copyFrom(crypto.sign(secondAcc.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsignedSetScript))).explicitGet().bodyBytes()).arr)
+        ByteString.copyFrom(
+          crypto.sign(secondAcc.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsignedSetScript))).explicitGet().bodyBytes()).arr
+        )
       val sig2 =
-        ByteString.copyFrom(crypto.sign(thirdAcc.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsignedSetScript))).explicitGet().bodyBytes()).arr)
+        ByteString.copyFrom(
+          crypto.sign(thirdAcc.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsignedSetScript))).explicitGet().bodyBytes()).arr
+        )
 
       sender.broadcast(unsignedSetScript, Seq(sig1, sig2), waitForTx = true)
 

@@ -57,10 +57,10 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       * @return Tuple of (asset, feeInAsset, feeInWaves)
       * @see [[com.wavesplatform.state.diffs.FeeValidation#getMinFee(com.wavesplatform.state.Blockchain, com.wavesplatform.transaction.Transaction)]]
       */
-    def calculateFee(tx: Transaction): (Asset, TxAmount, TxAmount) =
+    def calculateFee(tx: Transaction): (Asset, Long, Long) =
       transactions.calculateFee(tx).explicitGet()
 
-    def calculateWavesFee(tx: Transaction): TxAmount = {
+    def calculateWavesFee(tx: Transaction): Long = {
       val (Waves, _, feeInWaves) = (calculateFee(tx): @unchecked)
       feeInWaves
     }
@@ -295,7 +295,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       appendBlock(entries.map(TxHelpers.dataEntry(account, _)): _*)
     }
 
-    def transfer(account: KeyPair, to: Address, amount: TxAmount, asset: Asset): Unit = {
+    def transfer(account: KeyPair, to: Address, amount: Long, asset: Asset): Unit = {
       appendBlock(TxHelpers.transfer(account, to, amount, asset))
     }
 

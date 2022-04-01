@@ -5,10 +5,7 @@ import com.wavesplatform.it._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
 
-class AssetsApiGrpcSuite
-    extends BaseFreeSpec
-    with ActivationStatusRequest
-    with GrpcIntegrationSuiteWithThreeAddress {
+class AssetsApiGrpcSuite extends BaseFreeSpec with ActivationStatusRequest with GrpcIntegrationSuiteWithThreeAddress {
 
   "nftList returns all NFT" in {
     import com.wavesplatform.it.api.SyncGrpcApi._

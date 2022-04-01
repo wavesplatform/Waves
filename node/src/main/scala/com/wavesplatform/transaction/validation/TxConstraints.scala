@@ -43,7 +43,7 @@ object TxConstraints {
       .condNel(
         fee > 0,
         fee,
-        TxValidationError.InsufficientFee()
+        TxValidationError.InsufficientFee
       )
   }
 

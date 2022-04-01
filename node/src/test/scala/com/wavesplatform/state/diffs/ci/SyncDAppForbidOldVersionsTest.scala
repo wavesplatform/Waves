@@ -49,9 +49,9 @@ class SyncDAppForbidOldVersionsTest
 
   property("sync call is forbidden for V3 and V4 DApps") {
     Seq(V3, V4).foreach { callingDAppVersion =>
-      val invoker = TxHelpers.signer(0)
+      val invoker     = TxHelpers.signer(0)
       val callingDApp = TxHelpers.signer(1)
-      val proxyDApp = TxHelpers.signer(2)
+      val proxyDApp   = TxHelpers.signer(2)
 
       val balances = AddrWithBalance.enoughBalances(invoker, callingDApp, proxyDApp)
 

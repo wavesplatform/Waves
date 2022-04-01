@@ -42,8 +42,8 @@ class ScriptedSponsorTest extends PropSpec with WithState {
 
   property("sponsorship works when used by scripted accounts") {
     val (setupTxs, transfer, assetId) = separateContractAndSponsor
-    val setupBlocks   = setupTxs.map(TestBlock.create)
-    val transferBlock = TestBlock.create(Seq(transfer))
+    val setupBlocks                   = setupTxs.map(TestBlock.create)
+    val transferBlock                 = TestBlock.create(Seq(transfer))
 
     val contract            = transfer.sender
     val contractSpent: Long = ENOUGH_FEE + 1
@@ -62,8 +62,8 @@ class ScriptedSponsorTest extends PropSpec with WithState {
 
   property("sponsorship works when sponsored by scripted accounts") {
     val (setupTxs, transfer, assetId) = scriptedSponsor
-    val setupBlocks   = setupTxs.map(TestBlock.create)
-    val transferBlock = TestBlock.create(Seq(transfer))
+    val setupBlocks                   = setupTxs.map(TestBlock.create)
+    val transferBlock                 = TestBlock.create(Seq(transfer))
 
     val contract  = setupTxs.flatten.collectFirst { case t: SponsorFeeTransaction => t.sender }.get
     val recipient = transfer.sender
@@ -81,34 +81,34 @@ class ScriptedSponsorTest extends PropSpec with WithState {
   }
 
   private def scriptedSponsor = {
-    val contract = TxHelpers.signer(1)
+    val contract  = TxHelpers.signer(1)
     val recipient = TxHelpers.signer(2)
-    val otherAcc = TxHelpers.signer(3)
+    val otherAcc  = TxHelpers.signer(3)
 
-    val genesis = Seq(contract, recipient).map(acc => TxHelpers.genesis(acc.toAddress))
-    val (script, _) = ScriptCompiler(s"{-# STDLIB_VERSION 2 #-}\n true", isAssetScript = false, estimator).explicitGet()
-    val issue = TxHelpers.issue(contract, Long.MaxValue, fee = ENOUGH_FEE, version = TxVersion.V1)
-    val asset = IssuedAsset(issue.id())
-    val sponsorTx = TxHelpers.sponsor(asset, Some(1), contract, fee = SPONSOR_FEE)
+    val genesis             = Seq(contract, recipient).map(acc => TxHelpers.genesis(acc.toAddress))
+    val (script, _)         = ScriptCompiler(s"{-# STDLIB_VERSION 2 #-}\n true", isAssetScript = false, estimator).explicitGet()
+    val issue               = TxHelpers.issue(contract, Long.MaxValue, fee = ENOUGH_FEE, version = TxVersion.V1)
+    val asset               = IssuedAsset(issue.id())
+    val sponsorTx           = TxHelpers.sponsor(asset, Some(1), contract, fee = SPONSOR_FEE)
     val transferToRecipient = TxHelpers.transfer(contract, recipient.toAddress, ENOUGH_FEE * 3, asset, fee = ENOUGH_FEE)
-    val setScript = TxHelpers.setScript(contract, script, fee = ENOUGH_FEE)
-    val transfer = TxHelpers.transfer(recipient, otherAcc.toAddress, 1, feeAsset = asset, fee = ENOUGH_FEE)
+    val setScript           = TxHelpers.setScript(contract, script, fee = ENOUGH_FEE)
+    val transfer            = TxHelpers.transfer(recipient, otherAcc.toAddress, 1, feeAsset = asset, fee = ENOUGH_FEE)
 
     (Seq(genesis, Seq(issue, sponsorTx), Seq(transferToRecipient, setScript)), transfer, issue.id())
   }
 
   private def separateContractAndSponsor = {
     val contract = TxHelpers.signer(1)
-    val sponsor = TxHelpers.signer(2)
+    val sponsor  = TxHelpers.signer(2)
 
-    val genesis = Seq(contract, sponsor).map(acc => TxHelpers.genesis(acc.toAddress))
-    val (script, _) = ScriptCompiler(s"{-# STDLIB_VERSION 2 #-}\n true", isAssetScript = false, estimator).explicitGet()
-    val issue = TxHelpers.issue(sponsor, Long.MaxValue, fee = ENOUGH_FEE, version = TxVersion.V1)
-    val asset = IssuedAsset(issue.id())
-    val sponsorTx = TxHelpers.sponsor(asset, Some(1), sponsor, fee = SPONSOR_FEE)
+    val genesis            = Seq(contract, sponsor).map(acc => TxHelpers.genesis(acc.toAddress))
+    val (script, _)        = ScriptCompiler(s"{-# STDLIB_VERSION 2 #-}\n true", isAssetScript = false, estimator).explicitGet()
+    val issue              = TxHelpers.issue(sponsor, Long.MaxValue, fee = ENOUGH_FEE, version = TxVersion.V1)
+    val asset              = IssuedAsset(issue.id())
+    val sponsorTx          = TxHelpers.sponsor(asset, Some(1), sponsor, fee = SPONSOR_FEE)
     val transferToContract = TxHelpers.transfer(sponsor, contract.toAddress, ENOUGH_FEE * 3, asset, fee = ENOUGH_FEE)
-    val setScript = TxHelpers.setScript(contract, script, fee = ENOUGH_FEE)
-    val transfer = TxHelpers.transfer(contract, sponsor.toAddress, 1, feeAsset = asset, fee = ENOUGH_FEE)
+    val setScript          = TxHelpers.setScript(contract, script, fee = ENOUGH_FEE)
+    val transfer           = TxHelpers.transfer(contract, sponsor.toAddress, 1, feeAsset = asset, fee = ENOUGH_FEE)
 
     (Seq(genesis, Seq(issue, sponsorTx), Seq(transferToContract, setScript)), transfer, issue.id())
   }

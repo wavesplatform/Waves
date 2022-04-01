@@ -34,25 +34,25 @@ object TransferTransactionDiff {
       _ <- validateOverflow(blockchain, blockchain.height, tx)
       portfolios = (tx.assetId match {
         case Waves =>
-          Map(sender -> Portfolio(-tx.amount, LeaseBalance.empty, Map.empty)).combine(
-            Map(recipient -> Portfolio(tx.amount, LeaseBalance.empty, Map.empty))
+          Map(sender -> Portfolio(-tx.amount.value, LeaseBalance.empty, Map.empty)).combine(
+            Map(recipient -> Portfolio(tx.amount.value, LeaseBalance.empty, Map.empty))
           )
         case asset @ IssuedAsset(_) =>
-          Map(sender -> Portfolio(0, LeaseBalance.empty, Map(asset -> -tx.amount))).combine(
-            Map(recipient -> Portfolio(0, LeaseBalance.empty, Map(asset -> tx.amount)))
+          Map(sender -> Portfolio(0, LeaseBalance.empty, Map(asset -> -tx.amount.value))).combine(
+            Map(recipient -> Portfolio(0, LeaseBalance.empty, Map(asset -> tx.amount.value)))
           )
       }).combine(
         tx.feeAssetId match {
-          case Waves => Map(sender -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty))
+          case Waves => Map(sender -> Portfolio(-tx.fee.value, LeaseBalance.empty, Map.empty))
           case asset @ IssuedAsset(_) =>
-            val senderPf = Map(sender -> Portfolio(0, LeaseBalance.empty, Map(asset -> -tx.fee)))
+            val senderPf = Map(sender -> Portfolio(0, LeaseBalance.empty, Map(asset -> -tx.fee.value)))
             if (blockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
               val sponsorPf = blockchain
                 .assetDescription(asset)
                 .collect {
                   case desc if desc.sponsorship > 0 =>
-                    val feeInWaves = Sponsorship.toWaves(tx.fee, desc.sponsorship)
-                    Map(desc.issuer.toAddress -> Portfolio(-feeInWaves, LeaseBalance.empty, Map(asset -> tx.fee)))
+                    val feeInWaves = Sponsorship.toWaves(tx.fee.value, desc.sponsorship)
+                    Map(desc.issuer.toAddress -> Portfolio(-feeInWaves, LeaseBalance.empty, Map(asset -> tx.fee.value)))
                 }
                 .getOrElse(Map.empty)
               senderPf.combine(sponsorPf)
@@ -79,7 +79,7 @@ object TransferTransactionDiff {
       Right(()) // lets transaction validates itself
     else
       try {
-        Math.addExact(tx.fee, tx.amount)
+        Math.addExact(tx.fee.value, tx.amount.value)
         Right(())
       } catch {
         case NonFatal(_) => Left(TxValidationError.OverflowError)
