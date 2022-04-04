@@ -33,7 +33,7 @@ package object requests {
 
   def parseBase58ToIssuedAsset(v: String): Validation[IssuedAsset] =
     parseBase58(v, "invalid.assetId", AssetIdStringLength)
-      .map(IssuedAsset)
+      .map(IssuedAsset(_))
 
   def parseBase58ToAsset(v: Option[String], err: String): Validation[Asset] =
     parseBase58ToOption(v.filter(_.length > 0), err, AssetIdStringLength)

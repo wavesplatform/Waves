@@ -1,19 +1,20 @@
 package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
-import scala.util.Try
+
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.serialization.SerdeV1
-import com.wavesplatform.serialization._
-import com.wavesplatform.transaction.{Asset, TxVersion}
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.serialization.*
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.{Asset, TxVersion}
 import play.api.libs.json.{JsArray, JsObject, JsString, Json}
+
+import scala.util.Try
 
 object InvokeScriptTxSerializer {
   def functionCallToJson(fc: Terms.FUNCTION_CALL): JsObject = {
@@ -41,7 +42,7 @@ object InvokeScriptTxSerializer {
   def toJson(tx: InvokeScriptTransaction): JsObject = BaseTxJson.toJson(tx) ++ tx.toJson
 
   def bodyBytes(tx: InvokeScriptTransaction): Array[Byte] = {
-    import tx._
+    import tx.*
     version match {
       case TxVersion.V1 =>
         Bytes.concat(
@@ -68,7 +69,7 @@ object InvokeScriptTxSerializer {
     def parsePayment(arr: Array[Byte]): Payment = {
       val amt               = Longs.fromByteArray(arr.take(8))
       val (maybeAssetId, _) = Deser.parseOption(arr, 8, 32)(ByteStr.apply)
-      val asset             = maybeAssetId.fold[Asset](Waves)(IssuedAsset)
+      val asset             = Asset.fromCompatId(maybeAssetId)
       Payment(amt, asset)
     }
 

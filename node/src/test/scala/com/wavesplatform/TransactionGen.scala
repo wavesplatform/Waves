@@ -450,7 +450,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     for {
       wavesPayment <- Gen.option(positiveLongGen.map(Payment(_, Waves)))
       assetPayment = for {
-        asset <- bytes32gen.map(ByteStr(_)).map(IssuedAsset)
+        asset <- bytes32gen.map(ByteStr(_)).map(IssuedAsset(_))
         amt   <- positiveLongGen
       } yield Payment(amt, asset)
       assetPayments <- Gen.listOfN[Payment](ContractLimits.MaxAttachedPaymentAmount - 1, assetPayment)

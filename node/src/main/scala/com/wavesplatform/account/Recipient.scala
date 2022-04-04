@@ -3,7 +3,7 @@ package com.wavesplatform.account
 import java.nio.ByteBuffer
 
 import com.google.common.cache.{Cache, CacheBuilder}
-import com.google.common.primitives.Bytes
+import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
@@ -11,7 +11,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.traits.domain.Recipient as RideRecipient
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidAddress}
-import com.wavesplatform.utils.{base58Length, EthEncoding, StringBytes}
+import com.wavesplatform.utils.{EthEncoding, StringBytes, base58Length}
 import play.api.libs.json.*
 
 sealed trait AddressOrAlias {
@@ -28,7 +28,9 @@ final class Address private (val chainId: Byte, val publicKeyHash: Array[Byte], 
     case _          => false
   }
 
-  override def hashCode(): Int = (ByteStr(publicKeyHash), chainId).hashCode()
+  private lazy val hc = Ints.fromByteArray(checksum)
+
+  override def hashCode(): Int = hc
 }
 
 final case class Alias(chainId: Byte, name: String) extends AddressOrAlias {
@@ -89,7 +91,8 @@ object Address {
 
   def fromPublicKey(publicKey: PublicKey, chainId: Byte = scheme.chainId): Address = {
     publicKeyBytesCache.get(
-      (publicKey, chainId), { () =>
+      (publicKey, chainId),
+      { () =>
         val withoutChecksum = ByteBuffer
           .allocate(1 + 1 + HashLength)
           .put(AddressVersion)
@@ -110,28 +113,28 @@ object Address {
 
   def fromBytes(addressBytes: Array[Byte], chainId: Byte = scheme.chainId): Either[InvalidAddress, Address] = {
     bytesCache.get(
-      ByteStr(addressBytes), { () =>
+      ByteStr(addressBytes),
+      { () =>
         Either
           .cond(
             addressBytes.length == Address.AddressLength,
             (),
             InvalidAddress(s"Wrong addressBytes length: expected: ${Address.AddressLength}, actual: ${addressBytes.length}")
           )
-          .flatMap {
-            _ =>
-              val Array(version, network, _*) = (addressBytes: @unchecked)
+          .flatMap { _ =>
+            val Array(version, network, _*) = addressBytes: @unchecked
 
-              (for {
-                _ <- Either.cond(version == AddressVersion, (), s"Unknown address version: $version")
-                _ <- Either.cond(
-                  network == chainId,
-                  (),
-                  s"Address belongs to another network: expected: $chainId(${chainId.toChar}), actual: $network(${network.toChar})"
-                )
-                checkSum          = addressBytes.takeRight(ChecksumLength)
-                checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
-                _ <- Either.cond(java.util.Arrays.equals(checkSum, checkSumGenerated), (), s"Bad address checksum")
-              } yield createUnsafe(addressBytes)).left.map(err => InvalidAddress(err))
+            (for {
+              _ <- Either.cond(version == AddressVersion, (), s"Unknown address version: $version")
+              _ <- Either.cond(
+                network == chainId,
+                (),
+                s"Address belongs to another network: expected: $chainId(${chainId.toChar}), actual: $network(${network.toChar})"
+              )
+              checkSum          = addressBytes.takeRight(ChecksumLength)
+              checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
+              _ <- Either.cond(java.util.Arrays.equals(checkSum, checkSumGenerated), (), s"Bad address checksum")
+            } yield createUnsafe(addressBytes)).left.map(err => InvalidAddress(err))
           }
       }
     )
@@ -200,7 +203,7 @@ object Alias {
 
   def fromBytes(bytes: Array[Byte]): Either[ValidationError, Alias] = {
     bytes match {
-      case Array(`AddressVersion`, chainId, _, _, rest @ _*) =>
+      case Array(`AddressVersion`, chainId, _, _, rest*) =>
         createWithChainId(new String(rest.toArray, "UTF-8"), chainId)
 
       case _ =>
