@@ -37,7 +37,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with WithState {
         case (diff, blockchain) =>
           val assetBalance = issues
             .map(_.id())
-            .map(IssuedAsset)
+            .map(IssuedAsset(_))
             .map(asset => asset -> blockchain.balance(dAppAcc.toAddress, asset))
             .filter(_._2 != 0)
             .toMap
@@ -65,7 +65,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with WithState {
         case (diff, blockchain) =>
           val assetBalance = issues
             .map(_.id())
-            .map(IssuedAsset)
+            .map(IssuedAsset(_))
             .map(asset => asset -> blockchain.balance(dAppAcc.toAddress, asset))
             .filter(_._2 != 0)
             .toMap
@@ -150,7 +150,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with WithState {
         case (diff, blockchain) =>
           val assetBalance = issues
             .map(_.id())
-            .map(IssuedAsset)
+            .map(IssuedAsset(_))
             .map(asset => asset -> blockchain.balance(dAppAcc.toAddress, asset))
             .filter(_._2 != 0)
             .toMap

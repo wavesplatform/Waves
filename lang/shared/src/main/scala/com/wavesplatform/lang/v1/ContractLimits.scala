@@ -44,9 +44,7 @@ object ContractLimits {
   // Data 0.001 per kilobyte, rounded up, fee for CI is 0.005
   val MaxInvokeScriptSizeInBytes: Int = 5 * 1024
   val MaxWriteSetSizeInBytes: Int     = 5 * 1024
-
-  // noinspection ScalaUnusedSymbol
-  def MaxWriteSetSize(v: StdLibVersion): Int = 100
+  val MaxWriteSetSize: Int            = 100
 
   val MaxTotalWriteSetSizeInBytes: Int = 15 * 1024
 
@@ -56,10 +54,12 @@ object ContractLimits {
 
   // Mass Transfer	0.001 + 0.0005*N, rounded up to 0.001, fee for CI is 0.005
   def MaxCallableActionsAmount(v: StdLibVersion): Int =
-    if (v < V5) 10
-    else 30
-
-  val MaxAttachedPaymentAmount   = 2
+    v match {
+      case version if version < V5 => 10
+      case V5 => 30
+      case _ => 100
+    }
+  val MaxAttachedPaymentAmount = 2
   val MaxAttachedPaymentAmountV5 = 10
 
   // Data weight related constants

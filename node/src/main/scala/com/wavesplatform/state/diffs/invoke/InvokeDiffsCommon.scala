@@ -205,7 +205,7 @@ object InvokeDiffsCommon {
       )
       _ <- TracedResult(checkOverflow(transferList.map(_.amount))).leftMap(FailedTransactionError.dAppExecution(_, storingComplexity))
 
-      actionAssets = transferList.flatMap(_.assetId).map(IssuedAsset) ++
+      actionAssets = transferList.flatMap(_.assetId).map(IssuedAsset(_)) ++
         reissueList.map(r => IssuedAsset(r.assetId)) ++
         burnList.map(b => IssuedAsset(b.assetId)) ++
         sponsorFeeList.map(sf => IssuedAsset(sf.assetId))
@@ -344,9 +344,9 @@ object InvokeDiffsCommon {
   private def checkDataEntries(blockchain: Blockchain, tx: InvokeScriptLike, dataEntries: Seq[DataEntry[_]], stdLibVersion: StdLibVersion) =
     for {
       _ <- Either.cond(
-        dataEntries.length <= ContractLimits.MaxWriteSetSize(stdLibVersion),
+        dataEntries.length <= ContractLimits.MaxWriteSetSize,
         (),
-        s"WriteSet can't contain more than ${ContractLimits.MaxWriteSetSize(stdLibVersion)} entries"
+        s"WriteSet can't contain more than ${ContractLimits.MaxWriteSetSize} entries"
       )
       _ <- Either.cond(
         tx.enableEmptyKeys || dataEntries.forall(_.key.nonEmpty),

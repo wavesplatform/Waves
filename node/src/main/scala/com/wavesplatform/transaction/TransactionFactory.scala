@@ -349,7 +349,7 @@ object TransactionFactory {
       assetId <- ByteStr
         .decodeBase58(request.assetId)
         .toEither
-        .map(IssuedAsset)
+        .map(IssuedAsset(_))
         .left
         .map(_ => GenericError(s"Wrong Base58 string: ${request.assetId}"))
       tx <- SponsorFeeTransaction.signed(
@@ -368,7 +368,7 @@ object TransactionFactory {
       assetId <- ByteStr
         .decodeBase58(request.assetId)
         .toEither
-        .map(IssuedAsset)
+        .map(IssuedAsset(_))
         .left
         .map(_ => GenericError(s"Wrong Base58 string: ${request.assetId}"))
       tx <- SponsorFeeTransaction.create(

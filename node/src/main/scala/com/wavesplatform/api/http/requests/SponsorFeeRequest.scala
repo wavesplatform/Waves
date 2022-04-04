@@ -33,7 +33,7 @@ case class SignedSponsorFeeRequest(
   def toTx: Either[ValidationError, SponsorFeeTransaction] =
     for {
       _sender <- PublicKey.fromBase58String(senderPublicKey)
-      _asset  <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength).map(IssuedAsset)
+      _asset  <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength).map(IssuedAsset(_))
       t       <- SponsorFeeTransaction.create(version.getOrElse(1.toByte), _sender, _asset, minSponsoredAssetFee.filterNot(_ == 0), fee, timestamp, proofs)
     } yield t
 }
