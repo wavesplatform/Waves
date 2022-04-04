@@ -39,13 +39,13 @@ class OverheadCallableCallTest extends PropSpec with WithDomain {
 
   property("overhead callable call should be safe both before and after fix") {
     val invoker = TxHelpers.signer(0)
-    val dApp = TxHelpers.signer(1)
+    val dApp    = TxHelpers.signer(1)
 
     val balances = AddrWithBalance.enoughBalances(invoker, dApp)
 
     val setScript = TxHelpers.setScript(dApp, dAppScript)
-    val invoke1 = TxHelpers.invoke(dApp.toAddress, func = None, invoker = invoker)
-    val invoke2 = TxHelpers.invoke(dApp.toAddress, func = None, invoker = invoker)
+    val invoke1   = TxHelpers.invoke(dApp.toAddress, func = None, invoker = invoker)
+    val invoke2   = TxHelpers.invoke(dApp.toAddress, func = None, invoker = invoker)
 
     withDomain(domainSettingsWithFS(settings), balances) { d =>
       d.appendBlock(setScript)

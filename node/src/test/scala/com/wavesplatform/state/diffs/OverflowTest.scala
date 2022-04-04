@@ -1,4 +1,5 @@
 package com.wavesplatform.state.diffs
+
 import com.wavesplatform.TestValues
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
@@ -7,7 +8,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.transaction.{TxHelpers, TxNonNegativeAmount}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
@@ -44,7 +45,9 @@ class OverflowTest extends PropSpec with WithDomain {
       case (recipientBalance, transferAmount) =>
         val balances = Seq(AddrWithBalance(sender.toAddress, Long.MaxValue), AddrWithBalance(recipient, recipientBalance))
         withDomain(RideV5, balances) { d =>
-          d.appendBlockE(TxHelpers.massTransfer(sender, Seq(ParsedTransfer(recipient, transferAmount)))) should produce("Waves balance sum overflow")
+          d.appendBlockE(TxHelpers.massTransfer(sender, Seq(ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(transferAmount))))) should produce(
+            "Waves balance sum overflow"
+          )
         }
     }
   }
@@ -52,7 +55,13 @@ class OverflowTest extends PropSpec with WithDomain {
   property("mass transfer overflow in list of transfers") {
     numPairs(massTransferFee).foreach {
       case (balance1, balance2) =>
-        (the[Exception] thrownBy TxHelpers.massTransfer(sender, Seq(ParsedTransfer(recipient, balance1), ParsedTransfer(recipient, balance2)))).getMessage shouldBe "OverflowError"
+        (the[Exception] thrownBy TxHelpers.massTransfer(
+          sender,
+          Seq(
+            ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(balance1)),
+            ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(balance2))
+          )
+        )).getMessage shouldBe "OverflowError"
     }
   }
 

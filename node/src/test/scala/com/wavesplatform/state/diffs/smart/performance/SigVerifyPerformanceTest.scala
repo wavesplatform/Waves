@@ -19,13 +19,13 @@ class SigVerifyPerformanceTest extends PropSpec with WithState {
   private val AmtOfTxs = 10000
 
   private def differentTransfers(typed: EXPR) = {
-    val master = TxHelpers.signer(1)
+    val master    = TxHelpers.signer(1)
     val recipient = TxHelpers.signer(2)
 
     val genesis = TxHelpers.genesis(master.toAddress)
 
-    val setScript = TxHelpers.setScript(master, ExprScript(typed).explicitGet())
-    val transfers = (1 to AmtOfTxs).map(_ => TxHelpers.transfer(master, recipient.toAddress, version = TxVersion.V1))
+    val setScript       = TxHelpers.setScript(master, ExprScript(typed).explicitGet())
+    val transfers       = (1 to AmtOfTxs).map(_ => TxHelpers.transfer(master, recipient.toAddress, version = TxVersion.V1))
     val scriptTransfers = (1 to AmtOfTxs).map(_ => TxHelpers.transfer(master, recipient.toAddress))
 
     (genesis, setScript, transfers, scriptTransfers)

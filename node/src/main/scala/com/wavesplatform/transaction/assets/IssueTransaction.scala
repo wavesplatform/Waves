@@ -21,11 +21,11 @@ case class IssueTransaction(
     sender: PublicKey,
     name: ByteString,
     description: ByteString,
-    quantity: TxAmount,
-    decimals: Byte,
+    quantity: TxPositiveAmount,
+    decimals: TxDecimals,
     reissuable: Boolean,
     script: Option[Script],
-    fee: TxAmount,
+    fee: TxPositiveAmount,
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
@@ -61,37 +61,6 @@ object IssueTransaction extends TransactionParser {
   implicit def sign(tx: IssueTransaction, privateKey: PrivateKey): IssueTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
-  def apply(
-      version: TxVersion,
-      sender: PublicKey,
-      nameBytes: Array[Byte],
-      descriptionBytes: Array[Byte],
-      quantity: Long,
-      decimals: Byte,
-      reissuable: Boolean,
-      script: Option[Script],
-      fee: Long,
-      timestamp: Long,
-      proofs: Proofs = Proofs.empty,
-      chainId: Byte = AddressScheme.current.chainId
-  ): IssueTransaction = {
-    require(version <= 2, "bytes in name and description are only supported in versions <= 3")
-    IssueTransaction(
-      version,
-      sender,
-      ByteString.copyFrom(nameBytes),
-      ByteString.copyFrom(descriptionBytes),
-      quantity,
-      decimals,
-      reissuable,
-      script,
-      fee,
-      timestamp,
-      proofs,
-      chainId
-    )
-  }
-
   def create(
       version: TxVersion,
       sender: PublicKey,
@@ -106,20 +75,25 @@ object IssueTransaction extends TransactionParser {
       proofs: Proofs,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, IssueTransaction] =
-    IssueTransaction(
-      version,
-      sender,
-      ByteString.copyFromUtf8(name),
-      ByteString.copyFromUtf8(description),
-      quantity,
-      decimals,
-      reissuable,
-      script,
-      fee,
-      timestamp,
-      proofs,
-      chainId
-    ).validatedEither
+    for {
+      fee      <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
+      quantity <- TxPositiveAmount(quantity)(TxValidationError.NonPositiveAmount(quantity, "assets"))
+      decimals <- TxDecimals(decimals)(TxValidationError.InvalidDecimals(decimals))
+      tx <- IssueTransaction(
+        version,
+        sender,
+        ByteString.copyFromUtf8(name),
+        ByteString.copyFromUtf8(description),
+        quantity,
+        decimals,
+        reissuable,
+        script,
+        fee,
+        timestamp,
+        proofs,
+        chainId
+      ).validatedEither
+    } yield tx
 
   def signed(
       version: TxVersion,
@@ -156,6 +130,6 @@ object IssueTransaction extends TransactionParser {
 
   implicit class IssueTransactionExt(private val tx: IssueTransaction) extends AnyVal {
     def asset: IssuedAsset = IssuedAsset(assetId)
-    def assetId: ByteStr = tx.id()
+    def assetId: ByteStr   = tx.id()
   }
 }

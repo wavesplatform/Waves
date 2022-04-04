@@ -47,7 +47,7 @@ object InvokeDiffsCommon {
   def txFeeDiff(blockchain: Blockchain, tx: InvokeScriptTransaction): Either[GenericError, (Long, Map[Address, Portfolio])] = {
     val attachedFee = tx.fee
     tx.assetFee._1 match {
-      case Waves => Right((attachedFee, Map(tx.sender.toAddress -> Portfolio(-attachedFee))))
+      case Waves => Right((attachedFee.value, Map(tx.sender.toAddress -> Portfolio(-attachedFee.value))))
       case asset @ IssuedAsset(_) =>
         for {
           assetInfo <- blockchain
@@ -55,13 +55,13 @@ object InvokeDiffsCommon {
             .toRight(GenericError(s"Asset $asset does not exist, cannot be used to pay fees"))
           feeInWaves <- Either.cond(
             assetInfo.sponsorship > 0,
-            Sponsorship.toWaves(attachedFee, assetInfo.sponsorship),
+            Sponsorship.toWaves(attachedFee.value, assetInfo.sponsorship),
             GenericError(s"Asset $asset is not sponsored, cannot be used to pay fees")
           )
           portfolioDiff <- Diff
             .combine(
-              Map(tx.sender.toAddress        -> Portfolio(assets = Map(asset              -> -attachedFee))),
-              Map(assetInfo.issuer.toAddress -> Portfolio(-feeInWaves, assets = Map(asset -> attachedFee)))
+              Map(tx.sender.toAddress        -> Portfolio(assets = Map(asset              -> -attachedFee.value))),
+              Map(assetInfo.issuer.toAddress -> Portfolio(-feeInWaves, assets = Map(asset -> attachedFee.value)))
             )
             .leftMap(GenericError(_))
         } yield (feeInWaves, portfolioDiff)

@@ -13,10 +13,7 @@ import org.scalatest._
 
 import scala.concurrent.duration._
 
-class MerkleRootTestSuite
-    extends BaseFreeSpec
-    with ActivationStatusRequest
-    with OptionValues {
+class MerkleRootTestSuite extends BaseFreeSpec with ActivationStatusRequest with OptionValues {
   import MerkleRootTestSuite._
 
   override protected def nodeConfigs: Seq[Config] = Configs
@@ -68,17 +65,18 @@ class MerkleRootTestSuite
     )
   }
   "merkle proof api returns only existent txs when existent and inexistent ids passed" in {
-    val txId1 = nodes.head.broadcastTransfer(nodes.head.keyPair, nodes.head.address, transferAmount, minFee, None, None, waitForTx = true).id
-    val txId2 = nodes.head.broadcastTransfer(nodes.head.keyPair, nodes.head.address, transferAmount, minFee, None, None, waitForTx = true).id
+    val txId1        = nodes.head.broadcastTransfer(nodes.head.keyPair, nodes.head.address, transferAmount, minFee, None, None, waitForTx = true).id
+    val txId2        = nodes.head.broadcastTransfer(nodes.head.keyPair, nodes.head.address, transferAmount, minFee, None, None, waitForTx = true).id
     val inexistentTx = "FCym43ddiKKT3d4kznawWasoMbWd1LWyX8DUrwAAbcUA"
     nodes.head.getMerkleProof(txId1, txId2, inexistentTx).map(resp => resp.id) should contain theSameElementsAs Seq(txId1, txId2)
     nodes.head.getMerkleProofPost(txId1, txId2, inexistentTx).map(resp => resp.id) should contain theSameElementsAs Seq(txId1, txId2)
   }
   "merkle proof api can handle transactionsRoot changes caused by miner settings" in {
+
     /**
       * In this case we check that when some of generated microblocks connected to one keyblock transfers to next keyblock
       * due to miner setting "min-micro-block-age" it causes transactionsRoot and merkleProof recalculation
-    */
+      */
     nodes.waitForHeightArise()
     val currentHeight               = nodes.head.height
     val txsBuf                      = collection.mutable.ListBuffer[String]()

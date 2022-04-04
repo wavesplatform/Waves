@@ -514,7 +514,9 @@ object Application extends ScorexLogging {
     settings
   }
 
-  private[wavesplatform] def loadBlockAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
+  private[wavesplatform] def loadBlockAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(
+      height: Int
+  ): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
     loadBlockInfoAt(db, blockchainUpdater)(height)
 
   private[wavesplatform] def loadBlockInfoAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(

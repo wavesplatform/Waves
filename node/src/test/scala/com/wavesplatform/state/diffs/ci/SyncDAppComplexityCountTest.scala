@@ -107,13 +107,13 @@ class SyncDAppComplexityCountTest extends PropSpec with WithState {
       raiseError: Boolean,
       sequentialCalls: Boolean
   ): (Seq[Transaction], InvokeScriptTransaction, IssuedAsset, Address) = {
-    val invoker = TxHelpers.signer(0)
+    val invoker  = TxHelpers.signer(0)
     val dAppAccs = (1 to dAppCount).map(idx => TxHelpers.signer(idx))
 
     val invokerGenesis = TxHelpers.genesis(invoker.toAddress)
-    val assetIssue = TxHelpers.issue(invoker, ENOUGH_AMT, script = Some(assetScript(if (raiseError) sigVerify else groth)))
-    val asset   = IssuedAsset(assetIssue.id())
-    val payment = List(Payment(1, asset))
+    val assetIssue     = TxHelpers.issue(invoker, ENOUGH_AMT, script = Some(assetScript(if (raiseError) sigVerify else groth)))
+    val asset          = IssuedAsset(assetIssue.id())
+    val payment        = List(Payment(1, asset))
 
     val dAppGenesisTxs = dAppAccs.flatMap { dAppAcc =>
       List(
@@ -122,21 +122,22 @@ class SyncDAppComplexityCountTest extends PropSpec with WithState {
       )
     }
     val setVerifier = if (withVerifier) List(TxHelpers.setScript(invoker, verifierScript)) else Nil
-    val setScriptTxs = dAppAccs.foldLeft(List.empty[SetScriptTransaction]) { case (txs, currentAcc) =>
-      val callPayment = if (withThroughPayment) Some(asset) else None
-      val transfer    = if (withThroughTransfer) Some(asset) else None
-      val condition   = if (raiseError) if (txs.nonEmpty) "true" else "false" else groth
-      val script =
-        if (sequentialCalls)
-          if (txs.size == dAppAccs.size - 1)
-            dApp(txs.map(_.sender.toAddress), callPayment, transfer, condition)
+    val setScriptTxs = dAppAccs.foldLeft(List.empty[SetScriptTransaction]) {
+      case (txs, currentAcc) =>
+        val callPayment = if (withThroughPayment) Some(asset) else None
+        val transfer    = if (withThroughTransfer) Some(asset) else None
+        val condition   = if (raiseError) if (txs.nonEmpty) "true" else "false" else groth
+        val script =
+          if (sequentialCalls)
+            if (txs.size == dAppAccs.size - 1)
+              dApp(txs.map(_.sender.toAddress), callPayment, transfer, condition)
+            else
+              dApp(Nil, callPayment, transfer, condition)
           else
-            dApp(Nil, callPayment, transfer, condition)
-        else
-          dApp(txs.headOption.map(_.sender.toAddress).toList, callPayment, transfer, condition)
+            dApp(txs.headOption.map(_.sender.toAddress).toList, callPayment, transfer, condition)
 
-      val nextTx = TxHelpers.setScript(currentAcc, script)
-      nextTx :: txs
+        val nextTx = TxHelpers.setScript(currentAcc, script)
+        nextTx :: txs
     }
     val invokeTx = TxHelpers.invoke(
       dApp = dAppAccs.last.toAddress,
@@ -184,8 +185,8 @@ class SyncDAppComplexityCountTest extends PropSpec with WithState {
 
         val dAppAddress = invokeTx.dAppAddressOrAlias.asInstanceOf[Address]
         val basePortfolios = Map(
-          TestBlock.defaultSigner.toAddress -> Portfolio(invokeTx.fee),
-          invokeTx.senderAddress            -> Portfolio(-invokeTx.fee)
+          TestBlock.defaultSigner.toAddress -> Portfolio(invokeTx.fee.value),
+          invokeTx.senderAddress            -> Portfolio(-invokeTx.fee.value)
         )
         val paymentsPortfolios = Map(
           invokeTx.senderAddress -> Portfolio(assets = Map(asset -> -1)),

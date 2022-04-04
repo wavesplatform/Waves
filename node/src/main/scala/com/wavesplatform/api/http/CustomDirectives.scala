@@ -16,7 +16,7 @@ trait CustomDirectives extends Directives with ApiMarshallers with ScorexLogging
     baseDirective
       .flatMap {
         case list if nonEmpty && list.isEmpty => reject(MissingQueryParamRejection(paramName))
-        case list if list.size > limit      => complete(ApiError.TooBigArrayAllocation(limit))
+        case list if list.size > limit        => complete(ApiError.TooBigArrayAllocation(limit))
         case list                             => provide(list)
       }
   }

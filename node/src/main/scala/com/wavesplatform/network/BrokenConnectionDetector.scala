@@ -35,6 +35,6 @@ class BrokenConnectionDetector(timeout: FiniteDuration) extends ChannelInboundHa
           log.info(s"${id(ctx.channel())} Channel haven't sent a message in $timeout, closing it")
           ctx.channel().close()
         }
-      ))
-      .foreach(_.cancel(false))
+      )
+    ).foreach(_.cancel(false))
 }

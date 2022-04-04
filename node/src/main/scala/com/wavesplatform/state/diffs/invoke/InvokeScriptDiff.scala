@@ -173,7 +173,7 @@ object InvokeScriptDiff {
                   ByteStr(tx.root.getOrElse(tx).sender.arr),
                   payments,
                   tx.txId,
-                  tx.root.map(_.fee).getOrElse(0L),
+                  tx.root.map(_.fee.value).getOrElse(0L),
                   tx.root.flatMap(_.feeAssetId.compatId)
                 )
                 val (paymentsPartInsideDApp, paymentsPartToResolve) = if (version < V5) (Diff.empty, paymentsPart) else (paymentsPart, Diff.empty)

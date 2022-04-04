@@ -71,7 +71,7 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
   )
 
   private val preconditions = {
-    val accountWithPaidVerifier = TxHelpers.signer(0)
+    val accountWithPaidVerifier  = TxHelpers.signer(0)
     val accountWithSmallVerifier = TxHelpers.signer(1)
     val accountWithEmptyVerifier = TxHelpers.signer(2)
 
@@ -86,16 +86,16 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
       TxHelpers.setScript(accountWithEmptyVerifier, scriptWithEmptyVerifier, fee = setScriptFee)
     )
 
-    val invokeFromPaidVerifier = () => TxHelpers.invoke(accountWithSmallVerifier.toAddress, invoker = accountWithPaidVerifier)
+    val invokeFromPaidVerifier  = () => TxHelpers.invoke(accountWithSmallVerifier.toAddress, invoker = accountWithPaidVerifier)
     val invokeFromSmallVerifier = () => TxHelpers.invoke(accountWithPaidVerifier.toAddress, invoker = accountWithSmallVerifier)
     val invokeFromEmptyVerifier = () => TxHelpers.invoke(accountWithPaidVerifier.toAddress, invoker = accountWithEmptyVerifier)
 
     val transferFromSmallVerifier = () => TxHelpers.transfer(accountWithSmallVerifier, accountWithPaidVerifier.toAddress, 1, fee = transferFee)
-    val transferFromPaidVerifier = () => TxHelpers.transfer(accountWithPaidVerifier, accountWithSmallVerifier.toAddress, 1, fee = transferFee)
+    val transferFromPaidVerifier  = () => TxHelpers.transfer(accountWithPaidVerifier, accountWithSmallVerifier.toAddress, 1, fee = transferFee)
     val transferFromEmptyVerifier = () => TxHelpers.transfer(accountWithEmptyVerifier, accountWithSmallVerifier.toAddress, 1, fee = transferFee)
 
     val dataFromSmallVerifier = () => TxHelpers.dataV2(accountWithSmallVerifier, Seq(EmptyDataEntry("key")), fee = transferFee)
-    val dataFromPaidVerifier = () => TxHelpers.dataV2(accountWithPaidVerifier, Seq(EmptyDataEntry("key")), fee = transferFee)
+    val dataFromPaidVerifier  = () => TxHelpers.dataV2(accountWithPaidVerifier, Seq(EmptyDataEntry("key")), fee = transferFee)
     val dataFromEmptyVerifier = () => TxHelpers.dataV2(accountWithEmptyVerifier, Seq(EmptyDataEntry("key")), fee = transferFee)
 
     (

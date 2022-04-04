@@ -9,9 +9,7 @@ object PaymentTxValidator extends TxValidator[PaymentTransaction] {
   override def validate(transaction: PaymentTransaction): ValidatedNel[ValidationError, PaymentTransaction] = {
     import transaction._
     V.seq(transaction)(
-      V.fee(fee),
-      V.positiveAmount(amount, "waves"),
-      V.noOverflow(fee, amount),
+      V.noOverflow(fee.value, amount.value),
       V.addressChainId(recipient, chainId)
     )
   }

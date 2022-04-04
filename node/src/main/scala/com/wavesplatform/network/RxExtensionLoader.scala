@@ -260,7 +260,8 @@ object RxExtensionLoader extends ScorexLogging {
         timeout: CancelableFuture[Unit]
     ) extends WithPeer {
       override def toString: String =
-        s"ExpectingBlocks($channel,totalBlocks=${allBlocks.size},received=${received.size},expected=${if (expected.size == 1) expected.head.trim else expected.size})"
+        s"ExpectingBlocks($channel,totalBlocks=${allBlocks.size},received=${received.size},expected=${if (expected.size == 1) expected.head.trim
+        else expected.size})"
     }
 
   }

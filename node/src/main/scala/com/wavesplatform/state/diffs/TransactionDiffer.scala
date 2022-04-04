@@ -299,7 +299,7 @@ object TransactionDiffer {
   private def feePortfolios(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Map[Address, Portfolio]] =
     tx match {
       case _: GenesisTransaction   => Map.empty[Address, Portfolio].asRight
-      case ptx: PaymentTransaction => Map(ptx.sender.toAddress -> Portfolio(balance = -ptx.fee, LeaseBalance.empty, assets = Map.empty)).asRight
+      case ptx: PaymentTransaction => Map(ptx.sender.toAddress -> Portfolio(balance = -ptx.fee.value, LeaseBalance.empty, assets = Map.empty)).asRight
       case ptx: ProvenTransaction =>
         ptx.assetFee match {
           case (Waves, fee) => Map(ptx.sender.toAddress -> Portfolio(-fee, LeaseBalance.empty, Map.empty)).asRight

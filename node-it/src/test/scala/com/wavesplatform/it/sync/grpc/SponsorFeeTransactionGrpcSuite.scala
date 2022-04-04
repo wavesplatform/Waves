@@ -10,39 +10,58 @@ import com.wavesplatform.state.diffs.FeeValidation
 import io.grpc.Status.Code
 
 class SponsorFeeTransactionGrpcSuite extends GrpcBaseTransactionSuite {
-  val (alice, aliceAddress)     = (firstAcc, firstAddress)
-  val (bob, bobAddress)         = (secondAcc, secondAddress)
-  val (sponsor, sponsorAddress) = (thirdAcc, thirdAddress)
-  val token             = 100L
-  val sponsorAssetTotal = 100 * token
-  val minSponsorFee     = token
-  val tinyFee           = token / 2
-  val smallFee          = token + token / 2
-  val largeFee          = 10 * token
+  val (alice, aliceAddress)                     = (firstAcc, firstAddress)
+  val (bob, bobAddress)                         = (secondAcc, secondAddress)
+  val (sponsor, sponsorAddress)                 = (thirdAcc, thirdAddress)
+  val token                                     = 100L
+  val sponsorAssetTotal                         = 100 * token
+  val minSponsorFee                             = token
+  val tinyFee                                   = token / 2
+  val smallFee                                  = token + token / 2
+  val largeFee                                  = 10 * token
   val sponsorFeeTxSupportedVersions: List[Byte] = List(1, 2)
 
   test("able to make transfer with sponsored fee") {
     for (v <- sponsorFeeTxSupportedVersions) {
-      val minerWavesBalance = sender.wavesBalance(ByteString.copyFrom(Base58.decode(miner.address)))
+      val minerWavesBalance  = sender.wavesBalance(ByteString.copyFrom(Base58.decode(miner.address)))
       val minerBalanceHeight = sender.height
 
-      val sponsoredAssetId = PBTransactions.vanilla(
-        sender.broadcastIssue(sponsor, "SponsoredAsset", sponsorAssetTotal, 2, reissuable = false, issueFee, waitForTx = true)
-      ).explicitGet().id().toString
+      val sponsoredAssetId = PBTransactions
+        .vanilla(
+          sender.broadcastIssue(sponsor, "SponsoredAsset", sponsorAssetTotal, 2, reissuable = false, issueFee, waitForTx = true)
+        )
+        .explicitGet()
+        .id()
+        .toString
 
       val sponsoredAssetMinFee = Some(Amount.of(ByteString.copyFrom(Base58.decode(sponsoredAssetId)), token))
       sender.broadcastSponsorFee(sponsor, sponsoredAssetMinFee, fee = sponsorReducedFee, version = v, waitForTx = true)
 
-      sender.broadcastTransfer(sponsor, Recipient().withPublicKeyHash(aliceAddress), sponsorAssetTotal / 2, minFee, assetId = sponsoredAssetId, waitForTx = true)
+      sender.broadcastTransfer(
+        sponsor,
+        Recipient().withPublicKeyHash(aliceAddress),
+        sponsorAssetTotal / 2,
+        minFee,
+        assetId = sponsoredAssetId,
+        waitForTx = true
+      )
 
-      val aliceWavesBalance = sender.wavesBalance(aliceAddress)
-      val bobWavesBalance = sender.wavesBalance(bobAddress)
+      val aliceWavesBalance   = sender.wavesBalance(aliceAddress)
+      val bobWavesBalance     = sender.wavesBalance(bobAddress)
       val sponsorWavesBalance = sender.wavesBalance(sponsorAddress)
-      val aliceAssetBalance = sender.assetsBalance(aliceAddress, Seq(sponsoredAssetId)).getOrElse(sponsoredAssetId, 0L)
-      val bobAssetBalance = sender.assetsBalance(bobAddress, Seq(sponsoredAssetId)).getOrElse(sponsoredAssetId, 0L)
+      val aliceAssetBalance   = sender.assetsBalance(aliceAddress, Seq(sponsoredAssetId)).getOrElse(sponsoredAssetId, 0L)
+      val bobAssetBalance     = sender.assetsBalance(bobAddress, Seq(sponsoredAssetId)).getOrElse(sponsoredAssetId, 0L)
       val sponsorAssetBalance = sender.assetsBalance(sponsorAddress, Seq(sponsoredAssetId)).getOrElse(sponsoredAssetId, 0L)
 
-      sender.broadcastTransfer(alice, Recipient().withPublicKeyHash(bobAddress), 10 * token, smallFee, assetId = sponsoredAssetId, feeAssetId = sponsoredAssetId, waitForTx = true)
+      sender.broadcastTransfer(
+        alice,
+        Recipient().withPublicKeyHash(bobAddress),
+        10 * token,
+        smallFee,
+        assetId = sponsoredAssetId,
+        feeAssetId = sponsoredAssetId,
+        waitForTx = true
+      )
 
       nodes.foreach(n => n.waitForHeight(n.height + 1))
       sender.wavesBalance(aliceAddress).available shouldBe aliceWavesBalance.available
@@ -60,9 +79,13 @@ class SponsorFeeTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
   test("only issuer is able to sponsor asset") {
     for (v <- sponsorFeeTxSupportedVersions) {
-      val sponsoredAssetId = PBTransactions.vanilla(
-        sender.broadcastIssue(sponsor, "SponsoredAsset", sponsorAssetTotal, 2, reissuable = false, issueFee, waitForTx = true)
-      ).explicitGet().id().toString
+      val sponsoredAssetId = PBTransactions
+        .vanilla(
+          sender.broadcastIssue(sponsor, "SponsoredAsset", sponsorAssetTotal, 2, reissuable = false, issueFee, waitForTx = true)
+        )
+        .explicitGet()
+        .id()
+        .toString
 
       val sponsoredAssetMinFee = Some(Amount.of(ByteString.copyFrom(Base58.decode(sponsoredAssetId)), token))
       assertGrpcError(
@@ -75,9 +98,13 @@ class SponsorFeeTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
   test("sponsor is able to cancel sponsorship") {
     for (v <- sponsorFeeTxSupportedVersions) {
-      val sponsoredAssetId = PBTransactions.vanilla(
-        sender.broadcastIssue(alice, "SponsoredAsset", sponsorAssetTotal, 2, reissuable = false, issueFee, waitForTx = true)
-      ).explicitGet().id().toString
+      val sponsoredAssetId = PBTransactions
+        .vanilla(
+          sender.broadcastIssue(alice, "SponsoredAsset", sponsorAssetTotal, 2, reissuable = false, issueFee, waitForTx = true)
+        )
+        .explicitGet()
+        .id()
+        .toString
 
       val sponsoredAssetMinFee = Some(Amount.of(ByteString.copyFrom(Base58.decode(sponsoredAssetId)), token))
       sender.broadcastSponsorFee(alice, sponsoredAssetMinFee, fee = sponsorReducedFee, version = v, waitForTx = true)
@@ -92,7 +119,15 @@ class SponsorFeeTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       sender.broadcastSponsorFee(alice, sponsoredAssetNullMinFee, fee = sponsorReducedFee, version = v, waitForTx = true)
 
       assertGrpcError(
-        sender.broadcastTransfer(alice, Recipient().withPublicKeyHash(bobAddress), 10 * token, smallFee, assetId = sponsoredAssetId, feeAssetId = sponsoredAssetId, waitForTx = true),
+        sender.broadcastTransfer(
+          alice,
+          Recipient().withPublicKeyHash(bobAddress),
+          10 * token,
+          smallFee,
+          assetId = sponsoredAssetId,
+          feeAssetId = sponsoredAssetId,
+          waitForTx = true
+        ),
         s"Asset $sponsoredAssetId is not sponsored, cannot be used to pay fees",
         Code.INVALID_ARGUMENT
       )
@@ -101,11 +136,22 @@ class SponsorFeeTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
   test("sponsor is able to update amount of sponsored fee") {
     for (v <- sponsorFeeTxSupportedVersions) {
-      val sponsoredAssetId = PBTransactions.vanilla(
-        sender.broadcastIssue(sponsor, "SponsoredAsset", sponsorAssetTotal, 2, reissuable = false, issueFee, waitForTx = true)
-      ).explicitGet().id().toString
+      val sponsoredAssetId = PBTransactions
+        .vanilla(
+          sender.broadcastIssue(sponsor, "SponsoredAsset", sponsorAssetTotal, 2, reissuable = false, issueFee, waitForTx = true)
+        )
+        .explicitGet()
+        .id()
+        .toString
 
-      sender.broadcastTransfer(sponsor, Recipient().withPublicKeyHash(aliceAddress), sponsorAssetTotal / 2, minFee, assetId = sponsoredAssetId, waitForTx = true)
+      sender.broadcastTransfer(
+        sponsor,
+        Recipient().withPublicKeyHash(aliceAddress),
+        sponsorAssetTotal / 2,
+        minFee,
+        assetId = sponsoredAssetId,
+        waitForTx = true
+      )
 
       val sponsoredAssetMinFee = Some(Amount.of(ByteString.copyFrom(Base58.decode(sponsoredAssetId)), token))
       sender.broadcastSponsorFee(sponsor, sponsoredAssetMinFee, fee = sponsorReducedFee, version = v, waitForTx = true)
@@ -114,18 +160,34 @@ class SponsorFeeTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       sender.broadcastSponsorFee(sponsor, sponsoredAssetUpdatedMinFee, fee = sponsorReducedFee, version = v, waitForTx = true)
 
       assertGrpcError(
-        sender.broadcastTransfer(alice, Recipient().withPublicKeyHash(bobAddress), 10 * token, smallFee, assetId = sponsoredAssetId, feeAssetId = sponsoredAssetId, waitForTx = true),
+        sender.broadcastTransfer(
+          alice,
+          Recipient().withPublicKeyHash(bobAddress),
+          10 * token,
+          smallFee,
+          assetId = sponsoredAssetId,
+          feeAssetId = sponsoredAssetId,
+          waitForTx = true
+        ),
         s"does not exceed minimal value of $minFee WAVES or $largeFee $sponsoredAssetId",
         Code.INVALID_ARGUMENT
       )
-      val aliceWavesBalance = sender.wavesBalance(aliceAddress)
-      val bobWavesBalance = sender.wavesBalance(bobAddress)
+      val aliceWavesBalance   = sender.wavesBalance(aliceAddress)
+      val bobWavesBalance     = sender.wavesBalance(bobAddress)
       val sponsorWavesBalance = sender.wavesBalance(sponsorAddress)
-      val aliceAssetBalance = sender.assetsBalance(aliceAddress, Seq(sponsoredAssetId)).getOrElse(sponsoredAssetId, 0L)
-      val bobAssetBalance = sender.assetsBalance(bobAddress, Seq(sponsoredAssetId)).getOrElse(sponsoredAssetId, 0L)
+      val aliceAssetBalance   = sender.assetsBalance(aliceAddress, Seq(sponsoredAssetId)).getOrElse(sponsoredAssetId, 0L)
+      val bobAssetBalance     = sender.assetsBalance(bobAddress, Seq(sponsoredAssetId)).getOrElse(sponsoredAssetId, 0L)
       val sponsorAssetBalance = sender.assetsBalance(sponsorAddress, Seq(sponsoredAssetId)).getOrElse(sponsoredAssetId, 0L)
 
-      sender.broadcastTransfer(alice, Recipient().withPublicKeyHash(bobAddress), 10 * token, largeFee, assetId = sponsoredAssetId, feeAssetId = sponsoredAssetId, waitForTx = true)
+      sender.broadcastTransfer(
+        alice,
+        Recipient().withPublicKeyHash(bobAddress),
+        10 * token,
+        largeFee,
+        assetId = sponsoredAssetId,
+        feeAssetId = sponsoredAssetId,
+        waitForTx = true
+      )
 
       sender.wavesBalance(aliceAddress).available shouldBe aliceWavesBalance.available
       sender.wavesBalance(bobAddress).available shouldBe bobWavesBalance.available

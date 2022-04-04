@@ -33,7 +33,9 @@ class InvokeFeeMultiplierTest extends PropSpec with WithState with DBCacheSettin
     Script.fromBase64String(base64).explicitGet()
   }
 
-  private def paymentPreconditions(dApp: Script): (Seq[AddrWithBalance], List[Transaction], InvokeScriptTransaction, DataTransaction, InvokeScriptTransaction) = {
+  private def paymentPreconditions(
+      dApp: Script
+  ): (Seq[AddrWithBalance], List[Transaction], InvokeScriptTransaction, DataTransaction, InvokeScriptTransaction) = {
     val invoker  = TxHelpers.signer(0)
     val master   = TxHelpers.signer(1)
     val balances = AddrWithBalance.enoughBalances(invoker, master)

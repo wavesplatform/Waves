@@ -28,7 +28,6 @@ case class MicroBlock(
   override val signatureValid: Coeval[Boolean]        = Coeval.evalOnce(crypto.verify(signature, bytesWithoutSignature(), sender))
   override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
 
-
   override def toString: String = s"MicroBlock(... -> ${reference.trim}, txs=${transactionData.size}"
 
   def stringRepr(totalBlockId: ByteStr): String = s"MicroBlock(${totalBlockId.trim} -> ${reference.trim}, txs=${transactionData.size})"

@@ -7,9 +7,7 @@ import com.wavesplatform.it.api.BlockHeader
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs}
 
-class NotActivateFeatureTestSuite
-    extends BaseFreeSpec
-    with ActivationStatusRequest {
+class NotActivateFeatureTestSuite extends BaseFreeSpec with ActivationStatusRequest {
 
   private val votingInterval             = 14
   private val blocksForActivation        = 14
@@ -33,7 +31,8 @@ class NotActivateFeatureTestSuite
          |  features.supported=[$nonVotingFeatureNum]
          |  miner.quorum = 1
          |}""".stripMargin
-        ))
+        )
+      )
       .withDefault(2)
       .buildNonConflicting()
 
@@ -49,8 +48,8 @@ class NotActivateFeatureTestSuite
 
   "supported blocks is not increased when nobody votes for feature" in {
     val generatedBlocks: Seq[BlockHeader] = nodes.head.blockHeadersSeq(1, votingInterval - 1)
-    val featuresMapInGeneratedBlocks       = generatedBlocks.flatMap(b => b.features.getOrElse(Seq.empty)).groupBy(x => x)
-    val votesForFeature1                   = featuresMapInGeneratedBlocks.getOrElse(votingFeatureNum, Seq.empty).length
+    val featuresMapInGeneratedBlocks      = generatedBlocks.flatMap(b => b.features.getOrElse(Seq.empty)).groupBy(x => x)
+    val votesForFeature1                  = featuresMapInGeneratedBlocks.getOrElse(votingFeatureNum, Seq.empty).length
 
     votesForFeature1 shouldBe 0
     activationStatusInfoBefore.foreach(assertVotingStatus(_, votesForFeature1, BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Implemented))

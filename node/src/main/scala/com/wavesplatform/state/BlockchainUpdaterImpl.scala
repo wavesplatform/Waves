@@ -414,10 +414,10 @@ class BlockchainUpdaterImpl(
       recipient <- leveldb.resolveAlias(lt.recipient).toSeq
     } yield lt.id() -> Diff(
       portfolios = Map(
-        lt.sender.toAddress -> Portfolio(0, LeaseBalance(0, -lt.amount), Map.empty),
-        recipient           -> Portfolio(0, LeaseBalance(-lt.amount, 0), Map.empty)
+        lt.sender.toAddress -> Portfolio(0, LeaseBalance(0, -lt.amount.value), Map.empty),
+        recipient           -> Portfolio(0, LeaseBalance(-lt.amount.value, 0), Map.empty)
       ),
-      leaseState = Map((lt.id(), LeaseDetails(lt.sender, lt.recipient, lt.amount, LeaseDetails.Status.Expired(height), lt.id(), ltMeta.height)))
+      leaseState = Map((lt.id(), LeaseDetails(lt.sender, lt.recipient, lt.amount.value, LeaseDetails.Status.Expired(height), lt.id(), ltMeta.height)))
     )).toMap
 
   override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[(Block, ByteStr)]] = writeLock {

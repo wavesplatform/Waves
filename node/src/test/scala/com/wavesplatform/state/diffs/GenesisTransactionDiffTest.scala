@@ -11,7 +11,7 @@ class GenesisTransactionDiffTest extends PropSpec with WithState {
 
   property("fails if height != 1") {
     val genesis = TxHelpers.genesis(TxHelpers.address(1))
-    val height = 2
+    val height  = 2
     GenesisTransactionDiff(height)(genesis) should produce("GenesisTransaction cannot appear in non-initial block")
   }
 
@@ -20,12 +20,12 @@ class GenesisTransactionDiffTest extends PropSpec with WithState {
 
     assertDiffAndState(Seq.empty, TestBlock.create(genesis)) { (blockDiff, _) =>
       val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
-      totalPortfolioDiff.balance shouldBe genesis.map(_.amount).sum
-      totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe genesis.map(_.amount).sum
+      totalPortfolioDiff.balance shouldBe genesis.map(_.amount.value).sum
+      totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe genesis.map(_.amount.value).sum
       totalPortfolioDiff.assets shouldBe Map.empty
 
       genesis.foreach { gtx =>
-        blockDiff.portfolios(gtx.recipient).balance shouldBe gtx.amount
+        blockDiff.portfolios(gtx.recipient).balance shouldBe gtx.amount.value
       }
     }
   }

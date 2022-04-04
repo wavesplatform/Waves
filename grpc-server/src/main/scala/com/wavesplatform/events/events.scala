@@ -8,7 +8,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
 import com.wavesplatform.events.StateUpdate.{AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate}
-import com.wavesplatform.events.protobuf.TransactionMetadata
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions}
 import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
@@ -20,7 +19,7 @@ import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxAmount}
+import com.wavesplatform.transaction.{Asset, GenesisTransaction}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -49,7 +48,6 @@ object StateUpdate {
   }
 
   object BalanceUpdate {
-    import com.wavesplatform.events.protobuf.StateUpdate.{BalanceUpdate => PBBalanceUpdate}
 
     def fromPB(v: PBBalanceUpdate): BalanceUpdate = {
       val (asset, after) = PBAmounts.toAssetAndAmount(v.getAmountAfter)
@@ -71,7 +69,6 @@ object StateUpdate {
   }
 
   object DataEntryUpdate {
-    import com.wavesplatform.events.protobuf.StateUpdate.{DataEntryUpdate => PBDataEntryUpdate}
 
     def fromPB(v: PBDataEntryUpdate): DataEntryUpdate = {
       DataEntryUpdate(
@@ -95,7 +92,6 @@ object StateUpdate {
   }
 
   object LeasingBalanceUpdate {
-    import com.wavesplatform.events.protobuf.StateUpdate.{LeasingUpdate => PBLeasingUpdate}
 
     def fromPB(v: PBLeasingUpdate): LeasingBalanceUpdate = {
       LeasingBalanceUpdate(
@@ -119,7 +115,7 @@ object StateUpdate {
   case class LeaseUpdate(
       leaseId: ByteStr,
       statusAfter: LeaseUpdate.LeaseStatus,
-      amount: TxAmount,
+      amount: Long,
       sender: PublicKey,
       recipient: Address,
       originTransactionId: ByteStr
@@ -137,9 +133,6 @@ object StateUpdate {
       case object Active   extends LeaseStatus
       case object Inactive extends LeaseStatus
     }
-
-    import com.wavesplatform.events.protobuf.StateUpdate.LeaseUpdate.{LeaseStatus => PBLeaseStatus}
-    import com.wavesplatform.events.protobuf.StateUpdate.{LeaseUpdate => PBLeaseUpdate}
 
     def fromPB(v: PBLeaseUpdate): LeaseUpdate = {
       LeaseUpdate(
@@ -182,9 +175,6 @@ object StateUpdate {
 
   object AssetStateUpdate {
     final case class AssetDetails(assetId: ByteStr, desc: AssetDescription)
-
-    import com.wavesplatform.events.protobuf.StateUpdate.AssetDetails.{AssetScriptInfo => PBAssetScriptInfo}
-    import com.wavesplatform.events.protobuf.StateUpdate.{AssetDetails => PBAssetDetails, AssetStateUpdate => PBAssetStateUpdate}
 
     def fromPB(self: PBAssetStateUpdate): AssetStateUpdate = {
 
@@ -252,7 +242,6 @@ object StateUpdate {
 
   final case class AssetInfo(id: ByteStr, decimals: Int, name: String)
   object AssetInfo {
-    import com.wavesplatform.events.protobuf.StateUpdate.{AssetInfo => PBAssetInfo}
 
     def toPB(ai: AssetInfo): PBAssetInfo = PBAssetInfo(
       ai.id.toByteString,
@@ -267,8 +256,6 @@ object StateUpdate {
         ai.name
       )
   }
-
-  import com.wavesplatform.events.protobuf.{StateUpdate => PBStateUpdate}
 
   def fromPB(v: PBStateUpdate): StateUpdate = {
     StateUpdate(
@@ -400,8 +387,7 @@ object StateUpdate {
   }
 
   private[this] def transactionsMetadata(blockchain: Blockchain, diff: Diff): Seq[TransactionMetadata] = {
-    diff.transactions.values
-      .map[TransactionMetadata.Metadata] { tx =>
+    diff.transactions.values.map[TransactionMetadata.Metadata] { tx =>
         implicit class AddressResolver(addr: AddressOrAlias) {
           def resolve: Address = blockchain.resolveAlias(addr).explicitGet()
         }
@@ -525,7 +511,7 @@ object BlockAppended {
     // updatedWavesAmount can change as a result of either genesis transactions or miner rewards
     val updatedWavesAmount = blockchainBeforeWithMinerReward.height match {
       // genesis case
-      case 0 => block.transactionData.collect { case GenesisTransaction(_, amount, _, _, _) => amount }.sum
+      case 0 => block.transactionData.collect { case GenesisTransaction(_, amount, _, _, _) => amount.value }.sum
       // miner reward case
       case height => blockchainBeforeWithMinerReward.wavesAmount(height).toLong
     }

@@ -34,7 +34,7 @@ class VerifierComplexityLimitTest extends PropSpec with WithDomain with EitherVa
     val balances = AddrWithBalance.enoughBalances(account1)
 
     val setScript = TxHelpers.setScript(account1, verifier)
-    val checkTx = () => TxHelpers.transfer(account1, account2.toAddress, 1)
+    val checkTx   = () => TxHelpers.transfer(account1, account2.toAddress, 1)
 
     withDomain(domainSettingsWithFS(features(fix = false)), balances) { d =>
       d.appendBlock(setScript)
@@ -52,8 +52,8 @@ class VerifierComplexityLimitTest extends PropSpec with WithDomain with EitherVa
 
     val balances = AddrWithBalance.enoughBalances(account1)
 
-    val issue = TxHelpers.issue(account1, 1, script = Some(verifier))
-    val asset     = IssuedAsset(issue.id())
+    val issue   = TxHelpers.issue(account1, 1, script = Some(verifier))
+    val asset   = IssuedAsset(issue.id())
     val checkTx = () => TxHelpers.transfer(account1, account2.toAddress, 1, asset)
 
     withDomain(domainSettingsWithFS(features(fix = false)), balances) { d =>

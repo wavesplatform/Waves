@@ -19,7 +19,7 @@ case class SetAssetScriptTransaction(
     sender: PublicKey,
     asset: IssuedAsset,
     script: Option[Script],
-    fee: TxAmount,
+    fee: TxPositiveAmount,
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
@@ -60,19 +60,22 @@ object SetAssetScriptTransaction extends TransactionParser {
       sender: PublicKey,
       assetId: IssuedAsset,
       script: Option[Script],
-      fee: TxAmount,
+      fee: Long,
       timestamp: TxTimestamp,
       proofs: Proofs,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, SetAssetScriptTransaction] =
-    SetAssetScriptTransaction(version, sender, assetId, script, fee, timestamp, proofs, chainId).validatedEither
+    for {
+      fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
+      tx  <- SetAssetScriptTransaction(version, sender, assetId, script, fee, timestamp, proofs, chainId).validatedEither
+    } yield tx
 
   def signed(
       version: TxVersion,
       sender: PublicKey,
       asset: IssuedAsset,
       script: Option[Script],
-      fee: TxAmount,
+      fee: Long,
       timestamp: TxTimestamp,
       signer: PrivateKey,
       chainId: Byte = AddressScheme.current.chainId
@@ -84,7 +87,7 @@ object SetAssetScriptTransaction extends TransactionParser {
       sender: KeyPair,
       asset: IssuedAsset,
       script: Option[Script],
-      fee: TxAmount,
+      fee: Long,
       timestamp: TxTimestamp,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, SetAssetScriptTransaction] =

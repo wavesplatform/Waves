@@ -43,7 +43,7 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
     ) {
       case (_, blockchain) =>
         val asset        = IssuedAsset(issue.id())
-        val resultAmount = issue.quantity + reissueAmount - burnAmount
+        val resultAmount = issue.quantity.value + reissueAmount - burnAmount
 
         blockchain.assetDescription(asset).get.totalVolume shouldBe resultAmount
         blockchain.balance(master.toAddress, asset) shouldBe resultAmount
@@ -117,8 +117,8 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
     ) {
       case (_, blockchain) =>
         val asset                 = IssuedAsset(issue.id())
-        val totalResultAmount     = issue.quantity + (reissueAmount - burnAmount) * 2
-        val issuerResultAmount    = issue.quantity + (reissueAmount - burnAmount - transferAmount) * 2
+        val totalResultAmount     = issue.quantity.value + (reissueAmount - burnAmount) * 2
+        val issuerResultAmount    = issue.quantity.value + (reissueAmount - burnAmount - transferAmount) * 2
         val recipientResultAmount = transferAmount * 2
 
         blockchain.assetDescription(asset).get.totalVolume shouldBe totalResultAmount
@@ -321,7 +321,11 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
       TxHelpers.genesis(invoker.toAddress)
     )
     val issue =
-      TxHelpers.issue(master, startAmount, script = Some(checkStateAsset(startAmount, reissueAmount, burnAmount, assetCheckTransferAmount, invoker.toAddress)))
+      TxHelpers.issue(
+        master,
+        startAmount,
+        script = Some(checkStateAsset(startAmount, reissueAmount, burnAmount, assetCheckTransferAmount, invoker.toAddress))
+      )
     val setScript = TxHelpers.setScript(master, multiActionDApp(issue.id(), invoker.publicKey.toAddress, reissueAmount, burnAmount, transferAmount))
     val invoke    = TxHelpers.invoke(master.toAddress, func = None, invoker = invoker, fee = invokeFee)
 

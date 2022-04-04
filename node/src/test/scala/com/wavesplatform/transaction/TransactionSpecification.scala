@@ -16,8 +16,8 @@ class TransactionSpecification extends PropSpec {
         val tx = createWavesTransfer(sender, recipient.toAddress, amount, fee, time).explicitGet()
 
         tx.timestamp shouldEqual time
-        tx.amount shouldEqual amount
-        tx.fee shouldEqual fee
+        tx.amount.value shouldEqual amount
+        tx.fee.value shouldEqual fee
         tx.sender shouldEqual sender.publicKey
         tx.recipient shouldEqual recipient.toAddress
     }

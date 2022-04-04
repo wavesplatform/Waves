@@ -35,13 +35,13 @@ class PowNewPrecisionTest extends PropSpec with WithDomain {
   )
 
   private val scenario = {
-    val master = TxHelpers.signer(0)
+    val master  = TxHelpers.signer(0)
     val invoker = TxHelpers.signer(1)
 
     val balances = AddrWithBalance.enoughBalances(master, invoker)
 
     val setScript = TxHelpers.setScript(master, contract)
-    val invoke = () => TxHelpers.invoke(master.toAddress, invoker = invoker)
+    val invoke    = () => TxHelpers.invoke(master.toAddress, invoker = invoker)
 
     (balances, setScript, invoke, master.toAddress)
   }
