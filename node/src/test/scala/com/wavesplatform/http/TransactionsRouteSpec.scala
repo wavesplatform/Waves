@@ -399,7 +399,7 @@ class TransactionsRouteSpec
       val route = seal(transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route)
       Get(routePath(s"/info/${transaction.id()}")) ~> route ~> check {
         responseAs[JsObject] should matchJson(s"""{
-                                                 |  "type" : 19,
+                                                 |  "type" : 18,
                                                  |  "id" : "${transaction.id()}",
                                                  |  "fee" : 100000,
                                                  |  "feeAssetId" : null,
@@ -453,7 +453,7 @@ class TransactionsRouteSpec
       val route = seal(transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route)
       Get(routePath(s"/info/${transaction.id()}")) ~> route ~> check {
         responseAs[JsObject] should matchJson(s"""{
-                                                 |  "type" : 19,
+                                                 |  "type" : 18,
                                                  |  "id" : "${transaction.id()}",
                                                  |  "fee" : 500000,
                                                  |  "feeAssetId" : null,
