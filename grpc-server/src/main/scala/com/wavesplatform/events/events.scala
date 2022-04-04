@@ -8,6 +8,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
 import com.wavesplatform.events.StateUpdate.{AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate}
+import com.wavesplatform.events.protobuf.TransactionMetadata
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions}
 import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
@@ -48,6 +49,7 @@ object StateUpdate {
   }
 
   object BalanceUpdate {
+    import com.wavesplatform.events.protobuf.StateUpdate.{BalanceUpdate => PBBalanceUpdate}
 
     def fromPB(v: PBBalanceUpdate): BalanceUpdate = {
       val (asset, after) = PBAmounts.toAssetAndAmount(v.getAmountAfter)
@@ -69,6 +71,7 @@ object StateUpdate {
   }
 
   object DataEntryUpdate {
+    import com.wavesplatform.events.protobuf.StateUpdate.{DataEntryUpdate => PBDataEntryUpdate}
 
     def fromPB(v: PBDataEntryUpdate): DataEntryUpdate = {
       DataEntryUpdate(
@@ -92,6 +95,7 @@ object StateUpdate {
   }
 
   object LeasingBalanceUpdate {
+    import com.wavesplatform.events.protobuf.StateUpdate.{LeasingUpdate => PBLeasingUpdate}
 
     def fromPB(v: PBLeasingUpdate): LeasingBalanceUpdate = {
       LeasingBalanceUpdate(
@@ -134,6 +138,9 @@ object StateUpdate {
       case object Inactive extends LeaseStatus
     }
 
+    import com.wavesplatform.events.protobuf.StateUpdate.{LeaseUpdate => PBLeaseUpdate}
+    import com.wavesplatform.events.protobuf.StateUpdate.LeaseUpdate.{LeaseStatus => PBLeaseStatus}
+
     def fromPB(v: PBLeaseUpdate): LeaseUpdate = {
       LeaseUpdate(
         v.leaseId.toByteStr,
@@ -175,6 +182,9 @@ object StateUpdate {
 
   object AssetStateUpdate {
     final case class AssetDetails(assetId: ByteStr, desc: AssetDescription)
+
+    import com.wavesplatform.events.protobuf.StateUpdate.{AssetDetails => PBAssetDetails, AssetStateUpdate => PBAssetStateUpdate}
+    import com.wavesplatform.events.protobuf.StateUpdate.AssetDetails.{AssetScriptInfo => PBAssetScriptInfo}
 
     def fromPB(self: PBAssetStateUpdate): AssetStateUpdate = {
 
@@ -242,6 +252,7 @@ object StateUpdate {
 
   final case class AssetInfo(id: ByteStr, decimals: Int, name: String)
   object AssetInfo {
+    import com.wavesplatform.events.protobuf.StateUpdate.{AssetInfo => PBAssetInfo}
 
     def toPB(ai: AssetInfo): PBAssetInfo = PBAssetInfo(
       ai.id.toByteString,
@@ -256,6 +267,8 @@ object StateUpdate {
         ai.name
       )
   }
+
+  import com.wavesplatform.events.protobuf.{StateUpdate => PBStateUpdate}
 
   def fromPB(v: PBStateUpdate): StateUpdate = {
     StateUpdate(
