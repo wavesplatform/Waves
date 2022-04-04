@@ -90,7 +90,7 @@ object InvokeScriptDiff {
             )
           )
           _ <- traced {
-            if (blockchain.height >= blockchain.settings.functionalitySettings.forbidSyncDAppNegativePaymentHeight) {
+            if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls) && blockchain.height >= blockchain.settings.functionalitySettings.enforceTransferValidationAfter) {
               tx.payments.find { case Payment(amount, _) =>
                 amount < 0
               }.map(payment => Left(GenericError(s"DApp $invoker invoked DApp $dAppAddress with attached ${payment.assetId.fold("WAVES")(a => s"token $a")} amount = ${payment.amount}")))
@@ -232,7 +232,7 @@ object InvokeScriptDiff {
 
             _ <- traced(
               BalanceDiffValidation
-                .cond(blockchain, _.isFeatureActivated(BlockchainFeatures.SynchronousCalls))(diff)
+                .cond(blockchain, b => b.isFeatureActivated(BlockchainFeatures.SynchronousCalls) && b.height >= b.settings.functionalitySettings.enforceTransferValidationAfter)(diff)
                 .leftMap(be => FailedTransactionError.dAppExecution(be.toString, spentComplexity, log))
             )
 
@@ -303,7 +303,7 @@ object InvokeScriptDiff {
 
             _ <- traced(
               BalanceDiffValidation
-                .cond(blockchain, _.isFeatureActivated(BlockchainFeatures.SynchronousCalls))(resultDiff)
+                .cond(blockchain, b => b.isFeatureActivated(BlockchainFeatures.SynchronousCalls) && b.height >= b.settings.functionalitySettings.enforceTransferValidationAfter)(resultDiff)
                 .leftMap(be => FailedTransactionError.dAppExecution(be.toString, resultDiff.scriptsComplexity, log))
             )
 

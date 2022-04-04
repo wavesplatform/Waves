@@ -1874,14 +1874,14 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
   /** Generates sequence of Longs with predefined sum and size */
   def getSeqWithPredefinedSum(sum: Long, count: Int): Seq[Long] = {
 
-    val (rem, res) = (1 until count)
+    val (lastRemainder, values) = (1 until count)
       .foldLeft((sum, List.empty[Long])) {
-        case ((remainder, result), _) =>
-          val next = java.util.concurrent.ThreadLocalRandom.current.nextLong(1, remainder)
+        case ((remainder, result), index) =>
+          val next = java.util.concurrent.ThreadLocalRandom.current.nextLong(1, remainder / (count - index))
           (remainder - next) -> (next :: result)
       }
 
-    Random.shuffle(rem :: res)
+    Random.shuffle(lastRemainder :: values)
   }
 
   /** Generates sequence of sell orders for one big buy order */

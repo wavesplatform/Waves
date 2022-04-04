@@ -65,9 +65,9 @@ class SyncDAppNegativePaymentTest extends PropSpec with WithDomain {
   private val settings =
     TestFunctionalitySettings
       .withFeatures(BlockV5, SynchronousCalls)
-      .copy(forbidSyncDAppNegativePaymentHeight = 4)
+      .copy(enforceTransferValidationAfter = 4)
 
-  property("negative sync dApp payments amount rejects tx after forbidSyncDAppNegativePaymentHeight") {
+  property("negative sync dApp payments amount rejects tx after enforceTransferValidationAfter") {
     for {
       bigComplexityDApp1 <- Seq(false, true)
       bigComplexityDApp2 <- Seq(false, true)

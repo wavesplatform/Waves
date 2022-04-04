@@ -226,6 +226,6 @@ class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
     withDomain(RideV4)(assertNoFix)
     DirectiveDictionary[StdLibVersion].all
       .filter(_ >= V5)
-      .foreach(v => withDomain(settingsForRide(v))(assertFix(_, v)))
+      .foreach(v => withDomain(settingsForRide(v).configure(_.copy(enforceTransferValidationAfter = 0)))(assertFix(_, v)))
   }
 }
