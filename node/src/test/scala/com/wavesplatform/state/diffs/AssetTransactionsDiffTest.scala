@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs
 
-import cats._
 import com.wavesplatform.BlocksTransactionsHelpers
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
@@ -46,10 +45,10 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
     val ((gen, issue), (reissue, burn)) = issueReissueBurnTxs(isReissuable = true)
     assertDiffAndState(Seq(TestBlock.create(Seq(gen, issue))), TestBlock.create(Seq(reissue, burn))) {
       case (blockDiff, newState) =>
-        val totalPortfolioDiff = Monoid.combineAll(blockDiff.portfolios.values)
+        val totalPortfolioDiff = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
 
         totalPortfolioDiff.balance shouldBe 0
-        totalPortfolioDiff.effectiveBalance shouldBe 0
+        totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
         totalPortfolioDiff.assets shouldBe Map(reissue.asset -> (reissue.quantity.value - burn.quantity.value))
 
         val totalAssetVolume = issue.quantity.value + reissue.quantity.value - burn.quantity.value
@@ -266,7 +265,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
     val (gen, issue, transfer, _, _) = genesisIssueTransferReissue("true")
     assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, transfer)), smartEnabledFS) {
       case (blockDiff, newState) =>
-        val totalPortfolioDiff = Monoid.combineAll(blockDiff.portfolios.values)
+        val totalPortfolioDiff = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
         totalPortfolioDiff.assets(IssuedAsset(issue.id())) shouldEqual issue.quantity.value
         newState.balance(newState.resolveAlias(transfer.recipient).explicitGet(), IssuedAsset(issue.id())) shouldEqual transfer.amount.value
     }
@@ -423,7 +422,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
     val (genesis1, issue1, _, _, _) = genesisIssueTransferReissue(exprV4WithComplexityBetween3000And4000, V4)
     assertDiffAndState(Seq(TestBlock.create(genesis1)), TestBlock.create(Seq(issue1)), rideV4Activated) {
       case (blockDiff, _) =>
-        val totalPortfolioDiff = Monoid.combineAll(blockDiff.portfolios.values)
+        val totalPortfolioDiff = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
         totalPortfolioDiff.assets(IssuedAsset(issue1.id())) shouldEqual issue1.quantity.value
     }
 

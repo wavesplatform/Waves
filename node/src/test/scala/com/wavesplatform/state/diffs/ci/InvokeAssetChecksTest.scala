@@ -63,7 +63,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
                 s"Transfer error: invalid asset ID '$invalidLengthAsset' length = 4 bytes, must be 32"
               else
                 s"Transfer error: asset '$unexistingAsset' is not found on the blockchain"
-            Diff.empty.copy(
+            Diff(
               transactions = invokeInfo(false),
               portfolios = Map(
                 invoke.senderAddress -> Portfolio(-invoke.fee.value),
@@ -74,7 +74,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
             )
           } else {
             val asset = if (func == "invalidLength") invalidLengthAsset else unexistingAsset
-            Diff.empty.copy(
+            Diff(
               transactions = invokeInfo(true),
               portfolios = Map(
                 invoke.senderAddress -> Portfolio(-invoke.fee.value, assets = Map(asset -> 0)),

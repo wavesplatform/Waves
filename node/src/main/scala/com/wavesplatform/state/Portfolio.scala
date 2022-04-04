@@ -1,8 +1,7 @@
 package com.wavesplatform.state
 
-import cats.Monoid
-import cats.instances.map._
-import cats.kernel.CommutativeSemigroup
+import cats.{Monad, Monoid}
+import cats.implicits._
 import com.wavesplatform.state.diffs.BlockDiffer.Fraction
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset._
@@ -10,8 +9,8 @@ import com.wavesplatform.transaction.Asset._
 import scala.collection.immutable.Map
 
 case class Portfolio(balance: Long = 0L, lease: LeaseBalance = LeaseBalance.empty, assets: Map[IssuedAsset, Long] = Map.empty) {
-  lazy val effectiveBalance: Long = safeSum(balance, lease.in) - lease.out
-  lazy val spendableBalance: Long = balance - lease.out
+  lazy val effectiveBalance: Either[String, Long] = safeSum(balance, lease.in, "Effective balance").map(_ - lease.out)
+  lazy val spendableBalance: Long                 = balance - lease.out
 
   lazy val isEmpty: Boolean = this == Portfolio.empty
 
@@ -19,6 +18,16 @@ case class Portfolio(balance: Long = 0L, lease: LeaseBalance = LeaseBalance.empt
     case Waves                  => balance
     case asset @ IssuedAsset(_) => assets.getOrElse(asset, 0L)
   }
+
+  def combine(that: Portfolio): Either[String, Portfolio] =
+    combineF[Either[String, *]](that)
+
+  def combineF[F[_]: Monad](that: Portfolio)(implicit s: Summarizer[F]): F[Portfolio] =
+    for {
+      balance <- s.sum(balance, that.balance, "Waves balance")
+      lease   <- lease.combineF[F](that.lease)
+      assets  <- sumMapF(assets, that.assets, s.sum(_, _, "Assets balance"))
+    } yield Portfolio(balance, lease, assets)
 }
 
 object Portfolio {
@@ -32,19 +41,6 @@ object Portfolio {
   }
 
   val empty: Portfolio = Portfolio()
-
-  implicit val longSemigroup: CommutativeSemigroup[Long] = (x: Long, y: Long) => safeSum(x, y)
-
-  implicit val monoid: Monoid[Portfolio] = new Monoid[Portfolio] {
-    override val empty: Portfolio = Portfolio.empty
-
-    override def combine(older: Portfolio, newer: Portfolio): Portfolio =
-      Portfolio(
-        balance = safeSum(older.balance, newer.balance),
-        lease = Monoid.combine(older.lease, newer.lease),
-        assets = Monoid.combine(older.assets, newer.assets)
-      )
-  }
 
   implicit class PortfolioExt(val self: Portfolio) extends AnyVal {
     def spendableBalanceOf(assetId: Asset): Long = assetId.fold(self.spendableBalance)(self.assets.getOrElse(_, 0L))

@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs
 
-import cats.Monoid
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
@@ -27,11 +27,10 @@ class PaymentTransactionDiffTest extends PropSpec with WithState {
     preconditionsAndPayments.foreach {
       case ((genesis, paymentV2, _)) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(paymentV2)), settings) { (blockDiff, newState) =>
-          val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
+          val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
           totalPortfolioDiff.balance shouldBe 0
-          totalPortfolioDiff.effectiveBalance shouldBe 0
+          totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
         }
-
     }
   }
 

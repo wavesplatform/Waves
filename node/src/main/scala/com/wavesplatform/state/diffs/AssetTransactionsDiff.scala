@@ -1,9 +1,9 @@
 package com.wavesplatform.state.diffs
 
+import cats.implicits.toBifunctorOps
 import cats.instances.either._
 import cats.syntax.flatMap._
 import cats.syntax.ior._
-import cats.syntax.semigroup._
 import com.google.common.base.Utf8
 import com.google.protobuf.ByteString
 import com.wavesplatform.features.BlockchainFeatures
@@ -81,17 +81,17 @@ object AssetTransactionsDiff extends ScorexLogging {
   def reissue(blockchain: Blockchain, blockTime: Long)(tx: ReissueTransaction): Either[ValidationError, Diff] =
     DiffsCommon
       .processReissue(blockchain, tx.sender.toAddress, blockTime, tx.fee.value, Reissue(tx.asset.id, tx.reissuable, tx.quantity.value))
-      .map(_ |+| Diff(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)))
+      .flatMap(_.combine(Diff(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx))).leftMap(GenericError(_)))
 
   def burn(blockchain: Blockchain)(tx: BurnTransaction): Either[ValidationError, Diff] =
     DiffsCommon
       .processBurn(blockchain, tx.sender.toAddress, tx.fee.value, Burn(tx.asset.id, tx.quantity.value))
-      .map(_ |+| Diff(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)))
+      .flatMap(_.combine(Diff(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx))).leftMap(GenericError(_)))
 
   def sponsor(blockchain: Blockchain)(tx: SponsorFeeTransaction): Either[ValidationError, Diff] =
     DiffsCommon
       .processSponsor(blockchain, tx.sender.toAddress, tx.fee.value, SponsorFee(tx.asset.id, tx.minSponsoredAssetFee.map(_.value)))
-      .map(_ |+| Diff(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)))
+      .flatMap(_.combine(Diff(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx))).leftMap(GenericError(_)))
 
   def updateInfo(blockchain: Blockchain)(tx: UpdateAssetInfoTransaction): Either[ValidationError, Diff] =
     DiffsCommon.validateAsset(blockchain, tx.assetId, tx.sender.toAddress, issuerOnly = true) >> {

@@ -1,6 +1,5 @@
 package com.wavesplatform.db
 
-import cats.Monoid
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
@@ -14,18 +13,11 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.{
-  BlockchainSettings,
-  FunctionalitySettings,
-  TestSettings,
-  WavesSettings,
-  loadConfig,
-  TestFunctionalitySettings => TFS
-}
+import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, TestSettings, WavesSettings, loadConfig, TestFunctionalitySettings => TFS}
 import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT, produce}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.utils.TestLevelDB
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Portfolio}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers}
 import com.wavesplatform.{NTPTime, TestHelpers}
@@ -154,9 +146,9 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
     }
 
   def assertBalanceInvariant(diff: Diff): Unit = {
-    val portfolioDiff = Monoid.combineAll(diff.portfolios.values)
+    val portfolioDiff = diff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
     portfolioDiff.balance shouldBe 0
-    portfolioDiff.effectiveBalance shouldBe 0
+    portfolioDiff.effectiveBalance.explicitGet() shouldBe 0
     all(portfolioDiff.assets.values) shouldBe 0
   }
 
