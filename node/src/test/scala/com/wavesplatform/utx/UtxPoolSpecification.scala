@@ -841,18 +841,13 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
             val utx =
               new UtxPoolImpl(ntpTime, blockchain, WavesSettings.default().utxSettings)
             (blockchain.balance _).when(*, *).returning(ENOUGH_AMT).repeat((rest.length + 1) * 2)
-
-            (blockchain.balance _)
-              .when(*, *)
-              .onCall { (_: Address, _: Asset) =>
-                utx.removeAll(rest)
-                ENOUGH_AMT
-              }
-              .once()
             (blockchain.balance _).when(*, *).returning(ENOUGH_AMT)
-
             (blockchain.leaseBalance _).when(*).returning(LeaseBalance(0, 0))
-            (blockchain.accountScript _).when(*).returns(None)
+            (blockchain.accountScript _).when(*).onCall {
+              _: Address =>
+                utx.removeAll(rest)
+                None
+            }
             val tb = TestBlock.create(Nil)
             (blockchain.blockHeader _).when(*).returning(Some(SignedBlockHeader(tb.header, tb.signature)))
 

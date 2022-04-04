@@ -712,7 +712,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
   }
 
   property("can't overflow payment + fee") {
-    val payment                  = Some(Payment(Long.MaxValue, Waves))
+    val payment                  = Some(Payment(ENOUGH_AMT, Waves))
     val (genesis, setScript, ci) = preconditionsAndSetContract(dAppWithTransfers(), payment = payment)
     testDiff(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci))) {
       _ should produce("Attempt to transfer unavailable funds")
@@ -991,6 +991,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       .anyNumberOfTimes()
     (blockchain.accountScript _).expects(invoke.sender.toAddress).returning(None).anyNumberOfTimes()
     (blockchain.hasAccountScript _).expects(invoke.sender.toAddress).returning(false).anyNumberOfTimes()
+    (blockchain.balance _).expects(*, Waves).returning(ENOUGH_AMT).anyNumberOfTimes()
+    (blockchain.leaseBalance _).expects(*).returning(LeaseBalance.empty).anyNumberOfTimes()
     (() => blockchain.activatedFeatures)
       .expects()
       .returning(Map(BlockchainFeatures.Ride4DApps.id -> 0))
@@ -1037,6 +1039,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
           )
         )
       )
+      .anyNumberOfTimes()
     InvokeScriptTransactionDiff
       .apply(blockchain, invoke.timestamp, limitedExecution = false)(invoke)
       .resultE should produce("is already issued")

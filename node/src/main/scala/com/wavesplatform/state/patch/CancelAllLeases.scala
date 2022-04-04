@@ -27,7 +27,7 @@ case object CancelAllLeases extends PatchAtHeight('W' -> 462000, 'T' -> 51500) {
 
   def apply(blockchain: Blockchain): Diff = {
     val patch = readPatchData[CancelledLeases]()
-    Diff.empty.copy(portfolios = patch.balances.map {
+    Diff(portfolios = patch.balances.map {
       case (address, lb) =>
         Address.fromString(address).explicitGet() -> Portfolio(lease = lb)
     }, leaseState = patch.leaseStates)

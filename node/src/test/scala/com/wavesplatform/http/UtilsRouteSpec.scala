@@ -1,7 +1,5 @@
 package com.wavesplatform.http
 
-import scala.concurrent.duration._
-
 import akka.http.scaladsl.testkit.RouteTestTimeout
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.PublicKey
@@ -18,17 +16,17 @@ import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.directives.values.{V2, V3}
-import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.{FunctionHeader, Serde}
+import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.{FunctionHeader, Serde}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.{CallableFuncSignature, CompactNameAndOriginalNamePair}
-import com.wavesplatform.state.{AccountScriptInfo, Blockchain, IntegerDataEntry}
 import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.state.{AccountScriptInfo, Blockchain, IntegerDataEntry, LeaseBalance}
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.{Schedulers, Time}
@@ -38,6 +36,8 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.Inside
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
+
+import scala.concurrent.duration._
 
 class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks with PathMockFactory with Inside {
   implicit val routeTestTimeout = RouteTestTimeout(10.seconds)
@@ -877,6 +877,10 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     (() => utilsApi.blockchain.settings)
       .when()
       .returning(DefaultBlockchainSettings)
+      .anyNumberOfTimes()
+    (utilsApi.blockchain.leaseBalance _)
+      .when(*)
+      .returning(LeaseBalance.empty)
       .anyNumberOfTimes()
 
     evalScript(""" testSyncinvoke() """) ~> route ~> check {
