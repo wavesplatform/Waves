@@ -1877,7 +1877,9 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     val (rem, res) = (1 until count)
       .foldLeft((sum, List.empty[Long])) {
         case ((remainder, result), _) =>
-          val next = java.util.concurrent.ThreadLocalRandom.current.nextLong(0, remainder + 1)
+          val next =
+            if (remainder == 0) 0
+            else java.util.concurrent.ThreadLocalRandom.current.nextLong(0, remainder + 1)
           (remainder - next) -> (next :: result)
       }
 
