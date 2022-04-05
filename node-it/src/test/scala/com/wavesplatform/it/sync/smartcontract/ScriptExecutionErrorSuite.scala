@@ -18,7 +18,7 @@ import com.wavesplatform.transaction.transfer.TransferTransaction
 import org.scalatest.CancelAfterFailure
 
 class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFailure {
-  private val ts   = System.currentTimeMillis()
+  private val ts = System.currentTimeMillis()
 
   test("custom throw message") {
     val scriptSrc =

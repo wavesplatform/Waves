@@ -2,43 +2,42 @@ package com.wavesplatform.api.http.eth
 
 import java.math.BigInteger
 
-import akka.http.scaladsl.server._
+import akka.http.scaladsl.server.*
 import cats.data.Validated
-import cats.instances.vector._
-import cats.syntax.either._
-import cats.syntax.traverse._
+import cats.instances.vector.*
+import cats.syntax.either.*
+import cats.syntax.traverse.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonTransactionsApi
+import com.wavesplatform.api.http.*
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidIds}
-import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{ABIConverter, ERC20Address, EthereumTransaction}
-import com.wavesplatform.utils.EthEncoding._
+import com.wavesplatform.utils.EthEncoding.*
 import com.wavesplatform.utils.{EthEncoding, Time}
-import org.web3j.abi._
+import org.web3j.abi.*
 import org.web3j.abi.datatypes.generated.{Uint256, Uint8}
-import org.web3j.crypto._
+import org.web3j.crypto.*
+import play.api.libs.json.*
 import play.api.libs.json.Json.JsValueWrapper
-import play.api.libs.json._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi, time: Time) extends ApiRoute {
   val route: Route = pathPrefix("eth") {
     (path("assets") & anyParam("id", nonEmpty = true, limit = 100).massValidateEthereumIds) { erc20Ids =>
       val results = erc20Ids
-        .map(
-          id =>
-            id -> (for {
-              wavesId   <- blockchain.resolveERC20Address(ERC20Address(id))
-              assetDesc <- blockchain.assetDescription(wavesId)
-            } yield (wavesId, assetDesc))
+        .map(id =>
+          id -> (for {
+            wavesId   <- blockchain.resolveERC20Address(ERC20Address(id))
+            assetDesc <- blockchain.assetDescription(wavesId)
+          } yield (wavesId, assetDesc))
         )
         .map { case (id, assetOpt) => Validated.fromOption(assetOpt, EthEncoding.toHexString(id.arr)).toValidatedNel }
         .sequence
@@ -81,7 +80,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
 
           resp(
             id,
-            blockchain.heightOf(blockId).flatMap(blockchain.blockHeader).fold[JsValue](JsNull) { header =>
+            blockchain.heightOf(blockId).flatMap(blockchain.blockHeader).fold[JsValue](JsNull) { _ =>
               Json.obj(
                 "baseFeePerGas" -> "0x0"
               )

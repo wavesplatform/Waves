@@ -2,8 +2,6 @@ package com.wavesplatform.transaction
 
 import java.math.BigInteger
 
-import scala.reflect.ClassTag
-
 import cats.syntax.either.*
 import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
@@ -29,6 +27,8 @@ import org.web3j.crypto.Sign.SignatureData
 import org.web3j.utils.Convert
 import play.api.libs.json.*
 
+import scala.reflect.ClassTag
+
 final case class EthereumTransaction(
     payload: EthereumTransaction.Payload,
     underlying: RawTransaction,
@@ -38,7 +38,7 @@ final case class EthereumTransaction(
     with Authorized
     with VersionedTransaction.ConstV1
     with PBSince.V1 { self =>
-  import EthereumTransaction._
+  import EthereumTransaction.*
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(encodeTransaction(underlying, signatureData))
 
@@ -78,8 +78,8 @@ final case class EthereumTransaction(
 
   override lazy val sender: PublicKey = signerPublicKey()
 
-  def toTransferLike(a: TxAmount, r: AddressOrAlias, asset: Asset): TransferTransactionLike = new TransferTransactionLike {
-    override val amount: TxAmount               = a
+  def toTransferLike(a: TxPositiveAmount, r: AddressOrAlias, asset: Asset): TransferTransactionLike = new TransferTransactionLike {
+    override val amount: TxPositiveAmount       = a
     override val recipient: AddressOrAlias      = r
     override val sender: PublicKey              = signerPublicKey()
     override val assetId: Asset                 = asset
@@ -107,13 +107,17 @@ object EthereumTransaction {
         )(a => blockchain.resolveERC20Address(a).toRight(GenericError(s"Can't resolve ERC20 address $a")))
 
     def toTransferLike(tx: EthereumTransaction, blockchain: Blockchain): Either[ValidationError, TransferTransactionLike] =
-      tryResolveAsset(blockchain).map(tx.toTransferLike(amount, recipient, _))
+      for {
+        asset  <- tryResolveAsset(blockchain)
+        amount <- TxPositiveAmount(amount)(TxValidationError.NonPositiveAmount(amount, asset.maybeBase58Repr.getOrElse("waves")))
+      } yield tx.toTransferLike(amount, recipient, asset)
   }
 
   case class Invocation(dApp: Address, hexCallData: String) extends Payload {
     def toInvokeScriptLike(tx: EthereumTransaction, blockchain: Blockchain): Either[ValidationError, InvokeScriptTransactionLike] =
       blockchain.accountScript(dApp).toRight(GenericError(s"No script at address $dApp")).flatMap { scriptInfo =>
-        ABIConverter(scriptInfo.script).decodeFunctionCall(hexCallData)
+        ABIConverter(scriptInfo.script)
+          .decodeFunctionCall(hexCallData)
           .leftMap(GenericError(_))
           .map { case (extractedCall, extractedPayments) =>
             new InvokeScriptTransactionLike {
@@ -160,7 +164,7 @@ object EthereumTransaction {
   val AmountMultiplier = 10000000000L
 
   private val decodeMethod = {
-    val m = classOf[TypeDecoder].getDeclaredMethod("decode", classOf[String], classOf[Int], classOf[Class[_]])
+    val m = classOf[TypeDecoder].getDeclaredMethod("decode", classOf[String], classOf[Int], classOf[Class[?]])
     m.setAccessible(true)
     m
   }

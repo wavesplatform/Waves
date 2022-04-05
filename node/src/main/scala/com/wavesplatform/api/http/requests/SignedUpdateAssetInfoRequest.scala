@@ -6,7 +6,7 @@ import com.wavesplatform.account.PublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
-import com.wavesplatform.transaction.{AssetIdStringLength, Proofs, TxAmount, TxTimestamp, TxVersion}
+import com.wavesplatform.transaction.{AssetIdStringLength, Proofs, TxTimestamp, TxVersion}
 import play.api.libs.json.{Format, Json}
 
 case class SignedUpdateAssetInfoRequest(
@@ -17,7 +17,7 @@ case class SignedUpdateAssetInfoRequest(
     name: String,
     description: String,
     timestamp: TxTimestamp,
-    fee: TxAmount,
+    fee: Long,
     feeAssetId: Option[String],
     proofs: Proofs
 ) {

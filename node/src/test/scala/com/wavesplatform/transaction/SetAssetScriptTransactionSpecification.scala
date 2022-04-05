@@ -47,14 +47,14 @@ class SetAssetScriptTransactionSpecification extends GenericTransactionSpecifica
 
   override def generator: Gen[(Seq[Transaction], SetAssetScriptTransaction)] = setAssetScriptTransactionGen
   override def assertTxs(first: SetAssetScriptTransaction, second: SetAssetScriptTransaction): Unit = {
-      first.sender shouldEqual second.sender
-      first.timestamp shouldEqual second.timestamp
-      first.fee shouldEqual second.fee
-      first.version shouldEqual second.version
-      first.asset shouldEqual second.asset
-      first.proofs shouldEqual second.proofs
-      first.bytes() shouldEqual second.bytes()
-      first.script shouldEqual second.script
+    first.sender shouldEqual second.sender
+    first.timestamp shouldEqual second.timestamp
+    first.fee shouldEqual second.fee
+    first.version shouldEqual second.version
+    first.asset shouldEqual second.asset
+    first.proofs shouldEqual second.proofs
+    first.bytes() shouldEqual second.bytes()
+    first.script shouldEqual second.script
   }
 
   def jsonRepr: Seq[(JsValue, SetAssetScriptTransaction)] =

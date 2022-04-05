@@ -36,7 +36,7 @@ class CreateAliasTransactionSpecification extends PropSpec with WithDomain {
     val kp1 = KeyPair(Longs.toByteArray(Random.nextLong()))
     val kp2 = KeyPair(Longs.toByteArray(Random.nextLong()))
 
-    val cat = CreateAliasTransaction(3.toByte, TxHelpers.signer(1).publicKey, "abc12345", 0.001.waves, System.currentTimeMillis(), Proofs.empty, 'T'.toByte)
+    val cat = CreateAliasTransaction(3.toByte, TxHelpers.signer(1).publicKey, "abc12345", TxPositiveAmount.unsafeFrom(0.001.waves), System.currentTimeMillis(), Proofs.empty, 'T'.toByte)
     val signedCreateAlias = cat.copy(
       proofs = cat.signWith(kp1.privateKey).proofs.proofs ++ cat.signWith(kp2.privateKey).proofs.proofs
     )
@@ -127,7 +127,7 @@ class CreateAliasTransactionSpecification extends PropSpec with WithDomain {
       val kp1 = KeyPair(Longs.toByteArray(Random.nextLong()))
       val kp2 = KeyPair(Longs.toByteArray(Random.nextLong()))
 
-      val cat = CreateAliasTransaction(3.toByte, sender.publicKey, "abc12345", 0.001.waves, System.currentTimeMillis(), Proofs.empty, 'T'.toByte)
+      val cat = CreateAliasTransaction(3.toByte, sender.publicKey, "abc12345", TxPositiveAmount.unsafeFrom(0.001.waves), System.currentTimeMillis(), Proofs.empty, 'T'.toByte)
       val signedCreateAlias = cat.copy(
         proofs = cat.signWith(kp1.privateKey).proofs.proofs ++ cat.signWith(kp2.privateKey).proofs.proofs
       )
@@ -155,7 +155,15 @@ class CreateAliasTransactionSpecification extends PropSpec with WithDomain {
       val kp1 = KeyPair(Longs.toByteArray(Random.nextLong()))
       val kp2 = KeyPair(Longs.toByteArray(Random.nextLong()))
 
-      val cat = CreateAliasTransaction(3.toByte, sender.publicKey, "abc12345", 0.001.waves, System.currentTimeMillis(), Proofs.empty, 'T'.toByte)
+      val cat = CreateAliasTransaction(
+        3.toByte,
+        sender.publicKey,
+        "abc12345",
+        TxPositiveAmount.unsafeFrom(0.001.waves),
+        System.currentTimeMillis(),
+        Proofs.empty,
+        'T'.toByte
+      )
       val signedCreateAlias = cat.copy(
         proofs = cat.signWith(kp1.privateKey).proofs.proofs ++ cat.signWith(kp2.privateKey).proofs.proofs
       )

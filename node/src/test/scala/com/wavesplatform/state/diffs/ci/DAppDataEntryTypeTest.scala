@@ -71,12 +71,12 @@ class DAppDataEntryTypeTest
   }
 
   private def assert(constructor: String) = {
-    val dAppAcc = TxHelpers.signer(0)
-    val invoker = TxHelpers.signer(1)
+    val dAppAcc  = TxHelpers.signer(0)
+    val invoker  = TxHelpers.signer(1)
     val balances = AddrWithBalance.enoughBalances(dAppAcc, invoker)
 
     val setScript = TxHelpers.setScript(dAppAcc, dApp(constructor))
-    val invoke = TxHelpers.invoke(dAppAcc.toAddress, func = None, invoker = invoker)
+    val invoke    = TxHelpers.invoke(dAppAcc.toAddress, func = None, invoker = invoker)
 
     withDomain(domainSettingsWithFS(fsWithV5), balances) { d =>
       d.appendBlock(setScript)

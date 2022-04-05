@@ -17,9 +17,7 @@ import org.scalatest.Assertion
 
 import scala.concurrent.duration._
 
-class SponsorshipSuite
-    extends BaseFreeSpec
-    with IntegrationSuiteWithThreeAddresses {
+class SponsorshipSuite extends BaseFreeSpec with IntegrationSuiteWithThreeAddresses {
 
   override def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder

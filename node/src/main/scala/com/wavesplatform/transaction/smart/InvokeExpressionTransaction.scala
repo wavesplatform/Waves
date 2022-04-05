@@ -19,7 +19,7 @@ case class InvokeExpressionTransaction(
     version: TxVersion,
     sender: PublicKey,
     expression: ExprScript,
-    fee: TxAmount,
+    fee: TxPositiveAmount,
     feeAssetId: Asset,
     override val timestamp: TxTimestamp,
     proofs: Proofs,
@@ -70,28 +70,31 @@ object InvokeExpressionTransaction extends TransactionParser {
       version: Byte,
       sender: PublicKey,
       expression: ExprScript,
-      feeAmount: TxAmount,
+      feeAmount: Long,
       feeAsset: Asset,
       timestamp: TxTimestamp,
       proofs: Proofs,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, InvokeExpressionTransaction] =
-    InvokeExpressionTransaction(
-      version,
-      sender,
-      expression,
-      feeAmount,
-      feeAsset,
-      timestamp,
-      proofs,
-      chainId
-    ).validatedEither
+    for {
+      fee <- TxPositiveAmount(feeAmount)(TxValidationError.InsufficientFee)
+      tx <- InvokeExpressionTransaction(
+        version,
+        sender,
+        expression,
+        fee,
+        feeAsset,
+        timestamp,
+        proofs,
+        chainId
+      ).validatedEither
+    } yield tx
 
   def selfSigned(
       version: Byte,
       sender: KeyPair,
       expression: ExprScript,
-      feeAmount: TxAmount,
+      feeAmount: Long,
       feeAsset: Asset,
       timestamp: TxTimestamp
   ): Either[ValidationError, InvokeExpressionTransaction] =

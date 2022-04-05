@@ -20,9 +20,9 @@ case class TransferTransaction(
     sender: PublicKey,
     recipient: AddressOrAlias,
     assetId: Asset,
-    amount: TxAmount,
+    amount: TxPositiveAmount,
     feeAssetId: Asset,
-    fee: TxAmount,
+    fee: TxPositiveAmount,
     attachment: ByteStr,
     timestamp: TxTimestamp,
     proofs: Proofs,
@@ -47,7 +47,7 @@ trait TransferTransactionLike extends TransactionBase with Authorized {
   val sender: PublicKey
   val recipient: AddressOrAlias
   val assetId: Asset
-  val amount: TxAmount
+  val amount: TxPositiveAmount
   val attachment: ByteStr
 }
 
@@ -72,24 +72,28 @@ object TransferTransaction extends TransactionParser {
       sender: PublicKey,
       recipient: AddressOrAlias,
       asset: Asset,
-      amount: TxAmount,
+      amount: Long,
       feeAsset: Asset,
-      fee: TxAmount,
+      fee: Long,
       attachment: ByteStr,
       timestamp: TxTimestamp,
       proofs: Proofs,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, TransferTransaction] =
-    TransferTransaction(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, proofs, chainId).validatedEither
+    for {
+      amount <- TxPositiveAmount(amount)(TxValidationError.NonPositiveAmount(amount, asset.maybeBase58Repr.getOrElse("waves")))
+      fee    <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
+      tx     <- TransferTransaction(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, proofs, chainId).validatedEither
+    } yield tx
 
   def signed(
       version: TxVersion,
       sender: PublicKey,
       recipient: AddressOrAlias,
       asset: Asset,
-      amount: TxAmount,
+      amount: Long,
       feeAsset: Asset,
-      fee: TxAmount,
+      fee: Long,
       attachment: ByteStr,
       timestamp: TxTimestamp,
       signer: PrivateKey,
@@ -102,9 +106,9 @@ object TransferTransaction extends TransactionParser {
       sender: KeyPair,
       recipient: AddressOrAlias,
       asset: Asset,
-      amount: TxAmount,
+      amount: Long,
       feeAsset: Asset,
-      fee: TxAmount,
+      fee: Long,
       attachment: ByteStr,
       timestamp: TxTimestamp,
       chainId: Byte = AddressScheme.current.chainId

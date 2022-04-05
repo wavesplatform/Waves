@@ -18,10 +18,7 @@ import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Proofs, TxVersion}
 import org.scalatest.prop.TableDrivenPropertyChecks
 
-class RideCreateMerkleRootTestSuite
-    extends BaseFunSuite
-    with TransferSending
-    with TableDrivenPropertyChecks {
+class RideCreateMerkleRootTestSuite extends BaseFunSuite with TransferSending with TableDrivenPropertyChecks {
   override def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))

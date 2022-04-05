@@ -116,8 +116,8 @@ class TransactionFeeSpec extends FreeSpec with WithDomain {
                                                          |@Callable(i)
                                                          |func default() = {
                                                          |  strict test = ${(1 to 10)
-                  .map(_ => "sigVerify(base58'', base58'', base58'')")
-                  .mkString(" || ")}
+                                                           .map(_ => "sigVerify(base58'', base58'', base58'')")
+                                                           .mkString(" || ")}
                                                          |  (
                                                          |    [
                                                          |    ScriptTransfer(i.caller, 100, unit)],
@@ -128,8 +128,8 @@ class TransactionFeeSpec extends FreeSpec with WithDomain {
                                                          |@Callable(i)
                                                          |func test() = {
                                                          |  strict test = ${(1 to 10)
-                  .map(_ => "sigVerify(base58'', base58'', base58'')")
-                  .mkString(" || ")}
+                                                           .map(_ => "sigVerify(base58'', base58'', base58'')")
+                                                           .mkString(" || ")}
                                                          |  [ScriptTransfer(i.caller, 100, unit)]
                                                          |}""".stripMargin)),
                 0.01.waves,
@@ -197,8 +197,8 @@ class TransactionFeeSpec extends FreeSpec with WithDomain {
                                                          |@Callable(i)
                                                          |func default() = {
                                                          |  strict test = ${(1 to 10)
-                  .map(_ => "sigVerify(base58'', base58'', base58'')")
-                  .mkString(" || ")}
+                                                           .map(_ => "sigVerify(base58'', base58'', base58'')")
+                                                           .mkString(" || ")}
                                                          |  (
                                                          |    [
                                                          |    ScriptTransfer(i.caller, 100, unit)],
@@ -230,11 +230,23 @@ class TransactionFeeSpec extends FreeSpec with WithDomain {
         val issue = TxHelpers.issue()
         d.appendBlock(issue)
         d.appendBlock(
-          SponsorFeeTransaction.selfSigned(TxVersion.V1, TxHelpers.defaultSigner, issue.asset, Some(1L), 1.waves, ntpTime.getTimestamp()).explicitGet()
+          SponsorFeeTransaction
+            .selfSigned(TxVersion.V1, TxHelpers.defaultSigner, issue.asset, Some(1L), 1.waves, ntpTime.getTimestamp())
+            .explicitGet()
         )
 
         val transfer = TransferTransaction
-          .selfSigned(TxVersion.V2, TxHelpers.defaultSigner, TxHelpers.secondAddress, Waves, 1, issue.asset, 1L, ByteStr.empty, ntpTime.getTimestamp())
+          .selfSigned(
+            TxVersion.V2,
+            TxHelpers.defaultSigner,
+            TxHelpers.secondAddress,
+            Waves,
+            1,
+            issue.asset,
+            1L,
+            ByteStr.empty,
+            ntpTime.getTimestamp()
+          )
           .explicitGet()
         d.commonApi.calculateFee(transfer) shouldBe ((issue.asset, 1L, 0.001.waves))
       }

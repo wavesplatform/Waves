@@ -78,8 +78,8 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
       waitForTx = true
     )
 
-    sender.getDataByKey(dAppAddress, "amount").value shouldBe transferTx.amount
-    sender.getDataByKey(dAppAddress, "fee").value shouldBe transferTx.fee
+    sender.getDataByKey(dAppAddress, "amount").value shouldBe transferTx.amount.value
+    sender.getDataByKey(dAppAddress, "fee").value shouldBe transferTx.fee.value
     sender.getDataByKey(dAppAddress, "id").value shouldBe transferTx.id().toString
     sender.getDataByKey(dAppAddress, "assetId").value shouldBe "WAVES"
     sender.getDataByKey(dAppAddress, "feeAssetId").value shouldBe "WAVES"

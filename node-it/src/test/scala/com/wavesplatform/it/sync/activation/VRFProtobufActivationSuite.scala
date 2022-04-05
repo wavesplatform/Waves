@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync.activation
 import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, StateCheckFailed}
 import com.wavesplatform.block.Block
-import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
@@ -12,7 +12,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.transaction.TxVersion
+import com.wavesplatform.transaction.{TxExchangePrice, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 
 import scala.concurrent.duration._
@@ -28,8 +28,8 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
       .overrideBase(_.raw(s"waves.blockchain.custom.functionality.min-asset-info-update-interval = $updateInterval"))
       .buildNonConflicting()
 
-  private def senderAcc     = firstKeyPair
-  private def recipientAcc  = secondKeyPair
+  private def senderAcc             = firstKeyPair
+  private def recipientAcc          = secondKeyPair
   private var assetId               = ""
   private var otherAssetId          = ""
   private var secondUpdateAssetTxId = ""
@@ -83,7 +83,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
         sellOrder,
         buyOrder,
         buyOrder.amount,
-        buyOrder.price,
+        TxExchangePrice.unsafeFrom(buyOrder.price.value),
         matcherFee,
         matcherFee,
         matcherFee,
@@ -148,7 +148,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
         sellOrder,
         buyOrder,
         buyOrder.amount,
-        buyOrder.price,
+        TxExchangePrice.unsafeFrom(buyOrder.price.value),
         matcherFee,
         matcherFee * 10,
         matcherFee * 10,
@@ -164,7 +164,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
       sellOrder,
       buyOrder,
       buyOrder.amount,
-      buyOrder.price,
+      TxExchangePrice.unsafeFrom(buyOrder.price.value),
       matcherFee,
       matcherFee,
       matcherFee,
@@ -214,28 +214,32 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     val ts     = System.currentTimeMillis()
     val amount = 1000000
     val price  = 1000
-    val buyOrder = Order.buy(
-      version = TxVersion.V2,
-      sender.keyPair,
-      sender.publicKey,
-      AssetPair.createAssetPair("WAVES", assetId).get,
-      amount,
-      price,
-      ts,
-      ts + Order.MaxLiveTime,
-      matcherFee
-    )
-    val sellOrder = Order.sell(
-      version = TxVersion.V2,
-      sender.keyPair,
-      sender.publicKey,
-      AssetPair.createAssetPair("WAVES", assetId).get,
-      amount,
-      price,
-      ts,
-      ts + Order.MaxLiveTime,
-      matcherFee
-    )
+    val buyOrder = Order
+      .buy(
+        version = TxVersion.V2,
+        sender.keyPair,
+        sender.publicKey,
+        AssetPair.createAssetPair("WAVES", assetId).get,
+        amount,
+        price,
+        ts,
+        ts + Order.MaxLiveTime,
+        matcherFee
+      )
+      .explicitGet()
+    val sellOrder = Order
+      .sell(
+        version = TxVersion.V2,
+        sender.keyPair,
+        sender.publicKey,
+        AssetPair.createAssetPair("WAVES", assetId).get,
+        amount,
+        price,
+        ts,
+        ts + Order.MaxLiveTime,
+        matcherFee
+      )
+      .explicitGet()
     (buyOrder, sellOrder)
   }
 }

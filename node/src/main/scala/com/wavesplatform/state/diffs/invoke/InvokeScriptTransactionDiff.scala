@@ -1,10 +1,7 @@
 package com.wavesplatform.state.diffs.invoke
 
-import scala.util.Right
-
 import cats.Id
 import cats.syntax.either.*
-import cats.syntax.semigroup.*
 import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -35,13 +32,15 @@ import com.wavesplatform.state.diffs.invoke.CallArgumentPolicy.*
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.TransactionBase
 import com.wavesplatform.transaction.TxValidationError.*
-import com.wavesplatform.transaction.smart.{DApp as DAppTarget, *}
 import com.wavesplatform.transaction.smart.InvokeTransaction.DefaultCall
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
+import com.wavesplatform.transaction.smart.{DApp as DAppTarget, *}
 import com.wavesplatform.transaction.validation.impl.DataTxValidator
 import monix.eval.Coeval
 import shapeless.Coproduct
+
+import scala.util.Right
 
 object InvokeScriptTransactionDiff {
 
@@ -191,7 +190,8 @@ object InvokeScriptTransactionDiff {
           case i: IncompleteResult =>
             TracedResult(Left(GenericError(s"Evaluation was uncompleted with unused complexity = ${i.unusedComplexity}")))
         }
-      } yield invocationDiff.copy(scriptsComplexity = 0) |+| resultDiff
+        totalDiff <- TracedResult(invocationDiff.copy(scriptsComplexity = 0).combine(resultDiff)).leftMap(GenericError(_))
+      } yield totalDiff
     }
 
     def calcInvocationComplexity(
@@ -237,6 +237,8 @@ object InvokeScriptTransactionDiff {
             input <- buildThisValue(Coproduct[TxOrd](tx: TransactionBase), blockchain, directives, tthis)
           } yield (directives, tthis, input)).leftMap(GenericError(_))
 
+          paymentsPart <- TracedResult(if (version < V5) Right(Diff.empty) else InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map()))
+
           environment = new DAppEnvironment(
             AddressScheme.current.chainId,
             Coeval.evalOnce(input),
@@ -254,7 +256,7 @@ object InvokeScriptTransactionDiff {
             ContractLimits.MaxCallableActionsAmount(version),
             ContractLimits.MaxWriteSetSize,
             ContractLimits.MaxTotalWriteSetSizeInBytes,
-            if (version < V5) Diff.empty else InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map()),
+            paymentsPart,
             invocationTracker
           )
           invoker  = RideRecipient.Address(ByteStr(tx.sender.toAddress.bytes))
@@ -319,7 +321,7 @@ object InvokeScriptTransactionDiff {
       estimatedComplexity: Int,
       paymentsComplexity: Int,
       blockchain: Blockchain
-  ): Either[ValidationError with WithLog, (ScriptResult, Log[Id])] = {
+  ): Either[ValidationError & WithLog, (ScriptResult, Log[Id])] = {
     val evaluationCtx = CachedDAppCTX.get(version, blockchain).completeContext(environment)
     val startLimit    = limit - paymentsComplexity
     ContractEvaluator

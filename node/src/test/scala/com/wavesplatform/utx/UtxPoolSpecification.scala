@@ -119,7 +119,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
 
   private def massTransferWithRecipients(sender: KeyPair, recipients: List[PublicKey], maxAmount: Long, time: Time) = {
     val amount    = maxAmount / (recipients.size + 1)
-    val transfers = recipients.map(r => ParsedTransfer(r.toAddress, amount))
+    val transfers = recipients.map(r => ParsedTransfer(r.toAddress, TxNonNegativeAmount.unsafeFrom(amount)))
     val minFee    = FeeValidation.FeeConstants(TransactionType.Transfer) + FeeValidation.FeeConstants(TransactionType.MassTransfer) * transfers.size
     val txs =
       for { fee <- chooseNum(minFee, amount) } yield MassTransferTransaction
@@ -841,7 +841,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           acc  <- accountGen
           acc1 <- accountGen
           tx1  <- transfer(acc, ENOUGH_AMT / 3, ntpTime)
-          txs  <- Gen.nonEmptyListOf(transfer(acc1, 10000000L, ntpTime).suchThat(_.fee < tx1.fee))
+          txs  <- Gen.nonEmptyListOf(transfer(acc1, 10000000L, ntpTime).suchThat(_.fee.value < tx1.fee.value))
         } yield (tx1, txs)
 
         forAll(gen) { case (tx1, rest) =>
@@ -854,17 +854,15 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
             new UtxPoolImpl(ntpTime, blockchain, WavesSettings.default().utxSettings)
           (blockchain.balance _).when(*, *).returning(ENOUGH_AMT).repeat((rest.length + 1) * 2)
 
-          (blockchain.balance _)
-            .when(*, *)
-            .onCall { (_: Address, _: Asset) =>
-              utx.removeAll(rest)
-              ENOUGH_AMT
-            }
-            .once()
+
           (blockchain.balance _).when(*, *).returning(ENOUGH_AMT)
 
           (blockchain.leaseBalance _).when(*).returning(LeaseBalance(0, 0))
-          (blockchain.accountScript _).when(*).returns(None)
+          (blockchain.accountScript _).when(*).onCall {
+              _: Address =>
+                utx.removeAll(rest)
+                None
+            }
           val tb = TestBlock.create(Nil)
           (blockchain.blockHeader _).when(*).returning(Some(SignedBlockHeader(tb.header, tb.signature)))
 

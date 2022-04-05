@@ -7,7 +7,7 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.InvokeExpressionTransaction
-import play.api.libs.json._
+import play.api.libs.json.*
 
 case class InvokeExpressionRequest(
     version: Option[Byte],

@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs
 
-import cats.*
 import com.wavesplatform.BlocksTransactionsHelpers
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
@@ -46,13 +45,13 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
   property("Issue+Reissue+Burn do not break waves invariant and updates state") {
     val ((gen, issue), (reissue, burn)) = issueReissueBurnTxs(isReissuable = true)
     assertDiffAndState(Seq(TestBlock.create(Seq(gen, issue))), TestBlock.create(Seq(reissue, burn))) { case (blockDiff, newState) =>
-      val totalPortfolioDiff = Monoid.combineAll(blockDiff.portfolios.values)
+      val totalPortfolioDiff = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
 
       totalPortfolioDiff.balance shouldBe 0
-      totalPortfolioDiff.effectiveBalance shouldBe 0
-      totalPortfolioDiff.assets shouldBe Map(reissue.asset -> (reissue.quantity - burn.quantity))
+      totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
+      totalPortfolioDiff.assets shouldBe Map(reissue.asset -> (reissue.quantity.value - burn.quantity.value))
 
-      val totalAssetVolume = issue.quantity + reissue.quantity - burn.quantity
+      val totalAssetVolume = issue.quantity.value + reissue.quantity.value - burn.quantity.value
       newState.balance(issue.sender.toAddress, reissue.asset) shouldEqual totalAssetVolume
     }
   }
@@ -100,7 +99,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
       val asset         = IssuedAsset(issue.id())
       val assetTransfer = TxHelpers.transfer(issuer, burner.toAddress, 1, asset, version = TxVersion.V1)
       val wavesTransfer = TxHelpers.transfer(issuer, burner.toAddress, version = TxVersion.V1)
-      val burn          = TxHelpers.burn(asset, assetTransfer.amount, burner, fee = wavesTransfer.amount, version = TxVersion.V1)
+      val burn          = TxHelpers.burn(asset, assetTransfer.amount.value, burner, fee = wavesTransfer.amount.value, version = TxVersion.V1)
 
       (genesis, issue, assetTransfer, wavesTransfer, burn)
     }
@@ -213,9 +212,9 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
     val genesis        = Seq(accountA, accountB).map(acc => TxHelpers.genesis(acc.toAddress, Long.MaxValue / 100))
     val issue          = TxHelpers.issue(accountA, 100, script = Some(createScript(code, version)))
     val asset          = issue.asset
-    val transfer       = TxHelpers.transfer(accountA, accountB.toAddress, issue.quantity, asset, version = TxVersion.V1)
-    val reissue        = TxHelpers.reissue(asset, accountA, issue.quantity, version = TxVersion.V1)
-    val illegalReissue = TxHelpers.reissue(asset, accountB, issue.quantity, version = TxVersion.V1)
+    val transfer       = TxHelpers.transfer(accountA, accountB.toAddress, issue.quantity.value, asset, version = TxVersion.V1)
+    val reissue        = TxHelpers.reissue(asset, accountA, issue.quantity.value, version = TxVersion.V1)
+    val illegalReissue = TxHelpers.reissue(asset, accountB, issue.quantity.value, version = TxVersion.V1)
 
     (genesis, issue, transfer, reissue, illegalReissue)
   }
@@ -232,9 +231,9 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
           issue.sender,
           issue.name,
           issue.description,
-          issue.decimals,
+          issue.decimals.value,
           issue.reissuable,
-          BigInt(issue.quantity),
+          BigInt(issue.quantity.value),
           Height @@ 2,
           issue.script.map(s =>
             AssetScriptInfo(
@@ -245,7 +244,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
             )
           ),
           0L,
-          issue.decimals == 0 && issue.quantity == 1 && !issue.reissuable
+          issue.decimals.value == 0 && issue.quantity.value == 1 && !issue.reissuable
         )
       )
       blockDiff.transactions.contains(issue.id()) shouldBe true
@@ -257,9 +256,9 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
   property("Can transfer when script evaluates to TRUE") {
     val (gen, issue, transfer, _, _) = genesisIssueTransferReissue("true")
     assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, transfer)), smartEnabledFS) { case (blockDiff, newState) =>
-      val totalPortfolioDiff = Monoid.combineAll(blockDiff.portfolios.values)
-      totalPortfolioDiff.assets(IssuedAsset(issue.id())) shouldEqual issue.quantity
-      newState.balance(newState.resolveAlias(transfer.recipient).explicitGet(), IssuedAsset(issue.id())) shouldEqual transfer.amount
+      val totalPortfolioDiff = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
+      totalPortfolioDiff.assets(IssuedAsset(issue.id())) shouldEqual issue.quantity.value
+      newState.balance(newState.resolveAlias(transfer.recipient).explicitGet(), IssuedAsset(issue.id())) shouldEqual transfer.amount.value
     }
   }
 
@@ -414,8 +413,8 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
 
     val (genesis1, issue1, _, _, _) = genesisIssueTransferReissue(exprV4WithComplexityBetween3000And4000, V4)
     assertDiffAndState(Seq(TestBlock.create(genesis1)), TestBlock.create(Seq(issue1)), rideV4Activated) { case (blockDiff, _) =>
-      val totalPortfolioDiff = Monoid.combineAll(blockDiff.portfolios.values)
-      totalPortfolioDiff.assets(IssuedAsset(issue1.id())) shouldEqual issue1.quantity
+      val totalPortfolioDiff = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
+      totalPortfolioDiff.assets(IssuedAsset(issue1.id())) shouldEqual issue1.quantity.value
     }
 
     val (genesis2, issue2, _, _, _) = genesisIssueTransferReissue(exprV4WithComplexityAbove4000, V4)
@@ -442,7 +441,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
     val accountC = TxHelpers.signer(1)
 
     val genesis2 = TxHelpers.genesis(accountC.toAddress, Long.MaxValue / 100)
-    val issue2   = TxHelpers.issue(accountC, issue1.quantity, reissuable = false)
+    val issue2   = TxHelpers.issue(accountC, issue1.quantity.value, reissuable = false)
     val update2  = TxHelpers.updateAssetInfo(issue2.asset.id, "Invalid", "Invalid", accountC)
 
     (genesis1 :+ genesis2, Seq(issue1, issue2), accountC, update2)

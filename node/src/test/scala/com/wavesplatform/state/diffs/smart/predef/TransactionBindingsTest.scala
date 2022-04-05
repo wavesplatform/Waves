@@ -88,7 +88,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
          |   let name = t.name == base58'${Base58.encode(tx.name.toByteArray)}'
          |   let description = t.description == base58'${Base58.encode(tx.description.toByteArray)}'
          |   let script = if (${tx.script.isDefined}) then extract(t.script) == base64'${tx.script
-        .fold("")(_.bytes().base64)}' else isDefined(t.script) == false
+           .fold("")(_.bytes().base64)}' else isDefined(t.script) == false
          |   ${assertProvenPart("t")} && quantity && decimals && reissuable && script && name && description
          | case _ => throw()
          | }
@@ -211,7 +211,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
            |   ${provenPart(tx)}
            |   let assetId = t.assetId == base58'${tx.asset.id.toString}'
            |   let minSponsoredAssetFee = if (${tx.minSponsoredAssetFee.isDefined}) then extract(t.minSponsoredAssetFee) == ${tx.minSponsoredAssetFee
-          .getOrElse(0)} else isDefined(t.minSponsoredAssetFee) == false
+             .getOrElse(0)} else isDefined(t.minSponsoredAssetFee) == false
            |   ${assertProvenPart("t")} && assetId && minSponsoredAssetFee
            | case _ => throw()
            | }
@@ -408,8 +408,8 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
       version    <- DirectiveDictionary[StdLibVersion].all
       useV4Check <- Seq(true, false)
       entryCount <- Seq(0, 1, DataTransaction.MaxEntryCount)
-      dataEntries   = (1 to entryCount).map(idx => StringDataEntry(s"key$idx", "value"))
-      tx            <- Seq(TxHelpers.data(TxHelpers.defaultSigner, dataEntries), TxHelpers.dataV2(TxHelpers.defaultSigner, dataEntries))
+      dataEntries = (1 to entryCount).map(idx => StringDataEntry(s"key$idx", "value"))
+      tx <- Seq(TxHelpers.data(TxHelpers.defaultSigner, dataEntries), TxHelpers.dataV2(TxHelpers.defaultSigner, dataEntries))
     } {
       def check(i: Int, rideType: String, valueOpt: Option[Any]): String = {
         val key        = s""" "${tx.data(i).key}" """
@@ -510,7 +510,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
                       .getOrElse("")}'
                     |      else isDefined(t.assetId) == false
                     |     let transferCount = t.transferCount == ${tx.transfers.length}
-                    |     let totalAmount = t.totalAmount == ${tx.transfers.map(_.amount).sum}
+                    |     let totalAmount = t.totalAmount == ${tx.transfers.map(_.amount.value).sum}
                     |     let attachment = t.attachment == base58'${Base58.encode(tx.attachment.arr)}'
                     |     ${tx.transfers.indices.map(pg).mkString("\n")}
                     |   ${provenPart(tx)}

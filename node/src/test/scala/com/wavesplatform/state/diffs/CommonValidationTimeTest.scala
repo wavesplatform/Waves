@@ -10,9 +10,9 @@ class CommonValidationTimeTest extends PropSpec with WithState {
 
   property("disallows too old transacions") {
     val prevBlockTs = TxHelpers.timestamp
-    val blockTs = prevBlockTs + 7 * 24 * 3600 * 1000
+    val blockTs     = prevBlockTs + 7 * 24 * 3600 * 1000
 
-    val master = TxHelpers.signer(1)
+    val master    = TxHelpers.signer(1)
     val recipient = TxHelpers.signer(2)
 
     val transfer = TxHelpers.transfer(master, recipient.toAddress, timestamp = prevBlockTs - Enabled.maxTransactionTimeBackOffset.toMillis - 1)
@@ -25,9 +25,9 @@ class CommonValidationTimeTest extends PropSpec with WithState {
 
   property("disallows transactions from far future") {
     val prevBlockTs = TxHelpers.timestamp
-    val blockTs = prevBlockTs + 7 * 24 * 3600 * 1000
+    val blockTs     = prevBlockTs + 7 * 24 * 3600 * 1000
 
-    val master = TxHelpers.signer(1)
+    val master    = TxHelpers.signer(1)
     val recipient = TxHelpers.signer(2)
 
     val transfer = TxHelpers.transfer(master, recipient.toAddress, timestamp = blockTs + Enabled.maxTransactionTimeForwardOffset.toMillis + 1)

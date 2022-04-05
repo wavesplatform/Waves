@@ -1,11 +1,10 @@
 package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
-
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.serialization.ByteBufferOps
-import com.wavesplatform.transaction.TxVersion
+import com.wavesplatform.transaction.{TxPositiveAmount, TxVersion}
 import com.wavesplatform.transaction.assets.SponsorFeeTransaction
 import play.api.libs.json.{JsObject, Json}
 
@@ -16,7 +15,7 @@ object SponsorFeeTxSerializer {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
       "assetId"              -> asset.id.toString,
-      "minSponsoredAssetFee" -> minSponsoredAssetFee
+      "minSponsoredAssetFee" -> minSponsoredAssetFee.map(_.value)
     )
   }
 
@@ -28,8 +27,8 @@ object SponsorFeeTxSerializer {
           Array(tpe.id.toByte, version),
           sender.arr,
           asset.id.arr,
-          Longs.toByteArray(minSponsoredAssetFee.getOrElse(0)),
-          Longs.toByteArray(fee),
+          Longs.toByteArray(minSponsoredAssetFee.map(_.value).getOrElse(0)),
+          Longs.toByteArray(fee.value),
           Longs.toByteArray(timestamp)
         )
 
@@ -52,10 +51,10 @@ object SponsorFeeTxSerializer {
 
     val sender               = buf.getPublicKey
     val asset                = buf.getIssuedAsset
-    val minSponsoredAssetFee = buf.getLong
-    val fee                  = buf.getLong
+    val minSponsoredAssetFee = Some(buf.getLong).filter(_ != 0).map(TxPositiveAmount.unsafeFrom)
+    val fee                  = TxPositiveAmount.unsafeFrom(buf.getLong)
     val timestamp            = buf.getLong
     val proofs               = buf.getProofs
-    SponsorFeeTransaction(TxVersion.V1, sender, asset, Some(minSponsoredAssetFee).filterNot(_ == 0), fee, timestamp, proofs, AddressScheme.current.chainId)
+    SponsorFeeTransaction(TxVersion.V1, sender, asset, minSponsoredAssetFee, fee, timestamp, proofs, AddressScheme.current.chainId)
   }
 }

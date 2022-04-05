@@ -17,11 +17,7 @@ import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.*
 import play.api.libs.json.Json.*
 
-class LeaseBroadcastRouteSpec
-    extends RouteSpec("/leasing/broadcast/")
-    with RequestGen
-    with PathMockFactory
-    with RestAPISettingsHelper {
+class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with RequestGen with PathMockFactory with RestAPISettingsHelper {
   private[this] val publisher = DummyTransactionPublisher.rejecting(t => TransactionValidationError(GenericError("foo"), t))
   private[this] val route     = LeaseApiRoute(restAPISettings, stub[Wallet], stub[Blockchain], publisher, stub[Time], stub[CommonAccountsApi]).route
   "returns StateCheckFailed" - {
@@ -61,7 +57,7 @@ class LeaseBroadcastRouteSpec
         posting(lease.copy(recipient = a)) should produce(InvalidAddress)
       }
       forAll(nonPositiveLong) { fee =>
-        posting(lease.copy(fee = fee)) should produce(InsufficientFee())
+        posting(lease.copy(fee = fee)) should produce(InsufficientFee)
       }
       forAll(posNum[Long]) { quantity =>
         posting(lease.copy(amount = quantity, fee = Long.MaxValue)) should produce(OverflowError)
@@ -78,7 +74,7 @@ class LeaseBroadcastRouteSpec
         posting(cancel.copy(senderPublicKey = pk)) should produce(InvalidAddress)
       }
       forAll(nonPositiveLong) { fee =>
-        posting(cancel.copy(fee = fee)) should produce(InsufficientFee())
+        posting(cancel.copy(fee = fee)) should produce(InsufficientFee)
       }
     }
   }

@@ -21,7 +21,6 @@ object DataTxValidator extends TxValidator[DataTransaction] {
       V.cond(data.forall(_.key.nonEmpty), TxValidationError.EmptyDataKey),
       V.cond(data.map(_.key) == data.map(_.key).distinct, TxValidationError.DuplicatedDataKeys),
       V.cond(tx.version > TxVersion.V1 || tx.data.forall(!_.isEmpty), GenericError("Empty data is not allowed in V1")),
-      V.fee(fee)
     )
   }
 

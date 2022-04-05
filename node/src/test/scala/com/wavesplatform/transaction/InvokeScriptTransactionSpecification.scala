@@ -50,7 +50,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
     val unsigned = transaction.PBTransaction(
       tx.chainId,
       ByteString.copyFrom(caller.publicKey.arr),
-      Some(Amount.of(PBAmounts.toPBAssetId(tx.feeAssetId), tx.fee)),
+      Some(Amount.of(PBAmounts.toPBAssetId(tx.feeAssetId), tx.fee.value)),
       tx.timestamp,
       tx.version,
       transaction.PBTransaction.Data.InvokeScript(

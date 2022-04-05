@@ -9,8 +9,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import org.bouncycastle.util.encoders.Hex
-import org.web3j.crypto.{ECDSASignature, ECKeyPair, Sign, StructuredDataEncoder}
 import org.web3j.crypto.Sign.SignatureData
+import org.web3j.crypto.{ECDSASignature, ECKeyPair, Sign, StructuredDataEncoder}
 import play.api.libs.json.{JsObject, Json}
 
 object EthOrders extends App {
@@ -39,11 +39,11 @@ object EthOrders extends App {
       "amountAsset"       -> encodeAsset(order.assetPair.amountAsset),
       "priceAsset"        -> encodeAsset(order.assetPair.priceAsset),
       "orderType"         -> encodeOrderType(order.orderType),
-      "amount"            -> order.amount,
-      "price"             -> order.price,
+      "amount"            -> order.amount.value,
+      "price"             -> order.price.value,
       "timestamp"         -> order.timestamp,
       "expiration"        -> order.expiration,
-      "matcherFee"        -> order.matcherFee,
+      "matcherFee"        -> order.matcherFee.value,
       "matcherFeeAssetId" -> encodeAsset(order.matcherFeeAssetId),
       "priceMode"         -> toSnakeCase.convert(priceMode.toString)
     )

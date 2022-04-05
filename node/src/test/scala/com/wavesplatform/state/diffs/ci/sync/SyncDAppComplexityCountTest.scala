@@ -1,8 +1,6 @@
 package com.wavesplatform.state.diffs.ci.sync
 
 import cats.instances.list.*
-import cats.instances.map.*
-import cats.syntax.semigroup.*
 import cats.syntax.traverse.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
@@ -14,9 +12,9 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, ci}
+import com.wavesplatform.state.{Diff, Portfolio}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -190,8 +188,8 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
 
         val dAppAddress = invokeTx.dApp.asInstanceOf[Address]
         val basePortfolios =
-          Map(TestBlock.defaultSigner.toAddress -> Portfolio(CurrentBlockFeePart(invokeTx.fee))) |+|
-            Map(invokeTx.sender.toAddress       -> Portfolio(-invokeTx.fee))
+          Map(TestBlock.defaultSigner.toAddress -> Portfolio(CurrentBlockFeePart(invokeTx.fee.value))) |+|
+            Map(invokeTx.sender.toAddress       -> Portfolio(-invokeTx.fee.value))
         val paymentsPortfolios =
           Map(invokeTx.sender.toAddress -> Portfolio(assets = Map(asset -> -1))) |+|
             Map(dAppAddress             -> Portfolio(assets = Map(asset -> 1)))
@@ -215,6 +213,11 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
         diff.portfolios.filter(_._2 != overlappedPortfolio) shouldBe totalPortfolios.filter(_._2 != overlappedPortfolio)
       }
     }
+  }
+
+  private implicit class Ops(m: Map[Address, Portfolio]) {
+    def |+|(m2: Map[Address, Portfolio]): Map[Address, Portfolio] =
+      Diff.combine(m, m2).explicitGet()
   }
 
   property("complexity border") {

@@ -25,7 +25,9 @@ class ChainIdSpecification extends PropSpec {
   private val addressFromOther = Address.fromBytes(Base58.tryDecodeWithLimit("3P3oxTkpCWJgCr6SJrBzdP5N8jFqHCiy7L2").get, otherChainId).explicitGet()
   private val addressOrAlias   = Gen.oneOf(aliasFromOther, addressFromOther)
 
-  private def addressOrAliasWithVersion(vs: Set[TxVersion]): Gen[(AddressOrAlias, TxVersion, KeyPair, TxAmount, TxAmount, TxTimestamp)] =
+  private def addressOrAliasWithVersion(
+      vs: Set[TxVersion]
+  ): Gen[(AddressOrAlias, TxVersion, KeyPair, TxPositiveAmount, TxPositiveAmount, TxTimestamp)] =
     for {
       addressOrAlias <- addressOrAlias
       version        <- Gen.oneOf(vs.toSeq)
@@ -33,7 +35,7 @@ class ChainIdSpecification extends PropSpec {
       amount         <- Gen.choose(1, 10000000L)
       fee            <- Gen.choose(1000000L, 10000000L)
       ts             <- Gen.choose(1, 1000000L)
-    } yield (addressOrAlias, version, sender, amount, fee, ts)
+    } yield (addressOrAlias, version, sender, TxPositiveAmount.unsafeFrom(amount), TxPositiveAmount.unsafeFrom(fee), ts)
 
   private def validateFromOtherNetwork(tx: Transaction): Unit = {
     tx.chainId should not be AddressScheme.current.chainId
@@ -178,7 +180,7 @@ class ChainIdSpecification extends PropSpec {
       case (_, _, _, amount, _, ts) =>
         GenesisTransaction(
           addressFromOther,
-          amount,
+          TxNonNegativeAmount.unsafeFrom(amount.value),
           ts,
           ByteStr.empty,
           AddressScheme.current.chainId
@@ -194,7 +196,7 @@ class ChainIdSpecification extends PropSpec {
             TxVersion.V3,
             sender.publicKey,
             IssuedAsset(ByteStr(bytes32gen.sample.get)),
-            amount,
+            TxNonNegativeAmount.unsafeFrom(amount.value),
             fee,
             ts,
             Proofs.empty,
@@ -245,12 +247,12 @@ class ChainIdSpecification extends PropSpec {
         validateFromOtherNetwork(
           ExchangeTransaction(
             TxVersion.V3,
-            Order.sell(Order.V3, sender, sender.publicKey, pair, amount, amount, ts, ts + ts, fee),
-            Order.buy(Order.V3, sender, sender.publicKey, pair, amount, amount, ts, ts + ts, fee),
-            amount,
-            amount,
-            fee,
-            fee,
+            Order.sell(Order.V3, sender, sender.publicKey, pair, amount.value, amount.value, ts, ts + ts, fee.value).explicitGet(),
+            Order.buy(Order.V3, sender, sender.publicKey, pair, amount.value, amount.value, ts, ts + ts, fee.value).explicitGet(),
+            TxExchangeAmount.unsafeFrom(amount.value),
+            TxExchangePrice.unsafeFrom(amount.value),
+            fee.value,
+            fee.value,
             fee,
             ts,
             Proofs.empty,
@@ -270,7 +272,7 @@ class ChainIdSpecification extends PropSpec {
             ByteString.copyFromUtf8("name"),
             ByteString.copyFromUtf8("description"),
             quantity,
-            8: Byte,
+            TxDecimals.unsafeFrom(8: Byte),
             true,
             None,
             fee,
@@ -307,7 +309,7 @@ class ChainIdSpecification extends PropSpec {
             TxVersion.V2,
             sender.publicKey,
             Waves,
-            Seq(ParsedTransfer(addressOrAlias, amount)),
+            Seq(ParsedTransfer(addressOrAlias, TxNonNegativeAmount.unsafeFrom(amount.value))),
             fee,
             ts,
             ByteStr.empty,
@@ -400,8 +402,8 @@ class ChainIdSpecification extends PropSpec {
             IssuedAsset(ByteStr(bytes32gen.sample.get)),
             "name",
             "description",
-            fee,
             ts,
+            fee,
             Waves,
             Proofs.empty,
             otherChainId

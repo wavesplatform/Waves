@@ -57,8 +57,8 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest extends Prop
         domain.blockchainUpdater.processMicroBlock(micros.head) should beRight
         domain.blockchainUpdater.processBlock(emptyBlock) should beRight
 
-        domain.balance(miner.toAddress) shouldBe payment.fee
-        domain.balance(genesis.recipient) shouldBe (genesis.amount - payment.fee)
+        domain.balance(miner.toAddress) shouldBe payment.fee.value
+        domain.balance(genesis.recipient) shouldBe (genesis.amount.value - payment.fee.value)
     }
   }
 
