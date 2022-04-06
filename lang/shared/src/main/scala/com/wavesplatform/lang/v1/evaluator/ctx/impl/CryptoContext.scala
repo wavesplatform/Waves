@@ -1,7 +1,6 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
 import cats.implicits._
-import cats.syntax.traverse._
 import cats.{Id, Monad}
 import com.wavesplatform.common.merkle.Merkle.createRoot
 import com.wavesplatform.common.state.ByteStr

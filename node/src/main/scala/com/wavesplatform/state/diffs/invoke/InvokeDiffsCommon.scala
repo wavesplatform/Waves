@@ -1,11 +1,7 @@
 package com.wavesplatform.state.diffs.invoke
 
-import cats.implicits._
 import cats.Id
-import cats.implicits.{toFoldableOps, toTraverseOps}
-import cats.instances.either.*
-import cats.instances.list.*
-import cats.syntax.either.*
+import cats.implicits.*
 import com.google.common.base.Throwables
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
@@ -39,7 +35,7 @@ import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.Asset
 import com.wavesplatform.transaction.smart.script.trace.TracedResult.Attribute
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.validation.impl.{DataTxValidator, LeaseCancelTxValidator, LeaseTxValidator, SponsorFeeTxValidator}
-import com.wavesplatform.transaction.{Asset, AssetIdLength, ERC20Address, PBSince, TransactionType}
+import com.wavesplatform.transaction.{Asset, AssetIdLength, PBSince, TransactionType}
 import com.wavesplatform.utils.*
 import shapeless.Coproduct
 
@@ -492,25 +488,25 @@ object InvokeDiffsCommon {
       def applyDataItem(item: DataOp): TracedResult[FailedTransactionError, Diff] =
         TracedResult.wrapValue(Diff(accountData = Map(dAppAddress -> AccountDataInfo(Map(item.key -> dataItemToEntry(item))))))
 
-          def applyIssue(itx: InvokeScriptLike, pk: PublicKey, issue: Issue): TracedResult[ValidationError, Diff] = {
-            if (issue.name
-                  .getBytes("UTF-8")
-                  .length < IssueTransaction.MinAssetNameLength || issue.name.getBytes("UTF-8").length > IssueTransaction.MaxAssetNameLength) {
-              TracedResult(Left(FailedTransactionError.dAppExecution("Invalid asset name", 0L)), List())
-            } else if (issue.description.length > IssueTransaction.MaxAssetDescriptionLength) {
-              TracedResult(Left(FailedTransactionError.dAppExecution("Invalid asset description", 0L)), List())
-            } else if (blockchain.assetDescription(IssuedAsset(issue.id)).isDefined) {
-              if (blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight)
-                TracedResult(Left(AlwaysRejectError(s"Asset ${issue.id} is already issued")))
-              else if (blockchain.assetDescription(asset).isDefined || blockchain.resolveERC20Address(ERC20Address(asset)).isDefined)
-                TracedResult(Left(FailedTransactionError.dAppExecution(s"Asset ${issue.id} is already issued", 0L)), List())
-            } else {
-              val staticInfo = AssetStaticInfo(TransactionId @@ itx.txId, pk, issue.decimals, blockchain.isNFT(issue))
-              val volumeInfo = AssetVolumeInfo(issue.isReissuable, BigInt(issue.quantity))
-              val info       = AssetInfo(ByteString.copyFromUtf8(issue.name), ByteString.copyFromUtf8(issue.description), Height @@ blockchain.height)
-
-          val asset = IssuedAsset(issue.id)
-
+      def applyIssue(itx: InvokeScriptLike, pk: PublicKey, issue: Issue): TracedResult[ValidationError, Diff] = {
+        val asset = IssuedAsset(issue.id)
+        if (
+          issue.name.getBytes("UTF-8").length < IssueTransaction.MinAssetNameLength ||
+          issue.name.getBytes("UTF-8").length > IssueTransaction.MaxAssetNameLength
+        ) {
+          TracedResult(Left(FailedTransactionError.dAppExecution("Invalid asset name", 0L)), List())
+        } else if (issue.description.length > IssueTransaction.MaxAssetDescriptionLength) {
+          TracedResult(Left(FailedTransactionError.dAppExecution("Invalid asset description", 0L)), List())
+        } else if (blockchain.assetDescription(IssuedAsset(issue.id)).isDefined) {
+          val error = s"Asset ${issue.id} is already issued"
+          if (blockchain.height >= blockchain.settings.functionalitySettings.enforceTransferValidationAfter)
+            TracedResult(Left(AlwaysRejectError(error)))
+          else
+            TracedResult(Left(FailedTransactionError.dAppExecution(error, 0L)), List())
+        } else {
+          val staticInfo = AssetStaticInfo(TransactionId @@ itx.txId, pk, issue.decimals, blockchain.isNFT(issue))
+          val volumeInfo = AssetVolumeInfo(issue.isReissuable, BigInt(issue.quantity))
+          val info       = AssetInfo(ByteString.copyFromUtf8(issue.name), ByteString.copyFromUtf8(issue.description), Height @@ blockchain.height)
           Right(
             Diff(
               portfolios = Map(pk.toAddress -> Portfolio(assets = Map(asset -> issue.quantity))),
@@ -623,10 +619,7 @@ object InvokeDiffsCommon {
           case f: FailedTransactionError => f.addComplexity(curDiff.scriptsComplexity)
           case e                         => e
         }
-        .flatMap(curDiff.combine(_).leftMap {
-          case failed: FailedTransactionError => failed.addComplexity(curDiff.scriptsComplexity)
-          case other                          => other
-        }))
+        .flatMap(d => TracedResult(curDiff.combine(d)).leftMap(GenericError(_)))
     }
 
   private def validatePseudoTxWithSmartAssetScript(blockchain: Blockchain, tx: InvokeScriptLike)(
@@ -686,7 +679,7 @@ object InvokeDiffsCommon {
       val message = s"Storing data size should not exceed $limit, actual: $actual bytes"
       if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)) {
         TracedResult(Left(AlwaysRejectError(message)))
-      }  else
+      } else
         TracedResult(Right(()))
     } else if (actionsCount > availableActions)
       error("Actions count limit is exceeded")
@@ -696,7 +689,7 @@ object InvokeDiffsCommon {
 
   def checkScriptResultFields(blockchain: Blockchain, r: ScriptResult): Either[AlwaysRejectError, Unit] =
     r match {
-      case ScriptResultV4(actions, _, _) if blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckTransfersHeight =>
+      case ScriptResultV4(actions, _, _) if blockchain.height >= blockchain.settings.functionalitySettings.enforceTransferValidationAfter =>
         actions
           .collectFirstSome {
             case Reissue(_, _, quantity) if quantity < 0   => Some(AlwaysRejectError(s"Negative reissue quantity = $quantity"))

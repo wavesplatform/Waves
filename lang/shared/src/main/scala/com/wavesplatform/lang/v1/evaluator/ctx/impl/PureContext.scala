@@ -1,23 +1,18 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
-import java.nio.charset.StandardCharsets.UTF_8
-import java.nio.charset.{MalformedInputException, StandardCharsets}
-import java.nio.{BufferUnderflowException, ByteBuffer}
-
 import cats.implicits.*
 import cats.{Id, Monad}
 import com.google.common.annotations.VisibleForTesting
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.{ExecutionError, CommonError}
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.utils.getDecompilerContext
 import com.wavesplatform.lang.v1.ContractLimits.*
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR.NoLimit
 import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR.NoLimit
 import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.*
@@ -26,7 +21,11 @@ import com.wavesplatform.lang.v1.evaluator.{ContextfulUserFunction, ContextfulVa
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation.*
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX, FunctionHeader, compiler}
+import com.wavesplatform.lang.*
 
+import java.nio.charset.StandardCharsets.UTF_8
+import java.nio.charset.{MalformedInputException, StandardCharsets}
+import java.nio.{BufferUnderflowException, ByteBuffer}
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scala.util.{Success, Try}
@@ -395,12 +394,13 @@ object PureContext {
       ("denominator", LONG),
       ("round", UNION(fromV5RoundTypes))
     ) {
-      case CONST_LONG(v) :: CONST_LONG(n) :: CONST_LONG(d) :: (r: CaseObj) :: Nil =>
-        for {
-          _ <- Either.cond(d != 0, (), "Fraction: division by zero")
-          r <- global.divide(BigInt(v) * BigInt(n), d, Rounding.byValue(r))
-          _ <- Either.cond(r.isValidLong, (), s"Fraction result $r out of integers range")
-        } yield CONST_LONG(r.longValue)
+      case CONST_LONG(v) :: CONST_LONG(n) :: CONST_LONG(d) :: (round: CaseObj) :: Nil =>
+        val r = for {
+          _        <- Either.cond(d != 0, (), "Fraction: division by zero")
+          division <- global.divide(BigInt(v) * BigInt(n), d, Rounding.byValue(round))
+          _        <- Either.cond(division.isValidLong, (), s"Fraction result $division out of integers range")
+        } yield CONST_LONG(division.longValue)
+        r.leftMap(CommonError)
       case xs =>
         notImplemented[Id, EVALUATED](
           "fraction(value: Int, numerator: Int, denominator: Int, round: Ceiling|Down|Floor|HalfEven|HalfUp)",

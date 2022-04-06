@@ -1,7 +1,6 @@
 package com.wavesplatform.lang.evaluator
 
 import java.nio.ByteBuffer
-
 import cats.Id
 import cats.data.EitherT
 import cats.kernel.Monoid
@@ -29,7 +28,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV1, EvaluatorV2, FunctionIds, Log}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, ContractLimits, FunctionHeader}
-import com.wavesplatform.lang.{Common, EvalF, ExecutionError, Global}
+import com.wavesplatform.lang.{Common, CommonError, EvalF, ExecutionError, Global}
 import com.wavesplatform.test.*
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.EitherValues
@@ -465,7 +464,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     forAll(genBytesAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(Native(FunctionIds.DROP_RIGHT_BYTES), List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
-        val actual = evalPure[EVALUATED](pureContext(V6).evaluationContext, expr)
+        val actual = evalPure[EVALUATED](pureContext(V6).evaluationContext, expr).leftMap(_.message)
         val limit  = 165947
         actual shouldBe (
           if (number < 0)
@@ -482,7 +481,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     forAll(genBytesAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(Native(FunctionIds.TAKE_RIGHT_BYTES), List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
-        val actual = evalPure[EVALUATED](pureContext(V6).evaluationContext, expr)
+        val actual = evalPure[EVALUATED](pureContext(V6).evaluationContext, expr).leftMap(_.message)
         val limit  = 165947
         actual shouldBe (
           if (number < 0)

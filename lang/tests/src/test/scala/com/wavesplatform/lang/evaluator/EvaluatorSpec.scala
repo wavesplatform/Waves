@@ -54,7 +54,7 @@ abstract class EvaluatorSpec extends PropSpec with ScriptGen with Inside {
       for {
         compiled <- toExpr(version)
         (_, cost, result) = evalExpr(compiled, version, useNewPowPrecision)
-        evaluated <- result
+        evaluated <- result.leftMap(_.message)
       } yield (evaluated, cost)
 
     val results = (for {

@@ -3,8 +3,7 @@ package com.wavesplatform.state.diffs.invoke
 import cats.Id
 import cats.instances.list.*
 import cats.syntax.either.*
-import cats.syntax.foldable._
-import cats.syntax.flatMap._
+import cats.syntax.flatMap.*
 import cats.syntax.traverseFilter.*
 import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
@@ -18,8 +17,6 @@ import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp as DAppType, *}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.v1.ContractLimits
-import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, Log, ScriptResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, Log, ScriptResult, ScriptResultV3, ScriptResultV4}

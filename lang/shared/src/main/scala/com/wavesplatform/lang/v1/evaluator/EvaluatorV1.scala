@@ -1,20 +1,18 @@
 package com.wavesplatform.lang.v1.evaluator
 
-import cats.data.EitherT
 import cats.implicits.*
 import cats.{Eval, Id, Monad, StackSafeMonad}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, NOTHING}
 import com.wavesplatform.lang.v1.evaluator.ContextfulNativeFunction.{Extended, Simple}
-import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext.Lenses
 import com.wavesplatform.lang.v1.evaluator.ctx.*
+import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext.Lenses
 import com.wavesplatform.lang.v1.task.imports.*
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{CoevalF, EvalF, ExecutionError}
 
 import scala.collection.mutable.ListBuffer
-import scala.util.Try
 
 object EvaluatorV1 {
   implicit val idEvalFMonad: Monad[EvalF[Id, *]] = new StackSafeMonad[EvalF[Id, *]] {
@@ -31,7 +29,7 @@ object EvaluatorV1 {
 
 class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: Monad[CoevalF[F, *]]) {
   private val lenses = new Lenses[F, C]
-  import lenses._
+  import lenses.*
 
   private def evalLetBlock(let: LET, inner: EXPR): EvalM[F, C, (EvaluationContext[C, F], EVALUATED)] =
     for {
@@ -102,11 +100,7 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: M
             Monad[EvalM[F, C, *]].flatMap(args.traverse(evalExpr)) { args =>
               val evaluated = func.ev match {
                 case f: Simple[C]   =>
-                  val r = Try(f.evaluate(ctx.ec.environment, args))
-                    .toEither
-                    .leftMap(_.toString)
-                    .pure[F]
-                  Eval.now(EitherT(r).map(EitherT(_)).flatten.value)
+                  Eval.now(f.evaluate(ctx.ec.environment, args))
                 case f: Extended[C] =>
                   f.evaluate(ctx.ec.environment, args, Int.MaxValue)
                     .map(_.map(_._1))

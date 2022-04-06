@@ -18,7 +18,6 @@ import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalan
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
