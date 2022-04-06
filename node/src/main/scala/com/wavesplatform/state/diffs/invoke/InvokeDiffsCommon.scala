@@ -35,7 +35,7 @@ import com.wavesplatform.transaction.smart.script.trace.AssetVerifierTrace.Asset
 import com.wavesplatform.transaction.smart.script.trace.TracedResult.Attribute
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.validation.impl.{DataTxValidator, LeaseCancelTxValidator, LeaseTxValidator, SponsorFeeTxValidator}
-import com.wavesplatform.transaction.{Asset, AssetIdLength, PBSince, TransactionType}
+import com.wavesplatform.transaction.{Asset, AssetIdLength, ERC20Address, PBSince, TransactionType}
 import com.wavesplatform.utils.*
 import shapeless.Coproduct
 
@@ -497,7 +497,7 @@ object InvokeDiffsCommon {
           TracedResult(Left(FailedTransactionError.dAppExecution("Invalid asset name", 0L)), List())
         } else if (issue.description.length > IssueTransaction.MaxAssetDescriptionLength) {
           TracedResult(Left(FailedTransactionError.dAppExecution("Invalid asset description", 0L)), List())
-        } else if (blockchain.assetDescription(IssuedAsset(issue.id)).isDefined) {
+        } else if (blockchain.assetDescription(IssuedAsset(issue.id)).isDefined || blockchain.resolveERC20Address(ERC20Address(asset)).isDefined) {
           val error = s"Asset ${issue.id} is already issued"
           if (blockchain.height >= blockchain.settings.functionalitySettings.enforceTransferValidationAfter)
             TracedResult(Left(AlwaysRejectError(error)))
