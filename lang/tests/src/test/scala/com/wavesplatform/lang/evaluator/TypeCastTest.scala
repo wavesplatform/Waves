@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.evaluator
 
-import com.wavesplatform.lang.directives.values.{V3, V5}
+import com.wavesplatform.lang.directives.values.{V3, V5, V6}
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
 import com.wavesplatform.test._
 
@@ -77,7 +77,7 @@ class TypeCastTest extends EvaluatorSpec {
          | func f(a: Any) = a.exactAs[Int]
          | f("")
       """.stripMargin
-    ) shouldBe Left("Couldn't cast Any to Int")
+    )(V6) shouldBe Left("String couldn't be cast to Int")
   }
 
   property("type cast to concrete list is not supported") {
@@ -87,10 +87,6 @@ class TypeCastTest extends EvaluatorSpec {
     eval("func f(a: Any) = a.exactAs[List[Int]]")(V3) should produce(
       "Type cast to List is allowed only if expecting type is List[Any] in 17-37"
     )
-  }
-
-  property("generic function error") {
-    eval("func f(a: Any) = a.some[Int]") should produce("Can't find a generic function some[T]")
   }
 
   property("type casts in one scope") {

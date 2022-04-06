@@ -6,7 +6,7 @@ import cats.instances.option._
 import cats.syntax.either._
 import cats.syntax.traverse._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.v1.ContractLimits
+import com.wavesplatform.lang.v1.{ContractLimits, compiler}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.Expressions.PART.VALID
@@ -15,26 +15,28 @@ import com.wavesplatform.lang.v1.parser.UnaryOperation._
 import fastparse.MultiLineWhitespace._
 import fastparse._
 
+import scala.annotation.tailrec
+
 object Parser {
 
   private val Global                                        = com.wavesplatform.lang.hacks.Global // Hack for IDEA
   implicit def hack(p: fastparse.P[Any]): fastparse.P[Unit] = p.map(_ => ())
 
   def keywords                 = Set("let", "strict", "base58", "base64", "true", "false", "if", "then", "else", "match", "case", "func")
-  def lowerChar[_: P]          = CharIn("a-z")
-  def upperChar[_: P]          = CharIn("A-Z")
-  def char[_: P]               = lowerChar | upperChar
-  def digit[_: P]              = CharIn("0-9")
-  def unicodeSymbolP[_: P]     = P("\\u" ~/ Pass ~~ (char | digit).repX(0, "", 4))
-  def notEndOfString[_: P]     = CharPred(_ != '\"')
-  def specialSymbols[_: P]     = P("\\" ~~ AnyChar)
-  def comment[_: P]: P[Unit]   = P("#" ~~ CharPred(_ != '\n').repX).rep.map(_ => ())
-  def directive[_: P]: P[Unit] = P("{-#" ~ CharPred(el => el != '\n' && el != '#').rep ~ "#-}").rep(0, comment).map(_ => ())
+  def lowerChar[A: P]          = CharIn("a-z")
+  def upperChar[A: P]          = CharIn("A-Z")
+  def char[A: P]               = lowerChar | upperChar
+  def digit[A: P]              = CharIn("0-9")
+  def unicodeSymbolP[A: P]     = P("\\u" ~/ Pass ~~ (char | digit).repX(0, "", 4))
+  def notEndOfString[A: P]     = CharPred(_ != '\"')
+  def specialSymbols[A: P]     = P("\\" ~~ AnyChar)
+  def comment[A: P]: P[Unit]   = P("#" ~~ CharPred(_ != '\n').repX).rep.map(_ => ())
+  def directive[A: P]: P[Unit] = P("{-#" ~ CharPred(el => el != '\n' && el != '#').rep ~ "#-}").rep(0, comment).map(_ => ())
 
-  def unusedText[_: P] = comment ~ directive ~ comment
+  def unusedText[A: P] = comment ~ directive ~ comment
 
-  def escapedUnicodeSymbolP[_: P]: P[(Int, String, Int)] = P(Index ~~ (NoCut(unicodeSymbolP) | specialSymbols).! ~~ Index)
-  def stringP[_: P]: P[EXPR] =
+  def escapedUnicodeSymbolP[A: P]: P[(Int, String, Int)] = P(Index ~~ (NoCut(unicodeSymbolP) | specialSymbols).! ~~ Index)
+  def stringP[A: P]: P[EXPR] =
     P(Index ~~ "\"" ~/ Pass ~~ (escapedUnicodeSymbolP | notEndOfString).!.repX ~~ "\"" ~~ Index)
       .map {
         case (start, xs, end) =>
@@ -91,13 +93,15 @@ object Parser {
       }
       .map(posAndVal => CONST_STRING(posAndVal._1, posAndVal._2))
 
-  def correctVarName[_: P]: P[PART[String]] =
+  def correctVarName[A: P]: P[PART[String]] =
     (Index ~~ (char ~~ (digit | char).repX()).! ~~ Index)
       .filter { case (_, x, _) => !keywords.contains(x) }
       .map { case (start, x, end) => PART.VALID(Pos(start, end), x) }
 
-  def correctLFunName[_: P]: P[PART[String]] =
-    (Index ~~ (char ~~ ("_".? ~~ (digit | char)).repX()).! ~~ Index)
+  def declNameP[A: P]: P[Unit] = "_".? ~~ char ~~ ("_".? ~~ (digit | char)).repX() ~~ "_".?
+
+  def correctLFunName[A: P]: P[PART[String]] =
+    (Index ~~ declNameP.! ~~ Index)
       .filter { case (_, x, _) => !keywords.contains(x) }
       .map { case (start, x, end) => PART.VALID(Pos(start, end), x) }
 
@@ -111,11 +115,11 @@ object Parser {
   }
 
   def anyVarName(implicit c: fastparse.P[Any]): P[PART[String]] = {
-    def nameP(implicit c: fastparse.P[Any]): P[Unit] = char ~~ (digit | char).repX()
+    def nameP(implicit c: fastparse.P[Any]): P[Unit] = declNameP
     genericVarName(nameP(_))
   }
 
-  def invalid[_: P]: P[INVALID] = {
+  def invalid[A: P]: P[INVALID] = {
     import fastparse.NoWhitespace._
     P(Index ~~ CharPred(_ != '\n').rep(1) ~~ Index)
       .map {
@@ -123,25 +127,25 @@ object Parser {
       }
   }
 
-  def border[_: P]: P[Unit] = CharIn(" \t\n\r({")
+  def border[A: P]: P[Unit] = CharIn(" \t\n\r({")
 
-  def numberP[_: P]: P[CONST_LONG] =
+  def numberP[A: P]: P[CONST_LONG] =
     P(Index ~~ (CharIn("+\\-").? ~~ digit.repX(1)).! ~~ ("_" ~~ digit.repX(1).!).repX(0) ~~ Index)
       .map({ case (start, x1, x2, end) => CONST_LONG(Pos(start, end), x2.foldLeft(x1)(_ ++ _).toLong) })
 
-  def trueP[_: P]: P[TRUE]        = P(Index ~~ "true".! ~~ !(char | digit) ~~ Index).map { case (start, _, end) => TRUE(Pos(start, end)) }
-  def falseP[_: P]: P[FALSE]      = P(Index ~~ "false".! ~~ !(char | digit) ~~ Index).map { case (start, _, end) => FALSE(Pos(start, end)) }
-  def curlyBracesP[_: P]: P[EXPR] = P("{" ~ baseExpr ~ "}")
+  def trueP[A: P]: P[TRUE]        = P(Index ~~ "true".! ~~ !(char | digit) ~~ Index).map { case (start, _, end) => TRUE(Pos(start, end)) }
+  def falseP[A: P]: P[FALSE]      = P(Index ~~ "false".! ~~ !(char | digit) ~~ Index).map { case (start, _, end) => FALSE(Pos(start, end)) }
+  def curlyBracesP[A: P]: P[EXPR] = P("{" ~ baseExpr ~ "}")
 
-  def refP[_: P]: P[REF] = P(correctVarName).map { x =>
+  def refP[A: P]: P[REF] = P(correctVarName).map { x =>
     REF(Pos(x.position.start, x.position.end), x)
   }
 
-  def lfunP[_: P]: P[REF] = P(correctLFunName).map { x =>
+  def lfunP[A: P]: P[REF] = P(correctLFunName).map { x =>
     REF(Pos(x.position.start, x.position.end), x)
   }
 
-  def ifP[_: P]: P[IF] = {
+  def ifP[A: P]: P[IF] = {
     def optionalPart(keyword: String, branch: String): P[EXPR] = (Index ~ (keyword ~/ Index ~ baseExpr.?).?).map {
       case (ifTruePos, ifTrueRaw) =>
         ifTrueRaw
@@ -149,8 +153,8 @@ object Parser {
           .getOrElse(INVALID(Pos(ifTruePos, ifTruePos), s"expected a $branch branch"))
     }
 
-    def thenPart[_: P] = optionalPart("then", "true")
-    def elsePart[_: P] = optionalPart("else", "false")
+    def thenPart[AA: P] = optionalPart("then", "true")
+    def elsePart[AA: P] = optionalPart("else", "false")
 
     P(Index ~~ "if" ~~ &(border) ~/ Index ~ baseExpr.? ~ thenPart ~ elsePart ~~ Index).map {
       case (start, condPos, condRaw, ifTrue, ifFalse, end) =>
@@ -169,15 +173,15 @@ object Parser {
       }
   }
 
-  def functionCallArgs[_: P]: P[Seq[EXPR]] = comment ~ baseExpr.rep(0, comment ~ "," ~ comment) ~ comment
+  def functionCallArgs[A: P]: P[Seq[EXPR]] = comment ~ baseExpr.rep(0, comment ~ "," ~ comment) ~ comment
 
-  def maybeFunctionCallP[_: P]: P[EXPR] = (Index ~~ lfunP ~~ P("(" ~/ functionCallArgs ~ ")").? ~~ Index).map {
+  def maybeFunctionCallP[A: P]: P[EXPR] = (Index ~~ lfunP ~~ P("(" ~/ functionCallArgs ~ ")").? ~~ Index).map {
     case (start, REF(_, functionName, _, _), Some(args), accessEnd) => FUNCTION_CALL(Pos(start, accessEnd), functionName, args.toList)
     case (_, id, None, _)                                           => id
   }
 
-  def foldP[_: P]: P[EXPR] =
-    (Index ~~ P("FOLD<") ~~ Index ~~ digit.repX(1).! ~~ Index ~~ ">(" ~/ baseExpr ~ "," ~ baseExpr ~ "," ~ refP ~ ")" ~~ Index)
+  def foldMacroP[A: P]: P[EXPR] =
+    (Index ~~ P("FOLD<") ~~ Index ~~ digit.repX(1).! ~~ Index ~~ ">(" ~/ baseExpr ~ "," ~ baseExpr ~ "," ~ lfunP ~ ")" ~~ Index)
       .map {
         case (start, limStart, limit, limEnd, list, acc, f, end) =>
           val lim = limit.toInt
@@ -189,7 +193,7 @@ object Parser {
             FOLD(Pos(start, end), lim, list, acc, f)
       }
 
-  def list[_: P]: P[EXPR] = (Index ~~ P("[") ~ functionCallArgs ~ P("]") ~~ Index).map {
+  def list[A: P]: P[EXPR] = (Index ~~ P("[") ~ functionCallArgs ~ P("]") ~~ Index).map {
     case (s, e, f) =>
       val pos = Pos(s, f)
       e.foldRight(REF(pos, PART.VALID(pos, "nil")): EXPR) { (v, l) =>
@@ -197,23 +201,23 @@ object Parser {
       }
   }
 
-  def bracedArgs[_: P]: P[Seq[EXPR]] =
+  def bracedArgs[A: P]: P[Seq[EXPR]] =
     comment ~ baseExpr.rep(
       sep = comment ~ "," ~ comment,
       max = ContractLimits.MaxTupleSize
     ) ~ comment
 
-  def bracesOrTuple[_: P]: P[EXPR] = (Index ~~ P("(") ~ bracedArgs ~ P(")") ~~ Index).map {
+  def bracesOrTuple[A: P]: P[EXPR] = (Index ~~ P("(") ~ bracedArgs ~ P(")") ~~ Index).map {
     case (_, Seq(expr), _) => expr
     case (s, elements, f) =>
       FUNCTION_CALL(
         Pos(s, f),
-        PART.VALID(Pos(s, f), s"_Tuple${elements.length}"),
+        PART.VALID(Pos(s, f), s"${compiler.TuplePrefix}${elements.length}"),
         elements.toList
       )
   }
 
-  def extractableAtom[_: P]: P[EXPR] = P(
+  def extractableAtom[A: P]: P[EXPR] = P(
     curlyBracesP | bracesOrTuple |
       byteVectorP | stringP | numberP | trueP | falseP | list |
       maybeFunctionCallP
@@ -225,15 +229,22 @@ object Parser {
   case class ListIndex(index: EXPR)                          extends Accessor
   case class GenericMethod(name: PART[String], `type`: Type) extends Accessor
 
-  def singleTypeP[_: P]: P[Single] = (anyVarName ~~ ("[" ~~ Index ~ unionTypeP ~ Index ~~ "]").?).map {
+  object GenericMethod {
+    val ExactAs = "exactAs"
+    val As      = "as"
+
+    val KnownMethods: Set[String] = Set(ExactAs, As)
+  }
+
+  def singleTypeP[A: P]: P[Single] = (anyVarName ~~ ("[" ~~ Index ~ unionTypeP ~ Index ~~ "]").?).map {
     case (t, param) => Single(t, param.map { case (start, param, end) => VALID(Pos(start, end), param) })
   }
 
-  def unionTypeP[_: P]: P[Type] =
+  def unionTypeP[A: P]: P[Type] =
     (Index ~ P("Any") ~ Index).map { case (start, end) => AnyType(Pos(start, end)) } | P(singleTypeP | tupleTypeP)
       .rep(1, comment ~ "|" ~ comment)
       .map(Union.apply)
-  def tupleTypeP[_: P]: P[Tuple] =
+  def tupleTypeP[A: P]: P[Tuple] =
     ("(" ~
       P(unionTypeP).rep(
         ContractLimits.MinTupleSize,
@@ -248,29 +259,29 @@ object Parser {
     def argWithType(implicit c: fastparse.P[Any]) = anyVarName ~ ":" ~ unionTypeP ~ comment
     def args(implicit c: fastparse.P[Any])        = "(" ~ comment ~ argWithType.rep(0, "," ~ comment) ~ ")" ~ comment
     def funcHeader(implicit c: fastparse.P[Any]) =
-      Index ~~ "func" ~ funcname ~ comment ~ args ~ "=" ~ P(singleBaseExpr | ("{" ~ baseExpr ~ "}")) ~~ Index
+      Index ~~ "func" ~ funcname ~ comment ~ args ~ "=" ~ P(singleBaseExpr | ("{" ~ comment ~ baseExpr ~ "}")) ~~ Index
     funcHeader.map {
       case (start, name, args, expr, end) => FUNC(Pos(start, end), expr, name, args)
     }
   }
 
-  def annotationP[_: P]: P[ANNOTATION] = (Index ~~ "@" ~ anyVarName ~ comment ~ "(" ~ comment ~ anyVarName.rep(0, ",") ~ comment ~ ")" ~~ Index).map {
+  def annotationP[A: P]: P[ANNOTATION] = (Index ~~ "@" ~ anyVarName ~ comment ~ "(" ~ comment ~ anyVarName.rep(0, ",") ~ comment ~ ")" ~~ Index).map {
     case (start, name: PART[String], args: Seq[PART[String]], end) => ANNOTATION(Pos(start, end), name, args)
   }
 
-  def annotatedFunc[_: P]: P[ANNOTATEDFUNC] = (Index ~~ annotationP.rep(1) ~ comment ~ funcP ~~ Index).map {
+  def annotatedFunc[A: P]: P[ANNOTATEDFUNC] = (Index ~~ annotationP.rep(1) ~ comment ~ funcP ~~ Index).map {
     case (start, as, f, end) => ANNOTATEDFUNC(Pos(start, end), as, f)
   }
 
   def matchCaseP(implicit c: fastparse.P[Any]): P[MATCH_CASE] = {
     def checkForGenericAndGetLastPos(t: Type): Either[INVALID, Option[Pos]] =
       t match {
-        case Single(VALID(position, "List"), Some(VALID(_, AnyType(_)))) => Right(Some(position))
+        case Single(VALID(position, Type.ListTypeName), Some(VALID(_, AnyType(_)))) => Right(Some(position))
         case Single(name, parameter) =>
           parameter
             .toLeft(Some(name.position))
             .leftMap {
-              case VALID(position, v)              => INVALID(position, s"Unexpected generic match type $t")
+              case VALID(position, _)              => INVALID(position, s"Unexpected generic match type $t")
               case PART.INVALID(position, message) => INVALID(position, message)
             }
         case Union(types) =>
@@ -340,7 +351,7 @@ object Parser {
     }
   }
 
-  def matchP[_: P]: P[EXPR] =
+  def matchP[A: P]: P[EXPR] =
     P(Index ~~ "match" ~~ &(border) ~/ baseExpr ~ "{" ~ comment ~ matchCaseP.rep(0, comment) ~ comment ~ "}" ~~ Index)
       .map {
         case (start, _, Nil, end)   => INVALID(Pos(start, end), "pattern matching requires case branches")
@@ -352,28 +363,27 @@ object Parser {
     genericVarName(nameP(_))
   }
 
-  def accessP[_: P]: P[(Int, Accessor, Int)] = P(
+  def genericMethodName(implicit c: fastparse.P[Any]): P[PART[String]] =
+    accessorName.filter {
+      case VALID(_, name) if GenericMethod.KnownMethods.contains(name) => true
+      case _ => false
+    }
+
+  def accessP[A: P]: P[(Int, Accessor, Int)] = P(
     (("" ~ comment ~ Index ~ "." ~/ comment ~ functionCallOrGetter) ~~ Index) | (Index ~~ "[" ~/ baseExpr.map(ListIndex) ~ "]" ~~ Index)
   )
 
-  def functionCallOrGetter[_: P]: P[Accessor] = {
-    sealed trait ArgsOrType
-    case class Args(args: Seq[EXPR])    extends ArgsOrType
-    case class Type(t: Expressions.Type) extends ArgsOrType
-
-    (accessorName.map(Getter) ~/ comment ~~ (("(" ~/ comment ~ functionCallArgs ~/ comment ~ ")").map(Args) | ("[" ~ unionTypeP ~ "]").map(Type)).?).map {
-      case (g @ Getter(name), args) =>
-        args.fold(g: Accessor) {
-          case Args(a) => Method(name, a)
-          case Type(t) => GenericMethod(name, t)
-        }
+  def functionCallOrGetter[A: P]: P[Accessor] =
+    (genericMethodName ~~/ ("[" ~ unionTypeP ~ "]")).map {
+      case (name, tpe) => GenericMethod(name, tpe)
+    } | (accessorName.map(Getter) ~/ comment ~~ ("(" ~/ comment ~ functionCallArgs ~/ comment ~ ")").?).map {
+      case (g @ Getter(name), args) => args.fold(g: Accessor)(Method(name, _))
     }
-  }
 
-  def maybeAccessP[_: P]: P[EXPR] =
+  def maybeAccessP[A: P]: P[EXPR] =
     P(Index ~~ extractableAtom ~~ Index ~~ NoCut(accessP).repX)
       .map {
-        case (start, obj, objEnd, accessors) =>
+        case (start, obj, _, accessors) =>
           accessors.foldLeft(obj) {
             case (e, (accessStart, a, accessEnd)) =>
               a match {
@@ -385,7 +395,7 @@ object Parser {
           }
       }
 
-  def byteVectorP[_: P]: P[EXPR] =
+  def byteVectorP[A: P]: P[EXPR] =
     P(Index ~~ "base" ~~ ("58" | "64" | "16").! ~~ "'" ~/ Pass ~~ CharPred(_ != '\'').repX.! ~~ "'" ~~ Index)
       .map {
         case (start, base, xs, end) =>
@@ -402,7 +412,7 @@ object Parser {
           }
       }
 
-  private def destructuredTupleValuesP[_: P]: P[Seq[(Int, Option[PART[String]])]] =
+  private def destructuredTupleValuesP[A: P]: P[Seq[(Int, Option[PART[String]])]] =
     P("(") ~
       (Index ~ anyVarName.?).rep(
         ContractLimits.MinTupleSize,
@@ -411,10 +421,10 @@ object Parser {
       ) ~
       P(")")
 
-  private def letNameP[_: P]: P[Seq[(Int, Option[PART[String]])]] =
+  private def letNameP[A: P]: P[Seq[(Int, Option[PART[String]])]] =
     (Index ~ anyVarName.?).map(Seq(_))
 
-  def variableDefP[_: P](key: String): P[Seq[LET]] =
+  def variableDefP[A: P](key: String): P[Seq[LET]] =
     P(Index ~~ key ~~ &(CharIn(" \t\n\r")) ~/ comment ~ (destructuredTupleValuesP | letNameP) ~ comment ~ Index ~ ("=" ~/ Index ~ baseExpr.?).? ~~ Index)
       .map {
         case (start, names, valuePos, valueRaw, end) =>
@@ -450,7 +460,7 @@ object Parser {
     P(CharsWhileIn(" \t\r").repX ~~ "\n").repX(1)
   }
 
-  def strictLetBlockP[_: P]: P[EXPR] = {
+  def strictLetBlockP[A: P]: P[EXPR] = {
     P(
       Index ~~
         variableDefP("strict") ~/
@@ -482,7 +492,7 @@ object Parser {
       .map { case (pos, expr) => expr.getOrElse(INVALID(Pos(pos, pos), "expected a value's expression")) }
       .getOrElse(INVALID(Pos(valuePos, valuePos), "expected a value"))
 
-  def block[_: P]: P[EXPR] = blockOr(INVALID(_, "expected ';'"))
+  def block[A: P]: P[EXPR] = blockOr(INVALID(_, "expected ';'"))
 
   private def blockOr(otherExpr: Pos => EXPR)(implicit c: fastparse.P[Any]): P[EXPR] = {
     def declaration(implicit c: fastparse.P[Any]) = variableDefP("let") | funcP.map(Seq(_))
@@ -498,33 +508,32 @@ object Parser {
         ) ~~
         Index
     ).map {
-      case (start, declarations, body, end) => {
+      case (start, declarations, body, end) =>
         declarations.flatten.reverse
           .foldLeft(body.getOrElse(INVALID(Pos(end, end), "expected a body"))) { (acc, l) =>
             BLOCK(Pos(start, end), l, acc)
           }
-      }
     }
   }
 
-  def baseAtom[_: P](epn: fastparse.P[Any] => P[EXPR]) = {
-    def ep[_: P](implicit c: fastparse.P[Any]) = epn(c)
-    comment ~ P(foldP | ifP | matchP | ep | maybeAccessP) ~ comment
+  def baseAtom[A: P](epn: fastparse.P[Any] => P[EXPR]) = {
+    def ep[AA: P](implicit c: fastparse.P[Any]) = epn(c)
+    comment ~ P(foldMacroP | ifP | matchP | ep | maybeAccessP) ~ comment
   }
 
-  def baseExpr[_: P] = P(strictLetBlockP | binaryOp(baseAtom(block(_))(_), opsByPriority))
+  def baseExpr[A: P] = P(strictLetBlockP | binaryOp(baseAtom(block(_))(_), opsByPriority))
 
-  def blockOrDecl[_: P]    = baseAtom(blockOr(p => REF(p, VALID(p, "unit")))(_))
-  def baseExprOrDecl[_: P] = binaryOp(baseAtom(blockOrDecl(_))(_), opsByPriority)
+  def blockOrDecl[A: P]    = baseAtom(blockOr(p => REF(p, VALID(p, "unit")))(_))
+  def baseExprOrDecl[A: P] = binaryOp(baseAtom(blockOrDecl(_))(_), opsByPriority)
 
-  def singleBaseAtom[_: P] =
+  def singleBaseAtom[A: P] =
     comment ~
-      P(foldP | ifP | matchP | maybeAccessP) ~
+      P(foldMacroP | ifP | matchP | maybeAccessP) ~
       comment
 
-  def singleBaseExpr[_: P] = P(binaryOp(singleBaseAtom(_), opsByPriority))
+  def singleBaseExpr[A: P] = P(binaryOp(singleBaseAtom(_), opsByPriority))
 
-  def declaration[_: P] = P(variableDefP("let") | funcP.map(Seq(_)))
+  def declaration[A: P] = P(variableDefP("let") | funcP.map(Seq(_)))
 
   def revp[A, B](l: A, s: Seq[(B, A)], o: Seq[(A, B)] = Seq.empty): (Seq[(A, B)], A) = {
     s.foldLeft((o, l)) { (acc, op) =>
@@ -578,7 +587,7 @@ object Parser {
   }
 
   def unaryOp(atom: fastparse.P[Any] => P[EXPR], ops: List[UnaryOperation])(implicit c: fastparse.P[Any]): P[EXPR] =
-    (ops.foldRight(atom) {
+    ops.foldRight(atom) {
       case (op, accc) =>
         def acc(implicit c: fastparse.P[Any]) = accc(c);
         { implicit c: fastparse.P[Any] =>
@@ -586,29 +595,30 @@ object Parser {
             case (start, expr, end) => op.expr(start, end, expr)
           } | acc
         }
-    })(c)
+    }(c)
 
   def parseExpr(str: String): Parsed[EXPR] = {
-    def expr[_: P] = P(Start ~ unusedText ~ (baseExpr | invalid) ~ End)
-    parse(str, expr(_))
+    def expr[A: P] = P(Start ~ unusedText ~ (baseExpr | invalid) ~ End)
+    parse(str, expr(_), verboseFailures = true)
   }
 
   def parseExprOrDecl(str: String): Parsed[EXPR] = {
-    def e[_: P] = P(Start ~ unusedText ~ (baseExprOrDecl | invalid) ~ End)
-    parse(str, e(_))
+    def e[A: P] = P(Start ~ unusedText ~ (baseExprOrDecl | invalid) ~ End)
+    parse(str, e(_), verboseFailures = true)
   }
 
   def parseContract(str: String): Parsed[DAPP] = {
-    def contract[_: P] =
-      P(Start ~ unusedText ~ (declaration.rep) ~ comment ~ (annotatedFunc.rep) ~ declaration.rep ~ End ~~ Index)
+    def contract[A: P] =
+      P(Start ~ unusedText ~ declaration.rep ~ comment ~ annotatedFunc.rep ~ declaration.rep ~ End ~~ Index)
         .map {
           case (ds, fs, t, end) => (DAPP(Pos(0, end), ds.flatten.toList, fs.toList), t)
         }
-    parse(str, contract(_)) match {
+
+    parse(str, contract(_), verboseFailures = true) match {
       case Parsed.Success((s, t), _) if (t.nonEmpty) =>
-        def contract[_: P] = P(Start ~ unusedText ~ (declaration.rep) ~ comment ~ (annotatedFunc.rep) ~ !declaration.rep(1) ~ End ~~ Index)
+        def contract[A: P] = P(Start ~ unusedText ~ declaration.rep ~ comment ~ annotatedFunc.rep ~ !declaration.rep(1) ~ End ~~ Index)
         parse(str, contract(_)) match {
-          case Parsed.Failure(m, o, e) =>
+          case Parsed.Failure(_, o, e) =>
             Parsed.Failure(s"Local functions should be defined before @Callable one: ${str.substring(o)}", o, e)
           case _ => throw new Exception("Parser error")
         }
@@ -655,6 +665,7 @@ object Parser {
     }
   }
 
+  @tailrec
   private def clearChar(source: StringBuilder, pos: Int): Int = {
     if (pos >= 0) {
       if (" \n\r".contains(source.charAt(pos))) {
@@ -677,7 +688,7 @@ object Parser {
       .map(dApp => (dApp, Nil))
       .left
       .flatMap {
-        case ex: Parsed.Failure => {
+        case ex: Parsed.Failure =>
           val errorLastPos       = ex.index
           val lastRemovedCharPos = clearChar(source, errorLastPos - 1)
           val posList            = Set(errorLastPos, lastRemovedCharPos)
@@ -687,8 +698,6 @@ object Parser {
           } else {
             Right((defaultResult, posList))
           }
-
-        }
         case _ => Left(new Exception("Unknown parsing error."))
       }
   }

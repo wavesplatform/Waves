@@ -405,7 +405,7 @@ class GrpcIssueReissueBurnAssetSuite extends AnyFreeSpec with GrpcBaseTransactio
       case CallableMethod =>
         val tx = invokeScript(account, "issueAsset", fee = fee)
         assertStateChanges(tx) { sd =>
-          sd.issues match {
+          (sd.issues: @unchecked) match {
             case Seq(issue) => validateIssue(issue, data)
           }
         }

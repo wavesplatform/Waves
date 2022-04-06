@@ -1,8 +1,8 @@
 package com.wavesplatform.transaction
 
-import cats.instances.either._
-import cats.instances.lazyList._
-import cats.syntax.traverse._
+import cats.instances.either.*
+import cats.instances.lazyList.*
+import cats.syntax.traverse.*
 import com.wavesplatform.transaction.TxValidationError.InvalidSignature
 import monix.eval.Coeval
 

@@ -13,6 +13,7 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.utils.Signed
 
 class PseudoTransactionSuite extends BaseTransactionSuite {
 
@@ -22,7 +23,7 @@ class PseudoTransactionSuite extends BaseTransactionSuite {
 
   private def caller = thirdKeyPair
 
-  private var smartAssetId = ""
+  private var smartAssetId   = ""
   private val recipientAlias = "alias"
 
   protected override def beforeAll(): Unit = {
@@ -48,7 +49,7 @@ class PseudoTransactionSuite extends BaseTransactionSuite {
          |func transferAssetByAlias(r: String, a: ByteVector, q: Int) = [ScriptTransfer(Alias(r), q, a)]
          """.stripMargin,
       isAssetScript = false,
-      ScriptEstimatorV3(fixOverflow = true)
+      ScriptEstimatorV3(fixOverflow = true, overhead = false)
     ).explicitGet()._1.bytes().base64
 
     sender.setScript(firstDApp, Some(dAppScript), waitForTx = true)
@@ -57,9 +58,18 @@ class PseudoTransactionSuite extends BaseTransactionSuite {
 
   test("check burn pseudotransaction fields") {
     val smartAssetQuantityBefore = sender.assetsDetails(smartAssetId).quantity
-    val burnedQuantity = 100000
-    val signedInvoke = invokeScriptTransaction("burnAsset", List(Terms.CONST_BYTESTR(ByteStr.decodeBase58(smartAssetId).get).explicitGet(), Terms.CONST_LONG(burnedQuantity)))
-    sender.setAssetScript(smartAssetId, firstDApp, script = Some(smartAssetScript(signedInvoke.id().toString)), fee = issueFee + smartFee, waitForTx = true)
+    val burnedQuantity           = 100000
+    val signedInvoke = invokeScriptTransaction(
+      "burnAsset",
+      List(Terms.CONST_BYTESTR(ByteStr.decodeBase58(smartAssetId).get).explicitGet(), Terms.CONST_LONG(burnedQuantity))
+    )
+    sender.setAssetScript(
+      smartAssetId,
+      firstDApp,
+      script = Some(smartAssetScript(signedInvoke.id().toString)),
+      fee = issueFee + smartFee,
+      waitForTx = true
+    )
     sender.signedBroadcast(signedInvoke.json(), waitForTx = true)
 
     sender.assetsDetails(smartAssetId).quantity shouldBe smartAssetQuantityBefore - burnedQuantity
@@ -67,38 +77,63 @@ class PseudoTransactionSuite extends BaseTransactionSuite {
 
   test("check reissue pseudotransaction fields") {
     val smartAssetQuantityBefore = sender.assetsDetails(smartAssetId).quantity
-    val addedQuantity = 100000
-    val signedInvoke = invokeScriptTransaction("reissueAsset",
-      List(Terms.CONST_BYTESTR(ByteStr.decodeBase58(smartAssetId).get).explicitGet(), Terms.CONST_BOOLEAN(true), Terms.CONST_LONG(addedQuantity)))
-    sender.setAssetScript(smartAssetId, firstDApp, script = Some(smartAssetScript(signedInvoke.id().toString)), fee = issueFee + smartFee, waitForTx = true)
+    val addedQuantity            = 100000
+    val signedInvoke = invokeScriptTransaction(
+      "reissueAsset",
+      List(Terms.CONST_BYTESTR(ByteStr.decodeBase58(smartAssetId).get).explicitGet(), Terms.CONST_BOOLEAN(true), Terms.CONST_LONG(addedQuantity))
+    )
+    sender.setAssetScript(
+      smartAssetId,
+      firstDApp,
+      script = Some(smartAssetScript(signedInvoke.id().toString)),
+      fee = issueFee + smartFee,
+      waitForTx = true
+    )
     sender.signedBroadcast(signedInvoke.json(), waitForTx = true)
 
     sender.assetsDetails(smartAssetId).quantity shouldBe smartAssetQuantityBefore + addedQuantity
   }
 
   test("check transfer pseudotransaction fields") {
-    val signedInvoke = invokeScriptTransaction("transferAsset",
+    val signedInvoke = invokeScriptTransaction(
+      "transferAsset",
       List(
         Terms.CONST_BYTESTR(ByteStr.decodeBase58(recipient.toAddress.toString).get).explicitGet(),
         Terms.CONST_BYTESTR(ByteStr.decodeBase58(smartAssetId).get).explicitGet(),
         Terms.CONST_LONG(transferAmount / 2)
-      ))
-    sender.setAssetScript(smartAssetId, firstDApp, script = Some(smartAssetScript(signedInvoke.id().toString)), fee = issueFee + smartFee, waitForTx = true)
+      )
+    )
+    sender.setAssetScript(
+      smartAssetId,
+      firstDApp,
+      script = Some(smartAssetScript(signedInvoke.id().toString)),
+      fee = issueFee + smartFee,
+      waitForTx = true
+    )
     sender.signedBroadcast(signedInvoke.json(), waitForTx = true)
 
     sender.createAlias(recipient, recipientAlias, fee = smartMinFee, waitForTx = true)
-    val signedInvoke2 = invokeScriptTransaction("transferAssetByAlias",
+    val signedInvoke2 = invokeScriptTransaction(
+      "transferAssetByAlias",
       List(
         Terms.CONST_STRING(recipientAlias).explicitGet(),
         Terms.CONST_BYTESTR(ByteStr.decodeBase58(smartAssetId).get).explicitGet(),
         Terms.CONST_LONG(transferAmount / 2)
-      ))
-    sender.setAssetScript(smartAssetId, firstDApp, script = Some(smartAssetScript(signedInvoke2.id().toString)), fee = issueFee + smartFee, waitForTx = true)
+      )
+    )
+    sender.setAssetScript(
+      smartAssetId,
+      firstDApp,
+      script = Some(smartAssetScript(signedInvoke2.id().toString)),
+      fee = issueFee + smartFee,
+      waitForTx = true
+    )
     sender.signedBroadcast(signedInvoke2.json(), waitForTx = true)
   }
 
-  private def smartAssetScript(invokeId: String): String = ScriptCompiler(
-    s"""
+  private def smartAssetScript(invokeId: String): String =
+    ScriptCompiler(
+      s"""
        |{-# STDLIB_VERSION 4 #-}
        |{-# CONTENT_TYPE EXPRESSION #-}
        |{-# SCRIPT_TYPE ASSET #-}
@@ -135,19 +170,19 @@ class PseudoTransactionSuite extends BaseTransactionSuite {
        |    case _ => true
        |  }
          """.stripMargin,
-    isAssetScript = true,
-    ScriptEstimatorV3(fixOverflow = true)
-  ).explicitGet()._1.bytes().base64
+      isAssetScript = true,
+      ScriptEstimatorV3(fixOverflow = true, overhead = false)
+    ).explicitGet()._1.bytes().base64
 
-  private def invokeScriptTransaction(func: String, args: List[EXPR]): InvokeScriptTransaction = {
-    InvokeScriptTransaction.selfSigned(
+  private def invokeScriptTransaction(func: String, args: List[EXPR]): InvokeScriptTransaction =
+    Signed.invokeScript(
       2.toByte,
       caller,
       AddressOrAlias.fromString(firstDApp.toAddress.toString).explicitGet(),
-      Some(FUNCTION_CALL(FunctionHeader.User(func),args)),
+      Some(FUNCTION_CALL(FunctionHeader.User(func), args)),
       Seq.empty,
       smartMinFee + smartFee,
       Waves,
-      System.currentTimeMillis()).explicitGet()
-  }
+      System.currentTimeMillis()
+    )
 }

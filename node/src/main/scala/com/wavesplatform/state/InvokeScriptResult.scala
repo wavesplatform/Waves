@@ -5,7 +5,6 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
-import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.{IncompleteResult, ScriptResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.domain._
@@ -21,6 +20,7 @@ import play.api.libs.json._
 import PBInvokeScriptResult.Call.Argument
 import PBInvokeScriptResult.Call.Argument.Value
 import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.lang.v1.serialization.SerdeV1
 
 final case class InvokeScriptResult(
     data: Seq[R.DataEntry] = Nil,
@@ -79,7 +79,7 @@ object InvokeScriptResult {
   object Lease {
     implicit val recipientWrites = Writes[AddressOrAlias] {
       case address: Address => implicitly[Writes[Address]].writes(address)
-      case alias: Alias     => JsString(alias.stringRepr)
+      case alias: Alias     => JsString(alias.toString)
       case _                => JsNull
     }
     implicit val jsonWrites = Json.writes[Lease]
@@ -110,7 +110,7 @@ object InvokeScriptResult {
   implicit val errorMessageFormat = Json.writes[ErrorMessage]
   implicit val invocationFormat: Writes[Invocation] = (i: Invocation) =>
     Json.obj(
-      "dApp"         -> i.dApp,
+      "dApp"         -> i.dApp.toString,
       "call"         -> i.call,
       "payment"      -> i.payments,
       "stateChanges" -> jsonFormat.writes(i.stateChanges)
@@ -184,7 +184,7 @@ object InvokeScriptResult {
       case ScriptResultV3(ds, ts, _) =>
         InvokeScriptResult(data = ds.map(DataEntry.fromLangDataOp), transfers = ts.map(langTransferToPayment))
 
-      case ScriptResultV4(actions, _, ret) =>
+      case ScriptResultV4(actions, _, _) =>
         // XXX need return value processing
         val issues       = actions.collect { case i: lang.Issue         => i }
         val reissues     = actions.collect { case ri: lang.Reissue      => ri }
@@ -199,13 +199,13 @@ object InvokeScriptResult {
             Invocation(
               langAddressToAddress(dApp),
               Call(fname, args),
-              (payments.map {
+              payments.map {
                 case CaseObj(_, fields) =>
                   ((fields("assetId"), fields("amount")): @unchecked) match {
                     case (CONST_BYTESTR(b), CONST_LONG(a)) => InvokeScriptResult.AttachedPayment(IssuedAsset(b), a)
                     case (_, CONST_LONG(a))                => InvokeScriptResult.AttachedPayment(Waves, a)
                   }
-              }),
+              },
               fromLangResult(invokeId, r)
             )
         }
@@ -290,7 +290,7 @@ object InvokeScriptResult {
     }
 
     val args = if (i.argsBytes.nonEmpty) i.argsBytes.map { bytes =>
-      val (value, _) = Serde.deserialize(bytes.toByteArray, allowObjects = true).explicitGet()
+      val (value, _) = SerdeV1.deserialize(bytes.toByteArray, allowObjects = true).explicitGet()
       value.asInstanceOf[EVALUATED]
     } else i.args.map(a => toVanillaTerm(a.value))
     Call(i.function, args)

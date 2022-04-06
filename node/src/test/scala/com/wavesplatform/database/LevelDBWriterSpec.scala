@@ -30,11 +30,7 @@ import org.scalacheck.{Arbitrary, Gen}
 import scala.concurrent.duration.Duration
 
 //noinspection NameBooleanParameters
-class LevelDBWriterSpec
-    extends FreeSpec
-    with WithDB
-    with DBCacheSettings
-    with RequestGen {
+class LevelDBWriterSpec extends FreeSpec with WithDB with DBCacheSettings with RequestGen {
   "Slice" - {
     "drops tail" in {
       LevelDBWriter.slice(Seq(10, 7, 4), 7, 10) shouldEqual Seq(10, 7)
@@ -151,7 +147,6 @@ class LevelDBWriterSpec
       f(defaultWriter, account)
     } finally {
       bcu.shutdown()
-      db.close()
     }
   }
 
@@ -172,7 +167,6 @@ class LevelDBWriterSpec
       f(defaultWriter, blocks, account)
     } finally {
       bcu.shutdown()
-      db.close()
     }
   }
 
@@ -285,7 +279,6 @@ class LevelDBWriterSpec
 
     } finally {
       bcu.shutdown()
-      db.close()
     }
   }
 
@@ -296,7 +289,7 @@ class LevelDBWriterSpec
 
       forAll(randomTransactionGen) { tx =>
         val transactionId = tx.id()
-        db.put(Keys.transactionMetaById(TransactionId @@ transactionId).keyBytes, TransactionMeta(1, 0, tx.typeId, true).toByteArray)
+        db.put(Keys.transactionMetaById(TransactionId @@ transactionId).keyBytes, TransactionMeta(1, 0, tx.tpe.id, true).toByteArray)
         db.put(Keys.transactionAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](1, 2, 3, 4, 5, 6))
 
         writer.transferById(transactionId) shouldBe None
@@ -326,7 +319,7 @@ class LevelDBWriterSpec
       forAll(scenario) {
         case (tx, s) =>
           val transactionId = tx.id()
-          db.put(Keys.transactionMetaById(TransactionId(transactionId)).keyBytes, TransactionMeta(1, 0, tx.typeId, !s).toByteArray)
+          db.put(Keys.transactionMetaById(TransactionId(transactionId)).keyBytes, TransactionMeta(1, 0, tx.tpe.id, !s).toByteArray)
           db.put(Keys.transactionAt(Height(1), TxNum(0.toShort)).keyBytes, database.writeTransaction((TxMeta(Height(1), s, 0L), tx)))
 
           writer.transactionInfo(transactionId) shouldBe Some(TxMeta(Height(1), s, 0L) -> tx)

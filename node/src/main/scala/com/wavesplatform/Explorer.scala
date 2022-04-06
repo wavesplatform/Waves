@@ -3,28 +3,24 @@ package com.wavesplatform
 import java.io.File
 import java.nio.ByteBuffer
 import java.util
-
-import com.google.common.primitives.{Longs, Shorts}
+import com.google.common.primitives.Longs
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.AddressPortfolio
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
-import com.wavesplatform.database.{AddressId, DBExt, KeyTags, Keys, LevelDBWriter, openDB, readAccountScriptInfo, readTransaction, readTransactionHNSeqAndType}
+import com.wavesplatform.database._
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.diffs.{DiffsCommon, SetScriptTransactionDiff}
-import com.wavesplatform.state.{Blockchain, Diff, Height, Portfolio, TxNum}
+import com.wavesplatform.state.{Blockchain, Diff, Height, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB
 
 import scala.annotation.tailrec
 import scala.collection.mutable
-import scala.collection.mutable.ListBuffer
 import scala.jdk.CollectionConverters._
-import scala.util.Try
 
 //noinspection ScalaStyle
 object Explorer extends ScorexLogging {
@@ -224,35 +220,11 @@ object Explorer extends ScorexLogging {
           }
 
         case "TXBH" =>
-          val txs = new ListBuffer[(TxNum, Transaction)]
-
-          val h = Height(argument(1, "height").toInt)
-
-          val prefix = ByteBuffer
-            .allocate(6)
-            .put(KeyTags.NthTransactionInfoAtHeight.prefixBytes)
-            .putInt(h)
-            .array()
-
-          val iterator = db.iterator
-
-          try {
-            iterator.seek(prefix)
-            while (iterator.hasNext && iterator.peekNext().getKey.startsWith(prefix)) {
-              val entry = iterator.next()
-
-              val k = entry.getKey
-              println(k.toList.map(_.toInt & 0xff))
-
-              for {
-                idx <- Try(Shorts.fromByteArray(k.slice(6, 8)))
-                (_, tx) = readTransaction(h)(entry.getValue)
-              } txs.append((TxNum(idx), tx))
-            }
-          } finally iterator.close()
+          val h   = Height(argument(1, "height").toInt)
+          val txs = db.readOnly(loadTransactions(h, _))
 
           println(txs.length)
-          txs.foreach(println)
+          txs.foreach { case (_, tx) => println(tx) }
 
         case "AP" =>
           val address = Address.fromString(argument(1, "address")).explicitGet()
@@ -302,11 +274,28 @@ object Explorer extends ScorexLogging {
 
             estimationResult.left.foreach { error =>
               val addressId = Longs.fromByteArray(e.getKey.drop(2).dropRight(4))
-              val address = db.get(Keys.idToAddress(AddressId(addressId)))
+              val address   = db.get(Keys.idToAddress(AddressId(addressId)))
               log.info(s"$address: $error")
             }
           }
 
+        case "CSAI" =>
+          val PrefixLength = argument(1, "prefix").toInt
+          var prevAssetId  = Array.emptyByteArray
+          var assetCounter = 0
+          db.iterateOver(KeyTags.AssetStaticInfo) { e =>
+            assetCounter += 1
+            val thisAssetId = e.getKey.drop(2)
+            if (prevAssetId.nonEmpty) {
+              var counter = 0
+              while (counter < PrefixLength && prevAssetId(counter) == thisAssetId(counter)) counter += 1
+              if (counter == PrefixLength) {
+                log.info(s"${Base58.encode(prevAssetId)} ~ ${Base58.encode(thisAssetId)}")
+              }
+            }
+            prevAssetId = thisAssetId
+          }
+          log.info(s"Checked $assetCounter asset(s)")
       }
     } finally db.close()
   }

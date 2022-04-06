@@ -1,34 +1,36 @@
 package com.wavesplatform.it.sync.transactions
 
+import scala.concurrent.duration.*
+
 import com.google.protobuf.ByteString
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.api.grpc.{ApplicationStatus, TransactionsByIdRequest, TransactionStatus => PBTransactionStatus}
+import com.wavesplatform.api.grpc.{ApplicationStatus, TransactionsByIdRequest, TransactionStatus as PBTransactionStatus}
 import com.wavesplatform.api.http.ApiError.TransactionDoesNotExist
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.TransactionStatus
 import com.wavesplatform.it.{Node, NodeConfigs}
+import com.wavesplatform.it.api.TransactionStatus
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
+import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.utils.ScorexLogging
 import org.scalatest.matchers.should.Matchers
 import play.api.libs.json.JsObject
-
-import scala.concurrent.duration._
 
 trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
   protected def waitForHeightArise(): Unit
   protected def sender: Node
 
-  /**
-    * Sends `max-transactions-in-micro-block` * 2 transactions and then sends priority transaction.
-    * @param t transaction sender
-    * @param pt priority transaction sender
-    * @param checker transactions checker (will be executed twice - immediately after emptying the utx pool and then after height arising)
+  /** Sends `max-transactions-in-micro-block` * 2 transactions and then sends priority transaction.
+    * @param t
+    *   transaction sender
+    * @param pt
+    *   priority transaction sender
+    * @param checker
+    *   transactions checker (will be executed twice - immediately after emptying the utx pool and then after height arising)
     */
   def sendTxsAndThenPriorityTx[S](t: Int => T, pt: () => T)(
       checker: (Seq[T], T) => Seq[S]
@@ -43,10 +45,9 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
   }
 
   object restApi {
-    import com.wavesplatform.it.api.SyncHttpApi.{NodeExtSync, assertApiError}
+    import com.wavesplatform.it.api.SyncHttpApi.{assertApiError, NodeExtSync}
 
-    /**
-      * Checks that transactions contain failed and returns them.
+    /** Checks that transactions contain failed and returns them.
       */
     def assertFailedTxs(txs: Seq[String]): Seq[TransactionStatus] = {
       val statuses = sender.transactionStatus(txs).sortWith { case (f, s) => txs.indexOf(f.id) < txs.indexOf(s.id) }
@@ -64,24 +65,22 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
 
       val failedIdsByHeight = failed.groupBy(_.height.get).view.mapValues(_.map(_.id))
 
-      failedIdsByHeight.foreach {
-        case (h, ids) =>
-          sender.blockAt(h).transactions.map(_.id) should contain allElementsOf ids
-          sender.blockSeq(h, h).head.transactions.map(_.id) should contain allElementsOf ids
-          sender.blockById(sender.blockAt(h).id).transactions.map(_.id) should contain allElementsOf ids
-          sender.blockSeqByAddress(sender.address, h, h).head.transactions.map(_.id) should contain allElementsOf ids
+      failedIdsByHeight.foreach { case (h, ids) =>
+        sender.blockAt(h).transactions.map(_.id) should contain allElementsOf ids
+        sender.blockSeq(h, h).head.transactions.map(_.id) should contain allElementsOf ids
+        sender.blockById(sender.blockAt(h).id).transactions.map(_.id) should contain allElementsOf ids
+        sender.blockSeqByAddress(sender.address, h, h).head.transactions.map(_.id) should contain allElementsOf ids
 
-          val liquidBlock         = sender.lastBlock()
-          val maxHeightWithFailed = failedIdsByHeight.keys.max
-          if (liquidBlock.height == maxHeightWithFailed) {
-            liquidBlock.transactions.map(_.id) should contain allElementsOf failedIdsByHeight(maxHeightWithFailed)
-          }
+        val liquidBlock         = sender.lastBlock()
+        val maxHeightWithFailed = failedIdsByHeight.keys.max
+        if (liquidBlock.height == maxHeightWithFailed) {
+          liquidBlock.transactions.map(_.id) should contain allElementsOf failedIdsByHeight(maxHeightWithFailed)
+        }
       }
       failed
     }
 
-    /**
-      * Checks that transactions contain invalid and returns them.
+    /** Checks that transactions contain invalid and returns them.
       */
     def assertInvalidTxs(txs: Seq[String]): Seq[TransactionStatus] = {
       val statuses = sender.transactionStatus(txs).sortWith { case (f, s) => txs.indexOf(f.id) < txs.indexOf(s.id) }
@@ -116,7 +115,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
                    |    if (check) then false else $result
                    |}
                    |""".stripMargin,
-                ScriptEstimatorV3(fixOverflow = true)
+                ScriptEstimatorV3(fixOverflow = true, overhead = false)
               )
               .explicitGet()
               ._1
@@ -147,7 +146,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
                    |    if (check) then false else $r
                    |}
                    |""".stripMargin,
-                ScriptEstimatorV3(fixOverflow = true)
+                ScriptEstimatorV3(fixOverflow = true, overhead = false)
               )
               .explicitGet()
               ._1
@@ -163,10 +162,9 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
   }
 
   object grpcApi {
-    import com.wavesplatform.it.api.SyncGrpcApi._
+    import com.wavesplatform.it.api.SyncGrpcApi.*
 
-    /**
-      * Checks that transactions contain failed and returns them.
+    /** Checks that transactions contain failed and returns them.
       */
     def assertFailedTxs(txs: Seq[PBSignedTransaction]): Seq[PBTransactionStatus] = {
       val txsIds = txs.map(PBTransactions.vanillaUnsafe).map(tx => ByteString.copyFrom(tx.id().arr))
@@ -183,17 +181,15 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
 
       val failedIdsByHeight = failed.groupBy(_.height.toInt).view.mapValues(_.map(_.id))
 
-      failedIdsByHeight.foreach {
-        case (h, ids) =>
-          sender.blockAt(h).transactionData.map(_.id()) should contain allElementsOf ids.map(bs => ByteStr(bs.toByteArray))
-          sender.blockSeq(h, h).head.transactionData.map(_.id()) should contain allElementsOf ids.map(bs => ByteStr(bs.toByteArray))
+      failedIdsByHeight.foreach { case (h, ids) =>
+        sender.blockAt(h).transactionData.map(_.id()) should contain allElementsOf ids.map(bs => ByteStr(bs.toByteArray))
+        sender.blockSeq(h, h).head.transactionData.map(_.id()) should contain allElementsOf ids.map(bs => ByteStr(bs.toByteArray))
       }
 
       failed
     }
 
-    /**
-      * Checks that transactions contain invalid and returns them.
+    /** Checks that transactions contain invalid and returns them.
       */
     def assertInvalidTxs(txs: Seq[PBSignedTransaction]): Seq[PBTransactionStatus] = {
       val txsIds   = txs.map(PBTransactions.vanillaUnsafe).map(tx => ByteString.copyFrom(tx.id().arr))
@@ -217,14 +213,14 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
               ScriptCompiler
                 .compile(
                   s"""
-                   |match tx {
-                   |  case _: SetAssetScriptTransaction => true
-                   |  case _ =>
-                   |    let check = ${"sigVerify(base58'', base58'', base58'') ||" * 16} false
-                   |    if (check) then false else $result
-                   |}
-                   |""".stripMargin,
-                  ScriptEstimatorV3(fixOverflow = true)
+                     |match tx {
+                     |  case _: SetAssetScriptTransaction => true
+                     |  case _ =>
+                     |    let check = ${"sigVerify(base58'', base58'', base58'') ||" * 16} false
+                     |    if (check) then false else $result
+                     |}
+                     |""".stripMargin,
+                  ScriptEstimatorV3(fixOverflow = true, overhead = false)
                 )
                 .explicitGet()
                 ._1
@@ -244,16 +240,16 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
               ScriptCompiler
                 .compile(
                   s"""
-                   |{-# STDLIB_VERSION 3 #-}
-                   |{-# CONTENT_TYPE EXPRESSION #-}
-                   |{-# SCRIPT_TYPE ACCOUNT #-}
-                   |
-                   |match (tx) {
-                   |  case _: SetScriptTransaction => true
-                   |  case _ => $r
-                   |}
-                   |""".stripMargin,
-                  ScriptEstimatorV3(fixOverflow = true)
+                     |{-# STDLIB_VERSION 3 #-}
+                     |{-# CONTENT_TYPE EXPRESSION #-}
+                     |{-# SCRIPT_TYPE ACCOUNT #-}
+                     |
+                     |match (tx) {
+                     |  case _: SetScriptTransaction => true
+                     |  case _ => $r
+                     |}
+                     |""".stripMargin,
+                  ScriptEstimatorV3(fixOverflow = true, overhead = false)
                 )
                 .toOption
                 .map(_._1)
@@ -265,7 +261,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
   }
 
   def waitForEmptyUtx(): Unit = {
-    import com.wavesplatform.it.api.SyncHttpApi._
+    import com.wavesplatform.it.api.SyncHttpApi.*
 
     sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
   }
@@ -283,31 +279,51 @@ object FailedTransactionSuiteLike {
       buyMatcherFee: Long,
       sellMatcherFee: Long
   ): ExchangeTransaction = {
-    val ts   = System.currentTimeMillis()
-    val bmfa = Asset.fromString(Some(buyMatcherFeeAsset))
-    val smfa = Asset.fromString(Some(sellMatcherFeeAsset))
-    val buy  = Order.buy(Order.V4, buyer, matcher.publicKey, assetPair, 100, 100, ts, ts + Order.MaxLiveTime, buyMatcherFee, bmfa)
-    val sell = Order.sell(Order.V4, seller, matcher.publicKey, assetPair, 100, 100, ts, ts + Order.MaxLiveTime, sellMatcherFee, smfa)
+    val timestamp = System.currentTimeMillis()
+    val buy = Order.buy(
+      Order.V4,
+      buyer,
+      matcher.publicKey,
+      assetPair,
+      100,
+      100,
+      timestamp,
+      timestamp + Order.MaxLiveTime,
+      buyMatcherFee,
+      Asset.fromString(Some(buyMatcherFeeAsset))
+    ).explicitGet()
+    val sell = Order.sell(
+      Order.V4,
+      seller,
+      matcher.publicKey,
+      assetPair,
+      100,
+      100,
+      timestamp,
+      timestamp + Order.MaxLiveTime,
+      sellMatcherFee,
+      Asset.fromString(Some(sellMatcherFeeAsset))
+    ).explicitGet()
     ExchangeTransaction
       .signed(
         TxVersion.V3,
         matcher.privateKey,
         buy,
         sell,
-        buy.amount,
-        buy.price,
-        buy.matcherFee,
-        sell.matcherFee,
+        buy.amount.value,
+        buy.price.value,
+        buy.matcherFee.value,
+        sell.matcherFee.value,
         fee,
-        ts
+        timestamp
       )
       .explicitGet()
   }
 
   val configForMinMicroblockAge: Config = ConfigFactory.parseString(s"""
-     |waves.miner.min-micro-block-age = 7
-     |waves.miner.max-transactions-in-micro-block = 1
-     |""".stripMargin)
+                                                                       |waves.miner.min-micro-block-age = 7
+                                                                       |waves.miner.max-transactions-in-micro-block = 1
+                                                                       |""".stripMargin)
 
   val Configs: Seq[Config] =
     NodeConfigs.newBuilder

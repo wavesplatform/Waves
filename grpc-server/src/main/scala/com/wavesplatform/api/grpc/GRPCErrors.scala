@@ -15,7 +15,7 @@ object GRPCErrors {
 
   def toStatusException(api: ApiError): StatusException = {
     val code = api match {
-      case TransactionDoesNotExist | AliasDoesNotExist(_) | BlockDoesNotExist | MissingSenderPrivateKey | DataKeyDoesNotExist =>
+      case TransactionDoesNotExist | BlockDoesNotExist | MissingSenderPrivateKey | DataKeyDoesNotExist =>
         Status.NOT_FOUND
       case _ => Status.INVALID_ARGUMENT
     }

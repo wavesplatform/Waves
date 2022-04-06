@@ -1,7 +1,6 @@
 package com.wavesplatform.it.api
 
 import java.util.concurrent.TimeoutException
-
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
@@ -11,6 +10,7 @@ import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi.RequestAwaitTime
 import com.wavesplatform.it.sync._
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.Block.Header
@@ -303,7 +303,7 @@ object SyncGrpcApi extends Assertions {
     }
 
     def signedBroadcast(tx: PBSignedTransaction, waitForTx: Boolean = false): PBSignedTransaction = {
-      maybeWaitForTransaction(sync(async(n).broadcast(tx.getTransaction, tx.proofs)), waitForTx)
+      maybeWaitForTransaction(sync(async(n).broadcast(tx.getWavesTransaction, tx.proofs)), waitForTx)
     }
 
     def broadcast(tx: PBTransaction, proofs: Seq[ByteString], waitForTx: Boolean = false): PBSignedTransaction = {
@@ -325,6 +325,17 @@ object SyncGrpcApi extends Assertions {
         waitForTx: Boolean = false
     ): PBSignedTransaction = {
       maybeWaitForTransaction(sync(async(n).broadcastInvokeScript(caller, dApp, functionCall, payments, fee, version, feeAssetId)), waitForTx)
+    }
+
+    def broadcastInvokeExpression(
+        caller: KeyPair,
+        expression: ExprScript,
+        fee: Long = invokeExpressionFee,
+        version: Int = 1,
+        feeAssetId: ByteString = ByteString.EMPTY,
+        waitForTx: Boolean = false
+    ): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).broadcastInvokeExpression(caller, expression, fee, version, feeAssetId)), waitForTx)
     }
 
     def broadcastLease(

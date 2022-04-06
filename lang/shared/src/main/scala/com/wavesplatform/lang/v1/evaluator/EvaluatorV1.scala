@@ -1,22 +1,20 @@
 package com.wavesplatform.lang.v1.evaluator
 
-import cats.instances.list._
-import cats.syntax.applicative._
-import cats.syntax.traverse._
-import cats.syntax.functor._
-import cats.instances.either._
-import cats.syntax.bifunctor._
+import cats.data.EitherT
+import cats.implicits.*
 import cats.{Eval, Id, Monad, StackSafeMonad}
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, NOTHING}
+import com.wavesplatform.lang.v1.evaluator.ContextfulNativeFunction.{Extended, Simple}
 import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext.Lenses
-import com.wavesplatform.lang.v1.evaluator.ctx._
-import com.wavesplatform.lang.v1.task.imports._
+import com.wavesplatform.lang.v1.evaluator.ctx.*
+import com.wavesplatform.lang.v1.task.imports.*
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.{EvalF, ExecutionError}
+import com.wavesplatform.lang.{CoevalF, EvalF, ExecutionError}
 
 import scala.collection.mutable.ListBuffer
+import scala.util.Try
 
 object EvaluatorV1 {
   implicit val idEvalFMonad: Monad[EvalF[Id, *]] = new StackSafeMonad[EvalF[Id, *]] {
@@ -31,7 +29,7 @@ object EvaluatorV1 {
   def apply(): EvaluatorV1[Id, Environment] = evaluator
 }
 
-class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]]) {
+class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: Monad[CoevalF[F, *]]) {
   private val lenses = new Lenses[F, C]
   import lenses._
 
@@ -48,7 +46,7 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]]) {
 
   private def evalFuncBlock(func: FUNC, inner: EXPR): EvalM[F, C, (EvaluationContext[C, F], EVALUATED)] = {
     val funcHeader = FunctionHeader.User(func.name)
-    val function = UserFunction(func.name, 0, NOTHING, func.args.map(n => (n, NOTHING)): _*)(func.body)
+    val function = UserFunction(func.name, 0, NOTHING, func.args.map(n => (n, NOTHING))*)(func.body)
         .asInstanceOf[UserFunction[C]]
     local {
       modify[F, LoggedEvaluationContext[C, F], ExecutionError](funcs.modify(_)(_.updated(funcHeader, function)))
@@ -101,9 +99,21 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]]) {
               }
             }: EvalM[F, C, EVALUATED]
           case func: NativeFunction[C] =>
-            Monad[EvalM[F, C, *]].flatMap(args.traverse(evalExpr))(args =>
-              liftTER[F, C, EVALUATED](func.eval[F](ctx.ec.environment, args).value)
-            )
+            Monad[EvalM[F, C, *]].flatMap(args.traverse(evalExpr)) { args =>
+              val evaluated = func.ev match {
+                case f: Simple[C]   =>
+                  val r = Try(f.evaluate(ctx.ec.environment, args))
+                    .toEither
+                    .leftMap(_.toString)
+                    .pure[F]
+                  Eval.now(EitherT(r).map(EitherT(_)).flatten.value)
+                case f: Extended[C] =>
+                  f.evaluate(ctx.ec.environment, args, Int.MaxValue)
+                    .map(_.map(_._1))
+                    .to[Eval]
+              }
+              liftTER[F, C, EVALUATED](evaluated)
+            }
         }
         .orElse(
           // no such function, try data constructor

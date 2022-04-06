@@ -129,9 +129,9 @@ class StateHashSpec extends FreeSpec {
         .map(sect)
 
       val testPrevHash = sect(SectionId.Alias)
-      result.createStateHash(testPrevHash).totalHash shouldBe hash(testPrevHash.arr +: allHashes.map(_.arr): _*)
+      result.createStateHash(testPrevHash).totalHash shouldBe hash((testPrevHash.arr +: allHashes.map(_.arr))*)
       result.copy(hashes = result.hashes - SectionId.WavesBalance).createStateHash(ByteStr.empty).totalHash shouldBe hash(
-        StateHashBuilder.EmptySectionHash.arr +: allHashes.tail.map(_.arr): _*
+        (StateHashBuilder.EmptySectionHash.arr +: allHashes.tail.map(_.arr))*
       )
     }
   }

@@ -3,7 +3,7 @@ package com.wavesplatform.api.http.requests
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.{CreateAliasTransaction, Proofs, TxAmount, TxTimestamp, TxVersion}
+import com.wavesplatform.transaction.{CreateAliasTransaction, Proofs, TxTimestamp, TxVersion}
 import play.api.libs.json.{Format, Json}
 
 case class CreateAliasRequest(
@@ -11,7 +11,7 @@ case class CreateAliasRequest(
     version: Option[TxVersion] = None,
     sender: Option[String] = None,
     senderPublicKey: Option[String] = None,
-    fee: Option[TxAmount] = None,
+    fee: Option[Long] = None,
     timestamp: Option[TxTimestamp] = None,
     signature: Option[ByteStr] = None,
     proofs: Option[Proofs] = None

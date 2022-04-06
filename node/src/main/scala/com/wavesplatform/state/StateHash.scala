@@ -24,7 +24,7 @@ object StateHash {
 
     Json.obj("stateHash" -> toHexString(sh.totalHash)) ++ Json.obj(
       SectionId.values.toSeq
-        .map(id => s"${lowerCamel(id)}Hash" -> (toHexString(sh.sectionHashes.getOrElse(id, StateHashBuilder.EmptySectionHash)): JsValueWrapper)): _*
+        .map(id => s"${lowerCamel(id)}Hash" -> (toHexString(sh.sectionHashes.getOrElse(id, StateHashBuilder.EmptySectionHash)): JsValueWrapper))*
     )
   }
 }

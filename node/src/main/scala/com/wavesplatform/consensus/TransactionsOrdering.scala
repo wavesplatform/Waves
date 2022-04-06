@@ -8,7 +8,7 @@ import com.wavesplatform.transaction.{Authorized, Transaction}
 object TransactionsOrdering {
   trait WavesOrdering extends Ordering[Transaction] {
     def isWhitelisted(t: Transaction): Boolean = false
-    def transactionSize(tx: Transaction): Int  = tx.bytes().length
+    def transactionSize(tx: Transaction): Int  = tx.bytesSize
     def txTimestampOrder(ts: Long): Long
     private def orderBy(t: Transaction): (Boolean, Double, Long, Long) = {
       val byWhiteList = !isWhitelisted(t) // false < true
@@ -38,10 +38,10 @@ object TransactionsOrdering {
 
     override def isWhitelisted(t: Transaction): Boolean =
       t match {
-        case _ if whitelistAddresses.isEmpty                                                            => false
-        case a: Authorized if whitelistAddresses.contains(a.sender.toAddress.stringRepr)                => true
-        case i: InvokeScriptTransaction if whitelistAddresses.contains(i.dAppAddressOrAlias.stringRepr) => true
-        case _                                                                                          => false
+        case _ if whitelistAddresses.isEmpty                                            => false
+        case a: Authorized if whitelistAddresses.contains(a.sender.toAddress.toString)  => true
+        case i: InvokeScriptTransaction if whitelistAddresses.contains(i.dApp.toString) => true
+        case _                                                                          => false
       }
     override def txTimestampOrder(ts: Long): Long = ts
   }

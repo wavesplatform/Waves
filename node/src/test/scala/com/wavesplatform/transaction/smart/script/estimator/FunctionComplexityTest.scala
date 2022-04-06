@@ -12,7 +12,6 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Expressions.EXPR
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.v1.testing.TypedScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import com.wavesplatform.lang.{Global, utils}
@@ -22,11 +21,11 @@ import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{DataTransaction, Proofs}
+import com.wavesplatform.transaction.{DataTransaction, Proofs, TxPositiveAmount}
 import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
 
-class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with TypedScriptGen {
+class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec {
   private val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, null, DirectiveSet.contractDirectiveSet, ByteStr.empty)
 
   private def estimate(
@@ -41,7 +40,7 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with T
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(version, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
+          PureContext.build(version, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, version).withEnvironment[Environment],
           WavesContext.build(
             Global,
@@ -74,9 +73,9 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with T
       PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
       recipient,
       Waves,
-      100000000,
+      TxPositiveAmount.unsafeFrom(100000000),
       Waves,
-      100000000,
+      TxPositiveAmount.unsafeFrom(100000000),
       ByteStr.decodeBase58("4t2Xazb2SX").get,
       1526641218066L,
       Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get)),

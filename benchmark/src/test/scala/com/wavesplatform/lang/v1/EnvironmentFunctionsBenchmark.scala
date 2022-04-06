@@ -6,6 +6,7 @@ import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 import cats.Id
 import cats.syntax.bifunctor._
 import com.wavesplatform.account
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.Curve25519
@@ -14,7 +15,6 @@ import com.wavesplatform.lang.directives.values.{Account, DApp, V4}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark._
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_STRING, EVALUATED, EXPR, FUNCTION_CALL}
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.EnvironmentFunctions
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{Functions, WavesContext}
@@ -86,12 +86,9 @@ class EnvironmentFunctionsBenchmark {
   }
 
   @Benchmark
-  def addressFromPublicKey_test(): ByteStr = randomAddress
-
-  @Benchmark
   def addressFromString(st: AddressFromString, bh: Blackhole): Unit = {
     val i = Random.nextInt(100)
-    bh.consume(EvaluatorV2.applyCompleted(st.ctx, st.expr(i), V4))
+    bh.consume(eval(st.ctx, st.expr(i), V4))
   }
 }
 
@@ -102,7 +99,7 @@ object EnvironmentFunctionsBenchmark {
   val DataBytesLength   = 512
   val SeedBytesLength   = 128
 
-  val defaultEnvironment: Environment[Id] = new Environment[Id] {
+  val environment: Environment[Id] = new Environment[Id] {
     override def height: Long                                                                                    = 1
     override def chainId: Byte                                                                                   = ChainId
     override def inputEntity: Environment.InputEntity                                                            = ???
@@ -128,6 +125,10 @@ object EnvironmentFunctionsBenchmark {
           _.toString,
           address => Address(ByteStr(address.bytes))
         )
+
+    override def addressFromPublicKey(publicKey: ByteStr): Either[String, Address] =
+      Right(Address(ByteStr(PublicKey(publicKey).toAddress.bytes)))
+
     override def accountScript(addressOrAlias: Recipient): Option[Script] = ???
     override def callScript(
         dApp: Address,
@@ -139,7 +140,7 @@ object EnvironmentFunctionsBenchmark {
     ): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
   }
 
-  val environmentFunctions = new EnvironmentFunctions(defaultEnvironment)
+  val environmentFunctions = new EnvironmentFunctions(environment)
 
   val string32Kb: String = "FEDCBA9876543210" * (32 * 1024 / 16)
 
@@ -167,7 +168,7 @@ class AddressFromString {
   val ctx: EvaluationContext[Environment, Id] =
     WavesContext
       .build(Global, DirectiveSet(V4, Account, DApp).explicitGet())
-      .evaluationContext(defaultEnvironment)
+      .evaluationContext(environment)
 
   val expr: Array[EXPR] =
     (1 to 100).map { _ =>

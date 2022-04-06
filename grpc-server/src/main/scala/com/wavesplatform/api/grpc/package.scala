@@ -1,33 +1,37 @@
 package com.wavesplatform.api
 
+import com.typesafe.scalalogging.Logger
 import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.http.ApiError
+import com.wavesplatform.block as vb
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.{PBBlock, PBBlocks}
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions, VanillaTransaction}
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.utils.ScorexLogging
-import com.wavesplatform.{block => vb}
 import io.grpc.stub.{ServerCallStreamObserver, StreamObserver}
 import monix.execution.atomic.AtomicAny
 import monix.execution.{Ack, Scheduler}
 import monix.reactive.Observable
+import org.slf4j.LoggerFactory
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.control.NonFatal
 
-package object grpc extends ScorexLogging {
+package object grpc {
   implicit class VanillaTransactionConversions(val tx: VanillaTransaction) extends AnyVal {
     def toPB: PBSignedTransaction = PBTransactions.protobuf(tx)
   }
 
   implicit class PBSignedTransactionConversions(val tx: PBSignedTransaction) extends AnyVal {
-    def toVanilla: Either[ValidationError, VanillaTransaction] = PBTransactions.vanilla(tx)
+    def toVanilla: Either[ValidationError, VanillaTransaction] = PBTransactions.vanilla(tx, unsafe = false)
   }
 
   implicit class VanillaHeaderConversionOps(val header: vb.BlockHeader) extends AnyVal {
     def toPBHeader: PBBlock.Header = PBBlocks.protobuf(header)
   }
+
+  protected lazy val logger: Logger =
+    Logger(LoggerFactory.getLogger(getClass.getName))
 
   implicit class StreamObserverMonixOps[T](val streamObserver: StreamObserver[T]) extends AnyVal {
     def id: String =
@@ -38,8 +42,8 @@ package object grpc extends ScorexLogging {
 
     def failWith(error: Throwable): Unit = {
       error match {
-        case _: IllegalArgumentException => log.warn(s"[${streamObserver.id}] gRPC call completed with error", error)
-        case _                           => log.error(s"[${streamObserver.id}] gRPC call completed with error", error)
+        case _: IllegalArgumentException => logger.warn(s"[${streamObserver.id}] gRPC call completed with error", error)
+        case _                           => logger.error(s"[${streamObserver.id}] gRPC call completed with error", error)
       }
 
       streamObserver.onError(GRPCErrors.toStatusException(error))
@@ -99,17 +103,17 @@ package object grpc extends ScorexLogging {
             } else Future.failed(new IllegalStateException(s"An element ${nextItem()} is pending"))
           },
         err => cso.onError(err), { () =>
-          log.debug("Source observer completed")
+          logger.debug("Source observer completed")
           cso.onCompleted()
         }
       )
       cso.setOnCancelHandler { () =>
-        log.warn("Stream cancelled")
+        logger.warn("Stream cancelled")
         cancelable.cancel()
       }
 
     case _ =>
-      log.warn(s"Unsupported StreamObserver type: $dest")
+      logger.warn(s"Unsupported StreamObserver type: $dest")
       source.subscribe(
         { (elem: A) =>
           dest.onNext(elem)

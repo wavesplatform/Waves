@@ -1,12 +1,13 @@
 package com.wavesplatform.state
 
-import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
-import com.wavesplatform.block.Block.{BlockId, GenesisBlockVersion, NgBlockVersion, PlainBlockVersion, ProtoBlockVersion, RewardBlockVersion}
+import com.wavesplatform.account._
+import com.wavesplatform.block.Block._
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.traits.domain.Issue
 import com.wavesplatform.settings.BlockchainSettings
@@ -14,8 +15,8 @@ import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.transfer.TransferTransactionLike
+import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 
 trait Blockchain {
   def settings: BlockchainSettings
@@ -41,7 +42,7 @@ trait Blockchain {
 
   def wavesAmount(height: Int): BigInt
 
-  def transferById(id: ByteStr): Option[(Int, TransferTransaction)]
+  def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)]
   def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)]
   def transactionMeta(id: ByteStr): Option[TxMeta]
 
@@ -71,6 +72,8 @@ trait Blockchain {
   def leaseBalance(address: Address): LeaseBalance
 
   def balance(address: Address, mayBeAssetId: Asset = Waves): Long
+
+  def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]
 }
 
 object Blockchain {
@@ -152,8 +155,9 @@ object Blockchain {
         .blockHeader(atHeight)
         .flatMap(header => if (header.header.version >= Block.ProtoBlockVersion) blockchain.hitSource(atHeight) else None)
 
-    def isNFT(issueTransaction: IssueTransaction): Boolean = isNFT(issueTransaction.quantity, issueTransaction.decimals, issueTransaction.reissuable)
-    def isNFT(issueAction: Issue): Boolean                 = isNFT(issueAction.quantity, issueAction.decimals, issueAction.isReissuable)
+    def isNFT(issueTransaction: IssueTransaction): Boolean =
+      isNFT(issueTransaction.quantity.value, issueTransaction.decimals.value, issueTransaction.reissuable)
+    def isNFT(issueAction: Issue): Boolean = isNFT(issueAction.quantity, issueAction.decimals, issueAction.isReissuable)
     def isNFT(quantity: Long, decimals: Int, reissuable: Boolean): Boolean =
       isFeatureActivated(BlockchainFeatures.ReduceNFTFee) && quantity == 1 && decimals == 0 && !reissuable
 
@@ -187,6 +191,14 @@ object Blockchain {
     def binaryData(address: Address, key: String): Option[ByteStr] = blockchain.accountData(address, key).collect {
       case BinaryDataEntry(_, value) => value
     }
+
+    def hasDApp(address: Address): Boolean =
+      blockchain.hasAccountScript(address) && blockchain
+        .accountScript(address)
+        .exists(_.script match {
+          case _: ContractScript.ContractScriptImpl => true
+          case _                                    => false
+        })
 
     def transactionSucceeded(id: ByteStr): Boolean = blockchain.transactionMeta(id).exists(_.succeeded)
   }

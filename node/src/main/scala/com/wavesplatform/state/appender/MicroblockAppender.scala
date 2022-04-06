@@ -4,9 +4,9 @@ import cats.data.EitherT
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.MicroBlock
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.metrics.{BlockStats, _}
+import com.wavesplatform.metrics.*
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroblockData
-import com.wavesplatform.network._
+import com.wavesplatform.network.*
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.transaction.TxValidationError.InvalidSignature
@@ -21,7 +21,7 @@ import monix.execution.Scheduler
 import scala.util.{Left, Right}
 
 object MicroblockAppender extends ScorexLogging {
-  def apply(blockchainUpdater: BlockchainUpdater with Blockchain, utxStorage: UtxPool, scheduler: Scheduler, verify: Boolean = true)(
+  def apply(blockchainUpdater: BlockchainUpdater & Blockchain, utxStorage: UtxPool, scheduler: Scheduler, verify: Boolean = true)(
       microBlock: MicroBlock
   ): Task[Either[ValidationError, BlockId]] = {
 
@@ -39,7 +39,7 @@ object MicroblockAppender extends ScorexLogging {
   }
 
   def apply(
-      blockchainUpdater: BlockchainUpdater with Blockchain,
+      blockchainUpdater: BlockchainUpdater & Blockchain,
       utxStorage: UtxPool,
       allChannels: ChannelGroup,
       peerDatabase: PeerDatabase,
@@ -49,19 +49,21 @@ object MicroblockAppender extends ScorexLogging {
     val microblockTotalResBlockSig = microBlock.totalResBlockSig
     (for {
       _ <- EitherT(Task.now(microBlock.signaturesValid()))
-      _ <- EitherT(apply(blockchainUpdater, utxStorage, scheduler)(microBlock))
-    } yield ()).value.map {
-      case Right(_) =>
+      blockId <- EitherT(apply(blockchainUpdater, utxStorage, scheduler)(microBlock))
+    } yield blockId).value.map {
+      case Right(blockId) =>
         md.invOpt match {
           case Some(mi) => allChannels.broadcast(mi, except = md.microblockOwners())
           case None     => log.warn(s"${id(ch)} Not broadcasting MicroBlockInv")
         }
-        BlockStats.applied(microBlock)
+        BlockStats.applied(microBlock, blockId)
       case Left(is: InvalidSignature) =>
-        peerDatabase.blacklistAndClose(ch, s"Could not append microblock $microblockTotalResBlockSig: $is")
+        val idOpt = md.invOpt.map(_.totalBlockId)
+        peerDatabase.blacklistAndClose(ch, s"Could not append microblock ${idOpt.getOrElse(s"(sig=$microblockTotalResBlockSig)")}: $is")
       case Left(ve) =>
-        BlockStats.declined(microBlock)
-        log.debug(s"${id(ch)} Could not append microblock $microblockTotalResBlockSig: $ve")
+        md.invOpt.foreach(mi => BlockStats.declined(mi.totalBlockId))
+        val idOpt = md.invOpt.map(_.totalBlockId)
+        log.debug(s"${id(ch)} Could not append microblock ${idOpt.getOrElse(s"(sig=$microblockTotalResBlockSig)")}: $ve")
     }
   }
 

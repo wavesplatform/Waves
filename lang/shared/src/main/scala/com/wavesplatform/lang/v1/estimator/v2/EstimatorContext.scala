@@ -6,6 +6,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.FUNC
 import com.wavesplatform.lang.v1.estimator.EstimationError
 import com.wavesplatform.lang.v1.task.TaskM
 import com.wavesplatform.lang.v1.estimator.v2.EstimatorContext.EvalM
+import com.wavesplatform.lang.v1.task.TaskM
 import shapeless.{Lens, lens}
 
 private[v2] case class EstimatorContext(

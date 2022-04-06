@@ -1,5 +1,8 @@
 package com.wavesplatform.it.sync.transactions
 
+import scala.concurrent.duration._
+import scala.util.Random
+
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.http.ApiError.{InvalidName, StateCheckFailed, TooBigArrayAllocation}
@@ -7,22 +10,18 @@ import com.wavesplatform.api.http.requests.UpdateAssetInfoRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs.{Miners, NotMiner}
-import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.{Transaction, TransactionInfo}
+import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.transaction.TxVersion
-import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
+import com.wavesplatform.transaction.{TransactionType, TxVersion}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 import org.scalatest.prop.TableDrivenPropertyChecks
 import play.api.libs.json.{JsObject, Json}
-
-import scala.concurrent.duration._
-import scala.util.Random
 
 class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAfterFailure with TableDrivenPropertyChecks {
   import UpdateAssetInfoTransactionSuite._
@@ -86,7 +85,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
       )
       .id
     nftId = sender.broadcastIssue(issuer, "asset", "description", quantity = 1, decimals = 0, reissuable = false, script = None, waitForTx = true).id
-    val script = ScriptCompiler.compile(testDapp, ScriptEstimatorV3(fixOverflow = true)).explicitGet()._1.bytes().base64
+    val script = ScriptCompiler.compile(testDapp, ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64
     sender.setScript(dApp, Some(script), waitForTx = true)
   }
 
@@ -129,7 +128,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
           None
         )
       )
-      .as[JsObject] ++ Json.obj("type" -> UpdateAssetInfoTransaction.typeId)
+      .as[JsObject] ++ Json.obj("type" -> TransactionType.UpdateAssetInfo.id)
 
     val fee = sender.calculateFee(txJson)
     fee.feeAmount shouldBe 1e5.toLong
@@ -294,7 +293,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
   test("not able to update asset info without paying enough fee") {
     assertApiError(sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee - 1)) { error =>
       error.id shouldBe StateCheckFailed.Id
-      error.message shouldBe s"State check failed. Reason: . Fee for UpdateAssetInfoTransaction (${minFee - 1} in WAVES) does not exceed minimal value of $minFee WAVES."
+      error.message shouldBe s"State check failed. Reason: Fee for UpdateAssetInfoTransaction (${minFee - 1} in WAVES) does not exceed minimal value of $minFee WAVES."
     }
   }
 

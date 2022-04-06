@@ -1,7 +1,7 @@
 package com.wavesplatform
 
 import com.wavesplatform.account.Alias
-import com.wavesplatform.api.http.requests.{BurnV1Request, IssueV1Request, ReissueV1Request, SignedBurnV1Request, SignedCreateAliasV1Request, SignedIssueV1Request, SignedLeaseCancelV1Request, SignedLeaseV1Request, SignedReissueV1Request, SignedTransferV1Request, TransferV1Request}
+import com.wavesplatform.api.http.requests._
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto._
 import com.wavesplatform.transaction.assets._
@@ -96,7 +96,7 @@ trait RequestGen extends TransactionGen { _: Suite =>
 
   val transferReq: G[TransferV1Request] = for {
     (account, fee) <- commonFields
-    recipient      <- accountOrAliasGen.map(_.stringRepr)
+    recipient      <- accountOrAliasGen.map(_.toString)
     amount         <- positiveLongGen
     assetId        <- assetIdStringGen
     feeAssetId     <- assetIdStringGen
@@ -113,17 +113,17 @@ trait RequestGen extends TransactionGen { _: Suite =>
     _signature <- signatureGen
     _timestamp <- ntpTimestampGen
     _alias     <- createAliasGen
-  } yield SignedCreateAliasV1Request(_alias.sender.toString, _alias.fee, _alias.alias.name, _timestamp, _signature)
+  } yield SignedCreateAliasV1Request(_alias.sender.toString, _alias.fee.value, _alias.alias.name, _timestamp, _signature)
 
   val leaseReq: G[SignedLeaseV1Request] = for {
     _signature <- signatureGen
     _timestamp <- ntpTimestampGen
     _alias     <- leaseGen
-  } yield SignedLeaseV1Request(_alias.sender.toString, _alias.amount, _alias.fee, _alias.recipient.toString, _timestamp, _signature)
+  } yield SignedLeaseV1Request(_alias.sender.toString, _alias.amount.value, _alias.fee.value, _alias.recipient.toString, _timestamp, _signature)
 
   val leaseCancelReq: G[SignedLeaseCancelV1Request] = for {
     _signature <- signatureGen
     _timestamp <- ntpTimestampGen
     _cancel    <- leaseCancelGen
-  } yield SignedLeaseCancelV1Request(_cancel.sender.toString, _cancel.leaseId.toString, _timestamp, _signature, _cancel.fee)
+  } yield SignedLeaseCancelV1Request(_cancel.sender.toString, _cancel.leaseId.toString, _timestamp, _signature, _cancel.fee.value)
 }

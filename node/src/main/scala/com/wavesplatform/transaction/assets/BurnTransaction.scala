@@ -17,25 +17,21 @@ final case class BurnTransaction(
     version: TxVersion,
     sender: PublicKey,
     asset: IssuedAsset,
-    quantity: TxAmount,
-    fee: TxAmount,
+    quantity: TxNonNegativeAmount,
+    fee: TxPositiveAmount,
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends ProvenTransaction
+) extends Transaction(TransactionType.Burn, Seq(asset)) with ProvenTransaction
     with VersionedTransaction
     with SigProofsSwitch
     with TxWithFee.InWaves
     with FastHashId
-    with LegacyPBSwitch.V3 {
-
-  override def builder: TransactionParser = BurnTransaction
+    with PBSince.V3 {
 
   override val bodyBytes: Coeval[Array[Byte]] = BurnTxSerializer.bodyBytes(this)
   override val bytes: Coeval[Array[Byte]]     = BurnTxSerializer.toBytes(this)
   override val json: Coeval[JsObject]         = BurnTxSerializer.toJson(this)
-
-  override def checkedAssets: Seq[IssuedAsset] = Seq(asset)
 }
 
 object BurnTransaction extends TransactionParser {
@@ -64,7 +60,11 @@ object BurnTransaction extends TransactionParser {
       proofs: Proofs,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, BurnTransaction] =
-    BurnTransaction(version, sender, asset, quantity, fee, timestamp, proofs, chainId).validatedEither
+    for {
+      quantity <- TxNonNegativeAmount(quantity)(TxValidationError.NegativeAmount(quantity, "assets"))
+      fee      <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
+      tx       <- BurnTransaction(version, sender, asset, quantity, fee, timestamp, proofs, chainId).validatedEither
+    } yield tx
 
   def signed(
       version: TxVersion,
@@ -73,9 +73,10 @@ object BurnTransaction extends TransactionParser {
       quantity: Long,
       fee: Long,
       timestamp: Long,
-      signer: PrivateKey
+      signer: PrivateKey,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, BurnTransaction] =
-    create(version, sender, asset, quantity, fee, timestamp, Proofs.empty).map(_.signWith(signer))
+    create(version, sender, asset, quantity, fee, timestamp, Proofs.empty, chainId).map(_.signWith(signer))
 
   def selfSigned(
       version: TxVersion,
@@ -83,8 +84,9 @@ object BurnTransaction extends TransactionParser {
       asset: IssuedAsset,
       quantity: Long,
       fee: Long,
-      timestamp: Long
+      timestamp: Long,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, BurnTransaction] = {
-    signed(version, sender.publicKey, asset, quantity, fee, timestamp, sender.privateKey)
+    signed(version, sender.publicKey, asset, quantity, fee, timestamp, sender.privateKey, chainId)
   }
 }

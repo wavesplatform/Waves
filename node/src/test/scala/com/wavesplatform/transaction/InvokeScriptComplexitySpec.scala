@@ -4,25 +4,20 @@ import com.wavesplatform.NTPTime
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.directives.values.V5
-import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_STRING, FUNCTION_CALL}
+import com.wavesplatform.lang.directives.values.{V4, V5}
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_STRING}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.test._
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.utx.UtxPoolImpl
-import monix.reactive.Observer
+import com.wavesplatform.test.*
 
 class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
   private[this] val dApp1 = TestCompiler(V5).compileContract("""
       |{-# STDLIB_VERSION 5 #-}
       |{-# CONTENT_TYPE DAPP #-}
-      |{-# SCRIPT_TYPE ACCOUNT #-}@Callable(i)
+      |{-# SCRIPT_TYPE ACCOUNT #-}
+      |
+      |@Callable(i)
       |func call(k: String, childAddress: ByteVector, assetId: ByteVector) = {
       |    let key = takeRight(toBase58String(keccak256_16Kb((k+"x").toBytes())), 15)
       |    let payment = AttachedPayment(assetId, 1)
@@ -38,7 +33,9 @@ class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
   private[this] val dApp0 = TestCompiler(V5).compileContract("""
       |{-# STDLIB_VERSION 5 #-}
       |{-# CONTENT_TYPE DAPP #-}
-      |{-# SCRIPT_TYPE ACCOUNT #-}@Callable(i)
+      |{-# SCRIPT_TYPE ACCOUNT #-}
+      |
+      |@Callable(i)
       |func call(k: String, assetId:ByteVector) = {
       |
       |    ([
@@ -49,21 +46,19 @@ class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
       |}
       |""".stripMargin)
 
-  private[this] val (smartAssetScript, smartAssetScriptComplexity) =
-    ScriptCompiler(
+  private[this] val smartAssetScript =
+    TestCompiler(V4).compileAsset(
       s"""{-# STDLIB_VERSION 4 #-}
-      |{-# CONTENT_TYPE EXPRESSION #-}
-      |{-# SCRIPT_TYPE ASSET #-}
-      |
-      |let message = base58'emsY'
-      |let pub = base58'HnU9jfhpMcQNaG5yQ46eR43RnkWKGxerw2zVrbpnbGof'
-      |let sig = base58'4uXfw7162zaopAkTNa7eo6YK2mJsTiHGJL3dCtRRH63z1nrdoHBHyhbvrfZovkxf2jKsi2vPsaP2XykfZmUiwPeg'
-      |
-      |${Seq.fill(16)("sigVerify(message, sig, pub)").mkString(" && ")}
-      |""".stripMargin,
-      isAssetScript = true,
-      ScriptEstimatorV3(fixOverflow = true)
-    ).explicitGet()
+         |{-# CONTENT_TYPE EXPRESSION #-}
+         |{-# SCRIPT_TYPE ASSET #-}
+         |
+         |let message = base58'emsY'
+         |let pub = base58'HnU9jfhpMcQNaG5yQ46eR43RnkWKGxerw2zVrbpnbGof'
+         |let sig = base58'4uXfw7162zaopAkTNa7eo6YK2mJsTiHGJL3dCtRRH63z1nrdoHBHyhbvrfZovkxf2jKsi2vPsaP2XykfZmUiwPeg'
+         |
+         |${Seq.fill(16)("sigVerify(message, sig, pub)").mkString(" && ")}
+         |""".stripMargin
+    )
 
   private[this] val settings = domainSettingsWithFS(
     SettingsFromDefaultConfig.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = BlockchainFeatures.implemented.map {
@@ -73,61 +68,43 @@ class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
     }.toMap)
   )
 
-  private[this] val gen = for {
-    invoker <- accountGen
-    dapp0   <- accountGen
-    dapp1   <- accountGen
-  } yield (invoker, dapp0, dapp1)
+  "correctly estimates complexity when child dApp invocation involves payment in smart asset" in {
+    val invoker = TxHelpers.signer(0)
+    val dApp0KP = TxHelpers.signer(1)
+    val dApp1KP = TxHelpers.signer(2)
 
-  "correctly estimates complexity when child dApp invocation involves payment in smart asset" in forAll(gen) {
-    case (invoker, dApp0KP, dApp1KP) =>
-      withDomain(settings) { d =>
-        val utx = new UtxPoolImpl(ntpTime, d.blockchain, Observer.stopped, settings.utxSettings)
+    val balances = Seq(invoker, dApp0KP, dApp1KP).map(acc => AddrWithBalance(acc.toAddress, 10000.waves))
 
-        d.appendBlock(
-          Seq(invoker.toAddress, dApp0KP.toAddress, dApp1KP.toAddress)
-            .map(addr => GenesisTransaction.create(addr, 10000.waves, ntpTime.getTimestamp()).explicitGet()): _*
-        )
-        val issueTx = IssueTransaction
-          .selfSigned(TxVersion.V3, dApp1KP, "DAPP1", "", 1000_00, 2, false, Some(smartAssetScript), 1.waves, ntpTime.getTimestamp())
-          .explicitGet()
+    withDomain(settings, balances) { d =>
+      val utx = d.utxPool
 
-        d.appendBlock(
-          SetScriptTransaction.selfSigned(TxVersion.V2, dApp0KP, Some(dApp0), 0.01.waves, ntpTime.getTimestamp()).explicitGet(),
-          SetScriptTransaction.selfSigned(TxVersion.V2, dApp1KP, Some(dApp1), 0.01.waves, ntpTime.getTimestamp()).explicitGet(),
-          issueTx
-        )
+      val issueTx = TxHelpers.issue(issuer = dApp1KP, amount = 1000_00, script = Some(smartAssetScript))
 
-        val invocation = InvokeScriptTransaction
-          .selfSigned(
-            TxVersion.V2,
-            invoker,
-            dApp1KP.toAddress,
-            Some(
-              FUNCTION_CALL(
-                FunctionHeader.User("call"),
-                List(
-                  CONST_STRING("aaa").explicitGet(),
-                  CONST_BYTESTR(ByteStr(dApp0KP.toAddress.bytes)).explicitGet(),
-                  CONST_BYTESTR(issueTx.id()).explicitGet()
-                )
-              )
-            ),
-            Seq.empty,
-            0.005.waves,
-            Waves,
-            ntpTime.getTimestamp()
-          )
-          .explicitGet()
+      d.appendBlock(
+        TxHelpers.setScript(dApp0KP, dApp0),
+        TxHelpers.setScript(dApp1KP, dApp1),
+        issueTx
+      )
 
-        utx.putIfNew(invocation, true).resultE.explicitGet() shouldBe true
-        utx.size shouldBe 1
+      val invocation = TxHelpers.invoke(
+        dApp = dApp1KP.toAddress,
+        func = Some("call"),
+        args = Seq(
+          CONST_STRING("aaa").explicitGet(),
+          CONST_BYTESTR(ByteStr(dApp0KP.toAddress.bytes)).explicitGet(),
+          CONST_BYTESTR(issueTx.id()).explicitGet()
+        ),
+        invoker = invoker
+      )
 
-        utx.cleanUnconfirmed()
+      utx.putIfNew(invocation, forceValidate = true).resultE.explicitGet() shouldBe true
+      utx.size shouldBe 1
 
-        utx.size shouldBe 1
+      utx.cleanUnconfirmed()
 
-        utx.close()
-      }
+      utx.size shouldBe 1
+
+      utx.close()
+    }
   }
 }

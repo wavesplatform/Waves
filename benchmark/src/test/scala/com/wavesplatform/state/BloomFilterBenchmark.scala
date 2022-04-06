@@ -32,7 +32,7 @@ class BloomFilterBenchmark {
 
   @Benchmark
   def verifyExchangeTxSign(bh: Blackhole, st: St): Unit = {
-    bh.consume(Verifier.verifyAsEllipticCurveSignature(st.exchangeTransactions(Random.nextInt(1000))))
+    bh.consume(Verifier.verifyAsEllipticCurveSignature(st.exchangeTransactions(Random.nextInt(1000)), checkWeakPk = false))
   }
 }
 
@@ -51,7 +51,7 @@ object BloomFilterBenchmark {
           (0 until txCount).flatMap(
             txNum =>
               db.get(Keys.transactionAt(Height(h), TxNum(txNum.toShort)))
-                .collect { case (tx: ExchangeTransaction, true) => tx }
+                .collect { case (m, tx: ExchangeTransaction) if m.succeeded => tx }
           )
       }
 

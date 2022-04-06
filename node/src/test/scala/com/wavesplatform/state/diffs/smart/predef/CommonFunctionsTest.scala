@@ -3,52 +3,54 @@ package com.wavesplatform.state.diffs.smart.predef
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Testing._
+import com.wavesplatform.lang.Testing.*
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR
-import com.wavesplatform.lang.v1.evaluator.ctx.impl._
-import com.wavesplatform.state.diffs._
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.*
+import com.wavesplatform.test.*
+import com.wavesplatform.state.IntegerDataEntry
+import com.wavesplatform.test.{NumericExt, PropSpec}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.{DataTransaction, Proofs}
-import org.scalacheck.Gen
+import com.wavesplatform.transaction.transfer.MassTransferTransaction
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.transaction.{TxHelpers, TxNonNegativeAmount, TxVersion}
 import org.scalatest.Assertions
 import shapeless.Coproduct
+
+import scala.util.Try
 
 class CommonFunctionsTest extends PropSpec {
 
   property("extract should transaction transfer assetId if exists") {
-    forAll(transferV1Gen) {
-      case transfer =>
-        val result = runScript(
-          """
-            |match tx {
-            | case ttx : TransferTransaction  =>  extract(ttx.assetId)
-            | case _ => throw()
-            | }
-            |""".stripMargin,
-          Coproduct(transfer)
-        )
-        transfer.assetId match {
-          case IssuedAsset(v) => result.explicitGet().asInstanceOf[CONST_BYTESTR].bs.arr sameElements v.arr
-          case Waves          => result should produce("extract() called on unit")
-        }
+    val transfer = TxHelpers.transfer(version = TxVersion.V1)
+
+    val result = runScript(
+      """
+        |match tx {
+        | case ttx : TransferTransaction  =>  extract(ttx.assetId)
+        | case _ => throw()
+        | }
+        |""".stripMargin,
+      Coproduct(transfer)
+    )
+    transfer.assetId match {
+      case IssuedAsset(v) => result.explicitGet().asInstanceOf[CONST_BYTESTR].bs.arr sameElements v.arr
+      case Waves          => result should produce("extract() called on unit")
     }
   }
 
   property("isDefined should return true if transfer assetId exists") {
-    forAll(transferV1Gen) {
-      case transfer =>
-        val result = runScript(
-          """
-                                          |match tx {
-                                          | case ttx : TransferTransaction  =>  isDefined(ttx.assetId)
-                                          | case _ => throw()
-                                          | }
-                                          |""".stripMargin,
-          Coproduct(transfer)
-        )
-        result shouldEqual evaluated(transfer.assetId != Waves)
-    }
+    val transfer = TxHelpers.transfer(version = TxVersion.V1)
+
+    val result = runScript(
+      """
+                                      |match tx {
+                                      | case ttx : TransferTransaction  =>  isDefined(ttx.assetId)
+                                      | case _ => throw()
+                                      | }
+                                      |""".stripMargin,
+      Coproduct(transfer)
+    )
+    result shouldEqual evaluated(transfer.assetId != Waves)
   }
 
   property("Some/None/extract/isDefined") {
@@ -69,44 +71,42 @@ class CommonFunctionsTest extends PropSpec {
   }
 
   property("getTransfer should extract MassTransfer transfers") {
+    val massTransfer = createMassTransfer()
 
-    forAll(massTransferGen.retryUntil(tg => tg.transfers.nonEmpty && tg.transfers.map(_.address).forall(_.isInstanceOf[Address]))) {
-      case massTransfer =>
-        val resultAmount = runScript(
-          """
-            |match tx {
-            | case mttx : MassTransferTransaction  =>  mttx.transfers[0].amount
-            | case _ => throw()
-            | }
-            |""".stripMargin,
-          Coproduct(massTransfer)
-        )
-        resultAmount shouldBe evaluated(massTransfer.transfers(0).amount)
-        val resultAddress = runScript(
-          """
-                                                      |match tx {
-                                                      | case mttx : MassTransferTransaction  =>
-                                                      |       match mttx.transfers[0].recipient {
-                                                      |           case address : Address => address.bytes
-                                                      |           case _ => throw()
-                                                      |       }
-                                                      | case _ => throw()
-                                                      | }
-                                                      |""".stripMargin,
-          Coproduct(massTransfer)
-        )
-        resultAddress shouldBe evaluated(ByteStr(massTransfer.transfers(0).address.bytes))
-        val resultLen = runScript(
-          """
-                                           |match tx {
-                                           | case mttx : MassTransferTransaction  =>  size(mttx.transfers)
-                                           | case _ => throw()
-                                           | }
-                                           |""".stripMargin,
-          Coproduct(massTransfer)
-        )
-        resultLen shouldBe evaluated(massTransfer.transfers.size.toLong)
-    }
+    val resultAmount = runScript(
+      """
+        |match tx {
+        | case mttx : MassTransferTransaction  =>  mttx.transfers[0].amount
+        | case _ => throw()
+        | }
+        |""".stripMargin,
+      Coproduct(massTransfer)
+    )
+    resultAmount shouldBe evaluated(massTransfer.transfers(0).amount.value)
+    val resultAddress = runScript(
+      """
+                                                  |match tx {
+                                                  | case mttx : MassTransferTransaction  =>
+                                                  |       match mttx.transfers[0].recipient {
+                                                  |           case address : Address => address.bytes
+                                                  |           case _ => throw()
+                                                  |       }
+                                                  | case _ => throw()
+                                                  | }
+                                                  |""".stripMargin,
+      Coproduct(massTransfer)
+    )
+    resultAddress shouldBe evaluated(ByteStr(massTransfer.transfers(0).address.bytes))
+    val resultLen = runScript(
+      """
+                                       |match tx {
+                                       | case mttx : MassTransferTransaction  =>  size(mttx.transfers)
+                                       | case _ => throw()
+                                       | }
+                                       |""".stripMargin,
+      Coproduct(massTransfer)
+    )
+    resultLen shouldBe evaluated(massTransfer.transfers.size.toLong)
   }
 
   property("+ should check overflow") {
@@ -115,82 +115,91 @@ class CommonFunctionsTest extends PropSpec {
   }
 
   property("general shadowing verification") {
-    forAll(Gen.oneOf(transferV1Gen, transferV2Gen, issueGen, massTransferGen(10))) {
-      case (transfer) =>
-        val result = runScript(
-          s"""
-             |match tx {
-             | case tx : TransferTransaction  => tx.id == base58'${transfer.id().toString}'
-             | case tx : IssueTransaction => tx.fee == ${transfer.assetFee._2}
-             | case tx : MassTransferTransaction => tx.timestamp == ${transfer.timestamp}
-             | case _ => throw()
-             | }
-             |""".stripMargin,
-          Coproduct(transfer)
-        )
-        result shouldBe evaluated(true)
+    Seq(
+      TxHelpers.transfer(version = TxVersion.V1),
+      TxHelpers.transfer(),
+      TxHelpers.issue(version = TxVersion.V1),
+      createMassTransfer()
+    ).foreach { tx =>
+      val result = runScript(
+        s"""
+           |match tx {
+           | case tx : TransferTransaction  => tx.id == base58'${tx.id().toString}'
+           | case tx : IssueTransaction => tx.fee == ${tx.assetFee._2}
+           | case tx : MassTransferTransaction => tx.timestamp == ${tx.timestamp}
+           | case _ => throw()
+           | }
+           |""".stripMargin,
+        Coproduct(tx)
+      )
+      result shouldBe evaluated(true)
     }
   }
 
   property("negative shadowing verification") {
-    forAll(Gen.oneOf(transferV2Gen, issueGen, massTransferGen(10))) {
-      case (transfer) =>
-        try {
-          runScript(
-            s"""
-               |let t = 100
-               |match tx {
-               | case t: TransferTransaction  => t.id == base58'${transfer.id().toString}'
-               | case t: IssueTransaction => t.fee == ${transfer.assetFee._2}
-               | case t: MassTransferTransaction => t.timestamp == ${transfer.timestamp}
-               | case _ => throw()
-               | }
-               |""".stripMargin,
-            Coproduct(transfer)
-          )
-        } catch {
-          case ex: MatchError =>
-            Assertions.assert(ex.getMessage().contains("Compilation failed: Value 't' already defined in the scope"))
-          case _: Throwable => Assertions.fail("Some unexpected error")
-        }
+    Seq(
+      TxHelpers.transfer(),
+      TxHelpers.issue(version = TxVersion.V1),
+      createMassTransfer()
+    ).foreach { tx =>
+      Try[Either[String, ?]] {
+        runScript(
+          s"""
+             |let t = 100
+             |match tx {
+             | case t: TransferTransaction  => t.id == base58'${tx.id().toString}'
+             | case t: IssueTransaction => t.fee == ${tx.assetFee._2}
+             | case t: MassTransferTransaction => t.timestamp == ${tx.timestamp}
+             | case _ => throw()
+             | }
+             |""".stripMargin,
+          Coproduct(tx)
+        )
+      }.recover {
+        case ex: MatchError =>
+          Assertions.assert(ex.getMessage().contains("Compilation failed: Value 't' already defined in the scope"))
+        case _: Throwable => Assertions.fail("Some unexpected error")
+      }
     }
   }
 
   property("shadowing of empty ref") {
-    try {
+    Try {
       runScript(
         s"""
-               |match p {
-               | case _: TransferTransaction  => true
-               | case _ => throw()
-               | }
-               |""".stripMargin
+           |match p {
+           | case _: TransferTransaction  => true
+           | case _ => throw()
+           | }
+           |""".stripMargin
       )
-    } catch {
+    }.recover {
       case ex: MatchError => Assertions.assert(ex.getMessage().contains("Compilation failed: A definition of 'p' is not found"))
       case _: Throwable   => Assertions.fail("Some unexpected error")
     }
   }
 
   property("shadowing of inner pattern matching") {
-    forAll(Gen.oneOf(transferV2Gen, issueGen)) {
-      case transfer =>
-        val result =
-          runScript(
-            s"""
-               |match tx {
-               | case tx: TransferTransaction | IssueTransaction => {
-               |  match tx {
-               |    case tx: TransferTransaction  => tx.id == base58'${transfer.id().toString}'
-               |    case tx: IssueTransaction => tx.fee == ${transfer.assetFee._2}
-               |  }
-               |  }
-               | case _ => throw()
-               |}
-               |""".stripMargin,
-            Coproduct(transfer)
-          )
-        result shouldBe evaluated(true)
+    Seq(
+      TxHelpers.transfer(),
+      TxHelpers.issue(version = TxVersion.V1)
+    ).foreach { tx =>
+      val result =
+        runScript(
+          s"""
+             |match tx {
+             | case tx: TransferTransaction | IssueTransaction => {
+             |  match tx {
+             |    case tx: TransferTransaction  => tx.id == base58'${tx.id().toString}'
+             |    case tx: IssueTransaction => tx.fee == ${tx.assetFee._2}
+             |  }
+             |  }
+             | case _ => throw()
+             |}
+             |""".stripMargin,
+          Coproduct(tx)
+        )
+      result shouldBe evaluated(true)
     }
   }
 
@@ -209,49 +218,53 @@ class CommonFunctionsTest extends PropSpec {
   }
 
   property("data constructors") {
-    forAll(transferV2Gen, longEntryGen(dataAsciiKeyGen)) { (t, entry) =>
-      val compareClause = (t.recipient: @unchecked) match {
-        case addr: Address => s"tx.recipient == Address(base58'${addr.stringRepr}')"
-        case alias: Alias  => s"""tx.recipient == Alias("${alias.name}")"""
-      }
-      val transferResult = runScript(
-        s"""
-           |match tx {
-           |  case tx: TransferTransaction =>
-           |    let goodEq = $compareClause
-           |    let badAddressEq = tx.recipient == Address(base58'Mbembangwana')
-           |    let badAddressNe = tx.recipient != Address(base58'3AfZaKieM5')
-           |    let badAliasEq = tx.recipient == Alias("Ramakafana")
-           |    let badAliasNe = tx.recipient != Alias("Nuripitia")
-           |    goodEq && !badAddressEq && badAddressNe && !badAliasEq && badAliasNe
-           |  case _ => throw()
-           |}
-           |""".stripMargin,
-        Coproduct(t)
-      )
-      transferResult shouldBe evaluated(true)
+    val sender    = TxHelpers.signer(1)
+    val recipient = TxHelpers.signer(2)
 
-      val dataTx = DataTransaction.create(1.toByte, t.sender, List(entry), 100000L, t.timestamp, Proofs(Seq.empty)).explicitGet()
-      val dataResult = runScript(
-        s"""
-           |match tx {
-           |  case tx: DataTransaction =>
-           |    let intEq = tx.data[0] == DataEntry("${entry.key}", ${entry.value})
-           |    let intNe = tx.data[0] != DataEntry("${entry.key}", ${entry.value})
-           |    let boolEq = tx.data[0] == DataEntry("${entry.key}", true)
-           |    let boolNe = tx.data[0] != DataEntry("${entry.key}", true)
-           |    let binEq = tx.data[0] == DataEntry("${entry.key}", base64'WROOooommmmm')
-           |    let binNe = tx.data[0] != DataEntry("${entry.key}", base64'FlapFlap')
-           |    let strEq = tx.data[0] == DataEntry("${entry.key}", "${entry.value}")
-           |    let strNe = tx.data[0] != DataEntry("${entry.key}", "Zam")
-           |    intEq && !intNe && !boolEq && boolNe && !binEq && binNe && !strEq && strNe
-           |  case _ => throw()
-           |}
-         """.stripMargin,
-        Coproduct(dataTx)
-      )
-      dataResult shouldBe evaluated(true)
+    val transfer = TxHelpers.transfer(from = sender, to = recipient.toAddress)
+    val entry    = IntegerDataEntry("key", 123L)
+
+    val compareClause = (transfer.recipient: @unchecked) match {
+      case addr: Address => s"tx.recipient == Address(base58'${addr.toString}')"
+      case alias: Alias  => s"""tx.recipient == Alias("${alias.name}")"""
     }
+    val transferResult = runScript(
+      s"""
+         |match tx {
+         |  case tx: TransferTransaction =>
+         |    let goodEq = $compareClause
+         |    let badAddressEq = tx.recipient == Address(base58'Mbembangwana')
+         |    let badAddressNe = tx.recipient != Address(base58'3AfZaKieM5')
+         |    let badAliasEq = tx.recipient == Alias("Ramakafana")
+         |    let badAliasNe = tx.recipient != Alias("Nuripitia")
+         |    goodEq && !badAddressEq && badAddressNe && !badAliasEq && badAliasNe
+         |  case _ => throw()
+         |}
+         |""".stripMargin,
+      Coproduct(transfer)
+    )
+    transferResult shouldBe evaluated(true)
+
+    val dataTx = TxHelpers.data(sender, Seq(entry))
+    val dataResult = runScript(
+      s"""
+         |match tx {
+         |  case tx: DataTransaction =>
+         |    let intEq = tx.data[0] == DataEntry("${entry.key}", ${entry.value})
+         |    let intNe = tx.data[0] != DataEntry("${entry.key}", ${entry.value})
+         |    let boolEq = tx.data[0] == DataEntry("${entry.key}", true)
+         |    let boolNe = tx.data[0] != DataEntry("${entry.key}", true)
+         |    let binEq = tx.data[0] == DataEntry("${entry.key}", base64'WROOooommmmm')
+         |    let binNe = tx.data[0] != DataEntry("${entry.key}", base64'FlapFlap')
+         |    let strEq = tx.data[0] == DataEntry("${entry.key}", "${entry.value}")
+         |    let strNe = tx.data[0] != DataEntry("${entry.key}", "Zam")
+         |    intEq && !intNe && !boolEq && boolNe && !binEq && binNe && !strEq && strNe
+         |  case _ => throw()
+         |}
+       """.stripMargin,
+      Coproduct(dataTx)
+    )
+    dataResult shouldBe evaluated(true)
   }
 
   property("data constructors bad syntax") {
@@ -263,7 +276,7 @@ class CommonFunctionsTest extends PropSpec {
       (s"Addr(base58'$realAddr')", "Can't find a function 'Addr'")
     )
     for ((clause, err) <- cases) {
-      try {
+      Try[Either[String, ?]] {
         runScript(
           s"""
              |match tx {
@@ -274,10 +287,20 @@ class CommonFunctionsTest extends PropSpec {
              |}
              |""".stripMargin
         )
-      } catch {
+      }.recover {
         case ex: MatchError => Assertions.assert(ex.getMessage().contains(err))
         case e: Throwable   => Assertions.fail("Unexpected error", e)
       }
     }
+  }
+
+  private def createMassTransfer(): MassTransferTransaction = {
+    val sender     = TxHelpers.signer(1)
+    val recipients = (1 to 10).map(idx => TxHelpers.address(idx + 1))
+    TxHelpers.massTransfer(
+      from = sender,
+      to = recipients.map(addr => ParsedTransfer(addr, TxNonNegativeAmount.unsafeFrom(1.waves))),
+      version = TxVersion.V1
+    )
   }
 }

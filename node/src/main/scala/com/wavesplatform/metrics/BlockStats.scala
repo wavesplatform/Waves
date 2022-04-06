@@ -1,5 +1,6 @@
 package com.wavesplatform.metrics
 
+import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.network.{HandshakeHandler, MicroBlockInv}
@@ -91,29 +92,29 @@ object BlockStats {
     Seq.empty
   )
 
-  def received(m: MicroBlock, ch: Channel): Unit = write(
-    micro(m)
+  def received(m: MicroBlock, ch: Channel, blockId: BlockId): Unit = write(
+    micro(blockId)
       .tag("parent-id", id(m.reference))
       .addField("from", nodeName(ch)),
     Event.Received,
     Seq.empty
   )
 
-  def applied(m: MicroBlock): Unit = write(
-    micro(m)
+  def applied(m: MicroBlock, blockId: BlockId): Unit = write(
+    micro(blockId)
       .addField("txs", m.transactionData.size),
     Event.Applied,
     Seq.empty
   )
 
-  def declined(m: MicroBlock): Unit = write(
-    micro(m),
+  def declined(blockId: BlockId): Unit = write(
+    micro(blockId),
     Event.Declined,
     Seq.empty
   )
 
-  def mined(m: MicroBlock): Unit = write(
-    micro(m)
+  def mined(m: MicroBlock, blockId: BlockId): Unit = write(
+    micro(blockId)
       .tag("parent-id", id(m.reference))
       .addField("txs", m.transactionData.size),
     Event.Mined,
@@ -131,7 +132,7 @@ object BlockStats {
         "3P5dg6PtSAQmdH1qCGKJWu7bkzRG27mny5i",
         "3PNDoRLsFoPtW1P3nvVHAt7V6hfpyQ8Az9w"
       )
-      whitelistAddrs(b.sender.toAddress.stringRepr)
+      whitelistAddrs(b.sender.toAddress.toString)
     }
 
     measurement(Type.Block)
@@ -140,9 +141,9 @@ object BlockStats {
       .tag("whitelist", isWhitelistMiner.toString)
   }
 
-  private def micro(m: MicroBlock): Point.Builder =
+  private def micro(blockId: BlockId): Point.Builder =
     measurement(Type.Micro)
-      .tag("id", id(m.totalResBlockSig))
+      .tag("id", id(blockId))
 
   private def measurement(t: Type): Point.Builder =
     Point.measurement("block").tag("type", t.toString)

@@ -3,30 +3,25 @@ package com.wavesplatform.http
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.RequestGen
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
-import com.wavesplatform.api.http.ApiError._
-import com.wavesplatform.api.http._
-import com.wavesplatform.api.http.assets._
+import com.wavesplatform.api.http.ApiError.*
+import com.wavesplatform.api.http.assets.*
 import com.wavesplatform.api.http.requests.{SignedTransferV1Request, SignedTransferV2Request}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.test._
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{Asset, Proofs, Transaction}
-import com.wavesplatform.utils.{Time, _}
+import com.wavesplatform.transaction.transfer.*
+import com.wavesplatform.transaction.{Asset, Proofs, Transaction, TxPositiveAmount}
+import com.wavesplatform.utils.{Time, *}
 import com.wavesplatform.wallet.Wallet
-import org.scalacheck.{Gen => G}
+import org.scalacheck.Gen as G
 import org.scalamock.scalatest.PathMockFactory
-import play.api.libs.json._
+import play.api.libs.json.*
 
-class AssetsBroadcastRouteSpec
-    extends RouteSpec("/assets/broadcast/")
-    with RequestGen
-    with PathMockFactory
-    with RestAPISettingsHelper {
+class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with RequestGen with PathMockFactory with RestAPISettingsHelper {
 
   private[this] val route = AssetsApiRoute(
     restAPISettings,
@@ -48,7 +43,7 @@ class AssetsBroadcastRouteSpec
   } yield tx
 
   "returns StateCheckFailed" - {
-    val vt = Table[String, G[_ <: Transaction], JsValue => JsValue](
+    val vt = Table[String, G[? <: Transaction], JsValue => JsValue](
       ("url", "generator", "transform"),
       ("issue", fixedIssueGen, identity),
       ("reissue", reissueGen.retryUntil(_.version == 1), identity),
@@ -80,13 +75,13 @@ class AssetsBroadcastRouteSpec
         def posting[A: Writes](v: A): RouteTestResult = Post(routePath("issue"), v) ~> route
 
         forAll(nonPositiveLong) { q =>
-          posting(ir.copy(fee = q)) should produce(InsufficientFee())
+          posting(ir.copy(fee = q)) should produce(InsufficientFee)
         }
         forAll(nonPositiveLong) { q =>
           posting(ir.copy(quantity = q)) should produce(NonPositiveAmount(s"$q of assets"))
         }
         forAll(invalidDecimals) { d =>
-          posting(ir.copy(decimals = d)) should produce(TooBigArrayAllocation)
+          posting(ir.copy(decimals = d)) should produce(InvalidDecimals(d.toString))
         }
         forAll(longDescription) { d =>
           posting(ir.copy(description = d)) should produce(TooBigArrayAllocation)
@@ -98,7 +93,7 @@ class AssetsBroadcastRouteSpec
           posting(ir.copy(name = name)) should produce(InvalidName)
         }
         forAll(nonPositiveLong) { fee =>
-          posting(ir.copy(fee = fee)) should produce(InsufficientFee())
+          posting(ir.copy(fee = fee)) should produce(InsufficientFee)
         }
       }
     }
@@ -112,7 +107,7 @@ class AssetsBroadcastRouteSpec
           posting(rr.copy(quantity = q)) should produce(NonPositiveAmount(s"$q of assets"))
         }
         forAll(nonPositiveLong) { fee =>
-          posting(rr.copy(fee = fee)) should produce(InsufficientFee())
+          posting(rr.copy(fee = fee)) should produce(InsufficientFee)
         }
       }
     }
@@ -128,7 +123,7 @@ class AssetsBroadcastRouteSpec
           posting(br.copy(amount = q)) should produce(NegativeAmount(s"$q of assets"))
         }
         forAll(nonPositiveLong) { fee =>
-          posting(br.copy(fee = fee)) should produce(InsufficientFee())
+          posting(br.copy(fee = fee)) should produce(InsufficientFee)
         }
       }
     }
@@ -162,7 +157,7 @@ class AssetsBroadcastRouteSpec
           )
         }
         forAll(nonPositiveLong) { fee =>
-          posting(tr.copy(fee = fee)) should produce(InsufficientFee())
+          posting(tr.copy(fee = fee)) should produce(InsufficientFee)
         }
       }
     }
@@ -206,9 +201,9 @@ class AssetsBroadcastRouteSpec
         sender = senderPrivateKey.publicKey,
         recipient = receiverPrivateKey.toAddress,
         assetId = Asset.Waves,
-        amount = 1.waves,
+        amount = TxPositiveAmount.unsafeFrom(1.waves),
         feeAssetId = Asset.Waves,
-        fee = 0.3.waves,
+        fee = TxPositiveAmount.unsafeFrom(0.3.waves),
         attachment = ByteStr.empty,
         timestamp = System.currentTimeMillis(),
         proofs = Proofs(Seq.empty),
@@ -236,13 +231,13 @@ class AssetsBroadcastRouteSpec
   }
 
   protected def createSignedTransferRequest(tx: TransferTransaction): SignedTransferV1Request = {
-    import tx._
+    import tx.*
     SignedTransferV1Request(
       Base58.encode(tx.sender.arr),
       assetId.maybeBase58Repr,
-      recipient.stringRepr,
-      amount,
-      fee,
+      recipient.toString,
+      amount.value,
+      fee.value,
       feeAssetId.maybeBase58Repr,
       timestamp,
       Some(Base58.encode(attachment.arr)),
@@ -251,14 +246,14 @@ class AssetsBroadcastRouteSpec
   }
 
   protected def createSignedVersionedTransferRequest(tx: TransferTransaction): SignedTransferV2Request = {
-    import tx._
+    import tx.*
     SignedTransferV2Request(
       Base58.encode(tx.sender.arr),
       assetId.maybeBase58Repr,
-      recipient.stringRepr,
-      amount,
+      recipient.toString,
+      amount.value,
       feeAssetId.maybeBase58Repr,
-      fee,
+      fee.value,
       timestamp,
       Some(Base58.encode(attachment.arr)),
       proofs.proofs.map(_.toString).toList

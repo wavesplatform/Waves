@@ -10,8 +10,8 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.transfer.TransferTransactionLike
+import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 
 trait EmptyBlockchain extends Blockchain {
   override lazy val settings: BlockchainSettings = BlockchainSettings.fromRootConfig(ConfigFactory.load())
@@ -42,7 +42,7 @@ trait EmptyBlockchain extends Blockchain {
 
   override def wavesAmount(height: Int): BigInt = 0
 
-  override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = None
+  override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] = None
 
   override def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)] = None
 
@@ -75,6 +75,8 @@ trait EmptyBlockchain extends Blockchain {
   override def balance(address: Address, mayBeAssetId: Asset): Long = 0
 
   override def leaseBalance(address: Address): LeaseBalance = LeaseBalance.empty
+
+  override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] = None
 }
 
 object EmptyBlockchain extends EmptyBlockchain

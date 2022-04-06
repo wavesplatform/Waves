@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
 import cats.implicits._
+import cats.syntax.traverse._
 import cats.{Id, Monad}
 import com.wavesplatform.common.merkle.Merkle.createRoot
 import com.wavesplatform.common.state.ByteStr
@@ -27,7 +28,7 @@ object CryptoContext {
   }
 
   private def digestAlgorithmType(v: StdLibVersion) =
-    UNION.create(rsaHashAlgs(v), if (v > V3) Some("RsaDigestAlgs") else None)
+    UNION.create(rsaHashAlgs(v), if (v > V3 && v < V6) Some("RsaDigestAlgs") else None)
 
   private val rsaHashLib = {
     import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA._
@@ -49,118 +50,179 @@ object CryptoContext {
   private val ctxCache = mutable.AnyRefMap.empty[(BaseGlobal, StdLibVersion), CTX[NoContext]]
 
   private def buildNew(global: BaseGlobal, version: StdLibVersion): CTX[NoContext] = {
-    def lgen(
-        lim: Array[Int],
-        name: ((Int, Int)) => (String, Short),
-        complexity: Int => Int,
-        check: Int => List[EVALUATED] => Either[ExecutionError, Unit],
-        ret: TYPE,
+    def functionFamily(
+        startId: Short,
+        nameByLimit: Int => String,
+        costByLimit: List[(Int, Int)],
+        returnType: TYPE,
         args: (String, TYPE)*
-    )(body: List[EVALUATED] => Either[ExecutionError, EVALUATED]): Array[BaseFunction[NoContext]] = {
-      lim.zipWithIndex.map { n =>
-        val (sname, iname) = name(n)
-        NativeFunction[NoContext](sname, complexity(n._1), iname, ret, args: _*) { a =>
-          check(n._1)(a).flatMap(_ => body(a))
-        }
-      }
-    }
+    )(body: (Int, List[EVALUATED]) => Either[ExecutionError, EVALUATED]): Array[BaseFunction[NoContext]] =
+      costByLimit.mapWithIndex {
+        case ((limit, cost), i) =>
+          val name = nameByLimit(limit)
+          val id   = (startId + i).toShort
+          NativeFunction[NoContext](name, cost, id, returnType, args*)(args => body(limit, args))
+      }.toArray
 
     def hashFunction(name: String, internalName: Short, cost: Long)(h: Array[Byte] => Array[Byte]): BaseFunction[NoContext] =
       NativeFunction(name, cost, internalName, BYTESTR, ("bytes", BYTESTR)) {
-        case CONST_BYTESTR(m: ByteStr) :: Nil => CONST_BYTESTR(ByteStr(h(m.arr)))
-        case xs                               => notImplemented[Id, EVALUATED](s"$name(bytes: ByteVector)", xs)
+        case CONST_BYTESTR(m) :: Nil => CONST_BYTESTR(ByteStr(h(m.arr)))
+        case xs                      => notImplemented[Id, EVALUATED](s"$name(bytes: ByteVector)", xs)
       }
 
-    val keccak256F: BaseFunction[NoContext] = hashFunction("keccak256", KECCAK256, (if (version < V4) {
-                                                                                      10
-                                                                                    } else {
-                                                                                      200
-                                                                                    }))(global.keccak256)
-    val blake2b256F: BaseFunction[NoContext] = hashFunction("blake2b256", BLAKE256, (if (version < V4) {
-                                                                                       10
-                                                                                     } else {
-                                                                                       200
-                                                                                     }))(global.blake2b256)
-    val sha256F: BaseFunction[NoContext] = hashFunction("sha256", SHA256, (if (version < V4) {
-                                                                             10
-                                                                           } else {
-                                                                             200
-                                                                           }))(global.sha256)
+    val keccak256F: BaseFunction[NoContext] = {
+      val complexity =
+        if (version < V4) 10
+        else if (version < V6) 200
+        else 195
+      hashFunction("keccak256", KECCAK256, complexity)(global.keccak256)
+    }
 
-    def hashLimFunction(lim: Array[Int], name: String, internalName: Short, costs: Int => Int)(
-        h: Array[Byte] => Array[Byte]
-    ): Array[BaseFunction[NoContext]] =
-      lgen(
-        lim,
-        (n => (s"${name}_${n._1}Kb", (internalName + n._2).toShort)),
-        costs,
-        (n => {
-          case CONST_BYTESTR(msg: ByteStr) :: _ =>
-            Either.cond(msg.size <= n * 1024, (), s"Invalid message size = ${msg.size} bytes, must be not greater than $n KB")
-          case xs => notImplemented[Id, Unit](s"${name}_${n}Kb(bytes: ByteVector)", xs)
-        }),
+    val blake2b256F: BaseFunction[NoContext] = {
+      val complexity =
+        if (version < V4) 10
+        else if (version < V6) 200
+        else 136
+      hashFunction("blake2b256", BLAKE256, complexity)(global.blake2b256)
+    }
+
+    val sha256F: BaseFunction[NoContext] = {
+      val complexity =
+        if (version < V4) 10
+        else if (version < V6) 200
+        else 118
+      hashFunction("sha256", SHA256, complexity)(global.sha256)
+    }
+
+    def hashLimFunction(
+        name: String,
+        startId: Short,
+        costByLimit: List[(Int, Int)]
+    )(hash: Array[Byte] => Array[Byte]): Array[BaseFunction[NoContext]] =
+      functionFamily(
+        startId,
+        limit => s"${name}_${limit}Kb",
+        costByLimit,
         BYTESTR,
         ("bytes", BYTESTR)
       ) {
-        case CONST_BYTESTR(m: ByteStr) :: Nil => CONST_BYTESTR(ByteStr(h(m.arr)))
-        case xs                               => notImplemented[Id, EVALUATED](s"${name}_NKb(bytes: ByteVector)", xs)
+        case (limit, CONST_BYTESTR(msg) :: Nil) =>
+          if (msg.size <= limit * 1024)
+            CONST_BYTESTR(ByteStr(hash(msg.arr)))
+          else
+            Left(s"Invalid message size = ${msg.size} bytes, must be not greater than $limit KB")
+        case (limit, xs) =>
+          notImplemented[Id, EVALUATED](s"${name}_${limit}Kb(bytes: ByteVector)", xs)
       }
 
-    val keccak256F_lim: Array[BaseFunction[NoContext]] = hashLimFunction(Array(16, 32, 64, 128), "keccak256", KECCAK256_LIM, ({
-      case 16  => 10
-      case 32  => 25
-      case 64  => 50
-      case 128 => 100
-    }))(global.keccak256)
-    val blake2b256F_lim: Array[BaseFunction[NoContext]] = hashLimFunction(Array(16, 32, 64, 128), "blake2b256", BLAKE256_LIM, ({
-      case 16  => 10
-      case 32  => 25
-      case 64  => 50
-      case 128 => 100
-    }))(global.blake2b256)
-    val sha256F_lim: Array[BaseFunction[NoContext]] = hashLimFunction(Array(16, 32, 64, 128), "sha256", SHA256_LIM, ({
-      case 16  => 10
-      case 32  => 25
-      case 64  => 50
-      case 128 => 100
-    }))(global.sha256)
+    def keccak256F_lim: Array[BaseFunction[NoContext]] =
+      hashLimFunction(
+        "keccak256",
+        KECCAK256_LIM,
+        if (version >= V6)
+          List(
+            (16, 20),
+            (32, 39),
+            (64, 74),
+            (128, 147)
+          )
+        else
+          List(
+            (16, 10),
+            (32, 25),
+            (64, 50),
+            (128, 100)
+          )
+      )(global.keccak256)
 
-    val sigVerifyL: Array[BaseFunction[NoContext]] = lgen(
-      Array(8, 16, 32, 64, 128),
-      (n => (s"sigVerify_${n._1}Kb", (SIGVERIFY_LIM + n._2).toShort)),
-      ({
-        case 8   => 47
-        case 16  => 57
-        case 32  => 70
-        case 64  => 102
-        case 128 => 172
-      }),
-      (n => {
-        case CONST_BYTESTR(msg: ByteStr) :: _ =>
-          Either.cond(msg.size <= n * 1024, (), s"Invalid message size = ${msg.size} bytes, must be not greater than $n KB")
-        case xs => notImplemented[Id, Unit](s"sigVerify_${n}Kb(message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
-      }),
-      BOOLEAN,
-      ("message", BYTESTR),
-      ("sig", BYTESTR),
-      ("pub", BYTESTR)
-    ) {
-      case CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil =>
-        Right(CONST_BOOLEAN(global.curve25519verify(msg.arr, sig.arr, pub.arr)))
-      case xs => notImplemented[Id, EVALUATED](s"sigVerify(message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
-    }
+    val blake2b256F_lim: Array[BaseFunction[NoContext]] =
+      hashLimFunction(
+        "blake2b256",
+        BLAKE256_LIM,
+        if (version >= V6)
+          List(
+            (16, 13),
+            (32, 29),
+            (64, 58),
+            (128, 115)
+          )
+        else
+          List(
+            (16, 10),
+            (32, 25),
+            (64, 50),
+            (128, 100)
+          )
+      )(global.blake2b256)
+
+    val sha256F_lim: Array[BaseFunction[NoContext]] =
+      hashLimFunction(
+        "sha256",
+        SHA256_LIM,
+        if (version >= V6)
+          List(
+            (16, 12),
+            (32, 23),
+            (64, 47),
+            (128, 93)
+          )
+        else
+          List(
+            (16, 10),
+            (32, 25),
+            (64, 50),
+            (128, 100)
+          )
+      )(global.sha256)
+
+    val sigVerifyL: Array[BaseFunction[NoContext]] =
+      functionFamily(
+        SIGVERIFY_LIM,
+        limit => s"sigVerify_${limit}Kb",
+        if (version >= V6)
+          List(
+            (8, 43),
+            (16, 50),
+            (32, 64),
+            (64, 93),
+            (128, 150)
+          )
+        else
+          List(
+            (8, 47),
+            (16, 57),
+            (32, 70),
+            (64, 102),
+            (128, 172)
+          ),
+        BOOLEAN,
+        ("message", BYTESTR),
+        ("sig", BYTESTR),
+        ("pub", BYTESTR)
+      ) {
+        case (limit, CONST_BYTESTR(msg) :: CONST_BYTESTR(sig) :: CONST_BYTESTR(pub) :: Nil) =>
+          Either.cond(
+            msg.size <= limit * 1024,
+            CONST_BOOLEAN(global.curve25519verify(msg.arr, sig.arr, pub.arr)),
+            s"Invalid message size = ${msg.size} bytes, must be not greater than $limit KB"
+          )
+        case (limit, xs) =>
+          notImplemented[Id, EVALUATED](s"sigVerify_${limit}Kb(message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
+      }
 
     def sigVerifyF(contextVer: StdLibVersion): BaseFunction[NoContext] = {
       val lim = global.MaxByteStrSizeForVerifyFuncs
-      NativeFunction("sigVerify", (if (version < V4) {
-                                     100
-                                   } else {
-                                     200
-                                   }), SIGVERIFY, BOOLEAN, ("message", BYTESTR), ("sig", BYTESTR), ("pub", BYTESTR)) {
-        case CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil
-            if (contextVer == V3 && msg.size > lim) =>
+      val complexity =
+        if (version < V4)
+          100
+        else if (version < V6)
+          200
+        else
+          180
+      NativeFunction("sigVerify", complexity, SIGVERIFY, BOOLEAN, ("message", BYTESTR), ("sig", BYTESTR), ("pub", BYTESTR)) {
+        case CONST_BYTESTR(msg) :: CONST_BYTESTR(_) :: CONST_BYTESTR(_) :: Nil if contextVer == V3 && msg.size > lim =>
           Left(s"Invalid message size = ${msg.size} bytes, must be not greater than ${lim / 1024} KB")
-        case CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil =>
+        case CONST_BYTESTR(msg) :: CONST_BYTESTR(sig) :: CONST_BYTESTR(pub) :: Nil =>
           Right(CONST_BOOLEAN(global.curve25519verify(msg.arr, sig.arr, pub.arr)))
         case xs => notImplemented[Id, EVALUATED](s"sigVerify(message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
       }
@@ -193,40 +255,39 @@ object CryptoContext {
         ("sig", BYTESTR),
         ("pub", BYTESTR)
       ) {
-        case (digestAlg: CaseObj) :: CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil
-            if version < V4 && msg.size > lim =>
+        case (digestAlg: CaseObj) :: CONST_BYTESTR(msg) :: CONST_BYTESTR(sig) :: CONST_BYTESTR(pub) :: Nil if version < V4 && msg.size > lim =>
           Left(s"Invalid message size = ${msg.size} bytes, must be not greater than ${lim / 1024} KB")
-        case (digestAlg: CaseObj) :: CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil =>
+        case (digestAlg: CaseObj) :: CONST_BYTESTR(msg) :: CONST_BYTESTR(sig) :: CONST_BYTESTR(pub) :: Nil =>
           rsaVerify(digestAlg, msg, sig, pub)
         case xs => notImplemented[Id, EVALUATED](s"rsaVerify(digest: DigestAlgorithmType, message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
       }
     }
 
-    val rsaVerifyL: Array[BaseFunction[NoContext]] = lgen(
-      Array(16, 32, 64, 128),
-      (n => (s"rsaVerify_${n._1}Kb", (RSAVERIFY_LIM + n._2).toShort)),
-      ({
-        case 16  => 500
-        case 32  => 550
-        case 64  => 625
-        case 128 => 750
-      }),
-      (n => {
-        case _ :: CONST_BYTESTR(msg: ByteStr) :: _ =>
-          Either.cond(msg.size <= n * 1024, (), s"Invalid message size = ${msg.size} bytes, must be not greater than $n KB")
-        case xs =>
-          notImplemented[Id, Unit](s"rsaVerify_${n}Kb(digest: DigestAlgorithmType, message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
-      }),
-      BOOLEAN,
-      ("digest", digestAlgorithmType(V4)),
-      ("message", BYTESTR),
-      ("sig", BYTESTR),
-      ("pub", BYTESTR)
-    ) {
-      case (digestAlg: CaseObj) :: CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil =>
-        rsaVerify(digestAlg, msg, sig, pub)
-      case xs => notImplemented[Id, EVALUATED](s"rsaVerify(digest: DigestAlgorithmType, message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
-    }
+    def rsaVerifyL(version: StdLibVersion): Array[BaseFunction[NoContext]] =
+      functionFamily(
+        RSAVERIFY_LIM,
+        limit => s"rsaVerify_${limit}Kb",
+        List(
+          (16, 500),
+          (32, 550),
+          (64, 625),
+          (128, 750)
+        ),
+        BOOLEAN,
+        ("digest", digestAlgorithmType(version)),
+        ("message", BYTESTR),
+        ("sig", BYTESTR),
+        ("pub", BYTESTR)
+      ) {
+        case (limit, (digestAlg: CaseObj) :: CONST_BYTESTR(msg) :: CONST_BYTESTR(sig) :: CONST_BYTESTR(pub) :: Nil) =>
+          if (msg.size <= limit * 1024)
+            rsaVerify(digestAlg, msg, sig, pub)
+          else
+            Left(s"Invalid message size = ${msg.size} bytes, must be not greater than $limit KB")
+        case (limit, xs) =>
+          notImplemented[Id, EVALUATED](s"rsaVerify_${limit}Kb(digest: DigestAlgorithmType, message: ByteVector, sig: ByteVector, pub: ByteVector)",
+                                        xs)
+      }
 
     def toBase58StringF: BaseFunction[NoContext] =
       NativeFunction(
@@ -236,8 +297,8 @@ object CryptoContext {
         STRING,
         ("bytes", BYTESTR)
       ) {
-        case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base58Encode(bytes.arr).leftMap(CommonError).flatMap(CONST_STRING(_, reduceLimit = version >= V4))
-        case xs                                   => notImplemented[Id, EVALUATED]("toBase58String(bytes: ByteVector)", xs)
+        case CONST_BYTESTR(bytes) :: Nil => global.base58Encode(bytes.arr).leftMap(CommonError).flatMap(CONST_STRING(_, reduceLimit = version >= V4))
+        case xs                          => notImplemented[Id, EVALUATED]("toBase58String(bytes: ByteVector)", xs)
       }
 
     def fromBase58StringF: BaseFunction[NoContext] =
@@ -260,8 +321,8 @@ object CryptoContext {
         STRING,
         ("bytes", BYTESTR)
       ) {
-        case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base64Encode(bytes.arr).leftMap(CommonError).flatMap(CONST_STRING(_, reduceLimit = version >= V4))
-        case xs                                   => notImplemented[Id, EVALUATED]("toBase64String(bytes: ByteVector)", xs)
+        case CONST_BYTESTR(bytes) :: Nil => global.base64Encode(bytes.arr).leftMap(CommonError).flatMap(CONST_STRING(_, reduceLimit = version >= V4))
+        case xs                          => notImplemented[Id, EVALUATED]("toBase64String(bytes: ByteVector)", xs)
       }
 
     def fromBase64StringF: BaseFunction[NoContext] =
@@ -301,14 +362,14 @@ object CryptoContext {
         ("valueBytes", BYTESTR),
         ("index", LONG)
       ) {
-        case xs @ (ARR(proof) :: CONST_BYTESTR(value) :: CONST_LONG(index) :: Nil) =>
+        case xs @ ARR(proof) :: CONST_BYTESTR(value) :: CONST_LONG(index) :: Nil =>
           if (value.size == 32 && proof.length <= 16 && proof.forall({
                 case CONST_BYTESTR(v) => v.size == 32
                 case _                => false
               })) {
             CONST_BYTESTR(ByteStr(createRoot(value.arr, Math.toIntExact(index), proof.reverse.map({
               case CONST_BYTESTR(v) => v.arr
-              case _                => throw (new Exception("Expect ByteStr"))
+              case _                => throw new Exception("Expect ByteStr")
             }))))
           } else {
             notImplemented[Id, EVALUATED](s"createMerkleRoot(merkleProof: ByteVector, valueBytes: ByteVector)", xs)
@@ -317,8 +378,8 @@ object CryptoContext {
       }
 
     def toBase16StringF(checkLength: Boolean): BaseFunction[NoContext] = NativeFunction("toBase16String", 10, TOBASE16, STRING, ("bytes", BYTESTR)) {
-      case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base16Encode(bytes.arr, checkLength).leftMap(CommonError).flatMap(CONST_STRING(_))
-      case xs                                   => notImplemented[Id, EVALUATED]("toBase16String(bytes: ByteVector)", xs)
+      case CONST_BYTESTR(bytes) :: Nil => global.base16Encode(bytes.arr, checkLength).leftMap(CommonError).flatMap(CONST_STRING(_))
+      case xs                          => notImplemented[Id, EVALUATED]("toBase16String(bytes: ByteVector)", xs)
     }
 
     def fromBase16StringF(checkLength: Boolean): BaseFunction[NoContext] =
@@ -327,65 +388,56 @@ object CryptoContext {
         case xs                               => notImplemented[Id, EVALUATED]("fromBase16String(str: String)", xs)
       }
 
-    val bls12Groth16VerifyL: Array[BaseFunction[NoContext]] = lgen(
-      (1 to 15).toArray,
-      (n => (s"groth16Verify_${n._1}inputs", (BLS12_GROTH16_VERIFY_LIM + n._2).toShort)),
-      ({ n =>
-        Array(1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000, 2100, 2200, 2300, 2400, 2500, 2600)(n - 1)
-      }),
-      (n => {
-        case _ :: _ :: CONST_BYTESTR(inputs: ByteStr) :: _ =>
-          Either.cond(inputs.size <= n * 32, (), s"Invalid inputs size ${inputs.size} bytes, must be not greater than ${n * 32} bytes")
-        case xs => notImplemented[Id, Unit](s"groth16Verify_${n}inputs(vk:ByteVector, proof:ByteVector, inputs:ByteVector)", xs)
-      }),
-      BOOLEAN,
-      ("verifying key", BYTESTR),
-      ("proof", BYTESTR),
-      ("inputs", BYTESTR)
-    ) {
-      case CONST_BYTESTR(vk: ByteStr) :: CONST_BYTESTR(proof: ByteStr) :: CONST_BYTESTR(inputs: ByteStr) :: Nil =>
-        if (inputs.size > 512)
-          Left(s"Invalid inputs size ${inputs.size} bytes, must be not greater than 512 bytes")
-        else if (inputs.size % 32 != 0)
-          Left(s"Invalid inputs size ${inputs.size} bytes, must be a multiple of 32 bytes")
-        else if (proof.size != 192)
-          Left(s"Invalid proof size ${proof.size} bytes, must be equal to 192 bytes")
-        else if (vk.size != 48 * (8 + inputs.size / 32))
-          Left(s"Invalid vk size ${vk.size} bytes, must be equal to ${(8 + inputs.size / 32) * 48} bytes for ${inputs.size / 32} inputs")
-        else
-          Right(CONST_BOOLEAN(global.groth16Verify(vk.arr, proof.arr, inputs.arr)))
-      case xs => notImplemented[Id, EVALUATED]("groth16Verify(vk:ByteVector, proof:ByteVector, inputs:ByteVector)", xs)
-    }
+    val bls12Groth16VerifyL: Array[BaseFunction[NoContext]] =
+      functionFamily(
+        BLS12_GROTH16_VERIFY_LIM,
+        limit => s"groth16Verify_${limit}inputs",
+        (1200 to 2600 by 100).toList.mapWithIndex { case (complexity, i) => (i + 1, complexity) },
+        BOOLEAN,
+        ("verifying key", BYTESTR),
+        ("proof", BYTESTR),
+        ("inputs", BYTESTR)
+      ) {
+        case (limit, CONST_BYTESTR(vk) :: CONST_BYTESTR(proof) :: CONST_BYTESTR(inputs) :: Nil) =>
+          if (inputs.size > limit * 32)
+            Left(s"Invalid inputs size ${inputs.size} bytes, must be not greater than ${limit * 32} bytes")
+          else if (inputs.size % 32 != 0)
+            Left(s"Invalid inputs size ${inputs.size} bytes, must be a multiple of 32 bytes")
+          else if (proof.size != 192)
+            Left(s"Invalid proof size ${proof.size} bytes, must be equal to 192 bytes")
+          else if (vk.size != 48 * (8 + inputs.size / 32))
+            Left(s"Invalid vk size ${vk.size} bytes, must be equal to ${(8 + inputs.size / 32) * 48} bytes for ${inputs.size / 32} inputs")
+          else
+            Right(CONST_BOOLEAN(global.groth16Verify(vk.arr, proof.arr, inputs.arr)))
+        case (limit, xs) =>
+          notImplemented[Id, EVALUATED](s"groth16Verify_${limit}inputs(vk:ByteVector, proof:ByteVector, inputs:ByteVector)", xs)
+      }
 
-    val bn256Groth16VerifyComplexities =
-      Array(800, 850, 950, 1000, 1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1550, 1600)
-
-    val bn256Groth16VerifyL: Array[BaseFunction[NoContext]] = lgen(
-      (1 to 15).toArray,
-      n => (s"bn256Groth16Verify_${n._1}inputs", (BN256_GROTH16_VERIFY_LIM + n._2).toShort),
-      n => bn256Groth16VerifyComplexities(n - 1),
-      n => {
-        case _ :: _ :: CONST_BYTESTR(inputs: ByteStr) :: _ =>
-          Either.cond(inputs.size <= n * 32, (), s"Invalid inputs size ${inputs.size} bytes, must be not greater than ${n * 32} bytes")
-        case xs => notImplemented[Id, Unit](s"bn256Groth16Verify_${n}inputs(vk:ByteVector, proof:ByteVector, inputs:ByteVector)", xs)
-      },
-      BOOLEAN,
-      ("verifying key", BYTESTR),
-      ("proof", BYTESTR),
-      ("inputs", BYTESTR)
-    ) {
-      case CONST_BYTESTR(vk: ByteStr) :: CONST_BYTESTR(proof: ByteStr) :: CONST_BYTESTR(inputs: ByteStr) :: Nil =>
-        if (inputs.size > 512)
-          Left(s"Invalid inputs size ${inputs.size} bytes, must be not greater than 512 bytes")
-        else if (inputs.size % 32 != 0)
-          Left(s"Invalid inputs size ${inputs.size} bytes, must be a multiple of 32 bytes")
-        else if (proof.size != 128)
-          Left(s"Invalid proof size ${proof.size} bytes, must be equal to 128 bytes")
-        else if (vk.size != inputs.size + 256)
-          Left(s"Invalid vk size ${vk.size} bytes, must be equal to ${inputs.size + 256} bytes for ${inputs.size / 32} inputs")
-        else
-          Right(CONST_BOOLEAN(global.bn256Groth16Verify(vk.arr, proof.arr, inputs.arr)))
-      case xs => notImplemented[Id, EVALUATED]("bn256Groth16Verify(vk:ByteVector, proof:ByteVector, inputs:ByteVector)", xs)
+    val bn256Groth16VerifyL: Array[BaseFunction[NoContext]] = {
+      val complexities = List(800, 850, 950, 1000, 1050, 1100, 1150, 1200, 1250, 1300, 1350, 1400, 1450, 1550, 1600)
+      functionFamily(
+        BN256_GROTH16_VERIFY_LIM,
+        limit => s"bn256Groth16Verify_${limit}inputs",
+        complexities.mapWithIndex { case (complexity, i) => (i + 1, complexity) },
+        BOOLEAN,
+        ("verifying key", BYTESTR),
+        ("proof", BYTESTR),
+        ("inputs", BYTESTR)
+      ) {
+        case (limit, CONST_BYTESTR(vk) :: CONST_BYTESTR(proof) :: CONST_BYTESTR(inputs) :: Nil) =>
+          if (inputs.size > limit * 32)
+            Left(s"Invalid inputs size ${inputs.size} bytes, must be not greater than ${limit * 32} bytes")
+          else if (inputs.size % 32 != 0)
+            Left(s"Invalid inputs size ${inputs.size} bytes, must be a multiple of 32 bytes")
+          else if (proof.size != 128)
+            Left(s"Invalid proof size ${proof.size} bytes, must be equal to 128 bytes")
+          else if (vk.size != inputs.size + 256)
+            Left(s"Invalid vk size ${vk.size} bytes, must be equal to ${inputs.size + 256} bytes for ${inputs.size / 32} inputs")
+          else
+            Right(CONST_BOOLEAN(global.bn256Groth16Verify(vk.arr, proof.arr, inputs.arr)))
+        case (limit, xs) =>
+          notImplemented[Id, EVALUATED](s"bn256Groth16Verify_${limit}inputs(vk:ByteVector, proof:ByteVector, inputs:ByteVector)", xs)
+      }
     }
 
     val bls12Groth16VerifyF: BaseFunction[NoContext] =
@@ -398,7 +450,7 @@ object CryptoContext {
         ("proof", BYTESTR),
         ("inputs", BYTESTR)
       ) {
-        case CONST_BYTESTR(vk: ByteStr) :: CONST_BYTESTR(proof: ByteStr) :: CONST_BYTESTR(inputs: ByteStr) :: Nil =>
+        case CONST_BYTESTR(vk) :: CONST_BYTESTR(proof) :: CONST_BYTESTR(inputs) :: Nil =>
           if (inputs.size > 512)
             Left(s"Invalid inputs size ${inputs.size} bytes, must be not greater than 512 bytes")
           else if (inputs.size % 32 != 0)
@@ -409,7 +461,8 @@ object CryptoContext {
             Left(s"Invalid vk size ${vk.size} bytes, must be equal to ${(8 + inputs.size / 32) * 48} bytes for ${inputs.size / 32} inputs")
           else
             Right(CONST_BOOLEAN(global.groth16Verify(vk.arr, proof.arr, inputs.arr)))
-        case xs => notImplemented[Id, EVALUATED]("groth16Verify(vk:ByteVector, proof:ByteVector, inputs:ByteVector)", xs)
+        case xs =>
+          notImplemented[Id, EVALUATED]("groth16Verify(vk:ByteVector, proof:ByteVector, inputs:ByteVector)", xs)
       }
 
     val bn256Groth16VerifyF: BaseFunction[NoContext] =
@@ -422,7 +475,7 @@ object CryptoContext {
         ("proof", BYTESTR),
         ("inputs", BYTESTR)
       ) {
-        case CONST_BYTESTR(vk: ByteStr) :: CONST_BYTESTR(proof: ByteStr) :: CONST_BYTESTR(inputs: ByteStr) :: Nil =>
+        case CONST_BYTESTR(vk) :: CONST_BYTESTR(proof) :: CONST_BYTESTR(inputs) :: Nil =>
           if (inputs.size > 512)
             Left(s"Invalid inputs size ${inputs.size} bytes, must be not greater than 512 bytes")
           else if (inputs.size % 32 != 0)
@@ -445,7 +498,7 @@ object CryptoContext {
         ("message hash", BYTESTR),
         ("signature", BYTESTR)
       ) {
-        case CONST_BYTESTR(messageHash: ByteStr) :: CONST_BYTESTR(signature: ByteStr) :: Nil =>
+        case CONST_BYTESTR(messageHash) :: CONST_BYTESTR(signature) :: Nil =>
           if (messageHash.size != 32)
             Left(s"Invalid message hash size ${messageHash.size} bytes, must be equal to 32 bytes")
           else if (signature.size != 65)
@@ -472,6 +525,7 @@ object CryptoContext {
 
     val v4RsaDig = rsaHashAlgs(V4)
     val v4Types  = v4RsaDig :+ digestAlgorithmType(V4)
+    val v6Types  = v4RsaDig :+ digestAlgorithmType(V6)
 
     val v4Vars: Map[String, (FINAL, ContextfulVal[NoContext])] =
       rsaVarNames.zip(v4RsaDig.map(t => (t, digestAlgValue(t)))).toMap
@@ -490,7 +544,7 @@ object CryptoContext {
         fromBase16StringF(checkLength = false)
       )
 
-    val v4Functions =
+    def fromV4Functions(version: StdLibVersion) =
       Array(
         bls12Groth16VerifyF,
         bn256Groth16VerifyF,
@@ -499,16 +553,18 @@ object CryptoContext {
         rsaVerifyF,
         toBase16StringF(checkLength = true),
         fromBase16StringF(checkLength = true) // from V3
-      ) ++ sigVerifyL ++ rsaVerifyL ++ keccak256F_lim ++ blake2b256F_lim ++ sha256F_lim ++ bls12Groth16VerifyL ++ bn256Groth16VerifyL
+      ) ++ sigVerifyL ++ rsaVerifyL(version) ++ keccak256F_lim ++ blake2b256F_lim ++ sha256F_lim ++ bls12Groth16VerifyL ++ bn256Groth16VerifyL
 
     val fromV1Ctx = CTX[NoContext](Seq(), Map(), v1Functions)
     val fromV3Ctx = fromV1Ctx |+| CTX[NoContext](v3Types, v3Vars, v3Functions)
-    val fromV4Ctx = fromV1Ctx |+| CTX[NoContext](v4Types, v4Vars, v4Functions)
+    val fromV4Ctx = fromV1Ctx |+| CTX[NoContext](v4Types, v4Vars, fromV4Functions(V4))
+    val fromV6Ctx = fromV1Ctx |+| CTX[NoContext](v6Types, v4Vars, fromV4Functions(V6))
 
     version match {
       case V1 | V2 => fromV1Ctx
       case V3      => fromV3Ctx
       case V4 | V5 => fromV4Ctx
+      case _       => fromV6Ctx
     }
   }
 

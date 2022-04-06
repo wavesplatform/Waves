@@ -5,13 +5,14 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.lease.LeaseTransaction
+import com.wavesplatform.transaction.serialization.impl.LeaseTxSerializer
 import play.api.libs.json.Json
 
 class LeaseTransactionSpecification extends PropSpec {
 
   property("Lease transaction serialization roundtrip") {
     forAll(leaseGen) { tx: LeaseTransaction =>
-      val recovered = tx.builder.parseBytes(tx.bytes()).get.asInstanceOf[LeaseTransaction]
+      val recovered = LeaseTxSerializer.parseBytes(tx.bytes()).get
       assertTxs(recovered, tx)
     }
   }
@@ -36,7 +37,7 @@ class LeaseTransactionSpecification extends PropSpec {
         |}
         |""".stripMargin)
 
-    val tx = LeaseTransaction.serializer.parseBytes(bytes)
+    val tx = LeaseTxSerializer.parseBytes(bytes)
     tx.get.json() shouldBe json
   }
 
@@ -49,7 +50,7 @@ class LeaseTransactionSpecification extends PropSpec {
 
   private def assertTxs(first: LeaseTransaction, second: LeaseTransaction): Unit = {
     first.sender shouldEqual second.sender
-    first.recipient.stringRepr shouldEqual second.recipient.stringRepr
+    first.recipient shouldEqual second.recipient
     first.amount shouldEqual second.amount
     first.fee shouldEqual second.fee
     first.proofs shouldEqual second.proofs
@@ -129,7 +130,7 @@ class LeaseTransactionSpecification extends PropSpec {
       // hack in an assetId
       bytes(3) = 1: Byte
       val bytesWithAssetId = bytes.take(4) ++ assetId ++ bytes.drop(4)
-      val parsed           = tx.builder.parseBytes(bytesWithAssetId)
+      val parsed           = LeaseTxSerializer.parseBytes(bytesWithAssetId)
       parsed.isFailure shouldBe true
       parsed.failed.get.getMessage.contains("Leasing assets is not supported yet") shouldBe true
     }

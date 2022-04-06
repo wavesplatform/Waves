@@ -1,25 +1,25 @@
 package com.wavesplatform.state.diffs
 
-import cats.instances.either._
-import cats.syntax.flatMap._
-import cats.syntax.ior._
-import cats.syntax.semigroup._
+import cats.implicits.toBifunctorOps
+import cats.instances.either.*
+import cats.syntax.flatMap.*
+import cats.syntax.ior.*
 import com.google.common.base.Utf8
 import com.google.protobuf.ByteString
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.EstimatorProvider._
+import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.traits.domain.{Burn, Reissue, SponsorFee}
-import com.wavesplatform.state._
-import com.wavesplatform.transaction.Asset
+import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.assets._
+import com.wavesplatform.transaction.assets.*
+import com.wavesplatform.transaction.{Asset, ERC20Address}
 import com.wavesplatform.utils.ScorexLogging
 
 object AssetTransactionsDiff extends ScorexLogging {
-  def issue(blockchain: Blockchain)(tx: IssueTransaction): Either[ValidationError, Diff] = {
+  def issue(blockchain: Blockchain)(tx: IssueTransaction): Either[ValidationError, Diff] = { // TODO: unify with InvokeScript action diff?
     def requireValidUtf(): Boolean = {
       def isValid(str: ByteString): Boolean = {
         val convertible = ByteString.copyFromUtf8(str.toStringUtf8) == str
@@ -30,25 +30,30 @@ object AssetTransactionsDiff extends ScorexLogging {
       !activated || (isValid(tx.name) && isValid(tx.description))
     }
 
-    val staticInfo = AssetStaticInfo(TransactionId @@ tx.id(), tx.sender, tx.decimals, blockchain.isNFT(tx))
-    val volumeInfo = AssetVolumeInfo(tx.reissuable, BigInt(tx.quantity))
+    // First 20 bytes of id should be unique
+    def requireUnique(): Boolean = blockchain.resolveERC20Address(ERC20Address(tx.asset)).isEmpty
+
+    val staticInfo = AssetStaticInfo(TransactionId @@ tx.id(), tx.sender, tx.decimals.value, blockchain.isNFT(tx))
+    val volumeInfo = AssetVolumeInfo(tx.reissuable, BigInt(tx.quantity.value))
     val info       = AssetInfo(tx.name, tx.description, Height @@ blockchain.height)
 
     val asset = IssuedAsset(tx.id())
 
     for {
       _ <- Either.cond(requireValidUtf(), (), GenericError("Valid UTF-8 strings required"))
+      _ <- Either.cond(requireUnique(), (), GenericError(s"Asset ${tx.asset} is already issued"))
       result <- DiffsCommon
         .countVerifierComplexity(tx.script, blockchain, isAsset = true)
         .flatTap(checkEstimationOverflow(blockchain, _))
         .map(
           script =>
             Diff(
-              portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(asset -> tx.quantity))),
-              issuedAssets = Map(asset             -> NewAssetInfo(staticInfo, info, volumeInfo)),
-              assetScripts = Map(asset             -> script.map(AssetScriptInfo.tupled)),
+              portfolios =
+                Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee.value, lease = LeaseBalance.empty, assets = Map(asset -> tx.quantity.value))),
+              issuedAssets = Map(asset  -> NewAssetInfo(staticInfo, info, volumeInfo)),
+              assetScripts = Map(asset  -> script.map(AssetScriptInfo.tupled)),
               scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
-          )
+            )
         )
     } yield result
   }
@@ -65,12 +70,11 @@ object AssetTransactionsDiff extends ScorexLogging {
         DiffsCommon.countScriptRuns(blockchain, tx)
       else
         Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
-    } yield
-      Diff(
-        portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
-        assetScripts = Map(tx.asset          -> script.map(AssetScriptInfo.tupled)),
-        scriptsRun = scriptsRun
-      )
+    } yield Diff(
+      portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee.value, lease = LeaseBalance.empty, assets = Map.empty)),
+      assetScripts = Map(tx.asset          -> script.map(AssetScriptInfo.tupled)),
+      scriptsRun = scriptsRun
+    )
 
   private def checkEstimationOverflow(blockchain: Blockchain, script: Option[(Script, Long)]): Either[GenericError, Unit] =
     if (blockchain.checkEstimationOverflow && script.exists(_._2 < 0))
@@ -80,24 +84,24 @@ object AssetTransactionsDiff extends ScorexLogging {
 
   def reissue(blockchain: Blockchain, blockTime: Long)(tx: ReissueTransaction): Either[ValidationError, Diff] =
     DiffsCommon
-      .processReissue(blockchain, tx.sender.toAddress, blockTime, tx.fee, Reissue(tx.asset.id, tx.reissuable, tx.quantity))
-      .map(_ |+| Diff(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)))
+      .processReissue(blockchain, tx.sender.toAddress, blockTime, tx.fee.value, Reissue(tx.asset.id, tx.reissuable, tx.quantity.value))
+      .flatMap(_.combine(Diff(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx))).leftMap(GenericError(_)))
 
   def burn(blockchain: Blockchain)(tx: BurnTransaction): Either[ValidationError, Diff] =
     DiffsCommon
-      .processBurn(blockchain, tx.sender.toAddress, tx.fee, Burn(tx.asset.id, tx.quantity))
-      .map(_ |+| Diff(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)))
+      .processBurn(blockchain, tx.sender.toAddress, tx.fee.value, Burn(tx.asset.id, tx.quantity.value))
+      .flatMap(_.combine(Diff(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx))).leftMap(GenericError(_)))
 
   def sponsor(blockchain: Blockchain)(tx: SponsorFeeTransaction): Either[ValidationError, Diff] =
     DiffsCommon
-      .processSponsor(blockchain, tx.sender.toAddress, tx.fee, SponsorFee(tx.asset.id, tx.minSponsoredAssetFee))
-      .map(_ |+| Diff(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)))
+      .processSponsor(blockchain, tx.sender.toAddress, tx.fee.value, SponsorFee(tx.asset.id, tx.minSponsoredAssetFee.map(_.value)))
+      .flatMap(_.combine(Diff(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx))).leftMap(GenericError(_)))
 
   def updateInfo(blockchain: Blockchain)(tx: UpdateAssetInfoTransaction): Either[ValidationError, Diff] =
     DiffsCommon.validateAsset(blockchain, tx.assetId, tx.sender.toAddress, issuerOnly = true) >> {
       lazy val portfolioUpdate = tx.feeAsset match {
-        case ia @ IssuedAsset(_) => Portfolio(0L, LeaseBalance.empty, Map(ia -> -tx.feeAmount))
-        case Asset.Waves         => Portfolio(balance = -tx.feeAmount, LeaseBalance.empty, Map.empty)
+        case ia @ IssuedAsset(_) => Portfolio(0L, LeaseBalance.empty, Map(ia -> -tx.feeAmount.value))
+        case Asset.Waves         => Portfolio(balance = -tx.feeAmount.value, LeaseBalance.empty, Map.empty)
       }
 
       val minUpdateInfoInterval = blockchain.settings.functionalitySettings.minAssetInfoUpdateInterval
@@ -117,11 +121,10 @@ object AssetTransactionsDiff extends ScorexLogging {
           )
         )
         updatedInfo = AssetInfo(tx.name, tx.description, Height @@ blockchain.height)
-      } yield
-        Diff(
-          portfolios = Map(tx.sender.toAddress -> portfolioUpdate),
-          updatedAssets = Map(tx.assetId       -> updatedInfo.leftIor),
-          scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
-        )
+      } yield Diff(
+        portfolios = Map(tx.sender.toAddress -> portfolioUpdate),
+        updatedAssets = Map(tx.assetId       -> updatedInfo.leftIor),
+        scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
+      )
     }
 }

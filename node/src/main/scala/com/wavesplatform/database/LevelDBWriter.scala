@@ -3,33 +3,35 @@ package com.wavesplatform.database
 import java.util
 
 import cats.data.Ior
-import cats.syntax.option._
-import cats.syntax.semigroup._
+import cats.syntax.option.*
+import cats.syntax.semigroup.*
 import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
-import com.google.common.primitives.Ints
+import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.database
 import com.wavesplatform.database.patch.DisableHijackedAliases
-import com.wavesplatform.database.protobuf.TransactionMeta
+import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, TransactionMeta}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings, WavesSettings}
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{TxNum, _}
+import com.wavesplatform.state.{TxNum, *}
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.EthereumTransaction.Transfer
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
-import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.assets._
+import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
 import monix.reactive.Observer
 import org.iq80.leveldb.DB
@@ -37,7 +39,7 @@ import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
 
 object LevelDBWriter extends ScorexLogging {
@@ -62,7 +64,7 @@ object LevelDBWriter extends ScorexLogging {
         lastChange <- db.get(historyKey).headOption
       } yield db.get(valueKey(lastChange))
 
-    def hasInHistory(historyKey: Key[Seq[Int]], v: Int => Key[_]): Boolean =
+    def hasInHistory(historyKey: Key[Seq[Int]], v: Int => Key[?]): Boolean =
       db.get(historyKey)
         .headOption
         .exists(h => db.has(v(h)))
@@ -79,9 +81,7 @@ object LevelDBWriter extends ScorexLogging {
 
   private[database] def merge(wbh: Seq[Int], lbh: Seq[Int]): Seq[(Int, Int)] = {
 
-    /**
-      * Fixed implementation where
-      *  {{{([15, 12, 3], [12, 5]) => [(15, 12), (12, 12), (3, 5)]}}}
+    /** Fixed implementation where {{{([15, 12, 3], [12, 5]) => [(15, 12), (12, 12), (3, 5)]}}}
       */
     @tailrec
     def recMergeFixed(wh: Int, wt: Seq[Int], lh: Int, lt: Seq[Int], buf: ArrayBuffer[(Int, Int)]): ArrayBuffer[(Int, Int)] = {
@@ -106,7 +106,7 @@ object LevelDBWriter extends ScorexLogging {
     recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty).toSeq
   }
 
-  def apply(db: DB, spendableBalanceChanged: Observer[(Address, Asset)], settings: WavesSettings): LevelDBWriter with AutoCloseable = {
+  def apply(db: DB, spendableBalanceChanged: Observer[(Address, Asset)], settings: WavesSettings): LevelDBWriter & AutoCloseable = {
     val expectedHeight = loadHeight(db)
     def load(name: String, key: KeyTags.KeyTag): Option[BloomFilterImpl] = {
       if (settings.dbSettings.useBloomFilter)
@@ -174,7 +174,7 @@ abstract class LevelDBWriter private[database] (
   private[this] var disabledAliases = writableDB.get(Keys.disabledAliases)
 
   private[this] val balanceSnapshotMaxRollbackDepth: Int = dbSettings.maxRollbackDepth + 1000
-  import LevelDBWriter._
+  import LevelDBWriter.*
 
   private[database] def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
 
@@ -183,7 +183,8 @@ abstract class LevelDBWriter private[database] (
   private def loadWithFilter[A, R](filter: BloomFilter, key: Key[A])(f: (ReadOnlyDB, A) => Option[R]): Option[R] =
     if (filter.mightContain(key.suffix)) readOnly { ro =>
       f(ro, ro.get(key))
-    } else None
+    }
+    else None
 
   override protected def loadMaxAddressId(): Long = readOnly(db => db.get(Keys.lastAddressId).getOrElse(0L))
 
@@ -221,7 +222,7 @@ abstract class LevelDBWriter private[database] (
 
   override def carryFee: Long = readOnly(_.get(Keys.carryFee(height)))
 
-  override protected def loadAccountData(address: Address, key: String): Option[DataEntry[_]] =
+  override protected def loadAccountData(address: Address, key: String): Option[DataEntry[?]] =
     loadWithFilter(dataKeyFilter, Keys.dataHistory(address, key)) { (ro, history) =>
       for {
         aid <- addressId(address)
@@ -293,10 +294,10 @@ abstract class LevelDBWriter private[database] (
   override def blockReward(height: Int): Option[Long] =
     readOnly(_.db.get(Keys.blockReward(height)))
 
-  private def updateHistory(rw: RW, key: Key[Seq[Int]], threshold: Int, kf: Int => Key[_]): Seq[Array[Byte]] =
+  private def updateHistory(rw: RW, key: Key[Seq[Int]], threshold: Int, kf: Int => Key[?]): Seq[Array[Byte]] =
     updateHistory(rw, rw.get(key), key, threshold, kf)
 
-  private def updateHistory(rw: RW, history: Seq[Int], key: Key[Seq[Int]], threshold: Int, kf: Int => Key[_]): Seq[Array[Byte]] = {
+  private def updateHistory(rw: RW, history: Seq[Int], key: Key[Seq[Int]], threshold: Int, kf: Int => Key[?]): Seq[Array[Byte]] = {
     val (c1, c2) = history.partition(_ >= threshold)
     rw.put(key, (height +: c1) ++ c2.headOption)
     c2.drop(1).map(kf(_).keyBytes)
@@ -359,7 +360,7 @@ abstract class LevelDBWriter private[database] (
     }
   }
 
-  //noinspection ScalaStyle
+  // noinspection ScalaStyle
   override protected def doAppend(
       block: Block,
       carry: Long,
@@ -381,7 +382,8 @@ abstract class LevelDBWriter private[database] (
       hitSource: ByteStr,
       scriptResults: Map[ByteStr, InvokeScriptResult],
       transactionMeta: Seq[(TxMeta, Transaction)],
-      stateHash: StateHashBuilder.Result
+      stateHash: StateHashBuilder.Result,
+      ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta]
   ): Unit = {
     log.trace(s"Persisting block ${block.id()} at height $height")
     readWrite { rw =>
@@ -396,8 +398,8 @@ abstract class LevelDBWriter private[database] (
         rw.put(Keys.safeRollbackHeight, newSafeRollbackHeight)
       }
 
-      val transactions: Map[TransactionId, (TxMeta, Transaction, TxNum)] = transactionMeta.zipWithIndex.map {
-        case ((tm, tx), idx) => TransactionId(tx.id()) -> ((tm, tx, TxNum(idx.toShort)))
+      val transactions: Map[TransactionId, (TxMeta, Transaction, TxNum)] = transactionMeta.zipWithIndex.map { case ((tm, tx), idx) =>
+        TransactionId(tx.id()) -> ((tm, tx, TxNum(idx.toShort)))
       }.toMap
 
       rw.put(
@@ -446,15 +448,14 @@ abstract class LevelDBWriter private[database] (
       for ((asset, infoToUpdate) <- updatedAssets) {
         rw.fromHistory(Keys.assetDetailsHistory(asset), Keys.assetDetails(asset))
           .orElse(issuedAssets.get(asset).map { case NewAssetInfo(_, i, vi) => (i, vi) })
-          .foreach {
-            case (info, vol) =>
-              val updInfo = infoToUpdate.left
-                .fold(info)(identity)
+          .foreach { case (info, vol) =>
+            val updInfo = infoToUpdate.left
+              .fold(info)(identity)
 
-              val updVol = infoToUpdate.right
-                .fold(vol)(_ |+| vol)
+            val updVol = infoToUpdate.right
+              .fold(vol)(_ |+| vol)
 
-              rw.put(Keys.assetDetails(asset)(height), (updInfo, updVol))
+            rw.put(Keys.assetDetails(asset)(height), (updInfo, updVol))
           }
       }
 
@@ -494,7 +495,7 @@ abstract class LevelDBWriter private[database] (
         val nextSeqNr = rw.get(kk) + 1
         val txTypeNumSeq = txIds.asScala.map { txId =>
           val (_, tx, num) = transactions(txId)
-          (tx.typeId, num)
+          (tx.tpe.id.toByte, num)
         }.toSeq
         rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq.sortBy(-_._2))))
         rw.put(kk, nextSeqNr)
@@ -506,7 +507,7 @@ abstract class LevelDBWriter private[database] (
 
       for ((id, (txm, tx, num)) <- transactions) {
         rw.put(Keys.transactionAt(Height(height), num), Some((txm, tx)))
-        rw.put(Keys.transactionMetaById(id), Some(TransactionMeta(height, num, tx.typeId, !txm.succeeded)))
+        rw.put(Keys.transactionMetaById(id), Some(TransactionMeta(height, num, tx.tpe.id, !txm.succeeded)))
       }
 
       val activationWindowSize = settings.functionalitySettings.activationWindowSize(height)
@@ -535,7 +536,7 @@ abstract class LevelDBWriter private[database] (
         rw.put(Keys.wavesAmount(height), wavesAmount(height - 1) + lastReward)
       }
 
-      for ((asset, sp: SponsorshipValue) <- sponsorship) {
+      for (case (asset, sp: SponsorshipValue) <- sponsorship) {
         rw.put(Keys.sponsorship(asset)(height), sp)
         expiredKeys ++= updateHistory(rw, Keys.sponsorshipHistory(asset), threshold, Keys.sponsorship(asset))
       }
@@ -549,21 +550,24 @@ abstract class LevelDBWriter private[database] (
 
       rw.put(Keys.blockTransactionsFee(height), totalFee)
 
-      if (dbSettings.storeInvokeScriptResults) scriptResults.foreach {
-        case (txId, result) =>
-          val (txHeight, txNum) = transactions
-            .get(TransactionId(txId))
-            .map { case (_, _, txNum) => (height, txNum) }
-            .orElse(rw.get(Keys.transactionMetaById(TransactionId(txId))).map { tm =>
-              (tm.height, TxNum(tm.num.toShort))
-            })
-            .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction height and num: $txId"))
+      if (dbSettings.storeInvokeScriptResults) scriptResults.foreach { case (txId, result) =>
+        val (txHeight, txNum) = transactions
+          .get(TransactionId(txId))
+          .map { case (_, _, txNum) => (height, txNum) }
+          .orElse(rw.get(Keys.transactionMetaById(TransactionId(txId))).map { tm =>
+            (tm.height, TxNum(tm.num.toShort))
+          })
+          .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction height and num: $txId"))
 
-          try rw.put(Keys.invokeScriptResult(txHeight, txNum), Some(result))
-          catch {
-            case NonFatal(e) =>
-              throw new RuntimeException(s"Error storing invoke script result for $txId: $result", e)
-          }
+        try rw.put(Keys.invokeScriptResult(txHeight, txNum), Some(result))
+        catch {
+          case NonFatal(e) =>
+            throw new RuntimeException(s"Error storing invoke script result for $txId: $result", e)
+        }
+      }
+
+      for ((id, meta) <- ethereumTransactionMeta) {
+        rw.put(Keys.ethereumTransactionMeta(Height(height), transactions(TransactionId(id))._3), Some(meta))
       }
 
       expiredKeys.foreach(rw.delete(_, "expired-keys"))
@@ -600,85 +604,80 @@ abstract class LevelDBWriter private[database] (
 
     log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
-    val discardedBlocks: Seq[(Block, ByteStr)] = for (currentHeight <- height until targetHeight by -1) yield {
-      val balancesToInvalidate    = Seq.newBuilder[(Address, Asset)]
-      val ordersToInvalidate      = Seq.newBuilder[ByteStr]
-      val scriptsToDiscard        = Seq.newBuilder[Address]
-      val assetScriptsToDiscard   = Seq.newBuilder[IssuedAsset]
-      val accountDataToInvalidate = Seq.newBuilder[(Address, String)]
+    val discardedBlocks: Seq[(Block, ByteStr)] =
+      for (currentHeightInt <- height until targetHeight by -1; currentHeight = Height(currentHeightInt)) yield {
+        val balancesToInvalidate    = Seq.newBuilder[(Address, Asset)]
+        val ordersToInvalidate      = Seq.newBuilder[ByteStr]
+        val scriptsToDiscard        = Seq.newBuilder[Address]
+        val assetScriptsToDiscard   = Seq.newBuilder[IssuedAsset]
+        val accountDataToInvalidate = Seq.newBuilder[(Address, String)]
 
-      val h = Height(currentHeight)
+        val discardedBlock = readWrite { rw =>
+          rw.put(Keys.height, currentHeight - 1)
 
-      val discardedBlock = readWrite { rw =>
-        rw.put(Keys.height, currentHeight - 1)
+          val discardedMeta = rw
+            .get(Keys.blockMetaAt(currentHeight))
+            .getOrElse(throw new IllegalArgumentException(s"No block at height $currentHeight"))
 
-        val discardedMeta = rw
-          .get(Keys.blockMetaAt(h))
-          .getOrElse(throw new IllegalArgumentException(s"No block at height $currentHeight"))
+          log.trace(s"Removing block ${discardedMeta.id} at $currentHeight")
 
-        log.trace(s"Removing block ${discardedMeta.id} at $currentHeight")
-        rw.delete(Keys.blockMetaAt(h))
+          val changedAddresses = for {
+            addressId <- rw.get(Keys.changedAddresses(currentHeight))
+          } yield addressId -> rw.get(Keys.idToAddress(addressId))
 
-        val changedAddresses = for {
-          addressId <- rw.get(Keys.changedAddresses(currentHeight))
-        } yield addressId -> rw.get(Keys.idToAddress(addressId))
-
-        rw.iterateOver(KeyTags.ChangedAssetBalances.prefixBytes ++ Ints.toByteArray(h)) { e =>
-          val assetId = IssuedAsset(ByteStr(e.getKey.takeRight(32)))
-          for ((addressId, address) <- changedAddresses) {
-            val kabh    = Keys.assetBalanceHistory(addressId, assetId)
-            val history = rw.get(kabh)
-            if (history.nonEmpty && history.head == currentHeight) {
-              log.trace(s"Discarding ${assetId.id} balance for $address at $currentHeight")
-              balancesToInvalidate += address -> assetId
-              rw.delete(Keys.assetBalance(addressId, assetId)(history.head))
-              rw.put(kabh.keyBytes, writeIntSeq(history.tail))
+          rw.iterateOver(KeyTags.ChangedAssetBalances.prefixBytes ++ Ints.toByteArray(currentHeight)) { e =>
+            val assetId = IssuedAsset(ByteStr(e.getKey.takeRight(32)))
+            for ((addressId, address) <- changedAddresses) {
+              val kabh    = Keys.assetBalanceHistory(addressId, assetId)
+              val history = rw.get(kabh)
+              if (history.nonEmpty && history.head == currentHeight) {
+                log.trace(s"Discarding ${assetId.id} balance for $address at $currentHeight")
+                balancesToInvalidate += address -> assetId
+                rw.delete(Keys.assetBalance(addressId, assetId)(history.head))
+                rw.put(kabh.keyBytes, writeIntSeq(history.tail))
+              }
             }
           }
-        }
 
-        for ((addressId, address) <- changedAddresses) {
-          for (k <- rw.get(Keys.changedDataKeys(currentHeight, addressId))) {
-            log.trace(s"Discarding $k for $address at $currentHeight")
-            accountDataToInvalidate += (address -> k)
-            rw.delete(Keys.data(addressId, k)(currentHeight))
-            rw.filterHistory(Keys.dataHistory(address, k), currentHeight)
-          }
-          rw.delete(Keys.changedDataKeys(currentHeight, addressId))
+          for ((addressId, address) <- changedAddresses) {
+            for (k <- rw.get(Keys.changedDataKeys(currentHeight, addressId))) {
+              log.trace(s"Discarding $k for $address at $currentHeight")
+              accountDataToInvalidate += (address -> k)
+              rw.delete(Keys.data(addressId, k)(currentHeight))
+              rw.filterHistory(Keys.dataHistory(address, k), currentHeight)
+            }
+            rw.delete(Keys.changedDataKeys(currentHeight, addressId))
 
-          balancesToInvalidate += (address -> Waves)
-          rw.delete(Keys.wavesBalance(addressId)(currentHeight))
-          rw.filterHistory(Keys.wavesBalanceHistory(addressId), currentHeight)
+            balancesToInvalidate += (address -> Waves)
+            rw.delete(Keys.wavesBalance(addressId)(currentHeight))
+            rw.filterHistory(Keys.wavesBalanceHistory(addressId), currentHeight)
 
-          rw.delete(Keys.leaseBalance(addressId)(currentHeight))
-          rw.filterHistory(Keys.leaseBalanceHistory(addressId), currentHeight)
+            rw.delete(Keys.leaseBalance(addressId)(currentHeight))
+            rw.filterHistory(Keys.leaseBalanceHistory(addressId), currentHeight)
 
-          balanceAtHeightCache.invalidate((currentHeight, addressId))
-          leaseBalanceAtHeightCache.invalidate((currentHeight, addressId))
-          discardLeaseBalance(address)
+            balanceAtHeightCache.invalidate((currentHeight, addressId))
+            leaseBalanceAtHeightCache.invalidate((currentHeight, addressId))
+            discardLeaseBalance(address)
 
-          if (dbSettings.storeTransactionsByAddress) {
-            val kTxSeqNr = Keys.addressTransactionSeqNr(addressId)
-            val txSeqNr  = rw.get(kTxSeqNr)
-            val kTxHNSeq = Keys.addressTransactionHN(addressId, txSeqNr)
+            if (dbSettings.storeTransactionsByAddress) {
+              val kTxSeqNr = Keys.addressTransactionSeqNr(addressId)
+              val txSeqNr  = rw.get(kTxSeqNr)
+              val kTxHNSeq = Keys.addressTransactionHN(addressId, txSeqNr)
 
-            rw.get(kTxHNSeq)
-              .filter(_._1 == Height(currentHeight))
-              .foreach { _ =>
+              rw.get(kTxHNSeq).collect { case (`currentHeight`, _) =>
                 rw.delete(kTxHNSeq)
                 rw.put(kTxSeqNr, (txSeqNr - 1).max(0))
               }
+            }
           }
-        }
 
-        writableDB
-          .withResource(loadLeaseIds(_, currentHeight, currentHeight, includeCancelled = true))
-          .foreach(rollbackLeaseStatus(rw, _, currentHeight))
+          writableDB
+            .withResource(loadLeaseIds(_, currentHeight, currentHeight, includeCancelled = true))
+            .foreach(rollbackLeaseStatus(rw, _, currentHeight))
 
-        rollbackAssetsInfo(rw, currentHeight)
+          rollbackAssetsInfo(rw, currentHeight)
 
-        loadTransactions(h, rw).view.zipWithIndex.foreach {
-          case ((_, tx), idx) =>
+          loadTransactions(currentHeight, rw).view.zipWithIndex.foreach { case ((_, tx), idx) =>
             val num = TxNum(idx.toShort)
             forgetTransaction(tx.id())
             (tx: @unchecked) match {
@@ -707,48 +706,51 @@ abstract class LevelDBWriter private[database] (
                 rw.filterHistory(Keys.assetScriptHistory(asset), currentHeight)
 
               case _: DataTransaction => // see changed data keys removal
-
-              case _: InvokeScriptTransaction =>
-                val k = Keys.invokeScriptResult(h, num)
-                rw.delete(k)
+              case _: InvokeScriptTransaction | _: InvokeExpressionTransaction =>
+                rw.delete(Keys.invokeScriptResult(currentHeight, num))
 
               case tx: CreateAliasTransaction => rw.delete(Keys.addressIdOfAlias(tx.alias))
               case tx: ExchangeTransaction =>
                 ordersToInvalidate += rollbackOrderFill(rw, tx.buyOrder.id(), currentHeight)
                 ordersToInvalidate += rollbackOrderFill(rw, tx.sellOrder.id(), currentHeight)
+              case _: EthereumTransaction =>
+                rw.delete(Keys.ethereumTransactionMeta(currentHeight, num))
             }
 
-            if (tx.typeId != GenesisTransaction.typeId) {
-              rw.delete(Keys.transactionAt(h, num))
+            if (tx.tpe != TransactionType.Genesis) {
+              rw.delete(Keys.transactionAt(currentHeight, num))
               rw.delete(Keys.transactionMetaById(TransactionId(tx.id())))
             }
+          }
+
+          rw.delete(Keys.blockMetaAt(currentHeight))
+          rw.delete(Keys.score(currentHeight))
+          rw.delete(Keys.changedAddresses(currentHeight))
+          rw.delete(Keys.heightOf(discardedMeta.id))
+          rw.delete(Keys.carryFee(currentHeight))
+          rw.delete(Keys.blockTransactionsFee(currentHeight))
+          rw.delete(Keys.blockReward(currentHeight))
+          rw.delete(Keys.wavesAmount(currentHeight))
+          rw.delete(Keys.stateHash(currentHeight))
+          rw.delete(Keys.hitSource(currentHeight))
+
+          if (DisableHijackedAliases.height == currentHeight) {
+            disabledAliases = DisableHijackedAliases.revert(rw)
+          }
+
+          val hitSource = rw.get(Keys.hitSource(currentHeight)).get
+          val block     = createBlock(discardedMeta.header, discardedMeta.signature, loadTransactions(currentHeight, rw).map(_._2)).explicitGet()
+
+          (block, hitSource)
         }
 
-        rw.delete(Keys.blockMetaAt(h))
-        rw.delete(Keys.heightOf(discardedMeta.id))
-        rw.delete(Keys.carryFee(currentHeight))
-        rw.delete(Keys.blockTransactionsFee(currentHeight))
-        rw.delete(Keys.blockReward(currentHeight))
-        rw.delete(Keys.wavesAmount(currentHeight))
-        rw.delete(Keys.stateHash(currentHeight))
-
-        if (DisableHijackedAliases.height == currentHeight) {
-          disabledAliases = DisableHijackedAliases.revert(rw)
-        }
-
-        val hitSource = rw.get(Keys.hitSource(currentHeight)).get
-        val block     = createBlock(discardedMeta.header, discardedMeta.signature, loadTransactions(h, rw).map(_._2)).explicitGet()
-
-        (block, hitSource)
+        balancesToInvalidate.result().foreach(discardBalance)
+        ordersToInvalidate.result().foreach(discardVolumeAndFee)
+        scriptsToDiscard.result().foreach(discardScript)
+        assetScriptsToDiscard.result().foreach(discardAssetScript)
+        accountDataToInvalidate.result().foreach(discardAccountData)
+        discardedBlock
       }
-
-      balancesToInvalidate.result().foreach(discardBalance)
-      ordersToInvalidate.result().foreach(discardVolumeAndFee)
-      scriptsToDiscard.result().foreach(discardScript)
-      assetScriptsToDiscard.result().foreach(discardAssetScript)
-      accountDataToInvalidate.result().foreach(discardAccountData)
-      discardedBlock
-    }
 
     log.debug(s"Rollback to block $targetBlockId at $targetHeight completed")
     discardedBlocks.reverse
@@ -795,11 +797,21 @@ abstract class LevelDBWriter private[database] (
     rw.filterHistory(Keys.leaseDetailsHistory(leaseId), currentHeight)
   }
 
-  override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>
+  override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] = readOnly { db =>
     for {
       tm <- db.get(Keys.transactionMetaById(TransactionId @@ id))
-      if tm.`type` == TransferTransaction.typeId
-      tx <- db.get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort))).collect { case (tm, t: TransferTransaction) if tm.succeeded => t }
+      if tm.`type` == TransferTransaction.typeId || tm.`type` == TransactionType.Ethereum.id
+      tx <- db
+        .get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort)))
+        .collect {
+          case (tm, t: TransferTransaction) if tm.succeeded => t
+          case (m, e @ EthereumTransaction(_: Transfer, _, _, _)) if m.succeeded =>
+            val meta     = db.get(Keys.ethereumTransactionMeta(m.height, TxNum(tm.num.toShort))).get
+            val transfer = meta.payload.transfer.get
+            val tAmount  = transfer.amount.get
+            val asset    = PBAmounts.toVanillaAssetId(tAmount.assetId)
+            e.toTransferLike(TxPositiveAmount.unsafeFrom(tAmount.amount), Address(transfer.publicKeyHash.toByteArray), asset)
+        }
     } yield (height, tx)
   }
 
@@ -831,17 +843,16 @@ abstract class LevelDBWriter private[database] (
       detailsOrFlag <- db.get(Keys.leaseDetails(leaseId)(h))
       details <- detailsOrFlag.fold(
         isActive =>
-          transactionInfo(leaseId, db).collect {
-            case (txm, lt: LeaseTransaction) =>
-              LeaseDetails(
-                lt.sender,
-                lt.recipient,
-                lt.amount,
-                if (isActive) LeaseDetails.Status.Active
-                else LeaseDetails.Status.Cancelled(h, None),
-                leaseId,
-                txm.height
-              )
+          transactionInfo(leaseId, db).collect { case (txm, lt: LeaseTransaction) =>
+            LeaseDetails(
+              lt.sender,
+              lt.recipient,
+              lt.amount.value,
+              if (isActive) LeaseDetails.Status.Active
+              else LeaseDetails.Status.Cancelled(h, None),
+              leaseId,
+              txm.height
+            )
           },
         Some(_)
       )
@@ -944,5 +955,15 @@ abstract class LevelDBWriter private[database] (
 
   def loadStateHash(height: Int): Option[StateHash] = readOnly { db =>
     db.get(Keys.stateHash(height))
+  }
+
+  override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] = writableDB.withResource { r =>
+    import scala.jdk.CollectionConverters.*
+    r.iterator.seek(Bytes.concat(KeyTags.AssetStaticInfo.prefixBytes, address.arr))
+    r.iterator.asScala
+      .to(LazyList)
+      .headOption
+      .map(e => IssuedAsset(ByteStr(e.getKey.drop(2))))
+      .filter(asset => asset.id.size == 32 && ERC20Address(asset) == address)
   }
 }

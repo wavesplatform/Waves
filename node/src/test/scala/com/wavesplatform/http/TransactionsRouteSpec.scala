@@ -1,47 +1,49 @@
 package com.wavesplatform.http
 
-import scala.concurrent.Future
-import scala.util.Random
-
-import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.*
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.{BlockGen, TestTime, TestValues, TestWallet}
-import com.wavesplatform.account.{AddressScheme, KeyPair}
-import com.wavesplatform.api.common.CommonTransactionsApi
-import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
-import com.wavesplatform.api.http.ApiError._
-import com.wavesplatform.api.http.ApiMarshallers._
+import com.wavesplatform.account.KeyPair
+import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
+import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, _}
+import com.wavesplatform.common.utils.{Base58, *}
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.features.{BlockchainFeatures => BF}
-import com.wavesplatform.history.{settingsWithFeatures, Domain}
+import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.features.BlockchainFeatures as BF
+import com.wavesplatform.history.{Domain, settingsWithFeatures}
 import com.wavesplatform.lang.directives.values.StdLibVersion.V5
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.LeaseCancel
 import com.wavesplatform.network.TransactionPublisher
-import com.wavesplatform.state.{Blockchain, Height, InvokeScriptResult, TxMeta}
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.test._
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, GenesisTransaction, Proofs, TxHelpers, TxVersion}
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.state.{Blockchain, Height, InvokeScriptResult, TxMeta}
+import com.wavesplatform.test.*
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, TxHelpers, TxVersion}
+import com.wavesplatform.utils.{EthEncoding, EthHelpers}
+import com.wavesplatform.{BlockGen, BlockchainStubHelpers, TestValues, TestWallet}
 import monix.reactive.Observable
+import org.scalacheck.Gen.*
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.OptionValues
-import play.api.libs.json._
+import play.api.libs.json.*
 import play.api.libs.json.Json.JsValueWrapper
+
+import scala.concurrent.Future
+import scala.util.Random
 
 class TransactionsRouteSpec
     extends RouteSpec("/transactions")
@@ -50,7 +52,9 @@ class TransactionsRouteSpec
     with BlockGen
     with OptionValues
     with TestWallet
-    with WithDomain {
+    with WithDomain
+    with EthHelpers
+    with BlockchainStubHelpers {
 
   private val blockchain          = mock[Blockchain]
   private val utxPoolSynchronizer = mock[TransactionPublisher]
@@ -125,68 +129,72 @@ class TransactionsRouteSpec
       ).route
     )
 
-  "returns lease details for lease cancel transaction" in withDomain(settingsWithFeatures(BF.SmartAccounts)) { d =>
-    val sender      = testWallet.generateNewAccount().get
-    val recipient   = testWallet.generateNewAccount().get
-    val lease       = LeaseTransaction.selfSigned(2.toByte, sender, recipient.toAddress, 5.waves, 0.001.waves, ntpTime.getTimestamp()).explicitGet()
-    val leaseCancel = LeaseCancelTransaction.selfSigned(2.toByte, sender, lease.id(), 0.001.waves, ntpTime.getTimestamp()).explicitGet()
-    val sealedRoute = mkRoute(d)
+  "returns lease details for lease cancel transaction" in {
+    val sender    = testWallet.generateNewAccount().get
+    val recipient = testWallet.generateNewAccount().get
 
-    d.appendBlock(
-      GenesisTransaction.create(sender.toAddress, 10.waves, ntpTime.getTimestamp()).explicitGet(),
-      GenesisTransaction.create(recipient.toAddress, 10.waves, ntpTime.getTimestamp()).explicitGet(),
-      lease
+    val balances = Seq(
+      AddrWithBalance(sender.toAddress, 10.waves),
+      AddrWithBalance(recipient.toAddress, 10.waves)
     )
 
-    def expectedJson(status: String, cancelHeight: Option[Int] = None, cancelTransactionId: Option[ByteStr] = None): JsObject =
-      Json.parse(s"""{
-         |  "type" : 9,
-         |  "id" : "${leaseCancel.id()}",
-         |  "sender" : "${sender.toAddress}",
-         |  "senderPublicKey" : "${sender.publicKey}",
-         |  "fee" : ${0.001.waves},
-         |  "feeAssetId" : null,
-         |  "timestamp" : ${leaseCancel.timestamp},
-         |  "proofs" : [ "${leaseCancel.signature}" ],
-         |  "version" : 2,
-         |  "leaseId" : "${lease.id()}",
-         |  "chainId" : 84,
-         |  "spentComplexity" : 0,
-         |  "lease" : {
-         |    "id" : "${lease.id()}",
-         |    "originTransactionId" : "${lease.id()}",
-         |    "sender" : "${sender.toAddress}",
-         |    "recipient" : "${recipient.toAddress}",
-         |    "amount" : ${5.waves},
-         |    "height" : 1,
-         |    "status" : "$status",
-         |    "cancelHeight" : ${cancelHeight.getOrElse("null")},
-         |    "cancelTransactionId" : ${cancelTransactionId.fold("null")("\"" + _ + "\"")}
-         |  }
-         |}""".stripMargin).as[JsObject]
+    withDomain(settingsWithFeatures(BF.SmartAccounts), balances) { d =>
+      val lease       = LeaseTransaction.selfSigned(2.toByte, sender, recipient.toAddress, 5.waves, 0.001.waves, ntpTime.getTimestamp()).explicitGet()
+      val leaseCancel = LeaseCancelTransaction.selfSigned(2.toByte, sender, lease.id(), 0.001.waves, ntpTime.getTimestamp()).explicitGet()
+      val sealedRoute = mkRoute(d)
 
-    d.utxPool.putIfNew(leaseCancel)
+      d.appendBlock(lease)
 
-    withClue(routePath("/unconfirmed")) {
-      Get(routePath(s"/unconfirmed")) ~> sealedRoute ~> check {
-        responseAs[Seq[JsObject]].head should matchJson(expectedJson("active") - "spentComplexity")
+      def expectedJson(status: String, cancelHeight: Option[Int] = None, cancelTransactionId: Option[ByteStr] = None): JsObject =
+        Json.parse(s"""{
+                      |  "type" : 9,
+                      |  "id" : "${leaseCancel.id()}",
+                      |  "sender" : "${sender.toAddress}",
+                      |  "senderPublicKey" : "${sender.publicKey}",
+                      |  "fee" : ${0.001.waves},
+                      |  "feeAssetId" : null,
+                      |  "timestamp" : ${leaseCancel.timestamp},
+                      |  "proofs" : [ "${leaseCancel.signature}" ],
+                      |  "version" : 2,
+                      |  "leaseId" : "${lease.id()}",
+                      |  "chainId" : 84,
+                      |  "spentComplexity" : 0,
+                      |  "lease" : {
+                      |    "id" : "${lease.id()}",
+                      |    "originTransactionId" : "${lease.id()}",
+                      |    "sender" : "${sender.toAddress}",
+                      |    "recipient" : "${recipient.toAddress}",
+                      |    "amount" : ${5.waves},
+                      |    "height" : 2,
+                      |    "status" : "$status",
+                      |    "cancelHeight" : ${cancelHeight.getOrElse("null")},
+                      |    "cancelTransactionId" : ${cancelTransactionId.fold("null")("\"" + _ + "\"")}
+                      |  }
+                      |}""".stripMargin).as[JsObject]
+
+      d.utxPool.putIfNew(leaseCancel)
+
+      withClue(routePath("/unconfirmed")) {
+        Get(routePath(s"/unconfirmed")) ~> sealedRoute ~> check {
+          responseAs[Seq[JsObject]].head should matchJson(expectedJson("active") - "spentComplexity")
+        }
       }
-    }
 
-    d.appendBlock(leaseCancel)
+      d.appendBlock(leaseCancel)
 
-    val cancelTransactionJson = expectedJson("canceled", Some(2), Some(leaseCancel.id())) ++ Json.obj("height" -> 2)
+      val cancelTransactionJson = expectedJson("canceled", Some(3), Some(leaseCancel.id())) ++ Json.obj("height" -> 3)
 
-    withClue(routePath("/address/{address}/limit/{limit}")) {
-      Get(routePath(s"/address/${recipient.toAddress}/limit/10")) ~> sealedRoute ~> check {
-        val json = (responseAs[JsArray] \ 0 \ 0).as[JsObject]
-        json should matchJson(cancelTransactionJson)
+      withClue(routePath("/address/{address}/limit/{limit}")) {
+        Get(routePath(s"/address/${recipient.toAddress}/limit/10")) ~> sealedRoute ~> check {
+          val json = (responseAs[JsArray] \ 0 \ 0).as[JsObject]
+          json should matchJson(cancelTransactionJson)
+        }
       }
-    }
 
-    withClue(routePath("/info/{id}")) {
-      Get(routePath(s"/info/${leaseCancel.id()}")) ~> sealedRoute ~> check {
-        responseAs[JsObject] should matchJson(cancelTransactionJson)
+      withClue(routePath("/info/{id}")) {
+        Get(routePath(s"/info/${leaseCancel.id()}")) ~> sealedRoute ~> check {
+          responseAs[JsObject] should matchJson(cancelTransactionJson)
+        }
       }
     }
   }
@@ -247,7 +255,7 @@ class TransactionsRouteSpec
     }
 
     "provides stateChanges" in forAll(accountGen) { account =>
-      val transaction = TxHelpers.invoke(account.toAddress, "test")
+      val transaction = TxHelpers.invoke(account.toAddress)
 
       (() => blockchain.activatedFeatures).expects().returns(Map.empty).anyNumberOfTimes()
       (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
@@ -269,7 +277,7 @@ class TransactionsRouteSpec
       val leaseCancelId    = ByteStr(bytes32gen.sample.get)
       val recipientAddress = accountGen.sample.get.toAddress
       val recipientAlias   = aliasGen.sample.get
-      val invoke           = TxHelpers.invoke(invokeAddress, "test")
+      val invoke           = TxHelpers.invoke(invokeAddress)
       val scriptResult = InvokeScriptResult(
         leases = Seq(InvokeScriptResult.Lease(recipientAddress, 100, 1, leaseId1), InvokeScriptResult.Lease(recipientAlias, 200, 3, leaseId2)),
         leaseCancels = Seq(LeaseCancel(leaseCancelId))
@@ -313,56 +321,227 @@ class TransactionsRouteSpec
         status shouldEqual StatusCodes.OK
         val json = (responseAs[JsArray] \ 0 \ 0 \ "stateChanges").as[JsObject]
         json should matchJson(s"""{
-                                    |  "data": [],
-                                    |  "transfers": [],
-                                    |  "issues": [],
-                                    |  "reissues": [],
-                                    |  "burns": [],
-                                    |  "sponsorFees": [],
-                                    |  "leases": [
-                                    |    {
-                                    |      "id": "$leaseId1",
-                                    |      "originTransactionId": "$leaseId1",
-                                    |      "sender": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                    |      "recipient": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                    |      "amount": 123,
-                                    |      "height": 1,
-                                    |      "status":"active",
-                                    |      "cancelHeight" : null,
-                                    |      "cancelTransactionId" : null
-                                    |    },
-                                    |    {
-                                    |      "id": "$leaseId2",
-                                    |      "originTransactionId": "$leaseId2",
-                                    |      "sender": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                    |      "recipient": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                    |      "amount": 123,
-                                    |      "height": 1,
-                                    |      "status":"active",
-                                    |      "cancelHeight" : null,
-                                    |      "cancelTransactionId" : null
-                                    |    }
-                                    |  ],
-                                    |  "leaseCancels": [
-                                    |    {
-                                    |      "id": "$leaseCancelId",
-                                    |      "originTransactionId": "$leaseCancelId",
-                                    |      "sender": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                    |      "recipient": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                    |      "amount": 123,
-                                    |      "height": 1,
-                                    |      "status":"canceled",
-                                    |      "cancelHeight" : 2,
-                                    |      "cancelTransactionId" : "$leaseCancelId"
-                                    |    }
-                                    |  ],
-                                    |  "invokes": []
-                                    |}""".stripMargin)
+                                 |  "data": [],
+                                 |  "transfers": [],
+                                 |  "issues": [],
+                                 |  "reissues": [],
+                                 |  "burns": [],
+                                 |  "sponsorFees": [],
+                                 |  "leases": [
+                                 |    {
+                                 |      "id": "$leaseId1",
+                                 |      "originTransactionId": "$leaseId1",
+                                 |      "sender": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |      "recipient": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |      "amount": 123,
+                                 |      "height": 1,
+                                 |      "status":"active",
+                                 |      "cancelHeight" : null,
+                                 |      "cancelTransactionId" : null
+                                 |    },
+                                 |    {
+                                 |      "id": "$leaseId2",
+                                 |      "originTransactionId": "$leaseId2",
+                                 |      "sender": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |      "recipient": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |      "amount": 123,
+                                 |      "height": 1,
+                                 |      "status":"active",
+                                 |      "cancelHeight" : null,
+                                 |      "cancelTransactionId" : null
+                                 |    }
+                                 |  ],
+                                 |  "leaseCancels": [
+                                 |    {
+                                 |      "id": "$leaseCancelId",
+                                 |      "originTransactionId": "$leaseCancelId",
+                                 |      "sender": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |      "recipient": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |      "amount": 123,
+                                 |      "height": 1,
+                                 |      "status":"canceled",
+                                 |      "cancelHeight" : 2,
+                                 |      "cancelTransactionId" : "$leaseCancelId"
+                                 |    }
+                                 |  ],
+                                 |  "invokes": []
+                                 |}""".stripMargin)
       }
     }
   }
 
   routePath("/info/{id}") - {
+    "returns meta for eth transfer" in {
+      val blockchain = createBlockchainStub { blockchain =>
+        blockchain.stub.creditBalance(TxHelpers.defaultEthAddress, Waves)
+        blockchain.stub.activateAllFeatures()
+      }
+
+      val differ          = blockchain.stub.transactionDiffer().andThen(_.resultE.explicitGet())
+      val transaction     = EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, 10, Waves)
+      val diff            = differ(transaction)
+      val transactionsApi = stub[CommonTransactionsApi]
+      (transactionsApi.transactionById _)
+        .when(transaction.id())
+        .returning(
+          Some(
+            TransactionMeta.Ethereum(
+              Height(1),
+              transaction,
+              succeeded = true,
+              15L,
+              diff.ethereumTransactionMeta.values.headOption,
+              diff.scriptResults.values.headOption
+            )
+          )
+        )
+
+      val route = seal(transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route)
+      Get(routePath(s"/info/${transaction.id()}")) ~> route ~> check {
+        responseAs[JsObject] should matchJson(s"""{
+                                                 |  "type" : 18,
+                                                 |  "id" : "${transaction.id()}",
+                                                 |  "fee" : 100000,
+                                                 |  "feeAssetId" : null,
+                                                 |  "timestamp" : ${transaction.timestamp},
+                                                 |  "version" : 1,
+                                                 |  "chainId" : 84,
+                                                 |  "bytes" : "${EthEncoding.toHexString(transaction.bytes())}",
+                                                 |  "sender" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
+                                                 |  "senderPublicKey" : "5vwTDMooR7Hp57MekN7qHz7fHNVrkn2Nx4CiWdq4cyBR4LNnZWYAr7UfBbzhmSvtNkv6e45aJ4Q4aKCSinyHVw33",
+                                                 |  "height" : 1,
+                                                 |  "spentComplexity": 15,
+                                                 |  "applicationStatus" : "succeeded",
+                                                 |  "payload" : {
+                                                 |    "type" : "transfer",
+                                                 |    "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
+                                                 |    "asset" : null,
+                                                 |    "amount" : 10
+                                                 |  }
+                                                 |}""".stripMargin)
+      }
+    }
+
+    "returns meta and state changes for eth invoke" in {
+      val blockchain = createBlockchainStub { blockchain =>
+        blockchain.stub.creditBalance(TxHelpers.defaultEthAddress, Waves)
+        blockchain.stub.setScript(TxHelpers.secondAddress, TxHelpers.scriptV5("""@Callable(i)
+            |func test() = []
+            |""".stripMargin))
+        blockchain.stub.activateAllFeatures()
+      }
+
+      val differ          = blockchain.stub.transactionDiffer().andThen(_.resultE.explicitGet())
+      val transaction     = EthTxGenerator.generateEthInvoke(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, "test", Nil, Nil)
+      val diff            = differ(transaction)
+      val transactionsApi = stub[CommonTransactionsApi]
+      (transactionsApi.transactionById _)
+        .when(transaction.id())
+        .returning(
+          Some(
+            TransactionMeta.Ethereum(
+              Height(1),
+              transaction,
+              succeeded = true,
+              15L,
+              diff.ethereumTransactionMeta.values.headOption,
+              diff.scriptResults.values.headOption
+            )
+          )
+        )
+
+      val route = seal(transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route)
+      Get(routePath(s"/info/${transaction.id()}")) ~> route ~> check {
+        responseAs[JsObject] should matchJson(s"""{
+                                                 |  "type" : 18,
+                                                 |  "id" : "${transaction.id()}",
+                                                 |  "fee" : 500000,
+                                                 |  "feeAssetId" : null,
+                                                 |  "timestamp" : ${transaction.timestamp},
+                                                 |  "version" : 1,
+                                                 |  "chainId" : 84,
+                                                 |  "bytes" : "${EthEncoding.toHexString(transaction.bytes())}",
+                                                 |  "sender" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
+                                                 |  "senderPublicKey" : "5vwTDMooR7Hp57MekN7qHz7fHNVrkn2Nx4CiWdq4cyBR4LNnZWYAr7UfBbzhmSvtNkv6e45aJ4Q4aKCSinyHVw33",
+                                                 |  "height" : 1,
+                                                 |  "spentComplexity": 15,
+                                                 |  "applicationStatus" : "succeeded",
+                                                 |  "payload" : {
+                                                 |    "type" : "invocation",
+                                                 |    "dApp" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
+                                                 |    "call" : {
+                                                 |      "function" : "test",
+                                                 |      "args" : [ ]
+                                                 |    },
+                                                 |    "payment" : [ ],
+                                                 |    "stateChanges" : {
+                                                 |      "data" : [ ],
+                                                 |      "transfers" : [ ],
+                                                 |      "issues" : [ ],
+                                                 |      "reissues" : [ ],
+                                                 |      "burns" : [ ],
+                                                 |      "sponsorFees" : [ ],
+                                                 |      "leases" : [ ],
+                                                 |      "leaseCancels" : [ ],
+                                                 |      "invokes" : [ ]
+                                                 |    }
+                                                 |  }
+                                                 |}""".stripMargin)
+      }
+    }
+
+    "returns lease tx for lease cancel tx" in {
+      val lease       = TxHelpers.lease()
+      val leaseCancel = TxHelpers.leaseCancel(lease.id())
+
+      val blockchain = createBlockchainStub { blockchain =>
+        (blockchain.transactionInfo _).when(lease.id()).returns(Some(TxMeta(Height(1), true, 0L)        -> lease))
+        (blockchain.transactionInfo _).when(leaseCancel.id()).returns(Some((TxMeta(Height(1), true, 0L) -> leaseCancel)))
+      }
+
+      val transactionsApi = stub[CommonTransactionsApi]
+      (transactionsApi.transactionById _).when(lease.id()).returns(Some(TransactionMeta.Default(Height(1), lease, succeeded = true, 0L)))
+      (transactionsApi.transactionById _).when(leaseCancel.id()).returns(Some(TransactionMeta.Default(Height(1), leaseCancel, succeeded = true, 0L)))
+      (blockchain.transactionMeta _).when(lease.id()).returns(Some(TxMeta(Height(1), true, 0L)))
+      (blockchain.leaseDetails _)
+        .when(lease.id())
+        .returns(
+          Some(LeaseDetails(lease.sender, lease.recipient, lease.amount.value, LeaseDetails.Status.Cancelled(2, Some(leaseCancel.id())), lease.id(), 1))
+        )
+
+      val route = transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route
+      Get(routePath(s"/info/${leaseCancel.id()}")) ~> route ~> check {
+        val json = responseAs[JsObject]
+        json shouldBe Json.parse(s"""{
+                                    |  "type" : 9,
+                                    |  "id" : "${leaseCancel.id()}",
+                                    |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                    |  "senderPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+                                    |  "fee" : 1000000,
+                                    |  "feeAssetId" : null,
+                                    |  "timestamp" : ${leaseCancel.timestamp},
+                                    |  "proofs" : [ "${leaseCancel.signature}" ],
+                                    |  "version" : 2,
+                                    |  "leaseId" : "${lease.id()}",
+                                    |  "chainId" : 84,
+                                    |  "height" : 1,
+                                    |  "applicationStatus" : "succeeded",
+                                    |  "spentComplexity": 0,
+                                   |  "lease" : {
+                                    |    "id" : "${lease.id()}",
+                                    |    "originTransactionId" : "${lease.id()}",
+                                    |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                    |    "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
+                                    |    "amount" : 1000000000,
+                                    |    "height" : 1,
+                                    |    "status" : "canceled",
+                                    |    "cancelHeight" : 2,
+                                    |    "cancelTransactionId" : "${leaseCancel.id()}"
+                                    |  }
+                                    |}""".stripMargin)
+      }
+    }
+
     "handles invalid signature" in {
       forAll(invalidBase58Gen) { invalidBase58 =>
         Get(routePath(s"/info/$invalidBase58")) ~> route should produce(InvalidTransactionId("Wrong char"), matchMsg = true)
@@ -406,7 +585,7 @@ class TransactionsRouteSpec
     }
 
     "provides stateChanges" in forAll(accountGen) { account =>
-      val transaction = TxHelpers.invoke(account.toAddress, "test")
+      val transaction = TxHelpers.invoke(account.toAddress)
 
       (() => blockchain.activatedFeatures).expects().returns(Map.empty).anyNumberOfTimes()
       (addressTransactions.transactionById _)
@@ -433,7 +612,7 @@ class TransactionsRouteSpec
       val nestedLeaseId       = ByteStr(bytes32gen.sample.get)
       val nestedLeaseCancelId = ByteStr(bytes32gen.sample.get)
 
-      val invoke = TxHelpers.invoke(invokeAddress, "test")
+      val invoke = TxHelpers.invoke(invokeAddress)
       val scriptResult = InvokeScriptResult(
         leases = Seq(InvokeScriptResult.Lease(recipientAddress, 100, 1, leaseId1), InvokeScriptResult.Lease(recipientAlias, 200, 3, leaseId2)),
         leaseCancels = Seq(LeaseCancel(leaseCancelId)),
@@ -509,91 +688,91 @@ class TransactionsRouteSpec
         status shouldEqual StatusCodes.OK
         val json = (responseAs[JsObject] \ "stateChanges").as[JsObject]
         json should matchJson(s"""{
-                                   |  "data" : [ ],
-                                   |  "transfers" : [ ],
-                                   |  "issues" : [ ],
-                                   |  "reissues" : [ ],
-                                   |  "burns" : [ ],
-                                   |  "sponsorFees" : [ ],
-                                   |  "leases" : [ {
-                                   |    "id" : "$leaseId1",
-                                   |    "originTransactionId" : "$leaseId1",
-                                   |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |    "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |    "amount" : 123,
-                                   |    "height" : 1,
-                                   |    "status":"active",
-                                   |    "cancelHeight" : null,
-                                   |    "cancelTransactionId" : null
-                                   |  }, {
-                                   |    "id" : "$leaseId2",
-                                   |    "originTransactionId" : "$leaseId2",
-                                   |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |    "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |    "amount" : 123,
-                                   |    "height" : 1,
-                                   |    "status":"active",
-                                   |    "cancelHeight" : null,
-                                   |    "cancelTransactionId" : null
-                                   |  } ],
-                                   |  "leaseCancels" : [ {
-                                   |    "id" : "$leaseCancelId",
-                                   |    "originTransactionId" : "$leaseCancelId",
-                                   |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |    "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |    "amount" : 123,
-                                   |    "height" : 1,
-                                   |    "status" : "canceled",
-                                   |    "cancelHeight" : 2,
-                                   |    "cancelTransactionId" : "$leaseCancelId"
-                                   |  } ],
-                                   |  "invokes" : [ {
-                                   |    "dApp" : "$nestedInvokeAddress",
-                                   |    "call" : {
-                                   |      "function" : "nested",
-                                   |      "args" : [ ]
-                                   |    },
-                                   |    "payment" : [ ],
-                                   |    "stateChanges" : {
-                                   |      "data" : [ ],
-                                   |      "transfers" : [ ],
-                                   |      "issues" : [ ],
-                                   |      "reissues" : [ ],
-                                   |      "burns" : [ ],
-                                   |      "sponsorFees" : [ ],
-                                   |      "leases" : [ {
-                                   |        "id" : "$nestedLeaseId",
-                                   |        "originTransactionId" : "$nestedLeaseId",
-                                   |        "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |        "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |        "amount" : 123,
-                                   |        "height" : 1,
-                                   |        "status":"active",
-                                   |        "cancelHeight" : null,
-                                   |        "cancelTransactionId" : null
-                                   |      } ],
-                                   |      "leaseCancels" : [ {
-                                   |        "id" : "$nestedLeaseCancelId",
-                                   |        "originTransactionId" : "$nestedLeaseCancelId",
-                                   |        "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |        "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                   |        "amount" : 123,
-                                   |        "height" : 1,
-                                   |        "status" : "canceled",
-                                   |        "cancelHeight" : 2,
-                                   |        "cancelTransactionId" : "$nestedLeaseCancelId"
-                                   |      } ],
-                                   |      "invokes" : [ ]
-                                   |    }
-                                   |  } ]
-                                   |}
-                                   |""".stripMargin)
+                                 |  "data" : [ ],
+                                 |  "transfers" : [ ],
+                                 |  "issues" : [ ],
+                                 |  "reissues" : [ ],
+                                 |  "burns" : [ ],
+                                 |  "sponsorFees" : [ ],
+                                 |  "leases" : [ {
+                                 |    "id" : "$leaseId1",
+                                 |    "originTransactionId" : "$leaseId1",
+                                 |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |    "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |    "amount" : 123,
+                                 |    "height" : 1,
+                                 |    "status":"active",
+                                 |    "cancelHeight" : null,
+                                 |    "cancelTransactionId" : null
+                                 |  }, {
+                                 |    "id" : "$leaseId2",
+                                 |    "originTransactionId" : "$leaseId2",
+                                 |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |    "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |    "amount" : 123,
+                                 |    "height" : 1,
+                                 |    "status":"active",
+                                 |    "cancelHeight" : null,
+                                 |    "cancelTransactionId" : null
+                                 |  } ],
+                                 |  "leaseCancels" : [ {
+                                 |    "id" : "$leaseCancelId",
+                                 |    "originTransactionId" : "$leaseCancelId",
+                                 |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |    "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |    "amount" : 123,
+                                 |    "height" : 1,
+                                 |    "status" : "canceled",
+                                 |    "cancelHeight" : 2,
+                                 |    "cancelTransactionId" : "$leaseCancelId"
+                                 |  } ],
+                                 |  "invokes" : [ {
+                                 |    "dApp" : "$nestedInvokeAddress",
+                                 |    "call" : {
+                                 |      "function" : "nested",
+                                 |      "args" : [ ]
+                                 |    },
+                                 |    "payment" : [ ],
+                                 |    "stateChanges" : {
+                                 |      "data" : [ ],
+                                 |      "transfers" : [ ],
+                                 |      "issues" : [ ],
+                                 |      "reissues" : [ ],
+                                 |      "burns" : [ ],
+                                 |      "sponsorFees" : [ ],
+                                 |      "leases" : [ {
+                                 |        "id" : "$nestedLeaseId",
+                                 |        "originTransactionId" : "$nestedLeaseId",
+                                 |        "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |        "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |        "amount" : 123,
+                                 |        "height" : 1,
+                                 |        "status":"active",
+                                 |        "cancelHeight" : null,
+                                 |        "cancelTransactionId" : null
+                                 |      } ],
+                                 |      "leaseCancels" : [ {
+                                 |        "id" : "$nestedLeaseCancelId",
+                                 |        "originTransactionId" : "$nestedLeaseCancelId",
+                                 |        "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |        "recipient" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                 |        "amount" : 123,
+                                 |        "height" : 1,
+                                 |        "status" : "canceled",
+                                 |        "cancelHeight" : 2,
+                                 |        "cancelTransactionId" : "$nestedLeaseCancelId"
+                                 |      } ],
+                                 |      "invokes" : [ ]
+                                 |    }
+                                 |  } ]
+                                 |}
+                                 |""".stripMargin)
       }
     }
 
     "handles multiple ids" in {
       val txCount = 5
-      val txs     = (1 to txCount).map(_ => TxHelpers.invoke(TxHelpers.defaultSigner.toAddress, "test"))
+      val txs     = (1 to txCount).map(_ => TxHelpers.invoke(TxHelpers.defaultSigner.toAddress))
       txs.foreach(
         tx =>
           (addressTransactions.transactionById _)
@@ -612,10 +791,10 @@ class TransactionsRouteSpec
       }
 
       Get(routePath(s"/info?${txs.map("id=" + _.id()).mkString("&")}")) ~> route ~> check(checkResponse())
-      Post(routePath("/info"), FormData(txs.map("id" -> _.id().toString): _*)) ~> route ~> check(checkResponse())
+      Post(routePath("/info"), FormData(txs.map("id" -> _.id().toString)*)) ~> route ~> check(checkResponse())
       Post(
         routePath("/info"),
-        HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Json.arr(txs.map(_.id().toString: JsValueWrapper): _*)).toString())
+        HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Json.arr(txs.map(_.id().toString: JsValueWrapper)*)).toString())
       ) ~> route ~> check(
         checkResponse()
       )
@@ -744,7 +923,7 @@ class TransactionsRouteSpec
       val funcName          = "func"
       val funcWithoutArgs   = Json.obj("function" -> funcName)
       val funcWithEmptyArgs = Json.obj("function" -> funcName, "args" -> JsArray.empty)
-      val funcWithArgs = InvokeScriptTransaction.serializer.functionCallToJson(
+      val funcWithArgs = InvokeScriptTxSerializer.functionCallToJson(
         FUNCTION_CALL(
           FunctionHeader.User(funcName),
           List(CONST_LONG(1), CONST_BOOLEAN(true))
@@ -782,18 +961,16 @@ class TransactionsRouteSpec
       val seed = new Array[Byte](32)
       Random.nextBytes(seed)
       val sender: KeyPair = KeyPair(seed)
-      val ist = InvokeScriptTransaction(
-        TxVersion.V1,
-        sender.publicKey,
-        sender.toAddress,
-        None,
-        Seq.empty,
-        500000L,
-        Asset.Waves,
-        testTime.getTimestamp(),
-        Proofs.empty,
-        AddressScheme.current.chainId
-      ).signWith(sender.privateKey)
+      val ist = Signed.invokeScript(
+          TxVersion.V1,
+          sender,
+          sender.toAddress,
+          None,
+          Seq.empty,
+          500000L,
+          Asset.Waves,
+          testTime.getTimestamp()
+        )
       f(sender, ist)
     }
 
@@ -827,55 +1004,58 @@ class TransactionsRouteSpec
       }
     }
 
-    "generates valid trace with vars" in withDomain(settingsWithFeatures(BF.SmartAccounts, BF.BlockV5, BF.SynchronousCalls, BF.Ride4DApps)) { d =>
+    "generates valid trace with vars" in {
       val sender     = testWallet.generateNewAccount().get
       val aliasOwner = testWallet.generateNewAccount().get
       val recipient  = testWallet.generateNewAccount().get
 
-      val lease = LeaseTransaction.selfSigned(2.toByte, sender, recipient.toAddress, 50.waves, 0.001.waves, ntpTime.getTimestamp()).explicitGet()
-
-      d.appendBlock(
-        GenesisTransaction.create(sender.toAddress, 1000.waves, ntpTime.getTimestamp()).explicitGet(),
-        GenesisTransaction.create(aliasOwner.toAddress, 1000.waves, ntpTime.getTimestamp()).explicitGet(),
-        CreateAliasTransaction.selfSigned(2.toByte, aliasOwner, "test_alias", 0.001.waves, ntpTime.getTimestamp()).explicitGet(),
-        SetScriptTransaction
-          .selfSigned(
-            2.toByte,
-            sender,
-            Some(TestCompiler(V5).compileContract(s"""{-# STDLIB_VERSION 5 #-}
-             |{-# CONTENT_TYPE DAPP #-}
-             |{-# SCRIPT_TYPE ACCOUNT #-}
-             |
-             |@Callable(i)
-             |func default() = {
-             |  let leaseToAddress = Lease(Address(base58'${recipient.toAddress}'), ${10.waves})
-             |  let leaseToAlias = Lease(Alias("test_alias"), ${20.waves})
-             |  strict leaseId = leaseToAddress.calculateLeaseId()
-             |
-             |  [
-             |    leaseToAddress,
-             |    leaseToAlias,
-             |    LeaseCancel(base58'${lease.id()}')
-             |  ]
-             |}
-             |""".stripMargin)),
-            0.01.waves,
-            ntpTime.getTimestamp()
-          )
-          .explicitGet(),
-        lease
+      val balances = Seq(
+        AddrWithBalance(sender.toAddress, 1000.waves),
+        AddrWithBalance(aliasOwner.toAddress, 1000.waves)
       )
 
-      val invoke = InvokeScriptTransaction
-        .selfSigned(2.toByte, sender, sender.toAddress, None, Seq.empty, 0.005.waves, Asset.Waves, ntpTime.getTimestamp())
-        .explicitGet()
+      withDomain(settingsWithFeatures(BF.SmartAccounts, BF.BlockV5, BF.SynchronousCalls, BF.Ride4DApps), balances) { d =>
+        val lease = LeaseTransaction.selfSigned(2.toByte, sender, recipient.toAddress, 50.waves, 0.001.waves, ntpTime.getTimestamp()).explicitGet()
 
-      Post(routePath("/broadcast?trace=true"), invoke.json()) ~> mkRoute(d) ~> check {
-        println(Json.prettyPrint(responseAs[JsObject]))
-        val dappTrace = (responseAs[JsObject] \ "trace").as[Seq[JsObject]].find(jsObject => (jsObject \ "type").as[String] == "dApp").get
+        d.appendBlock(
+          CreateAliasTransaction.selfSigned(2.toByte, aliasOwner, "test_alias", 0.001.waves, ntpTime.getTimestamp()).explicitGet(),
+          SetScriptTransaction
+            .selfSigned(
+              2.toByte,
+              sender,
+              Some(TestCompiler(V5).compileContract(s"""{-# STDLIB_VERSION 5 #-}
+                                                       |{-# CONTENT_TYPE DAPP #-}
+                                                       |{-# SCRIPT_TYPE ACCOUNT #-}
+                                                       |
+                                                       |@Callable(i)
+                                                       |func default() = {
+                                                       |  let leaseToAddress = Lease(Address(base58'${recipient.toAddress}'), ${10.waves})
+                                                       |  let leaseToAlias = Lease(Alias("test_alias"), ${20.waves})
+                                                       |  strict leaseId = leaseToAddress.calculateLeaseId()
+                                                       |
+                                                       |  [
+                                                       |    leaseToAddress,
+                                                       |    leaseToAlias,
+                                                       |    LeaseCancel(base58'${lease.id()}')
+                                                       |  ]
+                                                       |}
+                                                       |""".stripMargin)),
+              0.01.waves,
+              ntpTime.getTimestamp()
+            )
+            .explicitGet(),
+          lease
+        )
 
-        (dappTrace \ "error").get shouldEqual JsNull
-        (dappTrace \ "vars" \\ "name").map(_.as[String]) should contain theSameElementsAs Seq("leaseToAddress", "leaseToAlias", "leaseId")
+        val invoke = Signed
+          .invokeScript(2.toByte, sender, sender.toAddress, None, Seq.empty, 0.005.waves, Asset.Waves, ntpTime.getTimestamp())
+
+        Post(routePath("/broadcast?trace=true"), invoke.json()) ~> mkRoute(d) ~> check {
+          val dappTrace = (responseAs[JsObject] \ "trace").as[Seq[JsObject]].find(jsObject => (jsObject \ "type").as[String] == "dApp").get
+
+          (dappTrace \ "error").get shouldEqual JsNull
+          (dappTrace \ "vars" \\ "name").map(_.as[String]) should contain theSameElementsAs Seq("leaseToAddress", "leaseToAlias", "leaseId")
+        }
       }
     }
   }

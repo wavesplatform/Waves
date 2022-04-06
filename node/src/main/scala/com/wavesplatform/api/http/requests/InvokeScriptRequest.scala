@@ -1,16 +1,16 @@
 package com.wavesplatform.api.http.requests
 
-import cats.instances.list._
-import cats.syntax.either._
-import cats.syntax.traverse._
-import com.wavesplatform.account.{AddressOrAlias, PublicKey}
+import cats.instances.list.*
+import cats.syntax.either.*
+import cats.syntax.traverse.*
+import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
-import play.api.libs.json._
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, InvokeTransaction}
+import play.api.libs.json.*
 
 object InvokeScriptRequest {
 
@@ -45,7 +45,9 @@ object InvokeScriptRequest {
           case _ => JsError("value is missing or not an base64 encoded string")
         }
       case JsDefined(JsString("list")) =>
-        ARR((jv \ "value").as[Vector[EVALUATED]], true).fold(e => JsError(e.message), {v: EVALUATED => JsSuccess(v)})
+        ARR((jv \ "value").as[Vector[EVALUATED]], true).fold(e => JsError(e.message), { v: EVALUATED =>
+          JsSuccess(v)
+        })
       case _ => JsError("type is missing")
     }
   }
@@ -75,6 +77,7 @@ object InvokeScriptRequest {
 }
 
 case class InvokeScriptRequest(
+    chainId: Option[Byte],
     version: Option[Byte],
     sender: String,
     fee: Long,
@@ -86,6 +89,7 @@ case class InvokeScriptRequest(
 )
 
 case class SignedInvokeScriptRequest(
+    chainId: Option[Byte],
     version: Option[Byte],
     senderPublicKey: String,
     fee: Long,
@@ -99,18 +103,19 @@ case class SignedInvokeScriptRequest(
   def toTx: Either[ValidationError, InvokeScriptTransaction] =
     for {
       _sender      <- PublicKey.fromBase58String(senderPublicKey)
-      _dappAddress <- AddressOrAlias.fromString(dApp)
-      _feeAssetId  <- parseBase58ToAsset(feeAssetId.filter(_.length > 0), "invalid.feeAssetId")
+      _dappAddress <- AddressOrAlias.fromString(dApp, checkChainId = false)
+      _feeAssetId  <- parseBase58ToAsset(feeAssetId.filter(_.nonEmpty), "invalid.feeAssetId")
       t <- InvokeScriptTransaction.create(
         version.getOrElse(2.toByte),
         _sender,
         _dappAddress,
-        call.map(fCallPart => InvokeScriptRequest.buildFunctionCall(fCallPart)),
+        call.map(InvokeScriptRequest.buildFunctionCall).filterNot(_ == InvokeTransaction.DefaultCall),
         payment.getOrElse(Seq()),
         fee,
         _feeAssetId,
         timestamp,
-        proofs
+        proofs,
+        chainId.getOrElse(_dappAddress.chainId)
       )
     } yield t
 }

@@ -1,39 +1,41 @@
 package com.wavesplatform.history
 
-import scala.concurrent.Future
-import scala.concurrent.duration._
-
-import cats.syntax.option._
-import com.wavesplatform.{database, Application}
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.api.BlockMeta
-import com.wavesplatform.api.common.{AddressPortfolio, AddressTransactions, CommonBlocksApi, CommonTransactionsApi}
-import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
-import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.api.common.*
 import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.{PoSCalculator, PoSSelector}
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
+import com.wavesplatform.consensus.{PoSCalculator, PoSSelector}
 import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state._
+import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.transaction.{BlockchainUpdater, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.utils.SystemTime
+import com.wavesplatform.transaction.{BlockchainUpdater, *}
+import com.wavesplatform.utils.{EthEncoding, SystemTime}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.{Application, TestValues, database}
 import monix.execution.Scheduler.Implicits.global
-import monix.reactive.Observer
 import org.iq80.leveldb.DB
+import play.api.libs.json.{JsNull, JsValue, Json}
+
+import scala.collection.immutable.SortedMap
+import scala.concurrent.Future
+import scala.concurrent.duration.*
+import scala.util.Try
+import scala.util.control.NonFatal
 
 case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter, settings: WavesSettings) {
-  import Domain._
+  import Domain.*
 
   val blockchain: BlockchainUpdaterImpl = blockchainUpdater
 
@@ -45,27 +47,39 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   val transactionDiffer: Transaction => TracedResult[ValidationError, Diff] =
     TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis())(blockchain, _)
 
-  lazy val utxPool = new UtxPoolImpl(SystemTime, blockchain, Observer.empty, settings.utxSettings)
-  lazy val wallet  = Wallet(settings.walletSettings.copy(file = None))
+  lazy val utxPool: UtxPoolImpl = new UtxPoolImpl(SystemTime, blockchain, settings.utxSettings)
+  lazy val wallet: Wallet       = Wallet(settings.walletSettings.copy(file = None))
+
+  def createDiffE(tx: Transaction): Either[ValidationError, Diff] = transactionDiffer(tx).resultE
+  def createDiff(tx: Transaction): Diff                           = createDiffE(tx).explicitGet()
 
   object commonApi {
+
     /**
       * @return Tuple of (asset, feeInAsset, feeInWaves)
       * @see [[com.wavesplatform.state.diffs.FeeValidation#getMinFee(com.wavesplatform.state.Blockchain, com.wavesplatform.transaction.Transaction)]]
       */
-    def calculateFee(tx: Transaction): (Asset, TxAmount, TxAmount) =
+    def calculateFee(tx: Transaction): (Asset, Long, Long) =
       transactions.calculateFee(tx).explicitGet()
 
-    def calculateWavesFee(tx: Transaction): TxAmount = {
-      val (Waves, _, feeInWaves) = (calculateFee(tx): @unchecked)
+    def calculateWavesFee(tx: Transaction): Long = {
+      val (Waves, _, feeInWaves) = calculateFee(tx): @unchecked
       feeInWaves
     }
 
-    def invokeScriptResult(transactionId: ByteStr): InvokeScriptResult =
-      transactions.transactionById(transactionId).get.asInstanceOf[TransactionMeta.Invoke].invokeScriptResult.get
+    def transactionMeta(transactionId: ByteStr): TransactionMeta =
+      transactions
+        .transactionById(transactionId)
+        .getOrElse(throw new NoSuchElementException(s"No meta for $transactionId"))
 
-    def addressTransactions(address: Address): Seq[Transaction] =
-      transactions.transactionsByAddress(address, None, Set.empty, None).map(_.transaction).toListL.runSyncUnsafe()
+    def invokeScriptResult(transactionId: ByteStr): InvokeScriptResult =
+      transactionMeta(transactionId) match {
+        case hsc: TransactionMeta.HasStateChanges => hsc.invokeScriptResult.get
+        case _                                    => ???
+      }
+
+    def addressTransactions(address: Address): Seq[TransactionMeta] =
+      transactions.transactionsByAddress(address, None, Set.empty, None).toListL.runSyncUnsafe()
 
     lazy val transactions: CommonTransactionsApi = CommonTransactionsApi(
       blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
@@ -78,6 +92,39 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     )
   }
 
+  def liquidState: Option[NgState] = {
+    val cls   = classOf[BlockchainUpdaterImpl]
+    val field = cls.getDeclaredField("ngState")
+    field.setAccessible(true)
+    field.get(blockchain).asInstanceOf[Option[NgState]]
+  }
+
+  def liquidAndSolidAssert(doCheck: () => Unit): Unit = {
+    require(liquidState.isDefined, "No liquid state is present")
+    try doCheck()
+    catch { case NonFatal(err) => throw new RuntimeException("Liquid check failed", err) }
+    makeStateSolid()
+    try doCheck()
+    catch { case NonFatal(err) => throw new RuntimeException("Solid check failed", err) }
+  }
+
+  def makeStateSolid(): (Int, SortedMap[String, String]) = {
+    if (liquidState.isDefined) appendBlock() // Just append empty block
+    (solidStateHeight, solidStateSnapshot())
+  }
+
+  def solidStateHeight: Int = {
+    db.get(Keys.height)
+  }
+
+  def solidStateSnapshot(): SortedMap[String, String] = {
+    val builder = SortedMap.newBuilder[String, String]
+    db.iterateOver(Array.emptyByteArray)(
+      e => builder.addOne(EthEncoding.toHexString(e.getKey).drop(2) -> EthEncoding.toHexString(e.getValue).drop(2))
+    )
+    builder.result()
+  }
+
   def lastBlock: Block = {
     blockchainUpdater.lastBlockId
       .flatMap(blockchainUpdater.liquidBlock)
@@ -87,6 +134,8 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def liquidDiff: Diff =
     blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty)
+
+  def microBlocks: Vector[MicroBlock] = blockchain.microblockIds.reverseIterator.flatMap(blockchain.microBlock).to(Vector)
 
   def effBalance(a: Address): Long = blockchainUpdater.effectiveBalance(a, 1000)
 
@@ -107,7 +156,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def nftList(address: Address): Seq[(IssuedAsset, AssetDescription)] = db.withResource { resource =>
     AddressPortfolio
-      .nftIterator(resource, address, blockchainUpdater.bestLiquidDiff.orEmpty, None, blockchainUpdater.assetDescription)
+      .nftIterator(resource, address, blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), None, blockchainUpdater.assetDescription)
       .toSeq
   }
 
@@ -129,19 +178,38 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   def appendAndAssertSucceed(txs: Transaction*): Block = {
     val block = createBlock(Block.PlainBlockVersion, txs)
     appendBlock(block)
-    txs.foreach(tx => require(blockchain.transactionSucceeded(tx.id()), s"should succeed: $tx"))
+    txs.foreach { tx =>
+      if (!blockchain.transactionSucceeded(tx.id())) {
+        val stateChanges = Try(commonApi.invokeScriptResult(tx.id())).toOption.flatMap(_.error).fold(JsNull: JsValue)(Json.toJson(_))
+        throw new AssertionError(s"Should succeed: ${tx.id()}, script error: ${Json.prettyPrint(stateChanges)}")
+      }
+    }
     lastBlock
+  }
+
+  def appendAndCatchError(txs: Transaction*): ValidationError = {
+    val block  = createBlock(Block.PlainBlockVersion, txs)
+    val result = appendBlockE(block)
+    txs.foreach { tx =>
+      assert(blockchain.transactionInfo(tx.id()).isEmpty, s"should not pass: $tx")
+    }
+    result.left.getOrElse(throw new RuntimeException(s"Block appended successfully: $txs"))
   }
 
   def appendAndAssertFailed(txs: Transaction*): Block = {
     val block = createBlock(Block.PlainBlockVersion, txs)
-    appendBlock(block)
-    txs.foreach(tx => require(!blockchain.transactionSucceeded(tx.id()), s"should fail: $tx"))
-    lastBlock
+    appendBlockE(block) match {
+      case Left(err) =>
+        throw new RuntimeException(s"Should be success: $err")
+
+      case Right(_) =>
+        txs.foreach(tx => assert(!blockchain.transactionSucceeded(tx.id()), s"should fail: $tx"))
+        lastBlock
+    }
   }
 
   def appendBlockE(txs: Transaction*): Either[ValidationError, Seq[Diff]] =
-    appendBlockE(createBlock(blockchainUpdater.nextBlockVersion, txs))
+    appendBlockE(createBlock(Block.PlainBlockVersion, txs))
 
   def appendBlock(txs: Transaction*): Block = {
     val block = createBlock(Block.PlainBlockVersion, txs)
@@ -191,10 +259,12 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def createBlock(version: Byte, txs: Seq[Transaction], ref: Option[ByteStr] = blockchainUpdater.lastBlockId, strictTime: Boolean = false): Block = {
     val reference = ref.getOrElse(randomSig)
-    val parent = ref.flatMap { bs =>
-      val height = blockchain.heightOf(bs)
-      height.flatMap(blockchain.blockHeader).map(_.header)
-    } getOrElse (lastBlock.header)
+    val parent = ref
+      .flatMap { bs =>
+        val height = blockchain.heightOf(bs)
+        height.flatMap(blockchain.blockHeader).map(_.header)
+      }
+      .getOrElse(lastBlock.header)
 
     val grandParent = ref.flatMap { bs =>
       val height = blockchain.heightOf(bs)
@@ -255,6 +325,44 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockInfoAt(db, blockchainUpdater))
   }
 
+  //noinspection ScalaStyle
+  object helpers {
+    def creditWavesToDefaultSigner(amount: Long = 10_0000_0000): Unit = {
+      import com.wavesplatform.transaction.utils.EthConverters.*
+      appendBlock(TxHelpers.genesis(TxHelpers.defaultAddress, amount), TxHelpers.genesis(TxHelpers.defaultSigner.toEthWavesAddress, amount))
+    }
+
+    def creditWavesFromDefaultSigner(to: Address, amount: Long = 1_0000_0000): Unit = {
+      appendBlock(TxHelpers.transfer(to = to, amount = amount))
+    }
+
+    def issueAsset(issuer: KeyPair = defaultSigner, script: Script = null, amount: Long = 1000): IssuedAsset = {
+      val transaction = TxHelpers.issue(issuer, script = Option(script), amount = amount)
+      appendBlock(transaction)
+      IssuedAsset(transaction.id())
+    }
+
+    def setScript(account: KeyPair, script: Script): Unit = {
+      appendBlock(TxHelpers.setScript(account, script))
+    }
+
+    def setData(account: KeyPair, entries: DataEntry[?]*): Unit = {
+      appendBlock(entries.map(TxHelpers.dataEntry(account, _))*)
+    }
+
+    def transfer(account: KeyPair, to: Address, amount: Long, asset: Asset): Unit = {
+      appendBlock(TxHelpers.transfer(account, to, amount, asset))
+    }
+
+    def transferAll(account: KeyPair, to: Address, asset: Asset): Unit = {
+      val balanceMinusFee = {
+        val balance = blockchain.balance(account.toAddress, asset)
+        if (asset == Waves) balance - TestValues.fee else balance
+      }
+      transfer(account, to, balanceMinusFee, asset)
+    }
+  }
+
   val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(
     blockchainUpdater.bestLiquidDiff.map(Height(blockchainUpdater.height) -> _),
     db,
@@ -263,6 +371,18 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     wallet,
     _ => Future.successful(TracedResult(Right(true))),
     h => blocksApi.blockAtHeight(h)
+  )
+
+  val accountsApi: CommonAccountsApi = CommonAccountsApi(
+    () => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty),
+    db,
+    blockchain
+  )
+
+  val assetsApi: CommonAssetsApi = CommonAssetsApi(
+    () => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty),
+    db,
+    blockchain
   )
 }
 
@@ -274,7 +394,12 @@ object Domain {
 
   def portfolio(address: Address, db: DB, blockchainUpdater: BlockchainUpdaterImpl): Seq[(IssuedAsset, Long)] = db.withResource { resource =>
     AddressPortfolio
-      .assetBalanceIterator(resource, address, blockchainUpdater.bestLiquidDiff.orEmpty, id => blockchainUpdater.assetDescription(id).exists(!_.nft))
+      .assetBalanceIterator(
+        resource,
+        address,
+        blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty),
+        id => blockchainUpdater.assetDescription(id).exists(!_.nft)
+      )
       .toSeq
   }
 }

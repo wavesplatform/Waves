@@ -6,8 +6,16 @@ import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.Diff
+import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.validation.TxValidator
-import com.wavesplatform.utils.base58Length
+import com.wavesplatform.utils.{EthEncoding, base58Length}
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.numeric.{Interval, NonNegative, Positive}
+import play.api.libs.json.{Format, Reads, Writes}
+import supertagged.*
+import supertagged.postfix.*
 
 package object transaction {
   val AssetIdLength: Int       = com.wavesplatform.crypto.DigestLength
@@ -15,7 +23,7 @@ package object transaction {
 
   type DiscardedBlocks       = Seq[(Block, ByteStr)]
   type DiscardedMicroBlocks  = Seq[(MicroBlock, Diff)]
-  type AuthorizedTransaction = Authorized with Transaction
+  type AuthorizedTransaction = Authorized & Transaction
 
   type TxType = Byte
 
@@ -25,9 +33,39 @@ package object transaction {
     val V2: TxVersion = 2.toByte
     val V3: TxVersion = 3.toByte
   }
-  type TxAmount    = Long
   type TxTimestamp = Long
   type TxByteArray = Array[Byte]
+
+  type TxPositiveAmount = Long Refined Positive
+  object TxPositiveAmount extends RefinedTypeOps[TxPositiveAmount, Long]
+
+  type TxNonNegativeAmount = Long Refined NonNegative
+  object TxNonNegativeAmount extends RefinedTypeOps[TxNonNegativeAmount, Long]
+
+  type TxDecimals = Byte Refined Interval.Closed[0, IssueTransaction.MaxAssetDecimals.type]
+  object TxDecimals extends RefinedTypeOps[TxDecimals, Byte] {
+    val errMsg = s"decimals should be in interval [0; ${IssueTransaction.MaxAssetDecimals}]"
+  }
+
+  type TxOrderPrice = Long Refined Positive
+  object TxOrderPrice extends RefinedTypeOps[TxOrderPrice, Long] {
+    val errMsg = "price should be > 0"
+  }
+
+  type TxExchangeAmount = Long Refined Interval.OpenClosed[0, Order.MaxAmount.type]
+  object TxExchangeAmount extends RefinedTypeOps[TxExchangeAmount, Long] {
+    val errMsg = s"amount should be in interval (0; ${Order.MaxAmount}]"
+  }
+
+  type TxExchangePrice = Long Refined Interval.OpenClosed[0, Order.MaxAmount.type]
+  object TxExchangePrice extends RefinedTypeOps[TxExchangePrice, Long] {
+    val errMsg = s"price should be in interval (0; ${Order.MaxAmount}]"
+  }
+
+  type TxMatcherFee = Long Refined Interval.Open[0, Order.MaxAmount.type]
+  object TxMatcherFee extends RefinedTypeOps[TxMatcherFee, Long] {
+    val errMsg = s"matcher fee should be in interval (0; ${Order.MaxAmount})"
+  }
 
   implicit class TransactionValidationOps[T <: Transaction](val tx: T) extends AnyVal {
     def validatedNel(implicit validator: TxValidator[T]): ValidatedNel[ValidationError, T] = validator.validate(tx)
@@ -37,4 +75,19 @@ package object transaction {
   implicit class TransactionSignOps[T](val tx: T) extends AnyVal {
     def signWith(privateKey: PrivateKey)(implicit sign: (T, PrivateKey) => T): T = sign(tx, privateKey)
   }
+
+  object ERC20Address extends TaggedType[ByteStr] {
+    def apply(bs: ByteStr): ERC20Address = {
+      require(bs.arr.length == 20, "ERC20 token address length must be 20 bytes")
+      bs @@ this
+    }
+
+    def apply(ia: IssuedAsset): ERC20Address = apply(ia.id.take(20))
+
+    implicit val jsonFormat: Format[ERC20Address] = Format(
+      implicitly[Reads[String]].map(str => ERC20Address(ByteStr(EthEncoding.toBytes(str)))),
+      implicitly[Writes[String]].contramap((addr: ERC20Address) => EthEncoding.toHexString(addr.arr))
+    )
+  }
+  type ERC20Address = ERC20Address.Type
 }

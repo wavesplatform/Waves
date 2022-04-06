@@ -44,7 +44,7 @@ case class AliasApiRoute(
       Alias
         .create(aliasName)
         .flatMap { a =>
-          blockchain.resolveAlias(a).bimap(_ => TxValidationError.AliasDoesNotExist(a), addr => Json.obj("address" -> addr.stringRepr))
+          blockchain.resolveAlias(a).bimap(_ => TxValidationError.AliasDoesNotExist(a), addr => Json.obj("address" -> addr.toString))
         }
     }
   }
@@ -54,7 +54,15 @@ case class AliasApiRoute(
   def aliasOfAddress: Route = (get & path("by-address" / AddrSegment)) { address =>
     extractScheduler { implicit s =>
       val value: Source[JsValue, NotUsed] =
-        Source.fromPublisher(commonApi.aliasesOfAddress(address).map { case (_, tx) => JsString(tx.alias.stringRepr) }.toReactivePublisher)
+        Source
+          .future(
+            commonApi
+              .aliasesOfAddress(address)
+              .map { case (_, tx) => JsString(tx.alias.toString) }
+              .toListL
+              .runToFuture
+          )
+          .mapConcat(identity)
       complete(value)
     }
   }

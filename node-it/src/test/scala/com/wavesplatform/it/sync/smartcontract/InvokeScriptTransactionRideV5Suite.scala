@@ -14,13 +14,13 @@ import org.scalatest.CancelAfterFailure
 
 class InvokeScriptTransactionRideV5Suite extends BaseTransactionSuite with CancelAfterFailure {
 
-  private lazy val dAppV3PK = sender.createKeyPair()
-  private lazy val dAppV4PK = sender.createKeyPair()
-  private lazy val dAppV5PK = sender.createKeyPair()
-  private lazy val callerPK = firstKeyPair
-  private lazy val dAppV3   = dAppV3PK.toAddress.toString
-  private lazy val dAppV4   = dAppV4PK.toAddress.toString
-  private lazy val dAppV5   = dAppV5PK.toAddress.toString
+  private lazy val dAppV3PK    = sender.createKeyPair()
+  private lazy val dAppV4PK    = sender.createKeyPair()
+  private lazy val dAppV5PK    = sender.createKeyPair()
+  private lazy val callerPK    = firstKeyPair
+  private lazy val dAppV3      = dAppV3PK.toAddress.toString
+  private lazy val dAppV4      = dAppV4PK.toAddress.toString
+  private lazy val dAppV5      = dAppV5PK.toAddress.toString
   private lazy val dAppAliasV3 = "dapp.v3"
   private lazy val dAppAliasV4 = "dapp.v4"
   private lazy val dAppAliasV5 = "dapp.v5"

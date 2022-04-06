@@ -36,7 +36,7 @@ class BlockchainUpdaterLiquidBlockTest extends PropSpec with DomainScenarioDrive
       val (keyBlock, microBlocks) = unsafeChainBaseAndMicro(
         totalRefTo = prevBlock.signature,
         base = keyBlockTxs,
-        micros = microTxs.grouped(math.max(1, txNumberInMicros / 5)).toSeq,
+        micros = microTxs.grouped((txNumberInMicros / 5) min 500 max 1).toSeq,
         signer = TestBlock.defaultSigner,
         version = 3,
         timestamp = ntpNow

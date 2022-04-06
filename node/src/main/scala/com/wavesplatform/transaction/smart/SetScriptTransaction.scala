@@ -1,10 +1,10 @@
 package com.wavesplatform.transaction.smart
 
-import com.wavesplatform.account._
+import com.wavesplatform.account.*
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.serialization.impl.SetScriptTxSerializer
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.SetScriptTxValidator
@@ -17,22 +17,19 @@ case class SetScriptTransaction(
     version: TxVersion,
     sender: PublicKey,
     script: Option[Script],
-    fee: TxAmount,
+    fee: TxPositiveAmount,
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends ProvenTransaction
+) extends Transaction(TransactionType.SetScript) with ProvenTransaction
     with VersionedTransaction
     with TxWithFee.InWaves
     with FastHashId
-    with LegacyPBSwitch.V2 {
+    with PBSince.V2 {
 
-  //noinspection TypeAnnotation
-  override val builder = SetScriptTransaction
-
-  val bodyBytes: Coeval[Array[Byte]]      = Coeval.evalOnce(SetScriptTransaction.serializer.bodyBytes(this))
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(SetScriptTransaction.serializer.toBytes(this))
-  override val json: Coeval[JsObject]     = Coeval.evalOnce(SetScriptTransaction.serializer.toJson(this))
+  val bodyBytes: Coeval[Array[Byte]]      = Coeval.evalOnce(SetScriptTxSerializer.bodyBytes(this))
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(SetScriptTxSerializer.toBytes(this))
+  override val json: Coeval[JsObject]     = Coeval.evalOnce(SetScriptTxSerializer.toJson(this))
 }
 
 object SetScriptTransaction extends TransactionParser {
@@ -42,41 +39,45 @@ object SetScriptTransaction extends TransactionParser {
   override val supportedVersions: Set[TxVersion] = Set(1, 2)
 
   implicit val validator: TxValidator[SetScriptTransaction] = SetScriptTxValidator
-  val serializer                                            = SetScriptTxSerializer
 
   implicit def sign(tx: SetScriptTransaction, privateKey: PrivateKey): SetScriptTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
   override def parseBytes(bytes: Array[TxVersion]): Try[SetScriptTransaction] =
-    serializer.parseBytes(bytes)
+    SetScriptTxSerializer.parseBytes(bytes)
 
   def create(
       version: TxVersion,
       sender: PublicKey,
       script: Option[Script],
-      fee: TxAmount,
+      fee: Long,
       timestamp: TxTimestamp,
       proofs: Proofs,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, SetScriptTransaction] =
-    SetScriptTransaction(version, sender, script, fee, timestamp, proofs, chainId).validatedEither
+    for {
+      fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
+      tx  <- SetScriptTransaction(version, sender, script, fee, timestamp, proofs, chainId).validatedEither
+    } yield tx
 
   def signed(
       version: TxVersion,
       sender: PublicKey,
       script: Option[Script],
-      fee: TxAmount,
+      fee: Long,
       timestamp: TxTimestamp,
-      signer: PrivateKey
+      signer: PrivateKey,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, SetScriptTransaction] =
-    create(version, sender, script, fee, timestamp, Proofs.empty).map(_.signWith(signer))
+    create(version, sender, script, fee, timestamp, Proofs.empty, chainId).map(_.signWith(signer))
 
   def selfSigned(
       version: TxVersion,
       sender: KeyPair,
       script: Option[Script],
-      fee: TxAmount,
-      timestamp: TxTimestamp
+      fee: Long,
+      timestamp: TxTimestamp,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, SetScriptTransaction] =
-    signed(version, sender.publicKey, script, fee, timestamp, sender.privateKey)
+    signed(version, sender.publicKey, script, fee, timestamp, sender.privateKey, chainId)
 }

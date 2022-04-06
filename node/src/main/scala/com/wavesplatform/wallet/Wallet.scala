@@ -2,10 +2,6 @@ package com.wavesplatform.wallet
 
 import java.io.File
 
-import scala.collection.concurrent.TrieMap
-import scala.util.{Failure, Success, Try}
-import scala.util.control.NonFatal
-
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
@@ -13,8 +9,12 @@ import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.WalletSettings
 import com.wavesplatform.transaction.TxValidationError.MissingSenderPrivateKey
-import com.wavesplatform.utils.{randomBytes, JsonFileStorage, _}
-import play.api.libs.json._
+import com.wavesplatform.utils.{JsonFileStorage, randomBytes, *}
+import play.api.libs.json.*
+
+import scala.collection.concurrent.TrieMap
+import scala.util.control.NonFatal
+import scala.util.{Failure, Success, Try}
 
 trait Wallet {
   def seed: Array[Byte]
@@ -110,7 +110,7 @@ object Wallet extends ScorexLogging {
 
     private[this] val accountsCache: TrieMap[String, KeyPair] = {
       val accounts = walletData.accountSeeds.map(KeyPair(_))
-      TrieMap(accounts.map(acc => acc.toAddress.toString -> acc).toSeq: _*)
+      TrieMap(accounts.map(acc => acc.toAddress.toString -> acc).toSeq*)
     }
 
     override def seed: Array[Byte] =
@@ -144,7 +144,7 @@ object Wallet extends ScorexLogging {
     }
 
     override def privateKeyAccount(account: Address): Either[ValidationError, KeyPair] =
-      accountsCache.get(account.stringRepr).toRight[ValidationError](MissingSenderPrivateKey)
+      accountsCache.get(account.toString).toRight[ValidationError](MissingSenderPrivateKey)
 
     override def nonce: Int =
       walletData.nonce

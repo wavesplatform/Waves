@@ -1,9 +1,9 @@
 package com.wavesplatform
 
-import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
+import com.wavesplatform.account.{AddressOrAlias, KeyPair}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.history.DefaultBaseTarget
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
@@ -14,8 +14,8 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.transaction.{DataTransaction, Transaction, TxVersion}
-import com.wavesplatform.utils._
 import org.scalacheck.Gen
 
 trait BlocksTransactionsHelpers { self: TransactionGen =>
@@ -76,18 +76,20 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     def nftIssue(from: KeyPair, timestamp: Gen[Long] = timestampGen): Gen[IssueTransaction] =
       for {
         timestamp <- timestamp
-      } yield IssueTransaction(
-        TxVersion.V1,
-        from.publicKey,
-        "test".utf8Bytes,
-        Array.emptyByteArray,
-        1,
-        0,
-        reissuable = false,
-        script = None,
-        100000000L,
-        timestamp
-      ).signWith(from.privateKey)
+      } yield IssueTransaction
+        .selfSigned(
+          TxVersion.V1,
+          from,
+          "test",
+          "",
+          1,
+          0,
+          reissuable = false,
+          script = None,
+          100000000L,
+          timestamp
+        )
+        .explicitGet()
 
     def setScript(from: KeyPair, script: Script, timestamp: Gen[Long] = timestampGen): Gen[SetScriptTransaction] =
       for {
@@ -96,14 +98,14 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
 
     def invokeScript(
         from: KeyPair,
-        dapp: Address,
+        dapp: AddressOrAlias,
         call: FUNCTION_CALL,
         payments: Seq[InvokeScriptTransaction.Payment] = Nil,
         timestamp: Gen[Long] = timestampGen
     ): Gen[InvokeScriptTransaction] =
       for {
         timestamp <- timestamp
-      } yield InvokeScriptTransaction.selfSigned(1.toByte, from, dapp, Some(call), payments, FeeAmount * 2, Waves, timestamp).explicitGet()
+      } yield Signed.invokeScript(1.toByte, from, dapp, Some(call), payments, FeeAmount * 2, Waves, timestamp)
   }
 
   object UnsafeBlocks {
@@ -117,10 +119,9 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     ): (Block, Seq[MicroBlock]) = {
       val block = unsafeBlock(totalRefTo, base, signer, version, timestamp)
       val microBlocks = micros
-        .foldLeft((block, Seq.empty[MicroBlock])) {
-          case ((lastTotal, allMicros), txs) =>
-            val (newTotal, micro) = unsafeMicro(totalRefTo, lastTotal, txs, signer, version, timestamp)
-            (newTotal, allMicros :+ micro)
+        .foldLeft((block, Seq.empty[MicroBlock])) { case ((lastTotal, allMicros), txs) =>
+          val (newTotal, micro) = unsafeMicro(totalRefTo, lastTotal, txs, signer, version, timestamp)
+          (newTotal, allMicros :+ micro)
         }
         ._2
       (block, microBlocks)
@@ -135,10 +136,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
         ts: Long
     ): (Block, MicroBlock) = {
       val newTotalBlock = unsafeBlock(totalRefTo, prevTotal.transactionData ++ txs, signer, version, ts)
-      val unsigned      = new MicroBlock(version, signer.publicKey, txs, prevTotal.id(), newTotalBlock.signature, ByteStr.empty)
-      val signature     = crypto.sign(signer.privateKey, unsigned.bytes())
-      val signed        = unsigned.copy(signature = signature)
-      (newTotalBlock, signed)
+      (newTotalBlock, MicroBlock.buildAndSign(version, signer, txs, prevTotal.id(), newTotalBlock.signature).explicitGet())
     }
 
     def unsafeBlock(

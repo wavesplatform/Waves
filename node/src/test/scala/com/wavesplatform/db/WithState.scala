@@ -1,38 +1,35 @@
 package com.wavesplatform.db
 
-import java.nio.file.Files
-
-import cats.Monoid
-import com.wavesplatform.{NTPTime, TestHelpers}
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{loadActiveLeases, LevelDBFactory, LevelDBWriter, TestStorageFactory}
+import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter, TestStorageFactory, loadActiveLeases}
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
+
+import com.wavesplatform.lang.directives.DirectiveDictionary
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.{
-  loadConfig,
-  BlockchainSettings,
-  FunctionalitySettings,
-  TestSettings,
-  WavesSettings,
-  TestFunctionalitySettings => TFS
-}
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff}
-import com.wavesplatform.state.diffs.{produce, BlockDiffer}
+import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, TestSettings, WavesSettings, loadConfig, TestFunctionalitySettings as TFS}
+import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.utils.TestLevelDB
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Portfolio}
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers}
+import com.wavesplatform.{NTPTime, TestHelpers}
 import monix.reactive.Observer
 import monix.reactive.subjects.{PublishSubject, Subject}
 import org.iq80.leveldb.{DB, Options}
 import org.scalatest.Suite
 import org.scalatest.matchers.should.Matchers
+
+import java.nio.file.Files
 
 trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
   protected val ignoreSpendableBalanceChanged: Subject[(Address, Asset), (Address, Asset)] = PublishSubject()
@@ -151,10 +148,10 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
     }
 
   def assertBalanceInvariant(diff: Diff): Unit = {
-    val portfolioDiff = Monoid.combineAll(diff.portfolios.values)
+    val portfolioDiff = diff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
     portfolioDiff.balance shouldBe 0
-    portfolioDiff.effectiveBalance shouldBe 0
-    portfolioDiff.assets.values.foreach(_ shouldBe 0)
+    portfolioDiff.effectiveBalance.explicitGet() shouldBe 0
+    all(portfolioDiff.assets.values) shouldBe 0
   }
 
   def assertLeft(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)(errorMessage: String): Unit =
@@ -163,21 +160,26 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
 
 trait WithDomain extends WithState { _: Suite =>
   implicit class WavesSettingsOps(ws: WavesSettings) {
-    def withFS(transformF: FunctionalitySettings => FunctionalitySettings): WavesSettings = {
+    def configure(transformF: FunctionalitySettings => FunctionalitySettings): WavesSettings = {
       val functionalitySettings = transformF(ws.blockchainSettings.functionalitySettings)
       ws.copy(blockchainSettings = ws.blockchainSettings.copy(functionalitySettings = functionalitySettings))
     }
 
     def withFeatures(fs: BlockchainFeature*): WavesSettings =
-      withFS(_.copy(preActivatedFeatures = fs.map(_.id -> 0).toMap))
+      configure(_.copy(preActivatedFeatures = fs.map(_.id -> 0).toMap))
 
-    def addFeatures(fs: BlockchainFeature*): WavesSettings =  withFS { functionalitySettings =>
-      val newFeatures           = functionalitySettings.preActivatedFeatures ++ fs.map(_.id -> 0)
+    def addFeatures(fs: BlockchainFeature*): WavesSettings = configure { functionalitySettings =>
+      val newFeatures = functionalitySettings.preActivatedFeatures ++ fs.map(_.id -> 0)
+      functionalitySettings.copy(preActivatedFeatures = newFeatures)
+    }
+
+    def setFeaturesHeight(fs: (BlockchainFeature, Int)*): WavesSettings = configure { functionalitySettings =>
+      val newFeatures = functionalitySettings.preActivatedFeatures ++ fs.map { case (f, height) => (f.id, height) }
       functionalitySettings.copy(preActivatedFeatures = newFeatures)
     }
 
     def withActivationPeriod(period: Int): WavesSettings =
-      withFS(_.copy(featureCheckBlocksPeriod = period, blocksForFeatureActivation = period, doubleFeaturesPeriodsAfterHeight = 10000))
+      configure(_.copy(featureCheckBlocksPeriod = period, blocksForFeatureActivation = period, doubleFeaturesPeriodsAfterHeight = 10000))
 
     def noFeatures(): WavesSettings = {
       ws.copy(
@@ -190,7 +192,7 @@ trait WithDomain extends WithState { _: Suite =>
     }
   }
 
-  lazy val SettingsFromDefaultConfig: WavesSettings =  WavesSettings.fromRootConfig(loadConfig(None))
+  lazy val SettingsFromDefaultConfig: WavesSettings = WavesSettings.fromRootConfig(loadConfig(None))
 
   def domainSettingsWithFS(fs: FunctionalitySettings): WavesSettings =
     SettingsFromDefaultConfig.copy(
@@ -198,14 +200,14 @@ trait WithDomain extends WithState { _: Suite =>
     )
 
   def domainSettingsWithPreactivatedFeatures(fs: BlockchainFeature*): WavesSettings =
-    domainSettingsWithFeatures(fs.map(_ -> 0): _*)
+    domainSettingsWithFeatures(fs.map(_ -> 0)*)
 
   def domainSettingsWithFeatures(fs: (BlockchainFeature, Int)*): WavesSettings = {
     val defaultFS = SettingsFromDefaultConfig
       .noFeatures()
       .blockchainSettings
       .functionalitySettings
-    
+
     domainSettingsWithFS(defaultFS.copy(preActivatedFeatures = fs.map {
       case (f, h) => f.id -> h
     }.toMap))
@@ -222,21 +224,43 @@ trait WithDomain extends WithState { _: Suite =>
       BlockchainFeatures.SmartAccounts,
       BlockchainFeatures.SmartAccountTrading,
       BlockchainFeatures.OrderV3,
-      BlockchainFeatures.FeeSponsorship,
       BlockchainFeatures.DataTransaction,
       BlockchainFeatures.SmartAssets
+    ).setFeaturesHeight(
+      BlockchainFeatures.FeeSponsorship -> -NG.blockchainSettings.functionalitySettings.activationWindowSize(1)
     )
 
-    val RideV4 = ScriptsAndSponsorship.addFeatures(
-      BlockchainFeatures.Ride4DApps,
+    val RideV3 = ScriptsAndSponsorship.addFeatures(
+      BlockchainFeatures.Ride4DApps
+    )
+
+    val RideV4 = RideV3.addFeatures(
+      BlockchainFeatures.BlockReward,
       BlockchainFeatures.BlockV5
     )
 
     val RideV5 = RideV4.addFeatures(BlockchainFeatures.SynchronousCalls)
+    val RideV6 = RideV5.addFeatures(BlockchainFeatures.RideV6)
+    val ContinuationTransaction = RideV6.addFeatures(BlockchainFeatures.ContinuationTransaction).copy(
+      featuresSettings = RideV6.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
+    )
+
+    def mostRecent: WavesSettings = RideV6
+
+    def settingsForRide(version: StdLibVersion): WavesSettings =
+      version match {
+        case V1 => RideV3
+        case V2 => RideV3
+        case V3 => RideV3
+        case V4 => RideV4
+        case V5 => RideV5
+        case V6 => RideV6
+      }
   }
 
   def withDomain[A](
-      settings: WavesSettings = SettingsFromDefaultConfig.addFeatures(BlockchainFeatures.SmartAccounts) // SmartAccounts to allow V2 transfers by default
+      settings: WavesSettings = SettingsFromDefaultConfig.addFeatures(BlockchainFeatures.SmartAccounts), // SmartAccounts to allow V2 transfers by default
+      balances: Seq[AddrWithBalance] = Seq.empty
   )(test: Domain => A): A =
     withLevelDBWriter(settings) { blockchain =>
       var domain: Domain = null
@@ -249,7 +273,35 @@ trait WithDomain extends WithState { _: Suite =>
         loadActiveLeases(db, _, _)
       )
       domain = Domain(db, bcu, blockchain, settings)
+      val genesis = balances.map {
+        case AddrWithBalance(address, amount) =>
+          TxHelpers.genesis(address, amount)
+      }
+      if (genesis.nonEmpty) {
+        domain.appendBlock(genesis*)
+      }
       try test(domain)
       finally bcu.shutdown()
     }
+
+  private val allVersions = DirectiveDictionary[StdLibVersion].all
+  private val lastVersion = allVersions.last
+
+  def testDomain(
+      balances: Seq[AddrWithBalance] = Nil,
+      from: StdLibVersion = V3,
+      to: StdLibVersion = lastVersion
+  )(assertion: (StdLibVersion, Domain) => Unit): Unit =
+    allVersions
+      .filter(v => v >= from && v <= to)
+      .foreach(v => withDomain(DomainPresets.settingsForRide(v), balances)(assertion(v, _)))
+}
+
+object WithState {
+  case class AddrWithBalance(address: Address, balance: Long = ENOUGH_AMT)
+
+  object AddrWithBalance {
+    def enoughBalances(accs: KeyPair*): Seq[AddrWithBalance] =
+      accs.map(acc => AddrWithBalance(acc.toAddress))
+  }
 }

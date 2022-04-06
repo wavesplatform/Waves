@@ -99,4 +99,9 @@ class DirectiveParserTest extends PropSpec {
       Directive(SCRIPT_TYPE, Asset)
     ))
   }
+
+  property("dashes, spaces, dots, underscores") {
+    parse("{-# IMPORT path/lib_1-a.ride, lib_2-b.ride #-}") shouldBe
+      Right(List(Directive(IMPORT, Imports(List("path/lib_1-a.ride", "lib_2-b.ride")))))
+  }
 }

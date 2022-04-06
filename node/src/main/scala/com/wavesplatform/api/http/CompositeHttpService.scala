@@ -60,17 +60,21 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
   private val corsAllowedHeaders = (if (settings.apiKeyDifferentHost) List("api_key", "X-API-Key") else List.empty[String]) ++
     Seq("Authorization", "Content-Type", "X-Requested-With", "Timestamp", "Signature")
 
-  private def corsAllowAll = if (settings.cors) respondWithHeader(`Access-Control-Allow-Origin`.*) else pass
+  private def corsAllowAll =
+    if (settings.cors) respondWithHeaders(`Access-Control-Allow-Credentials`(true),
+      `Access-Control-Allow-Headers`(corsAllowedHeaders),
+      `Access-Control-Allow-Methods`(OPTIONS, POST, PUT, GET, DELETE),
+      `Access-Control-Allow-Origin`(HttpOrigin("http://localhost:8080"))) else pass
 
   private def extendRoute(base: Route): Route = handleAllExceptions {
     if (settings.cors) { ctx =>
-      val extendedRoute = corsAllowAll(base) ~ options {
+      val extendedRoute = options {
         respondWithDefaultHeaders(
           `Access-Control-Allow-Credentials`(true),
           `Access-Control-Allow-Headers`(corsAllowedHeaders),
           `Access-Control-Allow-Methods`(OPTIONS, POST, PUT, GET, DELETE)
         )(corsAllowAll(complete(StatusCodes.OK)))
-      }
+      } ~ corsAllowAll(base)
 
       extendedRoute(ctx)
     } else base

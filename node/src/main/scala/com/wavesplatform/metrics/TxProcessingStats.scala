@@ -1,19 +1,17 @@
 package com.wavesplatform.metrics
 
 import com.google.common.base.CaseFormat
-import com.wavesplatform.settings.Constants
+import com.wavesplatform.transaction.{Transaction, TransactionType}
 import kamon.Kamon
 import kamon.metric.Metric
 import supertagged._
 
 object TxProcessingStats {
-  val typeToName: Map[Byte, String] = {
-    def timerName(name: String): String =
-      CaseFormat.UPPER_CAMEL
-        .converterTo(CaseFormat.LOWER_HYPHEN)
-        .convert(name.replace("Transaction", ""))
-
-    Constants.TransactionNames.view.mapValues(timerName).toMap
+  private val typeToName = {
+    val converter = CaseFormat.UPPER_CAMEL.converterTo(CaseFormat.LOWER_HYPHEN)
+    TransactionType.values.map { t =>
+      t -> converter.convert(t.toString)
+    }.toMap
   }
 
   object TxTimer extends TaggedType[Metric.Timer]
@@ -21,12 +19,8 @@ object TxProcessingStats {
   type TxTimer = TxTimer.Type
 
   implicit class TxTimerExt(val t: TxTimer) extends AnyVal {
-    def measureForType[A](typeId: Byte)(f: => A): A = {
-      val start  = t.withTag("transaction-type", typeToName(typeId)).start()
-      val result = f
-      start.stop()
-      result
-    }
+    def measureForType[A](tpe: Transaction.Type)(f: => A): A =
+      t.withTag("transaction-type", typeToName(tpe)).measure(f)
   }
 
   val invokedScriptExecution: TxTimer    = TxTimer(Kamon.timer("tx.processing.script-execution.invoked"))

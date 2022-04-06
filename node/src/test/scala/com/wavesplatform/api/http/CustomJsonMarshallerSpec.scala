@@ -5,8 +5,7 @@ import akka.http.scaladsl.model.MediaTypes.`application/json`
 import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.ScalatestRouteTest
-import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
-import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonTransactionsApi}
+import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
@@ -22,7 +21,7 @@ import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NTPTime, TestWallet}
 import org.scalactic.source.Position
 import org.scalamock.scalatest.PathMockFactory
-import play.api.libs.json._
+import play.api.libs.json.*
 
 import scala.reflect.ClassTag
 
@@ -33,7 +32,8 @@ class CustomJsonMarshallerSpec
     with TestWallet
     with NTPTime
     with ScalatestRouteTest
-    with ApiErrorMatchers {
+    with ApiErrorMatchers
+    with ApiMarshallers {
   private val blockchain      = mock[Blockchain]
   private val utx             = mock[UtxPool]
   private val publisher       = mock[TransactionPublisher]
@@ -51,11 +51,11 @@ class CustomJsonMarshallerSpec
 
   private def checkRoute(req: HttpRequest, route: Route, fields: String*)(implicit pos: Position): Unit = {
     req ~> route ~> check {
-      ensureFieldsAre[JsNumber](responseAs[JsObject], fields: _*)
+      ensureFieldsAre[JsNumber](responseAs[JsObject], fields *)
     }
 
     req ~> numberFormat ~> route ~> check {
-      ensureFieldsAre[JsString](responseAs[JsObject], fields: _*)
+      ensureFieldsAre[JsString](responseAs[JsObject], fields *)
     }
   }
 
@@ -68,7 +68,7 @@ class CustomJsonMarshallerSpec
       (transactionsApi.transactionById _).expects(lt.id()).returning(Some(TransactionMeta.Default(height, lt, succeeded = true, 0L))).twice()
       (blockchain.leaseDetails _)
         .expects(lt.id())
-        .returning(Some(LeaseDetails(lt.sender, lt.recipient, lt.amount, LeaseDetails.Status.Active, lt.id(), 1)))
+        .returning(Some(LeaseDetails(lt.sender, lt.recipient, lt.amount.value, LeaseDetails.Status.Active, lt.id(), 1)))
         .twice()
       checkRoute(Get(s"/transactions/info/${lt.id()}"), transactionsRoute, "amount")
     }

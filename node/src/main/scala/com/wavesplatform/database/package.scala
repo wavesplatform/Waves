@@ -2,45 +2,49 @@ package com.wavesplatform
 
 import java.io.File
 import java.nio.ByteBuffer
-import java.util.{Map => JMap}
+import java.util.Map as JMap
 
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.google.protobuf.ByteString
+import com.typesafe.scalalogging.Logger
 import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.validation.Validators
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.crypto._
+import com.wavesplatform.crypto.*
+import com.wavesplatform.database.protobuf as pb
 import com.wavesplatform.database.protobuf.DataEntry.Value
-import com.wavesplatform.database.protobuf.TransactionData.Transaction.{LegacyBytes, NewTransaction}
-import com.wavesplatform.database.{protobuf => pb}
+import com.wavesplatform.database.protobuf.TransactionData.Transaction as TD
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
+import com.wavesplatform.state.*
 import com.wavesplatform.state.StateHash.SectionId
-import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, LegacyPBSwitch, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
-import com.wavesplatform.utils.{ScorexLogging, _}
+import com.wavesplatform.transaction.{EthereumTransaction, GenesisTransaction, PBSince, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
+import com.wavesplatform.utils.*
 import monix.eval.Task
 import monix.reactive.Observable
-import org.iq80.leveldb._
+import org.iq80.leveldb.*
+import org.slf4j.LoggerFactory
 import supertagged.TaggedType
 
 import scala.collection.mutable
 
 //noinspection UnstableApiUsage
-package object database extends ScorexLogging {
+package object database {
+  private lazy val logger: Logger = Logger(LoggerFactory.getLogger(getClass.getName))
+
   def openDB(path: String, recreate: Boolean = false): DB = {
-    log.debug(s"Open DB at $path")
+    logger.debug(s"Open DB at $path")
     val file = new File(path)
     val options = new Options()
       .createIfMissing(true)
@@ -248,12 +252,6 @@ package object database extends ScorexLogging {
 
   def readTransactionHeight(data: Array[Byte]): Int = Ints.fromByteArray(data)
 
-  def writeTransactionInfo(txInfo: (Int, Transaction)): Array[Byte] = {
-    val (h, tx) = txInfo
-    val txBytes = tx.bytes()
-    ByteBuffer.allocate(4 + txBytes.length).putInt(h).put(txBytes).array()
-  }
-
   def readTransactionIds(data: Array[Byte]): Seq[(Int, ByteStr)] = Option(data).fold(Seq.empty[(Int, ByteStr)]) { d =>
     val b   = ByteBuffer.wrap(d)
     val ids = Seq.newBuilder[(Int, ByteStr)]
@@ -431,7 +429,7 @@ package object database extends ScorexLogging {
     ndo.toByteArray
   }
 
-  def readDataEntry(key: String)(bs: Array[Byte]): DataEntry[_] =
+  def readDataEntry(key: String)(bs: Array[Byte]): DataEntry[?] =
     pb.DataEntry.parseFrom(bs).value match {
       case Value.Empty              => EmptyDataEntry(key)
       case Value.IntValue(value)    => IntegerDataEntry(key, value)
@@ -440,7 +438,7 @@ package object database extends ScorexLogging {
       case Value.StringValue(value) => StringDataEntry(key, value)
     }
 
-  def writeDataEntry(e: DataEntry[_]): Array[Byte] =
+  def writeDataEntry(e: DataEntry[?]): Array[Byte] =
     pb.DataEntry(e match {
         case IntegerDataEntry(_, value) => pb.DataEntry.Value.IntValue(value)
         case BooleanDataEntry(_, value) => pb.DataEntry.Value.BoolValue(value)
@@ -489,7 +487,7 @@ package object database extends ScorexLogging {
 
     def get[A](key: Key[A]): A                           = key.parse(db.get(key.keyBytes))
     def get[A](key: Key[A], readOptions: ReadOptions): A = key.parse(db.get(key.keyBytes, readOptions))
-    def has(key: Key[_]): Boolean                        = db.get(key.keyBytes) != null
+    def has(key: Key[?]): Boolean                        = db.get(key.keyBytes) != null
 
     def iterateOver(tag: KeyTags.KeyTag)(f: DBEntry => Unit): Unit = iterateOver(tag.prefixBytes)(f)
 
@@ -547,19 +545,21 @@ package object database extends ScorexLogging {
   def readTransaction(height: Height)(b: Array[Byte]): (TxMeta, Transaction) = {
     val data = pb.TransactionData.parseFrom(b)
     TxMeta(height, !data.failed, data.spentComplexity) -> (data.transaction match {
-      case tx: LegacyBytes    => TransactionParsers.parseBytes(tx.value.toByteArray).get
-      case tx: NewTransaction => PBTransactions.vanilla(tx.value).explicitGet()
-      case _                  => throw new IllegalArgumentException("Illegal transaction data")
+      case tx: TD.LegacyBytes         => TransactionParsers.parseBytes(tx.value.toByteArray).get
+      case tx: TD.WavesTransaction    => PBTransactions.vanilla(tx.value, unsafe = false).explicitGet()
+      case tx: TD.EthereumTransaction => EthereumTransaction(tx.value.toByteArray).explicitGet()
+      case _                          => throw new IllegalArgumentException("Illegal transaction data")
     })
   }
 
   def writeTransaction(v: (TxMeta, Transaction)): Array[Byte] = {
     val (m, tx) = v
     val ptx = tx match {
-      case lps: LegacyPBSwitch if !lps.isProtobufVersion => LegacyBytes(ByteString.copyFrom(tx.bytes()))
-      case _: GenesisTransaction                         => LegacyBytes(ByteString.copyFrom(tx.bytes()))
-      case _: PaymentTransaction                         => LegacyBytes(ByteString.copyFrom(tx.bytes()))
-      case _                                             => NewTransaction(PBTransactions.protobuf(tx))
+      case lps: PBSince if !lps.isProtobufVersion => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
+      case _: GenesisTransaction                         => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
+      case _: PaymentTransaction                         => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
+      case et: EthereumTransaction                       => TD.EthereumTransaction(ByteString.copyFrom(et.bytes()))
+      case _                                             => TD.WavesTransaction(PBTransactions.protobuf(tx))
     }
     pb.TransactionData(ptx, !m.succeeded, m.spentComplexity).toByteArray
   }

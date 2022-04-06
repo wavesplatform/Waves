@@ -41,7 +41,7 @@ object BlockchainContext {
     ).map { ds =>
       val environment         = new WavesEnvironment(nByte, in, h, blockchain, address, ds, txId)
       val fixUnicodeFunctions = blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
-      val useNewPowPrecision  = blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckPaymentsHeight
+      val useNewPowPrecision  = blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls) && blockchain.height > blockchain.settings.functionalitySettings.enforceTransferValidationAfter
       build(ds, environment, fixUnicodeFunctions, useNewPowPrecision)
     }
 
@@ -55,7 +55,7 @@ object BlockchainContext {
       .synchronized(
         cache.computeIfAbsent(
           (ds.stdLibVersion, fixUnicodeFunctions, ds), { _ =>
-            PureContext.build(ds.stdLibVersion, fixUnicodeFunctions, useNewPowPrecision).withEnvironment[Environment] |+|
+            PureContext.build(ds.stdLibVersion, useNewPowPrecision).withEnvironment[Environment] |+|
               CryptoContext.build(Global, ds.stdLibVersion).withEnvironment[Environment] |+|
               WavesContext.build(Global, ds)
           }

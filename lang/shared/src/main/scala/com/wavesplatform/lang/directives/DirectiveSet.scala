@@ -2,7 +2,7 @@ package com.wavesplatform.lang.directives
 
 import com.wavesplatform.lang.directives.values._
 
-case class DirectiveSet private (
+case class DirectiveSet(
   stdLibVersion: StdLibVersion,
   scriptType:    ScriptType,
   contentType:   ContentType,

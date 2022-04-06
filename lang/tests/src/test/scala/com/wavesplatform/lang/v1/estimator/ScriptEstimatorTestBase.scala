@@ -4,6 +4,7 @@ import cats.kernel.Monoid
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.utils.functionCosts
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
@@ -32,12 +33,12 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*) extends PropSpec {
   implicit val version: StdLibVersion = V3
 
   private def ctx(implicit version: StdLibVersion) = {
-    val transactionType = Types.buildTransferTransactionType(true, version)
+    val transactionType = Types.buildTransferTransactionType(true)
     val tx              = CaseObj(transactionType, Map("amount" -> CONST_LONG(100000000L)))
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(version, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
+          PureContext.build(version, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, version).withEnvironment[Environment],
           WavesContext.build(Global, DirectiveSet(version, Account, DApp).explicitGet()),
           CTX[NoContext](
@@ -50,7 +51,7 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*) extends PropSpec {
   }
 
   private val env = Common.emptyBlockchainEnvironment()
-  private val lets: Set[String] =
+  protected val lets: Set[String] =
     ctx.evaluationContext(env).letDefs.keySet
 
   protected def compile(code: String)(implicit version: StdLibVersion): EXPR = {
@@ -63,6 +64,15 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*) extends PropSpec {
       script: EXPR
   ): Either[String, Long] = {
     val results = estimators.map(_(lets, functionCosts, script))
+    if (results.distinct.length == 1)
+      results.head
+    else
+      Left(s"Estimators discrepancy: ${results.toString}")
+  }
+
+  protected def estimate(script: String): Either[String, Long] = {
+    val expr = compile(script)(V6)
+    val results = estimators.map(_(lets, functionCosts(V6), expr))
     if (results.distinct.length == 1)
       results.head
     else

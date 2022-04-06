@@ -1,18 +1,21 @@
 package com.wavesplatform.lang.v1.estimator.v3
 
-import cats.implicits._
+import cats.implicits.*
 import cats.{Id, Monad}
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.estimator.{EstimationError, ScriptEstimator}
 import com.wavesplatform.lang.v1.estimator.v3.EstimatorContext.EvalM
-import com.wavesplatform.lang.v1.estimator.v3.EstimatorContext.Lenses._
-import com.wavesplatform.lang.v1.task.imports._
+import com.wavesplatform.lang.v1.estimator.v3.EstimatorContext.Lenses.*
+import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.lang.v1.task.imports.*
 import monix.eval.Coeval
 
 import scala.util.Try
 
-case class ScriptEstimatorV3(fixOverflow: Boolean) extends ScriptEstimator {
+case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean) extends ScriptEstimator {
+  private val overheadCost: Long = if (overhead) 1 else 0
+
   override val version: Int = 3
 
   override def apply(
@@ -34,7 +37,7 @@ case class ScriptEstimatorV3(fixOverflow: Boolean) extends ScriptEstimator {
         case BLOCK(f: FUNC, inner)       => evalFuncBlock(f, inner)
         case BLOCK(_: FAILED_DEC, _)     => const(0)
         case REF(str)                    => markRef(str)
-        case _: EVALUATED                => const(1L)
+        case _: EVALUATED                => const(overheadCost)
         case IF(cond, t1, t2)            => evalIF(cond, t1, t2)
         case GETTER(expr, _)             => evalGetter(expr)
         case FUNCTION_CALL(header, args) => evalFuncCall(header, args)
@@ -88,14 +91,14 @@ case class ScriptEstimatorV3(fixOverflow: Boolean) extends ScriptEstimator {
       right <- evalHoldingFuncs(ifTrue)
       left  <- evalHoldingFuncs(ifFalse)
       r1    <- sum(cond, Math.max(right, left))
-      r2    <- sum(r1, 1)
+      r2    <- sum(r1, overheadCost)
     } yield r2
 
   private def markRef(key: String): EvalM[Long] =
-    update(usedRefs.modify(_)(_ + key)).map(_ => 1)
+    update(usedRefs.modify(_)(_ + key)).map(_ => overheadCost)
 
   private def evalGetter(expr: EXPR): EvalM[Long] =
-    evalExpr(expr).flatMap(sum(_, 1))
+    evalExpr(expr).flatMap(sum(_, overheadCost))
 
   private def evalFuncCall(header: FunctionHeader, args: List[EXPR]): EvalM[Long] =
     for {
@@ -118,7 +121,9 @@ case class ScriptEstimatorV3(fixOverflow: Boolean) extends ScriptEstimator {
       )
       argsCosts    <- args.traverse(evalHoldingFuncs)
       argsCostsSum <- argsCosts.foldM(0L)(sum)
-      result       <- sum(argsCostsSum, bodyCost.value())
+      bodyCostV         = bodyCost.value()
+      correctedBodyCost = if (!overhead && bodyCostV == 0) 1 else bodyCostV
+      result <- sum(argsCostsSum, correctedBodyCost)
     } yield result
 
   private def update(f: EstimatorContext => EstimatorContext): EvalM[Unit] =

@@ -1,14 +1,13 @@
 package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
-
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.transaction.lease.LeaseCancelTransaction
-import com.wavesplatform.transaction.{Proofs, TxVersion}
+import com.wavesplatform.transaction.{Proofs, TxPositiveAmount, TxVersion}
 import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
@@ -20,11 +19,11 @@ object LeaseCancelTxSerializer {
 
   def bodyBytes(tx: LeaseCancelTransaction): Array[Byte] = {
     import tx._
-    val baseBytes = Bytes.concat(sender.arr, Longs.toByteArray(fee), Longs.toByteArray(timestamp), leaseId.arr)
+    val baseBytes = Bytes.concat(sender.arr, Longs.toByteArray(fee.value), Longs.toByteArray(timestamp), leaseId.arr)
 
     version match {
-      case TxVersion.V1 => Bytes.concat(Array(typeId), baseBytes)
-      case TxVersion.V2 => Bytes.concat(Array(typeId, version, chainId), baseBytes)
+      case TxVersion.V1 => Bytes.concat(Array(tpe.id.toByte), baseBytes)
+      case TxVersion.V2 => Bytes.concat(Array(tpe.id.toByte, version, chainId), baseBytes)
       case _            => PBTransactionSerializer.bodyBytes(tx)
     }
   }
@@ -40,7 +39,7 @@ object LeaseCancelTxSerializer {
   def parseBytes(bytes: Array[Byte]): Try[LeaseCancelTransaction] = Try {
     def parseCommonPart(version: TxVersion, buf: ByteBuffer): LeaseCancelTransaction = {
       val sender    = buf.getPublicKey
-      val fee       = buf.getLong
+      val fee       = TxPositiveAmount.unsafeFrom(buf.getLong)
       val timestamp = buf.getLong
       val leaseId   = buf.getByteArray(crypto.DigestLength)
       LeaseCancelTransaction(version, sender, ByteStr(leaseId), fee, timestamp, Nil, AddressScheme.current.chainId)

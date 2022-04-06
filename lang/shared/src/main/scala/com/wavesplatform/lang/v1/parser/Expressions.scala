@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.parser
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.compiler.Types.*
 
 object Expressions {
 
@@ -93,6 +93,9 @@ object Expressions {
         case Union(types) => types.isEmpty
         case Tuple(types) => types.exists(_.isEmpty)
       }
+  }
+  object Type {
+    val ListTypeName = "List"
   }
   case class Single(name: PART[String], parameter: Option[PART[Type]] = None) extends Type
   case class AnyType(position: Pos)                                           extends Type

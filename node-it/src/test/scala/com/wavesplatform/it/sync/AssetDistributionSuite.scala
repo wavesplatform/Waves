@@ -29,7 +29,7 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
 
     node.massTransfer(
       issuer,
-      addresses.map(addr => MassTransferTransaction.Transfer(addr.stringRepr, transferAmount)),
+      addresses.map(addr => MassTransferTransaction.Transfer(addr.toString, transferAmount)),
       minFee + (minFee * addresses.size),
       assetId = Some(issueTx),
       waitForTx = true
@@ -130,9 +130,8 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
     val assetId = node.issue(issuer, "TestCoin#2", "no description", issueAmount, 8, false, issueFee, waitForTx = true).id
 
     receivers.foreach { receiver =>
-      node.transfer(issuer, receiver.toAddress.stringRepr, 10, assetId = Some(assetId))
+      node.transfer(issuer, receiver.toAddress.toString, 10, assetId = Some(assetId))
     }
-
 
     node.waitFor("empty utx")(_.utxSize, (_: Int) == 0, 1 second)
     nodes.waitForHeightArise()
@@ -141,11 +140,10 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
     list should have size 2001
   }
 
-
   def distributionPages(asset: String, height: Int, limit: Int): List[AssetDistributionPage] = {
     def _load(acc: List[AssetDistributionPage], maybeAfter: Option[String]): List[AssetDistributionPage] = {
       val page = node.assetDistributionAtHeight(asset, height, limit, maybeAfter)
-      if (page.hasNext) _load(page :: acc, page.lastItem.map(_.stringRepr))
+      if (page.hasNext) _load(page :: acc, page.lastItem.map(_.toString))
       else page :: acc
     }
 

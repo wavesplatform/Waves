@@ -44,7 +44,8 @@ object NetworkServer extends ScorexLogging {
       utxPool: UtxPool,
       peerDatabase: PeerDatabase,
       allChannels: ChannelGroup,
-      peerInfo: ConcurrentHashMap[Channel, PeerInfo]
+      peerInfo: ConcurrentHashMap[Channel, PeerInfo],
+      blockV5Activated: () => Boolean
   ): NS = {
     @volatile var shutdownInitiated = false
 
@@ -103,7 +104,7 @@ object NetworkServer extends ScorexLogging {
     def pipelineTail: Seq[ChannelHandlerAdapter] = Seq(
       lengthFieldPrepender,
       new LengthFieldBasedFrameDecoder(MaxFrameLength, 0, LengthFieldSize, 0, LengthFieldSize),
-      new LegacyFrameCodec(peerDatabase, settings.networkSettings.receivedTxsCacheTimeout),
+      new LegacyFrameCodec(peerDatabase, settings.networkSettings.receivedTxsCacheTimeout, blockV5Activated),
       channelClosedHandler,
       trafficWatcher,
       discardingHandler,
@@ -257,8 +258,8 @@ object NetworkServer extends ScorexLogging {
           channelClosedHandler.shutdown()
         }
 
-      override val messages: Messages                     = networkMessages
-      override val closedChannels: Observable[Channel]    = closedChannelsSubject
+      override val messages: Messages                  = networkMessages
+      override val closedChannels: Observable[Channel] = closedChannelsSubject
     }
   }
 }

@@ -19,24 +19,20 @@ case class SetAssetScriptTransaction(
     sender: PublicKey,
     asset: IssuedAsset,
     script: Option[Script],
-    fee: TxAmount,
+    fee: TxPositiveAmount,
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends VersionedTransaction
+) extends Transaction(TransactionType.SetAssetScript, Seq(asset))
+    with VersionedTransaction
     with ProvenTransaction
     with TxWithFee.InWaves
     with FastHashId
-    with LegacyPBSwitch.V2 {
+    with PBSince.V2 {
 
-  //noinspection TypeAnnotation
-  override val builder = SetAssetScriptTransaction
-
-  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(builder.serializer.bodyBytes(this))
-  override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(builder.serializer.toBytes(this))
-  override val json: Coeval[JsObject]         = Coeval.evalOnce(builder.serializer.toJson(this))
-
-  override val checkedAssets: Seq[IssuedAsset] = Seq(asset)
+  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(SetAssetScriptTxSerializer.bodyBytes(this))
+  override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(SetAssetScriptTxSerializer.toBytes(this))
+  override val json: Coeval[JsObject]         = Coeval.evalOnce(SetAssetScriptTxSerializer.toJson(this))
 }
 
 object SetAssetScriptTransaction extends TransactionParser {
@@ -60,31 +56,36 @@ object SetAssetScriptTransaction extends TransactionParser {
       sender: PublicKey,
       assetId: IssuedAsset,
       script: Option[Script],
-      fee: TxAmount,
+      fee: Long,
       timestamp: TxTimestamp,
       proofs: Proofs,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, SetAssetScriptTransaction] =
-    SetAssetScriptTransaction(version, sender, assetId, script, fee, timestamp, proofs, chainId).validatedEither
+    for {
+      fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
+      tx  <- SetAssetScriptTransaction(version, sender, assetId, script, fee, timestamp, proofs, chainId).validatedEither
+    } yield tx
 
   def signed(
       version: TxVersion,
       sender: PublicKey,
       asset: IssuedAsset,
       script: Option[Script],
-      fee: TxAmount,
+      fee: Long,
       timestamp: TxTimestamp,
-      signer: PrivateKey
+      signer: PrivateKey,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, SetAssetScriptTransaction] =
-    create(version, sender, asset, script, fee, timestamp, Proofs.empty).map(_.signWith(signer))
+    create(version, sender, asset, script, fee, timestamp, Proofs.empty, chainId).map(_.signWith(signer))
 
   def selfSigned(
       version: TxVersion,
       sender: KeyPair,
       asset: IssuedAsset,
       script: Option[Script],
-      fee: TxAmount,
-      timestamp: TxTimestamp
+      fee: Long,
+      timestamp: TxTimestamp,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, SetAssetScriptTransaction] =
-    signed(version, sender.publicKey, asset, script, fee, timestamp, sender.privateKey)
+    signed(version, sender.publicKey, asset, script, fee, timestamp, sender.privateKey, chainId)
 }

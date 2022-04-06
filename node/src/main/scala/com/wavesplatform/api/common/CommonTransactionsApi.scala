@@ -1,6 +1,6 @@
 package com.wavesplatform.api.common
 
-import com.wavesplatform.account.{Address, AddressOrAlias}
+import com.wavesplatform.account.Address
 import com.wavesplatform.api.{BlockMeta, common}
 import com.wavesplatform.block
 import com.wavesplatform.block.Block
@@ -9,8 +9,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
-import com.wavesplatform.state.{Blockchain, Diff, Height, InvokeScriptResult, TxMeta}
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.state.{Blockchain, Diff, Height, TxMeta}
+import com.wavesplatform.transaction.TransactionType.TransactionType
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Transaction}
 import com.wavesplatform.utx.UtxPool
@@ -21,7 +21,6 @@ import org.iq80.leveldb.DB
 import scala.concurrent.Future
 
 trait CommonTransactionsApi {
-  import CommonTransactionsApi._
 
   def aliasesOfAddress(address: Address): Observable[(Height, CreateAliasTransaction)]
 
@@ -36,9 +35,9 @@ trait CommonTransactionsApi {
   def broadcastTransaction(tx: Transaction): Future[TracedResult[ValidationError, Boolean]]
 
   def transactionsByAddress(
-      subject: AddressOrAlias,
+      subject: Address,
       sender: Option[Address],
-      transactionTypes: Set[Byte],
+      transactionTypes: Set[TransactionType],
       fromId: Option[ByteStr] = None
   ): Observable[TransactionMeta]
 
@@ -46,39 +45,6 @@ trait CommonTransactionsApi {
 }
 
 object CommonTransactionsApi {
-  sealed trait TransactionMeta {
-    def height: Height
-    def transaction: Transaction
-    def succeeded: Boolean
-    def spentComplexity: Long
-  }
-
-  object TransactionMeta {
-    final case class Default(height: Height, transaction: Transaction, succeeded: Boolean, spentComplexity: Long) extends TransactionMeta
-
-    final case class Invoke(
-        height: Height,
-        transaction: InvokeScriptTransaction,
-        succeeded: Boolean,
-        spentComplexity: Long,
-        invokeScriptResult: Option[InvokeScriptResult]
-    ) extends TransactionMeta
-
-    def unapply(tm: TransactionMeta): Option[(Height, Transaction, Boolean)] =
-      Some((tm.height, tm.transaction, tm.succeeded))
-
-    def create(height: Height, transaction: Transaction, succeeded: Boolean, spentComplexity: Long)(
-        result: InvokeScriptTransaction => Option[InvokeScriptResult]
-    ): TransactionMeta =
-      transaction match {
-        case ist: InvokeScriptTransaction =>
-          Invoke(height, ist, succeeded, spentComplexity, result(ist))
-
-        case _ =>
-          Default(height, transaction, succeeded, spentComplexity)
-      }
-  }
-
   def apply(
       maybeDiff: => Option[(Height, Diff)],
       db: DB,
@@ -88,28 +54,18 @@ object CommonTransactionsApi {
       publishTransaction: Transaction => Future[TracedResult[ValidationError, Boolean]],
       blockAt: Int => Option[(BlockMeta, Seq[(TxMeta, Transaction)])]
   ): CommonTransactionsApi = new CommonTransactionsApi {
-    private def resolve(subject: AddressOrAlias): Option[Address] = blockchain.resolveAlias(subject).toOption
-
     override def aliasesOfAddress(address: Address): Observable[(Height, CreateAliasTransaction)] = common.aliasesOfAddress(db, maybeDiff, address)
 
     override def transactionsByAddress(
-        subject: AddressOrAlias,
+        subject: Address,
         sender: Option[Address],
-        transactionTypes: Set[Byte],
+        transactionTypes: Set[TransactionType],
         fromId: Option[ByteStr] = None
-    ): Observable[TransactionMeta] = resolve(subject).fold(Observable.empty[TransactionMeta]) { subjectAddress =>
-      common.addressTransactions(db, maybeDiff, subjectAddress, sender, transactionTypes, fromId)
-    }
+    ): Observable[TransactionMeta] =
+      common.addressTransactions(db, maybeDiff, subject, sender, transactionTypes, fromId)
 
     override def transactionById(transactionId: ByteStr): Option[TransactionMeta] =
-      blockchain.transactionInfo(transactionId).map {
-        case (m, tx) =>
-          TransactionMeta.create(m.height, tx, m.succeeded, m.spentComplexity) { _ =>
-            maybeDiff
-              .flatMap { case (_, diff) => diff.scriptResults.get(transactionId) }
-              .orElse(AddressTransactions.loadInvokeScriptResult(db, transactionId))
-          }
-      }
+      blockchain.transactionInfo(transactionId).map(common.loadTransactionMeta(db, maybeDiff))
 
     override def unconfirmedTransactions: Seq[Transaction] = utx.all
 

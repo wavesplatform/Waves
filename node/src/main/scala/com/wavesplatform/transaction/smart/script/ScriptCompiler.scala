@@ -1,15 +1,13 @@
 package com.wavesplatform.transaction.smart.script
 
-import com.wavesplatform.lang.directives.Directive.extractValue
-import com.wavesplatform.lang.directives.DirectiveKey._
-import com.wavesplatform.lang.directives._
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.*
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script, ScriptPreprocessor}
-import com.wavesplatform.lang.utils._
+import com.wavesplatform.lang.utils.*
 import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompiler}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.utils._
+import com.wavesplatform.utils.*
 
 object ScriptCompiler extends ScorexLogging {
 
@@ -17,64 +15,68 @@ object ScriptCompiler extends ScorexLogging {
   def apply(
       scriptText: String,
       isAssetScript: Boolean,
-      estimator: ScriptEstimator
+      estimator: ScriptEstimator,
+      fixEstimateOfVerifier: Boolean = true
   ): Either[String, (Script, Long)] =
-    applyAndEstimate(scriptText, isAssetScript, estimator, Script.estimate, StdLibVersion.VersionDic.default)
+    for {
+      directives   <- DirectiveParser(scriptText)
+      directiveSet <- Directive.extractDirectives(directives, StdLibVersion.VersionDic.default)
+      scriptType = ScriptType.isAssetScript(isAssetScript)
+      result <- applyAndEstimate(scriptText, directiveSet.copy(scriptType = scriptType), estimator, Script.estimate, fixEstimateOfVerifier)
+    } yield result
 
   def compile(
       scriptText: String,
       estimator: ScriptEstimator,
       libraries: Map[String, String] = Map(),
-      defaultStdLib: => StdLibVersion = StdLibVersion.VersionDic.default
+      defaultStdLib: => StdLibVersion = StdLibVersion.VersionDic.default,
+      fixEstimateOfVerifier: Boolean = true
   ): Either[String, (Script, Long)] =
-    compileAndEstimate(scriptText, estimator, libraries, Script.estimate, defaultStdLib)
+    compileAndEstimate(scriptText, estimator, libraries, Script.estimate, defaultStdLib, fixEstimateOfVerifier)
 
   def compileAndEstimateCallables(
       scriptText: String,
       estimator: ScriptEstimator,
-      libraries: Map[String, String] = Map(),
-      defaultStdLib: => StdLibVersion = StdLibVersion.VersionDic.default
+      defaultStdLib: => StdLibVersion,
+      fixEstimateOfVerifier: Boolean
   ): Either[String, (Script, Script.ComplexityInfo)] =
-    compileAndEstimate(scriptText, estimator, libraries, Script.complexityInfo, defaultStdLib)
+    compileAndEstimate(scriptText, estimator, Map(), Script.complexityInfo(_, _, _, _), defaultStdLib, fixEstimateOfVerifier)
 
-  def compileAndEstimate[C](
+  private def compileAndEstimate[C](
       scriptText: String,
       estimator: ScriptEstimator,
-      libraries: Map[String, String] = Map(),
-      estimate: (Script, ScriptEstimator, Boolean) => Either[String, C],
-      defaultStdLib: => StdLibVersion = StdLibVersion.VersionDic.default
+      libraries: Map[String, String],
+      estimate: (Script, ScriptEstimator, Boolean, Boolean) => Either[String, C],
+      defaultStdLib: => StdLibVersion,
+      fixEstimateOfVerifier: Boolean
   ): Either[String, (Script, C)] =
     for {
-      directives  <- DirectiveParser(scriptText)
-      ds          <- Directive.extractDirectives(directives, defaultStdLib)
-      linkedInput <- ScriptPreprocessor(scriptText, libraries, ds.imports)
-      result      <- applyAndEstimate(linkedInput, ds.scriptType == Asset, estimator, estimate, defaultStdLib)
+      directives   <- DirectiveParser(scriptText)
+      directiveSet <- Directive.extractDirectives(directives, defaultStdLib)
+      linkedInput  <- ScriptPreprocessor(scriptText, libraries, directiveSet.imports)
+      result       <- applyAndEstimate(linkedInput, directiveSet, estimator, estimate, fixEstimateOfVerifier)
     } yield result
 
   private def applyAndEstimate[C](
       scriptText: String,
-      isAssetScript: Boolean,
+      directiveSet: DirectiveSet,
       estimator: ScriptEstimator,
-      estimate: (Script, ScriptEstimator, Boolean) => Either[String, C],
-      defaultStdLib: => StdLibVersion // = StdLibVersion.VersionDic.default
+      estimate: (Script, ScriptEstimator, Boolean, Boolean) => Either[String, C],
+      fixEstimateOfVerifier: Boolean
   ): Either[String, (Script, C)] =
     for {
-      directives <- DirectiveParser(scriptText)
-      contentType = extractValue(directives, CONTENT_TYPE)
-      version     = extractValue(directives, STDLIB_VERSION)(Some(defaultStdLib))
-      scriptType  = if (isAssetScript) Asset else Account
-      _          <- DirectiveSet(version, scriptType, contentType)
-      script     <- tryCompile(scriptText, contentType, version, isAssetScript)
-      complexity <- estimate(script, estimator, !isAssetScript)
+      script     <- tryCompile(scriptText, directiveSet)
+      complexity <- estimate(script, estimator, fixEstimateOfVerifier, directiveSet.scriptType != Asset)
     } yield (script, complexity)
 
-  private def tryCompile(src: String, cType: ContentType, version: StdLibVersion, isAssetScript: Boolean): Either[String, Script] = {
-    val ctx = compilerContext(version, cType, isAssetScript)
+  private def tryCompile(src: String, directiveSet: DirectiveSet): Either[String, Script] = {
+    val ctx = compilerContext(directiveSet)
     try {
-      cType match {
-        case Expression => ExpressionCompiler.compileBoolean(src, ctx).flatMap(expr => ExprScript.apply(version, expr))
-        case DApp       => ContractCompiler.compile(src, ctx, version).flatMap(expr => ContractScript.apply(version, expr))
-        case Library    => ExpressionCompiler.compileDecls(src, ctx).flatMap(ExprScript(version, _))
+      directiveSet match {
+        case DirectiveSet(v, Call, Expression, _) => ContractCompiler.compileFreeCall(src, ctx, v).flatMap(ExprScript(v, _, isFreeCall = true))
+        case DirectiveSet(v, _, Expression, _)    => ExpressionCompiler.compileBoolean(src, ctx).flatMap(ExprScript(v, _))
+        case DirectiveSet(v, _, DApp, _)          => ContractCompiler.compile(src, ctx, v).flatMap(ContractScript(v, _))
+        case DirectiveSet(v, _, Library, _)       => ExpressionCompiler.compileDecls(src, ctx).flatMap(ExprScript(v, _))
       }
     } catch {
       case ex: Throwable =>

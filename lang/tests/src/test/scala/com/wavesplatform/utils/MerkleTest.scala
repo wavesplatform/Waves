@@ -112,7 +112,7 @@ class MerkleTest extends PropSpec {
 
   private def eval[T <: EVALUATED](code: String, version: StdLibVersion = V3): Either[String, T] = {
     val untyped = Parser.parseExpr(code).get.value
-    val ctx     = PureContext.build(version, fixUnicodeFunctions = true, useNewPowPrecision = true) |+| CryptoContext.build(Global, version)
+    val ctx     = PureContext.build(version, useNewPowPrecision = true) |+| CryptoContext.build(Global, version)
     val typed   = ExpressionCompiler(ctx.compilerContext, untyped)
     typed.flatMap(v => evaluator[T](ctx.evaluationContext, v._1).leftMap(_.toString))
   }

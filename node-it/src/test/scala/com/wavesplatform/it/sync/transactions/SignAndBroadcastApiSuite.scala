@@ -51,7 +51,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
       val json = Json.obj("type" -> CreateAliasTransaction.typeId, "sender" -> firstAddress, "alias" -> "alias", "fee" -> 100000)
       val js   = if (Option(v).isDefined) json ++ Json.obj("version" -> v) else json
       assertSignBadJson(js - "type", "failed to parse json message")
-      assertSignBadJson(js + ("type" -> Json.toJson(-100)), "Bad transaction type")
+      assertSignBadJson(js + ("type" -> JsNumber(-100)), "Bad transaction type")
       assertSignBadJson(js - "alias", "failed to parse json message")
     }
 
@@ -321,7 +321,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
   }
 
   test("/transactions/sign/{signerAddress} should sign a transaction by key of signerAddress") {
-    val firstAddress = sender.createKeyPairServerSide().toAddress.stringRepr
+    val firstAddress = sender.createKeyPairServerSide().toAddress.toString
 
     val json = Json.obj(
       "type"      -> TransferTransaction.typeId,
@@ -390,22 +390,24 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
       val buyAmount           = 2
       val sellAmount          = 3
       val assetPair           = AssetPair.createAssetPair("WAVES", issueTx).get
-      val buy                 = Order.buy(o1ver, buyer, matcher.publicKey, assetPair, buyAmount, buyPrice, ts, expirationTimestamp, mf, matcherFeeOrder1)
-      val sell                = Order.sell(o2ver, seller, matcher.publicKey, assetPair, sellAmount, sellPrice, ts, expirationTimestamp, mf, matcherFeeOrder2)
+      val buy =
+        Order.buy(o1ver, buyer, matcher.publicKey, assetPair, buyAmount, buyPrice, ts, expirationTimestamp, mf, matcherFeeOrder1).explicitGet()
+      val sell =
+        Order.sell(o2ver, seller, matcher.publicKey, assetPair, sellAmount, sellPrice, ts, expirationTimestamp, mf, matcherFeeOrder2).explicitGet()
 
-      val amount = math.min(buy.amount, sell.amount)
+      val amount = math.min(buy.amount.value, sell.amount.value)
       val tx =
         if (tver == 1) {
           ExchangeTransaction
             .signed(
               1.toByte,
               matcher = matcher.privateKey,
-              order1 = buy.asInstanceOf[Order],
-              order2 = sell.asInstanceOf[Order],
+              order1 = buy,
+              order2 = sell,
               amount = amount,
               price = sellPrice,
-              buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
-              sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
+              buyMatcherFee = (BigInt(mf) * amount / buy.amount.value).toLong,
+              sellMatcherFee = (BigInt(mf) * amount / sell.amount.value).toLong,
               fee = mf,
               timestamp = ts
             )
@@ -420,8 +422,8 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
               order2 = sell,
               amount = amount,
               price = sellPrice,
-              buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
-              sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
+              buyMatcherFee = (BigInt(mf) * amount / buy.amount.value).toLong,
+              sellMatcherFee = (BigInt(mf) * amount / sell.amount.value).toLong,
               fee = mf,
               timestamp = ts
             )

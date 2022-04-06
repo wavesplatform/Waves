@@ -9,13 +9,13 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.settings.SynchronizationSettings.MicroblockSynchronizerSettings
 import com.wavesplatform.utils.ScorexLogging
-import io.netty.channel._
+import io.netty.channel.*
 import monix.eval.{Coeval, Task}
 import monix.execution.CancelableFuture
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
 
-import scala.collection.mutable.{Set => MSet}
+import scala.collection.mutable.Set as MSet
 import scala.concurrent.duration.FiniteDuration
 
 object MicroBlockSynchronizer extends ScorexLogging {
@@ -26,7 +26,7 @@ object MicroBlockSynchronizer extends ScorexLogging {
       lastBlockIdEvents: Observable[ByteStr],
       microblockInvs: ChannelObservable[MicroBlockInv],
       microblockResponses: ChannelObservable[MicroBlockResponse],
-      scheduler: SchedulerService
+      scheduler: SchedulerService,
   ): (Observable[(Channel, MicroblockData)], Coeval[CacheSizes]) = {
 
     implicit val schdlr: SchedulerService = scheduler
@@ -122,7 +122,7 @@ object MicroBlockSynchronizer extends ScorexLogging {
     val observable = microblockResponses.observeOn(scheduler).flatMap {
       case (ch, MicroBlockResponse(mb, totalRef)) =>
         successfullyReceived.put(totalRef, dummy)
-        BlockStats.received(mb, ch)
+        BlockStats.received(mb, ch, totalRef)
         Option(awaiting.getIfPresent(totalRef)) match {
           case None =>
             log.trace(s"${id(ch)} Got unexpected ${mb.stringRepr(totalRef)}")

@@ -19,32 +19,26 @@ import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WalletSettings, WavesSettings}
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, NG, diffs}
-import com.wavesplatform.test.FlatSpec
+import com.wavesplatform.test.{FlatSpec, _}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction, TxVersion}
+import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{BlocksTransactionsHelpers, TestTime, crypto, protobuf}
+import com.wavesplatform.{BlocksTransactionsHelpers, crypto, protobuf}
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
 import monix.execution.Scheduler
-import monix.reactive.Observer
+import monix.reactive.{Observable, Observer}
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.enablers.Length
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
-
-class BlockV5Test
-    extends FlatSpec
-    with WithDomain
-    with OptionValues
-    with EitherValues
-    with BlocksTransactionsHelpers {
+class BlockV5Test extends FlatSpec with WithDomain with OptionValues with EitherValues with BlocksTransactionsHelpers {
   import BlockV5Test._
 
   private val testTime = new TestTime(1)
@@ -381,12 +375,11 @@ class BlockV5Test
 
     forAll(preconditions) {
       case (acc, genesis) =>
-        val fs = TestFunctionalitySettings.Stub.copy(
-          preActivatedFeatures = Map(
-            BlockchainFeatures.NG.id      -> 0,
-            BlockchainFeatures.BlockV5.id -> 2
-          )
-        )
+        val fs = TestFunctionalitySettings.Stub.copy(preActivatedFeatures = Map(
+            BlockchainFeatures.NG.id            -> 0,
+            BlockchainFeatures.BlockV5.id       -> 2,
+            BlockchainFeatures.SmartAccounts.id -> 0
+          ))
 
         withDomain(WavesSettings.default().copy(blockchainSettings = WavesSettings.default().blockchainSettings.copy(functionalitySettings = fs))) {
           d =>
@@ -407,7 +400,7 @@ class BlockV5Test
             def lastBlock: SignedBlockHeader =
               d.blockchainUpdater.lastBlockHeader.get
 
-            val block1 = applyBlock(genesis) // h=1
+            val block1 = applyBlock(genesis, TxHelpers.genesis(TxHelpers.defaultAddress)) // h=1
             block1.id() shouldBe block1.signature
             block1.id() should have length crypto.SignatureLength
 
@@ -420,11 +413,18 @@ class BlockV5Test
             block3.id() should have length crypto.DigestLength
 
             val (keyBlock, microBlocks) =
-              UnsafeBlocks.unsafeChainBaseAndMicro(block3.id(), Nil, Seq(Nil, Nil), acc, Block.ProtoBlockVersion, System.currentTimeMillis())
+              UnsafeBlocks.unsafeChainBaseAndMicro(
+                block3.id(),
+                Nil,
+                Seq(Seq(TxHelpers.transfer()), Seq(TxHelpers.transfer())),
+                acc,
+                Block.ProtoBlockVersion,
+                System.currentTimeMillis()
+              )
             d.appendBlock(keyBlock)
             microBlocks.foreach(d.appendMicroBlock)
 
-            val mb1 = d.blockchainUpdater.microBlock(d.blockchainUpdater.microblockIds.head).get
+            val mb1 = d.microBlocks.head
             mb1.totalResBlockSig should have length crypto.SignatureLength
             mb1.reference should not be keyBlock.signature
             mb1.reference shouldBe keyBlock.id()
@@ -469,10 +469,10 @@ class BlockV5Test
     val pos               = PoSSelector(blockchain, settings.synchronizationSettings.maxBaseTarget)
     val allChannels       = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val wallet            = Wallet(WalletSettings(None, Some("123"), None))
-    val utxPool           = new UtxPoolImpl(time, blockchain, Observer.stopped, settings.utxSettings)
+    val utxPool           = new UtxPoolImpl(time, blockchain, settings.utxSettings)
     val minerScheduler    = Scheduler.singleThread("miner")
     val appenderScheduler = Scheduler.singleThread("appender")
-    val miner             = new MinerImpl(allChannels, blockchain, settings, time, utxPool, wallet, pos, minerScheduler, appenderScheduler)
+    val miner             = new MinerImpl(allChannels, blockchain, settings, time, utxPool, wallet, pos, minerScheduler, appenderScheduler, Observable.empty)
     val blockAppender     = BlockAppender(blockchain, time, utxPool, pos, appenderScheduler) _
     f(miner, blockAppender, appenderScheduler)
   }
@@ -487,32 +487,23 @@ object BlockV5Test {
   private val defaultSettings = WavesSettings.fromRootConfig(ConfigFactory.load())
   private val testSettings = defaultSettings.copy(
     blockchainSettings = defaultSettings.blockchainSettings.copy(
-      functionalitySettings = FunctionalitySettings(
-        blockVersion3AfterHeight = NGActivationHeight,
-        featureCheckBlocksPeriod = 10,
-        blocksForFeatureActivation = 1,
-        doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
-        preActivatedFeatures = Map(
+      functionalitySettings = FunctionalitySettings(featureCheckBlocksPeriod = 10, blocksForFeatureActivation = 1, blockVersion3AfterHeight = NGActivationHeight, preActivatedFeatures = Map(
           BlockchainFeatures.BlockV5.id     -> BlockV5ActivationHeight,
           BlockchainFeatures.BlockReward.id -> BlockRewardActivationHeight,
           BlockchainFeatures.NG.id          -> NGActivationHeight,
           BlockchainFeatures.FairPoS.id     -> FairPoSActivationHeight
-        )
-      )
+        ), doubleFeaturesPeriodsAfterHeight = Int.MaxValue)
     ),
     minerSettings = defaultSettings.minerSettings.copy(quorum = 0)
   )
   private val preActivatedTestSettings = testSettings.copy(
     blockchainSettings = testSettings.blockchainSettings.copy(
-      functionalitySettings = testSettings.blockchainSettings.functionalitySettings.copy(
-        blockVersion3AfterHeight = 0,
-        preActivatedFeatures = Map(
+      functionalitySettings = testSettings.blockchainSettings.functionalitySettings.copy(blockVersion3AfterHeight = 0, preActivatedFeatures = Map(
           BlockchainFeatures.BlockV5.id     -> 0,
           BlockchainFeatures.BlockReward.id -> 0,
           BlockchainFeatures.NG.id          -> 0,
           BlockchainFeatures.FairPoS.id     -> 0
-        )
-      )
+        ))
     )
   )
 }

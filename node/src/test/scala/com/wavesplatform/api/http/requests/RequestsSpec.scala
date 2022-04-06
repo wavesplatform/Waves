@@ -26,7 +26,7 @@ class RequestsSpec extends FreeSpec with OptionValues {
         "timestamp"       -> System.currentTimeMillis(),
         "fee"             -> 100000,
         "amount"          -> 10000,
-        "recipient"       -> recipient.publicKey.toAddress.stringRepr,
+        "recipient"       -> recipient.publicKey.toAddress.toString,
         "proofs"          -> JsArray(proofs.proofs.map(p => JsString(p.toString)))
       )
     )).label(s"Transfer Request v$version")

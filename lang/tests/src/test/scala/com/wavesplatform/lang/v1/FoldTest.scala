@@ -97,7 +97,7 @@ class FoldTest extends EvaluatorSpec {
          | FOLD<5>(1, 9, sum)
          |
       """.stripMargin
-    ) shouldBe Left("Compilation failed: FOLD first argument should be List[T], but Int found in 34-52")
+    ) shouldBe Left("Compilation failed: First FOLD<5> argument should be List[A], but Int found in 34-52")
   }
 
   property("suitable function is not found") {
@@ -107,21 +107,21 @@ class FoldTest extends EvaluatorSpec {
          | FOLD<5>([1], 0, sum)
          |
       """.stripMargin
-    ) shouldBe Left("Compilation failed: Can't find suitable function sum(a: Int, b: Int) for FOLD in 33-53")
+    ) shouldBe Left("Compilation failed: Can't find suitable function sum(a: Int, b: Int) for FOLD<5> in 33-53")
     eval(
       s"""
          | func sum(a:String, b:Int) = a
          | FOLD<5>([1], 0, sum)
          |
       """.stripMargin
-    ) shouldBe Left("Compilation failed: Can't find suitable function sum(a: Int, b: Int) for FOLD in 33-53")
+    ) shouldBe Left("Compilation failed: Can't find suitable function sum(a: Int, b: Int) for FOLD<5> in 33-53")
     eval(
       s"""
          | func sum(a:String, b:Int) = a
          | FOLD<5>([], 0, sum)
          |
       """.stripMargin
-    ) shouldBe Left("Compilation failed: Can't find suitable function sum(a: Int, b: Any) for FOLD in 33-52")
+    ) shouldBe Left("Compilation failed: Can't find suitable function sum(a: Int, b: Any) for FOLD<5> in 33-52")
   }
 
   private val compiler: TestCompiler = TestCompiler(V5)
@@ -138,7 +138,7 @@ class FoldTest extends EvaluatorSpec {
         |
         |FOLD<3>(src, "F1", f1) != FOLD<3>(src, "F2", f1)
         |""".stripMargin).asInstanceOf[ExprScript].expr
-    ScriptEstimatorV3(true).apply(Set.empty, functionCosts(V5), script).isRight shouldBe true
+    ScriptEstimatorV3(fixOverflow = true, overhead = true).apply(Set.empty, functionCosts(V5), script).isRight shouldBe true
   }
 
   property("unique names are used for folds inside foldFunc") {
@@ -162,7 +162,7 @@ class FoldTest extends EvaluatorSpec {
         |
         |FOLD<3>(src, "", f2) == "STEP01v1_1v1_2STEP02v2_1v2_2STEP03v3_1v3_2"
         |""".stripMargin).asInstanceOf[ExprScript].expr
-    ScriptEstimatorV3(true).apply(Set.empty, functionCosts(V5), script).isRight shouldBe true
+    ScriptEstimatorV3(fixOverflow = true, overhead = true).apply(Set.empty, functionCosts(V5), script).isRight shouldBe true
   }
 
   property("unique names are used for native fold") {
@@ -176,7 +176,7 @@ class FoldTest extends EvaluatorSpec {
         |
         |FOLD<3>(FOLD<3>([1, 2, 3], [], f1), "F1", add) == "F1321"
         |""".stripMargin).asInstanceOf[ExprScript].expr
-    ScriptEstimatorV3(true).apply(Set.empty, functionCosts(V5), script).isRight shouldBe true
+    ScriptEstimatorV3(fixOverflow = true, overhead = true).apply(Set.empty, functionCosts(V5), script).isRight shouldBe true
   }
 
   property("multiple scopes") {
@@ -193,6 +193,6 @@ class FoldTest extends EvaluatorSpec {
         |
         |f(10) > 0
         |""".stripMargin).asInstanceOf[ExprScript].expr
-    ScriptEstimatorV3(true).apply(Set.empty, functionCosts(V5), script).isRight shouldBe true
+    ScriptEstimatorV3(fixOverflow = true, overhead = true).apply(Set.empty, functionCosts(V5), script).isRight shouldBe true
   }
 }

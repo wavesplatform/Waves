@@ -345,6 +345,17 @@ object Bindings {
             provenTxPart(p, proofsEnabled, version)
           )
         )
+      case InvokeExpression(p, expression, feeAssetId) =>
+        CaseObj(
+          buildInvokeExpressionTransactionType(proofsEnabled),
+          combine(
+            Map(
+              "expression" -> expression,
+              "feeAssetId" -> feeAssetId
+            ),
+            provenTxPart(p, proofsEnabled, version)
+          )
+        )
     }
 
   private def reissueTransactionObject(
@@ -399,7 +410,7 @@ object Bindings {
 
   def transferTransactionObject(tx: Tx.Transfer, proofsEnabled: Boolean, version: StdLibVersion): CaseObj =
     CaseObj(
-      buildTransferTransactionType(proofsEnabled, version),
+      buildTransferTransactionType(proofsEnabled),
       combine(
         Map(
           "amount"     -> tx.amount,

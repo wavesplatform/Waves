@@ -1,11 +1,9 @@
 package com.wavesplatform.state.diffs
 
-import cats.instances.map._
 import cats.instances.option._
 import cats.syntax.apply._
 import cats.syntax.either._
 import cats.syntax.ior._
-import cats.syntax.semigroup._
 import cats.syntax.traverse._
 import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
@@ -20,12 +18,12 @@ import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{AssetVolumeInfo, Blockchain, Diff, LeaseBalance, Portfolio, SponsorshipValue}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.ProvenTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.{Authorized, Transaction}
 
 object DiffsCommon {
-  def countScriptRuns(blockchain: Blockchain, tx: ProvenTransaction): Int =
-    tx.checkedAssets.count(blockchain.hasAssetScript) + Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
+  def countScriptRuns(blockchain: Blockchain, tx: Transaction with Authorized): Int =
+    tx.smartAssets(blockchain).size + Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
 
   def countVerifierComplexity(
       script: Option[Script],
@@ -38,12 +36,13 @@ object DiffsCommon {
           blockchain.height > blockchain.settings.functionalitySettings.estimatorPreCheckHeight &&
             !blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)
 
+        val fixEstimateOfVerifier = blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
         val cost =
           if (useV1PreCheck)
-            Script.verifierComplexity(script, ScriptEstimatorV1, !isAsset && blockchain.useReducedVerifierComplexityLimit) *>
-              Script.verifierComplexity(script, ScriptEstimatorV2, !isAsset && blockchain.useReducedVerifierComplexityLimit)
+            Script.verifierComplexity(script, ScriptEstimatorV1, fixEstimateOfVerifier, !isAsset && blockchain.useReducedVerifierComplexityLimit) *>
+              Script.verifierComplexity(script, ScriptEstimatorV2, fixEstimateOfVerifier, !isAsset && blockchain.useReducedVerifierComplexityLimit)
           else
-            Script.verifierComplexity(script, blockchain.estimator, !isAsset && blockchain.useReducedVerifierComplexityLimit)
+            Script.verifierComplexity(script, blockchain.estimator, fixEstimateOfVerifier, !isAsset && blockchain.useReducedVerifierComplexityLimit)
 
         cost.map((script, _))
       }
@@ -197,11 +196,12 @@ object DiffsCommon {
             s"time=$time > allowMultipleLeaseCancelTransactionUntilTimestamp=$allowedTs"
         )
       )
-      senderPortfolio    = Map(sender.toAddress -> Portfolio(-fee, LeaseBalance(0, -lease.amount)))
+      senderPortfolio    = Map[Address, Portfolio](sender.toAddress -> Portfolio(-fee, LeaseBalance(0, -lease.amount)))
       recipientPortfolio = Map(recipient -> Portfolio(0, LeaseBalance(-lease.amount, 0)))
       actionInfo         = lease.copy(status = LeaseDetails.Status.Cancelled(blockchain.height, Some(cancelTxId)))
+      portfolios <- Diff.combine(senderPortfolio, recipientPortfolio).leftMap(GenericError(_))
     } yield Diff(
-      portfolios = senderPortfolio |+| recipientPortfolio,
+      portfolios = portfolios,
       leaseState = Map((leaseId, actionInfo))
     )
   }

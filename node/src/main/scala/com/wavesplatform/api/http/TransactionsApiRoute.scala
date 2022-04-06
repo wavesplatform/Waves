@@ -1,8 +1,5 @@
 package com.wavesplatform.api.http
 
-import scala.concurrent.Future
-import scala.util.Success
-
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import cats.instances.either._
@@ -11,9 +8,8 @@ import cats.instances.try_._
 import cats.syntax.alternative._
 import cats.syntax.either._
 import cats.syntax.traverse._
-import com.wavesplatform.account.{Address, AddressOrAlias}
-import com.wavesplatform.api.common.CommonTransactionsApi
-import com.wavesplatform.api.common.CommonTransactionsApi.TransactionMeta
+import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
@@ -21,16 +17,24 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, _}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.network.TransactionPublisher
+import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{Blockchain, InvokeScriptResult, TxMeta}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.utils.Time
+import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.utils.{EthEncoding, Time}
 import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
 import monix.execution.Scheduler
 import play.api.libs.json._
+
+import scala.concurrent.Future
+import scala.util.Success
+import com.wavesplatform.database.protobuf.EthereumTransactionMeta.Payload
+import com.wavesplatform.lang.v1.serialization.SerdeV1
 
 case class TransactionsApiRoute(
     settings: RestAPISettings,
@@ -75,9 +79,9 @@ case class TransactionsApiRoute(
       complete(commonApi.transactionById(id).toRight(ApiError.TransactionDoesNotExist))
     } ~ (pathEndOrSingleSlash & anyParam("id")) { ids =>
       val result = for {
-        _        <- Either.cond(ids.nonEmpty, (), InvalidTransactionId("Transaction ID was not specified"))
-        statuses <- ids.map(readTransactionMeta).toList.sequence
-      } yield statuses
+        _    <- Either.cond(ids.nonEmpty, (), InvalidTransactionId("Transaction ID was not specified"))
+        meta <- ids.map(readTransactionMeta).toList.sequence
+      } yield meta
 
       complete(result)
     }
@@ -169,7 +173,7 @@ case class TransactionsApiRoute(
   }
 
   def signWithSigner: Route = path(AddrSegment) { address =>
-    jsonPost[JsObject](TransactionFactory.parseRequestAndSign(wallet, address.stringRepr, time, _))
+    jsonPost[JsObject](TransactionFactory.parseRequestAndSign(wallet, address.toString, time, _))
   }
 
   def signedBroadcast: Route = path("broadcast")(broadcast[JsValue](TransactionFactory.fromSignedRequest))
@@ -196,12 +200,12 @@ case class TransactionsApiRoute(
     }
 
   def transactionsByAddress(address: Address, limitParam: Int, maybeAfter: Option[ByteStr])(implicit sc: Scheduler): Future[List[JsObject]] = {
-    val aliasesOfAddress: Task[Set[AddressOrAlias]] =
+    val aliasesOfAddress: Task[Set[Alias]] =
       commonApi
         .aliasesOfAddress(address)
         .collect { case (_, cat) => cat.alias }
         .toListL
-        .map(aliases => (address :: aliases).toSet)
+        .map(aliases => aliases.toSet)
         .memoize
 
     /**
@@ -212,7 +216,15 @@ case class TransactionsApiRoute(
       import com.wavesplatform.transaction.transfer._
       meta.transaction match {
         case mtt: MassTransferTransaction if mtt.sender.toAddress != address =>
-          aliasesOfAddress.map(mtt.compactJson(_) ++ serializer.transactionMetaJson(meta))
+          (if (mtt.transfers.exists(
+                 pt =>
+                   pt.address match {
+                     case address: Address => false
+                     case a: Alias         => true
+                   }
+               )) aliasesOfAddress.map(aliases => mtt.compactJson(address, aliases))
+           else Task.now(mtt.compactJson(address, Set.empty))).map(_ ++ serializer.transactionMetaJson(meta))
+
         case _ => Task.now(serializer.transactionWithMetaJson(meta))
       }
     }
@@ -290,8 +302,37 @@ object TransactionsApiRoute {
       }
 
       val stateChanges = meta match {
-        case i: TransactionMeta.Invoke => Json.obj("stateChanges" -> i.invokeScriptResult)
-        case _                         => JsObject.empty
+        case i: TransactionMeta.Invoke =>
+          Json.obj("stateChanges" -> i.invokeScriptResult)
+
+        case e: TransactionMeta.Ethereum =>
+          val payloadJson: JsObject = e.meta
+            .map(_.payload)
+            .collect {
+              case Payload.Invocation(i) =>
+                val functionCallEi = SerdeV1.deserializeFunctionCall(i.functionCall.toByteArray).map(InvokeScriptTxSerializer.functionCallToJson)
+                val payments       = i.payments.map(p => InvokeScriptTransaction.Payment(p.amount, PBAmounts.toVanillaAssetId(p.assetId)))
+                Json.obj(
+                  "type"         -> "invocation",
+                  "dApp"         -> Address(EthEncoding.toBytes(e.transaction.underlying.getTo)),
+                  "call"         -> functionCallEi.toOption,
+                  "payment"      -> payments,
+                  "stateChanges" -> e.invokeScriptResult
+                )
+
+              case Payload.Transfer(t) =>
+                val (asset, amount) = PBAmounts.toAssetAndAmount(t.getAmount)
+                Json.obj(
+                  "type"      -> "transfer",
+                  "recipient" -> Address(t.publicKeyHash.toByteArray),
+                  "asset"     -> asset,
+                  "amount"    -> amount
+                )
+            }
+            .getOrElse(JsObject.empty)
+          Json.obj("payload" -> payloadJson)
+
+        case _ => JsObject.empty
       }
 
       Seq(
@@ -359,7 +400,7 @@ object TransactionsApiRoute {
       originTransactionId: ByteStr,
       sender: Address,
       recipient: Address,
-      amount: TxAmount,
+      amount: Long,
       height: Int,
       status: LeaseStatus = LeaseStatus.active,
       cancelHeight: Option[Int] = None,

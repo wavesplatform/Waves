@@ -1,12 +1,12 @@
 package com.wavesplatform.lagonaki.unit
 
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.block.serialization.MicroBlockSerializer
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.mining.Miner
-import com.wavesplatform.state.diffs.produce
-import com.wavesplatform.test.FunSuite
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.transfer._
@@ -34,7 +34,7 @@ class MicroBlockSpecification extends FunSuite with MockFactory {
     val transactions = Seq(tr, tr2)
 
     val microBlock  = MicroBlock.buildAndSign(3.toByte, sender, transactions, prevResBlockSig, totalResBlockSig).explicitGet()
-    val parsedBlock = MicroBlock.parseBytes(microBlock.bytes()).get
+    val parsedBlock = MicroBlock.parseBytes(MicroBlockSerializer.toBytes(microBlock)).get
 
     assert(microBlock.signaturesValid().isRight)
     assert(parsedBlock.signaturesValid().isRight)

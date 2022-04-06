@@ -12,8 +12,6 @@ import com.wavesplatform.transaction.validation.impl.UpdateAssetInfoTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
-import scala.util.{Failure, Success, Try}
-
 case class UpdateAssetInfoTransaction(
     version: TxVersion,
     sender: PublicKey,
@@ -21,18 +19,17 @@ case class UpdateAssetInfoTransaction(
     name: String,
     description: String,
     timestamp: TxTimestamp,
-    feeAmount: TxAmount,
+    feeAmount: TxPositiveAmount,
     feeAsset: Asset,
     proofs: Proofs,
     chainId: Byte
-) extends VersionedTransaction
+) extends Transaction(TransactionType.UpdateAssetInfo, Seq(assetId))
+    with VersionedTransaction
     with FastHashId
     with ProvenTransaction
-    with ProtobufOnly { self =>
+    with PBSince.V1 { self =>
 
-  override def assetFee: (Asset, TxAmount) = (feeAsset, feeAmount)
-
-  override def builder: UpdateAssetInfoTransaction.type = UpdateAssetInfoTransaction
+  override def assetFee: (Asset, Long) = (feeAsset, feeAmount.value)
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(PBTransactionSerializer.bodyBytes(self))
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(PBTransactionSerializer.bytes(self))
@@ -46,28 +43,15 @@ case class UpdateAssetInfoTransaction(
         "description" -> self.description
       )
     )
-
-  override def checkedAssets: Seq[IssuedAsset] = Seq(assetId)
 }
 
-object UpdateAssetInfoTransaction extends TransactionParser {
-  type TransactionT = UpdateAssetInfoTransaction
-
-  override val typeId: TxType                    = 17: Byte
-  override val supportedVersions: Set[TxVersion] = Set(1)
+object UpdateAssetInfoTransaction {
+  val supportedVersions: Set[TxVersion] = Set(1)
 
   implicit def sign(tx: UpdateAssetInfoTransaction, privateKey: PrivateKey): UpdateAssetInfoTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
   implicit val validator: TxValidator[UpdateAssetInfoTransaction] = UpdateAssetInfoTxValidator
-
-  override def parseBytes(bytes: Array[TxType]): Try[UpdateAssetInfoTransaction] =
-    PBTransactionSerializer
-      .parseBytes(bytes)
-      .flatMap {
-        case tx: UpdateAssetInfoTransaction => Success(tx)
-        case tx: Transaction                => Failure(UnexpectedTransaction(typeId, tx.typeId))
-      }
 
   def create(
       version: Byte,
@@ -76,24 +60,26 @@ object UpdateAssetInfoTransaction extends TransactionParser {
       name: String,
       description: String,
       timestamp: TxTimestamp,
-      feeAmount: TxAmount,
+      feeAmount: Long,
       feeAsset: Asset,
       proofs: Proofs,
       chainId: Byte = AddressScheme.current.chainId
-  ): Either[ValidationError, UpdateAssetInfoTransaction] = {
-    UpdateAssetInfoTransaction(
-      version,
-      sender,
-      IssuedAsset(assetId),
-      name,
-      description,
-      timestamp,
-      feeAmount,
-      feeAsset,
-      proofs,
-      chainId
-    ).validatedEither
-  }
+  ): Either[ValidationError, UpdateAssetInfoTransaction] =
+    for {
+      fee <- TxPositiveAmount(feeAmount)(TxValidationError.InsufficientFee)
+      tx <- UpdateAssetInfoTransaction(
+        version,
+        sender,
+        IssuedAsset(assetId),
+        name,
+        description,
+        timestamp,
+        fee,
+        feeAsset,
+        proofs,
+        chainId
+      ).validatedEither
+    } yield tx
 
   def selfSigned(
       version: Byte,
@@ -102,8 +88,10 @@ object UpdateAssetInfoTransaction extends TransactionParser {
       name: String,
       description: String,
       timestamp: TxTimestamp,
-      feeAmount: TxAmount,
-      feeAsset: Asset
+      feeAmount: Long,
+      feeAsset: Asset,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, UpdateAssetInfoTransaction] =
-    create(version, sender.publicKey, assetId, name, description, timestamp, feeAmount, feeAsset, Proofs.empty).map(_.signWith(sender.privateKey))
+    create(version, sender.publicKey, assetId, name, description, timestamp, feeAmount, feeAsset, Proofs.empty, chainId)
+      .map(_.signWith(sender.privateKey))
 }

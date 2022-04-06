@@ -21,6 +21,7 @@ package object sync {
   val reissueReducedFee: Long          = 0.001.waves
   val burnFee: Long                    = 0.001.waves
   val invokeFee: Long                  = 0.009.waves
+  val invokeExpressionFee: Long        = 0.01.waves
   val sponsorFee: Long                 = 1.waves
   val sponsorReducedFee: Long          = 0.001.waves
   val setAssetScriptFee: Long          = 1.waves
@@ -84,11 +85,11 @@ package object sync {
       Some(tx.sender.toString),
       tx.name.toStringUtf8,
       tx.description.toStringUtf8,
-      quantity,
-      decimals,
+      quantity.value,
+      decimals.value,
       reissuable,
       tx.script.map(_.bytes().base64),
-      fee,
+      fee.value,
       Some(timestamp),
       proofs.headOption,
       Some(proofs)

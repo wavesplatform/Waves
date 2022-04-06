@@ -5,6 +5,7 @@ import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.{ExecutionError, CommonError}
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5}
+import com.wavesplatform.lang.v1.compiler.ScriptResultSource.CallableFunction
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
@@ -17,6 +18,7 @@ import com.wavesplatform.lang.v1.traits.domain._
 sealed trait ScriptResult {
   def returnedValue: EVALUATED                                                    = unit
   def invokes: Seq[(Address, String, Seq[EVALUATED], Seq[CaseObj], ScriptResult)] = Nil
+  def unusedComplexity: Int
 }
 case class ScriptResultV3(ds: List[DataItem[_]], ts: List[AssetTransfer], unusedComplexity: Int) extends ScriptResult
 case class ScriptResultV4(
@@ -38,7 +40,7 @@ object ScriptResult {
       .flatMap(
         t =>
           Left(
-            callableResultError(t, actual) + (if (expected.isEmpty) "" else s" instead of $expected")
+            callableResultError(t, actual, CallableFunction) + (if (expected.isEmpty) "" else s" instead of $expected")
           )
       )
 
@@ -270,13 +272,13 @@ object ScriptResult {
     }
 
   private def processScriptResult(
-    ctx: EvaluationContext[Environment, Id],
-    txId: ByteStr,
-    actions: Seq[EVALUATED],
-    handlers: ActionHandlers,
-    version: StdLibVersion,
-    unusedComplexity: Int,
-    ret: EVALUATED = unit
+      ctx: EvaluationContext[Environment, Id],
+      txId: ByteStr,
+      actions: Seq[EVALUATED],
+      handlers: ActionHandlers,
+      version: StdLibVersion,
+      unusedComplexity: Int,
+      ret: EVALUATED = unit
   ): Either[ExecutionError, ScriptResultV4] =
     actions.toList
       .traverse {
@@ -319,17 +321,23 @@ object ScriptResult {
       e: EVALUATED,
       version: StdLibVersion,
       unusedComplexity: Int
-  ): Either[ExecutionError, ScriptResult] =
+  ): Either[ExecutionError, ScriptResult] = {
+    def processResultWithValue(
+        tpe: CASETYPEREF,
+        fields: Map[String, EVALUATED],
+        v: StdLibVersion
+    ) =
+      (fields.get("_1"), fields.get("_2")) match {
+        case (Some(ARR(actions)), Some(ret)) => processScriptResult(ctx, txId, actions, v5ActionHandlers, v, unusedComplexity, ret)
+        case _                               => err(tpe.name, version)
+      }
+
     (e, version) match {
-      case (CaseObj(tpe, fields), V3) => processScriptResultV3(ctx, tpe, fields, unusedComplexity)
-      case (ARR(actions), V4)         => processScriptResult(ctx, txId, actions, v4ActionHandlers, V4, unusedComplexity)
-      case (ARR(actions), V5)         => processScriptResult(ctx, txId, actions, v5ActionHandlers, V5, unusedComplexity)
-      case (CaseObj(tpe, fields), V5) if fields.size == 2 =>
-        // XXX check tpe
-        (fields("_1"), fields("_2")) match {
-          case (ARR(actions), ret) => processScriptResult(ctx, txId, actions, v5ActionHandlers, V5, unusedComplexity, ret)
-          case _                   => err(tpe.name, version)
-        }
-      case c => err(c.toString, version)
+      case (CaseObj(tpe, fields), V3)           => processScriptResultV3(ctx, tpe, fields, unusedComplexity)
+      case (ARR(actions), V4)                   => processScriptResult(ctx, txId, actions, v4ActionHandlers, V4, unusedComplexity)
+      case (ARR(actions), v) if v >= V5         => processScriptResult(ctx, txId, actions, v5ActionHandlers, v, unusedComplexity)
+      case (CaseObj(tpe, fields), v) if v >= V5 => processResultWithValue(tpe, fields, v)
+      case c                                    => err(c.toString, version)
     }
+  }
 }

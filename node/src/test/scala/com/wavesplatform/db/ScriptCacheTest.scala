@@ -99,7 +99,7 @@ class ScriptCacheTest extends FreeSpec with WithDB {
     }
 
     "Return correct script after rollback" in {
-      val scripts = mkScripts(1)
+      val scripts              = mkScripts(1)
       val (script, complexity) = scripts.head
 
       withBlockchain(blockGen(scripts, _)) {
@@ -140,7 +140,8 @@ class ScriptCacheTest extends FreeSpec with WithDB {
       ignoreSpendableBalanceChanged,
       TestFunctionalitySettings.Stub
     )
-    val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
+    val bcu =
+      new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
     try {
       val (accounts, blocks) = gen(ntpTime).sample.get
 
@@ -152,7 +153,6 @@ class ScriptCacheTest extends FreeSpec with WithDB {
       bcu.shutdown()
     } finally {
       bcu.shutdown()
-      db.close()
     }
   }
 }
