@@ -1,12 +1,11 @@
 package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
-
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{Proofs, TxVersion}
+import com.wavesplatform.transaction.{Proofs, TxPositiveAmount, TxVersion}
 import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
@@ -15,14 +14,15 @@ object LeaseTxSerializer {
   def toJson(tx: LeaseTransaction): JsObject = {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
-      "amount"    -> amount,
+      "amount"    -> amount.value,
       "recipient" -> recipient.toString
     )
   }
 
   def bodyBytes(tx: LeaseTransaction): Array[Byte] = {
     import tx._
-    val baseBytes = Bytes.concat(sender.arr, recipient.bytes, Longs.toByteArray(amount), Longs.toByteArray(fee), Longs.toByteArray(timestamp))
+    val baseBytes =
+      Bytes.concat(sender.arr, recipient.bytes, Longs.toByteArray(amount.value), Longs.toByteArray(fee.value), Longs.toByteArray(timestamp))
 
     version match {
       case TxVersion.V1 => Bytes.concat(Array(tpe.id.toByte), baseBytes)
@@ -41,8 +41,8 @@ object LeaseTxSerializer {
     def parseCommonPart(version: TxVersion, buf: ByteBuffer): LeaseTransaction = {
       val sender    = buf.getPublicKey
       val recipient = buf.getAddressOrAlias()
-      val amount    = buf.getLong
-      val fee       = buf.getLong
+      val amount    = TxPositiveAmount.unsafeFrom(buf.getLong)
+      val fee       = TxPositiveAmount.unsafeFrom(buf.getLong)
       val timestamp = buf.getLong
       LeaseTransaction(version, sender, recipient, amount, fee, timestamp, Nil, recipient.chainId)
     }

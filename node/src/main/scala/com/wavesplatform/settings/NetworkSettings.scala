@@ -15,28 +15,30 @@ import scala.util.Random
 
 case class UPnPSettings(enable: Boolean, gatewayTimeout: FiniteDuration, discoverTimeout: FiniteDuration)
 
-case class NetworkSettings(file: Option[File],
-                           bindAddress: InetSocketAddress,
-                           declaredAddress: Option[InetSocketAddress],
-                           nodeName: String,
-                           nonce: Long,
-                           knownPeers: Seq[String],
-                           peersDataResidenceTime: FiniteDuration,
-                           blackListResidenceTime: FiniteDuration,
-                           breakIdleConnectionsTimeout: FiniteDuration,
-                           maxInboundConnections: Int,
-                           maxOutboundConnections: Int,
-                           maxConnectionsPerHost: Int,
-                           connectionTimeout: FiniteDuration,
-                           maxUnverifiedPeers: Int,
-                           enablePeersExchange: Boolean,
-                           enableBlacklisting: Boolean,
-                           peersBroadcastInterval: FiniteDuration,
-                           handshakeTimeout: FiniteDuration,
-                           suspensionResidenceTime: FiniteDuration,
-                           receivedTxsCacheTimeout: FiniteDuration,
-                           uPnPSettings: UPnPSettings,
-                           trafficLogger: TrafficLogger.Settings)
+case class NetworkSettings(
+    file: Option[File],
+    bindAddress: InetSocketAddress,
+    declaredAddress: Option[InetSocketAddress],
+    nodeName: String,
+    nonce: Long,
+    knownPeers: Seq[String],
+    peersDataResidenceTime: FiniteDuration,
+    blackListResidenceTime: FiniteDuration,
+    breakIdleConnectionsTimeout: FiniteDuration,
+    maxInboundConnections: Int,
+    maxOutboundConnections: Int,
+    maxConnectionsPerHost: Int,
+    connectionTimeout: FiniteDuration,
+    maxUnverifiedPeers: Int,
+    enablePeersExchange: Boolean,
+    enableBlacklisting: Boolean,
+    peersBroadcastInterval: FiniteDuration,
+    handshakeTimeout: FiniteDuration,
+    suspensionResidenceTime: FiniteDuration,
+    receivedTxsCacheTimeout: FiniteDuration,
+    uPnPSettings: UPnPSettings,
+    trafficLogger: TrafficLogger.Settings
+)
 
 object NetworkSettings {
   private val MaxNodeNameBytesLength = 127
@@ -49,8 +51,7 @@ object NetworkSettings {
     val bindAddress = new InetSocketAddress(config.as[String]("bind-address"), config.as[Int]("port"))
     val nonce       = config.getOrElse("nonce", randomNonce)
     val nodeName    = config.getOrElse("node-name", s"Node-$nonce")
-    require(nodeName.utf8Bytes.length <= MaxNodeNameBytesLength,
-            s"Node name should have length less than $MaxNodeNameBytesLength bytes")
+    require(nodeName.utf8Bytes.length <= MaxNodeNameBytesLength, s"Node name should have length less than $MaxNodeNameBytesLength bytes")
     val declaredAddress = config.getAs[String]("declared-address").map { address =>
       val uri = new URI(s"my://$address")
       new InetSocketAddress(uri.getHost, uri.getPort)

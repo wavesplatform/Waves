@@ -83,10 +83,10 @@ class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure
 
   test("List can contain union data type") {
     val rndString = Random.nextString(10)
-    val intEl   = CONST_LONG(Long.MaxValue)
-    val strEl   = CONST_STRING(rndString).explicitGet()
-    val byteEl  = CONST_BYTESTR(ByteStr(rndString.getBytes())).explicitGet()
-    val boolEl  = CONST_BOOLEAN(true)
+    val intEl     = CONST_LONG(Long.MaxValue)
+    val strEl     = CONST_STRING(rndString).explicitGet()
+    val byteEl    = CONST_BYTESTR(ByteStr(rndString.getBytes())).explicitGet()
+    val boolEl    = CONST_BOOLEAN(true)
 
     sender
       .invokeScript(
@@ -103,7 +103,6 @@ class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure
     sender.getDataByKey(dAppAddress, "y") shouldBe BooleanDataEntry("y", true)
     sender.getDataByKey(dAppAddress, "listsize") shouldBe IntegerDataEntry("listsize", 4)
   }
-
 
   test("can set different data types from first list el") {
     val rndString = Random.nextString(10)

@@ -16,13 +16,13 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.*
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxHelpers, TxNonNegativeAmount, TxVersion}
 
 class CommonValidationTest extends PropSpec with WithState {
 
   property("disallows double spending") {
     val preconditionsAndPayment: Seq[(GenesisTransaction, TransferTransaction)] = {
-      val master = TxHelpers.signer(1)
+      val master     = TxHelpers.signer(1)
       val recipients = Seq(master, TxHelpers.signer(2))
 
       val genesis = TxHelpers.genesis(master.toAddress)
@@ -33,14 +33,15 @@ class CommonValidationTest extends PropSpec with WithState {
       }
     }
 
-    preconditionsAndPayment.foreach { case (genesis, transfer) =>
-      assertDiffEi(Seq(TestBlock.create(Seq(genesis, transfer))), TestBlock.create(Seq(transfer))) { blockDiffEi =>
-        blockDiffEi should produce("AlreadyInTheState")
-      }
+    preconditionsAndPayment.foreach {
+      case (genesis, transfer) =>
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis, transfer))), TestBlock.create(Seq(transfer))) { blockDiffEi =>
+          blockDiffEi should produce("AlreadyInTheState")
+        }
 
-      assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(transfer, transfer))) { blockDiffEi =>
-        blockDiffEi should produce("AlreadyInTheState")
-      }
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(transfer, transfer))) { blockDiffEi =>
+          blockDiffEi should produce("AlreadyInTheState")
+        }
     }
   }
 
@@ -68,7 +69,7 @@ class CommonValidationTest extends PropSpec with WithState {
   }
 
   private def smartAccountCheckFeeTest(feeInAssets: Boolean, feeAmount: Long)(f: Either[ValidationError, Unit] => Any): Unit = {
-    val settings = createSettings(BlockchainFeatures.SmartAccounts -> 0)
+    val settings                   = createSettings(BlockchainFeatures.SmartAccounts -> 0)
     val (genesisBlock, transferTx) = sponsorAndSetScript(sponsorship = false, smartToken = false, smartAccount = true, feeInAssets, feeAmount)
     withLevelDBWriter(settings) { blockchain =>
       val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) =
@@ -84,7 +85,7 @@ class CommonValidationTest extends PropSpec with WithState {
   }
 
   private def sponsorAndSetScript(sponsorship: Boolean, smartToken: Boolean, smartAccount: Boolean, feeInAssets: Boolean, feeAmount: Long) = {
-    val richAcc = TxHelpers.signer(1)
+    val richAcc      = TxHelpers.signer(1)
     val recipientAcc = TxHelpers.signer(2)
 
     val script = ExprScript(TRUE).explicitGet()
@@ -95,7 +96,8 @@ class CommonValidationTest extends PropSpec with WithState {
     } else {
       TxHelpers.issue(richAcc, Long.MaxValue, 2, script = None, reissuable = false, fee = Constants.UnitsInWave, version = TxVersion.V1)
     }
-    val transferWaves = TxHelpers.transfer(richAcc, recipientAcc.toAddress, 10 * Constants.UnitsInWave, fee = Constants.UnitsInWave, version = TxVersion.V1)
+    val transferWaves =
+      TxHelpers.transfer(richAcc, recipientAcc.toAddress, 10 * Constants.UnitsInWave, fee = Constants.UnitsInWave, version = TxVersion.V1)
     val transferAssetFee = if (smartToken) {
       1 * Constants.UnitsInWave + ScriptExtraFee
     } else {
@@ -138,7 +140,7 @@ class CommonValidationTest extends PropSpec with WithState {
       .copy(featureCheckBlocksPeriod = 1, blocksForFeatureActivation = 1, preActivatedFeatures = preActivatedFeatures.map { case (k, v) => k.id -> v }.toMap)
 
   private def smartTokensCheckFeeTest(feeInAssets: Boolean, feeAmount: Long)(f: Either[ValidationError, Unit] => Any): Unit = {
-    val settings = createSettings(BlockchainFeatures.SmartAccounts -> 0, BlockchainFeatures.SmartAssets -> 0)
+    val settings                   = createSettings(BlockchainFeatures.SmartAccounts -> 0, BlockchainFeatures.SmartAssets -> 0)
     val (genesisBlock, transferTx) = sponsorAndSetScript(sponsorship = false, smartToken = true, smartAccount = false, feeInAssets, feeAmount)
     withLevelDBWriter(settings) { blockchain =>
       val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) =
@@ -155,16 +157,16 @@ class CommonValidationTest extends PropSpec with WithState {
 
   property("disallows other network") {
     val preconditionsAndPayment: Seq[(GenesisTransaction, Transaction)] = {
-      val master = TxHelpers.signer(1)
+      val master    = TxHelpers.signer(1)
       val recipient = TxHelpers.signer(2)
 
       val amount = 100.waves
       val script = ExprScript(TRUE).explicitGet()
-      val asset = IssuedAsset(ByteStr.fill(32)(1))
+      val asset  = IssuedAsset(ByteStr.fill(32)(1))
 
       val genesis = TxHelpers.genesis(master.toAddress)
 
-      val invChainId = '#'.toByte
+      val invChainId    = '#'.toByte
       val invChainAddr  = recipient.toAddress(invChainId)
       val invChainAlias = Alias.createWithChainId("test", invChainId).explicitGet()
       Seq(
@@ -184,7 +186,7 @@ class CommonValidationTest extends PropSpec with WithState {
           chainId = invChainId
         ),
         TxHelpers.issue(master, amount, chainId = invChainId),
-        TxHelpers.massTransfer(master, Seq(ParsedTransfer(invChainAddr, amount)), chainId = invChainId),
+        TxHelpers.massTransfer(master, Seq(ParsedTransfer(invChainAddr, TxNonNegativeAmount.unsafeFrom(amount))), chainId = invChainId),
         TxHelpers.leaseCancel(asset.id, master, version = TxVersion.V3, chainId = invChainId),
         TxHelpers.setScript(master, script, version = TxVersion.V2, chainId = invChainId),
         TxHelpers.setAssetScript(master, asset, script, version = TxVersion.V2, chainId = invChainId),
@@ -196,11 +198,12 @@ class CommonValidationTest extends PropSpec with WithState {
       ).map(genesis -> _)
     }
 
-    preconditionsAndPayment.foreach { case (genesis, tx) =>
-      tx.chainId should not be AddressScheme.current.chainId
-      assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(tx))) { blockDiffEi =>
-        blockDiffEi should produce("Address belongs to another network")
-      }
+    preconditionsAndPayment.foreach {
+      case (genesis, tx) =>
+        tx.chainId should not be AddressScheme.current.chainId
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(tx))) { blockDiffEi =>
+          blockDiffEi should produce("Address belongs to another network")
+        }
     }
   }
 }

@@ -17,7 +17,7 @@ import com.wavesplatform.consensus.PoSCalculator.{generationSignature, hit}
 import com.wavesplatform.crypto._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.settings.{FunctionalitySettings, GenesisSettings, GenesisTransactionSettings}
-import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.{GenesisTransaction, TxNonNegativeAmount}
 import com.wavesplatform.utils._
 import com.wavesplatform.wallet.Wallet
 import net.ceedubs.ficus.Ficus._
@@ -103,9 +103,12 @@ object GenesisBlockGenerator extends App {
 
   val timestamp = settings.timestamp.getOrElse(System.currentTimeMillis())
 
-  val genesisTxs: Seq[GenesisTransaction] = shares.map {
+  val genesisTxs: Seq[GenesisTransaction] = shares.flatMap {
     case (addrInfo, part) =>
-      GenesisTransaction(addrInfo.accountAddress, part, timestamp, ByteStr.empty, settings.chainId.toByte)
+      TxNonNegativeAmount
+        .from(part)
+        .toOption
+        .map(amount => GenesisTransaction(addrInfo.accountAddress, amount, timestamp, ByteStr.empty, settings.chainId.toByte))
   }
 
   report(
@@ -197,7 +200,7 @@ object GenesisBlockGenerator extends App {
       settings.initialBalance,
       Some(genesis.signature),
       genesisTxs.map { tx =>
-        GenesisTransactionSettings(tx.recipient.toString, tx.amount)
+        GenesisTransactionSettings(tx.recipient.toString, tx.amount.value)
       },
       genesis.header.baseTarget,
       settings.averageBlockDelay

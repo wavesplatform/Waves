@@ -7,7 +7,7 @@ import com.wavesplatform.network
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.test.{FlatSpec, NumericExt}
-import com.wavesplatform.transaction.{DataTransaction, TxAmount, TxHelpers}
+import com.wavesplatform.transaction.{DataTransaction, TxHelpers}
 
 class DataTransactionNewLimitsSpec extends FlatSpec with WithDomain {
   def generateMaxAllowed(limit: Int, overLimit: Boolean = false): (BooleanDataEntry, IntegerDataEntry, StringDataEntry, Seq[BinaryDataEntry]) = {
@@ -86,7 +86,7 @@ class DataTransactionNewLimitsSpec extends FlatSpec with WithDomain {
   }
 
   it should "have lowered fee after V6" in {
-    def calculateFee(preset: WavesSettings)(data: DataEntry[?]*): TxAmount =
+    def calculateFee(preset: WavesSettings)(data: DataEntry[?]*): Long =
       withDomain(preset)(d => d.commonApi.calculateWavesFee(TxHelpers.dataWithMultipleEntries(TxHelpers.defaultSigner, data)))
 
     val bigData = (1 to 100).map(i => BinaryDataEntry(i.toString, ByteStr(new Array[Byte](1024 - i.toString.length))))

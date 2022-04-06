@@ -6,12 +6,16 @@ import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.Diff
-import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.utils.{base58Length, EthEncoding}
+import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.assets.exchange.Order
+import com.wavesplatform.transaction.validation.TxValidator
+import com.wavesplatform.utils.{EthEncoding, base58Length}
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.numeric.{Interval, NonNegative, Positive}
 import play.api.libs.json.{Format, Reads, Writes}
-import supertagged._
-import supertagged.postfix._
+import supertagged.*
+import supertagged.postfix.*
 
 package object transaction {
   val AssetIdLength: Int       = com.wavesplatform.crypto.DigestLength
@@ -19,7 +23,7 @@ package object transaction {
 
   type DiscardedBlocks       = Seq[(Block, ByteStr)]
   type DiscardedMicroBlocks  = Seq[(MicroBlock, Diff)]
-  type AuthorizedTransaction = Authorized with Transaction
+  type AuthorizedTransaction = Authorized & Transaction
 
   type TxType = Byte
 
@@ -29,9 +33,39 @@ package object transaction {
     val V2: TxVersion = 2.toByte
     val V3: TxVersion = 3.toByte
   }
-  type TxAmount    = Long
   type TxTimestamp = Long
   type TxByteArray = Array[Byte]
+
+  type TxPositiveAmount = Long Refined Positive
+  object TxPositiveAmount extends RefinedTypeOps[TxPositiveAmount, Long]
+
+  type TxNonNegativeAmount = Long Refined NonNegative
+  object TxNonNegativeAmount extends RefinedTypeOps[TxNonNegativeAmount, Long]
+
+  type TxDecimals = Byte Refined Interval.Closed[0, IssueTransaction.MaxAssetDecimals.type]
+  object TxDecimals extends RefinedTypeOps[TxDecimals, Byte] {
+    val errMsg = s"decimals should be in interval [0; ${IssueTransaction.MaxAssetDecimals}]"
+  }
+
+  type TxOrderPrice = Long Refined Positive
+  object TxOrderPrice extends RefinedTypeOps[TxOrderPrice, Long] {
+    val errMsg = "price should be > 0"
+  }
+
+  type TxExchangeAmount = Long Refined Interval.OpenClosed[0, Order.MaxAmount.type]
+  object TxExchangeAmount extends RefinedTypeOps[TxExchangeAmount, Long] {
+    val errMsg = s"amount should be in interval (0; ${Order.MaxAmount}]"
+  }
+
+  type TxExchangePrice = Long Refined Interval.OpenClosed[0, Order.MaxAmount.type]
+  object TxExchangePrice extends RefinedTypeOps[TxExchangePrice, Long] {
+    val errMsg = s"price should be in interval (0; ${Order.MaxAmount}]"
+  }
+
+  type TxMatcherFee = Long Refined Interval.Open[0, Order.MaxAmount.type]
+  object TxMatcherFee extends RefinedTypeOps[TxMatcherFee, Long] {
+    val errMsg = s"matcher fee should be in interval (0; ${Order.MaxAmount})"
+  }
 
   implicit class TransactionValidationOps[T <: Transaction](val tx: T) extends AnyVal {
     def validatedNel(implicit validator: TxValidator[T]): ValidatedNel[ValidationError, T] = validator.validate(tx)

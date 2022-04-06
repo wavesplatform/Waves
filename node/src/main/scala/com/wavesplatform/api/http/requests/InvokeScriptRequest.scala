@@ -1,16 +1,16 @@
 package com.wavesplatform.api.http.requests
 
-import cats.instances.list._
-import cats.syntax.either._
-import cats.syntax.traverse._
-import com.wavesplatform.account._
+import cats.instances.list.*
+import cats.syntax.either.*
+import cats.syntax.traverse.*
+import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, InvokeTransaction}
-import play.api.libs.json._
+import play.api.libs.json.*
 
 object InvokeScriptRequest {
 
@@ -45,7 +45,9 @@ object InvokeScriptRequest {
           case _ => JsError("value is missing or not an base64 encoded string")
         }
       case JsDefined(JsString("list")) =>
-        ARR((jv \ "value").as[Vector[EVALUATED]], true).fold(JsError.apply, ({v: EVALUATED => JsSuccess(v)}))
+        ARR((jv \ "value").as[Vector[EVALUATED]], true).fold(JsError.apply, { v: EVALUATED =>
+          JsSuccess(v)
+        })
       case _ => JsError("type is missing")
     }
   }

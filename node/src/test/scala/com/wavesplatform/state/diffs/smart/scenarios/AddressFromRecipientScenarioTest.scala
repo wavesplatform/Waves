@@ -14,13 +14,13 @@ class AddressFromRecipientScenarioTest extends PropSpec with WithState {
 
   val preconditionsAndAliasCreations: (Seq[GenesisTransaction], CreateAliasTransaction, TransferTransaction, TransferTransaction) = {
     val master = TxHelpers.signer(1)
-    val other = TxHelpers.signer(2)
+    val other  = TxHelpers.signer(2)
 
-    val genesis = Seq(master, other).map(acc => TxHelpers.genesis(acc.toAddress))
-    val alias = Alias.create("alias").explicitGet()
-    val createAlias = TxHelpers.createAlias(alias.name, other)
+    val genesis            = Seq(master, other).map(acc => TxHelpers.genesis(acc.toAddress))
+    val alias              = Alias.create("alias").explicitGet()
+    val createAlias        = TxHelpers.createAlias(alias.name, other)
     val transferViaAddress = TxHelpers.transfer(master, other.toAddress)
-    val transferViaAlias = TxHelpers.transfer(master, AddressOrAlias.fromBytes(alias.bytes).explicitGet())
+    val transferViaAlias   = TxHelpers.transfer(master, AddressOrAlias.fromBytes(alias.bytes).explicitGet())
 
     (genesis, createAlias, transferViaAddress, transferViaAlias)
   }

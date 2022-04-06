@@ -1,4 +1,4 @@
-package com.wavesplatform.transaction
+package com.wavesplatform.transaction.assets.exchange
 
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
@@ -8,14 +8,14 @@ import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, OrderValidationError}
 import com.wavesplatform.transaction.assets.exchange.AssetPair.extractAssetId
-import com.wavesplatform.transaction.assets.exchange.{Order, *}
 import com.wavesplatform.transaction.serialization.impl.ExchangeTxSerializer
-import com.wavesplatform.{crypto, NTPTime}
+import com.wavesplatform.transaction.{Asset, Proofs, TxExchangeAmount, TxMatcherFee, TxOrderPrice, TxVersion}
+import com.wavesplatform.utils.JsonMatchers
+import com.wavesplatform.{NTPTime, crypto}
 import org.scalacheck.Gen
 import play.api.libs.json.Json
-import scala.math.pow
 
-import com.wavesplatform.utils.JsonMatchers
+import scala.math.pow
 
 //noinspection ScalaStyle
 class ExchangeTransactionSpecification extends PropSpec with NTPTime with JsonMatchers {
@@ -204,30 +204,34 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime with JsonMa
 
       val (buyV, sellV, exchangeV) = versions
 
-      val buy = Order.buy(
-        buyV,
-        sender1,
-        matcher.publicKey,
-        pair,
-        buyAmount,
-        buyPrice,
-        time,
-        expirationTimestamp,
-        buyMatcherFee,
-        if (buyV == 3) buyerMatcherFeeAssetId else Waves
-      )
-      val sell = Order.sell(
-        sellV,
-        sender2,
-        matcher.publicKey,
-        pair,
-        sellAmount,
-        sellPrice,
-        time,
-        expirationTimestamp,
-        sellMatcherFee,
-        if (sellV == 3) sellerMatcherFeeAssetId else Waves
-      )
+      val buy = Order
+        .buy(
+          buyV,
+          sender1,
+          matcher.publicKey,
+          pair,
+          buyAmount,
+          buyPrice,
+          time,
+          expirationTimestamp,
+          buyMatcherFee,
+          if (buyV == 3) buyerMatcherFeeAssetId else Waves
+        )
+        .explicitGet()
+      val sell = Order
+        .sell(
+          sellV,
+          sender2,
+          matcher.publicKey,
+          pair,
+          sellAmount,
+          sellPrice,
+          time,
+          expirationTimestamp,
+          sellMatcherFee,
+          if (sellV == 3) sellerMatcherFeeAssetId else Waves
+        )
+        .explicitGet()
 
       def create(
           matcher: KeyPair = sender1,
@@ -286,23 +290,15 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime with JsonMa
       create(fee = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
 
       create(buyOrder = buy.copy(orderType = OrderType.SELL)) shouldBe Left(GenericError("order1 should have OrderType.BUY"))
-      create(buyOrder = buy.copy(amount = 0)) shouldBe an[Left[_, _]]
-      create(buyOrder = buy.copy(amount = -1)) shouldBe an[Left[_, _]]
-      create(buyOrder = buy.copy(amount = Order.MaxAmount + 1)) shouldBe an[Left[_, _]]
       create(buyOrder = buy.copy(assetPair = buy.assetPair.copy(amountAsset = sell.assetPair.priceAsset))) shouldBe an[Left[_, _]]
       create(buyOrder = buy.copy(expiration = 1L)) shouldBe an[Left[_, _]]
       create(buyOrder = buy.copy(expiration = buy.expiration + 1)) shouldBe an[Left[_, _]]
-      create(buyOrder = buy.copy(price = -1)) shouldBe an[Left[_, _]]
       create(buyOrder = buy.copy(matcherPublicKey = sender2.publicKey)) shouldBe an[Left[_, _]]
 
       create(sellOrder = sell.copy(orderType = OrderType.BUY)) shouldBe Left(GenericError("sellOrder should has OrderType.SELL"))
-      create(sellOrder = sell.copy(amount = 0)) shouldBe an[Left[_, _]]
-      create(sellOrder = sell.copy(amount = -1)) shouldBe an[Left[_, _]]
-      create(sellOrder = sell.copy(amount = Order.MaxAmount + 1)) shouldBe an[Left[_, _]]
       create(sellOrder = sell.copy(assetPair = sell.assetPair.copy(priceAsset = buy.assetPair.amountAsset))) shouldBe an[Left[_, _]]
       create(sellOrder = sell.copy(expiration = 1L)) shouldBe an[Left[_, _]]
       create(sellOrder = sell.copy(expiration = sell.expiration + 1)) shouldBe an[Left[_, _]]
-      create(sellOrder = sell.copy(price = -1)) shouldBe an[Left[_, _]]
       create(sellOrder = sell.copy(matcherPublicKey = sender2.publicKey)) shouldBe an[Left[_, _]]
 
       create(sellOrder = buy, buyOrder = sell) shouldBe Left(GenericError("order1 should have OrderType.BUY"))
@@ -319,7 +315,7 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime with JsonMa
 
   def createExTx(buy: Order, sell: Order, price: Long, matcher: KeyPair, version: TxVersion): Either[ValidationError, ExchangeTransaction] = {
     val matcherFee = 300000L
-    val amount     = math.min(buy.amount, sell.amount)
+    val amount     = math.min(buy.amount.value, sell.amount.value)
 
     if (version == 1) {
       ExchangeTransaction.signed(
@@ -329,8 +325,8 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime with JsonMa
         order2 = sell,
         amount = amount,
         price = price,
-        buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount).toLong,
-        sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount).toLong,
+        buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount.value).toLong,
+        sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount.value).toLong,
         fee = matcherFee,
         timestamp = ntpTime.correctedTime()
       )
@@ -342,8 +338,8 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime with JsonMa
         order2 = sell,
         amount = amount,
         price = price,
-        buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount).toLong,
-        sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount).toLong,
+        buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount.value).toLong,
+        sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount.value).toLong,
         fee = matcherFee,
         timestamp = ntpTime.correctedTime()
       )
@@ -361,38 +357,42 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime with JsonMa
       val (sellV, buyV, exchangeV) = versions
 
       val sell =
-        Order.sell(
-          sellV,
-          sender2,
-          matcher.publicKey,
-          pair,
-          2,
-          sellPrice,
-          time,
-          expirationTimestamp,
-          matcherFee,
-          if (sellV == 3) sellerMatcherFeeAssetId else Waves
-        )
+        Order
+          .sell(
+            sellV,
+            sender2,
+            matcher.publicKey,
+            pair,
+            2,
+            sellPrice,
+            time,
+            expirationTimestamp,
+            matcherFee,
+            if (sellV == 3) sellerMatcherFeeAssetId else Waves
+          )
+          .explicitGet()
       val buy =
-        Order.buy(
-          buyV,
-          sender1,
-          matcher.publicKey,
-          pair,
-          1,
-          buyPrice,
-          time,
-          expirationTimestamp,
-          matcherFee,
-          if (buyV == 3) buyerMatcherFeeAssetId else Waves
-        )
+        Order
+          .buy(
+            buyV,
+            sender1,
+            matcher.publicKey,
+            pair,
+            1,
+            buyPrice,
+            time,
+            expirationTimestamp,
+            matcherFee,
+            if (buyV == 3) buyerMatcherFeeAssetId else Waves
+          )
+          .explicitGet()
 
       createExTx(buy, sell, sellPrice, matcher, exchangeV) shouldBe an[Right[_, _]]
 
       val sell1 =
         if (sellV == 3) {
-          Order.sell(sellV, sender2, matcher.publicKey, pair, 1, buyPrice, time, time - 1, matcherFee, sellerMatcherFeeAssetId)
-        } else Order.sell(sellV, sender2, matcher.publicKey, pair, 1, buyPrice, time, time - 1, matcherFee)
+          Order.sell(sellV, sender2, matcher.publicKey, pair, 1, buyPrice, time, time - 1, matcherFee, sellerMatcherFeeAssetId).explicitGet()
+        } else Order.sell(sellV, sender2, matcher.publicKey, pair, 1, buyPrice, time, time - 1, matcherFee).explicitGet()
 
       createExTx(buy, sell1, buyPrice, matcher, exchangeV) shouldBe Left(OrderValidationError(sell1, "expiration should be > currentTime"))
     }
@@ -458,11 +458,11 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime with JsonMa
       PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
       OrderType.BUY,
-      2,
-      6000000000L,
+      TxExchangeAmount.unsafeFrom(2),
+      TxOrderPrice.unsafeFrom(6000000000L),
       1526992336241L,
       1529584336241L,
-      1
+      TxMatcherFee.unsafeFrom(1)
     )
 
     val sell = Order(
@@ -474,11 +474,11 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime with JsonMa
       PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
       OrderType.SELL,
-      3,
-      5000000000L,
+      TxExchangeAmount.unsafeFrom(3),
+      TxOrderPrice.unsafeFrom(5000000000L),
       1526992336241L,
       1529584336241L,
-      2
+      TxMatcherFee.unsafeFrom(2)
     )
 
     val tx = ExchangeTransaction
@@ -558,11 +558,11 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime with JsonMa
       PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
       OrderType.BUY,
-      2,
-      6000000000L,
+      TxExchangeAmount.unsafeFrom(2),
+      TxOrderPrice.unsafeFrom(6000000000L),
       1526992336241L,
       1529584336241L,
-      1
+      TxMatcherFee.unsafeFrom(1)
     )
 
     val sell = Order(
@@ -574,11 +574,11 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime with JsonMa
       PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
       OrderType.SELL,
-      3,
-      5000000000L,
+      TxExchangeAmount.unsafeFrom(3),
+      TxOrderPrice.unsafeFrom(5000000000L),
       1526992336241L,
       1529584336241L,
-      2
+      TxMatcherFee.unsafeFrom(2)
     )
 
     val tx = ExchangeTransaction
@@ -659,11 +659,11 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime with JsonMa
       PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
       OrderType.BUY,
-      2,
-      6000000000L,
+      TxExchangeAmount.unsafeFrom(2),
+      TxOrderPrice.unsafeFrom(6000000000L),
       1526992336241L,
       1529584336241L,
-      1,
+      TxMatcherFee.unsafeFrom(1),
       extractAssetId("9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get
     )
 
@@ -676,11 +676,11 @@ class ExchangeTransactionSpecification extends PropSpec with NTPTime with JsonMa
       PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
       OrderType.SELL,
-      3,
-      5000000000L,
+      TxExchangeAmount.unsafeFrom(3),
+      TxOrderPrice.unsafeFrom(5000000000L),
       1526992336241L,
       1529584336241L,
-      2
+      TxMatcherFee.unsafeFrom(2)
     )
 
     val tx = ExchangeTransaction

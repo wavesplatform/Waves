@@ -34,7 +34,11 @@ class InvokePaymentsLimitTest extends PropSpec with Inside with WithState with D
     )
   }
 
-  private def scenario(version: StdLibVersion, paymentsCount: Int, nested: Boolean): (Seq[AddrWithBalance], Seq[Transaction], InvokeScriptTransaction) = {
+  private def scenario(
+      version: StdLibVersion,
+      paymentsCount: Int,
+      nested: Boolean
+  ): (Seq[AddrWithBalance], Seq[Transaction], InvokeScriptTransaction) = {
     val invoker  = TxHelpers.signer(0)
     val dApp1    = TxHelpers.signer(1)
     val dApp2    = TxHelpers.signer(2)

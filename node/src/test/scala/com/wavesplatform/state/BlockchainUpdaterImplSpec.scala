@@ -29,23 +29,14 @@ import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.utils.Time
 import org.scalamock.scalatest.MockFactory
 
-class BlockchainUpdaterImplSpec
-    extends FreeSpec
-    with EitherMatchers
-    with WithDomain
-    with NTPTime
-    with DBCacheSettings
-    with MockFactory {
+class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDomain with NTPTime with DBCacheSettings with MockFactory {
 
   private val FEE_AMT = 1000000L
 
   // default settings, no NG
   private lazy val wavesSettings = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
 
-  def baseTest(setup: Time => (KeyPair, Seq[Block]),
-               enableNg: Boolean = false,
-               triggers: BlockchainUpdateTriggers = BlockchainUpdateTriggers.noop
-  )(
+  def baseTest(setup: Time => (KeyPair, Seq[Block]), enableNg: Boolean = false, triggers: BlockchainUpdateTriggers = BlockchainUpdateTriggers.noop)(
       f: (BlockchainUpdaterImpl, KeyPair) => Unit
   ): Unit = withDomain(if (enableNg) enableNG(wavesSettings) else wavesSettings) { d =>
     d.triggers = d.triggers :+ triggers
@@ -63,10 +54,10 @@ class BlockchainUpdaterImplSpec
     TxHelpers.transfer(master, recipient, ENOUGH_AMT / 5, fee = 1000000, timestamp = ts, version = TxVersion.V1)
 
   def commonPreconditions(ts: Long): (KeyPair, List[Block]) = {
-    val master = TxHelpers.signer(1)
+    val master    = TxHelpers.signer(1)
     val recipient = TxHelpers.signer(2)
 
-    val genesis = TxHelpers.genesis(master.toAddress, timestamp = ts)
+    val genesis      = TxHelpers.genesis(master.toAddress, timestamp = ts)
     val genesisBlock = TestBlock.create(ts, Seq(genesis))
     val b1 = TestBlock
       .create(
@@ -111,14 +102,17 @@ class BlockchainUpdaterImplSpec
 
           (triggersMock.onProcessBlock _)
             .expects(where { (block, diff, _, bc) =>
+              val txDiff = diff.transactionDiffs.head
+              val tx     = txDiff.transactions.head._2.transaction.asInstanceOf[TransferTransaction]
+
               bc.height == 1 &&
               block.transactionData.length == 5 &&
               // miner reward, no NG — all txs fees
               diff.parentDiff.portfolios.size == 1 &&
               diff.parentDiff.portfolios.head._2.balance == FEE_AMT * 5 &&
               // first Tx updated balances
-              diff.transactionDiffs.head.portfolios.head._2.balance == (ENOUGH_AMT / 5) &&
-              diff.transactionDiffs.head.portfolios.last._2.balance == (-ENOUGH_AMT / 5 - FEE_AMT)
+              txDiff.portfolios(tx.recipient.asInstanceOf[Address]).balance == (ENOUGH_AMT / 5) &&
+              txDiff.portfolios(tx.sender.toAddress).balance == (-ENOUGH_AMT / 5 - FEE_AMT)
             })
             .once()
 
@@ -172,7 +166,7 @@ class BlockchainUpdaterImplSpec
 
       "block, then 2 microblocks, then block referencing previous microblock" in withDomain(enableNG(wavesSettings)) { d =>
         def preconditions(ts: Long): (Transaction, Seq[Transaction]) = {
-          val master = TxHelpers.signer(1)
+          val master    = TxHelpers.signer(1)
           val recipient = TxHelpers.signer(2)
 
           val genesis = TxHelpers.genesis(master.toAddress, timestamp = ts)
@@ -271,20 +265,25 @@ class BlockchainUpdaterImplSpec
           BlockchainFeatures.Ride4DApps
         ),
         balances = Seq(AddrWithBalance(dapp.toAddress, 10_00000000), AddrWithBalance(sender.toAddress, 10_00000000))
-      ) { d =>
-
-        val script = ScriptCompiler.compile("""
-                                              |{-# STDLIB_VERSION 4 #-}
-                                              |{-# SCRIPT_TYPE ACCOUNT #-}
-                                              |{-# CONTENT_TYPE DAPP #-}
-                                              |
-                                              |@Callable(i)
-                                              |func default() = {
-                                              |  [
-                                              |    BinaryEntry("vrf", value(value(blockInfoByHeight(height)).vrf))
-                                              |  ]
-                                              |}
-                                              |""".stripMargin, ScriptEstimatorV2).explicitGet()._1
+    ) { d =>
+      val script = ScriptCompiler
+        .compile(
+          """
+          |{-# STDLIB_VERSION 4 #-}
+          |{-# SCRIPT_TYPE ACCOUNT #-}
+          |{-# CONTENT_TYPE DAPP #-}
+          |
+          |@Callable(i)
+          |func default() = {
+          |  [
+          |    BinaryEntry("vrf", value(value(blockInfoByHeight(height)).vrf))
+          |  ]
+          |}
+          |""".stripMargin,
+          ScriptEstimatorV2
+        )
+        .explicitGet()
+        ._1
 
         d.appendBlock(
           SetScriptTransaction.selfSigned(2.toByte, dapp, Some(script), 500_0000L, ntpTime.getTimestamp()).explicitGet()

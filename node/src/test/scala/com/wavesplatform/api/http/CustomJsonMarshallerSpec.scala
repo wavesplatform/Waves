@@ -68,7 +68,7 @@ class CustomJsonMarshallerSpec
       (transactionsApi.transactionById _).expects(lt.id()).returning(Some(TransactionMeta.Default(height, lt, succeeded = true, 0L))).twice()
       (blockchain.leaseDetails _)
         .expects(lt.id())
-        .returning(Some(LeaseDetails(lt.sender, lt.recipient, lt.amount, LeaseDetails.Status.Active, lt.id(), 1)))
+        .returning(Some(LeaseDetails(lt.sender, lt.recipient, lt.amount.value, LeaseDetails.Status.Active, lt.id(), 1)))
         .twice()
       checkRoute(Get(s"/transactions/info/${lt.id()}"), transactionsRoute, "amount")
     }

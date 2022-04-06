@@ -181,13 +181,13 @@ class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
       .map { case (acc, _) => TxHelpers.genesis(acc.toAddress) }
     val invokerGenesis = TxHelpers.genesis(invoker.toAddress)
 
-    val setNoFixVerifier = accWithNoFix.map { case (acc, v) => TxHelpers.setScript(acc, checkNoFixScript(v)) }
-    val setFixVerifier = accWithFix.map { case (acc, v) => TxHelpers.setScript(acc, checkFixScript(v)) }
+    val setNoFixVerifier     = accWithNoFix.map { case (acc, v)  => TxHelpers.setScript(acc, checkNoFixScript(v)) }
+    val setFixVerifier       = accWithFix.map { case (acc, v)    => TxHelpers.setScript(acc, checkFixScript(v)) }
     val setNoFixDApp = dAppWithNoFix.map { case (acc, v) => TxHelpers.setScript(acc, checkNoFixDAppScript(v)) }
-    val setFixDApp = dAppWithFix.map { case (acc, v) => TxHelpers.setScript(acc, checkFixDAppScript(v)) }
+    val setFixDApp   = dAppWithFix.map { case (acc, v)   => TxHelpers.setScript(acc, checkFixDAppScript(v)) }
 
-    val checkFixVerifier = accWithFix.map { case (acc, _) => TxHelpers.transfer(acc, recipient.toAddress, 1) }
-    val checkNoFixVerifier = accWithNoFix.map { case (acc, _) => TxHelpers.transfer(acc, recipient.toAddress, 1) }
+    val checkFixVerifier       = accWithFix.map { case (acc, _) => TxHelpers.transfer(acc, recipient.toAddress, 1) }
+    val checkNoFixVerifier     = accWithNoFix.map { case (acc, _) => TxHelpers.transfer(acc, recipient.toAddress, 1) }
     val checkFixDApp = dAppWithFix.map { case (acc, _) => TxHelpers.invoke(acc.toAddress, func = None, invoker = invoker) }
     val checkNoFixDApp = dAppWithNoFix.map { case (acc, _) => TxHelpers.invoke(acc.toAddress, func = None, invoker = invoker) }
 
@@ -226,6 +226,6 @@ class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
     withDomain(RideV4)(assertNoFix)
     DirectiveDictionary[StdLibVersion].all
       .filter(_ >= V5)
-      .foreach(v => withDomain(settingsForRide(v))(assertFix(_, v)))
+      .foreach(v => withDomain(settingsForRide(v).configure(_.copy(enforceTransferValidationAfter = 0)))(assertFix(_, v)))
   }
 }

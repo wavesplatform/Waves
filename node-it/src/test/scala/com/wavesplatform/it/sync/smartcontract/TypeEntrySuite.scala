@@ -115,7 +115,6 @@ class TypeEntrySuite extends BaseTransactionSuite {
       ScriptEstimatorV3(fixOverflow = true, overhead = false)
     ).explicitGet()._1.bytes().base64
 
-
     sender.setScript(firstDApp, Some(dAppScript), waitForTx = true)
     sender.setScript(secondDApp, Some(accountScript), waitForTx = true)
   }
@@ -128,25 +127,27 @@ class TypeEntrySuite extends BaseTransactionSuite {
       fee = issueFee,
       waitForTx = true
     )
-    assertApiError(sender.invokeScript(
-      caller,
-      firstDApp.toAddress.toString,
-      func = Some("deleteEntries"),
-      fee = issueFee
-    )) {
-      err =>
-        err.message should include regex "called on unit"
-        err.id shouldBe ScriptExecutionError.Id
+    assertApiError(
+      sender.invokeScript(
+        caller,
+        firstDApp.toAddress.toString,
+        func = Some("deleteEntries"),
+        fee = issueFee
+      )
+    ) { err =>
+      err.message should include regex "called on unit"
+      err.id shouldBe ScriptExecutionError.Id
     }
-    assertApiError(sender.invokeScript(
-      caller,
-      firstDApp.toAddress.toString,
-      func = Some("writeDeleteEntries"),
-      fee = issueFee,
-    )) {
-      err =>
-        err.message should include regex "called on unit"
-        err.id shouldBe ScriptExecutionError.Id
+    assertApiError(
+      sender.invokeScript(
+        caller,
+        firstDApp.toAddress.toString,
+        func = Some("writeDeleteEntries"),
+        fee = issueFee
+      )
+    ) { err =>
+      err.message should include regex "called on unit"
+      err.id shouldBe ScriptExecutionError.Id
     }
   }
 

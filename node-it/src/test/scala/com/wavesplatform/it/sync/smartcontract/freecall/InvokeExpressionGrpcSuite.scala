@@ -62,7 +62,7 @@ class InvokeExpressionGrpcSuite extends GrpcBaseTransactionSuite with CancelAfte
     b.flatMap(_.transactionData).find(_.id.value().toString == id).get.asInstanceOf[InvokeExpressionTransaction]
 
   private def checkTx(tx: InvokeExpressionTransaction): Assertion = {
-    tx.fee shouldBe invokeExpressionFee
+    tx.fee.value shouldBe invokeExpressionFee
     tx.feeAssetId shouldBe Waves
     tx.sender shouldBe firstAcc.publicKey
     tx.expression shouldBe expr

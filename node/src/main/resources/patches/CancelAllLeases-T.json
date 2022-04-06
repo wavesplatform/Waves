@@ -1,52 +1,52 @@
 {
-  "balances" : {
-    "3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8" : {
-      "in" : 1000000000000,
-      "out" : -10000000000000
+  "balances": {
+    "3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8": {
+      "in": 1000000000000,
+      "out": -10000000000000
     },
-    "3MtHNCZA7EdzsLjH8V9FWUmPbV42RGXvNk3" : {
-      "in" : 0,
-      "out" : -100000000
+    "3MtHNCZA7EdzsLjH8V9FWUmPbV42RGXvNk3": {
+      "in": 0,
+      "out": -100000000
     },
-    "3MsiHfvFVUULdn8bpVoDQ7JLKKjtPXUrCLT" : {
-      "in" : -100000000,
-      "out" : 0
+    "3MsiHfvFVUULdn8bpVoDQ7JLKKjtPXUrCLT": {
+      "in": -100000000,
+      "out": 0
     },
-    "3N65xeNsETsQT6NncwpufwVAkTpiabRRpUm" : {
-      "in" : 0,
-      "out" : -800000000
+    "3N65xeNsETsQT6NncwpufwVAkTpiabRRpUm": {
+      "in": 0,
+      "out": -800000000
     },
-    "3NBYqPnTDdGeXCBkegBQzzAVEjPxS478JVj" : {
-      "in" : -3163,
-      "out" : 0
+    "3NBYqPnTDdGeXCBkegBQzzAVEjPxS478JVj": {
+      "in": -3163,
+      "out": 0
     },
-    "3MvhHXWL5TCskTpL3XS2euywQaoFyzLWHCu" : {
-      "in" : 0,
-      "out" : -5884000003163
+    "3MvhHXWL5TCskTpL3XS2euywQaoFyzLWHCu": {
+      "in": 0,
+      "out": -5884000003163
     },
-    "3MqCsTH9y6nFJEFL81DubDrpKnvreR9M52p" : {
-      "in" : -100000000,
-      "out" : 0
+    "3MqCsTH9y6nFJEFL81DubDrpKnvreR9M52p": {
+      "in": -100000000,
+      "out": 0
     },
-    "3N5sUvKLnEUBwk7WFCSjJs8VoiLiuqTs29v" : {
-      "in" : -10000000000000,
-      "out" : 1000000000000
+    "3N5sUvKLnEUBwk7WFCSjJs8VoiLiuqTs29v": {
+      "in": -10000000000000,
+      "out": 1000000000000
     },
-    "3MtMoVbAHSitzohEvd6dJGR3kmJZHSePUkS" : {
-      "in" : -500000000,
-      "out" : 200000000
+    "3MtMoVbAHSitzohEvd6dJGR3kmJZHSePUkS": {
+      "in": -500000000,
+      "out": 200000000
     },
-    "3N38yU3szhRyJfVaDRQL9m9BtGiYHf4pJvV" : {
-      "in" : -100000000,
-      "out" : 0
+    "3N38yU3szhRyJfVaDRQL9m9BtGiYHf4pJvV": {
+      "in": -100000000,
+      "out": 0
     },
-    "3NBEheVJmcexzJ9itP9KiiC2K6qnGQwpqMg" : {
-      "in" : -5883900000000,
-      "out" : -1000
+    "3NBEheVJmcexzJ9itP9KiiC2K6qnGQwpqMg": {
+      "in": -5883900000000,
+      "out": -1000
     },
-    "3N9JoRvFqR5orj6v3s6NwPSmtPeM57yPRdh" : {
-      "in" : -1000,
-      "out" : 0
+    "3N9JoRvFqR5orj6v3s6NwPSmtPeM57yPRdh": {
+      "in": -1000,
+      "out": 0
     }
   },
   "cancelledLeases": [

@@ -15,7 +15,8 @@ import io.netty.channel.socket.nio.NioSocketChannel
 
 import scala.concurrent.{Future, Promise}
 
-class NetworkClient(trafficLoggerSettings: TrafficLogger.Settings, chainId: Char, nodeName: String, nonce: Long, allChannels: ChannelGroup) extends ScorexLogging {
+class NetworkClient(trafficLoggerSettings: TrafficLogger.Settings, chainId: Char, nodeName: String, nonce: Long, allChannels: ChannelGroup)
+    extends ScorexLogging {
 
   private val workerGroup = new NioEventLoopGroup()
   private val handshake   = Handshake(Constants.ApplicationName + chainId, Version.VersionTuple, nodeName, nonce, None)

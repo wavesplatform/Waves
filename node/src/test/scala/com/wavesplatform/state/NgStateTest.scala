@@ -8,17 +8,17 @@ import com.wavesplatform.transaction.transfer.*
 class NgStateTest extends PropSpec {
 
   def preconditionsAndPayments(amt: Int): (GenesisTransaction, Seq[TransferTransaction]) = {
-    val master = TxHelpers.signer(1)
+    val master    = TxHelpers.signer(1)
     val recipient = TxHelpers.signer(2)
 
-    val genesis = TxHelpers.genesis(master.toAddress)
+    val genesis  = TxHelpers.genesis(master.toAddress)
     val payments = (1 to amt).map(idx => TxHelpers.transfer(master, recipient.toAddress, idx))
 
     (genesis, payments)
   }
 
   property("can forge correctly signed blocks") {
-    val (genesis, payments) = preconditionsAndPayments(10)
+    val (genesis, payments)  = preconditionsAndPayments(10)
     val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
     var ng = NgState(block, Diff.empty, 0L, 0L, Set.empty, None, block.header.generationSignature, Map.empty)
@@ -33,7 +33,7 @@ class NgStateTest extends PropSpec {
   }
 
   property("can resolve best liquid block") {
-    val (genesis, payments) = preconditionsAndPayments(5)
+    val (genesis, payments)  = preconditionsAndPayments(5)
     val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
     var ng = NgState(block, Diff.empty, 0L, 0L, Set.empty, None, block.header.generationSignature, Map.empty)
@@ -46,7 +46,7 @@ class NgStateTest extends PropSpec {
   }
 
   property("can resolve best last block") {
-    val (genesis, payments) = preconditionsAndPayments(5)
+    val (genesis, payments)  = preconditionsAndPayments(5)
     val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
     var ng = NgState(block, Diff.empty, 0L, 0L, Set.empty, None, block.header.generationSignature, Map.empty)
@@ -67,7 +67,7 @@ class NgStateTest extends PropSpec {
   }
 
   property("calculates carry fee correctly") {
-    val (genesis, payments) = preconditionsAndPayments(5)
+    val (genesis, payments)  = preconditionsAndPayments(5)
     val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
     var ng = NgState(block, Diff.empty, 0L, 0L, Set.empty, None, block.header.generationSignature, Map.empty)

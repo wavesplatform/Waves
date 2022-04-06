@@ -17,9 +17,9 @@ case class ReissueTransaction(
     version: TxVersion,
     sender: PublicKey,
     asset: IssuedAsset,
-    quantity: TxAmount,
+    quantity: TxPositiveAmount,
     reissuable: Boolean,
-    fee: TxAmount,
+    fee: TxPositiveAmount,
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
@@ -60,7 +60,11 @@ object ReissueTransaction extends TransactionParser {
       proofs: Proofs,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, ReissueTransaction] =
-    ReissueTransaction(version, sender, asset, quantity, reissuable, fee, timestamp, proofs, chainId).validatedEither
+    for {
+      fee      <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
+      quantity <- TxPositiveAmount(quantity)(TxValidationError.NonPositiveAmount(quantity, "assets"))
+      tx       <- ReissueTransaction(version, sender, asset, quantity, reissuable, fee, timestamp, proofs, chainId).validatedEither
+    } yield tx
 
   def signed(
       version: TxVersion,
@@ -73,7 +77,7 @@ object ReissueTransaction extends TransactionParser {
       signer: PrivateKey,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, ReissueTransaction] =
-    create(version, sender, asset, quantity, reissuable, fee, timestamp, Nil,chainId).map(_.signWith(signer))
+    create(version, sender, asset, quantity, reissuable, fee, timestamp, Nil, chainId).map(_.signWith(signer))
 
   def selfSigned(
       version: TxVersion,

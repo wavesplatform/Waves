@@ -36,7 +36,7 @@ class LeasingExpirySpec extends FreeSpec with WithDomain {
     maxFeeAmount <- Gen.choose(100000L, 1 * Constants.UnitsInWave)
     transfer     <- transferGeneratorP(ntpTime.getTimestamp(), lessor, aliasRecipient.toAddress, maxFeeAmount)
     alias        <- aliasGen
-    createAlias  <- createAliasGen(aliasRecipient, alias, transfer.amount, ntpTime.getTimestamp())
+    createAlias  <- createAliasGen(aliasRecipient, alias, transfer.amount.value, ntpTime.getTimestamp())
     genesisBlock = TestBlock.create(
       ts,
       Seq(

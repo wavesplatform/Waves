@@ -18,21 +18,22 @@ import org.scalatest.CancelAfterFailure
 class RideUpdateAssetInfoTxSuite extends BaseTransactionSuite with CancelAfterFailure {
 
   override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs.Builder(Default, 1, Seq.empty)
+    NodeConfigs
+      .Builder(Default, 1, Seq.empty)
       .overrideBase(_.quorum(0))
       .overrideBase(_.minAssetInfoUpdateInterval(1))
       .buildNonConflicting()
 
-  private def dApp = firstKeyPair
+  private def dApp     = firstKeyPair
   private def smartAcc = secondKeyPair
 
   private var asset1: IssuedAsset = _
   private var asset2: IssuedAsset = _
 
-  private val name: String = "MyAsset"
+  private val name: String        = "MyAsset"
   private val description: String = "Some description"
-  private val fee = issueFee + smartFee * 2
-  private val timestamp = System.currentTimeMillis()
+  private val fee                 = issueFee + smartFee * 2
+  private val timestamp           = System.currentTimeMillis()
 
   def sourceDApp(version: Int): String =
     s"""
@@ -109,8 +110,8 @@ class RideUpdateAssetInfoTxSuite extends BaseTransactionSuite with CancelAfterFa
   }
 
   test("can issue assets and set contracts with check of UpdateAssetInfoTransaction") {
-    val scriptDApp = ScriptCompiler.compile(sourceDApp(4), ScriptEstimatorV2).explicitGet()._1.bytes().base64
-    val scriptAcc = ScriptCompiler.compile(sourceAcc(4), ScriptEstimatorV2).explicitGet()._1.bytes().base64
+    val scriptDApp  = ScriptCompiler.compile(sourceDApp(4), ScriptEstimatorV2).explicitGet()._1.bytes().base64
+    val scriptAcc   = ScriptCompiler.compile(sourceAcc(4), ScriptEstimatorV2).explicitGet()._1.bytes().base64
     val scriptAsset = ScriptCompiler.compile(sourceAsset(4), ScriptEstimatorV2).explicitGet()._1.bytes().base64
 
     val issue1 = sender.issue(dApp, script = Some(scriptAsset), waitForTx = true)
@@ -131,5 +132,3 @@ class RideUpdateAssetInfoTxSuite extends BaseTransactionSuite with CancelAfterFa
   }
 
 }
-
-
