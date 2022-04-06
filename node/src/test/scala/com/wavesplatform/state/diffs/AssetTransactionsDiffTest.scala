@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs
 
-import com.wavesplatform.BlocksTransactionsHelpers
+import com.wavesplatform.{BlocksTransactionsHelpers, TestValues}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -537,24 +537,26 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
 
   property("only Waves can be used to pay fees for UpdateAssetInfoTransaction after RideV6 activation") {
     val sponsoredIssuer = TxHelpers.signer(1)
-    val updatedIssuer = TxHelpers.signer(2)
+    val updatedIssuer   = TxHelpers.signer(2)
 
     withDomain(
-      DomainPresets.RideV5.setFeaturesHeight((BlockchainFeatures.RideV6, 5))
+      DomainPresets.RideV5
+        .setFeaturesHeight((BlockchainFeatures.RideV6, 5))
         .configure(_.copy(minAssetInfoUpdateInterval = 0)),
       AddrWithBalance.enoughBalances(sponsoredIssuer, updatedIssuer)
     ) { d =>
       val sponsorIssue = TxHelpers.issue(sponsoredIssuer)
-      val sponsor = TxHelpers.sponsor(sponsorIssue.asset, sender = sponsoredIssuer)
-      val transfer = TxHelpers.transfer(sponsoredIssuer, updatedIssuer.toAddress, sponsorIssue.quantity / 2, sponsorIssue.asset)
+      val sponsor      = TxHelpers.sponsor(sponsorIssue.asset, sender = sponsoredIssuer)
+      val transfer     = TxHelpers.transfer(sponsoredIssuer, updatedIssuer.toAddress, sponsorIssue.quantity.value / 2, sponsorIssue.asset)
 
       val updatedIssue = TxHelpers.issue(updatedIssuer)
-      val updateAssetInfo = () => TxHelpers.updateAssetInfo(
-        assetId = updatedIssue.assetId,
-        sender = updatedIssuer,
-        fee = Sponsorship.fromWaves(TestValues.fee, sponsor.minSponsoredAssetFee.get),
-        feeAsset = sponsorIssue.asset
-      )
+      val updateAssetInfo = () =>
+        TxHelpers.updateAssetInfo(
+          assetId = updatedIssue.assetId,
+          sender = updatedIssuer,
+          fee = Sponsorship.fromWaves(TestValues.fee, sponsor.minSponsoredAssetFee.get.value),
+          feeAsset = sponsorIssue.asset
+        )
 
       d.appendBlock(sponsorIssue, updatedIssue, sponsor, transfer)
       d.appendAndAssertSucceed(updateAssetInfo())
