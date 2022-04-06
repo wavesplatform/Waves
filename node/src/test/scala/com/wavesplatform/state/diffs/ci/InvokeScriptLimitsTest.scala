@@ -49,8 +49,8 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
       val wavesTransferAmount = (limit - 8) / 2
       val (preparingTxs1, invoke1, masterAddress, serviceAddress1) =
         scenario(
-          masterContract(_, _, wavesTransferAmount, version),
-          serviceContract(version, wavesTransferAmount)
+          balanceActionsWithIssueMasterContract(_, _, wavesTransferAmount, version),
+          balanceActionsServiceContract(version, wavesTransferAmount)
         )
 
       assertDiffAndState(Seq(TestBlock.create(preparingTxs1)), TestBlock.create(Seq(invoke1), Block.ProtoBlockVersion), features(version)) {
@@ -62,8 +62,8 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
 
       val (preparingTxs2, invoke2, _, _) =
         scenario(
-          masterContract(_, _, wavesTransferAmount, version, extraAction = true),
-          serviceContract(version, wavesTransferAmount)
+          balanceActionsWithIssueMasterContract(_, _, wavesTransferAmount, version, extraAction = true),
+          balanceActionsServiceContract(version, wavesTransferAmount)
         )
 
       val errMsg =
@@ -78,12 +78,69 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
     }
   }
 
+  Seq(V5, V6).foreach { version =>
+    val limit =
+      if (version == V6)
+        ContractLimits.MaxAssetScriptActionsAmountV6
+      else
+        ContractLimits.MaxCallableActionsAmountBeforeV6(version)
+
+    property(s"Allow not more $limit Issue/Reissue/Burn/SponsorFee actions for V${version.id}") {
+      val actionsAmount = limit / 2
+      val (preparingTxs1, invoke1, masterAddress, serviceAddress1) =
+        scenario(
+          (_: Address, alias: Alias) => assetActionsMasterContract(alias, actionsAmount, version),
+          assetActionsServiceContract(version, actionsAmount)
+        )
+
+      assertDiffAndState(Seq(TestBlock.create(preparingTxs1)), TestBlock.create(Seq(invoke1), Block.ProtoBlockVersion), features(version)) {
+        case (diff, bc) =>
+          diff.scriptResults(invoke1.id()).error shouldBe None
+          bc.accountData(masterAddress, "key") shouldBe Some(IntegerDataEntry("key", 1))
+          bc.accountData(serviceAddress1, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
+      }
+
+      val (preparingTxs2, invoke2, _, _) =
+        scenario(
+          (_: Address, alias: Alias) => assetActionsMasterContract(alias, actionsAmount, version, extraAction = true),
+          assetActionsServiceContract(version, actionsAmount)
+        )
+
+      val errMsg =
+        if (version == V6)
+          "Issue, Reissue, Burn, SponsorFee actions count limit is exceeded"
+        else
+          "Actions count limit is exceeded"
+
+      assertDiffEi(Seq(TestBlock.create(preparingTxs2)), TestBlock.create(Seq(invoke2), Block.ProtoBlockVersion), features(version)) { ei =>
+        ei should produceRejectOrFailedDiff(errMsg)
+      }
+    }
+  }
+
+  property(
+    s"""Allow ${ContractLimits.MaxBalanceScriptActionsAmountV6} ScriptTransfer/Lease/LeaseCancel 
+       |and ${ContractLimits.MaxAssetScriptActionsAmountV6} Issue/Reissue/Burn/SponsorFee actions for V6""".stripMargin
+  ) {
+    val (preparingTxs, invoke, masterAddress, serviceAddress) =
+      scenario(
+        (_: Address, alias: Alias) => onlyBalanceActionsMasterContract(alias, ContractLimits.MaxBalanceScriptActionsAmountV6, V6),
+        assetActionsServiceContract(V6, ContractLimits.MaxAssetScriptActionsAmountV6)
+      )
+
+    assertDiffAndState(Seq(TestBlock.create(preparingTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features(V6)) { case (diff, bc) =>
+      diff.scriptResults(invoke.id()).error shouldBe None
+      bc.accountData(masterAddress, "key") shouldBe Some(IntegerDataEntry("key", 1))
+      bc.accountData(serviceAddress, "bar") shouldBe Some(IntegerDataEntry("bar", 1))
+    }
+  }
+
   private def scenario(masterDApp: (Address, Alias) => Script, serviceDApp: Script): (Seq[Transaction], InvokeScriptTransaction, Address, Address) = {
     val master  = TxHelpers.signer(0)
     val invoker = TxHelpers.signer(1)
     val service = TxHelpers.signer(2)
 
-    val fee = TxHelpers.ciFee(1, 2)
+    val fee = 100.waves
 
     val genesis = Seq(
       TxHelpers.genesis(master.toAddress),
@@ -107,7 +164,7 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
       case _  => fsWithV6
     }
 
-  private def serviceContract(version: StdLibVersion, wavesTransferAmount: Int): Script = {
+  private def balanceActionsServiceContract(version: StdLibVersion, wavesTransferAmount: Int): Script = {
     val script =
       s"""
          |{-# STDLIB_VERSION ${version.id} #-}
@@ -133,7 +190,13 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
     TestCompiler(version).compileContract(script)
   }
 
-  def masterContract(otherAcc: Address, alias: Alias, wavesTransferAmount: Int, version: StdLibVersion, extraAction: Boolean = false): Script = {
+  def balanceActionsWithIssueMasterContract(
+      otherAcc: Address,
+      alias: Alias,
+      wavesTransferAmount: Int,
+      version: StdLibVersion,
+      extraAction: Boolean = false
+  ): Script = {
     val additionalBalanceActionsForV6 =
       if (version == V6)
         s"""
@@ -186,6 +249,84 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
          |    throw("Bad returned value")
          |  else
          |   throw("Imposible")
+         | }
+         |""".stripMargin
+
+    TestCompiler(version).compileContract(script)
+  }
+
+  def assetActionsMasterContract(
+      alias: Alias,
+      actionsAmount: Int,
+      version: StdLibVersion,
+      extraAction: Boolean = false
+  ): Script = {
+    val extraIssueAction = if (extraAction) s"""Issue("extraAsset", "", 100, 8, true, unit, ${actionsAmount + 1}),""" else ""
+
+    val script =
+      s"""
+         |{-# STDLIB_VERSION ${version.id} #-}
+         |{-# CONTENT_TYPE DAPP #-}
+         |{-#SCRIPT_TYPE ACCOUNT#-}
+         |
+         | @Callable(i)
+         | func foo() = {
+         |   strict r = invoke(Alias("${alias.name}"), "bar", [], [])
+         |   [
+         |     IntegerEntry("key", 1),
+         |     $extraIssueAction
+         |     ${(0 until actionsAmount).map(ind => s"""Issue("masterAsset$ind", "", 100, 8, true, unit, $ind)""").mkString(",\n")}
+         |   ]
+         | }
+         |""".stripMargin
+
+    TestCompiler(version).compileContract(script)
+  }
+
+  private def assetActionsServiceContract(version: StdLibVersion, actionsAmount: Int): Script = {
+    val script =
+      s"""
+         |{-# STDLIB_VERSION ${version.id} #-}
+         |{-# CONTENT_TYPE DAPP #-}
+         |{-#SCRIPT_TYPE ACCOUNT#-}
+         |
+         | @Callable(i)
+         | func bar() = {
+         |   let issue = Issue("serviceAsset0", "", 100, 8, true, unit, 0)
+         |   let assetId = issue.calculateAssetId()
+         |   [
+         |     issue,
+         |     IntegerEntry("bar", 1),
+         |     ${(1 until (actionsAmount - 3)).map(ind => s"""Issue("serviceAsset$ind", "", 100, 8, true, unit, $ind)""").mkString(",\n")},
+         |     Reissue(assetId, 100, true),
+         |     Burn(assetId, 50),
+         |     SponsorFee(assetId, 2)
+         |   ]
+         | }
+         |""".stripMargin
+
+    TestCompiler(version).compileContract(script)
+  }
+
+  private def onlyBalanceActionsMasterContract(alias: Alias, actionsAmount: Int, version: StdLibVersion): Script = {
+
+    val script =
+      s"""
+         |{-# STDLIB_VERSION ${version.id} #-}
+         |{-# CONTENT_TYPE DAPP #-}
+         |{-#SCRIPT_TYPE ACCOUNT#-}
+         |
+         | @Callable(i)
+         | func foo() = {
+         |   strict r = invoke(Alias("${alias.name}"), "bar", [], [])
+         |   let l = Lease(Alias("${alias.name}"), 10)
+         |   [
+         |     IntegerEntry("key", 1),
+         |     l,
+         |     Lease(Alias("${alias.name}"), 20),
+         |     LeaseCancel(l.calculateLeaseId()),
+         |     ${(0 until (actionsAmount - 3)).map(_ => s"""ScriptTransfer(Alias("${alias.name}"), 1, unit)""").mkString(",\n")}
+         |   ]
          | }
          |""".stripMargin
 
