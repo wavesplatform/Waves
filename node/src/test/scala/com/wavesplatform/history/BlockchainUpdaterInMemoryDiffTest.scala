@@ -32,7 +32,7 @@ class BlockchainUpdaterInMemoryDiffTest extends PropSpec with DomainScenarioDriv
 
         blocksWithoutCompaction.foreach(b => domain.blockchainUpdater.processBlock(b) should beRight)
         val mastersBalanceAfterPayment1 = domain.balance(genesis.recipient)
-        mastersBalanceAfterPayment1 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee)
+        mastersBalanceAfterPayment1 shouldBe (ENOUGH_AMT - payment1.amount.value - payment1.fee.value)
 
         domain.blockchainUpdater.height shouldBe MaxTransactionsPerBlockDiff * 2 + 1
 
@@ -41,7 +41,7 @@ class BlockchainUpdaterInMemoryDiffTest extends PropSpec with DomainScenarioDriv
         domain.blockchainUpdater.height shouldBe MaxTransactionsPerBlockDiff * 2 + 2
 
         val mastersBalanceAfterPayment1AndPayment2 = domain.blockchainUpdater.balance(genesis.recipient)
-        mastersBalanceAfterPayment1AndPayment2 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee - payment2.amount - payment2.fee)
+        mastersBalanceAfterPayment1AndPayment2 shouldBe (ENOUGH_AMT - payment1.amount.value - payment1.fee.value - payment2.amount.value - payment2.fee.value)
     }
   }
   property("compaction without liquid block doesn't make liquid block affect state once") {
@@ -57,7 +57,7 @@ class BlockchainUpdaterInMemoryDiffTest extends PropSpec with DomainScenarioDriv
         domain.blockchainUpdater.processBlock(payment1Block) should beRight
         domain.blockchainUpdater.processBlock(emptyBlock) should beRight
         val mastersBalanceAfterPayment1 = domain.blockchainUpdater.balance(genesis.recipient)
-        mastersBalanceAfterPayment1 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee)
+        mastersBalanceAfterPayment1 shouldBe (ENOUGH_AMT - payment1.amount.value - payment1.fee.value)
 
         // discard liquid block
         domain.blockchainUpdater.removeAfter(payment1Block.id())
@@ -66,7 +66,7 @@ class BlockchainUpdaterInMemoryDiffTest extends PropSpec with DomainScenarioDriv
         domain.blockchainUpdater.height shouldBe MaxTransactionsPerBlockDiff * 2 + 1
 
         val mastersBalanceAfterPayment1AndPayment2 = domain.blockchainUpdater.balance(genesis.recipient)
-        mastersBalanceAfterPayment1AndPayment2 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee - payment2.amount - payment2.fee)
+        mastersBalanceAfterPayment1AndPayment2 shouldBe (ENOUGH_AMT - payment1.amount.value - payment1.fee.value - payment2.amount.value - payment2.fee.value)
     }
   }
 }

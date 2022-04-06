@@ -9,31 +9,31 @@ import "waves/recipient.proto";
 import "google/protobuf/empty.proto";
 
 message AssetDetails {
-    bytes name = 1;
-    bytes description = 2;
-    int32 last_renamed_at = 3;
-    bool reissuable = 4;
-    bytes total_volume = 5;
+  bytes name = 1;
+  bytes description = 2;
+  int32 last_renamed_at = 3;
+  bool reissuable = 4;
+  bytes total_volume = 5;
 }
 
 message BlockMeta {
-    Block.Header header = 1;
-    bytes signature = 2;
-    bytes header_hash = 3;
-    int32 height = 4;
-    int32 size = 5;
-    int32 transaction_count = 6;
-    int64 total_fee_in_waves = 7;
-    int64 reward = 8;
-    bytes vrf = 9;
+  Block.Header header = 1;
+  bytes signature = 2;
+  bytes header_hash = 3;
+  int32 height = 4;
+  int32 size = 5;
+  int32 transaction_count = 6;
+  int64 total_fee_in_waves = 7;
+  int64 reward = 8;
+  bytes vrf = 9;
 }
 
 message TransactionMeta {
-    int32 height = 1;
-    int32 num = 2;
-    int32 type = 3;
-    bool failed = 4;
-    int64 spent_complexity = 5;
+  int32 height = 1;
+  int32 num = 2;
+  int32 type = 3;
+  bool failed = 4;
+  int64 spent_complexity = 5;
 }
 
 message EthereumTransactionMeta {
@@ -52,62 +52,62 @@ message EthereumTransactionMeta {
 }
 
 message TransactionData {
-    oneof transaction {
-        bytes legacy_bytes = 1;
-        SignedTransaction waves_transaction = 2;
+  oneof transaction {
+    bytes legacy_bytes = 1;
+    SignedTransaction waves_transaction = 2;
         bytes ethereum_transaction = 5;
-    }
-    bool failed = 3;
-    int64 spent_complexity = 4;
+  }
+  bool failed = 3;
+  int64 spent_complexity = 4;
 }
 
 message AccountScriptInfo {
-    message ComplexityByVersion {
-        int32 version = 1;
-        map<string, int64> callable_complexity = 2;
-    }
+  message ComplexityByVersion {
+    int32 version = 1;
+    map<string, int64> callable_complexity = 2;
+  }
 
-    bytes public_key = 1;
-    bytes script_bytes = 2;
-    int64 max_complexity = 3;
-    repeated ComplexityByVersion callable_complexity = 4;
+  bytes public_key = 1;
+  bytes script_bytes = 2;
+  int64 max_complexity = 3;
+  repeated ComplexityByVersion callable_complexity = 4;
 }
 
 message StaticAssetInfo {
-    bytes source_id = 1;
-    bytes issuer_public_key = 2;
-    int32 decimals = 3;
-    bool is_nft = 4;
+  bytes source_id = 1;
+  bytes issuer_public_key = 2;
+  int32 decimals = 3;
+  bool is_nft = 4;
 }
 
 message DataEntry {
-    oneof value {
-        int64 int_value = 1;
-        bool bool_value = 2;
-        bytes binary_value = 3;
-        string string_value = 4;
-    }
+  oneof value {
+    int64 int_value = 1;
+    bool bool_value = 2;
+    bytes binary_value = 3;
+    string string_value = 4;
+  }
 }
 
 message LeaseDetails {
-    message Cancelled {
-        int32 height = 1;
-        bytes transaction_id = 2;
-    }
+  message Cancelled {
+    int32 height = 1;
+    bytes transaction_id = 2;
+  }
 
-    message Expired {
-        int32 height = 1;
-    }
+  message Expired {
+    int32 height = 1;
+  }
 
-    bytes sender_public_key = 1;
-    Recipient recipient = 2;
-    int64 amount = 3;
-    bytes source_id = 4;
-    int32 height = 5;
+  bytes sender_public_key = 1;
+  Recipient recipient = 2;
+  int64 amount = 3;
+  bytes source_id = 4;
+  int32 height = 5;
 
-    oneof status {
-        google.protobuf.Empty active = 10;
-        Cancelled cancelled = 11;
-        Expired expired = 12;
-    }
+  oneof status {
+    google.protobuf.Empty active = 10;
+    Cancelled cancelled = 11;
+    Expired expired = 12;
+  }
 }

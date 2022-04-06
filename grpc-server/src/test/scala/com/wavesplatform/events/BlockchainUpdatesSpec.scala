@@ -329,9 +329,9 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
         issue.sender,
         issue.name,
         issue.description,
-        issue.decimals,
+        issue.decimals.value,
         issue.reissuable,
-        issue.quantity,
+        issue.quantity.value,
         Height @@ 2,
         None,
         0L,
@@ -360,9 +360,9 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
         issue.sender,
         issue.name,
         issue.description,
-        issue.decimals,
+        issue.decimals.value,
         issue.reissuable,
-        issue.quantity + reissue.quantity,
+        issue.quantity.value + reissue.quantity.value,
         Height @@ 2,
         None,
         0L,
@@ -391,7 +391,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
         )
 
         rollback.stateUpdate.leases shouldBe Seq(
-          LeaseUpdate(lease.id(), LeaseStatus.Inactive, lease.amount, lease.sender, lease.recipient.asInstanceOf[Address], lease.id())
+          LeaseUpdate(lease.id(), LeaseStatus.Inactive, lease.amount.value, lease.sender, lease.recipient.asInstanceOf[Address], lease.id())
         )
 
         rollback.stateUpdate.dataEntries shouldBe Seq(
@@ -425,7 +425,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
         )
 
         rollback.stateUpdate.leases shouldBe Seq(
-          LeaseUpdate(lease.id(), LeaseStatus.Inactive, lease.amount, lease.sender, lease.recipient.asInstanceOf[Address], lease.id())
+          LeaseUpdate(lease.id(), LeaseStatus.Inactive, lease.amount.value, lease.sender, lease.recipient.asInstanceOf[Address], lease.id())
         )
 
         rollback.stateUpdate.dataEntries shouldBe Seq(

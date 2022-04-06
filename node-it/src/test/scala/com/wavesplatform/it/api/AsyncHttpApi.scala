@@ -4,7 +4,6 @@ import java.io.IOException
 import java.net.{InetSocketAddress, URLEncoder}
 import java.util.concurrent.TimeoutException
 import java.util.{NoSuchElementException, UUID}
-
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
 import com.wavesplatform.api.http.DebugMessage.*
@@ -32,7 +31,18 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, Proofs, TxVersion}
+import com.wavesplatform.transaction.{
+  Asset,
+  CreateAliasTransaction,
+  DataTransaction,
+  Proofs,
+  TxDecimals,
+  TxExchangeAmount,
+  TxExchangePrice,
+  TxNonNegativeAmount,
+  TxPositiveAmount,
+  TxVersion
+}
 import org.asynchttpclient.*
 import org.asynchttpclient.Dsl.{delete as _delete, get as _get, post as _post, put as _put}
 import org.asynchttpclient.util.HttpConstants.ResponseStatusCodes.OK_200
@@ -353,9 +363,9 @@ object AsyncHttpApi extends Assertions {
           sender.publicKey,
           AddressOrAlias.fromString(recipient).explicitGet(),
           Asset.fromString(assetId),
-          amount,
+          TxPositiveAmount.unsafeFrom(amount),
           Asset.fromString(feeAssetId),
-          fee,
+          TxPositiveAmount.unsafeFrom(fee),
           attachment.fold(ByteStr.empty)(s => ByteStr(s.getBytes)),
           System.currentTimeMillis(),
           Proofs.empty,
@@ -373,8 +383,8 @@ object AsyncHttpApi extends Assertions {
           version,
           sender.publicKey,
           AddressOrAlias.fromString(recipient).explicitGet(),
-          amount,
-          fee,
+          TxPositiveAmount.unsafeFrom(amount),
+          TxPositiveAmount.unsafeFrom(fee),
           System.currentTimeMillis(),
           Proofs.empty,
           AddressScheme.current.chainId
@@ -388,7 +398,7 @@ object AsyncHttpApi extends Assertions {
           version,
           sender.publicKey,
           ByteStr.decodeBase58(leaseId).get,
-          fee,
+          TxPositiveAmount.unsafeFrom(fee),
           System.currentTimeMillis(),
           Proofs.empty,
           AddressScheme.current.chainId
@@ -414,11 +424,11 @@ object AsyncHttpApi extends Assertions {
           sender.publicKey,
           ByteString.copyFromUtf8(name),
           ByteString.copyFromUtf8(description),
-          quantity,
-          decimals,
+          TxPositiveAmount.unsafeFrom(quantity),
+          TxDecimals.unsafeFrom(decimals),
           reissuable,
           script.map(s => ScriptReader.fromBytes(Base64.decode(s)).explicitGet()),
-          fee,
+          TxPositiveAmount.unsafeFrom(fee),
           System.currentTimeMillis(),
           Proofs.empty,
           AddressScheme.current.chainId
@@ -431,7 +441,7 @@ object AsyncHttpApi extends Assertions {
           version,
           sender.publicKey,
           script.map(s => ScriptReader.fromBytes(Base64.decode(s)).explicitGet()),
-          fee,
+          TxPositiveAmount.unsafeFrom(fee),
           System.currentTimeMillis(),
           Proofs.empty,
           AddressScheme.current.chainId
@@ -451,7 +461,7 @@ object AsyncHttpApi extends Assertions {
           sender.publicKey,
           IssuedAsset(ByteStr.decodeBase58(assetId).get),
           script.map(s => ScriptReader.fromBytes(Base64.decode(s)).explicitGet()),
-          fee,
+          TxPositiveAmount.unsafeFrom(fee),
           System.currentTimeMillis(),
           Proofs.empty,
           AddressScheme.current.chainId
@@ -475,7 +485,7 @@ object AsyncHttpApi extends Assertions {
           AddressOrAlias.fromString(dappAddress).explicitGet(),
           func.map(fn => FUNCTION_CALL(FunctionHeader.User(fn), args)),
           payment,
-          fee,
+          TxPositiveAmount.unsafeFrom(fee),
           feeAssetId.map(aid => IssuedAsset(ByteStr.decodeBase58(aid).get)).getOrElse(Asset.Waves),
           System.currentTimeMillis(),
           Proofs.empty,
@@ -495,7 +505,7 @@ object AsyncHttpApi extends Assertions {
           version,
           caller.publicKey,
           expression,
-          fee,
+          TxPositiveAmount.unsafeFrom(fee),
           feeAssetId.map(aid => IssuedAsset(ByteStr.decodeBase58(aid).get)).getOrElse(Asset.Waves),
           System.currentTimeMillis(),
           Proofs.empty,
@@ -519,7 +529,7 @@ object AsyncHttpApi extends Assertions {
         AddressOrAlias.fromString(dappAddress).explicitGet(),
         func.map(fn => FUNCTION_CALL(FunctionHeader.User(fn), args)),
         payment,
-        fee,
+        TxPositiveAmount.unsafeFrom(fee),
         feeAssetId.map(aid => IssuedAsset(ByteStr.decodeBase58(aid).get)).getOrElse(Asset.Waves),
         System.currentTimeMillis(),
         Proofs.empty,
@@ -546,7 +556,7 @@ object AsyncHttpApi extends Assertions {
         name,
         description,
         timestamp.getOrElse(System.currentTimeMillis()),
-        fee,
+        TxPositiveAmount.unsafeFrom(fee),
         if (feeAssetId.isDefined) IssuedAsset(ByteStr(Base58.decode(feeAssetId.get))) else Waves,
         Proofs.empty,
         AddressScheme.current.chainId
@@ -566,9 +576,9 @@ object AsyncHttpApi extends Assertions {
           version,
           sender.publicKey,
           IssuedAsset(ByteStr.decodeBase58(assetId).get),
-          quantity,
+          TxPositiveAmount.unsafeFrom(quantity),
           reissuable,
-          fee,
+          TxPositiveAmount.unsafeFrom(fee),
           System.currentTimeMillis(),
           Proofs.empty,
           AddressScheme.current.chainId
@@ -581,8 +591,8 @@ object AsyncHttpApi extends Assertions {
           version,
           sender.publicKey,
           IssuedAsset(ByteStr.decodeBase58(assetId).get),
-          quantity,
-          fee,
+          TxNonNegativeAmount.unsafeFrom(quantity),
+          TxPositiveAmount.unsafeFrom(fee),
           System.currentTimeMillis(),
           Proofs.empty,
           AddressScheme.current.chainId
@@ -623,8 +633,8 @@ object AsyncHttpApi extends Assertions {
           version,
           sender.publicKey,
           IssuedAsset(ByteStr.decodeBase58(assetId).get),
-          minSponsoredAssetFee,
-          fee,
+          minSponsoredAssetFee.map(TxPositiveAmount.unsafeFrom),
+          TxPositiveAmount.unsafeFrom(fee),
           System.currentTimeMillis(),
           Proofs.empty,
           AddressScheme.current.chainId
@@ -656,8 +666,8 @@ object AsyncHttpApi extends Assertions {
           version,
           sender.publicKey,
           Asset.fromString(assetId),
-          transfers.map(t => ParsedTransfer(AddressOrAlias.fromString(t.recipient).explicitGet(), t.amount)),
-          fee,
+          transfers.map(t => ParsedTransfer(AddressOrAlias.fromString(t.recipient).explicitGet(), TxNonNegativeAmount.unsafeFrom(t.amount))),
+          TxPositiveAmount.unsafeFrom(fee),
           System.currentTimeMillis(),
           attachment.fold(ByteStr.empty)(s => ByteStr(s.getBytes())),
           Proofs.empty,
@@ -680,7 +690,7 @@ object AsyncHttpApi extends Assertions {
           version,
           sender.publicKey,
           data,
-          fee,
+          TxPositiveAmount.unsafeFrom(fee),
           timestamp.getOrElse(System.currentTimeMillis()),
           Proofs.empty,
           AddressScheme.current.chainId
@@ -752,8 +762,9 @@ object AsyncHttpApi extends Assertions {
 
     def createAlias(target: KeyPair, alias: String, fee: Long, version: TxVersion = TxVersion.V2): Future[Transaction] =
       signedBroadcast(
-        CreateAliasTransaction(version, target.publicKey, alias, fee, System.currentTimeMillis(), Proofs.empty, AddressScheme.current.chainId)
-          .signWith(target.privateKey)
+        CreateAliasTransaction
+          .selfSigned(version, target, alias, fee, System.currentTimeMillis())
+          .explicitGet()
           .json()
       )
 
@@ -761,8 +772,8 @@ object AsyncHttpApi extends Assertions {
         matcher: KeyPair,
         order1: Order,
         order2: Order,
-        amount: Long,
-        price: Long,
+        amount: TxExchangeAmount,
+        price: TxExchangePrice,
         buyMatcherFee: Long,
         sellMatcherFee: Long,
         fee: Long,
@@ -778,7 +789,7 @@ object AsyncHttpApi extends Assertions {
         price = price,
         buyMatcherFee = buyMatcherFee,
         sellMatcherFee = sellMatcherFee,
-        fee = fee,
+        fee = TxPositiveAmount.unsafeFrom(fee),
         proofs = Proofs.empty,
         timestamp = System.currentTimeMillis(),
         chainId = AddressScheme.current.chainId

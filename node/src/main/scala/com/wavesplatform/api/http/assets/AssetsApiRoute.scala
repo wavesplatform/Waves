@@ -125,22 +125,23 @@ case class AssetsApiRoute(
           formField("id".as[String].*) { ids =>
             complete(multipleDetails(ids.toList, full))
           } ~
-          jsonPost[JsObject] { jsv =>
-            (jsv \ "ids").validate[List[String]] match {
-              case JsSuccess(ids, _) =>
-                multipleDetails(ids, full)
-              case JsError(err) => WrongJson(errors = err)
+            jsonPost[JsObject] { jsv =>
+              (jsv \ "ids").validate[List[String]] match {
+                case JsSuccess(ids, _) =>
+                  multipleDetails(ids, full)
+                case JsError(err) => WrongJson(errors = err)
+              }
             }
-          }
         } ~ deprecatedRoute
       }
     }
 
-  private def multipleDetails(ids: List[String], full: Boolean): ToResponseMarshallable = ids.map(id => ByteStr.decodeBase58(id).toEither.leftMap(_ => id)).separate match {
-    case (Nil, Nil)      => CustomValidationError("Empty request")
-    case (Nil, assetIds) => assetIds.map(id => assetDetails(IssuedAsset(id), full).fold(_.json, identity))
-    case (errors, _)     => InvalidIds(errors)
-  }
+  private def multipleDetails(ids: List[String], full: Boolean): ToResponseMarshallable =
+    ids.map(id => ByteStr.decodeBase58(id).toEither.leftMap(_ => id)).separate match {
+      case (Nil, Nil)      => CustomValidationError("Empty request")
+      case (Nil, assetIds) => assetIds.map(id => assetDetails(IssuedAsset(id), full).fold(_.json, identity))
+      case (errors, _)     => InvalidIds(errors)
+    }
 
   def fullAssetInfoJson(asset: IssuedAsset): JsObject = commonAssetsApi.fullInfo(asset) match {
     case Some(CommonAssetsApi.AssetInfo(assetInfo, issueTransaction, sponsorBalance)) =>

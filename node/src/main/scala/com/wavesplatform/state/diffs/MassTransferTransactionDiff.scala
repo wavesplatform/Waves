@@ -1,8 +1,7 @@
 package com.wavesplatform.state.diffs
 
+import cats.implicits.{toBifunctorOps, toFoldableOps}
 import cats.instances.list._
-import cats.instances.map._
-import cats.syntax.semigroup._
 import cats.syntax.traverse._
 import com.wavesplatform.account.Address
 import com.wavesplatform.lang.ValidationError
@@ -19,38 +18,43 @@ object MassTransferTransactionDiff {
       for {
         recipientAddr <- blockchain.resolveAlias(xfer.address)
         portfolio = tx.assetId
-          .fold(Map[Address, Portfolio](recipientAddr -> Portfolio(xfer.amount, LeaseBalance.empty, Map.empty))) { asset =>
-            Map(recipientAddr -> Portfolio(0, LeaseBalance.empty, Map(asset -> xfer.amount)))
+          .fold(Map[Address, Portfolio](recipientAddr -> Portfolio(xfer.amount.value, LeaseBalance.empty, Map.empty))) { asset =>
+            Map(recipientAddr -> Portfolio(0, LeaseBalance.empty, Map(asset -> xfer.amount.value)))
           }
-      } yield (portfolio, xfer.amount)
+      } yield (portfolio, xfer.amount.value)
     }
     val portfoliosEi = tx.transfers.toList.traverse(parseTransfer)
 
     portfoliosEi.flatMap { list: List[(Map[Address, Portfolio], Long)] =>
       val sender   = Address.fromPublicKey(tx.sender)
-      val foldInit = (Map[Address, Portfolio](sender -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)), 0L)
-      val (recipientPortfolios, totalAmount) = list.fold(foldInit) { (u, v) =>
-        (u._1 combine v._1, u._2 + v._2)
-      }
-      val completePortfolio =
-        recipientPortfolios
-          .combine(
-            tx.assetId
-              .fold(Map[Address, Portfolio](sender -> Portfolio(-totalAmount, LeaseBalance.empty, Map.empty))) { asset =>
-                Map[Address, Portfolio](sender -> Portfolio(0, LeaseBalance.empty, Map(asset -> -totalAmount)))
-              }
+      val foldInit = (Map[Address, Portfolio](sender -> Portfolio(-tx.fee.value, LeaseBalance.empty, Map.empty)), 0L)
+      list
+        .foldM(foldInit) { case ((totalPortfolios, totalTransferAmount), (portfolios, transferAmount)) =>
+          Diff.combine(totalPortfolios, portfolios).map((_, totalTransferAmount + transferAmount))
+        }
+        .flatMap {
+          case (recipientPortfolios, totalAmount) =>
+            Diff.combine(
+              recipientPortfolios,
+              tx.assetId
+                .fold(Map[Address, Portfolio](sender -> Portfolio(-totalAmount, LeaseBalance.empty, Map.empty))) { asset =>
+                  Map[Address, Portfolio](sender -> Portfolio(0, LeaseBalance.empty, Map(asset -> -totalAmount)))
+                }
+            )
+        }
+        .leftMap(GenericError(_))
+        .flatMap { completePortfolio =>
+          val assetIssued =
+            tx.assetId match {
+              case Waves                  => true
+              case asset @ IssuedAsset(_) => blockchain.assetDescription(asset).isDefined
+            }
+          Either.cond(
+            assetIssued,
+            Diff(portfolios = completePortfolio, scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)),
+            GenericError(s"Attempt to transfer a nonexistent asset")
           )
-
-      val assetIssued = tx.assetId match {
-        case Waves                  => true
-        case asset @ IssuedAsset(_) => blockchain.assetDescription(asset).isDefined
-      }
-
-      Either.cond(
-        assetIssued,
-        Diff(portfolios = completePortfolio, scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)),
-        GenericError(s"Attempt to transfer a nonexistent asset")
-      )
+        }
     }
   }
 }

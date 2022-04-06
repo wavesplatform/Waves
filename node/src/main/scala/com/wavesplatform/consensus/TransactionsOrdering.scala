@@ -1,9 +1,9 @@
 package com.wavesplatform.consensus
 
-import com.wavesplatform.transaction.{Authorized, Transaction}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.{Authorized, Transaction}
 
 object TransactionsOrdering {
   trait WavesOrdering extends Ordering[Transaction] {
@@ -38,10 +38,10 @@ object TransactionsOrdering {
 
     override def isWhitelisted(t: Transaction): Boolean =
       t match {
-        case _ if whitelistAddresses.isEmpty                                                            => false
-        case a: Authorized if whitelistAddresses.contains(a.sender.toAddress.toString)                => true
+        case _ if whitelistAddresses.isEmpty                                            => false
+        case a: Authorized if whitelistAddresses.contains(a.sender.toAddress.toString)  => true
         case i: InvokeScriptTransaction if whitelistAddresses.contains(i.dApp.toString) => true
-        case _                                                                                          => false
+        case _                                                                          => false
       }
     override def txTimestampOrder(ts: Long): Long = ts
   }

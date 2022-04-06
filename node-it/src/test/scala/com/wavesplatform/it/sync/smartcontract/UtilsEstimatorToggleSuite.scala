@@ -42,8 +42,10 @@ class UtilsEstimatorToggleSuite extends BaseTransactionSuite with CancelAfterFai
 
   test("check estimations") {
     val compiledScript =
-      ScriptCompiler.compile(differentlyEstimatedScript, ScriptEstimatorV1)
-        .explicitGet()._1
+      ScriptCompiler
+        .compile(differentlyEstimatedScript, ScriptEstimatorV1)
+        .explicitGet()
+        ._1
         .bytes()
         .base64
 

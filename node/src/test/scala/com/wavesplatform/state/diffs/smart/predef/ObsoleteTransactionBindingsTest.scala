@@ -67,17 +67,17 @@ class ObsoleteTransactionBindingsTest extends PropSpec with WithState {
        |""".stripMargin
 
   val preconditionsAndPayments: Seq[(GenesisTransaction, PaymentTransaction, SetScriptTransaction, TransferTransaction)] = {
-    val master = TxHelpers.signer(1)
+    val master     = TxHelpers.signer(1)
     val recipients = Seq(master, TxHelpers.signer(2))
 
     val genesis = TxHelpers.genesis(master.toAddress, ENOUGH_AMT * 3)
     recipients.map { recipient =>
-      val payment = TxHelpers.payment(master, recipient.toAddress, ENOUGH_AMT * 2)
+      val payment       = TxHelpers.payment(master, recipient.toAddress, ENOUGH_AMT * 2)
       val untypedScript = Parser.parseExpr(script(genesis, payment)).get.value
       val typedScript = ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedScript).explicitGet()._1)
         .explicitGet()
       val setScriptTransaction = TxHelpers.setScript(recipient, typedScript)
-      val nextTransfer = TxHelpers.transfer(recipient, master.toAddress)
+      val nextTransfer         = TxHelpers.transfer(recipient, master.toAddress)
       (genesis, payment, setScriptTransaction, nextTransfer)
     }
   }
@@ -87,7 +87,8 @@ class ObsoleteTransactionBindingsTest extends PropSpec with WithState {
     preconditionsAndPayments.foreach {
       case (genesis, payment, setScriptTransaction, nextTransfer) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis, payment, setScriptTransaction))), TestBlock.create(Seq(nextTransfer)), settings) {
-          (_, _) => ()
+          (_, _) =>
+            ()
         }
     }
   }

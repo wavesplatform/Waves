@@ -26,9 +26,9 @@ class OrderJsonSpecification extends PropSpec with JsonMatchers with EthHelpers 
             "priceAsset": "GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44"
           },
           "orderType": "buy",
-          "amount": 0,
-          "matcherFee": 0,
-          "price": 0,
+          "amount": 1,
+          "matcherFee": 2,
+          "price": 3,
           "timestamp": 0,
           "expiration": 0,
           "signature": "signature"
@@ -42,9 +42,9 @@ class OrderJsonSpecification extends PropSpec with JsonMatchers with EthHelpers 
         o.matcherPublicKey shouldBe PublicKey(Base58.tryDecodeWithLimit("DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ").get)
         o.assetPair.amountAsset.compatId.get shouldBe ByteStr.decodeBase58("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get
         o.assetPair.priceAsset.compatId.get shouldBe ByteStr.decodeBase58("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get
-        o.price shouldBe 0
-        o.amount shouldBe 0
-        o.matcherFee shouldBe 0
+        o.price.value shouldBe 3
+        o.amount.value shouldBe 1
+        o.matcherFee.value shouldBe 2
         o.timestamp shouldBe 0
         o.expiration shouldBe 0
         o.signature shouldBe ByteStr(Base58.decode("signature"))
@@ -60,9 +60,9 @@ class OrderJsonSpecification extends PropSpec with JsonMatchers with EthHelpers 
             "priceAsset": "GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44"
           },
           "orderType": "buy",
-          "amount": 0,
-          "matcherFee": 0,
-          "price": 0,
+          "amount": 1,
+          "matcherFee": 2,
+          "price": 3,
           "timestamp": 0,
           "expiration": 0,
           "signature": "signature",
@@ -77,9 +77,9 @@ class OrderJsonSpecification extends PropSpec with JsonMatchers with EthHelpers 
         o.matcherPublicKey shouldBe PublicKey(Base58.tryDecodeWithLimit("DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ").get)
         o.assetPair.amountAsset shouldBe IssuedAsset(ByteStr.decodeBase58("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get)
         o.assetPair.priceAsset shouldBe IssuedAsset(ByteStr.decodeBase58("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get)
-        o.price shouldBe 0
-        o.amount shouldBe 0
-        o.matcherFee shouldBe 0
+        o.price.value shouldBe 3
+        o.amount.value shouldBe 1
+        o.matcherFee.value shouldBe 2
         o.timestamp shouldBe 0
         o.expiration shouldBe 0
         o.signature shouldBe ByteStr(Base58.decode("signature"))
@@ -96,11 +96,11 @@ class OrderJsonSpecification extends PropSpec with JsonMatchers with EthHelpers 
             "priceAsset": "GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44"
           },
           "orderType": "buy",
-          "amount": 0,
-          "matcherFee": 0,
-          "price": 0,
-          "timestamp": 0,
-          "expiration": 0,
+          "amount": 1,
+          "matcherFee": 2,
+          "price": 3,
+          "timestamp": 4,
+          "expiration": 5,
           "signature": "signature",
           "matcherFeeAssetId": "29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b"
         } """)
@@ -109,16 +109,16 @@ class OrderJsonSpecification extends PropSpec with JsonMatchers with EthHelpers 
       case JsError(e) =>
         fail("Error: " + e.toString())
       case JsSuccess(o, _) =>
-        o.id().toString shouldBe "GgLcdyNR5XCvqtGDh9cfFWQzU7sUGLkWQ6NnJufQfNhX"
+        o.id().toString shouldBe "BVJs4ip16nbh2vmuZkQmg8TMbN4vhnRAiACAfffQxSr7"
         o.senderPublicKey shouldBe keyPair.publicKey
         o.matcherPublicKey shouldBe PublicKey(Base58.tryDecodeWithLimit("DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ").get)
         o.assetPair.amountAsset shouldBe IssuedAsset(ByteStr.decodeBase58("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get)
         o.assetPair.priceAsset shouldBe IssuedAsset(ByteStr.decodeBase58("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get)
-        o.price shouldBe 0
-        o.amount shouldBe 0
-        o.matcherFee shouldBe 0
-        o.timestamp shouldBe 0
-        o.expiration shouldBe 0
+        o.price.value shouldBe 3
+        o.amount.value shouldBe 1
+        o.matcherFee.value shouldBe 2
+        o.timestamp shouldBe 4
+        o.expiration shouldBe 5
         o.signature shouldBe ByteStr(Base58.decode("signature"))
         o.matcherFeeAssetId shouldBe IssuedAsset(ByteStr.decodeBase58("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get)
     }
@@ -133,11 +133,11 @@ class OrderJsonSpecification extends PropSpec with JsonMatchers with EthHelpers 
             "priceAsset": "GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44"
           },
           "orderType": "buy",
-          "amount": 0,
-          "matcherFee": 0,
-          "price": 0,
-          "timestamp": 0,
-          "expiration": 0,
+          "amount": 1,
+          "matcherFee": 2,
+          "price": 3,
+          "timestamp": 4,
+          "expiration": 5,
           "signature": "signature",
           "matcherFeeAssetId": "29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b",
           "eip712Signature": "0x40dd06c9f80215612a0397948a10dd82d6a58dda8a256544971e236a95a395ad6b87e75fb58789ece4f2ff7ed380849d120faefce135b6f7ddec9e11df169f971b"
@@ -147,17 +147,17 @@ class OrderJsonSpecification extends PropSpec with JsonMatchers with EthHelpers 
       case JsError(e) =>
         fail("Error: " + e.toString())
       case JsSuccess(o, _) =>
-        o.id().toString shouldBe "24zTji9WLBEb4DrY4UhZAqN6aVrk7VYLNFdLg4J2c4g7"
+        o.id().toString shouldBe "FU8kLN9rRXCYjUDVUg914L3rdKNbgqpcfPmzXV7kLSJZ"
         o.withProofs(Proofs.empty).id() shouldNot be(o.id())
-        o.senderPublicKey shouldBe TestEthOrdersPublicKey
+        o.senderPublicKey shouldBe PublicKey(ByteStr.decodeBase58("4aEWkjMryfRtekGnQwwCYQg5gaoC41cgWxYXTaLfYCrt41T4A3kXnQnt6hR5d2DHaWsHfFYXvswbbumZ3s8irEWN").get)
         o.matcherPublicKey shouldBe PublicKey(Base58.tryDecodeWithLimit("DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ").get)
         o.assetPair.amountAsset shouldBe IssuedAsset(ByteStr.decodeBase58("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get)
         o.assetPair.priceAsset shouldBe IssuedAsset(ByteStr.decodeBase58("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get)
-        o.price shouldBe 0
-        o.amount shouldBe 0
-        o.matcherFee shouldBe 0
-        o.timestamp shouldBe 0
-        o.expiration shouldBe 0
+        o.price.value shouldBe 3
+        o.amount.value shouldBe 1
+        o.matcherFee.value shouldBe 2
+        o.timestamp shouldBe 4
+        o.expiration shouldBe 5
         o.signature shouldBe ByteStr.empty
         o.matcherFeeAssetId shouldBe IssuedAsset(ByteStr.decodeBase58("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get)
         o.eip712Signature shouldBe Some(ByteStr(EthEncoding.toBytes("0x40dd06c9f80215612a0397948a10dd82d6a58dda8a256544971e236a95a395ad6b87e75fb58789ece4f2ff7ed380849d120faefce135b6f7ddec9e11df169f971b")))
@@ -170,9 +170,9 @@ class OrderJsonSpecification extends PropSpec with JsonMatchers with EthHelpers 
           "senderPublicKey": " ",
           "spendAssetId": "string",
           "receiveAssetId": "string",
-          "amount": 0,
-          "matcherFee": 0,
-          "price": 0,
+          "amount": 1,
+          "matcherFee": 2,
+          "price": 3,
           "timestamp": 0,
           "expiration": 0,
           "signature": "signature"
@@ -241,9 +241,9 @@ class OrderJsonSpecification extends PropSpec with JsonMatchers with EthHelpers 
              "priceAsset": $priceAsset
            },
           "orderType": "sell",
-          "amount": 0,
-          "matcherFee": 0,
-          "price": 0,
+          "amount": 1,
+          "matcherFee": 2,
+          "price": 3,
           "timestamp": 0,
           "expiration": 0,
           "signature": "signature"

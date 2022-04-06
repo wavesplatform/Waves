@@ -1,10 +1,8 @@
 package com.wavesplatform.state.diffs.invoke
 
-import scala.util.Right
 import cats.Id
 import cats.instances.list.*
 import cats.syntax.either.*
-import cats.syntax.semigroup.*
 import cats.syntax.traverseFilter.*
 import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
@@ -19,28 +17,30 @@ import com.wavesplatform.lang.directives.values.{DApp as DAppType, *}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms.*
-import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, Log, ScriptResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
+import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, Log, ScriptResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain.{Recipient as RideRecipient, *}
 import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
+import com.wavesplatform.lang.v1.traits.domain.{Recipient as RideRecipient, *}
 import com.wavesplatform.metrics.*
 import com.wavesplatform.state.*
-import com.wavesplatform.state.diffs.invoke.CallArgumentPolicy.*
 import com.wavesplatform.state.diffs.BalanceDiffValidation
+import com.wavesplatform.state.diffs.invoke.CallArgumentPolicy.*
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.{TransactionType, TxValidationError}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.smart.{DApp as DAppTarget, *}
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
-import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, CoevalR, TracedResult}
 import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
+import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, CoevalR, TracedResult}
+import com.wavesplatform.transaction.smart.{DApp as DAppTarget, *}
 import com.wavesplatform.transaction.validation.impl.DataTxValidator
+import com.wavesplatform.transaction.{TransactionType, TxValidationError}
 import monix.eval.Coeval
 import shapeless.Coproduct
+
+import scala.util.Right
 
 object InvokeScriptDiff {
   private val stats = TxProcessingStats
@@ -168,6 +168,7 @@ object InvokeScriptDiff {
           input <- traced(buildThisValue(Coproduct[TxOrd](tx.root), blockchain, directives, tthis).leftMap(GenericError(_)))
 
           result <- for {
+            paymentsPart <- traced(InvokeDiffsCommon.paymentsPart(tx, tx.dApp, Map()))
             (diff, (scriptResult, log), availableActions, availableData, availableDataSize) <- {
               stats.invokedScriptExecution.measureForType(TransactionType.InvokeScript)({
                 val height = blockchain.height
@@ -182,7 +183,6 @@ object InvokeScriptDiff {
                   tx.root.fee,
                   tx.root.feeAssetId.compatId
                 )
-                val paymentsPart                                    = InvokeDiffsCommon.paymentsPart(tx, tx.dApp, Map())
                 val (paymentsPartInsideDApp, paymentsPartToResolve) = if (version < V5) (Diff.empty, paymentsPart) else (paymentsPart, Diff.empty)
                 val environment = new DAppEnvironment(
                   AddressScheme.current.chainId,
@@ -204,27 +204,20 @@ object InvokeScriptDiff {
                   paymentsPartInsideDApp,
                   invocationRoot
                 )
-
-                CoevalR(
-                  evaluateV2(
-                    version,
-                    blockchain,
-                    contract,
-                    invocation,
-                    environment,
-                    complexityAfterPayments,
-                    remainingComplexity
-                  ).map(TracedResult(_))
-                ).map(
-                  result =>
-                    (
-                      environment.currentDiff |+| paymentsPartToResolve,
-                      result,
-                      environment.availableActions,
-                      environment.availableData,
-                      environment.availableDataSize
-                    )
-                )
+                for {
+                  evaluated <- CoevalR(
+                    evaluateV2(
+                      version,
+                      blockchain,
+                      contract,
+                      invocation,
+                      environment,
+                      complexityAfterPayments,
+                      remainingComplexity
+                    ).map(TracedResult(_))
+                  )
+                  diff <- traced(environment.currentDiff.combine(paymentsPartToResolve).leftMap(GenericError(_)))
+                } yield (diff, evaluated, environment.availableActions, environment.availableData, environment.availableDataSize)
               })
             }
             _ = invocationRoot.setLog(log)
@@ -299,7 +292,13 @@ object InvokeScriptDiff {
                 val error          = FailedTransactionError.dAppExecution(s"Invoke complexity limit = $totalComplexityLimit is exceeded", usedComplexity, log)
                 traced(error.asLeft[(Diff, EVALUATED, Int, Int, Int)])
             }
-            resultDiff = diff.copy(scriptsComplexity = 0) |+| actionsDiff |+| Diff.empty.copy(scriptsComplexity = paymentsComplexity)
+            resultDiff <- traced(
+              diff
+                .copy(scriptsComplexity = 0)
+                .combine(actionsDiff)
+                .flatMap(_.combine(Diff(scriptsComplexity = paymentsComplexity)))
+                .leftMap(GenericError(_))
+            )
 
             _ <- traced(
               BalanceDiffValidation

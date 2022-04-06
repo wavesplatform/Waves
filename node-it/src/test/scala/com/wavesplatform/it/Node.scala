@@ -26,9 +26,11 @@ abstract class Node(val config: Config) extends AutoCloseable {
   val client: AsyncHttpClient = asyncHttpClient(
     clientConfig()
       .setKeepAlive(false)
-      .setNettyTimer(GlobalTimer.instance))
+      .setNettyTimer(GlobalTimer.instance)
+  )
 
-  lazy val grpcChannel: ManagedChannel = ManagedChannelBuilder.forAddress(networkAddress.getHostString, nodeExternalPort(6870))
+  lazy val grpcChannel: ManagedChannel = ManagedChannelBuilder
+    .forAddress(networkAddress.getHostString, nodeExternalPort(6870))
     .usePlaintext()
     .build()
 
@@ -39,7 +41,7 @@ abstract class Node(val config: Config) extends AutoCloseable {
     wallet.generateNewAccount().get
   }
 
-  val keyPair: KeyPair  = KeyPair.fromSeed(config.getString("account-seed")).explicitGet()
+  val keyPair: KeyPair     = KeyPair.fromSeed(config.getString("account-seed")).explicitGet()
   val publicKey: PublicKey = PublicKey.fromBase58String(config.getString("public-key")).explicitGet()
   val address: String      = config.getString("address")
 

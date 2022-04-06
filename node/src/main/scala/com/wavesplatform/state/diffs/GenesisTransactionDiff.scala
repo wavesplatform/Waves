@@ -11,6 +11,6 @@ object GenesisTransactionDiff {
   def apply(height: Int)(tx: GenesisTransaction): Either[ValidationError, Diff] = {
     if (height != 1) Left(GenericError(s"GenesisTransaction cannot appear in non-initial block ($height)"))
     else
-      Right(Diff(portfolios = Map(tx.recipient -> Portfolio(balance = tx.amount))))
+      Right(Diff(portfolios = Map(tx.recipient -> Portfolio(balance = tx.amount.value))))
   }
 }

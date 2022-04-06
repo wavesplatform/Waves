@@ -163,7 +163,7 @@ class ScriptVersionsTest extends FreeSpec {
           EmptyDataEntry("key")
         )
       } {
-        val tx = TxHelpers.dataV2(TxHelpers.signer(1), Seq(entry))
+        val tx         = TxHelpers.dataV2(TxHelpers.signer(1), Seq(entry))
         val blockchain = if (activateFix) fixedBlockchain else EmptyBlockchain
         if (version >= V4) {
           if (!activateFix && isDApp && !entry.isInstanceOf[EmptyDataEntry])

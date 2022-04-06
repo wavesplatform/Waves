@@ -2,7 +2,7 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.*
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.account.{AddressScheme, KeyPair}
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.api.http.TransactionsApiRoute
@@ -31,7 +31,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Proofs, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.{EthEncoding, EthHelpers}
 import com.wavesplatform.{BlockGen, BlockchainStubHelpers, TestValues, TestWallet}
 import monix.reactive.Observable
@@ -130,8 +130,8 @@ class TransactionsRouteSpec
     )
 
   "returns lease details for lease cancel transaction" in {
-    val sender      = testWallet.generateNewAccount().get
-    val recipient   = testWallet.generateNewAccount().get
+    val sender    = testWallet.generateNewAccount().get
+    val recipient = testWallet.generateNewAccount().get
 
     val balances = Seq(
       AddrWithBalance(sender.toAddress, 10.waves),
@@ -506,7 +506,7 @@ class TransactionsRouteSpec
       (blockchain.leaseDetails _)
         .when(lease.id())
         .returns(
-          Some(LeaseDetails(lease.sender, lease.recipient, lease.amount, LeaseDetails.Status.Cancelled(2, Some(leaseCancel.id())), lease.id(), 1))
+          Some(LeaseDetails(lease.sender, lease.recipient, lease.amount.value, LeaseDetails.Status.Cancelled(2, Some(leaseCancel.id())), lease.id(), 1))
         )
 
       val route = transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route
@@ -961,18 +961,16 @@ class TransactionsRouteSpec
       val seed = new Array[Byte](32)
       Random.nextBytes(seed)
       val sender: KeyPair = KeyPair(seed)
-      val ist = InvokeScriptTransaction(
-        TxVersion.V1,
-        sender.publicKey,
-        sender.toAddress,
-        None,
-        Seq.empty,
-        500000L,
-        Asset.Waves,
-        testTime.getTimestamp(),
-        Proofs.empty,
-        AddressScheme.current.chainId
-      ).signWith(sender.privateKey)
+      val ist = Signed.invokeScript(
+          TxVersion.V1,
+          sender,
+          sender.toAddress,
+          None,
+          Seq.empty,
+          500000L,
+          Asset.Waves,
+          testTime.getTimestamp()
+        )
       f(sender, ist)
     }
 

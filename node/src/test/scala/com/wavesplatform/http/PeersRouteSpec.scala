@@ -113,12 +113,14 @@ object PeersRouteSpec {
 
   implicit val connectRespFormat: Format[ConnectResp] = Json.format
 
-  case class ConnectedPeer(address: String,
-                           declaredAddress: String,
-                           peerName: String,
-                           peerNonce: Long,
-                           applicationName: String,
-                           applicationVersion: String)
+  case class ConnectedPeer(
+      address: String,
+      declaredAddress: String,
+      peerName: String,
+      peerNonce: Long,
+      applicationName: String,
+      applicationVersion: String
+  )
 
   implicit val connectedPeerFormat: Format[ConnectedPeer] = Json.format
 

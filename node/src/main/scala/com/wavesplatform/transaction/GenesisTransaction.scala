@@ -1,8 +1,5 @@
 package com.wavesplatform.transaction
 
-import scala.util.Try
-
-import cats.data.Validated
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
@@ -14,7 +11,9 @@ import com.wavesplatform.transaction.validation.{TxConstraints, TxValidator}
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-case class GenesisTransaction(recipient: Address, amount: TxAmount, timestamp: TxTimestamp, signature: ByteStr, chainId: Byte)
+import scala.util.Try
+
+case class GenesisTransaction(recipient: Address, amount: TxNonNegativeAmount, timestamp: TxTimestamp, signature: ByteStr, chainId: Byte)
     extends Transaction(TransactionType.Genesis) {
   override val assetFee: (Asset, Long) = (Waves, 0)
   override val id: Coeval[ByteStr]     = Coeval.evalOnce(signature)
@@ -36,7 +35,6 @@ object GenesisTransaction extends TransactionParser {
   implicit val validator: TxValidator[GenesisTransaction] =
     tx =>
       TxConstraints.seq(tx)(
-        Validated.condNel(tx.amount >= 0, tx, TxValidationError.NegativeAmount(tx.amount, "waves")),
         TxConstraints.addressChainId(tx.recipient, tx.chainId)
       )
 
@@ -48,6 +46,10 @@ object GenesisTransaction extends TransactionParser {
 
   def create(recipient: Address, amount: Long, timestamp: Long): Either[ValidationError, GenesisTransaction] = {
     val signature = ByteStr(GenesisTransaction.generateSignature(recipient, amount, timestamp))
-    GenesisTransaction(recipient, amount, timestamp, signature, recipient.chainId).validatedEither
+
+    for {
+      amount <- TxNonNegativeAmount(amount)(TxValidationError.NegativeAmount(amount, "waves"))
+      tx     <- GenesisTransaction(recipient, amount, timestamp, signature, recipient.chainId).validatedEither
+    } yield tx
   }
 }

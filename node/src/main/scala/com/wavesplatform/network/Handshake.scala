@@ -6,11 +6,13 @@ import com.google.common.base.Charsets
 import io.netty.buffer.ByteBuf
 import com.wavesplatform.utils._
 
-case class Handshake(applicationName: String,
-                     applicationVersion: (Int, Int, Int),
-                     nodeName: String,
-                     nodeNonce: Long,
-                     declaredAddress: Option[InetSocketAddress]) {
+case class Handshake(
+    applicationName: String,
+    applicationVersion: (Int, Int, Int),
+    nodeName: String,
+    nodeNonce: Long,
+    declaredAddress: Option[InetSocketAddress]
+) {
   def encode(out: ByteBuf): out.type = {
     val applicationNameBytes = applicationName.utf8Bytes
     require(applicationNameBytes.length <= Byte.MaxValue, "The application name is too long!")

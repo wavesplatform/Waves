@@ -17,10 +17,7 @@ import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
-class VerifierSpecification
-    extends PropSpec
-    with NTPTime
-    with WithDomain {
+class VerifierSpecification extends PropSpec with NTPTime with WithDomain {
   private def mkIssue(issuer: KeyPair, name: String, script: Option[Script] = None) =
     IssueTransaction
       .selfSigned(
@@ -44,19 +41,22 @@ class VerifierSpecification
       assetPair: AssetPair,
       fee: Long = 0.003.waves,
       feeAsset: Asset = Waves
-  ) = Order.selfSigned(
-    3.toByte,
-    sender,
-    matcher,
-    assetPair,
-    orderType,
-    100,
-    5.waves,
-    ntpTime.getTimestamp(),
-    ntpTime.getTimestamp() + 200000,
-    fee,
-    feeAsset
-  )
+  ) =
+    Order
+      .selfSigned(
+        3.toByte,
+        sender,
+        matcher,
+        assetPair,
+        orderType,
+        100,
+        5.waves,
+        ntpTime.getTimestamp(),
+        ntpTime.getTimestamp() + 200000,
+        fee,
+        feeAsset
+      )
+      .explicitGet()
 
   private val sharedParamGen = for {
     sender  <- accountGen

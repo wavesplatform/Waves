@@ -1,7 +1,6 @@
 package com.wavesplatform.it.api
 
 import java.net.InetSocketAddress
-
 import akka.http.scaladsl.model.StatusCodes.BadRequest
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
@@ -21,7 +20,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, TxVersion}
+import com.wavesplatform.transaction.{Asset, TxExchangeAmount, TxExchangePrice, TxVersion}
 import io.grpc.Status.Code
 import org.asynchttpclient.Response
 import org.scalactic.source.Position
@@ -68,7 +67,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
   implicit class ApiErrorOps(error: ApiError) {
     def assertive(matchMessage: Boolean = false): AssertiveApiError = AssertiveApiError(error.id, error.message, error.code, matchMessage)
-    def assertiveRegex: AssertiveApiError = assertive(matchMessage = true)
+    def assertiveRegex: AssertiveApiError                           = assertive(matchMessage = true)
   }
 
   def assertBadRequestAndResponse[R](f: => R, errorRegex: String): Assertion = Try(f) match {
@@ -406,8 +405,8 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
         matcher: KeyPair,
         order1: Order,
         order2: Order,
-        amount: Long,
-        price: Long,
+        amount: TxExchangeAmount,
+        price: TxExchangePrice,
         buyMatcherFee: Long,
         sellMatcherFee: Long,
         fee: Long,

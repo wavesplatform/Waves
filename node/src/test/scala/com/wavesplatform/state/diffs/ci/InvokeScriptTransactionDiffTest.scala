@@ -319,7 +319,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       List(CONST_BYTESTR(ByteStr.fromBytes(1, 2, 3)).explicitGet()),
       payment.toSeq,
       if (selfSend) dApp else invoker,
-      sponsored.map(s => Sponsorship.fromWaves(fee, s.minSponsoredAssetFee.get)).getOrElse(fee),
+      sponsored.map(s => Sponsorship.fromWaves(fee, s.minSponsoredAssetFee.get.value)).getOrElse(fee),
       sponsored.map(_.asset).getOrElse(Waves),
       txVersion
     )
@@ -391,7 +391,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     d.blockchain.balance(TxHelpers.secondAddress, asset) shouldBe 100L
   })
 
-  property("validates intermediate action balance after V6")(withDomain(DomainPresets.RideV6) { d =>
+  property("validates intermediate action balance after V6")(withDomain(DomainPresets.RideV6.configure(fs => fs.copy(enforceTransferValidationAfter = 0))) { d =>
     val dApp = TxHelpers.defaultSigner
 
     d.helpers.creditWavesToDefaultSigner()
@@ -642,7 +642,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       d.appendBlock(ci)
       d.liquidDiff.scriptsRun shouldBe 2
       d.blockchain.balance(thirdAddress, Waves) shouldBe amount
-      d.blockchain.balance(invokerAddress, asset) shouldBe (issue.quantity - 1)
+      d.blockchain.balance(invokerAddress, asset) shouldBe (issue.quantity.value - 1)
       d.blockchain.balance(dAppAddress, asset) shouldBe 1
     }
   }
@@ -707,7 +707,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     testDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(issue, ci), Block.ProtoBlockVersion)) {
       case (blockDiff, newState) =>
         blockDiff.scriptsRun shouldBe 3
-        newState.balance(dAppAddress, asset) shouldBe (issue.quantity - amount)
+        newState.balance(dAppAddress, asset) shouldBe (issue.quantity.value - amount)
         newState.balance(thirdAddress, asset) shouldBe amount
 
     }
@@ -824,7 +824,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
   }
 
   property("can't overflow payment + fee") {
-    val payment                  = Some(Payment(Long.MaxValue, Waves))
+    val payment                  = Some(Payment(ENOUGH_AMT, Waves))
     val (genesis, setScript, ci) = preconditionsAndSetContract(dAppWithTransfers(), payment = payment)
     testDiff(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci))) {
       _ should produceRejectOrFailedDiff("Attempt to transfer unavailable funds")
@@ -847,7 +847,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     val sponsorAsset             = IssuedAsset(sponsorIssue.id())
     val sponsor                  = TxHelpers.sponsor(sponsorAsset, sender = dApp)
     val (genesis, setScript, ci) = preconditionsAndSetContract(dAppWithTransfers(), sponsored = Some(sponsor))
-    val t                        = TxHelpers.transfer(dApp, invokerAddress, sponsorIssue.quantity / 2, sponsorAsset)
+    val t                        = TxHelpers.transfer(dApp, invokerAddress, sponsorIssue.quantity.value / 2, sponsorAsset)
 
     testDiffAndState(
       Seq(TestBlock.create(genesis ++ Seq(sponsorIssue, t, sponsor, setScript))),
@@ -856,11 +856,11 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       blockDiff.scriptsRun shouldBe 1
       blockDiff.errorMessage(ci.id()) shouldBe None
       newState.balance(thirdAddress, Waves) shouldBe amount
-      newState.balance(ci.sender.toAddress, sponsorAsset) shouldBe (sponsorIssue.quantity / 2 - ci.fee)
+      newState.balance(ci.sender.toAddress, sponsorAsset) shouldBe (sponsorIssue.quantity.value / 2 - ci.fee.value)
       newState.balance(
         dAppAddress,
         sponsorAsset
-      ) shouldBe (sponsorIssue.quantity - sponsorIssue.quantity / 2 + ci.fee)
+      ) shouldBe (sponsorIssue.quantity.value - sponsorIssue.quantity.value / 2 + ci.fee.value)
     }
   }
 
@@ -1056,7 +1056,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     testDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(issue, ci), Block.ProtoBlockVersion), from = V4) {
       case (blockDiff, newState) =>
         blockDiff.scriptsRun shouldBe 3
-        newState.balance(dAppAddress, IssuedAsset(issue.id())) shouldBe (issue.quantity - amount)
+        newState.balance(dAppAddress, IssuedAsset(issue.id())) shouldBe (issue.quantity.value - amount)
         newState.balance(thirdAddress, IssuedAsset(issue.id())) shouldBe amount
 
     }
@@ -1095,6 +1095,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       .anyNumberOfTimes()
     (blockchain.accountScript _).expects(invoke.sender.toAddress).returning(None).anyNumberOfTimes()
     (blockchain.hasAccountScript _).expects(invoke.sender.toAddress).returning(false).anyNumberOfTimes()
+    (blockchain.balance _).expects(*, Waves).returning(ENOUGH_AMT).anyNumberOfTimes()
+    (blockchain.leaseBalance _).expects(*).returning(LeaseBalance.empty).anyNumberOfTimes()
     (() => blockchain.activatedFeatures)
       .expects()
       .returning(Map(BlockchainFeatures.Ride4DApps.id -> 0))
@@ -1140,6 +1142,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
           )
         )
       )
+      .anyNumberOfTimes()
     InvokeScriptTransactionDiff
       .apply(blockchain, invoke.timestamp, limitedExecution = false)(invoke)
       .resultE should produceRejectOrFailedDiff("is already issued")
@@ -1317,7 +1320,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     val issueTx = TxHelpers.issue(dApp, script = Some(throwingAsset))
 
     val feeInWaves = FeeConstants(TransactionType.InvokeScript) * FeeValidation.FeeUnit
-    val feeInAsset = Sponsorship.fromWaves(feeInWaves, sponsorTx.minSponsoredAssetFee.get)
+    val feeInAsset = Sponsorship.fromWaves(feeInWaves, sponsorTx.minSponsoredAssetFee.get.value)
 
     Seq(
       (feeInWaves, Waves, issueContract, List.empty[EXPR]),        // insufficient fee
@@ -1334,7 +1337,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       val g2Tx = TxHelpers.genesis(invokerAddress)
       val g3Tx = TxHelpers.genesis(thirdAddress)
 
-      val tTx = TxHelpers.transfer(thirdAcc, invokerAddress, sponsorIssue.quantity, sponsorAsset)
+      val tTx = TxHelpers.transfer(thirdAcc, invokerAddress, sponsorIssue.quantity.value, sponsorAsset)
 
       val ssTx   = TxHelpers.setScript(dApp, contract)
       val invoke = TxHelpers.invoke(dAppAddress, Some("f"), args, fee = fee, feeAssetId = feeAsset)
@@ -1346,9 +1349,10 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       ) { case (diff, state) =>
         diff.scriptsRun shouldBe 0
         diff.portfolios(invoke.sender.toAddress).balanceOf(invoke.feeAssetId)
-        state.balance(invoke.sender.toAddress, invoke.feeAssetId) shouldBe invoke.feeAssetId.fold(g2Tx.amount)(_ =>
+        state.balance(invoke.sender.toAddress, invoke.feeAssetId) shouldBe invoke.feeAssetId.fold(g2Tx.amount.value)(_ =>
           sponsorIssue.quantity
-        ) - invoke.fee
+        .value
+            ) - invoke.fee.value
         state.transactionInfo(invoke.id()).map(r => r._2 -> r._1.succeeded) shouldBe Some((invoke, false))
       }
     }
@@ -1362,10 +1366,10 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     val iTx            = TxHelpers.issue(thirdAcc)
     val sponsoredAsset = IssuedAsset(iTx.assetId)
     val sTx            = TxHelpers.sponsor(sponsoredAsset, sender = thirdAcc)
-    val tTx            = TxHelpers.transfer(thirdAcc, dAppAddress, iTx.quantity / 1)
+    val tTx            = TxHelpers.transfer(thirdAcc, dAppAddress, iTx.quantity.value / 1)
 
     val wavesFee     = TestValues.invokeFee(1)
-    val sponsoredFee = Sponsorship.fromWaves(wavesFee, sTx.minSponsoredAssetFee.get)
+    val sponsoredFee = Sponsorship.fromWaves(wavesFee, sTx.minSponsoredAssetFee.get.value)
 
     Seq((Waves, wavesFee), (sponsoredAsset, sponsoredFee))
       .foreach { case (feeAsset, fee) =>

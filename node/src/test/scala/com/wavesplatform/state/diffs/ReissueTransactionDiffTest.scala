@@ -20,7 +20,7 @@ class ReissueTransactionDiffTest extends PropSpec with WithState with EitherValu
 
   private val beforeActivationScenario = {
     val (issuer, b1) = genesis
-    val issue = TxHelpers.issue(issuer, version = TxVersion.V1)
+    val issue        = TxHelpers.issue(issuer, version = TxVersion.V1)
     reissueTx(issuer, issue.asset, BeforeActivationFee).map { reissue =>
       val b2 = TestBlock.create(
         ntpNow,
@@ -34,20 +34,21 @@ class ReissueTransactionDiffTest extends PropSpec with WithState with EitherValu
   }
 
   property("Reissue transaction's fee before feature activation is 1 WAVES") {
-    beforeActivationScenario.foreach { case (bs, txs) =>
-      checkFee(bs, txs) {
-        case (result, lessResult, moreResult) =>
-          result.explicitGet()
-          lessResult.left.value
-          moreResult.explicitGet()
-      }
+    beforeActivationScenario.foreach {
+      case (bs, txs) =>
+        checkFee(bs, txs) {
+          case (result, lessResult, moreResult) =>
+            result.explicitGet()
+            lessResult.left.value
+            moreResult.explicitGet()
+        }
     }
   }
 
   private val afterActivationScenario = {
     val (issuer, b1) = genesis
-    val issue1 = TxHelpers.issue(issuer, name = "asset1", version = TxVersion.V1)
-    val issue2 = TxHelpers.issue(issuer, name = "asset2", version = TxVersion.V1)
+    val issue1       = TxHelpers.issue(issuer, name = "asset1", version = TxVersion.V1)
+    val issue2       = TxHelpers.issue(issuer, name = "asset2", version = TxVersion.V1)
 
     reissueTx(issuer, issue1.asset, AfterActivationFee).map { reissue =>
       val b2 = TestBlock.create(
@@ -68,13 +69,14 @@ class ReissueTransactionDiffTest extends PropSpec with WithState with EitherValu
   }
 
   property("Reissue transaction's fee after feature activation is 0.001 WAVES") {
-    afterActivationScenario.foreach { case (bs, txs) =>
-      checkFee(bs, txs) {
-        case (result, lessResult, moreResult) =>
-          result.explicitGet()
-          lessResult.left.value
-          moreResult.explicitGet()
-      }
+    afterActivationScenario.foreach {
+      case (bs, txs) =>
+        checkFee(bs, txs) {
+          case (result, lessResult, moreResult) =>
+            result.explicitGet()
+            lessResult.left.value
+            moreResult.explicitGet()
+        }
     }
   }
 

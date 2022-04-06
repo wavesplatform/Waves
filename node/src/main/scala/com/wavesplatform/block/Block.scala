@@ -70,7 +70,7 @@ case class Block(
 
   override def toString: String =
     s"Block(${id()},${header.reference},${header.generator.toAddress}," +
-      s"${header.timestamp},${header.featureVotes.mkString("[",",","]")}${if (header.rewardVote >= 0) s",${header.rewardVote}" else ""})"
+      s"${header.timestamp},${header.featureVotes.mkString("[", ",", "]")}${if (header.rewardVote >= 0) s",${header.rewardVote}" else ""})"
 }
 
 object Block extends ScorexLogging {
@@ -127,7 +127,8 @@ object Block extends ScorexLogging {
       featureVotes: Seq[Short],
       rewardVote: Long
   ): Either[GenericError, Block] =
-    create(version, timestamp, reference, baseTarget, generationSignature, signer.publicKey, featureVotes, rewardVote, txs).validate.map(_.sign(signer.privateKey))
+    create(version, timestamp, reference, baseTarget, generationSignature, signer.publicKey, featureVotes, rewardVote, txs).validate
+      .map(_.sign(signer.privateKey))
 
   def parseBytes(bytes: Array[Byte]): Try[Block] =
     BlockSerializer
@@ -153,7 +154,17 @@ object Block extends ScorexLogging {
       }.sequence
       baseTarget = genesisSettings.initialBaseTarget
       timestamp  = genesisSettings.blockTimestamp
-      block      = create(GenesisBlockVersion, timestamp, GenesisReference, baseTarget, GenesisGenerationSignature, GenesisGenerator.publicKey, Seq(), -1L, txs)
+      block = create(
+        GenesisBlockVersion,
+        timestamp,
+        GenesisReference,
+        baseTarget,
+        GenesisGenerationSignature,
+        GenesisGenerator.publicKey,
+        Seq(),
+        -1L,
+        txs
+      )
       signedBlock = genesisSettings.signature match {
         case None             => block.sign(GenesisGenerator.privateKey)
         case Some(predefined) => block.copy(signature = predefined)

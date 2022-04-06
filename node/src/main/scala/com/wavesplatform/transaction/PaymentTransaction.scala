@@ -15,8 +15,8 @@ import play.api.libs.json.JsObject
 case class PaymentTransaction(
     sender: PublicKey,
     recipient: Address,
-    amount: TxAmount,
-    fee: TxAmount,
+    amount: TxPositiveAmount,
+    fee: TxPositiveAmount,
     timestamp: TxTimestamp,
     signature: ByteStr,
     chainId: Byte
@@ -61,5 +61,9 @@ object PaymentTransaction extends TransactionParser {
       timestamp: Long,
       signature: ByteStr
   ): Either[ValidationError, PaymentTransaction] =
-    PaymentTransaction(sender, recipient, amount, fee, timestamp, signature, recipient.chainId).validatedEither
+    for {
+      fee    <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
+      amount <- TxPositiveAmount(amount)(TxValidationError.NonPositiveAmount(amount, "waves"))
+      tx     <- PaymentTransaction(sender, recipient, amount, fee, timestamp, signature, recipient.chainId).validatedEither
+    } yield tx
 }

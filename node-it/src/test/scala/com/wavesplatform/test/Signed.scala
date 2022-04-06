@@ -1,10 +1,10 @@
 package com.wavesplatform.test
 
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.transaction.{Asset, Proofs, TxAmount, TxTimestamp}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.{Asset, Proofs, TxTimestamp}
 
 object Signed {
   def invokeScript(
@@ -13,7 +13,7 @@ object Signed {
       dApp: AddressOrAlias,
       functionCall: Option[Terms.FUNCTION_CALL],
       payments: Seq[InvokeScriptTransaction.Payment],
-      fee: TxAmount,
+      fee: Long,
       feeAssetId: Asset,
       timestamp: TxTimestamp
   ): InvokeScriptTransaction =

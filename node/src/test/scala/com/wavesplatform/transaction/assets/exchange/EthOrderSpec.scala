@@ -7,7 +7,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.BlockchainStubHelpers
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.transaction.{TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{TxExchangeAmount, TxHelpers, TxMatcherFee, TxOrderPrice, TxVersion}
 import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, JsonMatchers}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterAll
@@ -30,11 +30,11 @@ class EthOrderSpec
       TestEthOrdersPublicKey,
       AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), IssuedAsset(ByteStr(EthStubBytes32))),
       OrderType.BUY,
-      1,
-      1,
+      TxExchangeAmount.unsafeFrom(1),
+      TxOrderPrice.unsafeFrom(1),
       123,
       321,
-      1,
+      TxMatcherFee.unsafeFrom(1),
       IssuedAsset(ByteStr(EthStubBytes32))
     )
 
@@ -69,11 +69,11 @@ class EthOrderSpec
       PublicKey(EthStubBytes32),
       AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
       OrderType.BUY,
-      1,
-      1,
+      TxExchangeAmount.unsafeFrom(1),
+      TxOrderPrice.unsafeFrom(1),
       123,
       321,
-      1,
+      TxMatcherFee.unsafeFrom(1),
       Waves
     )
 
@@ -114,7 +114,7 @@ class EthOrderSpec
       123,
       100000,
       Waves
-    )
+    ).explicitGet()
 
     val differ      = TransactionDiffer(Some(1L), 100L)(blockchain, _)
     val transaction = TxHelpers.exchange(buyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
@@ -143,7 +143,7 @@ class EthOrderSpec
         123,
         100000,
         Waves
-      )
+      ).explicitGet()
       .withProofs(TxHelpers.signature("2Bi5YFCeAUvQqWFJYUTzaDUfAdoHmQ4RC6nviBwvQgUYJLKrsa4T5eESGr5Er261kdeyNgHVJUGai8mALtLLWDoQ"))
 
     val sellOrder = ethSellOrder.copy(orderAuthentication =
@@ -155,7 +155,7 @@ class EthOrderSpec
     StubHelpers(blockchain).creditBalance(sellOrder.senderAddress, *)
 
     val transaction = TxHelpers
-      .exchange(buyOrder, sellOrder, price = 100, buyMatcherFee = buyOrder.matcherFee, sellMatcherFee = sellOrder.matcherFee, version = TxVersion.V3, timestamp = 100)
+      .exchange(buyOrder, sellOrder, price = 100, buyMatcherFee = buyOrder.matcherFee.value, sellMatcherFee = sellOrder.matcherFee.value, version = TxVersion.V3, timestamp = 100)
       .copy(proofs = TxHelpers.signature("4WrABDgkk9JraBLNQK4LTq7LWqVLgLzAEv8fr1rjr4ovca7224EBzLrEgcHdtHscGpQbLsk39ttQfqHMVLr9tXcB"))
 
     transaction.json() should matchJson("""{
@@ -274,7 +274,7 @@ class EthOrderSpec
       123,
       100000,
       Waves
-    )
+    ).explicitGet()
 
     val differ      = TransactionDiffer(Some(1L), 100L)(blockchain, _)
     val transaction = TxHelpers.exchange(buyOrder, ethSellOrder, price = 100, version = TxVersion.V3, timestamp = 100)
@@ -315,7 +315,7 @@ class EthOrderSpec
 
 object EthOrderSpec extends EthHelpers {
 
-  /** Use for create a hardcoded signature for a test order
+  /** Use this method to create a hardcoded signature for a test order
     * @param order
     *   Order parameters
     */
@@ -332,11 +332,11 @@ object EthOrderSpec extends EthHelpers {
     TxHelpers.matcher.publicKey,
     AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
     OrderType.BUY,
-    1,
-    100L,
+    TxExchangeAmount.unsafeFrom(1),
+    TxOrderPrice.unsafeFrom(100L),
     1,
     123,
-    100000,
+    TxMatcherFee.unsafeFrom(100000),
     Waves
   )
 
@@ -348,11 +348,11 @@ object EthOrderSpec extends EthHelpers {
     TxHelpers.matcher.publicKey,
     AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), Waves),
     OrderType.SELL,
-    1,
-    100L,
+    TxExchangeAmount.unsafeFrom(1),
+    TxOrderPrice.unsafeFrom(100L),
     1,
     123,
-    100000,
+    TxMatcherFee.unsafeFrom(100000),
     Waves
   )
 }

@@ -3,20 +3,19 @@ package com.wavesplatform
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.history.DefaultBaseTarget
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state.StringDataEntry
-import com.wavesplatform.transaction.{DataTransaction, Transaction, TxVersion}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.utils._
+import com.wavesplatform.transaction.{DataTransaction, Transaction, TxVersion}
 import org.scalacheck.Gen
 
 trait BlocksTransactionsHelpers { self: TransactionGen =>
@@ -77,18 +76,20 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     def nftIssue(from: KeyPair, timestamp: Gen[Long] = timestampGen): Gen[IssueTransaction] =
       for {
         timestamp <- timestamp
-      } yield IssueTransaction(
-        TxVersion.V1,
-        from.publicKey,
-        "test".utf8Bytes,
-        Array.emptyByteArray,
-        1,
-        0,
-        reissuable = false,
-        script = None,
-        100000000L,
-        timestamp
-      ).signWith(from.privateKey)
+      } yield IssueTransaction
+        .selfSigned(
+          TxVersion.V1,
+          from,
+          "test",
+          "",
+          1,
+          0,
+          reissuable = false,
+          script = None,
+          100000000L,
+          timestamp
+        )
+        .explicitGet()
 
     def setScript(from: KeyPair, script: Script, timestamp: Gen[Long] = timestampGen): Gen[SetScriptTransaction] =
       for {
@@ -118,10 +119,9 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     ): (Block, Seq[MicroBlock]) = {
       val block = unsafeBlock(totalRefTo, base, signer, version, timestamp)
       val microBlocks = micros
-        .foldLeft((block, Seq.empty[MicroBlock])) {
-          case ((lastTotal, allMicros), txs) =>
-            val (newTotal, micro) = unsafeMicro(totalRefTo, lastTotal, txs, signer, version, timestamp)
-            (newTotal, allMicros :+ micro)
+        .foldLeft((block, Seq.empty[MicroBlock])) { case ((lastTotal, allMicros), txs) =>
+          val (newTotal, micro) = unsafeMicro(totalRefTo, lastTotal, txs, signer, version, timestamp)
+          (newTotal, allMicros :+ micro)
         }
         ._2
       (block, microBlocks)

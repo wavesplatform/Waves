@@ -48,14 +48,14 @@ object ScriptRunner {
     )
 
   def applyGeneric(
-                    in: TxOrd,
-                    blockchain: Blockchain,
-                    script: Script,
-                    isAssetScript: Boolean,
-                    scriptContainerAddress: Environment.Tthis,
-                    defaultLimit: Int,
-                    default: EVALUATED,
-                    useCorrectScriptVersion: Boolean
+      in: TxOrd,
+      blockchain: Blockchain,
+      script: Script,
+      isAssetScript: Boolean,
+      scriptContainerAddress: Environment.Tthis,
+      defaultLimit: Int,
+      default: EVALUATED,
+      useCorrectScriptVersion: Boolean
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
 
     def evalVerifier(

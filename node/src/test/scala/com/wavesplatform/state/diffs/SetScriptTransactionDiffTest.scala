@@ -52,7 +52,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
   private def preconditionsAndSetCustomContract(script: Script): (GenesisTransaction, SetScriptTransaction) = {
     val master = TxHelpers.signer(1)
 
-    val genesis = TxHelpers.genesis(master.toAddress)
+    val genesis   = TxHelpers.genesis(master.toAddress)
     val setScript = TxHelpers.setScript(master, script)
 
     (genesis, setScript)
@@ -250,9 +250,9 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       val master = TxHelpers.signer(1)
 
       val genesis = TxHelpers.genesis(master.toAddress)
-      val expr = BLOCK(LET("x", CONST_LONG(3)), CONST_BOOLEAN(true))
-      val script = ExprScript(V1, expr, checkSize = false).explicitGet()
-      val tx = TxHelpers.setScript(master, script)
+      val expr    = BLOCK(LET("x", CONST_LONG(3)), CONST_BOOLEAN(true))
+      val script  = ExprScript(V1, expr, checkSize = false).explicitGet()
+      val tx      = TxHelpers.setScript(master, script)
 
       (genesis, tx)
     }
@@ -423,7 +423,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
        """.stripMargin
     )
 
-    val sender  = TxHelpers.signer(1)
+    val sender   = TxHelpers.signer(1)
     val balances = AddrWithBalance.enoughBalances(sender)
 
     def settings(checkNegative: Boolean = false, checkSumOverflow: Boolean = false): FunctionalitySettings = {

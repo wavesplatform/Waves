@@ -15,7 +15,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.{CreateAliasTransaction, Proofs}
+import com.wavesplatform.transaction.{CreateAliasTransaction, Proofs, TxPositiveAmount}
 import org.scalatest.prop.TableDrivenPropertyChecks
 import play.api.libs.json.Json
 
@@ -177,7 +177,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     )
 
     val kp = KeyPair(Longs.toByteArray(Random.nextLong()))
-    val cat = CreateAliasTransaction(3.toByte, notMiner.publicKey, "abc12345", 0.005.waves, System.currentTimeMillis(), Proofs.empty, AddressScheme.current.chainId)
+    val cat = CreateAliasTransaction(3.toByte, notMiner.publicKey, "abc12345", TxPositiveAmount.unsafeFrom(0.005.waves), System.currentTimeMillis(), Proofs.empty, AddressScheme.current.chainId)
     val signedCreateAlias = cat.copy(
       proofs = cat.signWith(notMiner.keyPair.privateKey).proofs.proofs ++ cat.signWith(kp.privateKey).proofs.proofs
     )

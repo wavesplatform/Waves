@@ -132,7 +132,7 @@ object Verifier extends ScorexLogging {
     result
       .flatMap(_ => additionalResult)
       .leftMap(ve => (complexity, ve))
-      .as(Diff.empty.copy(scriptsComplexity = complexity))
+      .as(Diff(scriptsComplexity = complexity))
   }
 
   private def logIfNecessary(

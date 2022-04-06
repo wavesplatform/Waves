@@ -13,7 +13,6 @@ object SetScriptTxValidator extends TxValidator[SetScriptTransaction] {
     }
 
     V.seq(tx)(
-      V.fee(tx.fee).map(_ => tx),
       V.cond(tx.script.forall(!_.isFreeCall), GenericError("Script type for Set Script Transaction should not be CALL")),
       V.cond(
         isUnionInCallableAllowed.contains(true),

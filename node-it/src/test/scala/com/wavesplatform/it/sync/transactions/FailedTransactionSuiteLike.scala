@@ -291,7 +291,7 @@ object FailedTransactionSuiteLike {
       timestamp + Order.MaxLiveTime,
       buyMatcherFee,
       Asset.fromString(Some(buyMatcherFeeAsset))
-    )
+    ).explicitGet()
     val sell = Order.sell(
       Order.V4,
       seller,
@@ -303,17 +303,17 @@ object FailedTransactionSuiteLike {
       timestamp + Order.MaxLiveTime,
       sellMatcherFee,
       Asset.fromString(Some(sellMatcherFeeAsset))
-    )
+    ).explicitGet()
     ExchangeTransaction
       .signed(
         TxVersion.V3,
         matcher.privateKey,
         buy,
         sell,
-        buy.amount,
-        buy.price,
-        buy.matcherFee,
-        sell.matcherFee,
+        buy.amount.value,
+        buy.price.value,
+        buy.matcherFee.value,
+        sell.matcherFee.value,
         fee,
         timestamp
       )

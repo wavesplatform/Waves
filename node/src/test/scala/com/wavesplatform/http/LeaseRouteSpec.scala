@@ -52,8 +52,7 @@ class LeaseRouteSpec
       CommonAccountsApi(() => domain.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), domain.db, domain.blockchain)
     )
 
-  private def withRoute(balances: Seq[AddrWithBalance])
-                       (f: (Domain, Route) => Unit): Unit =
+  private def withRoute(balances: Seq[AddrWithBalance])(f: (Domain, Route) => Unit): Unit =
     withDomain(
       settings = DomainPresets.ContinuationTransaction,
       balances = balances
@@ -128,7 +127,7 @@ class LeaseRouteSpec
       }
     }
 
-  private def toDetails(lt: LeaseTransaction) = LeaseDetails(lt.sender, lt.recipient, lt.amount, LeaseDetails.Status.Active, lt.id(), 1)
+  private def toDetails(lt: LeaseTransaction) = LeaseDetails(lt.sender, lt.recipient, lt.amount.value, LeaseDetails.Status.Active, lt.id(), 1)
 
   private def leaseGen(sender: KeyPair, maxAmount: Long, timestamp: Long): Gen[LeaseTransaction] =
     for {
@@ -139,7 +138,7 @@ class LeaseRouteSpec
     } yield LeaseTransaction.selfSigned(version, sender, recipient.toAddress, amount, fee, timestamp).explicitGet()
 
   "returns active leases which were" - {
-    val sender = TxHelpers.signer(1)
+    val sender  = TxHelpers.signer(1)
     val leaseTx = leaseGen(sender, ENOUGH_AMT, ntpTime.correctedTime())
 
     "created and cancelled by Lease/LeaseCancel transactions" in forAll(leaseTx) { leaseTransaction =>
@@ -183,7 +182,7 @@ class LeaseRouteSpec
     }
 
     val setScriptAndInvoke = {
-      val sender = TxHelpers.signer(1)
+      val sender    = TxHelpers.signer(1)
       val recipient = TxHelpers.signer(2)
 
       (
@@ -358,8 +357,8 @@ class LeaseRouteSpec
     }
 
     val nestedInvocation = {
-      val proxy = TxHelpers.signer(1)
-      val target = TxHelpers.signer(2)
+      val proxy     = TxHelpers.signer(1)
+      val target    = TxHelpers.signer(2)
       val recipient = TxHelpers.signer(3)
 
       (
@@ -450,7 +449,7 @@ class LeaseRouteSpec
             lease.id(),
             lease.sender.toAddress,
             lease.recipient.asInstanceOf[Address],
-            lease.amount,
+            lease.amount.value,
             1,
             LeaseInfo.Status.Canceled,
             Some(2),

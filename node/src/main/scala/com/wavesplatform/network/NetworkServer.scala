@@ -258,8 +258,8 @@ object NetworkServer extends ScorexLogging {
           channelClosedHandler.shutdown()
         }
 
-      override val messages: Messages                     = networkMessages
-      override val closedChannels: Observable[Channel]    = closedChannelsSubject
+      override val messages: Messages                  = networkMessages
+      override val closedChannels: Observable[Channel] = closedChannelsSubject
     }
   }
 }

@@ -1,18 +1,10 @@
 package com.wavesplatform.history
 
-import scala.collection.immutable.SortedMap
-import scala.concurrent.Future
-import scala.concurrent.duration.*
-import scala.util.control.NonFatal
-import scala.util.Try
-
-import cats.syntax.option.*
-import com.wavesplatform.{database, Application, TestValues}
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.*
-import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
@@ -25,15 +17,22 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.transaction.{BlockchainUpdater, *}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.{BlockchainUpdater, *}
 import com.wavesplatform.utils.{EthEncoding, SystemTime}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.{Application, TestValues, database}
 import monix.execution.Scheduler.Implicits.global
 import org.iq80.leveldb.DB
-import play.api.libs.json.{JsNull, Json, JsValue}
+import play.api.libs.json.{JsNull, JsValue, Json}
+
+import scala.collection.immutable.SortedMap
+import scala.concurrent.Future
+import scala.concurrent.duration.*
+import scala.util.Try
+import scala.util.control.NonFatal
 
 case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter, settings: WavesSettings) {
   import Domain.*
@@ -60,10 +59,10 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       * @return Tuple of (asset, feeInAsset, feeInWaves)
       * @see [[com.wavesplatform.state.diffs.FeeValidation#getMinFee(com.wavesplatform.state.Blockchain, com.wavesplatform.transaction.Transaction)]]
       */
-    def calculateFee(tx: Transaction): (Asset, TxAmount, TxAmount) =
+    def calculateFee(tx: Transaction): (Asset, Long, Long) =
       transactions.calculateFee(tx).explicitGet()
 
-    def calculateWavesFee(tx: Transaction): TxAmount = {
+    def calculateWavesFee(tx: Transaction): Long = {
       val (Waves, _, feeInWaves) = calculateFee(tx): @unchecked
       feeInWaves
     }
@@ -157,7 +156,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def nftList(address: Address): Seq[(IssuedAsset, AssetDescription)] = db.withResource { resource =>
     AddressPortfolio
-      .nftIterator(resource, address, blockchainUpdater.bestLiquidDiff.orEmpty, None, blockchainUpdater.assetDescription)
+      .nftIterator(resource, address, blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), None, blockchainUpdater.assetDescription)
       .toSeq
   }
 
@@ -351,7 +350,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       appendBlock(entries.map(TxHelpers.dataEntry(account, _))*)
     }
 
-    def transfer(account: KeyPair, to: Address, amount: TxAmount, asset: Asset): Unit = {
+    def transfer(account: KeyPair, to: Address, amount: Long, asset: Asset): Unit = {
       appendBlock(TxHelpers.transfer(account, to, amount, asset))
     }
 
@@ -395,7 +394,12 @@ object Domain {
 
   def portfolio(address: Address, db: DB, blockchainUpdater: BlockchainUpdaterImpl): Seq[(IssuedAsset, Long)] = db.withResource { resource =>
     AddressPortfolio
-      .assetBalanceIterator(resource, address, blockchainUpdater.bestLiquidDiff.orEmpty, id => blockchainUpdater.assetDescription(id).exists(!_.nft))
+      .assetBalanceIterator(
+        resource,
+        address,
+        blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty),
+        id => blockchainUpdater.assetDescription(id).exists(!_.nft)
+      )
       .toSeq
   }
 }

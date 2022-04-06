@@ -1,11 +1,9 @@
 package com.wavesplatform.state.diffs
 
-import cats.instances.map._
 import cats.instances.option._
 import cats.syntax.apply._
 import cats.syntax.either._
 import cats.syntax.ior._
-import cats.syntax.semigroup._
 import cats.syntax.traverse._
 import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
@@ -201,8 +199,9 @@ object DiffsCommon {
       senderPortfolio    = Map[Address, Portfolio](sender.toAddress -> Portfolio(-fee, LeaseBalance(0, -lease.amount)))
       recipientPortfolio = Map(recipient -> Portfolio(0, LeaseBalance(-lease.amount, 0)))
       actionInfo         = lease.copy(status = LeaseDetails.Status.Cancelled(blockchain.height, Some(cancelTxId)))
+      portfolios <- Diff.combine(senderPortfolio, recipientPortfolio).leftMap(GenericError(_))
     } yield Diff(
-      portfolios = senderPortfolio |+| recipientPortfolio,
+      portfolios = portfolios,
       leaseState = Map((leaseId, actionInfo))
     )
   }

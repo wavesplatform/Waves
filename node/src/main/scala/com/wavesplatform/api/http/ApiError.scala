@@ -31,8 +31,9 @@ object ApiError {
       case TxValidationError.InvalidAddress(_)               => InvalidAddress
       case TxValidationError.NegativeAmount(x, of)           => NegativeAmount(s"$x of $of")
       case TxValidationError.NonPositiveAmount(x, of)        => NonPositiveAmount(s"$x of $of")
+      case TxValidationError.InvalidDecimals(decimals)       => InvalidDecimals(decimals.toString)
       case TxValidationError.NegativeMinFee(x, of)           => NegativeMinFee(s"$x per $of")
-      case TxValidationError.InsufficientFee(x)              => InsufficientFee(x)
+      case TxValidationError.InsufficientFee                 => InsufficientFee
       case TxValidationError.InvalidName                     => InvalidName
       case TxValidationError.InvalidSignature(_, _)          => InvalidSignature
       case TxValidationError.InvalidRequestSignature         => InvalidSignature
@@ -306,13 +307,10 @@ object ApiError {
     val Id = 111
   }
 
-  final case class InsufficientFee(override val message: String = "insufficient fee") extends ApiError {
-    override val id: Int          = InsufficientFee.Id
+  case object InsufficientFee extends ApiError {
+    override val id: Int          = 112
+    override val message: String  = "insufficient fee"
     override val code: StatusCode = StatusCodes.BadRequest
-  }
-
-  case object InsufficientFee {
-    val Id = 112
   }
 
   final case class NegativeMinFee(msg: String) extends ApiError {
@@ -333,6 +331,16 @@ object ApiError {
 
   case object NonPositiveAmount {
     val Id = 115
+  }
+
+  final case class InvalidDecimals(msg: String) extends ApiError {
+    override val id: Int          = InvalidDecimals.Id
+    override val message: String  = s"invalid decimals value: $msg, ${TxDecimals.errMsg}"
+    override val code: StatusCode = StatusCodes.BadRequest
+  }
+
+  case object InvalidDecimals {
+    val Id = 117
   }
 
   case class AlreadyInState(transactionId: ByteStr, height: Int) extends ApiError {

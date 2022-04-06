@@ -37,7 +37,8 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec {
             Global,
             DirectiveSet(V1, Account, Expression).explicitGet()
           )
-        ))
+        )
+      )
   }
   private val funcCostsV1 = utils.functionCosts(V1)
 
@@ -102,7 +103,8 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec {
             Global,
             DirectiveSet(V2, Account, Expression).explicitGet()
           )
-        ))
+        )
+      )
   }
   private val funcCostsV2 = utils.functionCosts(V2)
 
@@ -167,7 +169,8 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec {
             Global,
             DirectiveSet(V3, Account, Expression).explicitGet()
           )
-        ))
+        )
+      )
   }
   private val funcCostsV3 = utils.functionCosts(V3)
 

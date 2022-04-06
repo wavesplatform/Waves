@@ -2,9 +2,8 @@ package com.wavesplatform.state
 
 import java.util.concurrent.TimeUnit
 
-import cats.kernel.Monoid
+import cats.implicits.toFoldableOps
 import com.google.common.cache.CacheBuilder
-import com.wavesplatform.account.Address
 import com.wavesplatform.block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
@@ -58,13 +57,11 @@ case class NgState(
     microBlocks: List[MicroBlockInfo] = List.empty,
     internalCaches: NgStateCaches = new NgStateCaches
 ) {
-  def cancelExpiredLeases(diff: Diff): Diff =
+  def cancelExpiredLeases(diff: Diff): Either[String, Diff] =
     leasesToCancel
       .collect { case (id, ld) if diff.leaseState.get(id).forall(_.isActive) => ld }
-      .foldLeft(diff) {
-        case (d, ld) =>
-          Monoid.combine(d, ld)
-      }
+      .toList
+      .foldM(diff)(_.combine(_))
 
   def microBlockIds: Seq[BlockId] = microBlocks.map(_.totalBlockId)
 
@@ -79,7 +76,7 @@ case class NgState(
               case Some(MicroBlockInfo(blockId, current)) =>
                 val (prevDiff, prevCarry, prevTotalFee)                   = this.diffFor(current.reference)
                 val CachedMicroDiff(currDiff, currCarry, currTotalFee, _) = this.microDiffs(blockId)
-                (Monoid.combine(prevDiff, currDiff), prevCarry + currCarry, prevTotalFee + currTotalFee)
+                (prevDiff.unsafeCombine(currDiff), prevCarry + currCarry, prevTotalFee + currTotalFee)
 
               case None =>
                 (Diff.empty, 0L, 0L)
@@ -119,12 +116,6 @@ case class NgState(
         (block, diff, carry, totalFee, discarded)
     }
 
-  /** HACK: this method returns LPOS portfolio as though expired leases have already been cancelled.
-    * It was added to make sure miner gets proper generating balance when scheduling next mining attempt.
-    */
-  def balanceDiffAt(address: Address, blockId: BlockId): Portfolio =
-    cancelExpiredLeases(diffFor(blockId)._1).portfolios.getOrElse(address, Portfolio.empty)
-
   def bestLiquidDiffAndFees: (Diff, Long, Long) = diffFor(microBlocks.headOption.fold(base.id())(_.totalBlockId))
 
   def bestLiquidDiff: Diff = bestLiquidDiffAndFees._1
@@ -156,7 +147,7 @@ case class NgState(
   ): NgState = {
     val blockId = totalBlockId.getOrElse(this.createBlockId(microBlock))
 
-    val microDiffs = this.microDiffs + (blockId -> CachedMicroDiff(diff, microblockCarry, microblockTotalFee, timestamp))
+    val microDiffs  = this.microDiffs + (blockId -> CachedMicroDiff(diff, microblockCarry, microblockTotalFee, timestamp))
     val microBlocks = MicroBlockInfo(blockId, microBlock) :: this.microBlocks
     internalCaches.invalidate(blockId)
     this.copy(microDiffs = microDiffs, microBlocks = microBlocks)

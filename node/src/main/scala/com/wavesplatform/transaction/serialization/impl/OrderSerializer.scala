@@ -2,16 +2,16 @@ package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
 
-import scala.util.Try
-
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.protobuf.transaction.PBOrders
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.transaction.assets.exchange.*
-import com.wavesplatform.transaction.Proofs
+import com.wavesplatform.transaction.{Proofs, TxExchangeAmount, TxMatcherFee, TxOrderPrice}
 import com.wavesplatform.utils.EthEncoding
 import play.api.libs.json.{JsObject, Json}
+
+import scala.util.Try
 
 object OrderSerializer {
   def toJson(order: Order): JsObject = {
@@ -24,16 +24,16 @@ object OrderSerializer {
       "matcherPublicKey" -> matcherPublicKey,
       "assetPair"        -> assetPair.json,
       "orderType"        -> orderType.toString,
-      "amount"           -> amount,
-      "price"            -> price,
+      "amount"           -> amount.value,
+      "price"            -> price.value,
       "timestamp"        -> timestamp,
       "expiration"       -> expiration,
-      "matcherFee"       -> matcherFee,
+      "matcherFee"       -> matcherFee.value,
       "signature"        -> proofs.toSignature.toString,
       "proofs"           -> proofs.proofs.map(_.toString)
     ) ++ (if (version >= Order.V3) Json.obj("matcherFeeAssetId" -> matcherFeeAssetId) else JsObject.empty) ++
       (if (version >= Order.V4) Json.obj("eip712Signature" -> eip712Signature.map(bs => EthEncoding.toHexString(bs.arr)), "priceMode" -> priceMode)
-       else JsObject.empty) // TODO: Should it be hex or base58?
+       else JsObject.empty)
   }
 
   def bodyBytes(order: Order): Array[Byte] = {
@@ -46,11 +46,11 @@ object OrderSerializer {
           matcherPublicKey.arr,
           assetPair.bytes,
           orderType.bytes,
-          Longs.toByteArray(price),
-          Longs.toByteArray(amount),
+          Longs.toByteArray(price.value),
+          Longs.toByteArray(amount.value),
           Longs.toByteArray(timestamp),
           Longs.toByteArray(expiration),
-          Longs.toByteArray(matcherFee)
+          Longs.toByteArray(matcherFee.value)
         )
 
       case Order.V2 =>
@@ -60,11 +60,11 @@ object OrderSerializer {
           matcherPublicKey.arr,
           assetPair.bytes,
           orderType.bytes,
-          Longs.toByteArray(price),
-          Longs.toByteArray(amount),
+          Longs.toByteArray(price.value),
+          Longs.toByteArray(amount.value),
           Longs.toByteArray(timestamp),
           Longs.toByteArray(expiration),
-          Longs.toByteArray(matcherFee)
+          Longs.toByteArray(matcherFee.value)
         )
 
       case Order.V3 =>
@@ -74,11 +74,11 @@ object OrderSerializer {
           matcherPublicKey.arr,
           assetPair.bytes,
           orderType.bytes,
-          Longs.toByteArray(price),
-          Longs.toByteArray(amount),
+          Longs.toByteArray(price.value),
+          Longs.toByteArray(amount.value),
           Longs.toByteArray(timestamp),
           Longs.toByteArray(expiration),
-          Longs.toByteArray(matcherFee),
+          Longs.toByteArray(matcherFee.value),
           matcherFeeAssetId.byteRepr
         )
 
@@ -96,7 +96,7 @@ object OrderSerializer {
     version match {
       case Order.V1            => Bytes.concat(this.bodyBytes(ord), proofs.toSignature.arr)
       case Order.V2 | Order.V3 => Bytes.concat(this.bodyBytes(ord), proofs.bytes())
-      case other => throw new IllegalArgumentException(s"Couldn't serialize OrderV$other")
+      case other               => throw new IllegalArgumentException(s"Couldn't serialize OrderV$other")
     }
   }
 
@@ -106,11 +106,11 @@ object OrderSerializer {
       val matcher    = buf.getPublicKey
       val assetPair  = AssetPair(buf.getAsset, buf.getAsset)
       val orderType  = OrderType(buf.get())
-      val price      = buf.getLong
-      val amount     = buf.getLong
+      val price      = TxOrderPrice.unsafeFrom(buf.getLong)
+      val amount     = TxExchangeAmount.unsafeFrom(buf.getLong)
       val timestamp  = buf.getLong
       val expiration = buf.getLong
-      val matcherFee = buf.getLong
+      val matcherFee = TxMatcherFee.unsafeFrom(buf.getLong)
       Order(
         version,
         OrderAuthentication(sender),

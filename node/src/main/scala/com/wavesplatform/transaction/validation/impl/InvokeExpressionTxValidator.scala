@@ -7,7 +7,6 @@ import com.wavesplatform.transaction.validation.{TxValidator, ValidatedV}
 object InvokeExpressionTxValidator extends TxValidator[InvokeExpressionTransaction] {
   override def validate(tx: InvokeExpressionTransaction): ValidatedV[InvokeExpressionTransaction] =
     V.seq(tx)(
-      V.fee(tx.fee),
-      V.invokeLength(tx.expressionBytes.size <= ContractLimits.MaxContractSizeInBytes),
+      V.invokeLength(tx.expressionBytes.size <= ContractLimits.MaxContractSizeInBytes)
     )
 }
