@@ -317,6 +317,8 @@ class DAppEnvironment(
     totalComplexityLimit: Int,
     var remainingCalls: Int,
     var availableActions: Int,
+    var availableBalanceActions: Int,
+    var availableAssetActions: Int,
     var availableData: Int,
     var availableDataSize: Int,
     var currentDiff: Diff,
@@ -366,19 +368,22 @@ class DAppEnvironment(
         val invocation = DAppEnvironment.DAppInvocation(invoke.dApp, invoke.funcCall, invoke.payments)
         invocationRoot.record(invocation)
       }
-      (diff, evaluated, remainingActions, remainingData, remainingDataSize) <- InvokeScriptDiff( // This is a recursive call
-        mutableBlockchain,
-        blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp + 1,
-        limitedExecution,
-        totalComplexityLimit,
-        availableComplexity,
-        remainingCalls,
-        availableActions,
-        availableData,
-        availableDataSize,
-        if (reentrant) calledAddresses else calledAddresses + invoke.sender.toAddress,
-        invocationTracker
-      )(invoke)
+      (diff, evaluated, remainingActions, remainingBalanceActions, remainingAssetActions, remainingData, remainingDataSize) <-
+        InvokeScriptDiff( // This is a recursive call
+          mutableBlockchain,
+          blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp + 1,
+          limitedExecution,
+          totalComplexityLimit,
+          availableComplexity,
+          remainingCalls,
+          availableActions,
+          availableBalanceActions,
+          availableAssetActions,
+          availableData,
+          availableDataSize,
+          if (reentrant) calledAddresses else calledAddresses + invoke.sender.toAddress,
+          invocationTracker
+        )(invoke)
       fixedDiff = diff.copy(
         scriptResults = Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = diff.scriptResults(txId))))),
         scriptsRun = diff.scriptsRun + 1
@@ -389,6 +394,8 @@ class DAppEnvironment(
       mutableBlockchain = CompositeBlockchain(blockchain, currentDiff)
       remainingCalls = remainingCalls - 1
       availableActions = remainingActions
+      availableBalanceActions = remainingBalanceActions
+      availableAssetActions = remainingAssetActions
       availableData = remainingData
       availableDataSize = remainingDataSize
       (evaluated, diff.scriptsComplexity.toInt)

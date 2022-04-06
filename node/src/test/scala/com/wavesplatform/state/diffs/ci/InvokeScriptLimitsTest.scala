@@ -22,7 +22,8 @@ import org.scalatest.EitherValues
 
 class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSettings with EitherValues {
 
-  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
+  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures =
+    Map(
       BlockchainFeatures.SmartAccounts.id    -> 0,
       BlockchainFeatures.SmartAssets.id      -> 0,
       BlockchainFeatures.Ride4DApps.id       -> 0,
@@ -30,15 +31,22 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
       BlockchainFeatures.DataTransaction.id  -> 0,
       BlockchainFeatures.BlockV5.id          -> 0,
       BlockchainFeatures.SynchronousCalls.id -> 0
-    ))
+    )
+  )
 
   private val fsWithV6 = fsWithV5.copy(
     preActivatedFeatures = fsWithV5.preActivatedFeatures.updated(BlockchainFeatures.RideV6.id, 0)
   )
 
   Seq(V5, V6).foreach { version =>
-    property(s"Allow not more ${ContractLimits.MaxCallableActionsAmount(version)} non-data actions for V${version.id}") {
-      val wavesTransferAmount = (ContractLimits.MaxCallableActionsAmount(version) - 8) / 2
+    val limit =
+      if (version == V6)
+        ContractLimits.MaxBalanceScriptActionsAmountV6
+      else
+        ContractLimits.MaxCallableActionsAmountBeforeV6(version)
+
+    property(s"Allow not more $limit ScriptTransfer/Lease/LeaseCancel actions for V${version.id}") {
+      val wavesTransferAmount = (limit - 8) / 2
       val (preparingTxs1, invoke1, masterAddress, serviceAddress1) =
         scenario(
           masterContract(_, _, wavesTransferAmount, version),
@@ -58,14 +66,20 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
           serviceContract(version, wavesTransferAmount)
         )
 
+      val errMsg =
+        if (version == V6)
+          "ScriptTransfer, Lease, LeaseCancel actions count limit is exceeded"
+        else
+          "Actions count limit is exceeded"
+
       assertDiffEi(Seq(TestBlock.create(preparingTxs2)), TestBlock.create(Seq(invoke2), Block.ProtoBlockVersion), features(version)) { ei =>
-        ei should produceRejectOrFailedDiff("Actions count limit is exceeded")
+        ei should produceRejectOrFailedDiff(errMsg)
       }
     }
   }
 
   private def scenario(masterDApp: (Address, Alias) => Script, serviceDApp: Script): (Seq[Transaction], InvokeScriptTransaction, Address, Address) = {
-    val master = TxHelpers.signer(0)
+    val master  = TxHelpers.signer(0)
     val invoker = TxHelpers.signer(1)
     val service = TxHelpers.signer(2)
 
@@ -76,11 +90,11 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
       TxHelpers.genesis(invoker.toAddress),
       TxHelpers.genesis(service.toAddress)
     )
-    val alias = Alias.create("alias").explicitGet()
-    val aliasTx = TxHelpers.createAlias(alias.name, service, fee)
-    val setMasterScript = TxHelpers.setScript(master, masterDApp(service.toAddress, alias), fee)
+    val alias            = Alias.create("alias").explicitGet()
+    val aliasTx          = TxHelpers.createAlias(alias.name, service, fee)
+    val setMasterScript  = TxHelpers.setScript(master, masterDApp(service.toAddress, alias), fee)
     val setServiceScript = TxHelpers.setScript(service, serviceDApp, fee)
-    val preparingTxs = genesis :+ aliasTx :+ setMasterScript :+ setServiceScript
+    val preparingTxs     = genesis :+ aliasTx :+ setMasterScript :+ setServiceScript
 
     val invoke = TxHelpers.invoke(master.toAddress, func = Some("foo"), invoker = invoker, payments = List(Payment(10L, Waves)), fee = fee)
 
@@ -90,7 +104,7 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
   private def features(version: StdLibVersion): FunctionalitySettings =
     version match {
       case V5 => fsWithV5
-      case _ => fsWithV6
+      case _  => fsWithV6
     }
 
   private def serviceContract(version: StdLibVersion, wavesTransferAmount: Int): Script = {
@@ -119,12 +133,16 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
     TestCompiler(version).compileContract(script)
   }
 
-  def masterContract(otherAcc: Address,
-                     alias: Alias,
-                     wavesTransferAmount: Int,
-                     version: StdLibVersion,
-                     extraAction: Boolean = false): Script = {
-    val extraLeaseAction = if (extraAction) s"Lease(Address(base58'$otherAcc'), 15)," else ""
+  def masterContract(otherAcc: Address, alias: Alias, wavesTransferAmount: Int, version: StdLibVersion, extraAction: Boolean = false): Script = {
+    val additionalBalanceActionsForV6 =
+      if (version == V6)
+        s"""
+           |Lease(Address(base58'$otherAcc'), 1),
+           |Lease(Address(base58'$otherAcc'), 2),
+           |""".stripMargin
+      else
+        ""
+    val extraLeaseAction = if (extraAction) s"Lease(Address(base58'$otherAcc'), 16)," else ""
 
     val script =
       s"""
@@ -155,6 +173,7 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
          |        IntegerEntry("key", 1),
          |        Lease(Address(base58'$otherAcc'), 13),
          |        Lease(Address(base58'$otherAcc'), 15),
+         |        $additionalBalanceActionsForV6
          |        $extraLeaseAction
          |        l,
          |        LeaseCancel(l.calculateLeaseId())
