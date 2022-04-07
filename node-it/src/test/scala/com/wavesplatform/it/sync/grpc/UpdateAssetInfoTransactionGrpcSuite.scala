@@ -3,19 +3,19 @@ package com.wavesplatform.it.sync.grpc
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs.Miners
-import com.wavesplatform.it.api.SyncGrpcApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.api.SyncGrpcApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.protobuf.transaction.PBTransactions
+import com.wavesplatform.transaction.assets.IssueTransaction.{MaxAssetDescriptionLength, MaxAssetNameLength, MinAssetNameLength}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import io.grpc.Status.Code
 import org.scalatest.prop.TableDrivenPropertyChecks
 
-import scala.concurrent.duration._
-import scala.util.Random
+import scala.concurrent.duration.*
 
 class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with TableDrivenPropertyChecks {
-  import UpdateAssetInfoTransactionGrpcSuite._
+  import UpdateAssetInfoTransactionGrpcSuite.*
   val updateInterval                              = 5
   override protected def nodeConfigs: Seq[Config] = Seq(configWithUpdateIntervalSetting(updateInterval).withFallback(Miners.head))
 
@@ -82,32 +82,47 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
     )
   }
 
-  val invalidAssetsNames =
-    Table(
+  test("can update asset only with name which have valid length") {
+    val invalidNames = Seq(
       "",
-      "abc",
-      "NameIsLongerThanLimit",
+      "a" * (MinAssetNameLength - 1),
+      "a" * (MaxAssetNameLength + 1),
       "~!|#$%^&*()_+=\";:/?><|\\][{}"
     )
-
-  forAll(invalidAssetsNames) { assetName: String =>
-    test(s"not able to update name to $assetName") {
-      sender.waitForHeight(sender.height + 3, 2.minutes)
+    val validNames = Seq("a" * MinAssetNameLength, "a" * MaxAssetNameLength)
+    invalidNames.foreach { name =>
       assertGrpcError(
-        sender.updateAssetInfo(issuer, assetId, assetName, "updatedDescription", minFee),
+        sender.updateAssetInfo(issuer, assetId, name, "updatedDescription", minFee),
         "invalid name",
         Code.INVALID_ARGUMENT
       )
     }
+    validNames.foreach { name =>
+      sender.waitForHeight(sender.height + updateInterval + 1, 3.minutes)
+      val tx = sender.updateAssetInfo(issuer, assetId, name, "updatedDescription", minFee)
+
+      nodes.foreach(_.waitForTxAndHeightArise(tx.id))
+      nodes.foreach(_.assetInfo(assetId).name shouldBe name)
+    }
   }
 
-  test(s"not able to set too big description") {
-    val tooBigDescription = Random.nextString(1001)
-    assertGrpcError(
-      sender.updateAssetInfo(issuer, assetId, "updatedName", tooBigDescription, minFee),
-      "Too big sequence requested",
-      Code.INVALID_ARGUMENT
-    )
+  test("can update asset only with description which have valid length") {
+    val invalidDescs = Seq("a" * (MaxAssetDescriptionLength + 1))
+    val validDescs = Seq("", "a" * MaxAssetDescriptionLength)
+    invalidDescs.foreach { desc =>
+      assertGrpcError(
+        sender.updateAssetInfo(issuer, assetId, "updatedName", desc, minFee),
+        "Too big sequence requested",
+        Code.INVALID_ARGUMENT
+      )
+    }
+    validDescs.foreach { desc =>
+      sender.waitForHeight(sender.height + updateInterval + 1, 3.minutes)
+      val tx = sender.updateAssetInfo(issuer, assetId, "updatedName", desc, minFee)
+
+      nodes.foreach(_.waitForTxAndHeightArise(tx.id))
+      nodes.foreach(_.assetInfo(assetId).description shouldBe desc)
+    }
   }
 
   test("not able to update asset info without paying enough fee") {

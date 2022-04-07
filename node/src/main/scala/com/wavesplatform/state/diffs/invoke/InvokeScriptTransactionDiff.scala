@@ -78,6 +78,8 @@ object InvokeScriptTransactionDiff {
           scriptResult: ScriptResult,
           log: Log[Id],
           availableActions: Int,
+          availableBalanceActions: Int,
+          availableAssetActions: Int,
           availableData: Int,
           availableDataSize: Int,
           limit: Int
@@ -118,6 +120,8 @@ object InvokeScriptTransactionDiff {
             result,
             log,
             environment.availableActions,
+            environment.availableBalanceActions,
+            environment.availableAssetActions,
             environment.availableData,
             environment.availableDataSize,
             fullLimit - paymentsComplexity
@@ -146,7 +150,17 @@ object InvokeScriptTransactionDiff {
       }
 
       for {
-        MainScriptResult(invocationDiff, scriptResult, log, availableActions, availableData, availableDataSize, limit) <- executeMainScript()
+        MainScriptResult(
+          invocationDiff,
+          scriptResult,
+          log,
+          availableActions,
+          availableBalanceActions,
+          availableAssetActions,
+          availableData,
+          availableDataSize,
+          limit
+        ) <- executeMainScript()
         otherIssues = invocationDiff.scriptResults.get(tx.id()).fold(Seq.empty[Issue])(allIssues)
 
         doProcessActions = InvokeDiffsCommon.processActions(
@@ -171,16 +185,27 @@ object InvokeScriptTransactionDiff {
           val dataCount    = dataEntries.length
           val dataSize     = DataTxValidator.invokeWriteSetSize(blockchain, dataEntries)
           val actionsCount = actions.length - dataCount
+          val balanceActionsCount = actions.collect {
+            case tr: AssetTransfer => tr
+            case l: Lease          => l
+            case lc: LeaseCancel   => lc
+          }.length
+          val assetActionsCount = actions.length - dataCount - balanceActionsCount
 
           for {
             _ <- InvokeDiffsCommon.checkCallResultLimits(
+              version,
               blockchain,
               storingComplexity,
               log,
               actionsCount,
+              balanceActionsCount,
+              assetActionsCount,
               dataCount,
               dataSize,
               availableActions,
+              availableBalanceActions,
+              availableAssetActions,
               availableData,
               availableDataSize
             )
@@ -263,7 +288,9 @@ object InvokeScriptTransactionDiff {
             limitedExecution,
             ContractLimits.MaxTotalInvokeComplexity(version),
             ContractLimits.MaxSyncDAppCalls(version),
-            ContractLimits.MaxCallableActionsAmount(version),
+            ContractLimits.MaxCallableActionsAmountBeforeV6(version),
+            ContractLimits.MaxBalanceScriptActionsAmountV6,
+            ContractLimits.MaxAssetScriptActionsAmountV6,
             ContractLimits.MaxWriteSetSize,
             ContractLimits.MaxTotalWriteSetSizeInBytes,
             paymentsPart,
@@ -339,14 +366,13 @@ object InvokeScriptTransactionDiff {
       .flatten
       .leftMap[ValidationError] {
         case (AlwaysRejectError(msg), _, log) =>
-          ScriptExecutionError.dAppExecution(msg, log)
-        case (error, unusedComplexity, log) =>
-          val usedComplexity = startLimit - unusedComplexity.max(0)
-          if (usedComplexity > failFreeLimit) {
-            val storingComplexity = if (blockchain.storeEvaluatedComplexity) usedComplexity else estimatedComplexity
-            FailedTransactionError.dAppExecution(error.message, storingComplexity + paymentsComplexity, log)
-          } else
-            ScriptExecutionError.dAppExecution(error.message, log)
+          ScriptExecutionError.dAppExecution(msg, log) case (error, unusedComplexity, log) =>
+        val usedComplexity = startLimit - unusedComplexity.max(0)
+        if (usedComplexity > failFreeLimit) {
+          val storingComplexity = if (blockchain.storeEvaluatedComplexity) usedComplexity else estimatedComplexity
+          FailedTransactionError.dAppExecution(error.message, storingComplexity + paymentsComplexity, log)
+        } else
+          ScriptExecutionError.dAppExecution(error.message, log)
       }
       .flatTap { case (r, log) =>
         InvokeDiffsCommon

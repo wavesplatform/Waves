@@ -54,13 +54,15 @@ object InvokeScriptDiff {
       remainingComplexity: Int,
       remainingCalls: Int,
       remainingActions: Int,
+      remainingBalanceActionsV6: Int,
+      remainingAssetActionsV6: Int,
       remainingData: Int,
       remainingDataSize: Int,
       calledAddresses: Set[Address],
       invocationRoot: DAppEnvironment.InvocationTreeTracker
   )(
       tx: InvokeScript
-  ): CoevalR[(Diff, EVALUATED, Int, Int, Int)] = {
+  ): CoevalR[(Diff, EVALUATED, Int, Int, Int, Int, Int)] = {
     val dAppAddress = tx.dApp
     val invoker     = tx.sender.toAddress
 
@@ -160,7 +162,7 @@ object InvokeScriptDiff {
 
           result <- for {
             paymentsPart <- traced(InvokeDiffsCommon.paymentsPart(tx, tx.dApp, Map()))
-            (diff, (scriptResult, log), availableActions, availableData, availableDataSize) <- {
+            (diff, (scriptResult, log), availableActions, availableBalanceActions, availableAssetActions, availableData, availableDataSize) <- {
               stats.invokedScriptExecution.measureForType(TransactionType.InvokeScript)({
                 val height = blockchain.height
                 val invocation = ContractEvaluator.Invocation(
@@ -190,6 +192,8 @@ object InvokeScriptDiff {
                   totalComplexityLimit,
                   remainingCalls - 1,
                   remainingActions,
+                  remainingBalanceActionsV6,
+                  remainingAssetActionsV6,
                   remainingData,
                   remainingDataSize,
                   paymentsPartInsideDApp,
@@ -208,13 +212,23 @@ object InvokeScriptDiff {
                     ).map(TracedResult(_))
                   )
                   diff <- traced(environment.currentDiff.combine(paymentsPartToResolve).leftMap(GenericError(_)))
-                } yield (diff, evaluated, environment.availableActions, environment.availableData, environment.availableDataSize)
+                } yield (
+                  diff,
+                  evaluated,
+                  environment.availableActions,
+                  environment.availableBalanceActions,
+                  environment.availableAssetActions,
+                  environment.availableData,
+                  environment.availableDataSize
+                )
               })
             }
             _               = invocationRoot.setLog(log)
             spentComplexity = remainingComplexity - scriptResult.unusedComplexity.max(0)
 
-            _ <- validateIntermediateBalances(blockchain, diff, spentComplexity, log)
+            _ <- validateIntermediateBalances(
+                  blockchain,
+                  diff, spentComplexity, log)
 
             doProcessActions = (actions: List[CallableAction], unusedComplexity: Int) => {
               val storingComplexity = if (blockchain.storeEvaluatedComplexity) complexityAfterPayments - unusedComplexity else invocationComplexity
@@ -238,47 +252,80 @@ object InvokeScriptDiff {
               )
             }
 
-            process = { (actions: List[CallableAction], unusedComplexity: Int, actionsCount: Int, dataCount: Int, dataSize: Int, ret: EVALUATED) =>
-              for {
-                _ <- CoevalR(
-                  Coeval(
-                    InvokeDiffsCommon.checkCallResultLimits(
-                      blockchain,
-                      remainingComplexity - unusedComplexity,
-                      log,
-                      actionsCount,
-                      dataCount,
-                      dataSize,
-                      availableActions,
-                      availableData,
-                      availableDataSize
+            process = {
+              (
+                  actions: List[CallableAction],
+                  unusedComplexity: Int,
+                  actionsCount: Int,
+                  balanceActionsCount: Int,
+                  assetActionsCount: Int,
+                  dataCount: Int,
+                  dataSize: Int,
+                  ret: EVALUATED
+              ) =>
+                for {
+                  _ <- CoevalR(
+                    Coeval(
+                      InvokeDiffsCommon.checkCallResultLimits(
+                        version,
+                        blockchain,
+                        remainingComplexity - unusedComplexity,
+                        log,
+                        actionsCount,
+                        balanceActionsCount,
+                        assetActionsCount,
+                        dataCount,
+                        dataSize,
+                        availableActions,
+                        availableBalanceActions,
+                        availableAssetActions,
+                        availableData,
+                        availableDataSize
+                      )
                     )
                   )
+                  diff <- doProcessActions(actions, unusedComplexity)
+                } yield (
+                  diff,
+                  ret,
+                  availableActions - actionsCount,
+                  availableBalanceActions - balanceActionsCount,
+                  availableAssetActions - assetActionsCount,
+                  availableData - dataCount,
+                  availableDataSize - dataSize
                 )
-                diff <- doProcessActions(actions, unusedComplexity)
-              } yield (diff, ret, availableActions - actionsCount, availableData - dataCount, availableDataSize - dataSize)
             }
 
-            (actionsDiff, evaluated, remainingActions1, remainingData1, remainingDataSize1) <- scriptResult match {
-              case ScriptResultV3(dataItems, transfers, unusedComplexity) =>
-                val dataEntries  = dataItems.map(InvokeDiffsCommon.dataItemToEntry)
-                val dataCount    = dataItems.length
-                val dataSize     = DataTxValidator.invokeWriteSetSize(blockchain, dataEntries)
-                val actionsCount = transfers.length
-                process(dataItems ::: transfers, unusedComplexity, actionsCount, dataCount, dataSize, unit)
-              case ScriptResultV4(actions, unusedComplexity, ret) =>
-                val dataEntries  = actions.collect { case d: DataOp => InvokeDiffsCommon.dataItemToEntry(d) }
-                val dataCount    = dataEntries.length
-                val dataSize     = DataTxValidator.invokeWriteSetSize(blockchain, dataEntries)
-                val actionsCount = actions.length - dataCount
-                process(actions, unusedComplexity, actionsCount, dataCount, dataSize, ret)
-              case _: IncompleteResult if limitedExecution =>
-                doProcessActions(Nil, 0).map((_, unit, availableActions, availableData, availableDataSize))
-              case r: IncompleteResult =>
-                val usedComplexity = remainingComplexity - r.unusedComplexity
-                val error = FailedTransactionError.dAppExecution(s"Invoke complexity limit = $totalComplexityLimit is exceeded", usedComplexity, log)
-                traced(error.asLeft[(Diff, EVALUATED, Int, Int, Int)])
-            }
+            (actionsDiff, evaluated, remainingActions1, remainingBalanceActions1, remainingAssetActions1, remainingData1, remainingDataSize1) <-
+              scriptResult match {
+                case ScriptResultV3(dataItems, transfers, unusedComplexity) =>
+                  val dataEntries  = dataItems.map(InvokeDiffsCommon.dataItemToEntry)
+                  val dataCount    = dataItems.length
+                  val dataSize     = DataTxValidator.invokeWriteSetSize(blockchain, dataEntries)
+                  val actionsCount = transfers.length
+                  process(dataItems ::: transfers, unusedComplexity, actionsCount, actionsCount, 0, dataCount, dataSize, unit)
+                case ScriptResultV4(actions, unusedComplexity, ret) =>
+                  val dataEntries = actions.collect { case d: DataOp => InvokeDiffsCommon.dataItemToEntry(d) }
+                  val dataCount   = dataEntries.length
+                  val balanceActionsCount = actions.collect {
+                    case tr: AssetTransfer => tr
+                    case l: Lease          => l
+                    case lc: LeaseCancel   => lc
+                  }.length
+                  val assetActionsCount = actions.length - dataCount - balanceActionsCount
+                  val dataSize          = DataTxValidator.invokeWriteSetSize(blockchain, dataEntries)
+                  val actionsCount      = actions.length - dataCount
+                  process(actions, unusedComplexity, actionsCount, balanceActionsCount, assetActionsCount, dataCount, dataSize, ret)
+                case _: IncompleteResult if limitedExecution =>
+                  doProcessActions(Nil, 0).map(
+                    (_, unit, availableActions, availableBalanceActions, availableAssetActions, availableData, availableDataSize)
+                  )
+                case r: IncompleteResult =>
+                  val usedComplexity = remainingComplexity - r.unusedComplexity
+                  val error =
+                    FailedTransactionError.dAppExecution(s"Invoke complexity limit = $totalComplexityLimit is exceeded", usedComplexity, log)
+                  traced(error.asLeft[(Diff, EVALUATED, Int, Int, Int, Int, Int)])
+              }
             resultDiff <- traced(
               diff
                 .copy(scriptsComplexity = 0)
@@ -287,10 +334,12 @@ object InvokeScriptDiff {
                 .leftMap(GenericError(_))
             )
 
-            _ <- validateIntermediateBalances(blockchain, resultDiff, resultDiff.scriptsComplexity, log)
+            _ <- validateIntermediateBalances(
+                  blockchain,
+                  resultDiff, resultDiff.scriptsComplexity, log)
 
             _ = invocationRoot.setResult(scriptResult)
-          } yield (resultDiff, evaluated, remainingActions1, remainingData1, remainingDataSize1)
+          } yield (resultDiff, evaluated, remainingActions1, remainingBalanceActions1, remainingAssetActions1, remainingData1, remainingDataSize1)
         } yield result
 
       case _ => traced(Left(GenericError(s"No contract at address ${tx.dApp}")))

@@ -16,7 +16,7 @@ object ContractLimits {
   }
 
   val MaxTotalInvokeComplexity: StdLibVersion => Int = {
-    case v @ (V1 | V2 | V3 | V4) => MaxComplexityByVersion(v) * (MaxAttachedPaymentAmount + MaxCallableActionsAmount(V4) + 1)
+    case v @ (V1 | V2 | V3 | V4) => MaxComplexityByVersion(v) * (MaxAttachedPaymentAmount + MaxCallableActionsAmountBeforeV6(V4) + 1)
     case V5                      => 26000
     case _                       => 52000
   }
@@ -33,7 +33,7 @@ object ContractLimits {
 
   val MaxExprSizeInBytes: Int     = 8 * 1024
   val MaxContractSizeInBytes: Int = 32 * 1024
-  val MaxContractSizeInBytesV6 = 160 * 1024
+  val MaxContractSizeInBytesV6    = 160 * 1024
 
   val MaxContractMetaSizeInBytes = 1024
 
@@ -53,13 +53,16 @@ object ContractLimits {
     v => if (v >= V4) 400 else 100
 
   // Mass Transfer	0.001 + 0.0005*N, rounded up to 0.001, fee for CI is 0.005
-  def MaxCallableActionsAmount(v: StdLibVersion): Int =
+  def MaxCallableActionsAmountBeforeV6(v: StdLibVersion): Int =
     v match {
       case version if version < V5 => 10
-      case V5 => 30
-      case _ => 100
+      case _                       => 30
     }
-  val MaxAttachedPaymentAmount = 2
+
+  val MaxBalanceScriptActionsAmountV6: Int = 100
+  val MaxAssetScriptActionsAmountV6: Int   = 30
+
+  val MaxAttachedPaymentAmount   = 2
   val MaxAttachedPaymentAmountV5 = 10
 
   // Data weight related constants

@@ -1,10 +1,11 @@
 package com.wavesplatform.state.diffs
 
-import com.wavesplatform.BlocksTransactionsHelpers
+import com.wavesplatform.{BlocksTransactionsHelpers, TestValues}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.BlockV5
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -531,6 +532,37 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
       d.appendBlock(successfulIssue)
       d.appendBlockE(setAssetScriptWithInvoke) should produce("function 'Native(1020)' not found")
       d.appendBlockE(setAssetScriptWithReentrantInvoke) should produce("function 'Native(1021)' not found")
+    }
+  }
+
+  property("only Waves can be used to pay fees for UpdateAssetInfoTransaction after RideV6 activation") {
+    val sponsoredIssuer = TxHelpers.signer(1)
+    val updatedIssuer   = TxHelpers.signer(2)
+
+    withDomain(
+      DomainPresets.RideV5
+        .setFeaturesHeight((BlockchainFeatures.RideV6, 5))
+        .configure(_.copy(minAssetInfoUpdateInterval = 0)),
+      AddrWithBalance.enoughBalances(sponsoredIssuer, updatedIssuer)
+    ) { d =>
+      val sponsorIssue = TxHelpers.issue(sponsoredIssuer)
+      val sponsor      = TxHelpers.sponsor(sponsorIssue.asset, sender = sponsoredIssuer)
+      val transfer     = TxHelpers.transfer(sponsoredIssuer, updatedIssuer.toAddress, sponsorIssue.quantity.value / 2, sponsorIssue.asset)
+
+      val updatedIssue = TxHelpers.issue(updatedIssuer)
+      val updateAssetInfo = () =>
+        TxHelpers.updateAssetInfo(
+          assetId = updatedIssue.assetId,
+          sender = updatedIssuer,
+          fee = Sponsorship.fromWaves(TestValues.fee, sponsor.minSponsoredAssetFee.get.value),
+          feeAsset = sponsorIssue.asset
+        )
+
+      d.appendBlock(sponsorIssue, updatedIssue, sponsor, transfer)
+      d.appendAndAssertSucceed(updateAssetInfo())
+      d.appendBlock()
+      d.appendBlockE(updateAssetInfo()) should produceRejectOrFailedDiff("only Waves can be used to pay fees for UpdateAssetInfoTransaction")
+      d.appendAndAssertSucceed(TxHelpers.updateAssetInfo(updatedIssue.assetId, sender = updatedIssuer))
     }
   }
 

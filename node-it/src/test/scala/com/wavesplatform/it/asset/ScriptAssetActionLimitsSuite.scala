@@ -26,43 +26,64 @@ class ScriptAssetActionLimitsSuite extends AnyFreeSpec with GrpcBaseTransactionS
       .overrideBase(_.preactivatedFeatures((SynchronousCalls.id, 0), (RideV6.id, 0)))
       .buildNonConflicting()
 
-  private val initialWavesBalance = 1000.waves
+  private val initialWavesBalance  = 1000.waves
   private val minSponsoredAssetFee = 1001
-  private val asset = Asset("Simple", "ReissuableAsset", "description", 100000000, reissuable = true, 3, 0)
+  private val asset                = Asset("Simple", "ReissuableAsset", "description", 100000000, reissuable = true, 3, 0)
 
   Seq(V4, V5, V6).foreach { version =>
-    val actionsLimit = ContractLimits.MaxCallableActionsAmount(version)
+    val actionsLimit =
+      if (version == V6)
+        ContractLimits.MaxAssetScriptActionsAmountV6
+      else
+        ContractLimits.MaxCallableActionsAmountBeforeV6(version)
+
+    val errMsg =
+      if (version == V6)
+        "Issue, Reissue, Burn, SponsorFee actions count limit is exceeded"
+      else
+        "Actions count limit is exceeded"
 
     s"SponsorFee actions count limit for V${version.id}" in {
-      val dApp = createSponsorFeeDApp(actionsLimit, version)
+      val dApp        = createSponsorFeeDApp(actionsLimit, version)
       val dAppAddress = dApp.toAddress.toString
-      val invokeTx1   = miner.invokeScript(miner.keyPair, dAppAddress, Some(s"issue${actionsLimit}assets"), waitForTx = true, fee = smartMinFee + issueFee * actionsLimit)
-      val invokeTx2   = miner.invokeScript(miner.keyPair, dAppAddress, Some(s"sponsor${actionsLimit}assets"), waitForTx = true, fee = smartMinFee)
+      val invokeTx1 = miner.invokeScript(
+        miner.keyPair,
+        dAppAddress,
+        Some(s"issue${actionsLimit}assets"),
+        waitForTx = true,
+        fee = smartMinFee + issueFee * actionsLimit
+      )
+      val invokeTx2 = miner.invokeScript(miner.keyPair, dAppAddress, Some(s"sponsor${actionsLimit}assets"), waitForTx = true, fee = smartMinFee)
 
       val assetIds    = miner.debugStateChanges(invokeTx1._1.id).stateChanges.get.issues.map(_.assetId)
       val sponsorFees = miner.debugStateChanges(invokeTx2._1.id).stateChanges.get.sponsorFees
 
       (assetIds zip sponsorFees)
-        .foreach {
-          case (issueAssetId, sponsorFee) =>
-            issueAssetId shouldBe sponsorFee.assetId
-            sponsorFee.minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
+        .foreach { case (issueAssetId, sponsorFee) =>
+          issueAssetId shouldBe sponsorFee.assetId
+          sponsorFee.minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
 
-            miner.assetsDetails(issueAssetId).minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
-            val dAppBalance = miner.assetsBalance(dAppAddress).balances.find(_.assetId == issueAssetId).get
-            dAppBalance.minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
-            dAppBalance.sponsorBalance shouldBe Some(miner.balance(dAppAddress).balance)
+          miner.assetsDetails(issueAssetId).minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
+          val dAppBalance = miner.assetsBalance(dAppAddress).balances.find(_.assetId == issueAssetId).get
+          dAppBalance.minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
+          dAppBalance.sponsorBalance shouldBe Some(miner.balance(dAppAddress).balance)
         }
 
       assertBadRequestAndMessage(
         miner.invokeScript(miner.keyPair, dAppAddress, Some(s"sponsor${actionsLimit + 1}assets"), fee = smartMinFee),
-        "Actions count limit is exceeded"
+        errMsg
       )
     }
 
     s"Issue $actionsLimit assets should not produce an error for V${version.id}" in {
       val acc = createDApp(script(actionsLimit, version))
-      val (tx, _) = miner.invokeScript(acc, acc.toAddress.toString, Some(s"issue${actionsLimit}Assets"), fee = smartMinFee + issueFee * actionsLimit, waitForTx = true)
+      val (tx, _) = miner.invokeScript(
+        acc,
+        acc.toAddress.toString,
+        Some(s"issue${actionsLimit}Assets"),
+        fee = smartMinFee + issueFee * actionsLimit,
+        waitForTx = true
+      )
       for (nth <- 0 until actionsLimit) {
         val assetInfo = sender.debugStateChanges(tx.id).stateChanges.get.issues(nth)
         assetInfo.quantity shouldBe asset.quantity
@@ -74,8 +95,8 @@ class ScriptAssetActionLimitsSuite extends AnyFreeSpec with GrpcBaseTransactionS
       }
     }
 
-    s"More than $actionsLimit actions Issue/Reissue/Burn should produce an error for V${version.id}" in {
-      val acc = createDApp(script(actionsLimit, version))
+    s"More than $actionsLimit Issue/Reissue/Burn/SponsorFee actions should produce an error for V${version.id}" in {
+      val acc   = createDApp(script(actionsLimit, version))
       val issue = miner.issue(acc)
 
       assertApiError(
@@ -88,7 +109,7 @@ class ScriptAssetActionLimitsSuite extends AnyFreeSpec with GrpcBaseTransactionS
           waitForTx = true
         )
       ) { e =>
-        e.message should include("Actions count limit is exceeded")
+        e.message should include(errMsg)
       }
     }
 
@@ -103,7 +124,7 @@ class ScriptAssetActionLimitsSuite extends AnyFreeSpec with GrpcBaseTransactionS
           waitForTx = true
         )
       ) { e =>
-        e.message should include("Actions count limit is exceeded")
+        e.message should include(errMsg)
       }
     }
   }
@@ -133,8 +154,7 @@ class ScriptAssetActionLimitsSuite extends AnyFreeSpec with GrpcBaseTransactionS
     address
   }
 
-  private def createSponsorFeeDApp(actionsLimit: Int,
-                                   version: StdLibVersion) =
+  private def createSponsorFeeDApp(actionsLimit: Int, version: StdLibVersion) =
     createDApp(
       s"""
          |{-# STDLIB_VERSION ${version.id} #-}
@@ -176,10 +196,9 @@ class ScriptAssetActionLimitsSuite extends AnyFreeSpec with GrpcBaseTransactionS
         """.stripMargin
     )
 
-  def script(actionsLimit: Int,
-             version: StdLibVersion): String = {
+  def script(actionsLimit: Int, version: StdLibVersion): String = {
     def createIssueParams(asset: Asset) = s""""${asset.name}","${asset.description}",${asset.quantity}, ${asset.decimals},${asset.reissuable},unit"""
-    val issueParams = createIssueParams(asset)
+    val issueParams                     = createIssueParams(asset)
 
     s"""
        |{-# STDLIB_VERSION ${version.id} #-}
@@ -205,7 +224,8 @@ class ScriptAssetActionLimitsSuite extends AnyFreeSpec with GrpcBaseTransactionS
        |  [
        |    Reissue(a, 1000, true),
        |    Burn(a, 500),
-       |    ${(1 until actionsLimit).map(ind => s"Issue($issueParams, $ind)").mkString(",\n")}
+       |    SponsorFee(a, 1),
+       |    ${(1 until (actionsLimit - 1)).map(ind => s"Issue($issueParams, $ind)").mkString(",\n")}
        |  ]
        |}
        |

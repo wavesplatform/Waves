@@ -28,16 +28,17 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
   private val v4Features = features(V4)
   private val v5Features = features(V5)
 
-  private def dApp(body: String, version: StdLibVersion = V5): Script = TestCompiler(version).compileContract(s"""
-    | {-# STDLIB_VERSION ${version.id} #-}
-    | {-# CONTENT_TYPE   DAPP    #-}
-    | {-# SCRIPT_TYPE    ACCOUNT #-}
-    |
-    | @Callable(i)
-    | func default() = {
-    |   $body
-    | }
-    |""".stripMargin)
+  private def dApp(body: String, version: StdLibVersion = V5): Script =
+    TestCompiler(version).compileContract(s"""
+                                             | {-# STDLIB_VERSION ${version.id} #-}
+                                             | {-# CONTENT_TYPE   DAPP    #-}
+                                             | {-# SCRIPT_TYPE    ACCOUNT #-}
+                                             |
+                                             | @Callable(i)
+                                             | func default() = {
+                                             |   $body
+                                             | }
+                                             |""".stripMargin)
 
   private def singleLeaseDApp(recipient: Recipient, amount: Long): Script =
     dApp(s"[Lease(${recipientStr(recipient)}, $amount)]")
@@ -116,12 +117,14 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       version
     )
 
-  private def multipleActionsDApp(recipient: Recipient,
-                                  amount: Long,
-                                  leaseCount: Int,
-                                  leaseCancelCount: Int,
-                                  transfersCount: Int,
-                                  version: StdLibVersion): Script =
+  private def multipleActionsDApp(
+      recipient: Recipient,
+      amount: Long,
+      leaseCount: Int,
+      leaseCancelCount: Int,
+      transfersCount: Int,
+      version: StdLibVersion
+  ): Script =
     dApp(
       s"""
          | ${(1 to leaseCount).map(i => s"let lease$i = Lease(${recipientStr(recipient)}, $amount, $i)").mkString("\n")}
@@ -192,9 +195,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       else
         Seq.empty[CreateAliasTransaction]
 
-    val leasesFromDApp = (1 to leaseCancelCount).toList.map(
-      _ => TxHelpers.lease(dAppAcc, invoker.toAddress, leaseTxAmount1, fee)
-    )
+    val leasesFromDApp = (1 to leaseCancelCount).toList.map(_ => TxHelpers.lease(dAppAcc, invoker.toAddress, leaseTxAmount1, fee))
     val setScript = TxHelpers.setScript(
       acc = dAppAcc,
       script = if (useLeaseCancelDApp) {
@@ -263,7 +264,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     leasePreconditions() match {
       case (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, leaseTxFromDApp :: _, _) =>
         withDomain(domainSettingsWithFS(v5Features)) { d =>
-          val invokerSpentFee = preparingTxs.collect { case a: Authorized if a.sender.toAddress == invoker                      => a.assetFee._2 }.sum
+          val invokerSpentFee = preparingTxs.collect { case a: Authorized if a.sender.toAddress == invoker => a.assetFee._2 }.sum
           val dAppSpentFee    = (preparingTxs :+ leaseTxFromDApp).collect { case a: Authorized if a.sender.toAddress == dAppAcc => a.assetFee._2 }.sum
 
           d.appendBlock(preparingTxs*)
@@ -302,7 +303,9 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       case (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, leaseTxFromDApp :: leaseTxToDApp :: Nil, leaseTxToDAppCancel) =>
         withDomain(domainSettingsWithFS(v5Features)) { d =>
           val invokerSpentFee =
-            (preparingTxs ++ Seq(leaseTxToDApp, leaseTxToDAppCancel)).collect { case a: Authorized if a.sender.toAddress == invoker => a.assetFee._2 }.sum
+            (preparingTxs ++ Seq(leaseTxToDApp, leaseTxToDAppCancel)).collect {
+              case a: Authorized if a.sender.toAddress == invoker => a.assetFee._2
+            }.sum
           val dAppSpentFee = (preparingTxs :+ leaseTxFromDApp).collect { case a: Authorized if a.sender.toAddress == dAppAcc => a.assetFee._2 }.sum
 
           d.appendBlock(preparingTxs*)
@@ -341,7 +344,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       case (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, _ :: leaseTxToDApp :: Nil, _) =>
         withDomain(domainSettingsWithFS(v5Features)) { d =>
           val invokerSpentFee = (preparingTxs :+ leaseTxToDApp).collect { case a: Authorized if a.sender.toAddress == invoker => a.assetFee._2 }.sum
-          val dAppSpentFee    = preparingTxs.collect { case a: Authorized if a.sender.toAddress == dAppAcc                    => a.assetFee._2 }.sum
+          val dAppSpentFee    = preparingTxs.collect { case a: Authorized if a.sender.toAddress == dAppAcc => a.assetFee._2 }.sum
 
           d.appendBlock(preparingTxs*)
           d.appendBlock(leaseTxToDApp)
@@ -423,7 +426,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     leasePreconditions() match {
       case (preparingTxs, invoke, leaseAmount, dAppAcc, invoker, leaseTxFromDApp :: leaseTxToDApp :: Nil, _) =>
         withDomain(domainSettingsWithFS(v5Features)) { d =>
-          val invokerSpentFee = (preparingTxs :+ leaseTxToDApp).collect { case a: Authorized if a.sender.toAddress == invoker   => a.assetFee._2 }.sum
+          val invokerSpentFee = (preparingTxs :+ leaseTxToDApp).collect { case a: Authorized if a.sender.toAddress == invoker => a.assetFee._2 }.sum
           val dAppSpentFee    = (preparingTxs :+ leaseTxFromDApp).collect { case a: Authorized if a.sender.toAddress == dAppAcc => a.assetFee._2 }.sum
 
           d.appendBlock(preparingTxs*)
@@ -467,10 +470,9 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) {
-      case (diff, _) =>
-        diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee.value, LeaseBalance(leaseAmount, out = 0))
-        diff.portfolios(dAppAcc) shouldBe Portfolio(0, LeaseBalance(in = 0, leaseAmount))
+    ) { case (diff, _) =>
+      diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee.value, LeaseBalance(leaseAmount, out = 0))
+      diff.portfolios(dAppAcc) shouldBe Portfolio(0, LeaseBalance(in = 0, leaseAmount))
     }
   }
 
@@ -480,11 +482,10 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke, leaseCancelTx)),
       v5Features
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id()) shouldBe empty
-        diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee.value)
-        diff.portfolios(dAppAcc) shouldBe Portfolio(-leaseCancelTx.fee.value)
+    ) { case (diff, _) =>
+      diff.errorMessage(invoke.id()) shouldBe empty
+      diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee.value)
+      diff.portfolios(dAppAcc) shouldBe Portfolio(-leaseCancelTx.fee.value)
     }
   }
 
@@ -494,9 +495,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id()).get.text shouldBe "InvalidAddress(Wrong addressBytes length: expected: 26, actual: 0)"
+    ) { case (diff, _) =>
+      diff.errorMessage(invoke.id()).get.text shouldBe "InvalidAddress(Wrong addressBytes length: expected: 26, actual: 0)"
     }
   }
 
@@ -506,9 +506,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id()).get.text shouldBe "InvalidAddress(Wrong addressBytes length: expected: 26, actual: 10)"
+    ) { case (diff, _) =>
+      diff.errorMessage(invoke.id()).get.text shouldBe "InvalidAddress(Wrong addressBytes length: expected: 26, actual: 10)"
     }
   }
 
@@ -521,9 +520,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id()).get.text shouldBe "InvalidAddress(Bad address checksum)"
+    ) { case (diff, _) =>
+      diff.errorMessage(invoke.id()).get.text shouldBe "InvalidAddress(Bad address checksum)"
     }
   }
 
@@ -533,9 +531,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id()).get.text shouldBe "Alias 'alias:T:alias2' does not exists."
+    ) { case (diff, _) =>
+      diff.errorMessage(invoke.id()).get.text shouldBe "Alias 'alias:T:alias2' does not exists."
     }
   }
 
@@ -545,9 +542,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id()).get.text shouldBe s"Alias should contain only following characters: ${Alias.AliasAlphabet}"
+    ) { case (diff, _) =>
+      diff.errorMessage(invoke.id()).get.text shouldBe s"Alias should contain only following characters: ${Alias.AliasAlphabet}"
     }
   }
 
@@ -557,9 +553,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id()).get.text shouldBe "NonPositiveAmount(0,waves)"
+    ) { case (diff, _) =>
+      diff.errorMessage(invoke.id()).get.text shouldBe "NonPositiveAmount(0,waves)"
     }
   }
 
@@ -580,9 +575,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) {
-      case (_, blockchain) =>
-        blockchain.wavesPortfolio(dAppAcc).effectiveBalance.explicitGet() shouldBe 0
+    ) { case (_, blockchain) =>
+      blockchain.wavesPortfolio(dAppAcc).effectiveBalance.explicitGet() shouldBe 0
     }
   }
 
@@ -594,9 +588,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id()).get.text shouldBe s"Cannot lease more than own: Balance: $dAppBalance, already leased: 0"
+    ) { case (diff, _) =>
+      diff.errorMessage(invoke.id()).get.text shouldBe s"Cannot lease more than own: Balance: $dAppBalance, already leased: 0"
     }
   }
 
@@ -609,10 +602,9 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs.toList ::: leaseTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id()).get.text shouldBe
-          s"Cannot lease more than own: Balance: ${dAppBalance - leaseFromDApp.fee.value}, already leased: ${leaseFromDApp.amount.value}"
+    ) { case (diff, _) =>
+      diff.errorMessage(invoke.id()).get.text shouldBe
+        s"Cannot lease more than own: Balance: ${dAppBalance - leaseFromDApp.fee.value}, already leased: ${leaseFromDApp.amount.value}"
     }
   }
 
@@ -624,10 +616,9 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) {
-      case (diff, _) =>
-        val id = Lease.calculateId(Lease(recipient, amount, nonce = 0), invoke.id())
-        diff.errorMessage(invoke.id()).get.text shouldBe s"Lease with id=$id is already in the state"
+    ) { case (diff, _) =>
+      val id = Lease.calculateId(Lease(recipient, amount, nonce = 0), invoke.id())
+      diff.errorMessage(invoke.id()).get.text shouldBe s"Lease with id=$id is already in the state"
     }
   }
 
@@ -637,9 +628,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id()).get.text shouldBe "Cannot lease to self"
+    ) { case (diff, _) =>
+      diff.errorMessage(invoke.id()).get.text shouldBe "Cannot lease to self"
     }
   }
 
@@ -649,20 +639,24 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id()).get.text shouldBe "Cannot lease to self"
+    ) { case (diff, _) =>
+      diff.errorMessage(invoke.id()).get.text shouldBe "Cannot lease to self"
     }
   }
 
   Seq(V5, V6).foreach { version =>
-    property(s"${ContractLimits.MaxCallableActionsAmount(version)} Lease actions for V${version.id}") {
-      val recipient                                         = TxHelpers.signer(3).toAddress
-      val amount                                            = 100
-      val dApp                                              = multipleActionsDApp(
+    val limit =
+      if (version == V6)
+        ContractLimits.MaxBalanceScriptActionsAmountV6
+      else
+        ContractLimits.MaxCallableActionsAmountBeforeV6(version)
+    property(s"$limit Lease actions for V${version.id}") {
+      val recipient = TxHelpers.signer(3).toAddress
+      val amount    = 100
+      val dApp = multipleActionsDApp(
         recipient.toRide,
         amount,
-        leaseCount = ContractLimits.MaxCallableActionsAmount(version),
+        leaseCount = limit,
         leaseCancelCount = 0,
         transfersCount = 0,
         version = version
@@ -672,32 +666,38 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
         Seq(TestBlock.create(preparingTxs)),
         TestBlock.create(Seq(invoke)),
         features(version)
-      ) {
-        case (diff, _) =>
-          diff.errorMessage(invoke.id()) shouldBe empty
-          diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee.value)
-          diff.portfolios(dAppAcc) shouldBe Portfolio(lease = LeaseBalance(in = 0, out = amount * ContractLimits.MaxCallableActionsAmount(version)))
-          diff.portfolios(recipient) shouldBe Portfolio(lease = LeaseBalance(in = amount * ContractLimits.MaxCallableActionsAmount(version), out = 0))
+      ) { case (diff, _) =>
+        diff.errorMessage(invoke.id()) shouldBe empty
+        diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee.value)
+        diff.portfolios(dAppAcc) shouldBe Portfolio(lease = LeaseBalance(in = 0, out = amount * limit))
+        diff.portfolios(recipient) shouldBe Portfolio(lease = LeaseBalance(in = amount * limit, out = 0))
       }
     }
 
-    property(s"${ContractLimits.MaxCallableActionsAmount(version) + 1} Lease actions for V${version.id}") {
-      val recipient                             = TxHelpers.signer(3).toAddress
-      val amount                                = 100
-      val dApp                                  = multipleActionsDApp(
+    property(s"${limit + 1} Lease actions for V${version.id}") {
+      val recipient = TxHelpers.signer(3).toAddress
+      val amount    = 100
+      val dApp = multipleActionsDApp(
         recipient.toRide,
         amount,
-        leaseCount = ContractLimits.MaxCallableActionsAmount(version) + 1,
+        leaseCount = limit + 1,
         leaseCancelCount = 0,
         transfersCount = 0,
         version = version
       )
       val (preparingTxs, invoke, _, _, _, _, _) = leasePreconditions(customDApp = Some(dApp))
+
+      val errMsg =
+        if (version == V6)
+          "ScriptTransfer, Lease, LeaseCancel actions count limit is exceeded"
+        else
+          "Actions count limit is exceeded"
+
       assertDiffEi(
         Seq(TestBlock.create(preparingTxs)),
         TestBlock.create(Seq(invoke)),
         features(version)
-      )(_ should produceRejectOrFailedDiff("Actions count limit is exceeded"))
+      )(_ should produceRejectOrFailedDiff(errMsg))
     }
   }
 
@@ -738,9 +738,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id()).get.text should include("is already in the state")
+    ) { case (diff, _) =>
+      diff.errorMessage(invoke.id()).get.text should include("is already in the state")
     }
   }
 
@@ -753,12 +752,11 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id()) shouldBe empty
-        diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee.value)
-        diff.portfolios(dAppAcc) shouldBe Portfolio(lease = LeaseBalance(in = 0, out = amount))
-        diff.portfolios(recipient) shouldBe Portfolio(lease = LeaseBalance(in = amount, 0))
+    ) { case (diff, _) =>
+      diff.errorMessage(invoke.id()) shouldBe empty
+      diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee.value)
+      diff.portfolios(dAppAcc) shouldBe Portfolio(lease = LeaseBalance(in = 0, out = amount))
+      diff.portfolios(recipient) shouldBe Portfolio(lease = LeaseBalance(in = amount, 0))
     }
   }
 
@@ -769,10 +767,9 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs ++ leaseTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) {
-      case (diff, _) =>
-        diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee.value, LeaseBalance(in = -leaseFromDApp.amount.value, 0))
-        diff.portfolios(dAppAcc) shouldBe Portfolio(0, LeaseBalance(0, out = -leaseFromDApp.amount.value))
+    ) { case (diff, _) =>
+      diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee.value, LeaseBalance(in = -leaseFromDApp.amount.value, 0))
+      diff.portfolios(dAppAcc) shouldBe Portfolio(0, LeaseBalance(0, out = -leaseFromDApp.amount.value))
     }
   }
 
@@ -783,9 +780,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id()).get.text shouldBe s"Lease with id=$leaseId not found"
+    ) { case (diff, _) =>
+      diff.errorMessage(invoke.id()).get.text shouldBe s"Lease with id=$leaseId not found"
     }
   }
 
@@ -796,9 +792,8 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id()).get.text shouldBe s"Lease id=$leaseId has invalid length = 1 byte(s) while expecting 32"
+    ) { case (diff, _) =>
+      diff.errorMessage(invoke.id()).get.text shouldBe s"Lease id=$leaseId has invalid length = 1 byte(s) while expecting 32"
     }
   }
 
@@ -810,10 +805,9 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) {
-      case (diff, _) =>
-        val leaseId = Lease.calculateId(Lease(recipient, amount, nonce = 0), invoke.id())
-        diff.errorMessage(invoke.id()).get.text shouldBe s"Duplicate LeaseCancel id(s): $leaseId"
+    ) { case (diff, _) =>
+      val leaseId = Lease.calculateId(Lease(recipient, amount, nonce = 0), invoke.id())
+      diff.errorMessage(invoke.id()).get.text shouldBe s"Duplicate LeaseCancel id(s): $leaseId"
     }
   }
 
@@ -823,30 +817,30 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       Seq(TestBlock.create(preparingTxs ++ leaseTxs ++ List(leaseCancelTx))),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) {
-      case (diff, _) =>
-        diff.errorMessage(invoke.id()).get.text shouldBe "Cannot cancel already cancelled lease"
+    ) { case (diff, _) =>
+      diff.errorMessage(invoke.id()).get.text shouldBe "Cannot cancel already cancelled lease"
     }
   }
 
   Seq(V5, V6).foreach { version =>
-    property(s"${ContractLimits.MaxCallableActionsAmount(version)} LeaseCancel actions for V${version.id}") {
-      val (preparingTxs, invoke, _, dAppAcc, invoker, ltx, _) = leasePreconditions(useLeaseCancelDApp = true, leaseCancelCount = ContractLimits.MaxCallableActionsAmount(version), version = version)
-      val leaseTxs                                            = ltx.init
+    property(s"${ContractLimits.MaxCallableActionsAmountBeforeV6(version)} LeaseCancel actions for V${version.id}") {
+      val (preparingTxs, invoke, _, dAppAcc, invoker, ltx, _) =
+        leasePreconditions(useLeaseCancelDApp = true, leaseCancelCount = ContractLimits.MaxCallableActionsAmountBeforeV6(version), version = version)
+      val leaseTxs = ltx.init
       assertDiffAndState(
         Seq(TestBlock.create(preparingTxs ++ leaseTxs)),
         TestBlock.create(Seq(invoke)),
         features(version)
-      ) {
-        case (diff, _) =>
-          diff.errorMessage(invoke.id()) shouldBe empty
-          diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee.value, LeaseBalance(in = -leaseTxs.map(_.amount.value).sum, out = 0))
-          diff.portfolios(dAppAcc) shouldBe Portfolio(0, LeaseBalance(in = 0, out = -leaseTxs.map(_.amount.value).sum))
+      ) { case (diff, _) =>
+        diff.errorMessage(invoke.id()) shouldBe empty
+        diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee.value, LeaseBalance(in = -leaseTxs.map(_.amount.value).sum, out = 0))
+        diff.portfolios(dAppAcc) shouldBe Portfolio(0, LeaseBalance(in = 0, out = -leaseTxs.map(_.amount.value).sum))
       }
     }
 
-    property(s"${ContractLimits.MaxCallableActionsAmount(version) + 1} LeaseCancel actions for V${version.id}") {
-      val (preparingTxs, invoke, _, _, _, ltx, _) = leasePreconditions(useLeaseCancelDApp = true, leaseCancelCount = ContractLimits.MaxCallableActionsAmount(version) + 1)
+    property(s"${ContractLimits.MaxCallableActionsAmountBeforeV6(version) + 1} LeaseCancel actions for V${version.id}") {
+      val (preparingTxs, invoke, _, _, _, ltx, _) =
+        leasePreconditions(useLeaseCancelDApp = true, leaseCancelCount = ContractLimits.MaxCallableActionsAmountBeforeV6(version) + 1)
       assertDiffEi(
         Seq(TestBlock.create(preparingTxs ++ ltx.init)),
         TestBlock.create(Seq(invoke)),
@@ -856,14 +850,19 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
   }
 
   Seq(V5, V6).foreach { version =>
-    property(s"${ContractLimits.MaxCallableActionsAmount(version)} multiple actions for V${version.id}") {
-      val recipient                                         = accountGen.sample.get.toAddress
-      val amount                                            = positiveLongGen.sample.get
-      val actionsCount     = ContractLimits.MaxCallableActionsAmount(version)
-      val leaseCount                                        = Random.nextInt(actionsCount) + 1
-      val leaseCancelCount                                  = Random.nextInt(leaseCount).min(actionsCount - leaseCount)
-      val transfersCount                                    = actionsCount - leaseCancelCount - leaseCount
-      val dApp                                              = multipleActionsDApp(
+    val limit =
+      if (version == V6)
+        ContractLimits.MaxBalanceScriptActionsAmountV6
+      else
+        ContractLimits.MaxCallableActionsAmountBeforeV6(version)
+    property(s"$limit multiple balance actions for V${version.id}") {
+      val recipient        = accountGen.sample.get.toAddress
+      val amount           = positiveLongGen.sample.get
+      val actionsCount     = limit
+      val leaseCount       = Random.nextInt(actionsCount) + 1
+      val leaseCancelCount = Random.nextInt(leaseCount).min(actionsCount - leaseCount)
+      val transfersCount   = actionsCount - leaseCancelCount - leaseCount
+      val dApp = multipleActionsDApp(
         recipient.toRide,
         amount,
         leaseCount,
@@ -877,23 +876,22 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
         Seq(TestBlock.create(preparingTxs)),
         TestBlock.create(Seq(invoke)),
         features(version)
-      ) {
-        case (diff, _) =>
-          diff.errorMessage(invoke.id()) shouldBe empty
-          diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee.value)
-          diff.portfolios(dAppAcc) shouldBe Portfolio(-transfersCount, lease = LeaseBalance(in = 0, out = leaseAmount))
-          diff.portfolios(recipient) shouldBe Portfolio(transfersCount, lease = LeaseBalance(in = leaseAmount, out = 0))
+      ) { case (diff, _) =>
+        diff.errorMessage(invoke.id()) shouldBe empty
+        diff.portfolios(invoker) shouldBe Portfolio(-invoke.fee.value)
+        diff.portfolios(dAppAcc) shouldBe Portfolio(-transfersCount, lease = LeaseBalance(in = 0, out = leaseAmount))
+        diff.portfolios(recipient) shouldBe Portfolio(transfersCount, lease = LeaseBalance(in = leaseAmount, out = 0))
       }
     }
 
-    property(s"${ContractLimits.MaxCallableActionsAmount(version) + 1} multiple actions for V${version.id}") {
+    property(s"${limit + 1} multiple balance actions for V${version.id}") {
       val recipient         = TxHelpers.signer(3).toAddress
       val amount            = 100
-      val totalActionsCount = ContractLimits.MaxCallableActionsAmount(version) + 1
+      val totalActionsCount = limit + 1
       val leaseCount        = Random.nextInt(totalActionsCount) + 1
       val leaseCancelCount  = Random.nextInt(leaseCount).min(totalActionsCount - leaseCount)
       val transfersCount    = totalActionsCount - leaseCancelCount - leaseCount
-      val dApp              = multipleActionsDApp(
+      val dApp = multipleActionsDApp(
         recipient.toRide,
         amount,
         leaseCount,
@@ -902,11 +900,18 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
         version
       )
       val (preparingTxs, invoke, _, _, _, _, _) = leasePreconditions(customDApp = Some(dApp))
+
+      val errMsg =
+        if (version == V6)
+          "ScriptTransfer, Lease, LeaseCancel actions count limit is exceeded"
+        else
+          "Actions count limit is exceeded"
+
       assertDiffEi(
         Seq(TestBlock.create(preparingTxs)),
         TestBlock.create(Seq(invoke)),
         features(version)
-      )(_ should produceRejectOrFailedDiff("Actions count limit is exceeded"))
+      )(_ should produceRejectOrFailedDiff(errMsg))
     }
   }
 

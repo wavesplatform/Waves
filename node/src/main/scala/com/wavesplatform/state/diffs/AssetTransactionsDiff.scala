@@ -99,14 +99,17 @@ object AssetTransactionsDiff extends ScorexLogging {
 
   def updateInfo(blockchain: Blockchain)(tx: UpdateAssetInfoTransaction): Either[ValidationError, Diff] =
     DiffsCommon.validateAsset(blockchain, tx.assetId, tx.sender.toAddress, issuerOnly = true) >> {
-      lazy val portfolioUpdate = tx.feeAsset match {
-        case ia @ IssuedAsset(_) => Portfolio(0L, LeaseBalance.empty, Map(ia -> -tx.feeAmount.value))
-        case Asset.Waves         => Portfolio(balance = -tx.feeAmount.value, LeaseBalance.empty, Map.empty)
-      }
-
       val minUpdateInfoInterval = blockchain.settings.functionalitySettings.minAssetInfoUpdateInterval
 
       for {
+        portfolioUpdate <- tx.feeAsset match {
+          case IssuedAsset(asset) if blockchain.isFeatureActivated(BlockchainFeatures.RideV6) =>
+            Left(GenericError(s"Invalid fee asset: ${asset.toString}, only Waves can be used to pay fees for UpdateAssetInfoTransaction"))
+          case ia @ IssuedAsset(_) =>
+            Right(Portfolio(0L, LeaseBalance.empty, Map(ia -> -tx.feeAmount.value)))
+          case Asset.Waves =>
+            Right(Portfolio(balance = -tx.feeAmount.value, LeaseBalance.empty, Map.empty))
+        }
         lastUpdateHeight <- blockchain
           .assetDescription(tx.assetId)
           .map(_.lastUpdatedAt)

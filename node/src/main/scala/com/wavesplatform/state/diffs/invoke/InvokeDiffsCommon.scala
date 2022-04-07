@@ -184,14 +184,8 @@ object InvokeDiffsCommon {
       _ <- TracedResult(checkDataEntries(blockchain, tx, dataEntries, version)).leftMap(FailedTransactionError.dAppExecution(_, storingComplexity))
       _ <- TracedResult(checkLeaseCancels(leaseCancelList)).leftMap(FailedTransactionError.dAppExecution(_, storingComplexity))
       _ <- TracedResult(
-        Either.cond(
-          actions.length - dataEntries.length <= ContractLimits.MaxCallableActionsAmount(version),
-          (),
-          FailedTransactionError.dAppExecution(
-            s"Too many script actions: max: ${ContractLimits.MaxCallableActionsAmount(version)}, actual: ${actions.length}",
-            storingComplexity
-          )
-        )
+        checkScriptActionsAmount(version, actions, transferList, leaseList, leaseCancelList, dataEntries)
+          .leftMap(FailedTransactionError.dAppExecution(_, storingComplexity))
       )
 
       _ <- TracedResult(checkSelfPayments(dAppAddress, blockchain, tx, version, transferList))
@@ -391,6 +385,41 @@ object InvokeDiffsCommon {
       (),
       s"Duplicate LeaseCancel id(s): ${duplicates.distinct.map(_.id).mkString(", ")}"
     )
+  }
+
+  private def checkScriptActionsAmount(
+      version: StdLibVersion,
+      actions: List[CallableAction],
+      transferList: List[AssetTransfer],
+      leaseList: List[Lease],
+      leaseCancelList: List[LeaseCancel],
+      dataEntries: Seq[DataEntry[?]]
+  ): Either[String, Unit] = {
+    if (version >= V6) {
+      val balanceChangeActionsAmount = transferList.length + leaseList.length + leaseCancelList.length
+      val assetsActionsAmount        = actions.length - dataEntries.length - balanceChangeActionsAmount
+
+      for {
+        _ <- Either.cond(
+          balanceChangeActionsAmount <= ContractLimits.MaxBalanceScriptActionsAmountV6,
+          (),
+          s"Too many ScriptTransfer, Lease, LeaseCancel actions: max: ${ContractLimits.MaxBalanceScriptActionsAmountV6}, actual: $balanceChangeActionsAmount"
+        )
+        _ <- Either.cond(
+          assetsActionsAmount <= ContractLimits.MaxAssetScriptActionsAmountV6,
+          (),
+          s"Too many Issue, Reissue, Burn, SponsorFee actions: max: ${ContractLimits.MaxAssetScriptActionsAmountV6}, actual: $assetsActionsAmount"
+        )
+      } yield ()
+    } else {
+      val actionsAmount = actions.length - dataEntries.length
+
+      Either.cond(
+        actionsAmount <= ContractLimits.MaxCallableActionsAmountBeforeV6(version),
+        (),
+        s"Too many script actions: max: ${ContractLimits.MaxCallableActionsAmountBeforeV6(version)}, actual: $actionsAmount"
+      )
+    }
   }
 
   private def resolveAddress(recipient: Recipient.Address, blockchain: Blockchain): TracedResult[FailedTransactionError, Address] =
@@ -660,13 +689,18 @@ object InvokeDiffsCommon {
     }
 
   def checkCallResultLimits(
+      version: StdLibVersion,
       blockchain: Blockchain,
       usedComplexity: Long,
       log: Log[Id],
       actionsCount: Int,
+      balanceActionsCount: Int,
+      assetActionsCount: Int,
       dataCount: Int,
       dataSize: Int,
       availableActions: Int,
+      availableBalanceActions: Int,
+      availableAssetActions: Int,
       availableData: Int,
       availableDataSize: Int
   ): TracedResult[ValidationError, Unit] = {
@@ -684,7 +718,11 @@ object InvokeDiffsCommon {
         TracedResult(Left(AlwaysRejectError(message)))
       } else
         TracedResult(Right(()))
-    } else if (actionsCount > availableActions)
+    } else if (version >= V6 && balanceActionsCount > availableBalanceActions) {
+      error("ScriptTransfer, Lease, LeaseCancel actions count limit is exceeded")
+    } else if (version >= V6 && assetActionsCount > availableAssetActions) {
+      error("Issue, Reissue, Burn, SponsorFee actions count limit is exceeded")
+    } else if (version < V6 && actionsCount > availableActions)
       error("Actions count limit is exceeded")
     else
       TracedResult(Right(()))
