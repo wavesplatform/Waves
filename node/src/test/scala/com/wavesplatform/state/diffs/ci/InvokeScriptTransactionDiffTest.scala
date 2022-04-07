@@ -91,8 +91,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
 
   private val amount = 123
 
-  private def dataContract(bigData: Boolean = false,
-                           emptyData: Boolean = false): Script = {
+  private def dataContract(bigData: Boolean = false, emptyData: Boolean = false): Script = {
     val datas =
       if (bigData)
         List(
@@ -150,12 +149,14 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     )
   }
 
-  private def dAppWithTransfers(recipientAddress: Address = thirdAddress,
-                                recipientAmount: Long = amount,
-                                argName: String = "a",
-                                funcName: String = "f",
-                                assets: List[Asset] = List(Waves),
-                                version: StdLibVersion = V3): Script = {
+  private def dAppWithTransfers(
+      recipientAddress: Address = thirdAddress,
+      recipientAmount: Long = amount,
+      argName: String = "a",
+      funcName: String = "f",
+      assets: List[Asset] = List(Waves),
+      version: StdLibVersion = V3
+  ): Script = {
     val transfers: immutable.Seq[FUNCTION_CALL] = assets.map(a =>
       FUNCTION_CALL(
         User(FieldNames.ScriptTransfer),
@@ -192,8 +193,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     )
   }
 
-  private def defaultTransferContract(recipientAddress: AddressOrAlias,
-                                      assets: List[Asset] = List(Waves)): Script = {
+  private def defaultTransferContract(recipientAddress: AddressOrAlias, assets: List[Asset] = List(Waves)): Script = {
     val transfers: immutable.Seq[FUNCTION_CALL] = assets.map(a =>
       FUNCTION_CALL(
         User(FieldNames.ScriptTransfer),
@@ -238,18 +238,18 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
   private def writeSet(count: Int): Script = {
     val DataEntries = Array.tabulate(count)(i => s"""DataEntry("$i", $i)""").mkString(",")
     TestCompiler(V3).compileContract(s"""
-           |
-           | {-#STDLIB_VERSION 3 #-}
-           | {-#CONTENT_TYPE DAPP#-}
-           | {-#SCRIPT_TYPE ACCOUNT#-}
-           |
-           | @Callable(i)
-           | func f(b: ByteVector) = {
-           |    WriteSet([
-           |    $DataEntries
-           |        ])
-           |}
-           |
+                                        |
+                                        | {-#STDLIB_VERSION 3 #-}
+                                        | {-#CONTENT_TYPE DAPP#-}
+                                        | {-#SCRIPT_TYPE ACCOUNT#-}
+                                        |
+                                        | @Callable(i)
+                                        | func f(b: ByteVector) = {
+                                        |    WriteSet([
+                                        |    $DataEntries
+                                        |        ])
+                                        |}
+                                        |
         """.stripMargin)
   }
 
@@ -301,15 +301,17 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     (List(genesis, genesis2), setContract, ci)
   }
 
-  private def preconditionsAndSetContract(contract: Script,
-                                          dApp: KeyPair = dApp,
-                                          payment: Option[Payment] = None,
-                                          sponsored: Option[SponsorFeeTransaction] = None,
-                                          isCIDefaultFunc: Boolean = false,
-                                          version: StdLibVersion = V3,
-                                          txVersion: TxVersion = TxVersion.V1,
-                                          selfSend: Boolean = false,
-                                          fee: Long = TestValues.invokeFee): (List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction) = {
+  private def preconditionsAndSetContract(
+      contract: Script,
+      dApp: KeyPair = dApp,
+      payment: Option[Payment] = None,
+      sponsored: Option[SponsorFeeTransaction] = None,
+      isCIDefaultFunc: Boolean = false,
+      version: StdLibVersion = V3,
+      txVersion: TxVersion = TxVersion.V1,
+      selfSend: Boolean = false,
+      fee: Long = TestValues.invokeFee
+  ): (List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction) = {
     val genesis     = TxHelpers.genesis(dApp.toAddress)
     val genesis2    = TxHelpers.genesis(invokerAddress)
     val setContract = TxHelpers.setScript(dApp, contract)
@@ -350,7 +352,9 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     (List(genesis, genesis2), setVerifier, setContract, ci, dApp, issue, sponsor)
   }
 
-  private def preconditionsAndSetContractWithAlias(senderBindingToContract: Script): (List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, InvokeScriptTransaction, CreateAliasTransaction) = {
+  private def preconditionsAndSetContractWithAlias(
+      senderBindingToContract: Script
+  ): (List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, InvokeScriptTransaction, CreateAliasTransaction) = {
     val genesis     = TxHelpers.genesis(dAppAddress)
     val genesis2    = TxHelpers.genesis(invokerAddress)
     val dAppAlias   = Alias.create("alias").explicitGet()
@@ -391,54 +395,56 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     d.blockchain.balance(TxHelpers.secondAddress, asset) shouldBe 100L
   })
 
-  property("validates intermediate action balance after V6")(withDomain(DomainPresets.RideV6.configure(fs => fs.copy(enforceTransferValidationAfter = 0))) { d =>
-    val dApp = TxHelpers.defaultSigner
+  property("validates intermediate action balance after V6")(
+    withDomain(DomainPresets.RideV6.configure(fs => fs.copy(enforceTransferValidationAfter = 0))) { d =>
+      val dApp = TxHelpers.defaultSigner
 
-    d.helpers.creditWavesToDefaultSigner()
-    val asset = d.helpers.issueAsset()
-    d.helpers.transferAll(dApp, TxHelpers.address(3), asset)
+      d.helpers.creditWavesToDefaultSigner()
+      val asset = d.helpers.issueAsset()
+      d.helpers.transferAll(dApp, TxHelpers.address(3), asset)
 
-    withClue("simple script") {
-      d.helpers.setScript(
-        dApp,
-        TxHelpers.scriptV5(s"""
-                              |@Callable(i)
-                              |func test(asset: ByteVector) = {
-                              |   [
-                              |     ScriptTransfer(Address(base58'${TxHelpers.secondAddress}'), 100, asset),
-                              |     Reissue(asset, 100, true)
-                              |   ]
-                              |}
-                              |""".stripMargin)
-      )
+      withClue("simple script") {
+        d.helpers.setScript(
+          dApp,
+          TxHelpers.scriptV5(s"""
+                                |@Callable(i)
+                                |func test(asset: ByteVector) = {
+                                |   [
+                                |     ScriptTransfer(Address(base58'${TxHelpers.secondAddress}'), 100, asset),
+                                |     Reissue(asset, 100, true)
+                                |   ]
+                                |}
+                                |""".stripMargin)
+        )
 
-      val invoke = TxHelpers.invoke(dApp.toAddress, Some("test"), Seq(CONST_BYTESTR(asset.id).explicitGet()))
-      d.appendAndCatchError(invoke).toString should include("negative asset balance")
-      d.blockchain.balance(dApp.toAddress, asset) shouldBe 0L
-      d.blockchain.balance(TxHelpers.secondAddress, asset) shouldBe 0L
+        val invoke = TxHelpers.invoke(dApp.toAddress, Some("test"), Seq(CONST_BYTESTR(asset.id).explicitGet()))
+        d.appendAndCatchError(invoke).toString should include("negative asset balance")
+        d.blockchain.balance(dApp.toAddress, asset) shouldBe 0L
+        d.blockchain.balance(TxHelpers.secondAddress, asset) shouldBe 0L
+      }
+
+      withClue("complex script") {
+        d.helpers.setScript(
+          dApp,
+          TxHelpers.scriptV5(s"""
+                                |@Callable(i)
+                                |func test(asset: ByteVector) = {
+                                |   strict test1 = ${"sigVerify(base58'', base58'', base58'') ||" * 16} true
+                                |   [
+                                |     ScriptTransfer(Address(base58'${TxHelpers.secondAddress}'), 100, asset),
+                                |     Reissue(asset, 100, true)
+                                |   ]
+                                |}
+                                |""".stripMargin)
+        )
+
+        val invoke = TxHelpers.invoke(dApp.toAddress, Some("test"), Seq(CONST_BYTESTR(asset.id).explicitGet()))
+        d.appendAndAssertFailed(invoke)
+        d.blockchain.balance(dApp.toAddress, asset) shouldBe 0L
+        d.blockchain.balance(TxHelpers.secondAddress, asset) shouldBe 0L
+      }
     }
-
-    withClue("complex script") {
-      d.helpers.setScript(
-        dApp,
-        TxHelpers.scriptV5(s"""
-                              |@Callable(i)
-                              |func test(asset: ByteVector) = {
-                              |   strict test1 = ${"sigVerify(base58'', base58'', base58'') ||" * 16} true
-                              |   [
-                              |     ScriptTransfer(Address(base58'${TxHelpers.secondAddress}'), 100, asset),
-                              |     Reissue(asset, 100, true)
-                              |   ]
-                              |}
-                              |""".stripMargin)
-      )
-
-      val invoke = TxHelpers.invoke(dApp.toAddress, Some("test"), Seq(CONST_BYTESTR(asset.id).explicitGet()))
-      d.appendAndAssertFailed(invoke)
-      d.blockchain.balance(dApp.toAddress, asset) shouldBe 0L
-      d.blockchain.balance(TxHelpers.secondAddress, asset) shouldBe 0L
-    }
-  })
+  )
 
   property("nested script failure") {
     val firstDApp  = TxHelpers.defaultSigner
@@ -611,18 +617,28 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
   }
 
   Seq(V3, V4, V5, V6).foreach { version =>
-    property(s"can't make more than ${ContractLimits.MaxCallableActionsAmount(version)} ScriptTransfers for V${version.id}") {
+    val limit =
+      if (version == V6)
+        ContractLimits.MaxBalanceScriptActionsAmountV6
+      else ContractLimits.MaxCallableActionsAmountBeforeV6(version)
+    property(s"can't make more than $limit ScriptTransfers for V${version.id}") {
       val (genesis, setScript, ci) =
         preconditionsAndSetContract(
           dAppWithTransfers(
-            assets = List.fill(ContractLimits.MaxCallableActionsAmount(version) + 1)(Waves),
+            assets = List.fill(limit + 1)(Waves),
             version = version
           ),
           version = version
         )
 
+      val errMsg =
+        if (version == V6)
+          "ScriptTransfer, Lease, LeaseCancel actions count limit is exceeded"
+        else
+          "Actions count limit is exceeded"
+
       testDiff(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), from = version) {
-        _ should produceRejectOrFailedDiff("Actions count limit is exceeded")
+        _ should produceRejectOrFailedDiff(errMsg)
       }
     }
   }
@@ -1111,7 +1127,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
             ByteStr.empty
           )
         )
-      ).anyNumberOfTimes()
+      )
+      .anyNumberOfTimes()
     (blockchain.blockHeader _)
       .expects(*)
       .returning(
@@ -1296,18 +1313,18 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
   private val throwContract: Script = {
     val script =
       s"""
-      |{-# STDLIB_VERSION 4 #-}
-      |{-# CONTENT_TYPE DAPP #-}
-      |{-#SCRIPT_TYPE ACCOUNT#-}
-      |
-      |@Callable(i)
-      |func f() = {
-      |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 10} true
-      |  if (check)
-      |    then throw("bad news")
-      |    else throw("bad news")
-      |}
-      |""".stripMargin
+         |{-# STDLIB_VERSION 4 #-}
+         |{-# CONTENT_TYPE DAPP #-}
+         |{-#SCRIPT_TYPE ACCOUNT#-}
+         |
+         |@Callable(i)
+         |func f() = {
+         |  let check = ${"sigVerify(base58'', base58'', base58'') ||" * 10} true
+         |  if (check)
+         |    then throw("bad news")
+         |    else throw("bad news")
+         |}
+         |""".stripMargin
 
     TestCompiler(V4).compileContract(script)
   }
@@ -1350,9 +1367,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
         diff.scriptsRun shouldBe 0
         diff.portfolios(invoke.sender.toAddress).balanceOf(invoke.feeAssetId)
         state.balance(invoke.sender.toAddress, invoke.feeAssetId) shouldBe invoke.feeAssetId.fold(g2Tx.amount.value)(_ =>
-          sponsorIssue.quantity
-        .value
-            ) - invoke.fee.value
+          sponsorIssue.quantity.value
+        ) - invoke.fee.value
         state.transactionInfo(invoke.id()).map(r => r._2 -> r._1.succeeded) shouldBe Some((invoke, false))
       }
     }
@@ -1404,7 +1420,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
                           | if (i == "throw" && check) then
                           |   throw("Some error")
                           | else if (i == "insufficient fee" && check) then
-                          |   [ ${(1 to ContractLimits.MaxCallableActionsAmount(V4))
+                          |   [ ${(1 to ContractLimits.MaxCallableActionsAmountBeforeV6(V4))
         .map(i => s"""Issue("Asset $i", "", 100, 8, true, unit, $i)""")
         .mkString(",")} ]
                           | else if (i == "negative amount" && check) then
@@ -1414,7 +1430,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
                           | else if (i == "self payment" && check) then
                           |   [ ScriptTransfer(this, 10, unit) ]
                           | else if (i == "max actions" && check) then
-                          |   [ ${(0 to ContractLimits.MaxCallableActionsAmount(V4))
+                          |   [ ${(0 to ContractLimits.MaxCallableActionsAmountBeforeV6(V4))
         .map(_ => "ScriptTransfer(inv.caller, 10, a)")
         .mkString(",")} ]
                           | else if (i == "invalid data entries" && check) then

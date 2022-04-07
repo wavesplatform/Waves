@@ -63,7 +63,7 @@ case class UtilsApiRoute(
 
   private def seed(length: Int): JsObject = {
     val seed = new Array[Byte](length)
-    new SecureRandom().nextBytes(seed) //seed mutated here!
+    new SecureRandom().nextBytes(seed) // seed mutated here!
     Json.obj("seed" -> Base58.encode(seed))
   }
 
@@ -94,20 +94,21 @@ case class UtilsApiRoute(
       Script.fromBase64String(code.trim) match {
         case Left(err) => complete(err)
         case Right(script) =>
-          executeLimited(Script.decompile(script)) {
-            case (scriptText, meta) =>
-              val directives: List[(String, JsValue)] = meta.map {
-                case (k, v) =>
-                  (k, v match {
-                    case n: Number => JsNumber(BigDecimal(n.toString))
-                    case s         => JsString(s.toString)
-                  })
-              }
-              val result  = directives ::: "script" -> JsString(scriptText) :: Nil
-              val wrapped = result.map { case (k, v) => (k, toJsFieldJsValueWrapper(v)) }
-              complete(
-                Json.obj(wrapped*)
+          executeLimited(Script.decompile(script)) { case (scriptText, meta) =>
+            val directives: List[(String, JsValue)] = meta.map { case (k, v) =>
+              (
+                k,
+                v match {
+                  case n: Number => JsNumber(BigDecimal(n.toString))
+                  case s         => JsString(s.toString)
+                }
               )
+            }
+            val result  = directives ::: "script" -> JsString(scriptText) :: Nil
+            val wrapped = result.map { case (k, v) => (k, toJsFieldJsValueWrapper(v)) }
+            complete(
+              Json.obj(wrapped*)
+            )
           }
       }
     }
@@ -120,13 +121,13 @@ case class UtilsApiRoute(
         executeLimited(ScriptCompiler(code, isAssetScript, estimator())) { result =>
           complete(
             result.fold(
-              e => ScriptCompilerError(e), {
-                case (script, complexity) =>
-                  Json.obj(
-                    "script"     -> script.bytes().base64,
-                    "complexity" -> complexity,
-                    "extraFee"   -> FeeValidation.ScriptExtraFee
-                  )
+              e => ScriptCompilerError(e),
+              { case (script, complexity) =>
+                Json.obj(
+                  "script"     -> script.bytes().base64,
+                  "complexity" -> complexity,
+                  "extraFee"   -> FeeValidation.ScriptExtraFee
+                )
               }
             )
           )
@@ -143,30 +144,32 @@ case class UtilsApiRoute(
         complete(
           checkInvokeExpression(result)
             .fold(
-              e => ScriptCompilerError(e), {
-                case (script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity)) =>
-                  val extraFee =
-                    if (verifierComplexity <= ContractLimits.FreeVerifierComplexity && blockchain
-                          .isFeatureActivated(BlockchainFeatures.SynchronousCalls))
-                      0
-                    else
-                      FeeValidation.ScriptExtraFee
-
-                  val compactedScript = script match {
-                    case ContractScript.ContractScriptImpl(stdLibVersion, expr) if compact =>
-                      val compacted = ContractScriptCompactor.compact(expr)
-
-                      ContractScriptImpl(stdLibVersion, compacted)
-
-                    case _ => script
-                  }
-                  Json.obj(
-                    "script"               -> compactedScript.bytes().base64,
-                    "complexity"           -> maxComplexity,
-                    "verifierComplexity"   -> verifierComplexity,
-                    "callableComplexities" -> callableComplexities,
-                    "extraFee"             -> extraFee
+              e => ScriptCompilerError(e),
+              { case (script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity)) =>
+                val extraFee =
+                  if (
+                    verifierComplexity <= ContractLimits.FreeVerifierComplexity && blockchain
+                      .isFeatureActivated(BlockchainFeatures.SynchronousCalls)
                   )
+                    0
+                  else
+                    FeeValidation.ScriptExtraFee
+
+                val compactedScript = script match {
+                  case ContractScript.ContractScriptImpl(stdLibVersion, expr) if compact =>
+                    val compacted = ContractScriptCompactor.compact(expr)
+
+                    ContractScriptImpl(stdLibVersion, compacted)
+
+                  case _ => script
+                }
+                Json.obj(
+                  "script"               -> compactedScript.bytes().base64,
+                  "complexity"           -> maxComplexity,
+                  "verifierComplexity"   -> verifierComplexity,
+                  "callableComplexities" -> callableComplexities,
+                  "extraFee"             -> extraFee
+                )
               }
             )
         )
@@ -183,13 +186,13 @@ case class UtilsApiRoute(
         complete(
           checkInvokeExpression(result)
             .fold(
-              e => ScriptCompilerError(e), {
-                case (script, complexity) =>
-                  Json.obj(
-                    "script"     -> script.bytes().base64,
-                    "complexity" -> complexity,
-                    "extraFee"   -> extraFee(complexity)
-                  )
+              e => ScriptCompilerError(e),
+              { case (script, complexity) =>
+                Json.obj(
+                  "script"     -> script.bytes().base64,
+                  "complexity" -> complexity,
+                  "extraFee"   -> extraFee(complexity)
+                )
               }
             )
         )
@@ -219,16 +222,16 @@ case class UtilsApiRoute(
         complete(
           result
             .fold(
-              e => ScriptCompilerError(e), {
-                case (script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity)) =>
-                  Json.obj(
-                    "script"               -> code,
-                    "scriptText"           -> script.expr.toString, // [WAIT] Script.decompile(script),
-                    "complexity"           -> maxComplexity,
-                    "verifierComplexity"   -> verifierComplexity,
-                    "callableComplexities" -> callableComplexities,
-                    "extraFee"             -> extraFee(verifierComplexity)
-                  )
+              e => ScriptCompilerError(e),
+              { case (script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity)) =>
+                Json.obj(
+                  "script"               -> code,
+                  "scriptText"           -> script.expr.toString, // [WAIT] Script.decompile(script),
+                  "complexity"           -> maxComplexity,
+                  "verifierComplexity"   -> verifierComplexity,
+                  "callableComplexities" -> callableComplexities,
+                  "extraFee"             -> extraFee(verifierComplexity)
+                )
               }
             )
         )
@@ -378,7 +381,9 @@ object UtilsApiRoute {
               limitedExecution = false,
               limit,
               remainingCalls = ContractLimits.MaxSyncDAppCalls(script.stdLibVersion),
-              availableActions = ContractLimits.MaxCallableActionsAmount(script.stdLibVersion),
+              availableActions = ContractLimits.MaxCallableActionsAmountBeforeV6(script.stdLibVersion),
+              availableBalanceActions = ContractLimits.MaxBalanceScriptActionsAmountV6,
+              availableAssetActions = ContractLimits.MaxAssetScriptActionsAmountV6,
               availableData = ContractLimits.MaxWriteSetSize,
               availableDataSize = ContractLimits.MaxTotalWriteSetSizeInBytes,
               currentDiff = Diff.empty,

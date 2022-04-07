@@ -287,11 +287,19 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
     }
   }
 
-  property("issue with 100 transfers") {
-    val (genesisTxs, invoke) = scenario(transfersCount = 100)
+  property(s"issue with ${ContractLimits.MaxBalanceScriptActionsAmountV6} transfers") {
+    val (genesisTxs, invoke) = scenario(transfersCount = ContractLimits.MaxBalanceScriptActionsAmountV6)
     withDomain(ContinuationTransaction) { d =>
       d.appendBlock(genesisTxs*)
-      d.appendAndCatchError(invoke).toString should include("Actions count limit is exceeded")
+      d.appendAndAssertSucceed(invoke)
+    }
+  }
+
+  property(s"issue with ${ContractLimits.MaxBalanceScriptActionsAmountV6 + 1} transfers") {
+    val (genesisTxs, invoke) = scenario(transfersCount = ContractLimits.MaxBalanceScriptActionsAmountV6 + 1)
+    withDomain(ContinuationTransaction) { d =>
+      d.appendBlock(genesisTxs*)
+      d.appendAndCatchError(invoke).toString should include("ScriptTransfer, Lease, LeaseCancel actions count limit is exceeded")
     }
   }
 
@@ -409,7 +417,7 @@ private object InvokeExpressionTest {
   def feeErrorMessage(invoke: InvokeExpressionTransaction, issue: Boolean = false, verifier: Boolean = false): String = {
     val expectingFee =
       FeeConstants(invoke.tpe) * FeeUnit + (if (issue) 1 else 0) * 1_0000_0000L + (if (verifier) 1 else 0) * FeeValidation.ScriptExtraFee
-    val issueErr    = if (issue) " with 1 assets issued" else ""
+    val issueErr = if (issue) " with 1 assets issued" else ""
     s"for InvokeExpressionTransaction (${invoke.fee} in WAVES)$issueErr does not exceed minimal value of $expectingFee WAVES."
   }
 
