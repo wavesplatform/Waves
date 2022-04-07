@@ -46,11 +46,11 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
         ContractLimits.MaxCallableActionsAmountBeforeV6(version)
 
     property(s"Allow not more $limit ScriptTransfer/Lease/LeaseCancel actions for V${version.id}") {
-      val wavesTransferAmount = (limit - 8) / 2
+      val wavesTransferActionsCount = (limit - 8) / 2
       val (preparingTxs1, invoke1, masterAddress, serviceAddress1) =
         scenario(
-          balanceActionsWithIssueMasterContract(_, _, wavesTransferAmount, version),
-          balanceActionsServiceContract(version, wavesTransferAmount)
+          balanceActionsWithIssueMasterContract(_, _, wavesTransferActionsCount, version),
+          balanceActionsWithIssueServiceContract(version, wavesTransferActionsCount)
         )
 
       assertDiffAndState(Seq(TestBlock.create(preparingTxs1)), TestBlock.create(Seq(invoke1), Block.ProtoBlockVersion), features(version)) {
@@ -62,8 +62,8 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
 
       val (preparingTxs2, invoke2, _, _) =
         scenario(
-          balanceActionsWithIssueMasterContract(_, _, wavesTransferAmount, version, extraAction = true),
-          balanceActionsServiceContract(version, wavesTransferAmount)
+          balanceActionsWithIssueMasterContract(_, _, wavesTransferActionsCount, version, extraAction = true),
+          balanceActionsWithIssueServiceContract(version, wavesTransferActionsCount)
         )
 
       val errMsg =
@@ -86,11 +86,11 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
         ContractLimits.MaxCallableActionsAmountBeforeV6(version)
 
     property(s"Allow not more $limit Issue/Reissue/Burn/SponsorFee actions for V${version.id}") {
-      val actionsAmount = limit / 2
+      val actionsCount = limit / 2
       val (preparingTxs1, invoke1, masterAddress, serviceAddress1) =
         scenario(
-          (_: Address, alias: Alias) => assetActionsMasterContract(alias, actionsAmount, version),
-          assetActionsServiceContract(version, actionsAmount)
+          (_: Address, alias: Alias) => assetActionsMasterContract(alias, actionsCount, version),
+          assetActionsServiceContract(version, actionsCount)
         )
 
       assertDiffAndState(Seq(TestBlock.create(preparingTxs1)), TestBlock.create(Seq(invoke1), Block.ProtoBlockVersion), features(version)) {
@@ -102,8 +102,8 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
 
       val (preparingTxs2, invoke2, _, _) =
         scenario(
-          (_: Address, alias: Alias) => assetActionsMasterContract(alias, actionsAmount, version, extraAction = true),
-          assetActionsServiceContract(version, actionsAmount)
+          (_: Address, alias: Alias) => assetActionsMasterContract(alias, actionsCount, version, extraAction = true),
+          assetActionsServiceContract(version, actionsCount)
         )
 
       val errMsg =
@@ -164,7 +164,7 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
       case _  => fsWithV6
     }
 
-  private def balanceActionsServiceContract(version: StdLibVersion, wavesTransferAmount: Int): Script = {
+  private def balanceActionsWithIssueServiceContract(version: StdLibVersion, wavesTransferActionsCount: Int): Script = {
     val script =
       s"""
          |{-# STDLIB_VERSION ${version.id} #-}
@@ -178,10 +178,10 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
          |     let n = Issue(an, an, 1, 0, false, unit, 0)
          |     ([
          |       IntegerEntry("bar", 1),
-         |       ${"ScriptTransfer(Address(a), 1, unit), " * wavesTransferAmount}
+         |       ${"ScriptTransfer(Address(a), 1, unit), " * wavesTransferActionsCount}
          |       BinaryEntry("asset", n.calculateAssetId()),
          |       n,
-         |       ScriptTransfer(Address(a), 1, n.calculateAssetId())], ${wavesTransferAmount + 4})
+         |       ScriptTransfer(Address(a), 1, n.calculateAssetId())], ${wavesTransferActionsCount + 4})
          |   else
          |     throw("Bad caller")
          | }
@@ -193,7 +193,7 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
   def balanceActionsWithIssueMasterContract(
       otherAcc: Address,
       alias: Alias,
-      wavesTransferAmount: Int,
+      wavesTransferActionsCount: Int,
       version: StdLibVersion,
       extraAction: Boolean = false
   ): Script = {
@@ -219,34 +219,30 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
          |  let ob1 = wavesBalance(Address(base58'$otherAcc'))
          |  if b1 == b1 && ob1 == ob1
          |  then
-         |    let r = invoke(Alias("${alias.name}"), "bar", [this.bytes, "aaaaaaaa"], [AttachedPayment(unit, ${wavesTransferAmount + 4})])
-         |    let r1 = invoke(Alias("${alias.name}"), "bar", [this.bytes, "bbbbbbbb"], [AttachedPayment(unit, ${wavesTransferAmount + 4})])
-         |    if r == r1
+         |    strict r = invoke(Alias("${alias.name}"), "bar", [this.bytes, "aaaaaaaa"], [AttachedPayment(unit, ${wavesTransferActionsCount + 4})])
+         |    strict r1 = invoke(Alias("${alias.name}"), "bar", [this.bytes, "bbbbbbbb"], [AttachedPayment(unit, ${wavesTransferActionsCount + 4})])
+         |    let data = getIntegerValue(Address(base58'$otherAcc'), "bar")
+         |    let b2 = wavesBalance(this)
+         |    let ob2 = wavesBalance(Address(base58'$otherAcc'))
+         |    let ab = assetBalance(this, getBinaryValue(Address(base58'$otherAcc'), "asset"))
+         |    if data == 1
          |    then
-         |     let data = getIntegerValue(Address(base58'$otherAcc'), "bar")
-         |     let b2 = wavesBalance(this)
-         |     let ob2 = wavesBalance(Address(base58'$otherAcc'))
-         |     let ab = assetBalance(this, getBinaryValue(Address(base58'$otherAcc'), "asset"))
-         |     if data == 1
-         |     then
          |      if ob1.regular+8 == ob2.regular && b1.regular == b2.regular+8 && ab == 1
          |      then
-         |       let l = Lease(Address(base58'$otherAcc'), 23)
-         |       [
-         |        IntegerEntry("key", 1),
-         |        Lease(Address(base58'$otherAcc'), 13),
-         |        Lease(Address(base58'$otherAcc'), 15),
-         |        $additionalBalanceActionsForV6
-         |        $extraLeaseAction
-         |        l,
-         |        LeaseCancel(l.calculateLeaseId())
-         |       ]
+         |        let l = Lease(Address(base58'$otherAcc'), 23)
+         |        [
+         |          IntegerEntry("key", 1),
+         |          Lease(Address(base58'$otherAcc'), 13),
+         |          Lease(Address(base58'$otherAcc'), 15),
+         |          $additionalBalanceActionsForV6
+         |          $extraLeaseAction
+         |          l,
+         |          LeaseCancel(l.calculateLeaseId())
+         |        ]
          |      else
-         |       throw("Balance check failed")
+         |        throw("Balance check failed")
          |    else
-         |     throw("Bad state")
-         |   else
-         |    throw("Bad returned value")
+         |      throw("Bad state")
          |  else
          |   throw("Imposible")
          | }
@@ -257,11 +253,11 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
 
   def assetActionsMasterContract(
       alias: Alias,
-      actionsAmount: Int,
+      actionsCount: Int,
       version: StdLibVersion,
       extraAction: Boolean = false
   ): Script = {
-    val extraIssueAction = if (extraAction) s"""Issue("extraAsset", "", 100, 8, true, unit, ${actionsAmount + 1}),""" else ""
+    val extraIssueAction = if (extraAction) s"""Issue("extraAsset", "", 100, 8, true, unit, ${actionsCount + 1}),""" else ""
 
     val script =
       s"""
@@ -275,7 +271,7 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
          |   [
          |     IntegerEntry("key", 1),
          |     $extraIssueAction
-         |     ${(0 until actionsAmount).map(ind => s"""Issue("masterAsset$ind", "", 100, 8, true, unit, $ind)""").mkString(",\n")}
+         |     ${(0 until actionsCount).map(ind => s"""Issue("masterAsset$ind", "", 100, 8, true, unit, $ind)""").mkString(",\n")}
          |   ]
          | }
          |""".stripMargin
@@ -283,7 +279,7 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
     TestCompiler(version).compileContract(script)
   }
 
-  private def assetActionsServiceContract(version: StdLibVersion, actionsAmount: Int): Script = {
+  private def assetActionsServiceContract(version: StdLibVersion, actionsCount: Int): Script = {
     val script =
       s"""
          |{-# STDLIB_VERSION ${version.id} #-}
@@ -292,12 +288,12 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
          |
          | @Callable(i)
          | func bar() = {
-         |   let issue = Issue("serviceAsset0", "", 100, 8, true, unit, 0)
+         |   let issue = Issue("serviceAsset", "", 100, 8, true, unit, 0)
          |   let assetId = issue.calculateAssetId()
          |   [
          |     issue,
          |     IntegerEntry("bar", 1),
-         |     ${(1 until (actionsAmount - 3)).map(ind => s"""Issue("serviceAsset$ind", "", 100, 8, true, unit, $ind)""").mkString(",\n")},
+         |     ${(0 until (actionsCount - 4)).map(ind => s"""Issue("serviceAsset$ind", "", 100, 8, true, unit, $ind)""").mkString(",\n")},
          |     Reissue(assetId, 100, true),
          |     Burn(assetId, 50),
          |     SponsorFee(assetId, 2)
@@ -308,7 +304,7 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
     TestCompiler(version).compileContract(script)
   }
 
-  private def onlyBalanceActionsMasterContract(alias: Alias, actionsAmount: Int, version: StdLibVersion): Script = {
+  private def onlyBalanceActionsMasterContract(alias: Alias, actionsCount: Int, version: StdLibVersion): Script = {
 
     val script =
       s"""
@@ -325,7 +321,7 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
          |     l,
          |     Lease(Alias("${alias.name}"), 20),
          |     LeaseCancel(l.calculateLeaseId()),
-         |     ${(0 until (actionsAmount - 3)).map(_ => s"""ScriptTransfer(Alias("${alias.name}"), 1, unit)""").mkString(",\n")}
+         |     ${(0 until (actionsCount - 3)).map(_ => s"""ScriptTransfer(Alias("${alias.name}"), 1, unit)""").mkString(",\n")}
          |   ]
          | }
          |""".stripMargin
