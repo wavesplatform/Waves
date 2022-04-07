@@ -337,9 +337,11 @@ object InvokeScriptTransactionDiff {
       .leftMap(error => (error.getMessage: ExecutionError, 0, Nil: Log[Id]))
       .flatten
       .leftMap[ValidationError] {
+        case (AlwaysRejectError(msg), _, log) =>
+          ScriptExecutionError.dAppExecution(msg, log)
         case (error, unusedComplexity, log) =>
           val usedComplexity = startLimit - unusedComplexity.max(0)
-          if (usedComplexity > failFreeLimit && !error.isInstanceOf[AlwaysRejectError]) {
+          if (usedComplexity > failFreeLimit) {
             val storingComplexity = if (blockchain.storeEvaluatedComplexity) usedComplexity else estimatedComplexity
             FailedTransactionError.dAppExecution(error.message, storingComplexity + paymentsComplexity, log)
           } else

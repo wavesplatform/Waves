@@ -28,9 +28,8 @@ import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.BalanceDiffValidation
 import com.wavesplatform.state.diffs.invoke.CallArgumentPolicy.*
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
@@ -90,16 +89,7 @@ object InvokeScriptDiff {
               ValidationError.ScriptRunsLimitError(s"DApp calls limit = ${ContractLimits.MaxSyncDAppCalls(version)} is exceeded")
             )
           )
-          _ <- traced {
-            if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls) && blockchain.height >= blockchain.settings.functionalitySettings.enforceTransferValidationAfter) {
-              tx.payments.find { case Payment(amount, _) =>
-                amount < 0
-              }.map(payment => Left(GenericError(s"DApp $invoker invoked DApp $dAppAddress with attached ${payment.assetId.fold("WAVES")(a => s"token $a")} amount = ${payment.amount}")))
-                .getOrElse(Right(()))
-            } else {
-              Right(())
-            }
-          }
+          _ <- ensurePaymentsAreNotNegative(blockchain, tx, invoker, dAppAddress)
           invocationComplexity <- traced {
             InvokeDiffsCommon.getInvocationComplexity(blockchain, tx.funcCall, callableComplexities, dAppAddress)
           }
@@ -113,7 +103,7 @@ object InvokeScriptDiff {
           )
 
           directives: DirectiveSet <- traced(DirectiveSet(version, Account, DAppType).leftMap(GenericError.apply))
-          payments                 <- traced(AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DAppTarget).leftMap(GenericError.apply))
+          payments <- traced(AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DAppTarget).leftMap(GenericError.apply))
           checkedPayments <- traced {
             payments.payments.toList
               .traverseFilter {
@@ -221,15 +211,10 @@ object InvokeScriptDiff {
                 } yield (diff, evaluated, environment.availableActions, environment.availableData, environment.availableDataSize)
               })
             }
-            _ = invocationRoot.setLog(log)
-
+            _               = invocationRoot.setLog(log)
             spentComplexity = remainingComplexity - scriptResult.unusedComplexity.max(0)
 
-            _ <- traced(
-              BalanceDiffValidation
-                .cond(blockchain, b => b.isFeatureActivated(BlockchainFeatures.SynchronousCalls) && b.height >= b.settings.functionalitySettings.enforceTransferValidationAfter)(diff)
-                .leftMap(be => FailedTransactionError.dAppExecution(be.toString, spentComplexity, log))
-            )
+            _ <- validateIntermediateBalances(blockchain, diff, spentComplexity, log)
 
             doProcessActions = (actions: List[CallableAction], unusedComplexity: Int) => {
               val storingComplexity = if (blockchain.storeEvaluatedComplexity) complexityAfterPayments - unusedComplexity else invocationComplexity
@@ -291,7 +276,7 @@ object InvokeScriptDiff {
                 doProcessActions(Nil, 0).map((_, unit, availableActions, availableData, availableDataSize))
               case r: IncompleteResult =>
                 val usedComplexity = remainingComplexity - r.unusedComplexity
-                val error          = FailedTransactionError.dAppExecution(s"Invoke complexity limit = $totalComplexityLimit is exceeded", usedComplexity, log)
+                val error = FailedTransactionError.dAppExecution(s"Invoke complexity limit = $totalComplexityLimit is exceeded", usedComplexity, log)
                 traced(error.asLeft[(Diff, EVALUATED, Int, Int, Int)])
             }
             resultDiff <- traced(
@@ -302,11 +287,7 @@ object InvokeScriptDiff {
                 .leftMap(GenericError(_))
             )
 
-            _ <- traced(
-              BalanceDiffValidation
-                .cond(blockchain, b => b.isFeatureActivated(BlockchainFeatures.SynchronousCalls) && b.height >= b.settings.functionalitySettings.enforceTransferValidationAfter)(resultDiff)
-                .leftMap(be => FailedTransactionError.dAppExecution(be.toString, resultDiff.scriptsComplexity, log))
-            )
+            _ <- validateIntermediateBalances(blockchain, resultDiff, resultDiff.scriptsComplexity, log)
 
             _ = invocationRoot.setResult(scriptResult)
           } yield (resultDiff, evaluated, remainingActions1, remainingData1, remainingDataSize1)
@@ -334,15 +315,58 @@ object InvokeScriptDiff {
     ContractEvaluator
       .applyV2Coeval(evaluationCtx, contract, invocation, version, limit, blockchain.correctFunctionCallScope, blockchain.newEvaluatorMode)
       .map(
-        _.leftMap(
-          {
-            case (reject: AlwaysRejectError, _, _) =>
-              reject
-            case (error, unusedComplexity, log) =>
-              val usedComplexity = startComplexityLimit - unusedComplexity
-              FailedTransactionError.dAppExecution(error.message, usedComplexity, log)
-          }
-        ).flatTap(r => InvokeDiffsCommon.checkScriptResultFields(blockchain, r._1))
+        _.leftMap[ValidationError] {
+          case (reject: AlwaysRejectError, _, _) =>
+            reject
+          case (error, unusedComplexity, log) =>
+            val usedComplexity = startComplexityLimit - unusedComplexity
+            FailedTransactionError.dAppExecution(error.message, usedComplexity, log)
+        }.flatTap(r => InvokeDiffsCommon.checkScriptResultFields(blockchain, r._1))
       )
+  }
+
+  private def validateIntermediateBalances(blockchain: Blockchain, diff: Diff, spentComplexity: Long, log: Log[Id]) = traced(
+    if (blockchain.isFeatureActivated(BlockchainFeatures.RideV6)) {
+      BalanceDiffValidation(blockchain)(diff)
+        .leftMap { be => FailedTransactionError.dAppExecution(be.toString, spentComplexity, log) }
+    } else if (blockchain.height >= blockchain.settings.functionalitySettings.enforceTransferValidationAfter) {
+      // reject transaction if any balance is negative
+      val compositeBlockchain = CompositeBlockchain(blockchain, diff)
+
+      diff.portfolios.view
+        .flatMap {
+          case (address, p) if p.balance < 0 && compositeBlockchain.balance(address) < 0 => Some(address -> Waves)
+          case (address, p) =>
+            p.assets
+              .find({ case (asset, balance) => balance < 0 && compositeBlockchain.balance(address, asset) < 0 })
+              .map { case (asset, _) => address -> asset }
+        }
+        .headOption
+        .fold[Either[ValidationError, Unit]](Right(())) { case (address, asset) =>
+          val msg = asset match {
+            case Waves => s"$address: Negative waves balance: old = ${blockchain.balance(address)}, new = ${compositeBlockchain.balance(address)}"
+            case ia: IssuedAsset =>
+              s"$address: Negative asset $ia balance: old = ${blockchain.balance(address, ia)}, new = ${compositeBlockchain.balance(address, ia)}"
+          }
+          println("EXCEPTION")
+          Left(AlwaysRejectError(msg))
+        }
+
+    } else Right(())
+  )
+
+  private def ensurePaymentsAreNotNegative(blockchain: Blockchain, tx: InvokeScript, invoker: Address, dAppAddress: Address) = traced {
+    tx.payments.collectFirst {
+      case p if p.amount < 0 =>
+        s"DApp $invoker invoked DApp $dAppAddress with attached ${p.assetId.fold("WAVES")(a => s"token $a")} amount = ${p.amount}"
+    } match {
+      case Some(e) if blockchain.isFeatureActivated(BlockchainFeatures.RideV6) =>
+        Left(GenericError(e))
+      case Some(e)
+          if blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls) &&
+            blockchain.height >= blockchain.settings.functionalitySettings.enforceTransferValidationAfter =>
+        Left(AlwaysRejectError(e))
+      case _ => Right(())
+    }
   }
 }

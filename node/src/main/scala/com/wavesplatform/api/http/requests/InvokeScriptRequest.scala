@@ -45,9 +45,12 @@ object InvokeScriptRequest {
           case _ => JsError("value is missing or not an base64 encoded string")
         }
       case JsDefined(JsString("list")) =>
-        ARR((jv \ "value").as[Vector[EVALUATED]], true).fold(e => JsError(e.message), { v: EVALUATED =>
-          JsSuccess(v)
-        })
+        ARR((jv \ "value").as[Vector[EVALUATED]], true).fold(
+          e => JsError(e.message),
+          { v: EVALUATED =>
+            JsSuccess(v)
+          }
+        )
       case _ => JsError("type is missing")
     }
   }

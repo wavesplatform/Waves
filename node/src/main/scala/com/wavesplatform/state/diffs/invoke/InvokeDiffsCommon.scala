@@ -8,7 +8,7 @@ import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.BlockchainFeatures.{BlockV5, SynchronousCalls}
+import com.wavesplatform.features.BlockchainFeatures.{BlockV5, RideV6, SynchronousCalls}
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.features.InvokeScriptSelfPaymentPolicyProvider.*
 import com.wavesplatform.features.ScriptTransferValidationProvider.*
@@ -499,10 +499,11 @@ object InvokeDiffsCommon {
           TracedResult(Left(FailedTransactionError.dAppExecution("Invalid asset description", 0L)), List())
         } else if (blockchain.assetDescription(IssuedAsset(issue.id)).isDefined || blockchain.resolveERC20Address(ERC20Address(asset)).isDefined) {
           val error = s"Asset ${issue.id} is already issued"
-          if (blockchain.height >= blockchain.settings.functionalitySettings.enforceTransferValidationAfter)
-            TracedResult(Left(AlwaysRejectError(error)))
-          else
+          if (blockchain.isFeatureActivated(RideV6) || blockchain.height < blockchain.settings.functionalitySettings.enforceTransferValidationAfter) {
             TracedResult(Left(FailedTransactionError.dAppExecution(error, 0L)), List())
+          } else {
+            TracedResult(Left(AlwaysRejectError(error)))
+          }
         } else {
           val staticInfo = AssetStaticInfo(TransactionId @@ itx.txId, pk, issue.decimals, blockchain.isNFT(issue))
           val volumeInfo = AssetVolumeInfo(issue.isReissuable, BigInt(issue.quantity))
@@ -687,29 +688,32 @@ object InvokeDiffsCommon {
       TracedResult(Right(()))
   }
 
-  def checkScriptResultFields(blockchain: Blockchain, r: ScriptResult): Either[AlwaysRejectError, Unit] =
+  def checkScriptResultFields(blockchain: Blockchain, r: ScriptResult): Either[ValidationError, ScriptResult] =
     r match {
-      case ScriptResultV4(actions, _, _) if blockchain.height >= blockchain.settings.functionalitySettings.enforceTransferValidationAfter =>
-        actions
+      case rv4: ScriptResultV4 =>
+        rv4.actions
           .collectFirstSome {
-            case Reissue(_, _, quantity) if quantity < 0   => Some(AlwaysRejectError(s"Negative reissue quantity = $quantity"))
-            case Burn(_, quantity) if quantity < 0         => Some(AlwaysRejectError(s"Negative burn quantity = $quantity"))
-            case t: AssetTransfer if t.amount < 0          => Some(AlwaysRejectError(s"Negative transfer amount = ${t.amount}"))
-            case l: Lease if l.amount < 0                  => Some(AlwaysRejectError(s"Negative lease amount = ${l.amount}"))
-            case SponsorFee(_, Some(amount)) if amount < 0 => Some(AlwaysRejectError(s"Negative sponsor amount = $amount"))
+            case Reissue(_, _, quantity) if quantity < 0   => Some(s"Negative reissue quantity = $quantity")
+            case Burn(_, quantity) if quantity < 0         => Some(s"Negative burn quantity = $quantity")
+            case t: AssetTransfer if t.amount < 0          => Some(s"Negative transfer amount = ${t.amount}")
+            case l: Lease if l.amount < 0                  => Some(s"Negative lease amount = ${l.amount}")
+            case SponsorFee(_, Some(amount)) if amount < 0 => Some(s"Negative sponsor amount = $amount")
             case i: Issue =>
               val length = i.name.getBytes("UTF-8").length
               if (length < IssueTransaction.MinAssetNameLength || length > IssueTransaction.MaxAssetNameLength)
-                Some(AlwaysRejectError("Invalid asset name"))
+                Some("Invalid asset name")
               else if (i.description.length > IssueTransaction.MaxAssetDescriptionLength)
-                Some(AlwaysRejectError("Invalid asset description"))
+                Some("Invalid asset description")
               else
                 None
             case _ =>
               None
           }
-          .toLeft(())
-      case _ =>
-        Right(())
+          .collect {
+            case e if blockchain.isFeatureActivated(BlockchainFeatures.RideV6)                                      => GenericError(e)
+            case e if blockchain.height >= blockchain.settings.functionalitySettings.enforceTransferValidationAfter => AlwaysRejectError(e)
+          }
+          .toLeft(r)
+      case _ => Right(r)
     }
 }
