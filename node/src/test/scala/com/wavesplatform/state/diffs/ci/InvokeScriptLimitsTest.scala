@@ -90,7 +90,7 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
       val (preparingTxs1, invoke1, masterAddress, serviceAddress1) =
         scenario(
           (_: Address, alias: Alias) => assetActionsMasterContract(alias, actionsCount, version),
-          assetActionsServiceContract(version, actionsCount)
+          assetAndDataActionsServiceContract(version, actionsCount)
         )
 
       assertDiffAndState(Seq(TestBlock.create(preparingTxs1)), TestBlock.create(Seq(invoke1), Block.ProtoBlockVersion), features(version)) {
@@ -103,7 +103,7 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
       val (preparingTxs2, invoke2, _, _) =
         scenario(
           (_: Address, alias: Alias) => assetActionsMasterContract(alias, actionsCount, version, extraAction = true),
-          assetActionsServiceContract(version, actionsCount)
+          assetAndDataActionsServiceContract(version, actionsCount)
         )
 
       val errMsg =
@@ -119,13 +119,15 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
   }
 
   property(
-    s"""Allow ${ContractLimits.MaxBalanceScriptActionsAmountV6} ScriptTransfer/Lease/LeaseCancel 
-       |and ${ContractLimits.MaxAssetScriptActionsAmountV6} Issue/Reissue/Burn/SponsorFee actions for V6""".stripMargin
+    s"""Allow ${ContractLimits.MaxBalanceScriptActionsAmountV6} ScriptTransfer/Lease/LeaseCancel, 
+       |${ContractLimits.MaxAssetScriptActionsAmountV6} Issue/Reissue/Burn/SponsorFee 
+       |and ${ContractLimits.MaxWriteSetSize} data actions for V6""".stripMargin
   ) {
     val (preparingTxs, invoke, masterAddress, serviceAddress) =
       scenario(
-        (_: Address, alias: Alias) => onlyBalanceActionsMasterContract(alias, ContractLimits.MaxBalanceScriptActionsAmountV6, V6),
-        assetActionsServiceContract(V6, ContractLimits.MaxAssetScriptActionsAmountV6)
+        (_: Address, alias: Alias) =>
+          balanceAndDataActionsMasterContract(alias, ContractLimits.MaxBalanceScriptActionsAmountV6, ContractLimits.MaxWriteSetSize / 2, V6),
+        assetAndDataActionsServiceContract(V6, ContractLimits.MaxAssetScriptActionsAmountV6, ContractLimits.MaxWriteSetSize / 2)
       )
 
     assertDiffAndState(Seq(TestBlock.create(preparingTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features(V6)) { case (diff, bc) =>
@@ -279,7 +281,7 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
     TestCompiler(version).compileContract(script)
   }
 
-  private def assetActionsServiceContract(version: StdLibVersion, actionsCount: Int): Script = {
+  private def assetAndDataActionsServiceContract(version: StdLibVersion, assetActionsCount: Int, dataActionsCount: Int = 2): Script = {
     val script =
       s"""
          |{-# STDLIB_VERSION ${version.id} #-}
@@ -293,7 +295,8 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
          |   [
          |     issue,
          |     IntegerEntry("bar", 1),
-         |     ${(0 until (actionsCount - 4)).map(ind => s"""Issue("serviceAsset$ind", "", 100, 8, true, unit, $ind)""").mkString(",\n")},
+         |     ${(0 until (assetActionsCount - 4)).map(ind => s"""Issue("serviceAsset$ind", "", 100, 8, true, unit, $ind)""").mkString(",\n")},
+         |     ${(0 until (dataActionsCount - 1)).map(ind => s"""IntegerEntry("bar$ind", 1)""").mkString(",\n")},
          |     Reissue(assetId, 100, true),
          |     Burn(assetId, 50),
          |     SponsorFee(assetId, 2)
@@ -304,7 +307,7 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
     TestCompiler(version).compileContract(script)
   }
 
-  private def onlyBalanceActionsMasterContract(alias: Alias, actionsCount: Int, version: StdLibVersion): Script = {
+  private def balanceAndDataActionsMasterContract(alias: Alias, balanceActionsCount: Int, dataActionsCount: Int, version: StdLibVersion): Script = {
 
     val script =
       s"""
@@ -321,7 +324,12 @@ class InvokeScriptLimitsTest extends PropSpec with WithState with DBCacheSetting
          |     l,
          |     Lease(Alias("${alias.name}"), 20),
          |     LeaseCancel(l.calculateLeaseId()),
-         |     ${(0 until (actionsCount - 3)).map(_ => s"""ScriptTransfer(Alias("${alias.name}"), 1, unit)""").mkString(",\n")}
+         |     BinaryEntry("bin", l.calculateLeaseId()),
+         |     BooleanEntry("bool", true),
+         |     DeleteEntry("bool"),
+         |     StringEntry("str", "string"),
+         |     ${(0 until (dataActionsCount - 5)).map(ind => s"""IntegerEntry("key$ind", 1)""").mkString(",\n")},
+         |     ${(0 until (balanceActionsCount - 3)).map(_ => s"""ScriptTransfer(Alias("${alias.name}"), 1, unit)""").mkString(",\n")}
          |   ]
          | }
          |""".stripMargin
