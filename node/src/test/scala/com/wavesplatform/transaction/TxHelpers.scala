@@ -69,9 +69,9 @@ object TxHelpers {
       feeAsset: Asset = Waves,
       attachment: ByteStr = ByteStr.empty,
       timestamp: TxTimestamp = timestamp,
-      version: Byte = TxVersion.V2
-  ,
-               chainId: Byte = AddressScheme.current.chainId): TransferTransaction =
+      version: Byte = TxVersion.V2,
+      chainId: Byte = AddressScheme.current.chainId
+  ): TransferTransaction =
     TransferTransaction.selfSigned(version, from, to, asset, amount, feeAsset, fee, attachment, timestamp, chainId).explicitGet()
 
   def transferUnsigned(
@@ -147,7 +147,12 @@ object TxHelpers {
   def data(account: KeyPair, entries: Seq[DataEntry[?]], fee: Long = TestValues.fee * 3, version: TxVersion = TxVersion.V1): DataTransaction =
     DataTransaction.selfSigned(version, account, entries, fee, timestamp).explicitGet()
 
-  def dataV2(account: KeyPair, entries: Seq[DataEntry[?]], fee: Long = TestValues.fee * 3, chainId: Byte = AddressScheme.current.chainId): DataTransaction =
+  def dataV2(
+      account: KeyPair,
+      entries: Seq[DataEntry[?]],
+      fee: Long = TestValues.fee * 3,
+      chainId: Byte = AddressScheme.current.chainId
+  ): DataTransaction =
     DataTransaction.selfSigned(TxVersion.V2, account, entries, fee, timestamp, chainId).explicitGet()
 
   def dataWithMultipleEntries(account: KeyPair, entries: Seq[DataEntry[?]]): DataTransaction =
@@ -168,10 +173,12 @@ object TxHelpers {
       name: String = "updated_name",
       desc: String = "updated_desc",
       sender: KeyPair = defaultSigner,
+      fee: Long = TestValues.fee,
+      feeAsset: Asset = Waves,
       version: TxVersion = TxVersion.V1,
       chainId: Byte = AddressScheme.current.chainId
   ): UpdateAssetInfoTransaction =
-    UpdateAssetInfoTransaction.selfSigned(version, sender, assetId, name, desc, timestamp, TestValues.fee, Waves, chainId).explicitGet()
+    UpdateAssetInfoTransaction.selfSigned(version, sender, assetId, name, desc, timestamp, fee, feeAsset, chainId).explicitGet()
 
   def orderV3(orderType: OrderType, asset: Asset, feeAsset: Asset): Order = {
     order(orderType, asset, Waves, feeAsset)
@@ -208,8 +215,9 @@ object TxHelpers {
         expiration,
         fee,
         feeAsset,
-      priceMode
-    ).explicitGet()
+        priceMode
+      )
+      .explicitGet()
   }
 
   def exchangeFromOrders(
