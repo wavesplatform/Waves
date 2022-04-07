@@ -4,18 +4,17 @@ import com.wavesplatform.TransactionGenBase
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.features.BlockchainFeatures._
+import com.wavesplatform.features.BlockchainFeatures.*
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
-import com.wavesplatform.test._
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 
 class SyncDAppBalanceCheckTest extends PropSpec with WithDomain with TransactionGenBase {
 
@@ -51,24 +50,25 @@ class SyncDAppBalanceCheckTest extends PropSpec with WithDomain with Transaction
       dApp2   <- accountGen
       fee     <- ciFee()
       gTx1     = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx2     = GenesisTransaction.create(dApp1.toAddress, fee, ts).explicitGet()
+      gTx2     = GenesisTransaction.create(dApp1.toAddress, 0.01.waves, ts).explicitGet()
       gTx3     = GenesisTransaction.create(dApp2.toAddress, ENOUGH_AMT, ts).explicitGet()
-      ssTx1    = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(dApp1Script(dApp2.toAddress)), fee, ts).explicitGet()
-      ssTx2    = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp2Script), fee, ts).explicitGet()
+      ssTx1    = SetScriptTransaction.selfSigned(1.toByte, dApp1, Some(dApp1Script(dApp2.toAddress)), 0.01.waves, ts).explicitGet()
+      ssTx2    = SetScriptTransaction.selfSigned(1.toByte, dApp2, Some(dApp2Script), 0.01.waves, ts).explicitGet()
       invokeTx = () => Signed.invokeScript(TxVersion.V3, invoker, dApp1.toAddress, None, Nil, fee, Waves, ts)
     } yield (Seq(gTx1, gTx2, gTx3, ssTx1, ssTx2), invokeTx)
 
   property("temporary negative balance of sync call produces error") {
     val (preparingTxs, invoke) = scenario.sample.get
     val settings =
-      TestFunctionalitySettings
-        .withFeatures(BlockV5, SynchronousCalls)
+      DomainPresets.RideV5
+        .configure(_.copy(enforceTransferValidationAfter = 2))
+        .setFeaturesHeight(RideV6 -> 4)
 
-    withDomain(domainSettingsWithFS(settings)) { d =>
+    withDomain(settings) { d =>
       d.appendBlock(preparingTxs*)
 
       val invoke1 = invoke()
-      d.appendAndCatchError(invoke1).toString should include("negative waves balance")
+      d.appendAndCatchError(invoke1).toString should include("Negative waves balance")
     }
   }
 }

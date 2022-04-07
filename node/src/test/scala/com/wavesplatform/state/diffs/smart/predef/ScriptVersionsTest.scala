@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs.smart.predef
 
+import cats.syntax.either._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
@@ -41,7 +42,7 @@ class ScriptVersionsTest extends FreeSpec {
       tx: Transaction,
       blockchain: Blockchain
   ): Either[String, EVALUATED] =
-    ScriptRunner(Coproduct(tx), blockchain, script, isAssetScript = false, null)._3
+    ScriptRunner(Coproduct(tx), blockchain, script, isAssetScript = false, null)._3.leftMap(_.message)
 
   private val duplicateNames =
     """

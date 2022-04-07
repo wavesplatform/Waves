@@ -30,7 +30,7 @@ object InvokeScriptRequest {
         }
       case JsDefined(JsString("string")) =>
         jv \ "value" match {
-          case JsDefined(JsString(n)) => CONST_STRING(n).fold(JsError(_), JsSuccess(_))
+          case JsDefined(JsString(n)) => CONST_STRING(n).fold(e => JsError(e.message), JsSuccess(_))
           case _                      => JsError("value is missing or not an string")
         }
       case JsDefined(JsString("binary")) =>
@@ -40,14 +40,17 @@ object InvokeScriptRequest {
               .decodeBase64(n)
               .toEither
               .leftMap(_.getMessage)
-              .flatMap(CONST_BYTESTR(_))
+              .flatMap(r => CONST_BYTESTR(r).leftMap(_.message))
               .fold(JsError(_), JsSuccess(_))
           case _ => JsError("value is missing or not an base64 encoded string")
         }
       case JsDefined(JsString("list")) =>
-        ARR((jv \ "value").as[Vector[EVALUATED]], true).fold(JsError.apply, { v: EVALUATED =>
-          JsSuccess(v)
-        })
+        ARR((jv \ "value").as[Vector[EVALUATED]], true).fold(
+          e => JsError(e.message),
+          { v: EVALUATED =>
+            JsSuccess(v)
+          }
+        )
       case _ => JsError("type is missing")
     }
   }

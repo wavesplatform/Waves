@@ -2,7 +2,6 @@ package com.wavesplatform.transaction
 
 import cats.syntax.either._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, Expression, Asset => AssetType, DApp => DAppType}
 import com.wavesplatform.lang.v1.traits.Environment.{InputEntity, Tthis}
@@ -17,15 +16,15 @@ package object smart {
       blockchain: Blockchain,
       ds: DirectiveSet,
       scriptContainerAddress: Tthis
-  ): Either[ExecutionError, InputEntity] =
+  ): Either[String, InputEntity] =
     in.eliminate(
       tx =>
         RealTransactionWrapper(tx, blockchain, ds.stdLibVersion, paymentTarget(ds, scriptContainerAddress))
           .map(Coproduct[InputEntity](_)),
       _.eliminate(
-        order => Coproduct[InputEntity](RealTransactionWrapper.ord(order)).asRight[ExecutionError],
+        order => Coproduct[InputEntity](RealTransactionWrapper.ord(order)).asRight[String],
         _.eliminate(
-          scriptTransfer => Coproduct[InputEntity](scriptTransfer).asRight[ExecutionError],
+          scriptTransfer => Coproduct[InputEntity](scriptTransfer).asRight[String],
           _ => ???
         )
       )

@@ -5,7 +5,8 @@ import cats.data.EitherT
 import monix.eval.Coeval
 
 package object lang {
-  type ExecutionError = String
+  implicit def toError(msg: String): CommonError = CommonError(msg)
+
   type ExecutionLog   = String
 
   type CoevalF[F[_], A]               = Coeval[F[A]]

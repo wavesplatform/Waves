@@ -3,7 +3,7 @@ package com.wavesplatform.lang.v1.evaluator
 import cats.Id
 import cats.syntax.either.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.ExecutionError
+import com.wavesplatform.lang.{ExecutionError, CommonError}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.VerifierFunction
 import com.wavesplatform.lang.directives.values.StdLibVersion
@@ -51,7 +51,7 @@ object ContractEvaluator {
     foldDeclarations(contract.decs ++ callables, BLOCK(LET("__synthetic_call", TRUE), call))
   }
 
-  def buildExprFromInvocation(c: DApp, i: Invocation, version: StdLibVersion): Either[String, EXPR] = {
+  def buildExprFromInvocation(c: DApp, i: Invocation, version: StdLibVersion): Either[ExecutionError, EXPR] = {
     val functionName = i.funcCall.function.funcName
 
     val contractFuncAndCallOpt = c.callableFuncs.find(_.u.name == functionName).map((_, i.funcCall))
@@ -63,7 +63,7 @@ object ContractEvaluator {
           if (otherFuncs contains functionName)
             s"function '$functionName exists in the script but is not marked as @Callable, therefore cannot not be invoked"
           else s"@Callable function '$functionName' doesn't exist in the script"
-        message.asLeft[EXPR]
+        CommonError(message).asLeft[EXPR]
 
       case Some((f, fc)) =>
         val takingArgsNumber = f.u.args.size
@@ -77,7 +77,7 @@ object ContractEvaluator {
             )
           ).asRight[ExecutionError]
         } else {
-          s"function '$functionName takes $takingArgsNumber args but $passedArgsNumber were(was) given"
+          CommonError(s"function '$functionName takes $takingArgsNumber args but $passedArgsNumber were(was) given")
             .asLeft[EXPR]
         }
     }

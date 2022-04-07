@@ -1,6 +1,5 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
-import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.traits.domain.AttachedPayments._
@@ -227,7 +226,7 @@ object Types {
     UNION(actions, TUPLE(List(actions, ANY)))
   }
 
-  def callableReturnType(v: StdLibVersion): Either[ExecutionError, FINAL] =
+  def callableReturnType(v: StdLibVersion): Either[String, FINAL] =
     v match {
       case V1 | V2 => Left(s"DApp is not supported for $v")
       case V3      => Right(callableV3ReturnType)

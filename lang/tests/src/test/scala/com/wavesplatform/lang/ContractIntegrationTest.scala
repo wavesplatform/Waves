@@ -123,7 +123,7 @@ class ContractIntegrationTest extends PropSpec with Inside {
       args = Nil
     )
     inside(evalResult) {
-      case Left((error, log)) =>
+      case Left((CommonError(error), log)) =>
         error shouldBe "exception message"
         log should contain.allOf(
           ("a", Right(CONST_LONG(1))),

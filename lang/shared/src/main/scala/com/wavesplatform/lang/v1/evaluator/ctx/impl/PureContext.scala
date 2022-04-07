@@ -1,9 +1,5 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
-import java.nio.charset.StandardCharsets.UTF_8
-import java.nio.charset.{MalformedInputException, StandardCharsets}
-import java.nio.{BufferUnderflowException, ByteBuffer}
-
 import cats.implicits.*
 import cats.{Id, Monad}
 import com.google.common.annotations.VisibleForTesting
@@ -15,8 +11,8 @@ import com.wavesplatform.lang.utils.getDecompilerContext
 import com.wavesplatform.lang.v1.ContractLimits.*
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR.NoLimit
 import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR.NoLimit
 import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.*
@@ -25,7 +21,11 @@ import com.wavesplatform.lang.v1.evaluator.{ContextfulUserFunction, ContextfulVa
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation.*
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX, FunctionHeader, compiler}
+import com.wavesplatform.lang.*
 
+import java.nio.charset.StandardCharsets.UTF_8
+import java.nio.charset.{MalformedInputException, StandardCharsets}
+import java.nio.{BufferUnderflowException, ByteBuffer}
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scala.util.{Success, Try}
@@ -148,6 +148,7 @@ object PureContext {
           .cond(n.length <= 155, BigInt(n), s"String too long for 512-bits big integers (${n.length} when max is 155)")
           .filterOrElse(v => v <= BigIntMax && v >= BigIntMin, "Value too big for 512-bits big integer")
           .map(CONST_BIGINT.apply)
+          .leftMap(CommonError)
       case xs => notImplemented[Id, EVALUATED]("parseBigIntValue(n: String)", xs)
     }
 
@@ -213,6 +214,7 @@ object PureContext {
             s"$a ${op.func} $b is out of range."
           )
           .map(CONST_BIGINT)
+          .leftMap(CommonError)
       case args =>
         Left(s"Unexpected args $args for BigInt operator '${op.func}'")
     }
@@ -349,12 +351,13 @@ object PureContext {
             ((_: BigInt) <= Long.MaxValue, (_: BigInt) >= Long.MinValue)
           else
             ((_: BigInt) < Long.MaxValue, (_: BigInt) > Long.MinValue)
-        for {
+        val r = for {
           _ <- Either.cond(d != 0, (), "Fraction: division by zero")
           result = BigInt(v) * n / d
           _ <- Either.cond(checkMax(result), (), s"Long overflow: value `$result` greater than 2^63-1")
           _ <- Either.cond(checkMin(result), (), s"Long overflow: value `$result` less than -2^63-1")
         } yield CONST_LONG(result.toLong)
+        r.leftMap(CommonError)
       case xs => notImplemented[Id, EVALUATED]("fraction(value: Int, numerator: Int, denominator: Int)", xs)
     }
 
@@ -391,12 +394,13 @@ object PureContext {
       ("denominator", LONG),
       ("round", UNION(fromV5RoundTypes))
     ) {
-      case CONST_LONG(v) :: CONST_LONG(n) :: CONST_LONG(d) :: (r: CaseObj) :: Nil =>
-        for {
-          _ <- Either.cond(d != 0, (), "Fraction: division by zero")
-          r <- global.divide(BigInt(v) * BigInt(n), d, Rounding.byValue(r))
-          _ <- Either.cond(r.isValidLong, (), s"Fraction result $r out of integers range")
-        } yield CONST_LONG(r.longValue)
+      case CONST_LONG(v) :: CONST_LONG(n) :: CONST_LONG(d) :: (round: CaseObj) :: Nil =>
+        val r = for {
+          _        <- Either.cond(d != 0, (), "Fraction: division by zero")
+          division <- global.divide(BigInt(v) * BigInt(n), d, Rounding.byValue(round))
+          _        <- Either.cond(division.isValidLong, (), s"Fraction result $division out of integers range")
+        } yield CONST_LONG(division.longValue)
+        r.leftMap(CommonError)
       case xs =>
         notImplemented[Id, EVALUATED](
           "fraction(value: Int, numerator: Int, denominator: Int, round: Ceiling|Down|Floor|HalfEven|HalfUp)",
@@ -415,12 +419,13 @@ object PureContext {
       ("denominator", BIGINT)
     ) {
       case CONST_BIGINT(v) :: CONST_BIGINT(n) :: CONST_BIGINT(d) :: Nil =>
-        for {
+        val r = for {
           _ <- Either.cond(d != 0, (), "Fraction: division by zero")
           result = v * n / d
           _ <- Either.cond(result <= BigIntMax, (), s"Long overflow: value `$result` greater than 2^511-1")
           _ <- Either.cond(result >= BigIntMin, (), s"Long overflow: value `$result` less than -2^511")
         } yield CONST_BIGINT(result)
+        r.leftMap(CommonError)
       case xs => notImplemented[Id, EVALUATED]("fraction(value: BigInt, numerator: BigInt, denominator: BigInt)", xs)
     }
 
@@ -435,13 +440,14 @@ object PureContext {
       ("denominator", BIGINT),
       ("round", roundTypes)
     ) {
-      case CONST_BIGINT(v) :: CONST_BIGINT(n) :: CONST_BIGINT(d) :: (r: CaseObj) :: Nil =>
-        for {
+      case CONST_BIGINT(v) :: CONST_BIGINT(n) :: CONST_BIGINT(d) :: (round: CaseObj) :: Nil =>
+        val r = for {
           _ <- Either.cond(d != 0, (), "Fraction: division by zero")
-          r <- global.divide(v * n, d, Rounding.byValue(r))
+          r <- global.divide(v * n, d, Rounding.byValue(round))
           _ <- Either.cond(r <= BigIntMax, (), s"Long overflow: value `$r` greater than 2^511-1")
           _ <- Either.cond(r >= BigIntMin, (), s"Long overflow: value `$r` less than -2^511")
         } yield CONST_BIGINT(r)
+        r.leftMap(CommonError)
       case xs =>
         notImplemented[Id, EVALUATED](
           "fraction(value: BigInt, numerator: BigInt, denominator: BigInt, round: Ceiling|Down|Floor|HalfEven|HalfUp)",
@@ -1292,7 +1298,7 @@ object PureContext {
     }
 
   def createRawOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, complexity: Int = 1)(
-      body: (EVALUATED, EVALUATED) => Either[String, EVALUATED]
+      body: (EVALUATED, EVALUATED) => Either[ExecutionError, EVALUATED]
   ): BaseFunction[NoContext] =
     NativeFunction(opsToFunctions(op), complexity, func, r, ("a", t), ("b", t)) {
       case a :: b :: Nil => body(a, b)
@@ -1300,7 +1306,7 @@ object PureContext {
     }
 
   def createRawOp(op: BinaryOperation, t: TYPE, r: TYPE, func: Short, complexity: Map[StdLibVersion, Long])(
-      body: (EVALUATED, EVALUATED) => Either[String, EVALUATED]
+      body: (EVALUATED, EVALUATED) => Either[ExecutionError, EVALUATED]
   ): BaseFunction[NoContext] =
     NativeFunction(opsToFunctions(op), complexity, func, r, ("a", t), ("b", t)) {
       case a :: b :: Nil => body(a, b)
@@ -1464,7 +1470,7 @@ object PureContext {
       element: EVALUATED,
       indexOf: EVALUATED => Int,
       indexWhere: (EVALUATED => Boolean) => Int
-  ): Either[String, EVALUATED] =
+  ): Either[ExecutionError, EVALUATED] =
     if (element.weight <= MaxCmpWeight)
       Right {
         val i = indexOf(element)
@@ -1552,7 +1558,7 @@ object PureContext {
         ) {
           Left("pow: scale out of range 0-8")
         } else {
-          global.pow(b, bp.toInt, e, ep.toInt, rp.toInt, Rounding.byValue(round), useNewPrecision).map(CONST_LONG)
+          global.pow(b, bp.toInt, e, ep.toInt, rp.toInt, Rounding.byValue(round), useNewPrecision).map(CONST_LONG).leftMap(CommonError)
         }
       case xs => notImplemented[Id, EVALUATED]("pow(base: Int, bp: Int, exponent: Int, ep: Int, rp: Int, round: Rounds)", xs)
     }
@@ -1584,9 +1590,9 @@ object PureContext {
           || rp < 0
           || rp > 8
         ) {
-          Left("log: scale out of range 0-8")
+          Left(CommonError("log: scale out of range 0-8"))
         } else {
-          global.log(b, bp, e, ep, rp, Rounding.byValue(round)).map(CONST_LONG)
+          global.log(b, bp, e, ep, rp, Rounding.byValue(round)).map(CONST_LONG).leftMap(CommonError)
         }
       case xs => notImplemented[Id, EVALUATED]("log(exponent: Int, ep: Int, base: Int, bp: Int, rp: Int, round: Rounds)", xs)
     }

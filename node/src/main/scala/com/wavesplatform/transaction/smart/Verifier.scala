@@ -168,13 +168,13 @@ object Verifier extends ScorexLogging {
         ScriptRunner(Coproduct[TxOrd](transaction), blockchain, script, isAsset, containerAddress, complexityLimit)
       val complexity = if (blockchain.storeEvaluatedComplexity) evaluatedComplexity else estimatedComplexity
       val resultE = result match {
-        case Left(execError) => Left(ScriptExecutionError(execError, log, assetIdOpt))
+        case Left(execError) => Left(ScriptExecutionError(execError.message, log, assetIdOpt))
         case Right(FALSE)    => Left(TransactionNotAllowedByScript(log, assetIdOpt))
         case Right(TRUE)     => Right(complexity)
         case Right(x)        => Left(ScriptExecutionError(s"Script returned not a boolean result, but $x", log, assetIdOpt))
       }
       val logId = s"transaction ${transaction.id()}"
-      logIfNecessary(resultE, logId, log, result)
+      logIfNecessary(resultE, logId, log, result.leftMap(_.message))
       resultE
     } match {
       case Failure(e) =>
@@ -212,13 +212,13 @@ object Verifier extends ScorexLogging {
         case (log, evaluatedComplexity, evaluationResult) =>
           val complexity = if (blockchain.storeEvaluatedComplexity) evaluatedComplexity else script.verifierComplexity.toInt
           val verifierResult = evaluationResult match {
-            case Left(execError) => Left(ScriptExecutionError(execError, log, None))
+            case Left(execError) => Left(ScriptExecutionError(execError.message, log, None))
             case Right(FALSE)    => Left(TransactionNotAllowedByScript(log, None))
             case Right(TRUE)     => Right(complexity)
             case Right(x)        => Left(GenericError(s"Script returned not a boolean result, but $x"))
           }
           val logId = s"order ${order.idStr()}"
-          logIfNecessary(verifierResult, logId, log, evaluationResult)
+          logIfNecessary(verifierResult, logId, log, evaluationResult.leftMap(_.message))
           verifierResult
       }
 

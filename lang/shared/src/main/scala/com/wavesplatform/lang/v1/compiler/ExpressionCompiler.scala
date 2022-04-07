@@ -1,9 +1,9 @@
 package com.wavesplatform.lang.v1.compiler
 
-import java.nio.charset.StandardCharsets
 import cats.implicits.*
 import cats.{Id, Show}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.CommonError
 import com.wavesplatform.lang.v1.compiler.CompilationError.*
 import com.wavesplatform.lang.v1.compiler.CompilerContext.*
 import com.wavesplatform.lang.v1.compiler.Terms.*
@@ -17,6 +17,7 @@ import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports.*
 import com.wavesplatform.lang.v1.{BaseGlobal, ContractLimits, FunctionHeader}
 
+import java.nio.charset.StandardCharsets
 import scala.util.Try
 
 object ExpressionCompiler {
@@ -105,14 +106,14 @@ object ExpressionCompiler {
     get[Id, CompilerContext, CompilationError].flatMap { ctx =>
       def adjustByteStr(expr: Expressions.CONST_BYTESTR, b: ByteStr) =
         CONST_BYTESTR(b)
-          .leftMap(CompilationError.Generic(expr.position.start, expr.position.end, _))
+          .leftMap(e => CompilationError.Generic(expr.position.start, expr.position.end, e.message))
           .map(CompilationStepResultExpr(ctx, _, BYTESTR, expr))
           .recover { case err => CompilationStepResultExpr(ctx, FAILED_EXPR(), NOTHING, expr, List(err)) }
 
       def adjustStr(expr: Expressions.CONST_STRING, str: String): Either[CompilationError, CompilationStepResultExpr] =
         CONST_STRING(str)
-          .filterOrElse(_ => allowIllFormedStrings || !global.isIllFormed(str), s"String '$str' contains ill-formed characters")
-          .leftMap(CompilationError.Generic(expr.position.start, expr.position.end, _))
+          .filterOrElse(_ => allowIllFormedStrings || !global.isIllFormed(str), CommonError(s"String '$str' contains ill-formed characters"))
+          .leftMap(e => CompilationError.Generic(expr.position.start, expr.position.end, e.message))
           .map(CompilationStepResultExpr(ctx, _, STRING, expr))
           .recover { case err => CompilationStepResultExpr(ctx, FAILED_EXPR(), NOTHING, expr, List(err)) }
 

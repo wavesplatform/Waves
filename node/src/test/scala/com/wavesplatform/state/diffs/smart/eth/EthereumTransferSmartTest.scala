@@ -108,7 +108,7 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
           )
         } else
           (the[Exception] thrownBy d.appendBlock(setVerifier())).getMessage should include(
-            s"t = Left(extract() called on unit value)"
+            s"t = Left(CommonError(extract() called on unit value))"
           )
       }
     }

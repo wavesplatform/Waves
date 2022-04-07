@@ -31,7 +31,7 @@ import com.wavesplatform.test.*
 import org.scalatest.Inside
 import org.web3j.crypto.Keys
 
-import scala.util.{Random, Try}
+import scala.util.Random
 
 class IntegrationTest extends PropSpec with Inside {
   private def eval[T <: EVALUATED](
@@ -91,13 +91,10 @@ class IntegrationTest extends PropSpec with Inside {
         )
       )
 
-    val typed = ExpressionCompiler(ctx.compilerContext, untyped)
-    val loggedCtx = LoggedEvaluationContext[C, Id](_ => _ => (), ctx.evaluationContext(env))
-      .asInstanceOf[LoggedEvaluationContext[Environment, Id]]
-    typed.flatMap(
-      v =>
-        Try(new EvaluatorV2(loggedCtx, version, correctFunctionCallScope = true, newMode = true)(v._1, Int.MaxValue)._1.asInstanceOf[T]).toEither
-          .leftMap(_.getMessage)
+    val compiled = ExpressionCompiler(ctx.compilerContext, untyped)
+    val evalCtx = ctx.evaluationContext(env).asInstanceOf[EvaluationContext[Environment, Id]]
+    compiled.flatMap(
+      v => EvaluatorV2.applyCompleted(evalCtx, v._1, version, correctFunctionCallScope = true, newMode = true)._3.bimap(_.message, _.asInstanceOf[T])
     )
   }
 

@@ -1,7 +1,6 @@
 package com.wavesplatform.lang.directives
 
 import cats.syntax.either.*
-import com.wavesplatform.lang.ExecutionError
 import fastparse.MultiLineWhitespace.*
 import fastparse.Parsed.{Failure, Success}
 import fastparse.*
@@ -24,7 +23,7 @@ object DirectiveParser {
       .repX(1)
       .!
 
-  private def parser[A: P]: P[Either[ExecutionError, Directive]] =
+  private def parser[A: P]: P[Either[String, Directive]] =
     P(space ~ start ~ directiveKeyP ~ directiveValueP ~ end ~ space)
       .map {
         case (parsedKey, parsedValue) => {
@@ -39,12 +38,12 @@ object DirectiveParser {
         }
       }
 
-  def apply(input: String): Either[ExecutionError, List[Directive]] =
+  def apply(input: String): Either[String, List[Directive]] =
     input
       .split("\n")
       .filter(_.matches(s"\\s*\\$start.*$end\\s*"))
       .map(parse(_, parser(_)))
-      .foldLeft(Map[DirectiveKey, Directive]().asRight[ExecutionError]) {
+      .foldLeft(Map[DirectiveKey, Directive]().asRight[String]) {
         case (err: Left[?, ?], _)                                      => err
         case (_, _: Failure)                                           => Left(s"Directive $input has illegal format")
         case (_, Success(Left(err), _))                                => Left(err)

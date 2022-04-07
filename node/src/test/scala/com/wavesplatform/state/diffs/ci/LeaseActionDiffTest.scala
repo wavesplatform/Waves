@@ -560,13 +560,11 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
 
   property(s"Lease action with negative amount") {
     val (preparingTxs, invoke, _, _, _, _, _) = leasePreconditions(customAmount = Some(-100))
-    assertDiffAndState(
+    assertDiffEi(
       Seq(TestBlock.create(preparingTxs)),
       TestBlock.create(Seq(invoke)),
       v5Features
-    ) { case (diff, _) =>
-      diff.errorMessage(invoke.id()).get.text should include("Negative lease amount")
-    }
+    )(_ should produce("Negative lease amount"))
   }
 
   property(s"Lease action spends all dApp balance") {

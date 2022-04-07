@@ -7,7 +7,7 @@ import com.wavesplatform.test._
 
 class DirectiveParserTest extends PropSpec {
 
-  def parse(s: String): Either[ExecutionError, List[Directive]] = DirectiveParser(s)
+  def parse(s: String): Either[String, List[Directive]] = DirectiveParser(s)
 
   property("parse directives") {
     parse("{-# STDLIB_VERSION 1 #-}") shouldBe Right(List(Directive(STDLIB_VERSION, V1)))

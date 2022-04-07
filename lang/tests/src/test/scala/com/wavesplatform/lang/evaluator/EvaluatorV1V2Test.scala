@@ -97,7 +97,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
   property("return error and log of failed evaluation") {
     forAll(blockBuilder) { block =>
-      val (err, log) = evalWithLogging(
+      val result = evalWithLogging(
         pureEvalContext.asInstanceOf[EvaluationContext[Environment, Id]],
         expr = block(
           LET("x", CONST_LONG(3)),
@@ -106,11 +106,9 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
             FUNCTION_CALL(PureContext.eq.header, List(REF("z"), CONST_LONG(1)))
           )
         )
-      ).left.value
-
-      val expectedError = "A definition of 'z' not found"
-      err shouldBe expectedError
-      log.isEmpty shouldBe true
+      )
+      result should produce("A definition of 'z' not found")
+      result.fold(_._2, _._2).isEmpty shouldBe true
     }
 
   }
@@ -467,7 +465,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     forAll(genBytesAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(Native(FunctionIds.DROP_RIGHT_BYTES), List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
-        val actual = evalPure[EVALUATED](pureContext(V6).evaluationContext, expr)
+        val actual = evalPure[EVALUATED](pureContext(V6).evaluationContext, expr).leftMap(_.message)
         val limit  = 165947
         actual shouldBe (
           if (number < 0)
@@ -484,7 +482,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     forAll(genBytesAndNumber) {
       case (xs, number) =>
         val expr   = FUNCTION_CALL(Native(FunctionIds.TAKE_RIGHT_BYTES), List(CONST_BYTESTR(xs).explicitGet(), CONST_LONG(number)))
-        val actual = evalPure[EVALUATED](pureContext(V6).evaluationContext, expr)
+        val actual = evalPure[EVALUATED](pureContext(V6).evaluationContext, expr).leftMap(_.message)
         val limit  = 165947
         actual shouldBe (
           if (number < 0)
@@ -567,9 +565,8 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     } yield Base58.encode(xs)
 
     forAll(gen) { xs =>
-      val expr   = FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(CONST_STRING(xs).explicitGet()))
-      val actual = evalPure[EVALUATED](defaultCryptoContext.evaluationContext, expr)
-      actual shouldBe Left("base58Decode input exceeds 100")
+      val expr = FUNCTION_CALL(FunctionHeader.Native(FROMBASE58), List(CONST_STRING(xs).explicitGet()))
+      evalPure(defaultCryptoContext.evaluationContext, expr) should produce("base58Decode input exceeds 100")
     }
   }
 
@@ -1077,8 +1074,8 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     evalPure[EVALUATED](expr = div) shouldBe evaluated(3)
     evalPure[EVALUATED](expr = mod) shouldBe evaluated(1)
     evalPure[EVALUATED](expr = frac) shouldBe evaluated(Long.MaxValue / 2)
-    evalPure[EVALUATED](expr = frac2) shouldBe Left(s"Long overflow: value `${BigInt(Long.MaxValue) * 3 / 2}` greater than 2^63-1")
-    evalPure[EVALUATED](expr = frac3) shouldBe Left(s"Long overflow: value `${-BigInt(Long.MaxValue) * 3 / 2}` less than -2^63-1")
+    evalPure[EVALUATED](expr = frac2) should produce(s"Long overflow: value `${BigInt(Long.MaxValue) * 3 / 2}` greater than 2^63-1")
+    evalPure[EVALUATED](expr = frac3) should produce(s"Long overflow: value `${-BigInt(Long.MaxValue) * 3 / 2}` less than -2^63-1")
   }
 
   property("data constructors") {
@@ -1210,7 +1207,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     eval[EVALUATED](v4Ctx, script(string32Kb)) shouldBe CONST_BYTESTR(bytes(string32Kb))
 
     eval[EVALUATED](v3Ctx, script(string32Kb + "aa")) shouldBe CONST_BYTESTR(bytes(string32Kb + "aa"))
-    eval[EVALUATED](v4Ctx, script(string32Kb + "aa")) shouldBe Left("Base16 decode input length=32770 should not exceed 32768")
+    eval[EVALUATED](v4Ctx, script(string32Kb + "aa")) should produce("Base16 decode input length=32770 should not exceed 32768")
   }
 
   property("tuple size limit") {

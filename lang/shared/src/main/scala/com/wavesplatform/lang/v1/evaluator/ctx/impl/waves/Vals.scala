@@ -3,7 +3,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 import cats.syntax.either._
 import cats.syntax.functor._
 import cats.{Eval, Monad}
-import com.wavesplatform.lang.ExecutionError
+import com.wavesplatform.lang.{ExecutionError, CommonError}
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -19,7 +19,7 @@ object Vals {
       isTokenContext: Boolean,
       version: StdLibVersion,
       proofsEnabled: Boolean
-  ): (ExecutionError, (UNION, ContextfulVal[Environment])) =
+  ): (String, (UNION, ContextfulVal[Environment])) =
     ("tx", (scriptInputType(isTokenContext, version, proofsEnabled), inputEntityVal(version, proofsEnabled)))
 
   private def scriptInputType(isTokenContext: Boolean, version: StdLibVersion, proofsEnabled: Boolean) =
@@ -44,7 +44,7 @@ object Vals {
                     case sf: SponsorFeePseudoTx => Bindings.mapSponsorFeePseudoTx(sf, version).asRight[ExecutionError]
                     case st: ScriptTransfer     => Bindings.scriptTransfer(st, version).asRight[ExecutionError]
                   },
-                  _ => "Expected Transaction or Order".asLeft[EVALUATED]
+                  _ => CommonError("Expected Transaction or Order").asLeft[EVALUATED]
                 )
               )
             )
@@ -105,10 +105,10 @@ object Vals {
   val sell = ("Sell", (ordTypeType, sellOrdTypeVal))
   val buy  = ("Buy", (ordTypeType, buyOrdTypeVal))
 
-  val height: (ExecutionError, (LONG.type, ContextfulVal[Environment])) = ("height", (LONG, heightVal))
+  val height: (String, (LONG.type, ContextfulVal[Environment])) = ("height", (LONG, heightVal))
 
-  val accountThis: (ExecutionError, (CASETYPEREF, ContextfulVal[Environment])) = ("this", (addressType, accountThisVal))
-  def assetThis(version: StdLibVersion): (ExecutionError, (CASETYPEREF, ContextfulVal[Environment])) =
+  val accountThis: (String, (CASETYPEREF, ContextfulVal[Environment])) = ("this", (addressType, accountThisVal))
+  def assetThis(version: StdLibVersion): (String, (CASETYPEREF, ContextfulVal[Environment])) =
     ("this", (assetType(version), assetThisVal(version)))
 
 }

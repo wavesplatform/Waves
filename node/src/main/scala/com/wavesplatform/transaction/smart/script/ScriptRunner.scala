@@ -94,9 +94,9 @@ object ScriptRunner {
       val (limit, onExceed) =
         if (defaultLimit == Int.MaxValue)
           if (blockchain.checkEstimatorSumOverflow)
-            (correctedLimit, (_: EXPR) => Left(s"Verifier complexity limit = $correctedLimit is exceeded"))
+            (correctedLimit, (_: EXPR) => Left(CommonError(s"Verifier complexity limit = $correctedLimit is exceeded")))
           else
-            (defaultLimit, (_: EXPR) => Left(s"Verifier complexity limit = $defaultLimit is exceeded"))
+            (defaultLimit, (_: EXPR) => Left(CommonError(s"Verifier complexity limit = $defaultLimit is exceeded")))
         else
           (defaultLimit, (_: EXPR) => Right(default))
 
@@ -143,7 +143,7 @@ object ScriptRunner {
         (Nil, 0, Verifier.verifyAsEllipticCurveSignature(proven, blockchain.isFeatureActivated(BlockchainFeatures.RideV6)).bimap(_.err, _ => TRUE))
 
       case other =>
-        (Nil, 0, s"$other: Unsupported script version".asLeft[EVALUATED])
+        (Nil, 0, Left(s"$other: Unsupported script version"))
     }
   }
 }

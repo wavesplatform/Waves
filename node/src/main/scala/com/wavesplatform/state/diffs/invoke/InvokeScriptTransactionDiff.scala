@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.invoke
 
 import cats.Id
 import cats.syntax.either.*
+import cats.syntax.flatMap.*
 import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -135,7 +136,13 @@ object InvokeScriptTransactionDiff {
               tx.dApp,
               tx.funcCall,
               scriptResultE.map(_.scriptResult),
-              scriptResultE.fold(_.log, _.log),
+              scriptResultE.fold(
+                {
+                  case w: WithLog => w.log
+                  case _          => Nil
+                },
+                _.log
+              ),
               environment.invocationRoot.toTraceList(tx.id())
             )
           )
@@ -349,7 +356,7 @@ object InvokeScriptTransactionDiff {
       estimatedComplexity: Int,
       paymentsComplexity: Int,
       blockchain: Blockchain
-  ): Either[ValidationError & WithLog, (ScriptResult, Log[Id])] = {
+  ): Either[ValidationError, (ScriptResult, Log[Id])] = {
     val evaluationCtx = CachedDAppCTX.get(version, blockchain).completeContext(environment)
     val startLimit    = limit - paymentsComplexity
     ContractEvaluator
@@ -357,25 +364,33 @@ object InvokeScriptTransactionDiff {
       .runAttempt()
       .leftMap(error => (error.getMessage: ExecutionError, 0, Nil: Log[Id]))
       .flatten
-      .leftMap { case (error, unusedComplexity, log) =>
+      .leftMap[ValidationError] {
+        case (AlwaysRejectError(msg), _, log) =>
+          ScriptExecutionError.dAppExecution(msg, log) case (error, unusedComplexity, log) =>
         val usedComplexity = startLimit - unusedComplexity.max(0)
         if (usedComplexity > failFreeLimit) {
           val storingComplexity = if (blockchain.storeEvaluatedComplexity) usedComplexity else estimatedComplexity
-          FailedTransactionError.dAppExecution(error, storingComplexity + paymentsComplexity, log)
+          FailedTransactionError.dAppExecution(error.message, storingComplexity + paymentsComplexity, log)
         } else
-          ScriptExecutionError.dAppExecution(error, log)
+          ScriptExecutionError.dAppExecution(error.message, log)
       }
-      .flatMap { case (result, log) =>
-        val usedComplexity = startLimit - result.unusedComplexity.max(0)
-        (for (
-          _ <-
-            InvokeDiffsCommon.checkScriptResultFields(blockchain, result)
-        ) yield (result, log))
-          .leftMap(err => FailedTransactionError.dAppExecution(err.toString, usedComplexity, log))
+      .flatTap { case (r, log) =>
+        InvokeDiffsCommon
+          .checkScriptResultFields(blockchain, r)
+          .leftMap[ValidationError] {
+            case reject: AlwaysRejectError => reject
+            case error =>
+              val usedComplexity = startLimit - r.unusedComplexity
+              if (usedComplexity > failFreeLimit) {
+                val storingComplexity = if (blockchain.storeEvaluatedComplexity) usedComplexity else estimatedComplexity
+                FailedTransactionError.dAppExecution(error.toString, storingComplexity + paymentsComplexity, log)
+              } else
+                ScriptExecutionError.dAppExecution(error.toString, log)
+          }
       }
   }
 
-  private def checkCall(fc: FUNCTION_CALL, blockchain: Blockchain): Either[ExecutionError, Unit] = {
+  private def checkCall(fc: FUNCTION_CALL, blockchain: Blockchain): Either[String, Unit] = {
     val policy =
       if (blockchain.callableListArgumentsCorrected)
         CallArgumentPolicy.PrimitivesAndListsOfPrimitives

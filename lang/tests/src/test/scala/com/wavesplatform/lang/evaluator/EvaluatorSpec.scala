@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.evaluator
 
+import cats.implicits._
 import cats.Id
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.{Common, ExecutionError}
@@ -53,7 +54,7 @@ abstract class EvaluatorSpec extends PropSpec with ScriptGen with Inside {
       for {
         compiled <- toExpr(version)
         (_, cost, result) = evalExpr(compiled, version, useNewPowPrecision)
-        evaluated <- result
+        evaluated <- result.leftMap(_.message)
       } yield (evaluated, cost)
 
     val results = (for {
