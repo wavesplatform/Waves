@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.evaluator
 
 import java.nio.ByteBuffer
+
 import cats.Id
 import cats.data.EitherT
 import cats.kernel.Monoid
@@ -28,7 +29,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV1, EvaluatorV2, FunctionIds, Log}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, ContractLimits, FunctionHeader}
-import com.wavesplatform.lang.{Common, CommonError, EvalF, ExecutionError, Global}
+import com.wavesplatform.lang.{Common, EvalF, ExecutionError, Global}
 import com.wavesplatform.test.*
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.EitherValues

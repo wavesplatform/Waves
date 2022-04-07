@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs.invoke
 
 import cats.Id
 import cats.syntax.either.*
-import cats.syntax.flatMap._
+import cats.syntax.flatMap.*
 import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -87,7 +87,7 @@ object InvokeScriptTransactionDiff {
         val scriptResultE = Stats.invokedScriptExecution.measureForType(tx.tpe) {
           val fullLimit =
             if (blockchain.estimator == ScriptEstimatorV2)
-              Int.MaxValue //to avoid continuations when evaluating underestimated by EstimatorV2 scripts
+              Int.MaxValue // to avoid continuations when evaluating underestimated by EstimatorV2 scripts
             else if (limitedExecution)
               ContractLimits.FailFreeInvokeComplexity
             else
@@ -213,12 +213,15 @@ object InvokeScriptTransactionDiff {
 
         stepLimit = ContractLimits.MaxCallableComplexityByVersion(version)
 
-        fixedInvocationComplexity = if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls) && callableComplexities.contains(
-                                          ScriptEstimatorV2.version
-                                        ))
-          Math.min(invocationComplexity, stepLimit)
-        else
-          invocationComplexity
+        fixedInvocationComplexity =
+          if (
+            blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls) && callableComplexities.contains(
+              ScriptEstimatorV2.version
+            )
+          )
+            Math.min(invocationComplexity, stepLimit)
+          else
+            invocationComplexity
 
         _ <- InvokeDiffsCommon.calcAndCheckFee(
           (message, _) => GenericError(message),
@@ -294,9 +297,8 @@ object InvokeScriptTransactionDiff {
       scriptOpt: Option[AccountScriptInfo]
   ): Either[GenericError, (PublicKey, StdLibVersion, FUNCTION_CALL, DApp, Map[Int, Map[String, Long]])] =
     scriptOpt
-      .collect {
-        case AccountScriptInfo(publicKey, ContractScriptImpl(version, dApp), _, complexities) =>
-          (publicKey, version, tx.funcCall, dApp, complexities)
+      .collect { case AccountScriptInfo(publicKey, ContractScriptImpl(version, dApp), _, complexities) =>
+        (publicKey, version, tx.funcCall, dApp, complexities)
       }
       .toRight(GenericError(s"No contract at address ${tx.dApp}"))
 
@@ -312,9 +314,8 @@ object InvokeScriptTransactionDiff {
     ContractScript
       .estimateComplexity(version, dApp, estimator, fixEstimateOfVerifier = blockchain.isFeatureActivated(RideV6))
       .leftMap(GenericError(_))
-      .map {
-        case (_, complexities) =>
-          (tx.sender, version, DefaultCall, dApp, Map(estimator.version -> complexities))
+      .map { case (_, complexities) =>
+        (tx.sender, version, DefaultCall, dApp, Map(estimator.version -> complexities))
       }
   }
 
@@ -347,7 +348,20 @@ object InvokeScriptTransactionDiff {
           } else
             ScriptExecutionError.dAppExecution(error.message, log)
       }
-      .flatTap { r => InvokeDiffsCommon.checkScriptResultFields(blockchain, r._1) }
+      .flatTap { case (r, log) =>
+        InvokeDiffsCommon
+          .checkScriptResultFields(blockchain, r)
+          .leftMap[ValidationError] {
+            case reject: AlwaysRejectError => reject
+            case error =>
+              val usedComplexity = startLimit - r.unusedComplexity
+              if (usedComplexity > failFreeLimit) {
+                val storingComplexity = if (blockchain.storeEvaluatedComplexity) usedComplexity else estimatedComplexity
+                FailedTransactionError.dAppExecution(error.toString, storingComplexity + paymentsComplexity, log)
+              } else
+                ScriptExecutionError.dAppExecution(error.toString, log)
+          }
+      }
   }
 
   private def checkCall(fc: FUNCTION_CALL, blockchain: Blockchain): Either[String, Unit] = {

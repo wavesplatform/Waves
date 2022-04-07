@@ -678,7 +678,9 @@ object InvokeDiffsCommon {
       val limit   = ContractLimits.MaxTotalWriteSetSizeInBytes
       val actual  = limit + dataSize - availableDataSize
       val message = s"Storing data size should not exceed $limit, actual: $actual bytes"
-      if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)) {
+      if (blockchain.isFeatureActivated(RideV6)) {
+        error(message)
+      } else if (blockchain.isFeatureActivated(SynchronousCalls) && blockchain.height >= blockchain.settings.functionalitySettings.enforceTransferValidationAfter) {
         TracedResult(Left(AlwaysRejectError(message)))
       } else
         TracedResult(Right(()))

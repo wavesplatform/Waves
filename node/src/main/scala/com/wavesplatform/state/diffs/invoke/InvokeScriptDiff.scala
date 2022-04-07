@@ -1,9 +1,9 @@
 package com.wavesplatform.state.diffs.invoke
 
 import cats.Id
+import cats.implicits.toFlatMapOps
 import cats.instances.list.*
 import cats.syntax.either.*
-import cats.syntax.flatMap.*
 import cats.syntax.traverseFilter.*
 import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
@@ -302,7 +302,7 @@ object InvokeScriptDiff {
     }
   }
 
-  private def evaluateV2(
+  private[invoke] def evaluateV2(
       version: StdLibVersion,
       blockchain: Blockchain,
       contract: DApp,
@@ -321,7 +321,16 @@ object InvokeScriptDiff {
           case (error, unusedComplexity, log) =>
             val usedComplexity = startComplexityLimit - unusedComplexity
             FailedTransactionError.dAppExecution(error.message, usedComplexity, log)
-        }.flatTap(r => InvokeDiffsCommon.checkScriptResultFields(blockchain, r._1))
+        }.flatTap { case (r, log) =>
+          InvokeDiffsCommon
+            .checkScriptResultFields(blockchain, r)
+            .leftMap[ValidationError]({
+              case reject: AlwaysRejectError => reject
+              case error =>
+                val usedComplexity = startComplexityLimit - r.unusedComplexity
+                FailedTransactionError.dAppExecution(error.toString, usedComplexity, log)
+            })
+        }
       )
   }
 
@@ -348,7 +357,6 @@ object InvokeScriptDiff {
             case ia: IssuedAsset =>
               s"$address: Negative asset $ia balance: old = ${blockchain.balance(address, ia)}, new = ${compositeBlockchain.balance(address, ia)}"
           }
-          println("EXCEPTION")
           Left(AlwaysRejectError(msg))
         }
 

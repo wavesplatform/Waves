@@ -4,6 +4,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.features.BlockchainFeatures.RideV6
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
@@ -58,7 +59,6 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain {
        """.stripMargin
     )
 
-
   private def scenario(exceed5Kb: Boolean, sync: Boolean, reach15kb: Boolean = false) = {
     val invoker  = TxHelpers.signer(0)
     val dApp1    = TxHelpers.signer(1)
@@ -76,11 +76,10 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain {
     (balances, Seq(ssTx1, ssTx2, ssTx3, ssTx4), invokeTx)
   }
 
-
   property("exceeding 5 Kb after activation") {
     val (balances, preparingTxs, invoke) = scenario(exceed5Kb = true, sync = true)
     withDomain(DomainPresets.RideV5, balances) { d =>
-      d.appendBlock(preparingTxs *)
+      d.appendBlock(preparingTxs*)
 
       val invoke1 = invoke()
 
@@ -90,18 +89,20 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain {
 
   property("exceeding 15 Kb after activation") {
     val (balances, preparingTxs, invoke) = scenario(exceed5Kb = false, sync = true)
-    withDomain(DomainPresets.RideV5, balances) { d =>
-      d.appendBlock(preparingTxs *)
+    withDomain(DomainPresets.RideV5.configure(_.copy(enforceTransferValidationAfter = 2)).setFeaturesHeight(RideV6 -> 3), balances) { d =>
+      d.appendBlock(preparingTxs*)
 
       val invoke1 = invoke()
-      d.appendAndAssertFailed(invoke1)
+      d.appendAndCatchError(invoke1).toString should include("Storing data size should not exceed 15360")
+      d.appendBlock()
+      d.appendAndCatchError(invoke1).toString should include("Storing data size should not exceed 15360")
     }
   }
 
   property("exceeding 15 Kb with RideV6") {
     val (balances, preparingTxs, invoke) = scenario(exceed5Kb = false, sync = true)
     withDomain(DomainPresets.RideV6, balances) { d =>
-      d.appendBlock(preparingTxs *)
+      d.appendBlock(preparingTxs*)
 
       val invoke1 = invoke()
       d.appendAndCatchError(invoke1).toString should include("Storing data size should not exceed 15360")
@@ -111,7 +112,7 @@ class InvokeDataEntriesBytesTest extends PropSpec with WithDomain {
   property("reaching 5 Kb after activation") {
     val (balances, preparingTxs, invoke) = scenario(exceed5Kb = false, sync = false)
     withDomain(DomainPresets.RideV5, balances) { d =>
-      d.appendBlock(preparingTxs *)
+      d.appendBlock(preparingTxs*)
       val invoke1 = invoke()
       d.appendBlock(invoke1)
       d.blockchain.transactionSucceeded(invoke1.id.value()) shouldBe true
