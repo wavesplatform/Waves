@@ -214,7 +214,7 @@ object InvokeScriptTransactionDiff {
       } yield (invocationComplexity.toInt, fixedInvocationComplexity.toInt)
     }
 
-    (accScriptEi: @unchecked) match {
+    accScriptEi match {
       case Right((dAppAddress, AccountScriptInfo(pk, ContractScriptImpl(version, contract), _, callableComplexities))) =>
         val invocationTracker = DAppEnvironment.InvocationTreeTracker(DAppEnvironment.DAppInvocation(dAppAddress, tx.funcCall, tx.payments))
         (for {
@@ -270,7 +270,11 @@ object InvokeScriptTransactionDiff {
           case other                       => other
         }
 
-      case Left(error) => TracedResult(Left(error))
+      case Right((_, AccountScriptInfo(_, _, _, _))) =>
+        TracedResult(Left(GenericError("Trying to call dApp on the account with expression script")))
+
+      case Left(error) =>
+        TracedResult(Left(error))
     }
   }
 
