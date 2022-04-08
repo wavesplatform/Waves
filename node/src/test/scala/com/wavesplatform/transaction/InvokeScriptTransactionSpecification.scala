@@ -15,6 +15,7 @@ import com.wavesplatform.protobuf.{Amount, transaction}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxHelpers.defaultAddress
 import com.wavesplatform.transaction.TxValidationError.NonPositiveAmount
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, Verifier}
@@ -216,18 +217,10 @@ class InvokeScriptTransactionSpecification extends PropSpec {
   }
 
   property(s"can't have more than ${ContractLimits.MaxInvokeScriptArgs} args") {
-    val pk = PublicKey.fromBase58String(publicKey).explicitGet()
-    InvokeScriptTransaction.create(
-      1.toByte,
-      pk,
-      pk.toAddress,
-      Some(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), Range(0, 23).map(_ => Terms.CONST_LONG(0)).toList)),
-      Seq(),
-      1,
-      Waves,
-      1,
-      Proofs.empty
-    ) should produce("more than 22 arguments")
+    TxHelpers.invoke(defaultAddress, Some(""), Seq.fill(22)(CONST_LONG(0))).funcCallOpt.get.args.length shouldBe 22
+    (the[Exception] thrownBy TxHelpers.invoke(defaultAddress, Some(""), Seq.fill(23)(CONST_LONG(0)))).getMessage should include(
+      "InvokeScript can't have more than 22 arguments"
+    )
   }
 
   property(s"can call a func with ARR") {
