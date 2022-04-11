@@ -6,9 +6,10 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.StdLibVersion.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.state.diffs.FeeValidation.FeeUnit
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
 import com.wavesplatform.test.{PropSpec, produce}
-import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 
@@ -50,24 +51,23 @@ class InvokeValidationTest extends PropSpec with WithDomain {
   }
 
   property("sync invoke address with set expression") {
-    val thirdSigner = signer(2)
-    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner, thirdSigner)) { d =>
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner, signer(2))) { d =>
       val dApp = TestCompiler(V5).compileContract(
         s"""
            | @Callable(i)
            | func default() = {
-           |   strict r = invoke(Address(base58'${thirdSigner.toAddress}'), "f", [], [])
+           |   strict r = invoke(Address(base58'${signer(2).toAddress}'), "f", [], [])
            |   []
            | }
          """.stripMargin
       )
       val expression = TestCompiler(V5).compileExpression("true")
-      d.appendBlock(setScript(secondSigner, dApp), setScript(thirdSigner, expression))
+      d.appendBlock(setScript(secondSigner, dApp), setScript(signer(2), expression))
       d.appendBlockE(invoke(secondAddress)) should produce("Trying to call dApp on the account with expression script")
     }
   }
 
-  property("invoke payment balance should be checked before script execution only if spending exceeds fee") {
+  property("invoke payment balance in Waves should be checked before script execution only if spending exceeds fee, in asset — always") {
     withDomain(RideV5, Seq(AddrWithBalance(secondAddress, ENOUGH_AMT), AddrWithBalance(signer(2).toAddress, invokeFee))) { d =>
       val script = TestCompiler(V5).compileContract(
         """
@@ -76,6 +76,8 @@ class InvokeValidationTest extends PropSpec with WithDomain {
         """.stripMargin
       )
       d.appendBlock(setScript(secondSigner, script))
+
+      // Waves payment and fee
       d.appendBlockE(invoke(secondAddress, invoker = signer(2), payments = Seq(Payment(invokeFee, Waves)))) should produce(
         "Explicit script termination"
       )
@@ -83,6 +85,24 @@ class InvokeValidationTest extends PropSpec with WithDomain {
         "Attempt to transfer unavailable funds: " +
           "Transaction application leads to negative waves balance to (at least) temporary negative state, " +
           "current balance equals 500000, spends equals -1000001, result is -500001"
+      )
+
+      // asset payment and Waves fee
+      val i     = issue()
+      val asset = IssuedAsset(i.id.value())
+      d.appendBlock(i)
+      d.appendBlockE(invoke(secondAddress, invoker = signer(2), payments = Seq(Payment(1, asset)))) should produce(
+        "Attempt to transfer unavailable funds: " +
+          s"Transaction application leads to negative asset '$asset' balance to (at least) temporary negative state, " +
+          "current balance is 0, spends equals -1, result is -1"
+      )
+
+      // asset payment and asset fee
+      d.appendBlock(sponsor(asset, Some(FeeUnit)), transfer(defaultSigner, signer(2).toAddress, invokeFee, asset))
+      d.appendBlockE(invoke(secondAddress, invoker = signer(2), payments = Seq(Payment(1, asset)), feeAssetId = asset)) should produce(
+        "Attempt to transfer unavailable funds: " +
+          s"Transaction application leads to negative asset '$asset' balance to (at least) temporary negative state, " +
+          "current balance is 500000, spends equals -500001, result is -1"
       )
     }
   }
