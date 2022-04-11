@@ -23,7 +23,7 @@ class InvokeValidationTest extends PropSpec with WithDomain {
   }
 
   property("invoke unexisting function") {
-    withDomain(RideV5, Seq(AddrWithBalance(secondAddress, ENOUGH_AMT))) { d =>
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       val script = TestCompiler(V5).compileContract(
         """
           | @Callable(i)
@@ -42,9 +42,27 @@ class InvokeValidationTest extends PropSpec with WithDomain {
   }
 
   property("invoke address with set expression") {
-    withDomain(RideV5, Seq(AddrWithBalance(secondAddress, ENOUGH_AMT))) { d =>
-      val script = TestCompiler(V5).compileExpression("true")
-      d.appendBlock(setScript(secondSigner, script))
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+      val expression = TestCompiler(V5).compileExpression("true")
+      d.appendBlock(setScript(secondSigner, expression))
+      d.appendBlockE(invoke(secondAddress)) should produce("Trying to call dApp on the account with expression script")
+    }
+  }
+
+  property("sync invoke address with set expression") {
+    val thirdSigner = signer(2)
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner, thirdSigner)) { d =>
+      val dApp = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = {
+           |   strict r = invoke(Address(base58'${thirdSigner.toAddress}'), "f", [], [])
+           |   []
+           | }
+         """.stripMargin
+      )
+      val expression = TestCompiler(V5).compileExpression("true")
+      d.appendBlock(setScript(secondSigner, dApp), setScript(thirdSigner, expression))
       d.appendBlockE(invoke(secondAddress)) should produce("Trying to call dApp on the account with expression script")
     }
   }

@@ -44,6 +44,9 @@ import shapeless.Coproduct
 import scala.util.{Failure, Right, Success, Try}
 
 object InvokeDiffsCommon {
+  val callExpressionError: TracedResult[GenericError, Nothing] =
+    TracedResult(Left(GenericError("Trying to call dApp on the account with expression script")))
+
   def txFeeDiff(blockchain: Blockchain, tx: InvokeScriptTransaction): Either[GenericError, (Long, Map[Address, Portfolio])] = {
     val attachedFee = tx.fee
     tx.assetFee._1 match {

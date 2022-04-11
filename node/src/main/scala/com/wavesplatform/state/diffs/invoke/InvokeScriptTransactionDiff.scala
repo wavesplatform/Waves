@@ -270,11 +270,8 @@ object InvokeScriptTransactionDiff {
           case other                       => other
         }
 
-      case Right((_, AccountScriptInfo(_, _, _, _))) =>
-        TracedResult(Left(GenericError("Trying to call dApp on the account with expression script")))
-
-      case Left(error) =>
-        TracedResult(Left(error))
+      case Right((_, AccountScriptInfo(_, _, _, _))) => InvokeDiffsCommon.callExpressionError
+      case Left(error)                               => TracedResult(Left(error))
     }
   }
 
