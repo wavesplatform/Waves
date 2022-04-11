@@ -12,6 +12,8 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.validation.{TxValidator, ValidatedNV, ValidatedV}
 import com.wavesplatform.utils._
 
+import scala.util.Try
+
 object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
   override def validate(tx: InvokeScriptTransaction): ValidatedV[InvokeScriptTransaction] = {
     import tx._
@@ -53,7 +55,7 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
         GenericError(s"Callable function name size = $callableNameSize bytes must be less than ${ContractLimits.MaxDeclarationNameInBytes}")
       ),
       checkAmounts(payments),
-      checkLength.toValidatedNel
+      Try(checkLength).toEither.leftMap(e => GenericError(e.toString)).flatten.toValidatedNel
     )
   }
 }
