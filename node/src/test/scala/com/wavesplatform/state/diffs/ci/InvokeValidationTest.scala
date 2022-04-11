@@ -5,12 +5,16 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.StdLibVersion.V5
+import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_LONG}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.protobuf.transaction.PBTransactions
+import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.FeeValidation.FeeUnit
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
 import com.wavesplatform.test.{PropSpec, produce}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.TxHelpers._
+import com.wavesplatform.transaction.TxVersion._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 
 class InvokeValidationTest extends PropSpec with WithDomain {
@@ -105,5 +109,19 @@ class InvokeValidationTest extends PropSpec with WithDomain {
           "current balance is 500000, spends equals -500001, result is -1"
       )
     }
+  }
+
+  property("invoke tx size limit is 5 Kb") {
+    def array(size: Int): ARR = ARR(Vector.fill(size)(CONST_LONG(1)), 0, false).explicitGet()
+
+    def txV1       = invoke(defaultAddress, Some("f"), Seq(array(557)), version = V1)
+    def tooBigTxV1 = invoke(defaultAddress, Some("f"), Seq(array(558)), version = V1)
+    txV1.copy(proofs = Proofs.empty).bytes().length shouldBe 5114
+    (the[Exception] thrownBy tooBigTxV1).getMessage shouldBe "GenericError(InvokeScriptTransaction bytes length = 5123 exceeds limit = 5120)"
+
+    val txV2       = invoke(defaultAddress, Some("f"), Seq(array(564)), version = V2)
+    def tooBigTxV2 = invoke(defaultAddress, Some("f"), Seq(array(565)), version = V2)
+    PBTransactions.toPBInvokeScriptData(txV2.dAppAddressOrAlias, txV2.funcCallOpt, txV2.payments).toByteArray.length shouldBe 5120
+    (the[Exception] thrownBy tooBigTxV2).getMessage shouldBe "GenericError(InvokeScriptTransaction bytes length = 5129 exceeds limit = 5120)"
   }
 }

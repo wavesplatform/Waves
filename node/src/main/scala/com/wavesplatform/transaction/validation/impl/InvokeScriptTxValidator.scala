@@ -6,13 +6,11 @@ import cats.syntax.either._
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.protobuf.transaction.PBTransactions
-import com.wavesplatform.transaction.TxValidationError.{GenericError, NonPositiveAmount, TooBigArray}
+import com.wavesplatform.transaction.TxValidationError.{GenericError, NonPositiveAmount}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.validation.{TxValidator, ValidatedNV, ValidatedV}
 import com.wavesplatform.utils._
-
-import scala.util.Try
 
 object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
   override def validate(tx: InvokeScriptTransaction): ValidatedV[InvokeScriptTransaction] = {
@@ -25,13 +23,18 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
       else Valid(())
     }
 
-    def checkLength =
-      if (tx.isProtobufVersion)
-        PBTransactions
-          .toPBInvokeScriptData(tx.dAppAddressOrAlias, tx.funcCallOpt, tx.payments)
-          .toByteArray
-          .length <= ContractLimits.MaxInvokeScriptSizeInBytes
-      else tx.bytes().length <= ContractLimits.MaxInvokeScriptSizeInBytes
+    def checkLength: Either[GenericError, Unit] = {
+      val length =
+        if (tx.isProtobufVersion)
+          PBTransactions.toPBInvokeScriptData(tx.dAppAddressOrAlias, tx.funcCallOpt, tx.payments).toByteArray.length
+        else
+          tx.bytes().length
+      Either.cond(
+        length <= ContractLimits.MaxInvokeScriptSizeInBytes,
+        (),
+        GenericError(s"InvokeScriptTransaction bytes length = $length exceeds limit = ${ContractLimits.MaxInvokeScriptSizeInBytes}")
+      )
+    }
 
     val callableNameSize =
       funcCallOpt match {
@@ -50,11 +53,7 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
         GenericError(s"Callable function name size = $callableNameSize bytes must be less than ${ContractLimits.MaxDeclarationNameInBytes}")
       ),
       checkAmounts(payments),
-      Try(checkLength).toEither
-        .leftMap(err => GenericError(err.getMessage))
-        .filterOrElse(identity, TooBigArray)
-        .toValidatedNel
-        .map(_ => ())
+      checkLength.toValidatedNel
     )
   }
 }
