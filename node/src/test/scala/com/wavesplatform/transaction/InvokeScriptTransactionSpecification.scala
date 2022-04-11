@@ -285,22 +285,6 @@ class InvokeScriptTransactionSpecification extends PropSpec {
     ) should produce("is unsupported")
   }
 
-  property("can't be more 5kb") {
-    val largeString = "abcde" * 1024
-    val pk          = KeyPair("test8".getBytes("UTF-8")).publicKey
-    InvokeScriptTransaction.create(
-      1.toByte,
-      pk,
-      pk.toAddress,
-      Some(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_STRING(largeString).explicitGet()))),
-      Seq(),
-      1,
-      Waves,
-      1,
-      Proofs.empty
-    ) should produce("TooBigArray")
-  }
-
   property("can't have zero amount") {
     val req = SignedInvokeScriptRequest(
       Some(1.toByte),
