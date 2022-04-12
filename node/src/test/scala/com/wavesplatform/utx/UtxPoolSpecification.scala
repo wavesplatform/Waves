@@ -1,7 +1,5 @@
 package com.wavesplatform.utx
 
-import java.nio.file.{Files, Path}
-
 import cats.data.NonEmptyList
 import com.wavesplatform
 import com.wavesplatform._
@@ -12,11 +10,13 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.database.{LevelDBWriter, TestStorageFactory, openDB}
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
-import com.wavesplatform.history.{DefaultWavesSettings, randomSig, settingsWithFeatures}
+import com.wavesplatform.history.{DefaultWavesSettings, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.directives.values.StdLibVersion.V5
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
@@ -25,10 +25,11 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.mining._
 import com.wavesplatform.settings._
 import com.wavesplatform.state._
-import com.wavesplatform.state.diffs._
+import com.wavesplatform.state.diffs.{invoke => _, _}
 import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.test.{FreeSpec, NumericExt}
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.TxHelpers._
 import com.wavesplatform.transaction.TxValidationError.{GenericError, SenderIsBlacklisted}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -45,6 +46,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
 import org.scalatest.concurrent.Eventually
 
+import java.nio.file.{Files, Path}
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 import scala.util.Random
@@ -67,6 +69,7 @@ private object UtxPoolSpecification {
 class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransactionsHelpers with WithDomain with EitherValues with Eventually {
   private val PoolDefaultMaxBytes = 50 * 1024 * 1024 // 50 MB
 
+  import DomainPresets._
   import FeeValidation.{ScriptExtraFee => extraFee}
   import FunctionalitySettings.TESTNET.{maxTransactionTimeBackOffset => maxAge}
   import UtxPoolSpecification._
@@ -746,13 +749,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         }
       }
 
-      "dApp to dApp call chain in force validate mode" in withDomain(
-        settingsWithFeatures(
-          BlockchainFeatures.Ride4DApps,
-          BlockchainFeatures.BlockV5,
-          BlockchainFeatures.SynchronousCalls
-        )
-      ) { d =>
+      "dApp to dApp call chain in force validate mode" in withDomain(RideV5) { d =>
         def dApp(otherDApp: Option[Address]): Script =
           ScriptCompiler
             .compile(
@@ -800,6 +797,30 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         utx.putIfNew(invoke, forceValidate = false).resultE.explicitGet() shouldBe true
         utx.close()
       }
+
+      "InvokeScriptTransaction is fully validated in forceValidate mode and before 1000 complexity otherwise" in withDomain(
+        RideV5,
+        AddrWithBalance.enoughBalances(defaultSigner, secondSigner)
+      ) { d =>
+        def dApp(sigCount: Int) = TestCompiler(V5).compileContract(
+          s"""
+             | @Callable(i)
+             | func default() = {
+             |   strict c = ${(1 to sigCount).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}
+             |   if (true) then throw() else []
+             | }
+         """.stripMargin
+        )
+        val utx = new UtxPoolImpl(ntpTime, d.blockchainUpdater, DefaultWavesSettings.utxSettings)
+
+        d.appendBlock(setScript(secondSigner, dApp(5)))
+        utx.putIfNew(invoke(secondAddress)).resultE shouldBe Right(true)
+        utx.putIfNew(invoke(secondAddress), forceValidate = true).resultE should produce("Explicit script termination")
+
+        d.appendBlock(setScript(secondSigner, dApp(4)))
+        utx.putIfNew(invoke(secondAddress)).resultE should produce("Explicit script termination")
+        utx.putIfNew(invoke(secondAddress), forceValidate = true).resultE should produce("Explicit script termination")
+      }
     }
 
     "cleanup" - {
@@ -843,10 +864,9 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
             (blockchain.balance _).when(*, *).returning(ENOUGH_AMT).repeat((rest.length + 1) * 2)
             (blockchain.balance _).when(*, *).returning(ENOUGH_AMT)
             (blockchain.leaseBalance _).when(*).returning(LeaseBalance(0, 0))
-            (blockchain.accountScript _).when(*).onCall {
-              _: Address =>
-                utx.removeAll(rest)
-                None
+            (blockchain.accountScript _).when(*).onCall { _: Address =>
+              utx.removeAll(rest)
+              None
             }
             val tb = TestBlock.create(Nil)
             (blockchain.blockHeader _).when(*).returning(Some(SignedBlockHeader(tb.header, tb.signature)))
