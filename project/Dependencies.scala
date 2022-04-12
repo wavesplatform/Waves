@@ -12,13 +12,13 @@ object Dependencies {
 
   private def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.2.9"
 
-  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.5.0"
+  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.5.1"
 
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.13.1"
 
   private def catsModule(module: String, version: String = "2.6.1") = Def.setting("org.typelevel" %%% s"cats-$module" % version)
 
-  private def web3jModule(module: String) = "org.web3j" % module % "4.8.9"
+  private def web3jModule(module: String) = "org.web3j" % module % "4.9.1"
 
   def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %%% s"monix-$module" % "3.4.0")
 
@@ -37,11 +37,11 @@ object Dependencies {
 
   val catsEffect = catsModule("effect", "2.1.3")
   val catsCore   = catsModule("core", "2.7.0")
-  val shapeless  = Def.setting("com.chuusai" %%% "shapeless" % "2.3.7")
+  val shapeless  = Def.setting("com.chuusai" %%% "shapeless" % "2.3.9")
 
   val scalaTest = "org.scalatest" %% "scalatest" % "3.2.11" % Test
 
-  val sttp3 = "com.softwaremill.sttp.client3" % "core_2.13" % "3.3.18"
+  val sttp3 = "com.softwaremill.sttp.client3" % "core_2.13" % "3.5.1"
 
   val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk15on" % "1.70"
 
@@ -99,7 +99,7 @@ object Dependencies {
       monixModule("eval").value,
       catsCore.value.exclude("org.scala-js", "scalajs-library_2.13"),
       ("com.lihaoyi"   %%% "fastparse" % "2.3.3").exclude("org.scala-js", "scalajs-library_2.13"),
-      ("org.parboiled" %%% "parboiled" % "2.3.0").exclude("org.scala-js", "scalajs-library_2.13"),
+      ("org.parboiled" %%% "parboiled" % "2.4.0").exclude("org.scala-js", "scalajs-library_2.13"),
       shapeless.value.exclude("org.scala-js", "scalajs-library_2.13"),
       ("org.typelevel" %% "cats-mtl-core" % "0.7.1").exclude("org.scalacheck", "scalacheck_2.13"),
       "ch.obermuhlner" % "big-math" % "2.3.0",
@@ -110,7 +110,7 @@ object Dependencies {
       web3jModule("crypto"),
       web3jModule("abi"),
       web3jModule("rlp"),
-      "com.esaulpaugh" % "headlong" % "5.6.1"
+      "com.esaulpaugh" % "headlong" % "6.1.1"
     ) ++ langCompilerPlugins.value ++ scalapbRuntime.value ++ protobuf.value
   )
 
@@ -152,7 +152,7 @@ object Dependencies {
       "commons-net"          % "commons-net"              % "3.8.0",
       "org.apache.commons"   % "commons-lang3"            % "3.12.0",
       "com.iheart"           %% "ficus"                   % "1.5.2",
-      "net.logstash.logback" % "logstash-logback-encoder" % "7.0.1" % Runtime,
+      "net.logstash.logback" % "logstash-logback-encoder" % "7.1" % Runtime,
       kamonCore,
       kamonModule("system-metrics"),
       kamonModule("influxdb"),
