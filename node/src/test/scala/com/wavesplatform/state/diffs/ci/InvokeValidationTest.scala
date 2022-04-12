@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs.ci
 import com.wavesplatform.TestValues.invokeFee
 import com.wavesplatform.account.Alias
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
@@ -114,7 +115,7 @@ class InvokeValidationTest extends PropSpec with WithDomain {
   property("invoke tx size limit is 5 Kb") {
     def array(size: Int): ARR = ARR(Vector.fill(size)(CONST_LONG(1)), 0, false).explicitGet()
 
-    def txV1       = invoke(defaultAddress, Some("f"), Seq(array(557)), version = V1)
+    val txV1       = invoke(defaultAddress, Some("f"), Seq(array(557)), version = V1)
     def tooBigTxV1 = invoke(defaultAddress, Some("f"), Seq(array(558)), version = V1)
     txV1.copy(proofs = Proofs.empty).bytes().length shouldBe 5114
     (the[Exception] thrownBy tooBigTxV1).getMessage shouldBe "GenericError(InvokeScriptTransaction bytes length = 5123 exceeds limit = 5120)"
@@ -123,5 +124,16 @@ class InvokeValidationTest extends PropSpec with WithDomain {
     def tooBigTxV2 = invoke(defaultAddress, Some("f"), Seq(array(565)), version = V2)
     PBTransactions.toPBInvokeScriptData(txV2.dAppAddressOrAlias, txV2.funcCallOpt, txV2.payments).toByteArray.length shouldBe 5120
     (the[Exception] thrownBy tooBigTxV2).getMessage shouldBe "GenericError(InvokeScriptTransaction bytes length = 5129 exceeds limit = 5120)"
+  }
+
+  property("unexisting payment asset") {
+    withDomain(RideV5) { d =>
+      val asset = IssuedAsset(ByteStr.fromBytes(1, 2, 3))
+      d.appendBlockE(invoke(defaultAddress, payments = Seq(Payment(1, asset)))) should produce(
+        "Attempt to transfer unavailable funds: " +
+          s"Transaction application leads to negative asset '$asset' balance to (at least) temporary negative state, " +
+          "current balance is 0, spends equals -1, result is -1"
+      )
+    }
   }
 }
