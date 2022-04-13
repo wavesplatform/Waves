@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs.ci
 
+import com.wavesplatform.TestValues.invokeFee
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.StdLibVersion.V5
@@ -7,11 +8,14 @@ import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.script.v1.ExprScript.ExprScriptImpl
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.produce
+import com.wavesplatform.state.{Portfolio, StringDataEntry}
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxHelpers._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.smart.SetScriptTransaction
 
 class InvokeFailAndRejectTest extends PropSpec with WithDomain {
   import DomainPresets._
@@ -116,6 +120,56 @@ class InvokeFailAndRejectTest extends PropSpec with WithDomain {
       d.appendBlock(i)
       d.appendBlock(setScript(secondSigner, dApp))
       d.appendBlockE(invokeTx) should produce("negative asset balance")
+    }
+  }
+
+  property("failed invoke doesn't affect state") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner, signer(10))) { d =>
+      val failAssetIssue = issue(script = Some(assetFailScript))
+      val trueAssetIssue = issue(secondSigner, script = Some(ExprScriptImpl(V3, TRUE)))
+      val failAsset      = IssuedAsset(failAssetIssue.id())
+      val trueAsset      = IssuedAsset(trueAssetIssue.id())
+      val leaseTx        = lease(secondSigner, defaultAddress)
+      val dataTx         = data(secondSigner, Seq(StringDataEntry("old", "value")))
+      val dApp = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = [
+           |   StringEntry("key1", "value"),
+           |   IntegerEntry("key2", 1),
+           |   BooleanEntry("key3", true),
+           |   BinaryEntry("key4", base58''),
+           |   DeleteEntry("old"),
+           |   ScriptTransfer(i.caller, 1, unit),
+           |   Issue("name", "description", 1000, 4, true, unit, 0),
+           |   Reissue(base58'$trueAsset', 1, true),
+           |   Burn(base58'$trueAsset', 1),
+           |   Lease(i.caller, 1, 1),
+           |   LeaseCancel(base58'${leaseTx.id()}'),
+           |   SponsorFee(base58'', 1)
+           | ]
+         """.stripMargin
+      )
+      val invokeTx = invoke(secondAddress, payments = Seq(Payment(1, failAsset)))
+      d.appendBlock(failAssetIssue, trueAssetIssue)
+      d.appendBlock(leaseTx, dataTx)
+      d.appendBlock(setScript(secondSigner, dApp))
+      d.appendBlock(invokeTx)
+      d.blockchain.transactionInfo(invokeTx.id()).get._1.succeeded shouldBe false
+      d.liquidDiff.sponsorship shouldBe Map()
+      d.liquidDiff.leaseState shouldBe Map()
+      d.liquidDiff.issuedAssets shouldBe Map()
+      d.liquidDiff.updatedAssets shouldBe Map()
+      d.liquidDiff.accountData shouldBe Map()
+      d.blockchain.accountData(secondAddress, "old").get.value shouldBe "value"
+      d.liquidDiff.portfolios shouldBe {
+        val reward              = d.blockchain.blockReward(d.blockchain.height).get
+        val setScriptFee        = FeeConstants(SetScriptTransaction.typeId) * FeeUnit
+        val previousBlockReward = (0.6 * setScriptFee).toLong
+        val currentBlockReward  = (0.4 * invokeFee).toLong
+        val total               = reward + previousBlockReward + currentBlockReward - invokeFee
+        Map(defaultAddress -> Portfolio.waves(total))
+      }
     }
   }
 }

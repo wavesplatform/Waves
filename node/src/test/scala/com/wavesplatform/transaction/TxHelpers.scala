@@ -270,7 +270,7 @@ object TxHelpers {
   def setScript(
       acc: KeyPair,
       script: Script,
-      fee: Long = TestValues.fee,
+      fee: Long = FeeConstants(SetScriptTransaction.typeId) * FeeUnit,
       version: TxVersion = TxVersion.V1,
       chainId: Byte = AddressScheme.current.chainId
   ): SetScriptTransaction = {
@@ -281,7 +281,7 @@ object TxHelpers {
       acc: KeyPair,
       asset: IssuedAsset,
       script: Script,
-      fee: Long = TestValues.fee,
+      fee: Long = FeeConstants(SetAssetScriptTransaction.typeId) * FeeUnit,
       timestamp: TxTimestamp = timestamp,
       version: TxVersion = TxVersion.V1,
       chainId: Byte = AddressScheme.current.chainId
