@@ -4,12 +4,12 @@ import com.wavesplatform.TestValues
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.test.FlatSpec
-import com.wavesplatform.transaction.{CreateAliasTransaction, GenesisTransaction, TxVersion}
+import com.wavesplatform.transaction.{CreateAliasTransaction, TxVersion}
 import com.wavesplatform.utils.Schedulers
 import com.wavesplatform.utx.UtxPoolImpl
 import monix.execution.Scheduler
@@ -22,11 +22,9 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
   "Micro block miner" should "generate microblocks in flat interval" in {
     val scheduler = Schedulers.singleThread("test")
     val acc       = TestValues.keyPair
-    val genesis   = GenesisTransaction.create(acc.toAddress, TestValues.bigMoney, TestValues.timestamp).explicitGet()
     val settings  = domainSettingsWithFS(TestFunctionalitySettings.withFeatures(BlockchainFeatures.NG))
-    withDomain(settings) { d =>
-      d.appendBlock(TestBlock.create(Seq(genesis)))
-      val utxPool = new UtxPoolImpl(ntpTime, d.blockchainUpdater, ignoreSpendableBalanceChanged, settings.utxSettings)
+    withDomain(settings, Seq(AddrWithBalance(acc.toAddress, TestValues.bigMoney))) { d =>
+      val utxPool = new UtxPoolImpl(ntpTime, d.blockchainUpdater, settings.utxSettings)
       val microBlockMiner = new MicroBlockMinerImpl(
         _ => (),
         null,

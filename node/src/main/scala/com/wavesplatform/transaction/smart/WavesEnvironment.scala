@@ -1,7 +1,6 @@
 package com.wavesplatform.transaction.smart
 
 import cats.syntax.either._
-import cats.syntax.semigroup._
 import com.wavesplatform.account
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.block.BlockHeader
@@ -105,7 +104,7 @@ class WavesEnvironment(
       address <- recipient match {
         case Address(bytes) =>
           com.wavesplatform.account.Address
-            .fromBytes(bytes.arr)
+            .fromBytes(bytes.arr, chainId)
             .toOption
         case Alias(name) =>
           com.wavesplatform.account.Alias
@@ -146,11 +145,12 @@ class WavesEnvironment(
       }
       address <- blockchain.resolveAlias(aoa)
       portfolio = currentBlockchain().wavesPortfolio(address)
+      effectiveBalance <- portfolio.effectiveBalance
     } yield Environment.BalanceDetails(
       portfolio.balance - portfolio.lease.out,
       portfolio.balance,
       blockchain.generatingBalance(address),
-      portfolio.effectiveBalance
+      effectiveBalance
     )).left.map(_.toString)
   }
 
@@ -211,7 +211,7 @@ class WavesEnvironment(
 
   override def addressFromString(addressStr: String): Either[String, Address] =
     account.Address
-      .fromString(addressStr)
+      .fromString(addressStr, Some(chainId))
       .bimap(
         _.toString,
         address => Address(ByteStr(address.bytes))
@@ -370,12 +370,13 @@ class DAppEnvironment(
         if (reentrant) calledAddresses else calledAddresses + invoke.senderAddress,
         invocationTracker
       )(invoke)
-    } yield {
-      val fixedDiff = diff.copy(
+      fixedDiff = diff.copy(
         scriptResults = Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = diff.scriptResults(txId))))),
         scriptsRun = diff.scriptsRun + 1
       )
-      currentDiff = currentDiff |+| fixedDiff
+      newCurrentDiff <- traced(currentDiff.combine(fixedDiff).leftMap(GenericError(_)))
+    } yield {
+      currentDiff = newCurrentDiff
       mutableBlockchain = CompositeBlockchain(blockchain, currentDiff)
       remainingCalls = remainingCalls - 1
       availableActions = remainingActions

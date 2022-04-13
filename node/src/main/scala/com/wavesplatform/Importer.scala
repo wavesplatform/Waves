@@ -32,7 +32,6 @@ import com.wavesplatform.wallet.Wallet
 import kamon.Kamon
 import monix.eval.Task
 import monix.execution.Scheduler
-import monix.reactive.subjects.PublishSubject
 import monix.reactive.{Observable, Observer}
 import org.iq80.leveldb.DB
 import scopt.OParser
@@ -280,28 +279,31 @@ object Importer extends ScorexLogging {
     val db          = openDB(settings.dbSettings.directory)
     val (blockchainUpdater, levelDb) =
       StorageFactory(settings, db, time, Observer.empty, BlockchainUpdateTriggers.combined(triggers))
-    val utxPool     = new UtxPoolImpl(time, blockchainUpdater, PublishSubject(), settings.utxSettings)
+    val utxPool     = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings)
     val pos         = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
     val extAppender = BlockAppender(blockchainUpdater, time, utxPool, pos, scheduler, importOptions.verify) _
 
     val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, db, actorSystem)
     checkGenesis(settings, blockchainUpdater, Miner.Disabled)
 
-    val importFileOffset = if (importOptions.dryRun) 0 else importOptions.format match {
-      case Formats.Binary =>
-        var result = 0L
-        db.iterateOver(KeyTags.BlockInfoAtHeight) { e =>
-          e.getKey match {
-            case Array(_, _, 0, 0, 0, 1) => // Skip genesis
-            case _ =>
-              val meta = com.wavesplatform.database.readBlockMeta(e.getValue)
-              result += meta.size + 4
-          }
-        }
-        result
+    val importFileOffset =
+      if (importOptions.dryRun) 0
+      else
+        importOptions.format match {
+          case Formats.Binary =>
+            var result = 0L
+            db.iterateOver(KeyTags.BlockInfoAtHeight) { e =>
+              e.getKey match {
+                case Array(_, _, 0, 0, 0, 1) => // Skip genesis
+                case _ =>
+                  val meta = com.wavesplatform.database.readBlockMeta(e.getValue)
+                  result += meta.size + 4
+              }
+            }
+            result
 
-      case _ => 0L
-    }
+          case _ => 0L
+        }
     val inputStream = new BufferedInputStream(initFileStream(importOptions.blockchainFile, importFileOffset), 2 * 1024 * 1024)
 
     if (importOptions.dryRun) {
@@ -309,7 +311,6 @@ object Importer extends ScorexLogging {
       readNextBlock().flatMap {
         case None => Future.successful(())
         case Some(block) =>
-
           readNextBlock()
       }
     }

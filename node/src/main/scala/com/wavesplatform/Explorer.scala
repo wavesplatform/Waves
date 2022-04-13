@@ -9,7 +9,17 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.AddressPortfolio
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
-import com.wavesplatform.database.{AddressId, DBExt, KeyTags, Keys, LevelDBWriter, openDB, readAccountScriptInfo, readTransaction, readTransactionHNSeqAndType}
+import com.wavesplatform.database.{
+  AddressId,
+  DBExt,
+  KeyTags,
+  Keys,
+  LevelDBWriter,
+  openDB,
+  readAccountScriptInfo,
+  readTransaction,
+  readTransactionHNSeqAndType
+}
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.settings.Constants
@@ -302,7 +312,7 @@ object Explorer extends ScorexLogging {
 
             estimationResult.left.foreach { error =>
               val addressId = Longs.fromByteArray(e.getKey.drop(2).dropRight(4))
-              val address = db.get(Keys.idToAddress(AddressId(addressId)))
+              val address   = db.get(Keys.idToAddress(AddressId(addressId)))
               log.info(s"$address: $error")
             }
           }

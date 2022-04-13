@@ -73,7 +73,7 @@ object RollbackBenchmark extends ScorexLogging {
 
     log.info("Appending genesis block")
     levelDBWriter.append(
-      Diff.empty.copy(portfolios = portfolios.toMap),
+      Diff(portfolios = portfolios.toMap),
       0,
       0,
       None,
@@ -85,7 +85,7 @@ object RollbackBenchmark extends ScorexLogging {
       Block
         .buildAndSign(2.toByte, time.getTimestamp(), genesisBlock.id(), 1000, Block.GenesisGenerationSignature, Seq.empty, issuer, Seq.empty, -1)
         .explicitGet()
-    val nextDiff = Diff.empty.copy(portfolios = addresses.map(_ -> Portfolio(1, assets = Map(IssuedAsset(assets.head.id()) -> 1L))).toMap)
+    val nextDiff = Diff(portfolios = addresses.map(_ -> Portfolio(1, assets = Map(IssuedAsset(assets.head.id()) -> 1L))).toMap)
 
     log.info("Appending next block")
     levelDBWriter.append(nextDiff, 0, 0, None, ByteStr.empty, nextBlock)

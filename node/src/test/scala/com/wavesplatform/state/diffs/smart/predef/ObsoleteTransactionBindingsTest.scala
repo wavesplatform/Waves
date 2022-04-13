@@ -9,11 +9,12 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, PaymentTransaction}
+import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{GenesisTransaction, PaymentTransaction, TxHelpers}
 
 class ObsoleteTransactionBindingsTest extends PropSpec with WithState {
 
@@ -65,28 +66,28 @@ class ObsoleteTransactionBindingsTest extends PropSpec with WithState {
        |genTotal && payTotal
        |""".stripMargin
 
-  val preconditionsAndPayments = for {
-    master    <- accountGen
-    recipient <- otherAccountGen(candidate = master)
-    ts        <- positiveIntGen
-    fee       <- smallFeeGen
-    genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT * 3, ts).explicitGet()
-    payment                     = PaymentTransaction.create(master, recipient.toAddress, ENOUGH_AMT * 2, fee, ts).explicitGet()
-    untypedScript               = Parser.parseExpr(script(genesis, payment)).get.value
-    typedScript = ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedScript).explicitGet()._1)
-      .explicitGet()
-    setScriptTransaction: SetScriptTransaction = SetScriptTransaction
-      .selfSigned(1.toByte, recipient, Some(typedScript), 100000000L, ts)
-      .explicitGet()
-    nextTransfer <- transferGeneratorPV2(ts, recipient, master.toAddress, ENOUGH_AMT)
-  } yield (genesis, payment, setScriptTransaction, nextTransfer)
+  val preconditionsAndPayments: Seq[(GenesisTransaction, PaymentTransaction, SetScriptTransaction, TransferTransaction)] = {
+    val master     = TxHelpers.signer(1)
+    val recipients = Seq(master, TxHelpers.signer(2))
 
-  val settings = TestFunctionalitySettings.Enabled.copy(blockVersion3AfterHeight = 100)
+    val genesis = TxHelpers.genesis(master.toAddress, ENOUGH_AMT * 3)
+    recipients.map { recipient =>
+      val payment       = TxHelpers.payment(master, recipient.toAddress, ENOUGH_AMT * 2)
+      val untypedScript = Parser.parseExpr(script(genesis, payment)).get.value
+      val typedScript = ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedScript).explicitGet()._1)
+        .explicitGet()
+      val setScriptTransaction = TxHelpers.setScript(recipient, typedScript)
+      val nextTransfer         = TxHelpers.transfer(recipient, master.toAddress)
+      (genesis, payment, setScriptTransaction, nextTransfer)
+    }
+  }
+
+  val settings: FunctionalitySettings = TestFunctionalitySettings.Enabled.copy(blockVersion3AfterHeight = 100)
   property("Obsolete transaction bindings") {
-    forAll(preconditionsAndPayments) {
-      case ((genesis, payment, setScriptTransaction, nextTransfer)) =>
+    preconditionsAndPayments.foreach {
+      case (genesis, payment, setScriptTransaction, nextTransfer) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis, payment, setScriptTransaction))), TestBlock.create(Seq(nextTransfer)), settings) {
-          (blockDiff, newState) =>
+          (_, _) =>
             ()
         }
     }

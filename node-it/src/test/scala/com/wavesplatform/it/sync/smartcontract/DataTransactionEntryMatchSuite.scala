@@ -32,7 +32,7 @@ class DataTransactionEntryMatchSuite extends BaseTransactionSuite {
       s"""
          | {-# STDLIB_VERSION 4       #-}
          | {-# SCRIPT_TYPE    ACCOUNT #-}
-         | {-# CONTENT_TYPE ${if (dApp) "DAPP" else "EXPRESSION" }  #-}
+         | {-# CONTENT_TYPE ${if (dApp) "DAPP" else "EXPRESSION"}  #-}
          |
          | ${if (dApp) "@Verifier(tx) \n func verify() = " else ""}
          | match tx {

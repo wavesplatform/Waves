@@ -70,7 +70,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
   '/addresses/seq/{from}/{to}':
     get:
       tags:
@@ -130,7 +130,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
   '/addresses/publicKey/{publicKey}':
     get:
       tags:
@@ -469,7 +469,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
   '/addresses/balance/details/{address}':
     get:
       tags:
@@ -599,7 +599,7 @@ paths:
                 $ref: '#/components/schemas/Block'
   '/blocks/heightByTimestamp/{timestamp}':
     get:
-      tags: [blocks]
+      tags: [ blocks ]
       operationId: getHeightByTimestamp
       summary: Blockchain height for timestamp
       description: >-
@@ -889,7 +889,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
       x-codegen-request-body-name: body
   /peers/clearblacklist:
     post:
@@ -913,7 +913,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
   /peers/all:
     get:
       tags:
@@ -1223,7 +1223,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
       x-codegen-request-body-name: json
   /transactions/unconfirmed:
     get:
@@ -1388,7 +1388,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
       x-codegen-request-body-name: json
   /transactions/broadcast:
     post:
@@ -1402,7 +1402,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [yes]
+            enum: [ yes ]
           description: Return trace
       requestBody:
         description: >-
@@ -1731,7 +1731,7 @@ paths:
                     properties:
                       type:
                         type: string
-                      value: {}
+                      value: { }
   /utils/seed:
     get:
       tags:
@@ -1858,7 +1858,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
   '/alias/by-alias/{alias}':
     get:
       tags:
@@ -2370,11 +2370,11 @@ paths:
       responses:
         '200':
           description: Success
-          content: {}
+          content: { }
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
       x-codegen-request-body-name: body
   /debug/state:
     get:
@@ -2400,7 +2400,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
   /debug/info:
     get:
       tags:
@@ -2487,7 +2487,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
   '/debug/stateHash/{height}':
     get:
       tags:
@@ -2554,14 +2554,14 @@ paths:
       responses:
         '200':
           description: Success
-          content: {}
+          content: { }
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
         '404':
           description: There are no peer with such address
-          content: {}
+          content: { }
       security:
-        - APIKey: []
+        - APIKey: [ ]
       x-codegen-request-body-name: address
   '/debug/portfolios/{address}':
     get:
@@ -2619,7 +2619,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
   '/debug/rollback-to/{id}':
     delete:
       tags:
@@ -2644,7 +2644,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
   /debug/validate:
     post:
       tags:
@@ -2746,7 +2746,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
   /debug/rollback:
     post:
       tags:
@@ -2788,7 +2788,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
       x-codegen-request-body-name: body
   /debug/minerInfo:
     get:
@@ -2820,7 +2820,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
   /debug/configInfo:
     get:
       tags:
@@ -2838,11 +2838,11 @@ paths:
       responses:
         '200':
           description: Json config
-          content: {}
+          content: { }
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
   /node/stop:
     post:
       tags:
@@ -2865,7 +2865,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
   /node/status:
     get:
       tags:
@@ -2979,7 +2979,7 @@ components:
       minimum: 0
     TransactionBase:
       type: object
-      required: [id, timestamp, type, fee]
+      required: [ id, timestamp, type, fee ]
       properties:
         timestamp:
           $ref: '#/components/schemas/Timestamp'
@@ -3019,7 +3019,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/TransactionBase'
         - type: object
-          required: [height, sender, senderPublicKey, proofs, signature]
+          required: [ height, sender, senderPublicKey, proofs, signature ]
     ApiError:
       required:
         - error
@@ -3505,7 +3505,7 @@ components:
           format: int32
         votes:
           type: object
-          required: [decrease, increase]
+          required: [ decrease, increase ]
           properties:
             increase:
               type: integer
@@ -3524,7 +3524,7 @@ components:
         signature:
           $ref: '#/components/schemas/Signature'
     NonGenesisTransaction:
-      required: [sender, senderPublicKey, applicationStatus, version, proofs, signature, feeAssetId]
+      required: [ sender, senderPublicKey, applicationStatus, version, proofs, signature, feeAssetId ]
       allOf:
         - $ref: '#/components/schemas/TransactionBase'
       oneOf:
@@ -3659,7 +3659,7 @@ components:
             $ref: '#/components/schemas/Hash'
     BurnTransaction:
       type: object
-      required: [assetId, amount]
+      required: [ assetId, amount ]
       properties:
         assetId:
           $ref: '#/components/schemas/AssetId'
@@ -3667,14 +3667,14 @@ components:
           $ref: '#/components/schemas/Amount'
     CreateAliasTransaction:
       type: object
-      required: [alias]
+      required: [ alias ]
       properties:
         alias:
           type: string
           pattern: '^[\-\.0-9@_a-z]{4,30}$'
     DataTransaction:
       type: object
-      required: [data]
+      required: [ data ]
       properties:
         data:
           type: array
@@ -3773,7 +3773,7 @@ components:
                       - string
                   value:
                     type: object
-                    properties: {}
+                    properties: { }
                     description: >-
                       binary/boolean/integer/string value or list of { type,
                       value } objects
@@ -3950,7 +3950,7 @@ components:
         - asset
         - amount
       properties:
-        address: 
+        address:
           $ref: '#/components/schemas/Address'
         asset:
           allOf:
@@ -3976,7 +3976,7 @@ components:
         - assetId
         - isReissuable
         - quantity
-      properties: 
+      properties:
         assetId:
           $ref: '#/components/schemas/AssetId'
         isReissuable:
@@ -3989,13 +3989,13 @@ components:
       required:
         - assetId
         - quantity
-      properties: {}
+      properties: { }
     SponsorFeeAction:
       type: object
       required:
         - assetId
         - minSponsoredAssetFee
-      properties: {}
+      properties: { }
     LeaseAction:
       allOf:
         - $ref: '#/components/schemas/LeaseInfo'
@@ -4003,7 +4003,7 @@ components:
       type: object
       required:
         - recipient
-      properties: {}
+      properties: { }
     InvokeAction:
       type: object
       required:
@@ -4072,7 +4072,7 @@ components:
         application/json:
           schema:
             type: object
-            required: [height]
+            required: [ height ]
             properties:
               height:
                 $ref: '#/components/schemas/Height'

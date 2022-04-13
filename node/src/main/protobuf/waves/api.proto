@@ -3,10 +3,10 @@ package waves.api;
 option java_package = "com.wavesplatform.protobuf.api";
 
 message DataRequest {
-    repeated string keys = 1;
-    string matches = 2;
+  repeated string keys = 1;
+  string matches = 2;
 }
 
 message TransactionsByIdRequest {
-    repeated string ids = 1;
+  repeated string ids = 1;
 }

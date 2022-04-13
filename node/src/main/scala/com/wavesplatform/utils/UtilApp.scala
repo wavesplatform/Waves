@@ -46,17 +46,19 @@ object UtilApp {
     final case class Str(str: String)   extends Input
   }
 
-  case class Command(mode: Command.Mode = null,
-                     configFile: Option[String] = None,
-                     inputData: Input = Input.StdIn,
-                     outputFile: Option[String] = None,
-                     inFormat: String = "plain",
-                     outFormat: String = "plain",
-                     compileOptions: CompileOptions = CompileOptions(),
-                     signOptions: SignOptions = SignOptions(),
-                     verifyOptions: VerifyOptions = VerifyOptions(),
-                     hashOptions: HashOptions = HashOptions(),
-                     signTxOptions: SignTxOptions = SignTxOptions())
+  case class Command(
+      mode: Command.Mode = null,
+      configFile: Option[String] = None,
+      inputData: Input = Input.StdIn,
+      outputFile: Option[String] = None,
+      inFormat: String = "plain",
+      outFormat: String = "plain",
+      compileOptions: CompileOptions = CompileOptions(),
+      signOptions: SignOptions = SignOptions(),
+      verifyOptions: VerifyOptions = VerifyOptions(),
+      hashOptions: HashOptions = HashOptions(),
+      signTxOptions: SignTxOptions = SignTxOptions()
+  )
 
   def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, Command()) match {

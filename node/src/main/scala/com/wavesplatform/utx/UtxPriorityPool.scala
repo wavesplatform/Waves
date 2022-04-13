@@ -3,20 +3,19 @@ package com.wavesplatform.utx
 import java.time.Duration
 import java.time.temporal.ChronoUnit
 
-import scala.annotation.tailrec
-
-import cats.kernel.Monoid
 import com.wavesplatform.ResponsivenessLogs
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
 
-final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with OptimisticLockable {
+import scala.annotation.tailrec
+
+final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging with OptimisticLockable {
   import UtxPriorityPool._
 
   private[this] case class PriorityData(diff: Diff, isValid: Boolean = true)
@@ -28,7 +27,9 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with Optimis
   def priorityTransactions: Seq[Transaction] = priorityDiffs.flatMap(_.diff.transactionsValues)
   def priorityTransactionIds: Seq[ByteStr]   = priorityTransactions.map(_.id())
 
-  def compositeBlockchain: CompositeBlockchain = CompositeBlockchain(base, priorityDiffsCombined)
+  def compositeBlockchain: Blockchain =
+    if (priorityDiffs.isEmpty) realBlockchain
+    else CompositeBlockchain(realBlockchain, priorityDiffsCombined)
 
   def lockedWrite[T](f: => T): T =
     this.writeLock(f)
@@ -117,7 +118,7 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with Optimis
     val oldTxs = priorityTransactions.toSet
 
     priorityDiffs = f(priorityDiffs).filterNot(_.diff.transactions.isEmpty)
-    priorityDiffsCombined = Monoid.combineAll(validPriorityDiffs)
+    priorityDiffsCombined = validPriorityDiffs.fold(Diff())(_.unsafeCombine(_))
 
     val newTxs = priorityTransactions.toSet
 
@@ -125,7 +126,7 @@ final class UtxPriorityPool(base: Blockchain) extends ScorexLogging with Optimis
     removed.foreach(PoolMetrics.removeTransactionPriority)
     (newTxs diff oldTxs).foreach { tx =>
       PoolMetrics.addTransactionPriority(tx)
-      ResponsivenessLogs.writeEvent(base.height, tx, ResponsivenessLogs.TxEvent.Received)
+      ResponsivenessLogs.writeEvent(realBlockchain.height, tx, ResponsivenessLogs.TxEvent.Received)
     }
     removed
   }

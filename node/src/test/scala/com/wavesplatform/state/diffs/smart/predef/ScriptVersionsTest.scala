@@ -16,17 +16,16 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.{BinaryDataEntry, Blockchain, BooleanDataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.test.FreeSpec
-import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.{Transaction, TxHelpers}
 import com.wavesplatform.transaction.smart.script.{ScriptCompiler, ScriptRunner}
 import com.wavesplatform.utils.EmptyBlockchain
-import org.scalacheck.Gen
 import shapeless.Coproduct
 
 class ScriptVersionsTest extends FreeSpec {
   private def eval[T <: EVALUATED](
       script: String,
       version: StdLibVersion,
-      tx: Transaction = transferV2Gen.sample.get,
+      tx: Transaction = TxHelpers.transfer(),
       blockchain: Blockchain = EmptyBlockchain
   ): Either[String, EVALUATED] = {
     val expr = Parser.parseExpr(script).get.value
@@ -70,9 +69,9 @@ class ScriptVersionsTest extends FreeSpec {
     """.stripMargin
 
   "ScriptV1 allows duplicate names" in {
-    forAll(transferV2Gen.flatMap(tx => Gen.oneOf(V1, V2).map(v => (tx, v)))) {
-      case (tx, v) =>
-        eval[EVALUATED](duplicateNames, v, tx) shouldBe Testing.evaluated(true)
+    val transfer = TxHelpers.transfer()
+    Seq(V1, V2).foreach { version =>
+      eval[EVALUATED](duplicateNames, version, transfer) shouldBe Testing.evaluated(true)
     }
   }
 
@@ -88,9 +87,8 @@ class ScriptVersionsTest extends FreeSpec {
 
   "ScriptV2" - {
     "allows duplicate names" in {
-      forAll(transferV2Gen) { tx =>
-        eval[EVALUATED](duplicateNames, V2, tx) shouldBe Testing.evaluated(true)
-      }
+      val transfer = TxHelpers.transfer()
+      eval[EVALUATED](duplicateNames, V2, transfer) shouldBe Testing.evaluated(true)
     }
 
     "has bindings defined in V2" in {
@@ -114,7 +112,7 @@ class ScriptVersionsTest extends FreeSpec {
 
   "ScriptV4" - {
     "DataTransaction entry mapping" in {
-      def compile(scriptText: String) =
+      def compile(scriptText: String): Script =
         ScriptCompiler.compile(scriptText, ScriptEstimatorV3(fixOverflow = true)).explicitGet()._1
 
       def script(dApp: Boolean, version: StdLibVersion): Script =
@@ -166,7 +164,7 @@ class ScriptVersionsTest extends FreeSpec {
           EmptyDataEntry("key")
         )
       } {
-        val tx         = dataTransactionGen(1, withDeleteEntry = true).sample.get.copy(data = Seq(entry))
+        val tx         = TxHelpers.dataV2(TxHelpers.signer(1), Seq(entry))
         val blockchain = if (activateFix) fixedBlockchain else EmptyBlockchain
         if (version >= V4) {
           if (!activateFix && isDApp && !entry.isInstanceOf[EmptyDataEntry])

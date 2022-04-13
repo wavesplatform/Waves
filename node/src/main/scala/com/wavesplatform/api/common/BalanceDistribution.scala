@@ -4,8 +4,7 @@ import com.google.common.collect.AbstractIterator
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.Address
 import com.wavesplatform.database.{AddressId, DBExt, DBResource, Keys}
-import com.wavesplatform.state.Portfolio
-import com.wavesplatform.state.Portfolio.longSemigroup
+import com.wavesplatform.state.{Portfolio, safeSum}
 import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
@@ -70,11 +69,13 @@ object BalanceDistribution {
             }
           }
 
-          val adjustedBalance = longSemigroup.combine(balance, pendingPortfolios.get(address).fold(0L)(balanceOf))
+          val adjustedBalanceE = safeSum(balance, pendingPortfolios.get(address).fold(0L)(balanceOf), "Next distribution balance")
           pendingPortfolios -= address
 
-          if (currentHeight <= height && adjustedBalance > 0) Some(address -> adjustedBalance)
-          else findNextBalance()
+          adjustedBalanceE match {
+            case Right(adjustedBalance) if currentHeight <= height && adjustedBalance > 0 => Some(address -> adjustedBalance)
+            case _                                                                        => findNextBalance()
+          }
         }
       }
     }

@@ -16,15 +16,18 @@ package object wavesplatform extends ScorexLogging {
     if (blockchainUpdater.isEmpty) {
       blockchainUpdater.processBlock(block, block.header.generationSignature).map { _ =>
         val genesisHeader = blockchainUpdater.blockHeader(1).get
-        log.info(s"Genesis block ${genesisHeader.id()} (generated at ${Instant.ofEpochMilli(genesisHeader.header.timestamp)}) has been added to the state")
+        log.info(
+          s"Genesis block ${genesisHeader.id()} (generated at ${Instant.ofEpochMilli(genesisHeader.header.timestamp)}) has been added to the state"
+        )
       }
-    } else blockchainUpdater.blockHeader(1).map(_.id()) match {
-      case Some(id) if id == block.id() =>
-        miner.scheduleMining()
-        Right(())
-      case _ =>
-        Left(GenericError("Mismatched genesis blocks in configuration and blockchain"))
-    }
+    } else
+      blockchainUpdater.blockHeader(1).map(_.id()) match {
+        case Some(id) if id == block.id() =>
+          miner.scheduleMining()
+          Right(())
+        case _ =>
+          Left(GenericError("Mismatched genesis blocks in configuration and blockchain"))
+      }
 
   def checkGenesis(settings: WavesSettings, blockchainUpdater: Blockchain with BlockchainUpdater, miner: Miner): Unit = {
     Block

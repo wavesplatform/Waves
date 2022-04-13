@@ -31,7 +31,7 @@ object JsAPI {
             "name" -> name,
             "type" -> typeRepr(ft),
             "doc"  -> DocSource.varData((name, ver))
-          )
+        )
       }
       .toJSArray
 
