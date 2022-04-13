@@ -7,6 +7,7 @@ import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.script.v1.ExprScript.ExprScriptImpl
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxHelpers._
@@ -79,6 +80,23 @@ class InvokeFailAndRejectTest extends PropSpec with WithDomain {
       d.appendBlock(setScript(secondSigner, dApp))
       d.appendBlock(invokeTx)
       d.liquidDiff.errorMessage(invokeTx.id()).get.text should include(s"Transaction is not allowed by script of the asset $failAsset")
+    }
+  }
+
+  property("invoke with failing payment is rejected due to dApp script") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+      val failAssetIssue = issue(script = Some(assetFailScript))
+      val failAsset      = IssuedAsset(failAssetIssue.id())
+      val dApp = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = if (true) then throw() else []
+         """.stripMargin
+      )
+      val invokeTx = invoke(secondAddress, payments = Seq(Payment(1, failAsset)))
+      d.appendBlock(failAssetIssue)
+      d.appendBlock(setScript(secondSigner, dApp))
+      d.appendBlockE(invokeTx) should produce("Explicit script termination")
     }
   }
 }
