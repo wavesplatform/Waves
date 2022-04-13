@@ -267,7 +267,7 @@ class UtxPoolImpl(
           val differ = TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime())(priorityPool.compositeBlockchain, _)
           val diffEi = differ(tx).resultE
           diffEi.left.foreach { error =>
-            TxStateActions.removeInvalid(tx, error)
+            TxStateActions.removeInvalid("Cleanup", tx, error)
           }
         }
       }
@@ -354,7 +354,7 @@ class UtxPoolImpl(
                       r
 
                     case Left(error) =>
-                      TxStateActions.removeInvalid(tx, error)
+                      TxStateActions.removeInvalid("Pack", tx, error)
                       r.copy(
                         iterations = r.iterations + 1,
                         validatedTransactions = r.validatedTransactions + tx.id(),
@@ -442,8 +442,8 @@ class UtxPoolImpl(
       onEvent(UtxEvent.TxRemoved(tx, None))
     }
 
-    def removeInvalid(tx: Transaction, error: ValidationError): Unit = {
-      log.debug(s"Transaction ${tx.id()} removed due to ${extractErrorMessage(error)}")
+    def removeInvalid(cause: String, tx: Transaction, error: ValidationError): Unit = {
+      log.debug(s"$cause: Transaction ${tx.id()} removed due to ${extractErrorMessage(error)}")
       traceLogger.trace(error.toString)
 
       ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Invalidated, Some(extractErrorClass(error)))

@@ -11,6 +11,7 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state.diffs.produce
+import com.wavesplatform.test.DomainPresets._
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -18,10 +19,7 @@ import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
-class VerifierSpecification
-    extends PropSpec
-    with NTPTime
-    with WithDomain {
+class VerifierSpecification extends PropSpec with NTPTime with WithDomain {
   private def mkIssue(issuer: KeyPair, name: String, script: Option[Script] = None) =
     IssueTransaction
       .selfSigned(

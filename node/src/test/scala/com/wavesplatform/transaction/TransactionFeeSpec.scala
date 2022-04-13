@@ -8,11 +8,12 @@ import com.wavesplatform.features.{BlockchainFeatures => BF}
 import com.wavesplatform.history.settingsWithFeatures
 import com.wavesplatform.lang.directives.values.StdLibVersion.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.test.DomainPresets._
 import com.wavesplatform.test.{FreeSpec, NumericExt}
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.SponsorFeeTransaction
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.Asset.Waves
 
 class TransactionFeeSpec extends FreeSpec with WithDomain {
   "invoke script" - {
@@ -117,8 +118,8 @@ class TransactionFeeSpec extends FreeSpec with WithDomain {
                                                          |@Callable(i)
                                                          |func default() = {
                                                          |  strict test = ${(1 to 10)
-                  .map(_ => "sigVerify(base58'', base58'', base58'')")
-                  .mkString(" || ")}
+                                                           .map(_ => "sigVerify(base58'', base58'', base58'')")
+                                                           .mkString(" || ")}
                                                          |  (
                                                          |    [
                                                          |    ScriptTransfer(i.caller, 100, unit)],
@@ -129,8 +130,8 @@ class TransactionFeeSpec extends FreeSpec with WithDomain {
                                                          |@Callable(i)
                                                          |func test() = {
                                                          |  strict test = ${(1 to 10)
-                  .map(_ => "sigVerify(base58'', base58'', base58'')")
-                  .mkString(" || ")}
+                                                           .map(_ => "sigVerify(base58'', base58'', base58'')")
+                                                           .mkString(" || ")}
                                                          |  [ScriptTransfer(i.caller, 100, unit)]
                                                          |}""".stripMargin)),
                 0.01.waves,
@@ -205,8 +206,8 @@ class TransactionFeeSpec extends FreeSpec with WithDomain {
                                                          |@Callable(i)
                                                          |func default() = {
                                                          |  strict test = ${(1 to 10)
-                  .map(_ => "sigVerify(base58'', base58'', base58'')")
-                  .mkString(" || ")}
+                                                           .map(_ => "sigVerify(base58'', base58'', base58'')")
+                                                           .mkString(" || ")}
                                                          |  (
                                                          |    [
                                                          |    ScriptTransfer(i.caller, 100, unit)],
@@ -240,11 +241,23 @@ class TransactionFeeSpec extends FreeSpec with WithDomain {
         val issue = TxHelpers.issue()
         d.appendBlock(issue)
         d.appendBlock(
-          SponsorFeeTransaction.selfSigned(TxVersion.V1, TxHelpers.defaultSigner, issue.asset, Some(1L), 1.waves, ntpTime.getTimestamp()).explicitGet()
+          SponsorFeeTransaction
+            .selfSigned(TxVersion.V1, TxHelpers.defaultSigner, issue.asset, Some(1L), 1.waves, ntpTime.getTimestamp())
+            .explicitGet()
         )
 
         val transfer = TransferTransaction
-          .selfSigned(TxVersion.V2, TxHelpers.defaultSigner, TxHelpers.secondAddress, Waves, 1, issue.asset, 1L, ByteStr.empty, ntpTime.getTimestamp())
+          .selfSigned(
+            TxVersion.V2,
+            TxHelpers.defaultSigner,
+            TxHelpers.secondAddress,
+            Waves,
+            1,
+            issue.asset,
+            1L,
+            ByteStr.empty,
+            ntpTime.getTimestamp()
+          )
           .explicitGet()
         d.commonApi.calculateFee(transfer) shouldBe ((issue.asset, 1L, 0.001.waves))
       }

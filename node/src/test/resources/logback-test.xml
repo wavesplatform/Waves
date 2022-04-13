@@ -8,7 +8,7 @@
 
     <logger name="scorex.crypto.signatures.Curve25519$" level="INFO"/>
 
-    <root level="${logback.test.level:-OFF}">
+    <root level="TRACE">
         <appender-ref ref="STDOUT" />
     </root>
 </configuration>

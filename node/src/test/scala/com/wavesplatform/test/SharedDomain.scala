@@ -18,7 +18,7 @@ trait SharedDomain extends BeforeAndAfterAll with NTPTime { _: Suite =>
   private val db: DB   = LevelDBFactory.factory.open(path.toFile, new Options().createIfMissing(true))
   private val (bui, ldb) = TestStorageFactory(settings, db, ntpTime, Observer.stopped, BlockchainUpdateTriggers.noop)
 
-  def settings: WavesSettings = DomainPresets.
+  def settings: WavesSettings = DomainPresets.ScriptsAndSponsorship
   def genesisBalances: Seq[AddrWithBalance] = Seq.empty
 
   lazy val domain: Domain = Domain(db, bui, ldb, settings)

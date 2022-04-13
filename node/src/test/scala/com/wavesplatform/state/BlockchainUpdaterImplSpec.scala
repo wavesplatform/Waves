@@ -9,7 +9,6 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{DBCacheSettings, WithDomain}
 import com.wavesplatform.events.BlockchainUpdateTriggers
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.history.{chainBaseAndMicro, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -28,23 +27,14 @@ import org.scalamock.scalatest.MockFactory
 
 import scala.util.Random
 
-class BlockchainUpdaterImplSpec
-    extends FreeSpec
-    with EitherMatchers
-    with WithDomain
-    with NTPTime
-    with DBCacheSettings
-    with MockFactory {
+class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDomain with NTPTime with DBCacheSettings with MockFactory {
 
   private val FEE_AMT = 1000000L
 
   // default settings, no NG
   private lazy val wavesSettings = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
 
-  def baseTest(setup: Time => (KeyPair, Seq[Block]),
-               enableNg: Boolean = false,
-               triggers: BlockchainUpdateTriggers = BlockchainUpdateTriggers.noop
-  )(
+  def baseTest(setup: Time => (KeyPair, Seq[Block]), enableNg: Boolean = false, triggers: BlockchainUpdateTriggers = BlockchainUpdateTriggers.noop)(
       f: (BlockchainUpdaterImpl, KeyPair) => Unit
   ): Unit = withDomain(if (enableNg) enableNG(wavesSettings) else wavesSettings) { d =>
     d.triggers = d.triggers :+ triggers
@@ -62,10 +52,10 @@ class BlockchainUpdaterImplSpec
     TxHelpers.transfer(master, recipient, ENOUGH_AMT / 5, fee = 1000000, timestamp = ts, version = TxVersion.V1)
 
   def commonPreconditions(ts: Long): (KeyPair, List[Block]) = {
-    val master = TxHelpers.signer(1)
+    val master    = TxHelpers.signer(1)
     val recipient = TxHelpers.signer(2)
 
-    val genesis = TxHelpers.genesis(master.toAddress, timestamp = ts)
+    val genesis      = TxHelpers.genesis(master.toAddress, timestamp = ts)
     val genesisBlock = TestBlock.create(ts, Seq(genesis))
     val b1 = TestBlock
       .create(
@@ -171,7 +161,7 @@ class BlockchainUpdaterImplSpec
 
       "block, then 2 microblocks, then block referencing previous microblock" in withDomain(enableNG(wavesSettings)) { d =>
         def preconditions(ts: Long): (Transaction, Seq[Transaction]) = {
-          val master = TxHelpers.signer(1)
+          val master    = TxHelpers.signer(1)
           val recipient = TxHelpers.signer(2)
 
           val genesis = TxHelpers.genesis(master.toAddress, timestamp = ts)
@@ -264,15 +254,12 @@ class BlockchainUpdaterImplSpec
       val sender = KeyPair(Longs.toByteArray(Random.nextLong()))
 
       withDomain(
-        settings = domainSettingsWithPreactivatedFeatures(
-          BlockchainFeatures.NG,
-          BlockchainFeatures.BlockV5,
-          BlockchainFeatures.Ride4DApps
-        ),
+        DomainPresets.RideV3,
         balances = Seq(AddrWithBalance(dapp.toAddress, 10_00000000), AddrWithBalance(sender.toAddress, 10_00000000))
       ) { d =>
-
-        val script = ScriptCompiler.compile("""
+        val script = ScriptCompiler
+          .compile(
+            """
                                               |{-# STDLIB_VERSION 4 #-}
                                               |{-# SCRIPT_TYPE ACCOUNT #-}
                                               |{-# CONTENT_TYPE DAPP #-}
@@ -283,7 +270,11 @@ class BlockchainUpdaterImplSpec
                                               |    BinaryEntry("vrf", value(value(blockInfoByHeight(height)).vrf))
                                               |  ]
                                               |}
-                                              |""".stripMargin, ScriptEstimatorV2).explicitGet()._1
+                                              |""".stripMargin,
+            ScriptEstimatorV2
+          )
+          .explicitGet()
+          ._1
 
         d.appendBlock(
           SetScriptTransaction.selfSigned(2.toByte, dapp, Some(script), 500_0000L, ntpTime.getTimestamp()).explicitGet()
