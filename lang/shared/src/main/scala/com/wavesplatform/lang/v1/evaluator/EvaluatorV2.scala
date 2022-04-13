@@ -13,6 +13,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluat
 import com.wavesplatform.lang.v1.traits.Environment
 import monix.eval.Coeval
 
+import java.io.FileWriter
 import scala.annotation.tailrec
 import scala.collection.mutable.ListBuffer
 
@@ -64,12 +65,18 @@ class EvaluatorV2(
       if (limit < cost)
         Coeval.now(limit)
       else {
+        val writer = new FileWriter("complexity.log", true)
+        writer.append(s"BEFORE CALL $fc, LIMIT: $limit\n")
+        writer.close()
         function.ev
           .evaluateExtended[Id](ctx.ec.environment, fc.args.asInstanceOf[List[EVALUATED]], limit - cost)
           .flatMap {
             case (result, additionalComplexity) =>
               val totalCost        = cost + additionalComplexity
               val unusedComplexity = limit - totalCost
+              val writer           = new FileWriter("complexity.log", true)
+              writer.append(s"COMPUTED: $fc, RESULT: $result, UNUSED: $unusedComplexity\n")
+              writer.close()
               result.fold(
                 error => throw EvaluationException(error, unusedComplexity),
                 evaluated => update(evaluated).map(_ => unusedComplexity)
@@ -182,7 +189,7 @@ class EvaluatorV2(
                       update = update,
                       limit = unused - 1,
                       parentBlocks = parentBlocks
-                  )
+                    )
                 )
               case FALSE if unused > 0 =>
                 update(i.ifFalse).flatMap(
@@ -192,7 +199,7 @@ class EvaluatorV2(
                       update = update,
                       limit = unused - 1,
                       parentBlocks = parentBlocks
-                  )
+                    )
                 )
               case _: EVALUATED => throw EvaluationException("Non-boolean result in cond", unused)
               case _            => Coeval.now(unused)

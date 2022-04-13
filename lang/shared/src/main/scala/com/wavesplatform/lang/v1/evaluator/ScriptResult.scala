@@ -271,13 +271,13 @@ object ScriptResult {
     }
 
   private def processScriptResult(
-    ctx: EvaluationContext[Environment, Id],
-    txId: ByteStr,
-    actions: Seq[EVALUATED],
-    handlers: ActionHandlers,
-    version: StdLibVersion,
-    unusedComplexity: Int,
-    ret: EVALUATED = unit
+      ctx: EvaluationContext[Environment, Id],
+      txId: ByteStr,
+      actions: Seq[EVALUATED],
+      handlers: ActionHandlers,
+      version: StdLibVersion,
+      unusedComplexity: Int,
+      ret: EVALUATED = unit
   ): Either[String, ScriptResultV4] =
     actions.toList
       .traverse {
@@ -322,9 +322,9 @@ object ScriptResult {
       unusedComplexity: Int
   ): Either[ExecutionError, ScriptResult] =
     (e, version) match {
-      case (CaseObj(tpe, fields), V3) => processScriptResultV3(ctx, tpe, fields, unusedComplexity)
-      case (ARR(actions), V4)         => processScriptResult(ctx, txId, actions, v4ActionHandlers, V4, unusedComplexity)
-      case (ARR(actions), V5)         => processScriptResult(ctx, txId, actions, v5ActionHandlers, V5, unusedComplexity)
+      case (CaseObj(tpe, fields), V3)                     => processScriptResultV3(ctx, tpe, fields, unusedComplexity)
+      case (ARR(actions), V4)                             => processScriptResult(ctx, txId, actions, v4ActionHandlers, V4, unusedComplexity)
+      case (ARR(actions), V5)                             => processScriptResult(ctx, txId, actions, v5ActionHandlers, V5, unusedComplexity)
       case (CaseObj(tpe, fields), V5) if fields.size == 2 =>
         // XXX check tpe
         (fields("_1"), fields("_2")) match {

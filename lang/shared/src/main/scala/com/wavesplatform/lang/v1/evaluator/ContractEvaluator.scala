@@ -134,14 +134,18 @@ object ContractEvaluator {
       }
     EvaluatorV2
       .applyLimitedCoeval(exprWithLets, limit, ctx, version, correctFunctionCallScope)
-      .map(_.flatMap {
-        case (expr, unusedComplexity, log) =>
-          val result =
-            expr match {
-              case value: EVALUATED => ScriptResult.fromObj(ctx, transactionId, value, version, unusedComplexity)
-              case expr: EXPR       => Right(IncompleteResult(expr, unusedComplexity))
+      .map { r =>
+        r.flatMap {
+          case (expr, unusedComplexity, log) =>
+            val result = {
+              expr match {
+                case value: EVALUATED => ScriptResult.fromObj(ctx, transactionId, value, version, unusedComplexity)
+                case expr: EXPR       => Right(IncompleteResult(expr, unusedComplexity))
+              }
             }
-          result.bimap((_, unusedComplexity, log), (_, log))
-      })
+            result.bimap((_, unusedComplexity, log), (_, log))
+        }
+      }
+
   }
 }

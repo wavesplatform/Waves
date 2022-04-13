@@ -1,7 +1,6 @@
 package com.wavesplatform.it.sync
 
 import java.net.URLDecoder
-
 import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, TooBigArrayAllocation}
 import com.wavesplatform.it.api.SyncHttpApi._
