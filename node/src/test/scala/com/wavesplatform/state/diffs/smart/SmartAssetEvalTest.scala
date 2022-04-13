@@ -16,12 +16,12 @@ import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers}
 class SmartAssetEvalTest extends PropSpec with WithState {
 
   val preconditions: (GenesisTransaction, IssueTransaction, SetAssetScriptTransaction, TransferTransaction) = {
-    val firstAcc = TxHelpers.signer(1)
+    val firstAcc  = TxHelpers.signer(1)
     val secondAcc = TxHelpers.signer(2)
 
     val genesis = TxHelpers.genesis(firstAcc.toAddress)
 
-    val emptyScript = s"""
+    val emptyScript       = s"""
                      |{-# STDLIB_VERSION 3 #-}
                      |{-# CONTENT_TYPE EXPRESSION #-}
                      |{-# SCRIPT_TYPE ASSET #-}
@@ -30,12 +30,13 @@ class SmartAssetEvalTest extends PropSpec with WithState {
                      |
         """.stripMargin
     val parsedEmptyScript = Parser.parseExpr(emptyScript).get.value
-    val emptyExprScript = ExprScript(V3, ExpressionCompiler(compilerContext(V3, Expression, isAssetScript = true), parsedEmptyScript).explicitGet()._1)
-      .explicitGet()
+    val emptyExprScript =
+      ExprScript(V3, ExpressionCompiler(compilerContext(V3, Expression, isAssetScript = true), parsedEmptyScript).explicitGet()._1)
+        .explicitGet()
     val issue = TxHelpers.issue(firstAcc, 100, script = Some(emptyExprScript), reissuable = false)
     val asset = IssuedAsset(issue.id())
 
-    val assetScript = s"""
+    val assetScript   = s"""
                      | {-# STDLIB_VERSION 3 #-}
                      | {-# CONTENT_TYPE EXPRESSION #-}
                      | {-# SCRIPT_TYPE ASSET #-}

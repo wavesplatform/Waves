@@ -20,7 +20,6 @@ class UtxPriorityPoolSpecification extends FreeSpec with SharedDomain {
 
   override val genesisBalances: Seq[WithState.AddrWithBalance] = Seq(alice -> 10000.waves)
 
-
   override def settings: WavesSettings = DomainPresets.RideV3
 
   private def pack() = domain.utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1

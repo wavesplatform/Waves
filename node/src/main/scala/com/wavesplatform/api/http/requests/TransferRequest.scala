@@ -17,7 +17,7 @@ case class TransferRequest(
     feeAssetId: Option[Asset],
     fee: Long,
     attachment: Option[ByteStr] = None,
-    timestamp: Option[Long]= None,
+    timestamp: Option[Long] = None,
     signature: Option[ByteStr] = None,
     proofs: Option[Proofs] = None
 ) extends TxBroadcastRequest {

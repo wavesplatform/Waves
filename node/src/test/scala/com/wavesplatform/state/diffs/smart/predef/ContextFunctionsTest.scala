@@ -33,7 +33,7 @@ import shapeless.Coproduct
 class ContextFunctionsTest extends PropSpec with WithState {
 
   private val preconditionsAndPayments = {
-    val master = TxHelpers.signer(1)
+    val master    = TxHelpers.signer(1)
     val recipient = TxHelpers.signer(2)
 
     val genesis = Seq(master, recipient).map(acc => TxHelpers.genesis(acc.toAddress))
@@ -47,7 +47,7 @@ class ContextFunctionsTest extends PropSpec with WithState {
         StringDataEntry("str", "test")
       )
     )
-    val transfer = TxHelpers.transfer(master, recipient.toAddress, 100000000L, version = TxVersion.V1)
+    val transfer  = TxHelpers.transfer(master, recipient.toAddress, 100000000L, version = TxVersion.V1)
     val transfer2 = TxHelpers.transfer(master, recipient.toAddress, 100000L)
 
     val setScripts = Seq(
@@ -139,7 +139,7 @@ class ContextFunctionsTest extends PropSpec with WithState {
 
   property("reading from data transaction array by index") {
     val (_, _, _, _, tx, _, _) = preconditionsAndPayments
-    val badIndex = 4
+    val badIndex               = 4
 
     val int  = tx.data(0)
     val bool = tx.data(1)
@@ -279,8 +279,8 @@ class ContextFunctionsTest extends PropSpec with WithState {
         val (masterAcc, _, genesis, setScriptTransactions, dataTransaction, transferTx, transfer2) = preconditionsAndPayments
         for {
           setScriptTransaction <- setScriptTransactions
-          v4Activation <- if (version >= V4) Seq(true) else Seq(false, true)
-          v5Activation <- if (version >= V5) Seq(true) else Seq(false, true)
+          v4Activation         <- if (version >= V4) Seq(true) else Seq(false, true)
+          v5Activation         <- if (version >= V5) Seq(true) else Seq(false, true)
         } yield {
           val fs = {
             val features = smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (FeeSponsorship.id -> 0))
@@ -307,7 +307,7 @@ class ContextFunctionsTest extends PropSpec with WithState {
             val issueTx = TxHelpers.issue(masterAcc, quantity, decimals)
 
             val sponsoredFee = 100
-            val sponsorTx = TxHelpers.sponsor(issueTx.asset, Some(sponsoredFee), masterAcc)
+            val sponsorTx    = TxHelpers.sponsor(issueTx.asset, Some(sponsoredFee), masterAcc)
 
             append(Seq(transferTx, issueTx)).explicitGet()
 
@@ -379,8 +379,8 @@ class ContextFunctionsTest extends PropSpec with WithState {
                |
                | let lastBlockBaseTarget = lastBlock.baseTarget == 2
                | let lastBlockGenerationSignature = lastBlock.generationSignature == base58'${ByteStr(
-              Array.fill(Block.GenerationSignatureLength)(0: Byte)
-            )}'
+                 Array.fill(Block.GenerationSignatureLength)(0: Byte)
+               )}'
                | let lastBlockGenerator = lastBlock.generator.bytes == base58'${defaultSigner.publicKey.toAddress}'
                | let lastBlockGeneratorPublicKey = lastBlock.generatorPublicKey == base58'${defaultSigner.publicKey}'
                |
@@ -408,7 +408,7 @@ class ContextFunctionsTest extends PropSpec with WithState {
         val (masterAcc, _, genesis, setScriptTransactions, dataTransaction, transferTx, transfer2) = preconditionsAndPayments
         for {
           setScriptTransaction <- setScriptTransactions
-          withVrf <- Seq(version >= V4, true).distinct
+          withVrf              <- Seq(version >= V4, true).distinct
         } yield {
           val generationSignature =
             if (withVrf) ByteStr(new Array[Byte](Block.GenerationVRFSignatureLength)) else ByteStr(new Array[Byte](Block.GenerationSignatureLength))
@@ -499,14 +499,15 @@ class ContextFunctionsTest extends PropSpec with WithState {
              |""".stripMargin
 
         val compiledScript = TestCompiler(V3).compileContract(script)
-        val setScriptTx = TxHelpers.setScript(masterAcc, compiledScript)
+        val setScriptTx    = TxHelpers.setScript(masterAcc, compiledScript)
 
         val invoke = TxHelpers.invoke(
           dApp = masterAcc.toAddress,
           func = Some("compareBlocks"),
           invoker = masterAcc,
           fee = TxHelpers.ciFee(1),
-          version = TxVersion.V1)
+          version = TxVersion.V1
+        )
 
         append(Seq(setScriptTx)).explicitGet()
         append(Seq(invoke)).explicitGet()
@@ -739,7 +740,7 @@ class ContextFunctionsTest extends PropSpec with WithState {
               WavesContext.build(Global, DirectiveSet(version, Account, DApp).explicitGet())
 
           val compiledScript = ContractScript(version, ContractCompiler(ctx.compilerContext, expr, version).explicitGet()).explicitGet()
-          val setScriptTx = TxHelpers.setScript(recipient, compiledScript)
+          val setScriptTx    = TxHelpers.setScript(recipient, compiledScript)
 
           val invoke = TxHelpers.invoke(recipient.toAddress, invoker = masterAcc, version = TxVersion.V1)
 

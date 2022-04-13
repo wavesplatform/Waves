@@ -174,14 +174,16 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     ).explicitGet()._1.bytes().base64
     sender.setAssetScript(blackAsset, firstKeyPair, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
-    val blackTx = TransferTransaction.selfSigned(
+    val blackTx = TransferTransaction
+      .selfSigned(
         2.toByte,
         secondKeyPair,
         thirdKeyPair.toAddress,
         IssuedAsset(ByteStr.decodeBase58(blackAsset).get),
         1,
         Waves,
-        smartMinFee, ByteStr.empty,
+        smartMinFee,
+        ByteStr.empty,
         System.currentTimeMillis + 1.minutes.toMillis
       )
       .explicitGet()
@@ -194,7 +196,8 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
         IssuedAsset(ByteStr.decodeBase58(blackAsset).get),
         1,
         Waves,
-        smartMinFee, ByteStr.empty,
+        smartMinFee,
+        ByteStr.empty,
         System.currentTimeMillis + 10.minutes.toMillis
       )
       .explicitGet()

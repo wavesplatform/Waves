@@ -836,7 +836,7 @@ abstract class LevelDBWriter private[database] (
               LeaseDetails(
                 lt.sender,
                 lt.recipient,
-                lt.amount,
+                lt.amount.value,
                 if (isActive) LeaseDetails.Status.Active
                 else LeaseDetails.Status.Cancelled(h, None),
                 leaseId,

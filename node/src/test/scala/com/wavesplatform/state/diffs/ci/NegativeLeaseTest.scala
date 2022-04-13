@@ -34,13 +34,13 @@ class NegativeLeaseTest extends PropSpec with WithDomain {
       .copy(syncDAppCheckTransfersHeight = 4)
 
   property("negative lease amount") {
-    for(bigComplexity <- Seq(false, true)) {
+    for (bigComplexity <- Seq(false, true)) {
       val invoker = TxHelpers.signer(0)
-      val dApp = TxHelpers.signer(1)
+      val dApp    = TxHelpers.signer(1)
 
       val balances = AddrWithBalance.enoughBalances(invoker, dApp)
 
-      val issue = TxHelpers.issue(dApp, 100)
+      val issue     = TxHelpers.issue(dApp, 100)
       val setScript = TxHelpers.setScript(dApp, dAppScript(bigComplexity))
 
       val preparingTxs = Seq(issue, setScript)

@@ -42,23 +42,23 @@ class BalancesV4Test extends PropSpec with WithState {
 
   private val preconditionsAndTransfer = {
     val master = TxHelpers.signer(0)
-    val acc1 = TxHelpers.signer(1)
-    val dapp = TxHelpers.signer(2)
+    val acc1   = TxHelpers.signer(1)
+    val dapp   = TxHelpers.signer(2)
 
     val genesis = Seq(
       TxHelpers.genesis(master.toAddress),
       TxHelpers.genesis(acc1.toAddress, 25 * Constants.UnitsInWave + 3 * MinFee),
       TxHelpers.genesis(dapp.toAddress, 10 * Constants.UnitsInWave + SetScriptFee + 2 * InvokeScriptTxFee + 1 * Constants.UnitsInWave)
     )
-    val alias = "alias"
+    val alias       = "alias"
     val createAlias = TxHelpers.createAlias(alias, acc1, MinFee)
-    val setScript = TxHelpers.setScript(dapp, script(alias), SetScriptFee)
-    val invoke = TxHelpers.invoke(dapp.toAddress, func = Some("bar"), invoker = master, fee = InvokeScriptTxFee)
-    val lease1 = TxHelpers.lease(acc1, dapp.toAddress, 10 * Constants.UnitsInWave, MinFee)
-    val lease2 = TxHelpers.lease(acc1, dapp.toAddress, 10 * Constants.UnitsInWave, MinFee)
-    val leaseD = TxHelpers.lease(dapp, acc1.toAddress, 1 * Constants.UnitsInWave, MinFee)
-    val cancel1 = TxHelpers.leaseCancel(lease1.id(), acc1, MinFee)
-    val transfer = TxHelpers.transfer(dapp, acc1.toAddress, 1 * Constants.UnitsInWave + MinFee, fee = InvokeScriptTxFee)
+    val setScript   = TxHelpers.setScript(dapp, script(alias), SetScriptFee)
+    val invoke      = TxHelpers.invoke(dapp.toAddress, func = Some("bar"), invoker = master, fee = InvokeScriptTxFee)
+    val lease1      = TxHelpers.lease(acc1, dapp.toAddress, 10 * Constants.UnitsInWave, MinFee)
+    val lease2      = TxHelpers.lease(acc1, dapp.toAddress, 10 * Constants.UnitsInWave, MinFee)
+    val leaseD      = TxHelpers.lease(dapp, acc1.toAddress, 1 * Constants.UnitsInWave, MinFee)
+    val cancel1     = TxHelpers.leaseCancel(lease1.id(), acc1, MinFee)
+    val transfer    = TxHelpers.transfer(dapp, acc1.toAddress, 1 * Constants.UnitsInWave + MinFee, fee = InvokeScriptTxFee)
 
     ((genesis :+ createAlias) ++ Seq(setScript, lease1, lease2), Seq(cancel1, leaseD, transfer), acc1, dapp, invoke)
   }
@@ -95,7 +95,7 @@ class BalancesV4Test extends PropSpec with WithState {
       rideV4Activated
     ) {
       case (d, s) =>
-        val apiBalance = com.wavesplatform.api.common.CommonAccountsApi(() => d, db, s).balanceDetails(acc1.toAddress)
+        val apiBalance = com.wavesplatform.api.common.CommonAccountsApi(() => d, db, s).balanceDetails(acc1.toAddress).explicitGet()
         val data       = d.accountData(dapp.toAddress)
         data.data("available") shouldBe IntegerDataEntry("available", apiBalance.available)
         apiBalance.available shouldBe 16 * Constants.UnitsInWave
@@ -158,9 +158,9 @@ class BalancesV4Test extends PropSpec with WithState {
       TxHelpers.genesis(acc2.toAddress)
     )
     val createAlias = TxHelpers.createAlias("alias", acc2, MinFee)
-    val issue = TxHelpers.issue(acc1, 10000000000L, script = Some(assetScript(ByteStr(acc1.toAddress.bytes))), fee = SetAssetScriptFee)
-    val setScript = TxHelpers.setScript(acc1, dappScript(ByteStr(acc2.toAddress.bytes), issue.id()), SetScriptFee)
-    val invoke = TxHelpers.invoke(acc1.toAddress, func = Some("bar"), invoker = acc1, fee = InvokeScriptTxFee)
+    val issue       = TxHelpers.issue(acc1, 10000000000L, script = Some(assetScript(ByteStr(acc1.toAddress.bytes))), fee = SetAssetScriptFee)
+    val setScript   = TxHelpers.setScript(acc1, dappScript(ByteStr(acc2.toAddress.bytes), issue.id()), SetScriptFee)
+    val invoke      = TxHelpers.invoke(acc1.toAddress, func = Some("bar"), invoker = acc1, fee = InvokeScriptTxFee)
 
     assertDiffAndState(Seq(TestBlock.create(genesis :+ createAlias :+ issue :+ setScript)), TestBlock.create(Seq(invoke)), rideV4Activated) {
       case (d, s) =>
@@ -219,9 +219,9 @@ class BalancesV4Test extends PropSpec with WithState {
       TxHelpers.genesis(acc1.toAddress),
       TxHelpers.genesis(acc2.toAddress)
     )
-    val issue = TxHelpers.issue(acc1, 10000000000L, script = Some(assetScript(ByteStr(acc1.toAddress.bytes))), fee = SetAssetScriptFee)
+    val issue     = TxHelpers.issue(acc1, 10000000000L, script = Some(assetScript(ByteStr(acc1.toAddress.bytes))), fee = SetAssetScriptFee)
     val setScript = TxHelpers.setScript(acc1, dappScript(ByteStr(acc2.toAddress.bytes), issue.id()), SetScriptFee)
-    val invoke = TxHelpers.invoke(acc1.toAddress, func = Some("bar"), invoker = acc2, fee = InvokeScriptTxFee)
+    val invoke    = TxHelpers.invoke(acc1.toAddress, func = Some("bar"), invoker = acc2, fee = InvokeScriptTxFee)
 
     assertDiffAndState(Seq(TestBlock.create(genesis :+ issue :+ setScript)), TestBlock.create(Seq(invoke)), rideV4Activated) {
       case (d, s) =>

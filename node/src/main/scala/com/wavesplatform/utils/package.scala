@@ -84,14 +84,14 @@ package object utils extends ScorexLogging {
   implicit val evaluatedWrites: Writes[EVALUATED] = new Writes[EVALUATED] {
     import com.wavesplatform.api.http.ApiError
     override def writes(o: EVALUATED): JsValue = (o: @unchecked) match {
-        case CONST_LONG(num)   => Json.obj("type" -> "Int", "value"        -> num)
-        case CONST_BYTESTR(bs) => Json.obj("type" -> "ByteVector", "value" -> bs.toString)
-        case CONST_STRING(str) => Json.obj("type" -> "String", "value"     -> str)
-        case CONST_BOOLEAN(b)  => Json.obj("type" -> "Boolean", "value"    -> b)
-        case CaseObj(caseType, fields) =>
-          Json.obj("type" -> caseType.name, "value" -> JsObject(fields.view.mapValues(writes).toSeq))
-        case ARR(xs)      => Json.obj("type"  -> "Array", "value" -> xs.map(writes))
-        case FAIL(reason) => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "error" -> reason)
+      case CONST_LONG(num)   => Json.obj("type" -> "Int", "value"        -> num)
+      case CONST_BYTESTR(bs) => Json.obj("type" -> "ByteVector", "value" -> bs.toString)
+      case CONST_STRING(str) => Json.obj("type" -> "String", "value"     -> str)
+      case CONST_BOOLEAN(b)  => Json.obj("type" -> "Boolean", "value"    -> b)
+      case CaseObj(caseType, fields) =>
+        Json.obj("type" -> caseType.name, "value" -> JsObject(fields.view.mapValues(writes).toSeq))
+      case ARR(xs)      => Json.obj("type"  -> "Array", "value"                          -> xs.map(writes))
+      case FAIL(reason) => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "error" -> reason)
     }
   }
 }

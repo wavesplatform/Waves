@@ -19,7 +19,7 @@ import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import play.api.libs.json.{JsObject, JsValue}
 
-object  TransactionFactory {
+object TransactionFactory {
   def transferAsset(request: TransferRequest, wallet: Wallet, time: Time): Either[ValidationError, TransferTransaction] =
     for {
       _  <- Either.cond(request.sender.nonEmpty, (), GenericError("invalid.sender"))
@@ -86,7 +86,14 @@ object  TransactionFactory {
         case None | Some("") => Right(None)
         case Some(s)         => Script.fromBase64String(s).map(Some(_))
       }
-      tx <- SetScriptTransaction.signed(request.version.getOrElse(1.toByte), sender.publicKey, script, request.fee, request.timestamp.getOrElse(time.getTimestamp()), signer.privateKey)
+      tx <- SetScriptTransaction.signed(
+        request.version.getOrElse(1.toByte),
+        sender.publicKey,
+        script,
+        request.fee,
+        request.timestamp.getOrElse(time.getTimestamp()),
+        signer.privateKey
+      )
     } yield tx
 
   def setScript(request: SetScriptRequest, sender: PublicKey): Either[ValidationError, SetScriptTransaction] =
@@ -251,7 +258,14 @@ object  TransactionFactory {
     for {
       sender <- wallet.findPrivateKey(request.sender)
       signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
-      tx     <- DataTransaction.signed(request.version, sender.publicKey, request.data, request.fee, request.timestamp.getOrElse(time.getTimestamp()), signer.privateKey)
+      tx <- DataTransaction.signed(
+        request.version,
+        sender.publicKey,
+        request.data,
+        request.fee,
+        request.timestamp.getOrElse(time.getTimestamp()),
+        signer.privateKey
+      )
     } yield tx
 
   def data(request: DataRequest, sender: PublicKey): Either[ValidationError, DataTransaction] =

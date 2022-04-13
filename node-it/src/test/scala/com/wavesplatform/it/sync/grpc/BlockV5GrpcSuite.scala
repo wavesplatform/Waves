@@ -13,11 +13,7 @@ import org.scalatest._
 
 import scala.concurrent.duration._
 
-class BlockV5GrpcSuite
-    extends freespec.AnyFreeSpec
-    with ActivationStatusRequest
-    with OptionValues
-    with GrpcIntegrationSuiteWithThreeAddress {
+class BlockV5GrpcSuite extends freespec.AnyFreeSpec with ActivationStatusRequest with OptionValues with GrpcIntegrationSuiteWithThreeAddress {
 
   override def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder

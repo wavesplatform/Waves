@@ -32,7 +32,7 @@ class DAppVerifierRestrictionsTest extends PropSpec with WithDomain with EitherV
 
     val balances = AddrWithBalance.enoughBalances(account1, account2)
 
-    val setInvoke = TxHelpers.setScript(account1, contract("invoke"))
+    val setInvoke          = TxHelpers.setScript(account1, contract("invoke"))
     val setReentrantInvoke = TxHelpers.setScript(account2, contract("reentrantInvoke"))
 
     (balances, setInvoke, setReentrantInvoke)

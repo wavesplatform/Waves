@@ -1,7 +1,8 @@
 package com.wavesplatform.it.api
 
-import java.util.NoSuchElementException
+import com.google.common.primitives.{Bytes, Longs}
 
+import java.util.NoSuchElementException
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.{AddressScheme, Alias, KeyPair}
@@ -17,8 +18,10 @@ import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.PBBlocks
+import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.{Asset, TxVersion}
 import io.grpc.stub.StreamObserver
@@ -94,10 +97,33 @@ object AsyncGrpcApi {
       )
 
       script match {
-        case Left(_) => transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.EMPTY)))
-        case _ =>
-          val proofs =
-            crypto.sign(source.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())
+        case Left(_)   => transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.EMPTY)))
+        case Right(sc) =>
+          // IssueTxSerializer.bodyBytes can't be used here because we must be able to test broadcasting issue transaction with incorrect data
+          val baseBytes = Bytes.concat(
+            source.publicKey.arr,
+            Deser.serializeArrayWithLength(name.getBytes),
+            Deser.serializeArrayWithLength(description.getBytes),
+            Longs.toByteArray(quantity),
+            Array(decimals.toByte),
+            Deser.serializeBoolean(reissuable),
+            Longs.toByteArray(fee),
+            Longs.toByteArray(unsigned.timestamp)
+          )
+
+          val bodyBytes = version match {
+            case TxVersion.V1 => Bytes.concat(Array(IssueTransaction.typeId), baseBytes)
+            case TxVersion.V2 =>
+              Bytes.concat(
+                Array(IssueTransaction.typeId, version.toByte, chainId),
+                baseBytes,
+                Deser.serializeOptionOfArrayWithLength(sc)(_.bytes().arr)
+              )
+            case _ =>
+              PBUtils.encodeDeterministic(unsigned)
+          }
+
+          val proofs = crypto.sign(source.privateKey, bodyBytes)
           transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs.arr))))
       }
     }
@@ -377,7 +403,8 @@ object AsyncGrpcApi {
           )
         )
       )
-      val proofs = crypto.sign(sender.privateKey, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())
+      // MassTransferTxSerializer.bodyBytes can't be used here because we must be able to test broadcasting mass transfer transaction with incorrect data
+      val proofs = TxHelpers.massTransferBodyBytes(sender, assetId, transfers, attachment, fee, unsigned.timestamp, version)
       transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs.arr))))
     }
 

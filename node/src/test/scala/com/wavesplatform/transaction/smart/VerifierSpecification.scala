@@ -43,19 +43,22 @@ class VerifierSpecification extends PropSpec with NTPTime with WithDomain {
       assetPair: AssetPair,
       fee: Long = 0.003.waves,
       feeAsset: Asset = Waves
-  ) = Order.selfSigned(
-    3.toByte,
-    sender,
-    matcher,
-    assetPair,
-    orderType,
-    100,
-    5.waves,
-    ntpTime.getTimestamp(),
-    ntpTime.getTimestamp() + 200000,
-    fee,
-    feeAsset
-  )
+  ) =
+    Order
+      .selfSigned(
+        3.toByte,
+        sender,
+        matcher,
+        assetPair,
+        orderType,
+        100,
+        5.waves,
+        ntpTime.getTimestamp(),
+        ntpTime.getTimestamp() + 200000,
+        fee,
+        feeAsset
+      )
+      .explicitGet()
 
   private val sharedParamGen = for {
     sender  <- accountGen

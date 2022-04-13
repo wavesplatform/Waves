@@ -20,12 +20,7 @@ import play.api.libs.json._
 
 import scala.util.Random
 
-class BlocksApiRouteSpec
-    extends RouteSpec("/blocks")
-    with PathMockFactory
-    with RestAPISettingsHelper
-    with TestWallet
-    with WithDomain {
+class BlocksApiRouteSpec extends RouteSpec("/blocks") with PathMockFactory with RestAPISettingsHelper with TestWallet with WithDomain {
   private val blocksApi                      = mock[CommonBlocksApi]
   private val blocksApiRoute: BlocksApiRoute = BlocksApiRoute(restAPISettings, blocksApi, SystemTime)
   private val route                          = blocksApiRoute.route

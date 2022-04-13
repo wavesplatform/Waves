@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs
 
-import cats._
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
@@ -42,19 +41,19 @@ class LeaseTransactionsDiffTest extends PropSpec with WithDomain {
       case (genesis, lease, leaseCancel) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(lease))) {
           case (totalDiff, _) =>
-            val totalPortfolioDiff = Monoid.combineAll(totalDiff.portfolios.values)
+            val totalPortfolioDiff = totalDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
             totalPortfolioDiff.balance shouldBe 0
             total(totalPortfolioDiff.lease) shouldBe 0
-            totalPortfolioDiff.effectiveBalance shouldBe 0
+            totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
             totalPortfolioDiff.assets.values.foreach(_ shouldBe 0)
         }
 
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis, lease))), TestBlock.create(Seq(leaseCancel))) {
           case (totalDiff, _) =>
-            val totalPortfolioDiff = Monoid.combineAll(totalDiff.portfolios.values)
+            val totalPortfolioDiff = totalDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
             totalPortfolioDiff.balance shouldBe 0
             total(totalPortfolioDiff.lease) shouldBe 0
-            totalPortfolioDiff.effectiveBalance shouldBe 0
+            totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe 0
             totalPortfolioDiff.assets.values.foreach(_ shouldBe 0)
         }
     }
@@ -79,8 +78,8 @@ class LeaseTransactionsDiffTest extends PropSpec with WithDomain {
         TxHelpers.leaseCancel(lease.id(), master, timestamp = ts + 1, version = TxVersion.V1)
       )
       leaseCancel2 <- Seq(
-        TxHelpers.leaseCancel(lease.id(), master, fee = leaseCancel.fee + 1, timestamp = ts + 1),
-        TxHelpers.leaseCancel(lease.id(), master, fee = leaseCancel.fee + 1, timestamp = ts + 1, version = TxVersion.V1)
+        TxHelpers.leaseCancel(lease.id(), master, fee = leaseCancel.fee.value + 1, timestamp = ts + 1),
+        TxHelpers.leaseCancel(lease.id(), master, fee = leaseCancel.fee.value + 1, timestamp = ts + 1, version = TxVersion.V1)
       )
     } yield {
       // ensure recipient has enough effective balance
@@ -192,8 +191,8 @@ class LeaseTransactionsDiffTest extends PropSpec with WithDomain {
         assertDiffAndState(Seq(TestBlock.create(genesis :+ lease)), TestBlock.create(blockTime, Seq(unleaseOther)), settings) {
           case (totalDiff, _) =>
             totalDiff.portfolios.get(lease.sender.toAddress) shouldBe None
-            total(totalDiff.portfolios(lease.recipient.asInstanceOf[Address]).lease) shouldBe -lease.amount
-            total(totalDiff.portfolios(unleaseOther.sender.toAddress).lease) shouldBe lease.amount
+            total(totalDiff.portfolios(lease.recipient.asInstanceOf[Address]).lease) shouldBe -lease.amount.value
+            total(totalDiff.portfolios(unleaseOther.sender.toAddress).lease) shouldBe lease.amount.value
         }
     }
   }

@@ -15,7 +15,6 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{DataTransaction, Transaction, TxVersion}
-import com.wavesplatform.utils._
 import org.scalacheck.Gen
 
 trait BlocksTransactionsHelpers { self: TransactionGen =>
@@ -76,18 +75,20 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     def nftIssue(from: KeyPair, timestamp: Gen[Long] = timestampGen): Gen[IssueTransaction] =
       for {
         timestamp <- timestamp
-      } yield IssueTransaction(
-        TxVersion.V1,
-        from.publicKey,
-        "test".utf8Bytes,
-        Array.emptyByteArray,
-        1,
-        0,
-        reissuable = false,
-        script = None,
-        100000000L,
-        timestamp
-      ).signWith(from.privateKey)
+      } yield IssueTransaction
+        .selfSigned(
+          TxVersion.V1,
+          from,
+          "test",
+          "",
+          1,
+          0,
+          reissuable = false,
+          script = None,
+          100000000L,
+          timestamp
+        )
+        .explicitGet()
 
     def setScript(from: KeyPair, script: Script, timestamp: Gen[Long] = timestampGen): Gen[SetScriptTransaction] =
       for {

@@ -20,7 +20,7 @@ case class SignedReissueV2Request(
 ) {
   def toTx: Either[ValidationError, ReissueTransaction] =
     for {
-      _sender <- PublicKey.fromBase58String(senderPublicKey)
+      _sender     <- PublicKey.fromBase58String(senderPublicKey)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
       _assetId    <- parseBase58ToIssuedAsset(assetId)

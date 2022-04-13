@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs
 
-import cats.syntax.monoid._
 import com.wavesplatform.TestValues
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.StdLibVersion
@@ -21,22 +21,22 @@ class TransferTransactionDiffTest extends PropSpec with WithDomain {
 
     withDomain(DomainPresets.mostRecent.copy(rewardsSettings = RewardsVotingSettings(None)), AddrWithBalance.enoughBalances(senderKp)) { d =>
       val wavesTransfer = TxHelpers.transfer(senderKp, recipient)
-      assertBalanceInvariant(d.createDiff(wavesTransfer) |+| feeDiff)
+      assertBalanceInvariant(d.createDiff(wavesTransfer).combine(feeDiff).explicitGet())
 
       d.appendAndAssertSucceed(wavesTransfer)
-      d.blockchain.balance(recipient) shouldBe wavesTransfer.amount
-      d.blockchain.balance(sender) shouldBe ENOUGH_AMT - wavesTransfer.amount - wavesTransfer.fee
+      d.blockchain.balance(recipient) shouldBe wavesTransfer.amount.value
+      d.blockchain.balance(sender) shouldBe ENOUGH_AMT - wavesTransfer.amount.value - wavesTransfer.fee.value
     }
 
     withDomain(DomainPresets.mostRecent, AddrWithBalance.enoughBalances(senderKp)) { d =>
       val asset         = d.helpers.issueAsset(senderKp)
       val assetTransfer = TxHelpers.transfer(senderKp, recipient, asset = asset, amount = 1000)
-      assertBalanceInvariant(d.createDiff(assetTransfer) |+| feeDiff)
+      assertBalanceInvariant(d.createDiff(assetTransfer).combine(feeDiff).explicitGet())
 
       d.appendAndAssertSucceed(assetTransfer)
       d.blockchain.balance(recipient) shouldBe 0L
       d.blockchain.balance(recipient, asset) shouldBe 1000L
-      d.blockchain.balance(sender) shouldBe ENOUGH_AMT - assetTransfer.fee - 1.waves
+      d.blockchain.balance(sender) shouldBe ENOUGH_AMT - assetTransfer.fee.value - 1.waves
       d.blockchain.balance(sender, asset) shouldBe 0L
     }
   }

@@ -24,9 +24,9 @@ case class InvokeScriptTransaction(
     dAppAddressOrAlias: AddressOrAlias,
     funcCallOpt: Option[FUNCTION_CALL],
     payments: Seq[Payment],
-    fee: TxAmount,
+    fee: TxPositiveAmount,
     feeAssetId: Asset,
-    override val timestamp: TxTimestamp,
+    timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
 ) extends ProvenTransaction
@@ -45,8 +45,8 @@ case class InvokeScriptTransaction(
   val json: Coeval[JsObject]         = Coeval.evalOnce(builder.serializer.toJson(this))
 
   override def root: Option[InvokeScriptTransaction] = Some(this)
-  def senderAddress: Address = sender.toAddress
-  override def checkedAssets: Seq[IssuedAsset] = super[InvokeScriptLike].checkedAssets
+  def senderAddress: Address                         = sender.toAddress
+  override def checkedAssets: Seq[IssuedAsset]       = super[InvokeScriptLike].checkedAssets
 }
 
 object InvokeScriptTransaction extends TransactionParser {
@@ -65,7 +65,7 @@ object InvokeScriptTransaction extends TransactionParser {
   override def parseBytes(bytes: Array[Byte]): Try[InvokeScriptTransaction] =
     serializer.parseBytes(bytes)
 
-  case class Payment(amount: TxAmount, assetId: Asset)
+  case class Payment(amount: Long, assetId: Asset)
   object Payment {
     import play.api.libs.json.{Json, _}
     implicit val jsonFormat: Format[Payment] = Json.format
@@ -77,12 +77,15 @@ object InvokeScriptTransaction extends TransactionParser {
       dappAddress: AddressOrAlias,
       fc: Option[FUNCTION_CALL],
       p: Seq[Payment],
-      fee: TxAmount,
+      fee: Long,
       feeAssetId: Asset,
       timestamp: TxTimestamp,
       proofs: Proofs
   ): Either[ValidationError, InvokeScriptTransaction] =
-    InvokeScriptTransaction(version, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, proofs, dappAddress.chainId).validatedEither
+    for {
+      fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
+      tx  <- InvokeScriptTransaction(version, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, proofs, dappAddress.chainId).validatedEither
+    } yield tx
 
   def signed(
       version: TxVersion,
@@ -90,7 +93,7 @@ object InvokeScriptTransaction extends TransactionParser {
       dappAddress: AddressOrAlias,
       fc: Option[FUNCTION_CALL],
       p: Seq[Payment],
-      fee: TxAmount,
+      fee: Long,
       feeAssetId: Asset,
       timestamp: TxTimestamp,
       signer: PrivateKey
@@ -103,7 +106,7 @@ object InvokeScriptTransaction extends TransactionParser {
       dappAddress: AddressOrAlias,
       fc: Option[FUNCTION_CALL],
       p: Seq[Payment],
-      fee: TxAmount,
+      fee: Long,
       feeAssetId: Asset,
       timestamp: TxTimestamp
   ): Either[ValidationError, InvokeScriptTransaction] =

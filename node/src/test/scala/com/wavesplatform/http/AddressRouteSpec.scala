@@ -32,12 +32,7 @@ import play.api.libs.json._
 
 import scala.concurrent.duration._
 
-class AddressRouteSpec
-    extends RouteSpec("/addresses")
-    with PathMockFactory
-    with RestAPISettingsHelper
-    with TestWallet
-    with WithDomain {
+class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with RestAPISettingsHelper with TestWallet with WithDomain {
 
   testWallet.generateNewAccounts(10)
   private val allAccounts  = testWallet.privateKeyAccounts
@@ -74,7 +69,9 @@ class AddressRouteSpec
 
   routePath("/balance/{address}/{confirmations}") in withDomain(balances = Seq(AddrWithBalance(TxHelpers.defaultAddress))) { d =>
     val route =
-      addressApiRoute.copy(blockchain = d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(() => d.liquidDiff, d.db, d.blockchainUpdater)).route
+      addressApiRoute
+        .copy(blockchain = d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(() => d.liquidDiff, d.db, d.blockchainUpdater))
+        .route
     val address = TxHelpers.signer(1).toAddress
 
     for (_ <- 1 until 10) d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, address))

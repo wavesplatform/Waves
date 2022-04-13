@@ -133,14 +133,12 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
       node.transfer(issuer, receiver.toAddress.stringRepr, 10, assetId = Some(assetId))
     }
 
-
     node.waitFor("empty utx")(_.utxSize, (_: Int) == 0, 1 second)
     nodes.waitForHeightArise()
 
     val list = node.assetDistribution(assetId)
     list should have size 2001
   }
-
 
   def distributionPages(asset: String, height: Int, limit: Int): List[AssetDistributionPage] = {
     def _load(acc: List[AssetDistributionPage], maybeAfter: Option[String]): List[AssetDistributionPage] = {

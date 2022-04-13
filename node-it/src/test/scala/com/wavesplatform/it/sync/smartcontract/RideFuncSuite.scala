@@ -46,28 +46,44 @@ class RideFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     val tx =
       sender.signedBroadcast(
-        SetScriptTransaction.selfSigned(1.toByte, pkNewAddress, Some(compiled), setScriptFee, System.currentTimeMillis()).explicitGet().json())
+        SetScriptTransaction.selfSigned(1.toByte, pkNewAddress, Some(compiled), setScriptFee, System.currentTimeMillis()).explicitGet().json()
+      )
     nodes.waitForHeightAriseAndTxPresent(tx.id)
 
     assertBadRequestAndResponse(
       sender.signedBroadcast(
-        TransferTransaction.selfSigned(2.toByte, pkNewAddress, pkNewAddress.toAddress, Waves, 1.waves, Waves, smartMinFee, ByteStr.empty,  System.currentTimeMillis())
+        TransferTransaction
+          .selfSigned(2.toByte, pkNewAddress, pkNewAddress.toAddress, Waves, 1.waves, Waves, smartMinFee, ByteStr.empty, System.currentTimeMillis())
           .explicitGet()
-          .json()),
+          .json()
+      ),
       "Transaction is not allowed by account-script"
     )
 
     sender.signedBroadcast(
-      TransferTransaction.selfSigned(2.toByte, firstKeyPair, pkNewAddress.toAddress, IssuedAsset(ByteStr.decodeBase58(asset).get), 100000000, Waves, smartMinFee, ByteStr.empty,  System.currentTimeMillis())
+      TransferTransaction
+        .selfSigned(
+          2.toByte,
+          firstKeyPair,
+          pkNewAddress.toAddress,
+          IssuedAsset(ByteStr.decodeBase58(asset).get),
+          100000000,
+          Waves,
+          smartMinFee,
+          ByteStr.empty,
+          System.currentTimeMillis()
+        )
         .explicitGet()
         .json(),
       waitForTx = true
     )
 
     val transfer = sender.signedBroadcast(
-      TransferTransaction.selfSigned(2.toByte, pkNewAddress, pkNewAddress.toAddress, Waves, 1.waves, Waves, smartMinFee, ByteStr.empty,  System.currentTimeMillis())
+      TransferTransaction
+        .selfSigned(2.toByte, pkNewAddress, pkNewAddress.toAddress, Waves, 1.waves, Waves, smartMinFee, ByteStr.empty, System.currentTimeMillis())
         .explicitGet()
-        .json())
+        .json()
+    )
     nodes.waitForHeightAriseAndTxPresent(transfer.id)
 
     val udpatedScript =
@@ -82,28 +98,47 @@ class RideFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     val updTx =
       sender.signedBroadcast(
-        SetScriptTransaction.selfSigned(1.toByte, pkNewAddress, Some(updated), setScriptFee + smartFee, System.currentTimeMillis()).explicitGet().json())
+        SetScriptTransaction
+          .selfSigned(1.toByte, pkNewAddress, Some(updated), setScriptFee + smartFee, System.currentTimeMillis())
+          .explicitGet()
+          .json()
+      )
     nodes.waitForHeightAriseAndTxPresent(updTx.id)
 
     assertBadRequestAndResponse(
       sender.signedBroadcast(
-        TransferTransaction.selfSigned(2.toByte, pkNewAddress, pkNewAddress.toAddress, Waves, 1.waves, Waves, smartMinFee, ByteStr.empty,  System.currentTimeMillis())
+        TransferTransaction
+          .selfSigned(2.toByte, pkNewAddress, pkNewAddress.toAddress, Waves, 1.waves, Waves, smartMinFee, ByteStr.empty, System.currentTimeMillis())
           .explicitGet()
-          .json()),
+          .json()
+      ),
       "Transaction is not allowed by account-script"
     )
 
     sender.signedBroadcast(
-      TransferTransaction.selfSigned(2.toByte, firstKeyPair, pkNewAddress.toAddress, IssuedAsset(ByteStr.decodeBase58(asset).get), 800000000, Waves, smartMinFee, ByteStr.empty,  System.currentTimeMillis())
+      TransferTransaction
+        .selfSigned(
+          2.toByte,
+          firstKeyPair,
+          pkNewAddress.toAddress,
+          IssuedAsset(ByteStr.decodeBase58(asset).get),
+          800000000,
+          Waves,
+          smartMinFee,
+          ByteStr.empty,
+          System.currentTimeMillis()
+        )
         .explicitGet()
         .json(),
       waitForTx = true
     )
 
     val transferAfterUpd = sender.signedBroadcast(
-      TransferTransaction.selfSigned(2.toByte, pkNewAddress, pkNewAddress.toAddress, Waves, 1.waves, Waves, smartMinFee, ByteStr.empty,  System.currentTimeMillis())
+      TransferTransaction
+        .selfSigned(2.toByte, pkNewAddress, pkNewAddress.toAddress, Waves, 1.waves, Waves, smartMinFee, ByteStr.empty, System.currentTimeMillis())
         .explicitGet()
-        .json())
+        .json()
+    )
     nodes.waitForHeightAriseAndTxPresent(transferAfterUpd.id)
   }
 
@@ -131,18 +166,29 @@ class RideFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
     val pkNewAddress = newAddress
     sender.transfer(firstKeyPair, newAddress.toAddress.toString, 10.waves, minFee, waitForTx = true)
 
-    val scriptSet = SetScriptTransaction.selfSigned(1.toByte, pkNewAddress, Some(compiledScript), setScriptFee, System.currentTimeMillis())
+    val scriptSet          = SetScriptTransaction.selfSigned(1.toByte, pkNewAddress, Some(compiledScript), setScriptFee, System.currentTimeMillis())
     val scriptSetBroadcast = sender.signedBroadcast(scriptSet.explicitGet().json())
     nodes.waitForHeightAriseAndTxPresent(scriptSetBroadcast.id)
 
-    val transfer = TransferTransaction.selfSigned(2.toByte, pkNewAddress, pkNewAddress.toAddress, Waves, 1.waves, Waves, smartMinFee, ByteStr.empty,  System.currentTimeMillis())
+    val transfer = TransferTransaction.selfSigned(
+      2.toByte,
+      pkNewAddress,
+      pkNewAddress.toAddress,
+      Waves,
+      1.waves,
+      Waves,
+      smartMinFee,
+      ByteStr.empty,
+      System.currentTimeMillis()
+    )
     val transferBroadcast = sender.signedBroadcast(transfer.explicitGet().json())
     nodes.waitForHeightAriseAndTxPresent(transferBroadcast.id)
   }
 
   test("lastBlock and blockInfoByHeight(last) must return liquid block") {
-    val script = ScriptCompiler.compile(
-      s"""
+    val script = ScriptCompiler
+      .compile(
+        s"""
          |  {-# STDLIB_VERSION 3       #-}
          |  {-# CONTENT_TYPE   DAPP    #-}
          |  {-# SCRIPT_TYPE    ACCOUNT #-}
@@ -156,7 +202,11 @@ class RideFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
          |    let checkHeightLast = lastBlock.height == height
          |    checkTs && checkHeight && checkHeightLast
          |  }
-      """.stripMargin, estimator).explicitGet()._1
+      """.stripMargin,
+        estimator
+      )
+      .explicitGet()
+      ._1
 
     val newAddress = sender.createKeyPair()
     sender.transfer(firstKeyPair, newAddress.toAddress.toString, 10.waves, minFee, waitForTx = true)

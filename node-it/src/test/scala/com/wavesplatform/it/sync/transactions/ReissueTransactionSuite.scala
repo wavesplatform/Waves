@@ -32,7 +32,8 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
       miner.assertAssetBalance(firstAddress, issuedAssetId, 2 * someAssetAmount)
     }
 
-    miner.transactionsByAddress(firstAddress, limit = 100)
+    miner
+      .transactionsByAddress(firstAddress, limit = 100)
       .count(_._type == ReissueTransaction.typeId) shouldBe reissueTxSupportedVersions.length
   }
 
@@ -62,9 +63,12 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
 
       nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
 
-      assertApiError(sender.reissue(firstKeyPair, issuedAssetId, someAssetAmount, reissuable = true, fee = reissueReducedFee - 1, version = v)) { error =>
-        error.id shouldBe StateCheckFailed.Id
-        error.message should include(s"Fee for ReissueTransaction (${reissueReducedFee - 1} in WAVES) does not exceed minimal value of $reissueReducedFee WAVES.")
+      assertApiError(sender.reissue(firstKeyPair, issuedAssetId, someAssetAmount, reissuable = true, fee = reissueReducedFee - 1, version = v)) {
+        error =>
+          error.id shouldBe StateCheckFailed.Id
+          error.message should include(
+            s"Fee for ReissueTransaction (${reissueReducedFee - 1} in WAVES) does not exceed minimal value of $reissueReducedFee WAVES."
+          )
       }
     }
   }
@@ -72,7 +76,7 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
   test("not able to reissue if cannot pay fee - insufficient funds") {
     for (v <- reissueTxSupportedVersions) {
       val (balance, effectiveBalance) = miner.accountBalances(firstAddress)
-      val reissueFee = effectiveBalance + 1.waves
+      val reissueFee                  = effectiveBalance + 1.waves
 
       val issuedAssetId = sender.issue(firstKeyPair, "name4", "description4", someAssetAmount, decimals = 2, reissuable = true, issueFee).id
 

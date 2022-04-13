@@ -1,7 +1,5 @@
 package com.wavesplatform.state.patch
 
-import cats.instances.map._
-import cats.syntax.semigroup._
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -47,10 +45,12 @@ case object CancelLeasesToDisabledAliases extends PatchOnFeature(BlockchainFeatu
             leaseState = Map(
               id -> ld.copy(status = LeaseDetails.Status.Expired(blockchain.height))
             ),
-            portfolios =
-              Map(ld.sender.toAddress -> Portfolio(lease = LeaseBalance(0, -ld.amount))) |+|
-                Map(recipientAddress  -> Portfolio(lease = LeaseBalance(-ld.amount, 0)))
+            portfolios = Diff
+              .unsafeCombine(
+                Map(ld.sender.toAddress -> Portfolio(lease = LeaseBalance(0, -ld.amount))),
+                Map(recipientAddress    -> Portfolio(lease = LeaseBalance(-ld.amount, 0)))
+              )
           )
       }
-      .foldLeft(Diff.empty)(_ |+| _)
+      .foldLeft(Diff.empty)(_.unsafeCombine(_))
 }

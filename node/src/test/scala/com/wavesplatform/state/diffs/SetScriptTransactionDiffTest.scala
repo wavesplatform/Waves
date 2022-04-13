@@ -48,7 +48,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
   private def preconditionsAndSetCustomContract(script: Script): (GenesisTransaction, SetScriptTransaction) = {
     val master = TxHelpers.signer(1)
 
-    val genesis = TxHelpers.genesis(master.toAddress)
+    val genesis   = TxHelpers.genesis(master.toAddress)
     val setScript = TxHelpers.setScript(master, script)
 
     (genesis, setScript)
@@ -87,9 +87,9 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       val master = TxHelpers.signer(1)
 
       val genesis = TxHelpers.genesis(master.toAddress)
-      val expr = BLOCK(LET("x", CONST_LONG(3)), CONST_BOOLEAN(true))
-      val script = ExprScript(V1, expr, checkSize = false).explicitGet()
-      val tx = TxHelpers.setScript(master, script)
+      val expr    = BLOCK(LET("x", CONST_LONG(3)), CONST_BOOLEAN(true))
+      val script  = ExprScript(V1, expr, checkSize = false).explicitGet()
+      val tx      = TxHelpers.setScript(master, script)
 
       (genesis, tx)
     }
@@ -252,7 +252,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
        """.stripMargin
     )
 
-    val sender  = TxHelpers.signer(1)
+    val sender   = TxHelpers.signer(1)
     val balances = AddrWithBalance.enoughBalances(sender)
 
     def settings(checkNegative: Boolean = false, checkSumOverflow: Boolean = false): FunctionalitySettings = {
@@ -305,7 +305,8 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       @Verifier(tx)
       func a2() = a1()
      */
-    val userFunctions = "AAIFAAAAAAAAAA0IAhoJCgJhMRIDYTExAAAAAgEAAAACYTEAAAAABgEAAAACYTEAAAAACQEAAAACYTEAAAAAAAAAAAAAAAEAAAACdHgBAAAAAmEyAAAAAAkBAAAAAmExAAAAAIGVAL4="
+    val userFunctions =
+      "AAIFAAAAAAAAAA0IAhoJCgJhMRIDYTExAAAAAgEAAAACYTEAAAAABgEAAAACYTEAAAAACQEAAAACYTEAAAAAAAAAAAAAAAEAAAACdHgBAAAAAmEyAAAAAAkBAAAAAmExAAAAAIGVAL4="
 
     /*
       func a1() = true
@@ -321,7 +322,8 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       @Verifier(tx)
       func a4() = a2()
      */
-    val innerOverlapWithVerifier = "AAIFAAAAAAAAAA0IAhoJCgJhMRIDYTExAAAAAgEAAAACYTEAAAAABgEAAAACYTIAAAAACgEAAAACYTMAAAAACgEAAAACYTEAAAAACQEAAAACYTEAAAAACQEAAAACYTEAAAAACQEAAAACYTMAAAAAAAAAAAAAAAEAAAACdHgBAAAAAmE0AAAAAAkBAAAAAmEyAAAAAEjFcsE="
+    val innerOverlapWithVerifier =
+      "AAIFAAAAAAAAAA0IAhoJCgJhMRIDYTExAAAAAgEAAAACYTEAAAAABgEAAAACYTIAAAAACgEAAAACYTMAAAAACgEAAAACYTEAAAAACQEAAAACYTEAAAAACQEAAAACYTEAAAAACQEAAAACYTMAAAAAAAAAAAAAAAEAAAACdHgBAAAAAmE0AAAAAAkBAAAAAmEyAAAAAEjFcsE="
 
     /*
       func a1() = true
@@ -340,7 +342,8 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
         []
       }
      */
-    val innerOverlapWithCallable = "AAIFAAAAAAAAAA8IAhIAGgkKAmExEgNhMTEAAAACAQAAAAJhMQAAAAAGAQAAAAJhMgAAAAAKAQAAAAJhMwAAAAAKAQAAAAJhMQAAAAAJAQAAAAJhMQAAAAAJAQAAAAJhMQAAAAAJAQAAAAJhMwAAAAAAAAABAAAAAWkBAAAAAmE0AAAAAAQAAAACYTAJAQAAAAJhMgAAAAADCQAAAAAAAAIFAAAAAmEwBQAAAAJhMAUAAAADbmlsCQAAAgAAAAECAAAAJFN0cmljdCB2YWx1ZSBpcyBub3QgZXF1YWwgdG8gaXRzZWxmLgAAAABEHCSy"
+    val innerOverlapWithCallable =
+      "AAIFAAAAAAAAAA8IAhIAGgkKAmExEgNhMTEAAAACAQAAAAJhMQAAAAAGAQAAAAJhMgAAAAAKAQAAAAJhMwAAAAAKAQAAAAJhMQAAAAAJAQAAAAJhMQAAAAAJAQAAAAJhMQAAAAAJAQAAAAJhMwAAAAAAAAABAAAAAWkBAAAAAmE0AAAAAAQAAAACYTAJAQAAAAJhMgAAAAADCQAAAAAAAAIFAAAAAmEwBQAAAAJhMAUAAAADbmlsCQAAAgAAAAECAAAAJFN0cmljdCB2YWx1ZSBpcyBub3QgZXF1YWwgdG8gaXRzZWxmLgAAAABEHCSy"
     val keyPairs = Vector.tabulate(8)(i => KeyPair(Ints.toByteArray(i)))
     val balances = keyPairs.map(acc => AddrWithBalance(acc.toAddress, 10.waves))
 
@@ -348,11 +351,13 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       TxHelpers.setScript(keyPairs(keyPairIndex), Script.fromBase64String(script).explicitGet(), version = TxVersion.V2)
 
     val settings =
-      DomainPresets.RideV5.copy(blockchainSettings = DomainPresets.RideV5.blockchainSettings.copy(
-        functionalitySettings = DomainPresets.RideV5.blockchainSettings.functionalitySettings.copy(
-          estimatorSumOverflowFixHeight = 3
+      DomainPresets.RideV5.copy(
+        blockchainSettings = DomainPresets.RideV5.blockchainSettings.copy(
+          functionalitySettings = DomainPresets.RideV5.blockchainSettings.functionalitySettings.copy(
+            estimatorSumOverflowFixHeight = 3
+          )
         )
-      ))
+      )
 
     withDomain(settings, balances) { d =>
       d.appendBlock(

@@ -16,10 +16,14 @@ trait InvokeScriptLike {
   def checkedAssets: Seq[IssuedAsset] = payments collect { case Payment(_, assetId: IssuedAsset) => assetId }
   def senderAddress: Address
   def sender: PublicKey
+}
 
-  def txId: ByteStr            = root.map(_.id()).getOrElse(ByteStr.empty)
-  val enableEmptyKeys: Boolean = root.forall(_.isProtobufVersion)
-  val timestamp: TxTimestamp   = root.map(_.timestamp).getOrElse(0L)
+object InvokeScriptLike {
+  implicit class InvokeScriptLikeOps(val invokeScriptLike: InvokeScriptLike) extends AnyVal {
+    def txId: ByteStr            = invokeScriptLike.root.map(_.id()).getOrElse(ByteStr.empty)
+    def enableEmptyKeys: Boolean = invokeScriptLike.root.forall(_.isProtobufVersion)
+    def timestamp: TxTimestamp   = invokeScriptLike.root.map(_.timestamp).getOrElse(0L)
+  }
 }
 
 case class InvokeScript(

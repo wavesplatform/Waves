@@ -17,8 +17,8 @@ final case class BurnTransaction(
     version: TxVersion,
     sender: PublicKey,
     asset: IssuedAsset,
-    quantity: TxAmount,
-    fee: TxAmount,
+    quantity: TxNonNegativeAmount,
+    fee: TxPositiveAmount,
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
@@ -64,7 +64,11 @@ object BurnTransaction extends TransactionParser {
       proofs: Proofs,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, BurnTransaction] =
-    BurnTransaction(version, sender, asset, quantity, fee, timestamp, proofs, chainId).validatedEither
+    for {
+      quantity <- TxNonNegativeAmount(quantity)(TxValidationError.NegativeAmount(quantity, "assets"))
+      fee      <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
+      tx       <- BurnTransaction(version, sender, asset, quantity, fee, timestamp, proofs, chainId).validatedEither
+    } yield tx
 
   def signed(
       version: TxVersion,
