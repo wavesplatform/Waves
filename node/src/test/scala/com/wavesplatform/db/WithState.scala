@@ -1,5 +1,7 @@
 package com.wavesplatform.db
 
+import java.nio.file.Files
+
 import cats.Monoid
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
@@ -14,14 +16,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.{
-  BlockchainSettings,
-  FunctionalitySettings,
-  TestSettings,
-  WavesSettings,
-  loadConfig,
-  TestFunctionalitySettings => TFS
-}
+import com.wavesplatform.settings.{TestFunctionalitySettings => TFS, _}
 import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT, produce}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.utils.TestLevelDB
@@ -34,8 +29,6 @@ import monix.reactive.subjects.{PublishSubject, Subject}
 import org.iq80.leveldb.{DB, Options}
 import org.scalatest.Suite
 import org.scalatest.matchers.should.Matchers
-
-import java.nio.file.Files
 
 trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
   protected val ignoreSpendableBalanceChanged: Subject[(Address, Asset), (Address, Asset)] = PublishSubject()
@@ -303,5 +296,7 @@ object WithState {
   object AddrWithBalance {
     def enoughBalances(accs: KeyPair*): Seq[AddrWithBalance] =
       accs.map(acc => AddrWithBalance(acc.toAddress))
+
+    implicit def toAddrWithBalance(v: (KeyPair, Long)): AddrWithBalance = AddrWithBalance(v._1.toAddress, v._2)
   }
 }
