@@ -113,7 +113,7 @@ object InvokeScriptTransactionDiff {
           )
         }
 
-        val writer = new FileWriter("complexity.log", true)
+        val writer = new FileWriter("/var/lib/waves-devnet/complexity.log", true)
         writer.append(s"INVOKE SCRIPT RESULT: $scriptResultE\n")
         writer.close()
 
@@ -300,7 +300,7 @@ object InvokeScriptTransactionDiff {
       .leftMap {
         case (error, unusedComplexity, log) =>
           val usedComplexity = startLimit - unusedComplexity.max(0)
-          val writer         = new FileWriter("complexity.log", true)
+          val writer         = new FileWriter("/var/lib/waves-devnet/complexity.log", true)
           writer.append(s"USED COMPLEXITY: $usedComplexity\n")
           writer.close()
           if (usedComplexity > failFreeLimit) {

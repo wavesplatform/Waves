@@ -65,7 +65,7 @@ class EvaluatorV2(
       if (limit < cost)
         Coeval.now(limit)
       else {
-        val writer = new FileWriter("complexity.log", true)
+        val writer = new FileWriter("/var/lib/waves-devnet/complexity.log", true)
         writer.append(s"BEFORE CALL $fc, LIMIT: $limit\n")
         writer.close()
         function.ev
@@ -74,7 +74,7 @@ class EvaluatorV2(
             case (result, additionalComplexity) =>
               val totalCost        = cost + additionalComplexity
               val unusedComplexity = limit - totalCost
-              val writer           = new FileWriter("complexity.log", true)
+              val writer           = new FileWriter("/var/lib/waves-devnet/complexity.log", true)
               writer.append(s"COMPUTED: $fc, RESULT: $result, UNUSED: $unusedComplexity\n")
               writer.close()
               result.fold(
