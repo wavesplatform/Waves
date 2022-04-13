@@ -99,4 +99,23 @@ class InvokeFailAndRejectTest extends PropSpec with WithDomain {
       d.appendBlockE(invokeTx) should produce("Explicit script termination")
     }
   }
+
+  ignore("invoke is rejected with a lack of funds without execution of ScriptTransfer script") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner, signer(10))) { d =>
+      val i     = issue(signer(10), script = Some(assetFailScript))
+      val asset = IssuedAsset(i.id())
+      val dApp = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = [
+           |   ScriptTransfer(i.caller, 1, base58'$asset')
+           | ]
+         """.stripMargin
+      )
+      val invokeTx = invoke(secondAddress)
+      d.appendBlock(i)
+      d.appendBlock(setScript(secondSigner, dApp))
+      d.appendBlockE(invokeTx) should produce("negative asset balance")
+    }
+  }
 }
