@@ -276,7 +276,7 @@ class UtxPoolImpl(
       checkedAddresses: Set[Address],
       error: ValidationError
   ): PackResult = {
-    TxStateActions.removeInvalid(tx, error)
+    TxStateActions.removeInvalid("Pack", tx, error)
     r.copy(
       iterations = r.iterations + 1,
       validatedTransactions = r.validatedTransactions + tx.id(),

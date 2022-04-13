@@ -2,7 +2,6 @@ package com.wavesplatform.db
 
 import java.nio.file.Files
 
-import cats.Monoid
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
