@@ -216,4 +216,24 @@ class InvokeFailAndRejectTest extends PropSpec with WithDomain {
       }
     }
   }
+
+  property("invoke is rejected from account with non-boolean verifier") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+      val dApp = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = []
+         """.stripMargin
+      )
+      val verifier = TestCompiler(V5).compileExpression(
+        s"""
+           | strict c = ${(1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}
+           | 1
+         """.stripMargin
+      )
+      d.appendBlock(setScript(secondSigner, dApp))
+      d.appendBlock(setScript(defaultSigner, verifier))
+      d.appendBlockE(invoke()) should produce("Script returned not a boolean result")
+    }
+  }
 }
