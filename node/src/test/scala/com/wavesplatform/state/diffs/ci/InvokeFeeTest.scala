@@ -65,4 +65,24 @@ class InvokeFeeTest extends PropSpec with WithDomain {
       d.appendBlockE(invoke(feeAssetId = asset)) should produce(s"negative waves balance: ${signer(9).toAddress}, old: 0, new: -$invokeFee")
     }
   }
+
+  property("invoke Issue fee") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+      val dApp = TestCompiler(V5).compileContract(
+        """
+          | @Callable(i)
+          | func default() = [
+          |   Issue("name", "description", 1000, 4, true, unit, 0)
+          | ]
+        """.stripMargin
+      )
+      d.appendBlock(setScript(secondSigner, dApp))
+      d.appendBlock(invoke(fee = invokeFee(issues = 1)))
+      val failed = invoke(fee = invokeFee(issues = 1) - 1)
+      d.appendBlock(failed)
+      d.liquidDiff.errorMessage(failed.id()).get.text should include(
+        "Fee in WAVES for InvokeScriptTransaction (100499999 in WAVES) with 1 assets issued does not exceed minimal value of 100500000 WAVES"
+      )
+    }
+  }
 }
