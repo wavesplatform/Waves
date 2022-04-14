@@ -85,4 +85,8 @@ class InvokeFeeTest extends PropSpec with WithDomain {
       )
     }
   }
+
+  property("invoke negative fee") {
+    (the[Exception] thrownBy invoke(fee = -1)).getMessage should include("InsufficientFee")
+  }
 }
