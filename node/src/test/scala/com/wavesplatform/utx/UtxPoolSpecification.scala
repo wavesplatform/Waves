@@ -19,6 +19,7 @@ import com.wavesplatform.history.{DefaultWavesSettings, randomSig, settingsWithF
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.{V3, V5}
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
@@ -42,7 +43,7 @@ import org.iq80.leveldb.DB
 import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{Assertion, EitherValues}
+import org.scalatest.EitherValues
 import org.scalatest.concurrent.Eventually
 
 import scala.collection.mutable.ListBuffer
@@ -90,8 +91,8 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
       featuresSettings = origSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
     )
 
-    val dbContext            = TempDB(settings.blockchainSettings.functionalitySettings, settings.dbSettings)
-    val (bcu, levelDBWriter) = TestStorageFactory(settings, dbContext.db, new TestTime, ignoreSpendableBalanceChanged, ignoreBlockchainUpdateTriggers)
+    val dbContext = TempDB(settings.blockchainSettings.functionalitySettings, settings.dbSettings)
+    val (bcu, _)  = TestStorageFactory(settings, dbContext.db, new TestTime, ignoreSpendableBalanceChanged, ignoreBlockchainUpdateTriggers)
     bcu.processBlock(Block.genesis(genesisSettings).explicitGet()) should beRight
     bcu
   }
@@ -943,7 +944,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
               }
 
               def addUnverified(tx: Transaction): Unit = {
-                utxPool.addTransaction(tx, false)
+                utxPool.addTransaction(tx, verify = false)
               }
 
               val differ = TransactionDiffer(d.blockchainUpdater.lastBlockTimestamp, System.currentTimeMillis(), verify = false)(
@@ -985,11 +986,11 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
     OneDimensionalMiningConstraint(n, TxEstimators.one, "one")
   )
 
-  private def checkCleanupForceValidateTxScenario(forceValidateInCleanup: Boolean, isMiningEnabled: Boolean): Assertion = {
+  private def checkCleanupForceValidateTxScenario(forceValidateInCleanup: Boolean, isMiningEnabled: Boolean): Unit = {
     val dApp    = TxHelpers.signer(1)
     val invoker = TxHelpers.signer(2)
 
-    val contract: Script =
+    val simpleContract: Script =
       TestCompiler(V5).compileContract(
         s"""
            |{-# STDLIB_VERSION 5 #-}
@@ -1007,6 +1008,23 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
            |""".stripMargin
       )
 
+    val selfInvokeContract =
+      TestCompiler(V5).compileContract(
+        s"""
+           |{-# STDLIB_VERSION 5 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-# SCRIPT_TYPE ACCOUNT #-}
+           |
+           |@Callable(i)
+           |func test( r: Int ) = {
+           |  if( r == 0 ) then [ ScriptTransfer(i.caller, -1, unit ) ] else
+           |  let f = fraction( fraction( r, 1, 1 ), 1, 1 )
+           |  strict g = invoke( this, "test", [ f - 1 ], [] )
+           |  []
+           |}  
+           |""".stripMargin
+      )
+
     val settings = DomainPresets.RideV5.copy(
       utxSettings = DomainPresets.RideV5.utxSettings.copy(
         forceValidateInCleanup = forceValidateInCleanup
@@ -1016,23 +1034,29 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
       )
     )
 
-    withDomain(settings, balances = AddrWithBalance.enoughBalances(dApp, invoker)) { d =>
-      val setScript = TxHelpers.setScript(dApp, contract)
-      val invoke    = TxHelpers.invoke(dApp.toAddress, func = Some("test"), invoker = invoker)
+    Seq(
+      (simpleContract, Seq.empty),
+      (selfInvokeContract, Seq(CONST_LONG(9)))
+    ).foreach {
+      case (contract, args) =>
+        withDomain(settings, balances = AddrWithBalance.enoughBalances(dApp, invoker)) { d =>
+          val setScript = TxHelpers.setScript(dApp, contract)
+          val invoke    = TxHelpers.invoke(dApp.toAddress, func = Some("test"), args = args, invoker = invoker)
 
-      d.appendBlock(setScript)
-      d.utxPool.addTransaction(invoke, verify = true)
+          d.appendBlock(setScript)
+          d.utxPool.addTransaction(invoke, verify = true)
 
-      d.utxPool.size shouldBe 1
+          d.utxPool.size shouldBe 1
 
-      d.utxPool.cleanUnconfirmed()
+          d.utxPool.cleanUnconfirmed()
 
-      val expectedResult = if (!isMiningEnabled && forceValidateInCleanup) {
-        None
-      } else {
-        Some(invoke)
-      }
-      d.utxPool.transactionById(invoke.id()) shouldBe expectedResult
+          val expectedResult = if (!isMiningEnabled && forceValidateInCleanup) {
+            None
+          } else {
+            Some(invoke)
+          }
+          d.utxPool.transactionById(invoke.id()) shouldBe expectedResult
+        }
     }
   }
 }
