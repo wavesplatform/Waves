@@ -8,7 +8,7 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TxValidationError.InvalidAddress
-import com.wavesplatform.utils.{ScorexLogging, base58Length}
+import com.wavesplatform.utils.base58Length
 import play.api.libs.json._
 
 sealed trait Address extends AddressOrAlias {
@@ -16,7 +16,7 @@ sealed trait Address extends AddressOrAlias {
 }
 
 //noinspection ScalaDeprecation
-object Address extends ScorexLogging {
+object Address {
   val Prefix: String           = "address:"
   val AddressVersion: Byte     = 1
   val ChecksumLength: Int      = 4

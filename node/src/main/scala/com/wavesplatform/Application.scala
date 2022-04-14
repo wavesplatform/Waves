@@ -181,7 +181,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     def rollbackTask(blockId: ByteStr, returnTxsToUtx: Boolean) =
       Task {
-        utxStorage.resetPriorityPool()
+        utxStorage.setPriorityDiffs(Seq.empty)
         blockchainUpdater.removeAfter(blockId)
       }.executeOn(appenderScheduler)
         .asyncBoundary

@@ -60,13 +60,13 @@ class UtxPoolImpl(
 
   override def putIfNew(tx: Transaction, forceValidate: Boolean): TracedResult[ValidationError, Boolean] = {
     if (transactions.containsKey(tx.id()) || priorityPool.contains(tx.id())) TracedResult.wrapValue(false)
-    else putNewTx(tx, verify = true, forceValidate)
+    else putNewTx(tx, forceValidate)
   }
 
-  private[utx] def putNewTx(tx: Transaction, verify: Boolean, forceValidate: Boolean): TracedResult[ValidationError, Boolean] = {
+  private[utx] def putNewTx(tx: Transaction, forceValidate: Boolean): TracedResult[ValidationError, Boolean] = {
     PoolMetrics.putRequestStats.increment()
 
-    val checks = if (verify) PoolMetrics.putTimeStats.measure {
+    val checks = PoolMetrics.putTimeStats.measure {
       object LimitChecks {
         def checkScripted(tx: Transaction, skipSizeCheck: () => Boolean): Either[GenericError, Transaction] =
           PoolMetrics.checkScripted.measure(
@@ -144,9 +144,9 @@ class UtxPoolImpl(
         _ <- LimitChecks.checkNotBlacklisted(tx)
         _ <- LimitChecks.checkScripted(tx, () => skipSizeCheck)
       } yield ()
-    } else Right(())
+    }
 
-    val tracedIsNew = TracedResult(checks).flatMap(_ => addTransaction(tx, verify, forceValidate))
+    val tracedIsNew = TracedResult(checks).flatMap(_ => addTransaction(tx, verify = true, forceValidate))
     tracedIsNew.resultE match {
       case Right(isNew) =>
         log.trace(s"putIfNew(${tx.id()}) succeeded, isNew = $isNew")
@@ -166,11 +166,6 @@ class UtxPoolImpl(
   def setPriorityDiffs(discDiffs: Seq[Diff]): Unit = {
     val txs = priorityPool.setPriorityDiffs(discDiffs)
     txs.foreach(addTransaction(_, verify = false, canLock = false))
-  }
-
-  def resetPriorityPool(): Unit = {
-    val txs = priorityPool.clear()
-    txs.foreach(addTransaction(_, verify = false))
   }
 
   private[this] def removeFromOrdPool(txId: ByteStr): Option[Transaction] = {
@@ -321,6 +316,7 @@ class UtxPoolImpl(
                 r.copy(iterations = r.iterations + 1, removedTransactions = r.removedTransactions + tx.id())
               } else {
                 val newScriptedAddresses = scriptedAddresses(tx)
+                println(s"\n\tchecked = ${r.checkedAddresses}\n\tnew = $newScriptedAddresses\n\tpriority = $priority\n")
                 if (!priority && r.checkedAddresses.intersect(newScriptedAddresses).nonEmpty) r
                 else {
                   val updatedBlockchain   = CompositeBlockchain(blockchain, r.totalDiff)
@@ -379,6 +375,7 @@ class UtxPoolImpl(
 
       @tailrec
       def loop(seed: PackResult): PackResult = {
+        println(s"LOOP new seed")
         def allValidated(seed: PackResult): Boolean =
           (transactions.keys().asScala ++ priorityPool.priorityTransactionIds).forall(seed.validatedTransactions)
 
@@ -453,15 +450,14 @@ class UtxPoolImpl(
       onEvent(UtxEvent.TxRemoved(tx, None))
     }
 
-    def removeInvalid(cause: String, tx: Transaction, error: ValidationError): Unit = {
-      log.debug(s"$cause: Transaction ${tx.id()} removed due to ${extractErrorMessage(error)}")
-      traceLogger.trace(error.toString)
+    def removeInvalid(cause: String, tx: Transaction, error: ValidationError): Unit =
+      removeFromOrdPool(tx.id()).foreach { tx =>
+        log.debug(s"$cause: Transaction ${tx.id()} removed due to ${extractErrorMessage(error)}")
+        traceLogger.trace(error.toString)
 
-      ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Invalidated, Some(extractErrorClass(error)))
-      onEvent(UtxEvent.TxRemoved(tx, Some(error)))
-
-      UtxPoolImpl.this.removeFromOrdPool(tx.id())
-    }
+        ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Invalidated, Some(extractErrorClass(error)))
+        onEvent(UtxEvent.TxRemoved(tx, Some(error)))
+      }
 
     def removeExpired(tx: Transaction): Unit = {
       log.debug(s"Transaction ${tx.id()} expired")

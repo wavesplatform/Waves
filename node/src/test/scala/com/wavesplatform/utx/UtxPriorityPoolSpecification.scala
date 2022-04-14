@@ -73,7 +73,7 @@ class UtxPriorityPoolSpecification extends FreeSpec with SharedDomain {
     }
 
     "doesn't run cleanup on priority pool" in {
-      println(sys.props("logback.test.level"))
+
     }
 
     "invalidates priority pool on different microblock" in {}
@@ -81,8 +81,13 @@ class UtxPriorityPoolSpecification extends FreeSpec with SharedDomain {
     "continues packing when priority diff contains no valid transactions" in {
       val bob = nextKeyPair
       domain.appendBlock(
-        TxHelpers.transfer(alice, bob.toAddress, 10.015.waves, fee = 0.001.waves),
-        TxHelpers.setScript(bob, TestCompiler(V3).compileExpression(s"height % 2 == ${domain.blockchain.height % 2}"), fee = 0.01.waves)
+        TxHelpers.transfer(alice, bob.toAddress, 10.016.waves, fee = 0.001.waves),
+        TxHelpers.setScript(bob, TestCompiler(V3).compileExpression(
+          s"""match tx {
+             |    case _: TransferTransaction => height % 2 == ${domain.blockchain.height % 2}
+             |    case _ => true
+             |}
+             |""".stripMargin), fee = 0.01.waves)
       )
       val ref = domain.appendKeyBlock().id()
       val transfer1 = TxHelpers.transfer(bob, nextKeyPair.toAddress, 10.waves, fee = 0.005.waves)
@@ -90,11 +95,11 @@ class UtxPriorityPoolSpecification extends FreeSpec with SharedDomain {
       domain.appendKeyBlock(Some(ref))
       domain.utxPool.priorityPool.priorityTransactions shouldEqual Seq(transfer1)
 
-      val transfer2 = TxHelpers.transfer(alice, nextKeyPair.toAddress, fee = 0.001.waves)
-      domain.utxPool.putIfNew(transfer2).resultE should beRight
-      domain.utxPool.all shouldEqual Seq(transfer1, transfer2)
+      val createAlias = TxHelpers.createAlias("0xbob", bob, 0.001.waves)
+      domain.utxPool.putIfNew(createAlias).resultE should beRight
+      domain.utxPool.all shouldEqual Seq(transfer1, createAlias)
 
-      pack() shouldEqual Some(Seq(transfer2))
+      pack() shouldEqual Some(Seq(createAlias))
     }
   }
 }

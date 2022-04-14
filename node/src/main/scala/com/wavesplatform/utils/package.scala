@@ -13,7 +13,7 @@ import play.api.libs.json._
 
 import scala.annotation.tailrec
 
-package object utils extends ScorexLogging {
+package object utils {
 
   private val BytesMaxValue  = 256
   private val Base58MaxValue = 58
