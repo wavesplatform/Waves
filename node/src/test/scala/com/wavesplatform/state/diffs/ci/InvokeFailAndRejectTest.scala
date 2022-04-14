@@ -172,4 +172,26 @@ class InvokeFailAndRejectTest extends PropSpec with WithDomain {
       }
     }
   }
+
+  property("invoke is rejected if action address is from other network") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner, signer(10))) { d =>
+      val i     = issue(signer(10), script = Some(assetFailScript))
+      val asset = IssuedAsset(i.id())
+      val dApp = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = {
+           |   strict c = ${(1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}
+           |   [
+           |     ScriptTransfer(Address(base58'3P2pTpQhGbZrJXATKr75A1uZjeTrb4PHMYf'), 1, base58'$asset')
+           |   ]
+           | }
+         """.stripMargin
+      )
+      val invokeTx = invoke()
+      d.appendBlock(i)
+      d.appendBlock(setScript(secondSigner, dApp))
+      d.appendBlockE(invokeTx) should produce("Data from other network: expected: 84(T), actual: 87(W)")
+    }
+  }
 }
