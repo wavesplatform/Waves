@@ -37,13 +37,13 @@ class InvokeValidationTest extends PropSpec with WithDomain {
         """.stripMargin
       )
       d.appendBlock(setScript(secondSigner, script))
-      d.appendBlockE(invoke(secondAddress, Some("g"))) should produce("Cannot find callable function `g`")
+      d.appendBlockE(invoke(func = Some("g"))) should produce("Cannot find callable function `g`")
     }
   }
 
   property("invoke address without script") {
     withDomain(RideV5) { d =>
-      d.appendBlockE(invoke(secondAddress)) should produce(s"No contract at address $secondAddress")
+      d.appendBlockE(invoke()) should produce(s"No contract at address $secondAddress")
     }
   }
 
@@ -51,7 +51,7 @@ class InvokeValidationTest extends PropSpec with WithDomain {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       val expression = TestCompiler(V5).compileExpression("true")
       d.appendBlock(setScript(secondSigner, expression))
-      d.appendBlockE(invoke(secondAddress)) should produce("Trying to call dApp on the account with expression script")
+      d.appendBlockE(invoke()) should produce("Trying to call dApp on the account with expression script")
     }
   }
 
@@ -68,7 +68,7 @@ class InvokeValidationTest extends PropSpec with WithDomain {
       )
       val expression = TestCompiler(V5).compileExpression("true")
       d.appendBlock(setScript(secondSigner, dApp), setScript(signer(2), expression))
-      d.appendBlockE(invoke(secondAddress)) should produce("Trying to call dApp on the account with expression script")
+      d.appendBlockE(invoke()) should produce("Trying to call dApp on the account with expression script")
     }
   }
 
@@ -83,10 +83,10 @@ class InvokeValidationTest extends PropSpec with WithDomain {
       d.appendBlock(setScript(secondSigner, script))
 
       // Waves payment and fee
-      d.appendBlockE(invoke(secondAddress, invoker = signer(2), payments = Seq(Payment(invokeFee, Waves)))) should produce(
+      d.appendBlockE(invoke(invoker = signer(2), payments = Seq(Payment(invokeFee, Waves)))) should produce(
         "Explicit script termination"
       )
-      d.appendBlockE(invoke(secondAddress, invoker = signer(2), payments = Seq(Payment(invokeFee + 1, Waves)))) should produce(
+      d.appendBlockE(invoke(invoker = signer(2), payments = Seq(Payment(invokeFee + 1, Waves)))) should produce(
         "Attempt to transfer unavailable funds: " +
           "Transaction application leads to negative waves balance to (at least) temporary negative state, " +
           "current balance equals 500000, spends equals -1000001, result is -500001"
@@ -96,7 +96,7 @@ class InvokeValidationTest extends PropSpec with WithDomain {
       val i     = issue()
       val asset = IssuedAsset(i.id.value())
       d.appendBlock(i)
-      d.appendBlockE(invoke(secondAddress, invoker = signer(2), payments = Seq(Payment(1, asset)))) should produce(
+      d.appendBlockE(invoke(invoker = signer(2), payments = Seq(Payment(1, asset)))) should produce(
         "Attempt to transfer unavailable funds: " +
           s"Transaction application leads to negative asset '$asset' balance to (at least) temporary negative state, " +
           "current balance is 0, spends equals -1, result is -1"
@@ -104,7 +104,7 @@ class InvokeValidationTest extends PropSpec with WithDomain {
 
       // asset payment and asset fee
       d.appendBlock(sponsor(asset, Some(FeeUnit)), transfer(defaultSigner, signer(2).toAddress, invokeFee, asset))
-      d.appendBlockE(invoke(secondAddress, invoker = signer(2), payments = Seq(Payment(1, asset)), feeAssetId = asset)) should produce(
+      d.appendBlockE(invoke(invoker = signer(2), payments = Seq(Payment(1, asset)), feeAssetId = asset)) should produce(
         "Attempt to transfer unavailable funds: " +
           s"Transaction application leads to negative asset '$asset' balance to (at least) temporary negative state, " +
           "current balance is 500000, spends equals -500001, result is -1"

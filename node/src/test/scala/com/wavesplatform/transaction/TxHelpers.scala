@@ -290,7 +290,7 @@ object TxHelpers {
   }
 
   def invoke(
-      dApp: AddressOrAlias,
+      dApp: AddressOrAlias = secondAddress,
       func: Option[String] = None,
       args: Seq[EXPR] = Nil,
       payments: Seq[Payment] = Nil,

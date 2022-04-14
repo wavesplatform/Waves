@@ -37,7 +37,7 @@ class InvokeFailAndRejectTest extends PropSpec with WithDomain {
           | func default() = []
         """.stripMargin
       )
-      val invokeTx = invoke(secondAddress, payments = Seq(Payment(1, asset)))
+      val invokeTx = invoke(payments = Seq(Payment(1, asset)))
       d.appendBlock(i)
       d.appendBlock(setScript(secondSigner, dApp))
       d.appendBlock(invokeTx)
@@ -57,7 +57,7 @@ class InvokeFailAndRejectTest extends PropSpec with WithDomain {
            | ]
          """.stripMargin
       )
-      val invokeTx = invoke(secondAddress)
+      val invokeTx = invoke()
       d.appendBlock(i)
       d.appendBlock(setScript(secondSigner, dApp))
       d.appendBlock(invokeTx)
@@ -79,7 +79,7 @@ class InvokeFailAndRejectTest extends PropSpec with WithDomain {
            | ]
          """.stripMargin
       )
-      val invokeTx = invoke(secondAddress, payments = Seq(Payment(1, failAsset)))
+      val invokeTx = invoke(payments = Seq(Payment(1, failAsset)))
       d.appendBlock(failAssetIssue, trueAssetIssue)
       d.appendBlock(setScript(secondSigner, dApp))
       d.appendBlock(invokeTx)
@@ -97,7 +97,7 @@ class InvokeFailAndRejectTest extends PropSpec with WithDomain {
            | func default() = if (true) then throw() else []
          """.stripMargin
       )
-      val invokeTx = invoke(secondAddress, payments = Seq(Payment(1, failAsset)))
+      val invokeTx = invoke(payments = Seq(Payment(1, failAsset)))
       d.appendBlock(failAssetIssue)
       d.appendBlock(setScript(secondSigner, dApp))
       d.appendBlockE(invokeTx) should produce("Explicit script termination")
@@ -116,7 +116,7 @@ class InvokeFailAndRejectTest extends PropSpec with WithDomain {
            | ]
          """.stripMargin
       )
-      val invokeTx = invoke(secondAddress)
+      val invokeTx = invoke()
       d.appendBlock(i)
       d.appendBlock(setScript(secondSigner, dApp))
       d.appendBlockE(invokeTx) should produce("negative asset balance")
@@ -150,7 +150,7 @@ class InvokeFailAndRejectTest extends PropSpec with WithDomain {
            | ]
          """.stripMargin
       )
-      val invokeTx = invoke(secondAddress, payments = Seq(Payment(1, failAsset)))
+      val invokeTx = invoke(payments = Seq(Payment(1, failAsset)))
       d.appendBlock(failAssetIssue, trueAssetIssue)
       d.appendBlock(leaseTx, dataTx)
       d.appendBlock(setScript(secondSigner, dApp))

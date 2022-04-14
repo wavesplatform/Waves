@@ -814,12 +814,12 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         val utx = new UtxPoolImpl(ntpTime, d.blockchainUpdater, DefaultWavesSettings.utxSettings)
 
         d.appendBlock(setScript(secondSigner, dApp(5)))
-        utx.putIfNew(invoke(secondAddress)).resultE shouldBe Right(true)
-        utx.putIfNew(invoke(secondAddress), forceValidate = true).resultE should produce("Explicit script termination")
+        utx.putIfNew(invoke()).resultE shouldBe Right(true)
+        utx.putIfNew(invoke(), forceValidate = true).resultE should produce("Explicit script termination")
 
         d.appendBlock(setScript(secondSigner, dApp(4)))
-        utx.putIfNew(invoke(secondAddress)).resultE should produce("Explicit script termination")
-        utx.putIfNew(invoke(secondAddress), forceValidate = true).resultE should produce("Explicit script termination")
+        utx.putIfNew(invoke()).resultE should produce("Explicit script termination")
+        utx.putIfNew(invoke(), forceValidate = true).resultE should produce("Explicit script termination")
       }
     }
 
