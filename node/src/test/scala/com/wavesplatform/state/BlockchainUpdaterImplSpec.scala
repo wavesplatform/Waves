@@ -257,23 +257,24 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
       val sender = KeyPair(Longs.toByteArray(Random.nextLong()))
 
       withDomain(
-        DomainPresets.RideV3,
+        DomainPresets.RideV4,
         balances = Seq(AddrWithBalance(dapp.toAddress, 10_00000000), AddrWithBalance(sender.toAddress, 10_00000000))
       ) { d =>
         val script = ScriptCompiler
           .compile(
             """
-                                              |{-# STDLIB_VERSION 4 #-}
-                                              |{-# SCRIPT_TYPE ACCOUNT #-}
-                                              |{-# CONTENT_TYPE DAPP #-}
-                                              |
-                                              |@Callable(i)
-                                              |func default() = {
-                                              |  [
-                                              |    BinaryEntry("vrf", value(value(blockInfoByHeight(height)).vrf))
-                                              |  ]
-                                              |}
-                                              |""".stripMargin,
+                |
+                |{-# STDLIB_VERSION 4 #-}
+                |{-# SCRIPT_TYPE ACCOUNT #-}
+                |{-# CONTENT_TYPE DAPP #-}
+                |
+                |@Callable(i)
+                |func default() = {
+                |  [
+                |    BinaryEntry("vrf", value(value(blockInfoByHeight(height)).vrf))
+                |  ]
+                |}
+                |""".stripMargin,
             ScriptEstimatorV2
           )
           .explicitGet()

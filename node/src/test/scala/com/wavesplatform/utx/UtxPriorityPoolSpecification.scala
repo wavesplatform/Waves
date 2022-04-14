@@ -72,7 +72,9 @@ class UtxPriorityPoolSpecification extends FreeSpec with SharedDomain {
       domain.utxPool.priorityPool.nextMicroBlockSize(12) shouldBe 12
     }
 
-    "doesn't run cleanup on priority pool" in {}
+    "doesn't run cleanup on priority pool" in {
+      println(sys.props("logback.test.level"))
+    }
 
     "invalidates priority pool on different microblock" in {}
 

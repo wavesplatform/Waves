@@ -1,8 +1,9 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.testkit.RouteTestTimeout
+import com.google.common.primitives.Longs
 import com.google.protobuf.ByteString
-import com.wavesplatform.{TestTime, TestWallet, crypto}
+import com.wavesplatform.{TestTime, crypto}
 import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.AddressApiRoute
@@ -21,10 +22,12 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
+import com.wavesplatform.settings.WalletSettings
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utils.Schedulers
+import com.wavesplatform.wallet.Wallet
 import io.netty.util.HashedWheelTimer
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
@@ -32,10 +35,11 @@ import play.api.libs.json._
 
 import scala.concurrent.duration._
 
-class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with RestAPISettingsHelper with TestWallet with WithDomain {
+class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with RestAPISettingsHelper with WithDomain {
 
-  testWallet.generateNewAccounts(10)
-  private val allAccounts  = testWallet.privateKeyAccounts
+  private val wallet = Wallet(WalletSettings(None, Some("123"), Some(ByteStr(Longs.toByteArray(System.nanoTime())))))
+  wallet.generateNewAccounts(10)
+  private val allAccounts  = wallet.privateKeyAccounts
   private val allAddresses = allAccounts.map(_.toAddress)
   private val blockchain   = stub[Blockchain]("globalBlockchain")
   (() => blockchain.activatedFeatures).when().returning(Map())
@@ -46,7 +50,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
 
   private val addressApiRoute: AddressApiRoute = AddressApiRoute(
     restAPISettings,
-    testWallet,
+    wallet,
     blockchain,
     utxPoolSynchronizer,
     new TestTime,
