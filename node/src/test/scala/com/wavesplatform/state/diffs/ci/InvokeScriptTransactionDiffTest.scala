@@ -719,16 +719,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     }
   }
 
-  property("can't overflow sum of payment in contract") {
-    val (genesis, setScript, ci) = preconditionsAndSetContract(
-      dAppWithTransfers(recipientAmount = Long.MaxValue / 2 + 2, assets = List.fill(4)(Waves)),
-      payment = Some(Payment(1, Waves))
-    )
-    testDiff(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)))(
-      _ should produce("Attempt to transfer unavailable funds")
-    )
-  }
-
   property("invoking contract with sponsored fee") {
     val sponsorIssue             = TxHelpers.issue(dApp, amount = ENOUGH_AMT)
     val sponsorAsset             = IssuedAsset(sponsorIssue.id())
