@@ -14,7 +14,7 @@ import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
-import com.wavesplatform.test.{PropSpec, NumericExt}
+import com.wavesplatform.test.{NumericExt, PropSpec}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.{Authorized, CreateAliasTransaction, Transaction, TxHelpers, TxVersion}
@@ -792,6 +792,18 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     ) {
       case (diff, _) =>
         diff.errorMessage(invoke.id()).get.text shouldBe s"Lease id=$leaseId has invalid length = 1 byte(s) while expecting 32"
+    }
+  }
+
+  property("LeaseCancel foreign leaseId") {
+    val leaseTx                               = TxHelpers.lease(TxHelpers.signer(2))
+    val (preparingTxs, invoke, _, _, _, _, _) = leasePreconditions(customDApp = Some(singleLeaseCancelDApp(leaseTx.id())))
+    assertDiffAndState(
+      Seq(TestBlock.create(preparingTxs :+ leaseTx)),
+      TestBlock.create(Seq(invoke)),
+      v5Features
+    ) {
+      case (diff, _) => diff.errorMessage(invoke.id()).get.text should include("LeaseTransaction was leased by other sender")
     }
   }
 
