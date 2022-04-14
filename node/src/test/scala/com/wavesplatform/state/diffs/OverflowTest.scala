@@ -7,7 +7,8 @@ import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.test.PropSpec
-import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxHelpers.issue
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
@@ -127,6 +128,29 @@ class OverflowTest extends PropSpec with WithDomain {
           val invoke = TxHelpers.invoke(recipient, invoker = sender)
           d.appendBlock(invoke)
           d.liquidDiff.errorMessage(invoke.id()).get.text shouldBe "ScriptTransfer overflow"
+        }
+    }
+  }
+
+  property("invoke Reissue overflow") {
+    numPairs(0).foreach {
+      case (amount1, amount2) =>
+        withDomain(RideV5, AddrWithBalance.enoughBalances(sender, recipientKp)) { d =>
+          val issueTx = issue(recipientKp, amount = amount1)
+          val asset   = IssuedAsset(issueTx.id())
+          val dApp = TestCompiler(V5).compileContract(
+            s"""
+               | @Callable(i)
+               | func default() =
+               |   [
+               |     Reissue(base58'$asset', $amount2, false)
+               |   ]
+             """.stripMargin
+          )
+          val invoke = TxHelpers.invoke(recipient, invoker = sender)
+          d.appendBlock(issueTx, TxHelpers.setScript(recipientKp, dApp))
+          d.appendBlock(invoke)
+          d.liquidDiff.errorMessage(invoke.id()).get.text shouldBe "Asset total value overflow"
         }
     }
   }
