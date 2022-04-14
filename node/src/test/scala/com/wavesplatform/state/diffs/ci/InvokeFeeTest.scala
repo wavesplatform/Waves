@@ -4,9 +4,11 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.StdLibVersion.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.state.diffs.FeeValidation.FeeUnit
 import com.wavesplatform.state.diffs.produce
-import com.wavesplatform.test.PropSpec
-import com.wavesplatform.transaction.TxHelpers.{invoke, secondSigner, setScript}
+import com.wavesplatform.test.{NumericExt, PropSpec}
+import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.TxHelpers._
 
 class InvokeFeeTest extends PropSpec with WithDomain {
   import DomainPresets._
@@ -24,6 +26,43 @@ class InvokeFeeTest extends PropSpec with WithDomain {
       d.appendBlockE(invoke(fee = invokeFee - 1)) should produce(
         "Fee in WAVES for InvokeScriptTransaction (499999 in WAVES) does not exceed minimal value of 500000 WAVES"
       )
+    }
+  }
+
+  property("invoke sponsor fee") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+      val dApp = TestCompiler(V5).compileContract(
+        """
+          | @Callable(i)
+          | func default() = []
+        """.stripMargin
+      )
+      val issueTx   = issue()
+      val asset     = IssuedAsset(issueTx.id())
+      val sponsorTx = sponsor(asset, Some(FeeUnit))
+      d.appendBlock(setScript(secondSigner, dApp))
+      d.appendBlock(issueTx, sponsorTx)
+      d.appendBlock(invoke(fee = invokeFee, feeAssetId = asset))
+      d.appendBlockE(invoke(fee = invokeFee - 1, feeAssetId = asset)) should produce(
+        s"Fee in $asset for InvokeScriptTransaction (499999 in $asset) does not exceed minimal value of 500000 WAVES"
+      )
+    }
+  }
+
+  property("invoke is rejected if fee sponsor has not enough Waves") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner) :+ AddrWithBalance(signer(9).toAddress, 2.waves)) { d =>
+      val dApp = TestCompiler(V5).compileContract(
+        """
+          | @Callable(i)
+          | func default() = []
+        """.stripMargin
+      )
+      val issueTx   = issue(signer(9))
+      val asset     = IssuedAsset(issueTx.id())
+      val sponsorTx = sponsor(asset, Some(FeeUnit), signer(9))
+      d.appendBlock(setScript(secondSigner, dApp))
+      d.appendBlock(issueTx, sponsorTx)
+      d.appendBlockE(invoke(feeAssetId = asset)) should produce(s"negative waves balance: ${signer(9).toAddress}, old: 0, new: -$invokeFee")
     }
   }
 }
