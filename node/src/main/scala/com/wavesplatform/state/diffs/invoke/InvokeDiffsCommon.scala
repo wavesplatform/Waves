@@ -330,7 +330,7 @@ object InvokeDiffsCommon {
   private def checkOverflow(dataList: Iterable[Long]): Either[String, Unit] = {
     Try(dataList.foldLeft(0L)(Math.addExact))
       .fold(
-        _ => "Attempt to transfer unavailable funds in contract payment".asLeft[Unit],
+        _ => "ScriptTransfer overflow".asLeft[Unit],
         _ => ().asRight[String]
       )
   }
