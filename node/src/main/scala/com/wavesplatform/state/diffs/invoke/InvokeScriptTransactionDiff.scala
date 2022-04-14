@@ -41,6 +41,7 @@ import com.wavesplatform.transaction.validation.impl.DataTxValidator
 import monix.eval.Coeval
 import shapeless.Coproduct
 
+import java.io.FileWriter
 import scala.util.Right
 
 object InvokeScriptTransactionDiff {
@@ -127,6 +128,10 @@ object InvokeScriptTransactionDiff {
             fullLimit - paymentsComplexity
           )
         }
+
+        val writer = new FileWriter("/var/lib/waves-devnet/complexity14.log", true)
+        writer.append(s"INVOKE SCRIPT RESULT: $scriptResultE\n")
+        writer.close()
 
         TracedResult(
           scriptResultE,
@@ -373,6 +378,11 @@ object InvokeScriptTransactionDiff {
           ScriptExecutionError.dAppExecution(msg, log)
         case (error, unusedComplexity, log) =>
           val usedComplexity = startLimit - unusedComplexity.max(0)
+
+          val writer = new FileWriter("/var/lib/waves-devnet/complexity14.log", true)
+          writer.append(s"USED COMPLEXITY: $usedComplexity\n")
+          writer.close()
+
           if (usedComplexity > failFreeLimit) {
             val storingComplexity = if (blockchain.storeEvaluatedComplexity) usedComplexity else estimatedComplexity
             FailedTransactionError.dAppExecution(error.message, storingComplexity + paymentsComplexity, log)
