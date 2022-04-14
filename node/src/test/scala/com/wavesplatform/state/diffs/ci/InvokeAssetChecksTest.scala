@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs.ci
 
+import com.wavesplatform.TestValues.invokeFee
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.db.WithState.AddrWithBalance
@@ -11,6 +12,7 @@ import com.wavesplatform.state.{Diff, InvokeScriptResult, NewTransactionInfo, Po
 import com.wavesplatform.test.{NumericExt, PropSpec, produce}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.transaction.TxHelpers.{invoke, secondAddress, secondSigner, setScript}
 import org.scalatest.{EitherValues, Inside}
 
 import scala.collection.immutable.VectorMap
@@ -142,6 +144,24 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
       d.appendBlock(genesis, genesis2, setDApp, setDApp2)
       d.appendBlockE(invokeInvalidLength) should produce(s"Transfer error: invalid asset ID '$invalidLengthAsset' length = 4 bytes, must be 32")
       d.appendBlockE(invokeUnexisting) should produce(s"Transfer error: asset '$unexistingAsset' is not found on the blockchain")
+    }
+  }
+
+  property("invalid issuing asset name always leads to reject") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+      val dApp = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = [
+           |   strict c = ${(1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}
+           |   Issue("aaa", "description", 1000, 4, true, unit, 0)
+           | ]
+         """.stripMargin
+      )
+      val invokeTx = invoke(secondAddress, fee = invokeFee(issues = 1))
+      d.appendBlock(setScript(secondSigner, dApp))
+      d.appendBlock(invokeTx)
+      d.liquidDiff.errorMessage(invokeTx.id()).get.text should include(s"Invalid asset name")
     }
   }
 }
