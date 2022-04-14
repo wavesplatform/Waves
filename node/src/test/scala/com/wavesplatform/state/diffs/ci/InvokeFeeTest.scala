@@ -89,4 +89,20 @@ class InvokeFeeTest extends PropSpec with WithDomain {
   property("invoke negative fee") {
     (the[Exception] thrownBy invoke(fee = -1)).getMessage should include("InsufficientFee")
   }
+
+  property("invoke sponsor fee via non-sponsored asset") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+      val dApp = TestCompiler(V5).compileContract(
+        """
+          | @Callable(i)
+          | func default() = []
+        """.stripMargin
+      )
+      val issueTx = issue()
+      val asset   = IssuedAsset(issueTx.id())
+      d.appendBlock(setScript(secondSigner, dApp))
+      d.appendBlock(issueTx)
+      d.appendBlockE(invoke(feeAssetId = asset)) should produce(s"Asset $asset is not sponsored, cannot be used to pay fees")
+    }
+  }
 }
