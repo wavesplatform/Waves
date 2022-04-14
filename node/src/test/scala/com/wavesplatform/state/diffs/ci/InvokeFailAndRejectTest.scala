@@ -173,25 +173,47 @@ class InvokeFailAndRejectTest extends PropSpec with WithDomain {
     }
   }
 
-  property("invoke is rejected if action address is from other network") {
-    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner, signer(10))) { d =>
-      val i     = issue(signer(10), script = Some(assetFailScript))
-      val asset = IssuedAsset(i.id())
+  property("invoke is always rejected if action address is from other network") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       val dApp = TestCompiler(V5).compileContract(
         s"""
            | @Callable(i)
            | func default() = {
            |   strict c = ${(1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}
            |   [
-           |     ScriptTransfer(Address(base58'3P2pTpQhGbZrJXATKr75A1uZjeTrb4PHMYf'), 1, base58'$asset')
+           |     ScriptTransfer(Address(base58'3P2pTpQhGbZrJXATKr75A1uZjeTrb4PHMYf'), 1, unit)
            |   ]
            | }
          """.stripMargin
       )
       val invokeTx = invoke()
-      d.appendBlock(i)
       d.appendBlock(setScript(secondSigner, dApp))
       d.appendBlockE(invokeTx) should produce("Data from other network: expected: 84(T), actual: 87(W)")
+    }
+  }
+
+  property("invoke is rejected or failed if attached invoke address is from other network") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+      val sigVerify = s"strict c = ${(1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}"
+      Seq(false, true).foreach { complex =>
+        val dApp = TestCompiler(V5).compileContract(
+          s"""
+               | @Callable(i)
+               | func default() = {
+               |   ${if (complex) sigVerify else ""}
+               |   strict r = Address(base58'3P2pTpQhGbZrJXATKr75A1uZjeTrb4PHMYf').invoke("bar", [], [])
+               |   []
+               | }
+             """.stripMargin
+        )
+        d.appendBlock(setScript(secondSigner, dApp))
+        val invokeTx = invoke()
+        if (complex) {
+          d.appendBlock(invokeTx)
+          d.liquidDiff.errorMessage(invokeTx.txId).get.text should include("Data from other network: expected: 84(T), actual: 87(W)")
+        } else
+          d.appendBlockE(invokeTx) should produce("Data from other network: expected: 84(T), actual: 87(W)")
+      }
     }
   }
 }
