@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs.ci
 import com.wavesplatform.TestValues.invokeFee
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.StdLibVersion.V5
@@ -103,6 +104,20 @@ class InvokeFeeTest extends PropSpec with WithDomain {
       d.appendBlock(setScript(secondSigner, dApp))
       d.appendBlock(issueTx)
       d.appendBlockE(invoke(feeAssetId = asset)) should produce(s"Asset $asset is not sponsored, cannot be used to pay fees")
+    }
+  }
+
+  property("invoke sponsor fee via unexisting asset") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+      val dApp = TestCompiler(V5).compileContract(
+        """
+          | @Callable(i)
+          | func default() = []
+        """.stripMargin
+      )
+      val asset = IssuedAsset(ByteStr.fromBytes(1, 2, 3))
+      d.appendBlock(setScript(secondSigner, dApp))
+      d.appendBlockE(invoke(feeAssetId = asset)) should produce(s"Asset $asset does not exist, cannot be used to pay fees")
     }
   }
 }
