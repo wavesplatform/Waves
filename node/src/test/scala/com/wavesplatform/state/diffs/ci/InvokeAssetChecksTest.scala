@@ -12,7 +12,7 @@ import com.wavesplatform.state.{Diff, InvokeScriptResult, NewTransactionInfo, Po
 import com.wavesplatform.test.{NumericExt, PropSpec, produce}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers
-import com.wavesplatform.transaction.TxHelpers.{invoke, secondAddress, secondSigner, setScript}
+import com.wavesplatform.transaction.TxHelpers.{invoke, secondSigner, setScript}
 import org.scalatest.{EitherValues, Inside}
 
 import scala.collection.immutable.VectorMap
@@ -147,21 +147,35 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
     }
   }
 
-  property("invalid issuing asset name always leads to reject") {
+  property("invalid issuing asset name and description") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
-      val dApp = TestCompiler(V5).compileContract(
-        s"""
+      Seq(false, true).foreach { complex =>
+        val sigVerify = s"""strict c = ${(1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")} """
+        def dApp(name: String = "name", description: String = "") = TestCompiler(V5).compileContract(
+          s"""
            | @Callable(i)
            | func default() = [
-           |   strict c = ${(1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}
-           |   Issue("aaa", "description", 1000, 4, true, unit, 0)
+           |   ${if (complex) sigVerify else ""}
+           |   Issue("$name", "$description", 1000, 4, true, unit, 0)
            | ]
          """.stripMargin
-      )
-      val invokeTx = invoke(secondAddress, fee = invokeFee(issues = 1))
-      d.appendBlock(setScript(secondSigner, dApp))
-      d.appendBlock(invokeTx)
-      d.liquidDiff.errorMessage(invokeTx.id()).get.text should include(s"Invalid asset name")
+        )
+
+        val invokeTx = invoke(fee = invokeFee(issues = 1))
+        d.appendBlock(setScript(secondSigner, dApp("aaa")))
+        d.appendBlock(invokeTx)
+        d.liquidDiff.errorMessage(invokeTx.id()).get.text should include("Invalid asset name")
+
+        val invokeTx2 = invoke(fee = invokeFee(issues = 1))
+        d.appendBlock(setScript(secondSigner, dApp("a" * 17)))
+        d.appendBlock(invokeTx2)
+        d.liquidDiff.errorMessage(invokeTx2.id()).get.text should include("Invalid asset name")
+
+        val invokeTx3 = invoke(fee = invokeFee(issues = 1))
+        d.appendBlock(setScript(secondSigner, dApp(description = "a" * 1001)))
+        d.appendBlock(invokeTx3)
+        d.liquidDiff.errorMessage(invokeTx3.id()).get.text should include("Invalid asset description")
+      }
     }
   }
 }
