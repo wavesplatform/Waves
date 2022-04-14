@@ -23,6 +23,9 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
   private val invalidLengthAsset = IssuedAsset(ByteStr.decodeBase58("WAVES").get)
   private val unexistingAsset    = IssuedAsset(ByteStr.decodeBase58("WAVESwavesWAVESwavesWAVESwavesWAVESwaves123").get)
 
+  private val lengthError     = s"Transfer error: invalid asset ID '$invalidLengthAsset' length = 4 bytes, must be 32"
+  private val unexistingError = s"Transfer error: asset '$unexistingAsset' is not found on the blockchain"
+
   property("invoke asset checks") {
     val dApp = TestCompiler(V4).compileContract(
       s"""
@@ -62,9 +65,9 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
           if (activated) {
             val expectingMessage =
               if (func == "invalidLength")
-                s"Transfer error: invalid asset ID '$invalidLengthAsset' length = 4 bytes, must be 32"
+                lengthError
               else
-                s"Transfer error: asset '$unexistingAsset' is not found on the blockchain"
+                unexistingError
             Diff(
               transactions = invokeInfo(false),
               portfolios = Map(
@@ -100,6 +103,46 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
           d.appendBlock(setScriptTx)
           d.appendBlock(invoke)
           d.liquidDiff shouldBe expectedResult
+        }
+      }
+    }
+  }
+
+  property("attached invoke payment asset checks") {
+    val sigVerify = s"""strict c = ${(1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}"""
+    def dApp(complex: Boolean) = TestCompiler(V5).compileContract(
+      s"""
+         |@Callable(i)
+         |func invalidLength() = {
+         |  ${if (complex) sigVerify else ""}
+         |  strict r = invoke(this, "default", [], [AttachedPayment(base58'$invalidLengthAsset', 1)])
+         |  []
+         |}
+         |
+         |@Callable(i)
+         |func unexisting() = {
+         |  ${if (complex) sigVerify else ""}
+         |  strict r = invoke(this, "default", [], [AttachedPayment(base58'$unexistingAsset', 1)])
+         |  []
+         |}
+         |
+         |@Callable(i)
+         |func default() = []
+       """.stripMargin
+    )
+    Seq(true, false).foreach { complex =>
+      withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+        d.appendBlock(setScript(secondSigner, dApp(complex)))
+        val invalidLengthInvoke   = invoke(func = Some("invalidLength"))
+        val unexistingErrorInvoke = invoke(func = Some("unexisting"))
+        if (complex) {
+          d.appendBlock(invalidLengthInvoke)
+          d.liquidDiff.errorMessage(invalidLengthInvoke.txId).get.text should include(lengthError)
+          d.appendBlock(unexistingErrorInvoke)
+          d.liquidDiff.errorMessage(unexistingErrorInvoke.txId).get.text should include(unexistingError)
+        } else {
+          d.appendBlockE(invalidLengthInvoke) should produce(lengthError)
+          d.appendBlockE(unexistingErrorInvoke) should produce(unexistingError)
         }
       }
     }
@@ -142,8 +185,8 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
 
     withDomain(RideV5) { d =>
       d.appendBlock(genesis, genesis2, setDApp, setDApp2)
-      d.appendBlockE(invokeInvalidLength) should produce(s"Transfer error: invalid asset ID '$invalidLengthAsset' length = 4 bytes, must be 32")
-      d.appendBlockE(invokeUnexisting) should produce(s"Transfer error: asset '$unexistingAsset' is not found on the blockchain")
+      d.appendBlockE(invokeInvalidLength) should produce(lengthError)
+      d.appendBlockE(invokeUnexisting) should produce(unexistingError)
     }
   }
 
