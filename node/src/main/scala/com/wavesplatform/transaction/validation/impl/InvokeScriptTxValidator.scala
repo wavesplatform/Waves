@@ -9,11 +9,11 @@ import com.wavesplatform.transaction.TxValidationError.{GenericError, NonPositiv
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.validation.{TxValidator, ValidatedNV, ValidatedV}
-import com.wavesplatform.utils._
+import com.wavesplatform.utils.*
 
 object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
   override def validate(tx: InvokeScriptTransaction): ValidatedV[InvokeScriptTransaction] = {
-    import tx._
+    import tx.*
 
     def checkAmounts(payments: Seq[Payment]): ValidatedNV = {
       val invalid = payments.filter(_.amount <= 0)
@@ -33,7 +33,7 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
     val callableNameSize =
       funcCallOpt match {
         case Some(FUNCTION_CALL(FunctionHeader.User(internalName, _), _)) => internalName.utf8Bytes.length
-        case _ => 0
+        case _                                                            => 0
       }
 
     V.seq(tx)(
@@ -47,7 +47,6 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
         GenericError(s"Callable function name size = $callableNameSize bytes must be less than ${ContractLimits.MaxDeclarationNameInBytes}")
       ),
       checkAmounts(payments),
-      V.fee(fee),
       V.invokeLength(checkLength)
     )
   }

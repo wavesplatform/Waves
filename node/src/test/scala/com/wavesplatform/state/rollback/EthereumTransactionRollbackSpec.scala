@@ -47,8 +47,8 @@ class EthereumTransactionRollbackSpec extends FlatSpec with WithDomain with EthH
         |     StringEntry("key", "str"),
         |     BinaryEntry("key", base58''),
         |     DeleteEntry("key"),
-        |     ScriptTransfer(i.caller, 1, unit),
-        |     ScriptTransfer(i.caller, 1, base58'$asset'),
+        |     ScriptTransfer(Address(base58'${TxHelpers.secondAddress}'), 1, unit),
+        |     ScriptTransfer(Address(base58'${TxHelpers.secondAddress}'), 1, base58'$asset'),
         |     Issue("name", "description", 1000, 4, true, unit, 0),
         |     Reissue(base58'$asset', 1, false),
         |     Burn(base58'$asset', 1),
@@ -59,7 +59,7 @@ class EthereumTransactionRollbackSpec extends FlatSpec with WithDomain with EthH
     d.helpers.setScript(TxHelpers.defaultSigner, script)
 
     val (initHeight, initStateSnapshot) = d.makeStateSolid()
-    val invoke = TxHelpers.invoke(TxHelpers.defaultAddress, "foo", fee = 1_0000_0000)
+    val invoke = TxHelpers.invoke(TxHelpers.defaultAddress, Some("foo"), fee = 1_0050_0000)
     d.appendBlock(invoke)
 
     d.rollbackTo(initHeight)

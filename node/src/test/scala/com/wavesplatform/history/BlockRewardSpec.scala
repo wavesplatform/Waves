@@ -28,16 +28,11 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
   private val InitialReward               = 6 * Constants.UnitsInWave
   private val rewardSettings = settings.copy(
     blockchainSettings = DefaultBlockchainSettings.copy(
-      functionalitySettings = FunctionalitySettings(
-        featureCheckBlocksPeriod = 10,
-        blocksForFeatureActivation = 1,
-        doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
-        preActivatedFeatures = Map(
+      functionalitySettings = FunctionalitySettings(featureCheckBlocksPeriod = 10, blocksForFeatureActivation = 1, preActivatedFeatures = Map(
           BlockchainFeatures.BlockReward.id    -> BlockRewardActivationHeight,
           BlockchainFeatures.NG.id             -> NGActivationHeight,
           BlockchainFeatures.FeeSponsorship.id -> -10
-        )
-      ),
+        ), doubleFeaturesPeriodsAfterHeight = Int.MaxValue),
       rewardsSettings = RewardsSettings(
         10,
         InitialReward,
@@ -132,7 +127,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
   "Miner receives reward as soon as the feature is activated and changes reward amount after voting" in forAll(activationScenario) {
     case (miner, transfers, b1s, b2s, activationBlock, b3s, b4s, newTermBlock, b5s, b6s, b7s) =>
       withDomain(rewardSettings) { d =>
-        val totalFee = transfers.map(_.fee).sum
+        val totalFee = transfers.map(_.fee.value).sum
 
         b1s.foreach(b => d.blockchainUpdater.processBlock(b) should beRight)
 
@@ -430,16 +425,11 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
 
   private val calcRewardSettings = rewardSettings.copy(
     blockchainSettings = rewardSettings.blockchainSettings.copy(
-      functionalitySettings = FunctionalitySettings(
-        featureCheckBlocksPeriod = 10,
-        blocksForFeatureActivation = 1,
-        doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
-        preActivatedFeatures = Map(
+      functionalitySettings = FunctionalitySettings(featureCheckBlocksPeriod = 10, blocksForFeatureActivation = 1, preActivatedFeatures = Map(
           BlockchainFeatures.BlockReward.id    -> 4,
           BlockchainFeatures.NG.id             -> NGActivationHeight,
           BlockchainFeatures.FeeSponsorship.id -> -10
-        )
-      ),
+        ), doubleFeaturesPeriodsAfterHeight = Int.MaxValue),
       rewardsSettings = RewardsSettings(12, 6 * Constants.UnitsInWave, 1 * Constants.UnitsInWave, 6)
     )
   )
@@ -494,16 +484,11 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
 
   private val smallPeriodRewardSettings = rewardSettings.copy(
     blockchainSettings = rewardSettings.blockchainSettings.copy(
-      functionalitySettings = FunctionalitySettings(
-        featureCheckBlocksPeriod = 10,
-        blocksForFeatureActivation = 1,
-        doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
-        preActivatedFeatures = Map(
+      functionalitySettings = FunctionalitySettings(featureCheckBlocksPeriod = 10, blocksForFeatureActivation = 1, preActivatedFeatures = Map(
           BlockchainFeatures.BlockReward.id    -> 4,
           BlockchainFeatures.NG.id             -> NGActivationHeight,
           BlockchainFeatures.FeeSponsorship.id -> -10
-        )
-      ),
+        ), doubleFeaturesPeriodsAfterHeight = Int.MaxValue),
       rewardsSettings = RewardsSettings(3, 6 * Constants.UnitsInWave, 1 * Constants.UnitsInWave, 2)
     )
   )

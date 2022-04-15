@@ -32,7 +32,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest extends PropSpec with DomainScenari
     alice                       <- accountGen
     bob                         <- accountGen
     (feeAsset, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(alice)
-    wavesFee                    = Sponsorship.toWaves(sponsorTx.minSponsoredAssetFee.get, sponsorTx.minSponsoredAssetFee.get)
+    wavesFee                    = Sponsorship.toWaves(sponsorTx.minSponsoredAssetFee.get.value, sponsorTx.minSponsoredAssetFee.get.value)
     genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
     masterToAlice: TransferTransaction = TransferTransaction
       .selfSigned(
@@ -40,7 +40,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest extends PropSpec with DomainScenari
         master,
         alice.toAddress,
         Waves,
-        feeAsset.fee + sponsorTx.fee + transferAssetWavesFee + wavesFee,
+        feeAsset.fee.value + sponsorTx.fee.value + transferAssetWavesFee + wavesFee,
         Waves,
         transferAssetWavesFee,
         ByteStr.empty,
@@ -53,7 +53,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest extends PropSpec with DomainScenari
         alice,
         bob.toAddress,
         Asset.fromCompatId(Some(feeAsset.id())),
-        feeAsset.quantity / 2,
+        feeAsset.quantity.value / 2,
         Waves,
         transferAssetWavesFee,
         ByteStr.empty,
@@ -68,7 +68,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest extends PropSpec with DomainScenari
         Asset.fromCompatId(Some(feeAsset.id())),
         amtTx,
         Asset.fromCompatId(Some(feeAsset.id())),
-        sponsorTx.minSponsoredAssetFee.get,
+        sponsorTx.minSponsoredAssetFee.get.value,
         ByteStr.empty,
         ts + 3
       )
@@ -81,7 +81,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest extends PropSpec with DomainScenari
         Asset.fromCompatId(Some(feeAsset.id())),
         amtTx,
         Asset.fromCompatId(Some(feeAsset.id())),
-        sponsorTx.minSponsoredAssetFee.get,
+        sponsorTx.minSponsoredAssetFee.get.value,
         ByteStr.empty,
         ts + 4
       )
@@ -90,15 +90,11 @@ class BlockchainUpdaterSponsoredFeeBlockTest extends PropSpec with DomainScenari
 
   val SponsoredFeeActivatedAt0BlockchainSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
     functionalitySettings = DefaultBlockchainSettings.functionalitySettings
-      .copy(
-        featureCheckBlocksPeriod = 1,
-        blocksForFeatureActivation = 1,
-        preActivatedFeatures = Map(
+      .copy(featureCheckBlocksPeriod = 1, blocksForFeatureActivation = 1, preActivatedFeatures = Map(
           BlockchainFeatures.FeeSponsorship.id -> 0,
           BlockchainFeatures.NG.id             -> 0,
           BlockchainFeatures.BlockV5.id        -> 0
-        )
-      )
+        ))
   )
 
   val SponsoredActivatedAt0WavesSettings: WavesSettings = settings.copy(blockchainSettings = SponsoredFeeActivatedAt0BlockchainSettings)

@@ -5,11 +5,11 @@ import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.http.requests.SignedDataRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
-import com.wavesplatform.state.DataEntry._
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
-import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.crypto
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry}
+import com.wavesplatform.state.DataEntry._
 import com.wavesplatform.test.PropSpec
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.serialization.impl.DataTxSerializer
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest._
@@ -108,7 +108,7 @@ class DataTransactionSpecification extends PropSpec {
 
       val req = json.as[SignedDataRequest]
       req.senderPublicKey shouldEqual Base58.encode(tx.sender.arr)
-      req.fee shouldEqual tx.fee
+      req.fee shouldEqual tx.fee.value
       req.timestamp shouldEqual tx.timestamp
 
       req.data zip tx.data foreach {
@@ -131,7 +131,7 @@ class DataTransactionSpecification extends PropSpec {
     forAll(dataTransactionGen, dataEntryGen(500)) {
       case (DataTransaction(version, sender, _, fee, timestamp, proofs, chainId), _) =>
         def check(data: List[DataEntry[_]]): Assertion = {
-          val txEi = DataTransaction.create(version, sender, data, fee, timestamp, proofs)
+          val txEi = DataTransaction.create(version, sender, data, fee.value, timestamp, proofs)
           txEi shouldBe Right(DataTransaction(version, sender, data, fee, timestamp, proofs, chainId))
           checkSerialization(txEi.explicitGet())
         }
@@ -151,34 +151,29 @@ class DataTransactionSpecification extends PropSpec {
     val gen = Arbitrary.arbBool.arbitrary.flatMap(proto => dataTransactionGen(DataTransaction.MaxEntryCount, withDeleteEntry = proto))
     forAll(gen) {
       case tx @ DataTransaction(version, sender, data, fee, timestamp, proofs, _) =>
-        val dataSize     = if (tx.isProtobufVersion) 110 else 100
-        val dataTooBig   = List.tabulate(dataSize)(n => StringDataEntry((100 + n).toString, "a" * 1527))
-        val dataTooBigEi = DataTransaction.create(version, sender, dataTooBig, fee, timestamp, proofs)
-        dataTooBigEi shouldBe Left(TxValidationError.TooBigArray)
-
         val emptyKey   = List(IntegerDataEntry("", 2))
-        val emptyKeyEi = DataTransaction.create(version, sender, emptyKey, fee, timestamp, proofs)
+        val emptyKeyEi = DataTransaction.create(version, sender, emptyKey, fee.value, timestamp, proofs)
         emptyKeyEi shouldBe Left(TxValidationError.EmptyDataKey)
 
-        val maxKeySize   = if (tx.isProtobufVersion) MaxPBKeySize else MaxKeySize
+        val maxKeySize   = MaxPBKeySize
         val keyTooLong   = data :+ BinaryDataEntry("a" * (maxKeySize + 1), ByteStr(Array(1, 2)))
-        val keyTooLongEi = DataTransaction.create(version, sender, keyTooLong, fee, timestamp, proofs)
+        val keyTooLongEi = DataTransaction.create(version, sender, keyTooLong, fee.value, timestamp, proofs)
         keyTooLongEi shouldBe Left(TxValidationError.TooBigArray)
 
         val valueTooLong   = data :+ BinaryDataEntry("key", ByteStr(Array.fill(MaxValueSize + 1)(1: Byte)))
-        val valueTooLongEi = DataTransaction.create(version, sender, valueTooLong, fee, timestamp, proofs)
+        val valueTooLongEi = DataTransaction.create(version, sender, valueTooLong, fee.value, timestamp, proofs)
         valueTooLongEi shouldBe Left(TxValidationError.TooBigArray)
 
         val e               = BooleanDataEntry("dupe", value = true)
         val duplicateKeys   = e +: data.drop(3) :+ e
-        val duplicateKeysEi = DataTransaction.create(version, sender, duplicateKeys, fee, timestamp, proofs)
+        val duplicateKeysEi = DataTransaction.create(version, sender, duplicateKeys, fee.value, timestamp, proofs)
         duplicateKeysEi shouldBe Left(TxValidationError.DuplicatedDataKeys)
 
         val noFeeEi = DataTransaction.create(1.toByte, sender, data, 0, timestamp, proofs)
-        noFeeEi shouldBe Left(TxValidationError.InsufficientFee())
+        noFeeEi shouldBe Left(TxValidationError.InsufficientFee)
 
         val negativeFeeEi = DataTransaction.create(1.toByte, sender, data, -100, timestamp, proofs)
-        negativeFeeEi shouldBe Left(TxValidationError.InsufficientFee())
+        negativeFeeEi shouldBe Left(TxValidationError.InsufficientFee)
     }
   }
 

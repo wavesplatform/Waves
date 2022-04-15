@@ -1,18 +1,16 @@
 package com.wavesplatform.state.diffs
 
-import com.wavesplatform.BlockGen
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{Blockchain, Diff}
-import com.wavesplatform.test._
-import com.wavesplatform.test.node._
-import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.test.node.*
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
+import com.wavesplatform.test.FreeSpec
 
-class BlockDifferTest extends FreeSpec with BlockGen with WithState {
+class BlockDifferTest extends FreeSpec with WithState {
   private val TransactionFee = 10
 
   private val signerA, signerB = randomKeyPair()
@@ -102,28 +100,16 @@ class BlockDifferTest extends FreeSpec with BlockGen with WithState {
   }
 
   private def assertDiff(blocks: Seq[Block], ngAtHeight: Int)(assertion: (Diff, Blockchain) => Unit): Unit = {
-    val fs = FunctionalitySettings(
-      featureCheckBlocksPeriod = ngAtHeight / 2,
-      blocksForFeatureActivation = 1,
-      preActivatedFeatures = Map[Short, Int]((2, ngAtHeight)),
-      doubleFeaturesPeriodsAfterHeight = Int.MaxValue
-    )
+    val fs = FunctionalitySettings(featureCheckBlocksPeriod = ngAtHeight / 2, blocksForFeatureActivation = 1, preActivatedFeatures = Map[Short, Int]((2, ngAtHeight)), doubleFeaturesPeriodsAfterHeight = Int.MaxValue)
     assertNgDiffState(blocks.init, blocks.last, fs)(assertion)
   }
 
   private def getTwoMinersBlockChain(from: KeyPair, to: KeyPair, numPayments: Int): Seq[Block] = {
-    val ts                   = System.currentTimeMillis() - 100000
-    val genesisTx            = GenesisTransaction.create(from.toAddress, Long.MaxValue - 1, ts).explicitGet()
+    val genesisTx            = TxHelpers.genesis(from.toAddress, Long.MaxValue - 1)
     val features: Seq[Short] = Seq[Short](2)
 
     val paymentTxs = (1 to numPayments).map { i =>
-      createWavesTransfer(
-        from,
-        to.toAddress,
-        amount = 10000,
-        TransactionFee,
-        timestamp = ts + i * 1000
-      ).explicitGet()
+      TxHelpers.transfer(from, to.toAddress, 10000, fee = TransactionFee, version = TxVersion.V1)
     }
 
     (genesisTx +: paymentTxs).zipWithIndex.map {

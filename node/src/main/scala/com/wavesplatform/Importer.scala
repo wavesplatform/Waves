@@ -286,29 +286,33 @@ object Importer extends ScorexLogging {
     val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, db, actorSystem)
     checkGenesis(settings, blockchainUpdater, Miner.Disabled)
 
-    val importFileOffset = if (importOptions.dryRun) 0 else importOptions.format match {
-      case Formats.Binary =>
-        var result = 0L
-        db.iterateOver(KeyTags.BlockInfoAtHeight) { e =>
-          e.getKey match {
-            case Array(_, _, 0, 0, 0, 1) => // Skip genesis
-            case _ =>
-              val meta = com.wavesplatform.database.readBlockMeta(e.getValue)
-              result += meta.size + 4
-          }
-        }
-        result
+    val importFileOffset =
+      if (importOptions.dryRun) 0
+      else
+        importOptions.format match {
+          case Formats.Binary =>
+            var result = 0L
+            db.iterateOver(KeyTags.BlockInfoAtHeight) { e =>
+              e.getKey match {
+                case Array(_, _, 0, 0, 0, 1) => // Skip genesis
+                case _ =>
+                  val meta = com.wavesplatform.database.readBlockMeta(e.getValue)
+                  result += meta.size + 4
+              }
+            }
+            result
 
-      case _ => 0L
-    }
+          case _ => 0L
+        }
     val inputStream = new BufferedInputStream(initFileStream(importOptions.blockchainFile, importFileOffset), 2 * 1024 * 1024)
 
     if (importOptions.dryRun) {
       def readNextBlock(): Future[Option[Block]] = Future.successful(None)
       readNextBlock().flatMap {
-        case None => Future.successful(())
-        case Some(block) =>
+        case None =>
+          Future.successful(())
 
+        case Some(_) =>
           readNextBlock()
       }
     }
@@ -317,7 +321,7 @@ object Importer extends ScorexLogging {
       quit = true
       Await.result(actorSystem.terminate(), 10.second)
       lock.synchronized {
-        if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG)) {
+        if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG) && blockchainUpdater.liquidBlockMeta.nonEmpty) {
           // Force store liquid block in leveldb
           val lastHeader = blockchainUpdater.lastBlockHeader.get.header
           val pseudoBlock = Block(

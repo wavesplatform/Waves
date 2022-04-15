@@ -87,23 +87,23 @@
 	{
       name: "makeString"
       params: [ "List[String]", "String" ]
-      doc: "Returns all the elements of the list in a string using the separator string."
-      paramsDoc: [ "The list of strings.", "The separator" ]
-      complexity: 11
-    }
-	{
-      name: "makeString_1C"
-      params: [ "List[String]", "String" ]
-      doc: "Returns all the elements of the list in a string using the separator string. Input list size limit = 70. Output string size limit = 500 bytes."
+      doc: "Returns all the elements of the list in a string using the separator string. Input list size limit = 70. Output string size limit = 500 bytes"
       paramsDoc: [ "The list of strings.", "The separator" ]
       complexity: 1
     }
 	{
       name: "makeString_2C"
       params: [ "List[String]", "String" ]
-      doc: "Returns all the elements of the list in a string using the separator string. Input list size limit = 100. Output string size limit = 6000 bytes."
+      doc: "Returns all the elements of the list in a string using the separator string. Input list size limit = 100. Output string size limit = 6000 bytes"
       paramsDoc: [ "The list of strings.", "The separator" ]
       complexity: 2
+    }
+	{
+      name: "makeString_11C"
+      params: [ "List[String]", "String" ]
+      doc: "Returns all the elements of the list in a string using the separator string. Input list size limit = 1000. Output string size limit = 32767 bytes"
+      paramsDoc: [ "The list of strings.", "The separator" ]
+      complexity: 11
     }
 	{
       name: "removeByIndex"
@@ -111,49 +111,6 @@
       doc: "Removes the element at given index from the list and returns new list."
       paramsDoc: [ "The list.", "The element." ]
       complexity: 7
-    }
-
-	{
-      name: "fold_20"
-      params: [ "List[A]", "B", "String" ]
-      doc: "Applies a binary operator to a start value and all elements of the list, going left to right. Max list size is 20"
-      paramsDoc: [ "The list.", "The start value.", "Folding function." ]
-      complexity: 3
-    }
-	{
-      name: "fold_50"
-      params: [ "List[A]", "B", "String" ]
-      doc: "Applies a binary operator to a start value and all elements of the list, going left to right. Max list size is 50"
-      paramsDoc: [ "The list.", "The start value.", "Folding function." ]
-      complexity: 7
-    }
-	{
-      name: "fold_100"
-      params: [ "List[A]", "B", "String" ]
-      doc: "Applies a binary operator to a start value and all elements of the list, going left to right. Max list size is 100"
-      paramsDoc: [ "The list.", "The start value.", "Folding function." ]
-      complexity: 9
-    }
-	{
-      name: "fold_200"
-      params: [ "List[A]", "B", "String" ]
-      doc: "Applies a binary operator to a start value and all elements of the list, going left to right. Max list size is 200"
-      paramsDoc: [ "The list.", "The start value.", "Folding function." ]
-      complexity: 20
-    }
-	{
-      name: "fold_500"
-      params: [ "List[A]", "B", "String" ]
-      doc: "Applies a binary operator to a start value and all elements of the list, going left to right. Max list size is 500"
-      paramsDoc: [ "The list.", "The start value.", "Folding function." ]
-      complexity: 56
-    }
-	{
-      name: "fold_1000"
-      params: [ "List[A]", "B", "String" ]
-      doc: "Applies a binary operator to a start value and all elements of the list, going left to right. Max list size is 1000"
-      paramsDoc: [ "The list.", "The start value.", "Folding function." ]
-      complexity: 115
     }
   ]
 }

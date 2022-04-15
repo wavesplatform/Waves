@@ -12,11 +12,11 @@ import com.wavesplatform.transaction.validation.impl.PaymentTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-case class PaymentTransaction private (
+case class PaymentTransaction(
     sender: PublicKey,
     recipient: Address,
-    amount: TxAmount,
-    fee: TxAmount,
+    amount: TxPositiveAmount,
+    fee: TxPositiveAmount,
     timestamp: TxTimestamp,
     signature: ByteStr,
     chainId: Byte
@@ -29,7 +29,7 @@ case class PaymentTransaction private (
 
   def proofs: Proofs = Proofs(signature)
 
-  val signatureValid: Coeval[Boolean] = Coeval.evalOnce(crypto.verify(signature, bodyBytes(), sender))
+  protected val signatureValid: Coeval[Boolean] = Coeval.evalOnce(crypto.verify(signature, bodyBytes(), sender))
 
   override val id: Coeval[ByteStr] = Coeval.evalOnce(signature)
 
@@ -61,5 +61,9 @@ object PaymentTransaction extends TransactionParser {
       timestamp: Long,
       signature: ByteStr
   ): Either[ValidationError, PaymentTransaction] =
-    PaymentTransaction(sender, recipient, amount, fee, timestamp, signature, recipient.chainId).validatedEither
+    for {
+      fee    <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
+      amount <- TxPositiveAmount(amount)(TxValidationError.NonPositiveAmount(amount, "waves"))
+      tx     <- PaymentTransaction(sender, recipient, amount, fee, timestamp, signature, recipient.chainId).validatedEither
+    } yield tx
 }

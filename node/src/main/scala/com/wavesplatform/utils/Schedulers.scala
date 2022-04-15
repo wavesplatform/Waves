@@ -11,11 +11,15 @@ import scala.concurrent.duration._
 
 /** Helper methods to create schedulers with custom DiscardPolicy */
 object Schedulers {
-  private trait AdaptedThreadPoolExecutorMixin { self: ThreadPoolExecutor =>
+  private abstract class AdaptedThreadPoolExecutor(
+      corePoolSize: Int,
+      factory: ThreadFactory,
+      rejectedExecutionHandler: RejectedExecutionHandler
+  ) extends ScheduledThreadPoolExecutor(corePoolSize, factory, rejectedExecutionHandler) {
     def reportFailure(t: Throwable): Unit
 
     override def afterExecute(r: Runnable, t: Throwable): Unit = {
-      self.afterExecute(r, t)
+      super.afterExecute(r, t)
       var exception: Throwable = t
 
       if ((exception eq null) && r.isInstanceOf[JavaFuture[_]]) {
@@ -53,7 +57,7 @@ object Schedulers {
       rejectedExecutionHandler: RejectedExecutionHandler = new DiscardOldestPolicy
   ): SchedulerService = {
     val factory = threadFactory(name, daemonic = true, reporter)
-    val executor = new ScheduledThreadPoolExecutor(1, factory, rejectedExecutionHandler) with AdaptedThreadPoolExecutorMixin {
+    val executor = new AdaptedThreadPoolExecutor(1, factory, rejectedExecutionHandler) {
       override def reportFailure(t: Throwable): Unit = reporter.reportFailure(t)
     }
 
@@ -68,7 +72,7 @@ object Schedulers {
       rejectedExecutionHandler: RejectedExecutionHandler = new DiscardOldestPolicy
   ): SchedulerService = {
     val factory = threadFactory(name, daemonic = true, reporter)
-    val executor = new ScheduledThreadPoolExecutor(poolSize, factory, rejectedExecutionHandler) with AdaptedThreadPoolExecutorMixin {
+    val executor = new AdaptedThreadPoolExecutor(poolSize, factory, rejectedExecutionHandler) {
       override def reportFailure(t: Throwable): Unit = reporter.reportFailure(t)
     }
 
@@ -117,7 +121,7 @@ object Schedulers {
       rejectedExecutionHandler: RejectedExecutionHandler = new DiscardOldestPolicy
   ): SchedulerService = {
     val factory = threadFactory(name, daemonic = true, reporter)
-    val executor = new ScheduledThreadPoolExecutor(poolSize, factory, rejectedExecutionHandler) with AdaptedThreadPoolExecutorMixin {
+    val executor = new AdaptedThreadPoolExecutor(poolSize, factory, rejectedExecutionHandler) {
       override def reportFailure(t: Throwable): Unit = reporter.reportFailure(t)
       override def decorateTask[V](runnable: Runnable, task: RunnableScheduledFuture[V]): RunnableScheduledFuture[V] =
         new TimedWrapper(timer, timeout, task)

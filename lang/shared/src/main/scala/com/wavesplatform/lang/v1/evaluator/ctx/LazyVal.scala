@@ -32,7 +32,7 @@ object LazyVal {
   def apply[F[_] : Monad](v: TrampolinedExecResult[F, EVALUATED]): LazyVal[F] =
     LazyValImpl(v.value, _ => Monad[F].unit)
 
-  def fromEval[F[_] : Monad](v: Eval[F[Either[String, EVALUATED]]]): LazyVal[F] =
+  def fromEval[F[_] : Monad](v: Eval[F[Either[ExecutionError, EVALUATED]]]): LazyVal[F] =
     LazyValImpl(v, _ => Monad[F].unit)
 
   def fromEvaluated[F[_] : Monad](v: EVALUATED, lc: LogCallback[F]): LazyVal[F] =

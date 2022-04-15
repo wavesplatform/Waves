@@ -1,18 +1,19 @@
 package com.wavesplatform.state.diffs
 
 import cats.data.Chain
-import cats.syntax.foldable._
+import cats.syntax.foldable.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state._
+import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError._
-import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.transaction.smart._
+import com.wavesplatform.transaction.TxValidationError.*
+import com.wavesplatform.transaction.*
+import com.wavesplatform.transaction.assets.*
+import com.wavesplatform.transaction.assets.exchange.*
+import com.wavesplatform.transaction.smart.*
 import com.wavesplatform.transaction.smart.script.trace.TracedResult.Attribute
-import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.transfer.*
+import com.wavesplatform.transaction.validation.impl.DataTxValidator
 
 object FeeValidation {
 
@@ -66,7 +67,7 @@ object FeeValidation {
 
     val errorMessage = s"Fee for ${txType.transactionName} ($actualFee) does not exceed minimal value of $requiredFee."
 
-    GenericError((if (feeDetails.requirements.nonEmpty) (feeDetails.requirements mkString_ " ") ++ ". " else "") ++ errorMessage)
+    GenericError((if (feeDetails.requirements.nonEmpty) (feeDetails.requirements mkString_ ". ") ++ ". " else "") ++ errorMessage)
   }
 
   private case class FeeInfo(assetInfo: Option[(IssuedAsset, AssetDescription)], requirements: Chain[String], wavesFee: Long)
@@ -79,12 +80,13 @@ object FeeValidation {
           case tx: MassTransferTransaction =>
             baseFee + (tx.transfers.size + 1) / 2
           case tx: DataTransaction =>
-            val payload =
-              if (tx.isProtobufVersion) tx.protoDataPayload
-              else if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccounts)) tx.bodyBytes()
-              else tx.bytes()
+            val payloadLength =
+              if (blockchain.isFeatureActivated(BlockchainFeatures.RideV6)) DataTxValidator.realUserPayloadSize(tx.data)
+              else if (tx.isProtobufVersion) tx.protoDataPayload.length
+              else if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccounts)) tx.bodyBytes().length
+              else tx.bytes().length
 
-            baseFee + (payload.length - 1) / 1024
+            baseFee + (payloadLength - 1) / 1024
           case itx: IssueTransaction =>
             val multiplier = if (blockchain.isNFT(itx)) NFTMultiplier else 1
 
@@ -100,6 +102,14 @@ object FeeValidation {
               case _: EthereumTransaction.Transfer   => 1
               case _: EthereumTransaction.Invocation => 5
             }
+
+          case ss: SetScriptTransaction if blockchain.isFeatureActivated(BlockchainFeatures.RideV6) =>
+            ss.script.fold(1) { script =>
+              val scriptSize = script.bytes().size
+              val kbs        = scriptSize / 1024
+              if (scriptSize > 0 && scriptSize % 1024 == 0) kbs else kbs + 1
+            }
+
           case _ => baseFee
         }
       }
@@ -141,7 +151,8 @@ object FeeValidation {
         .exists(_.script.isDefined)
 
     val assetsCount = tx match {
-      case _: InvokeScriptTransaction if blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls) => 0
+      case _: InvokeScriptTransaction =>
+        if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)) 0 else tx.smartAssets(blockchain).size
       case tx: ExchangeTransaction =>
         tx.smartAssets(blockchain).size /* *3 if we decide to check orders and transaction */
       case _ => tx.smartAssets(blockchain).size
@@ -170,7 +181,7 @@ object FeeValidation {
 
     val extraFee = smartAccountScriptsCount * ScriptExtraFee
     val extraRequirements =
-      if (smartAccountScriptsCount > 0) Chain(s"Transaction sent from smart account. Requires $extraFee extra fee.")
+      if (smartAccountScriptsCount > 0) Chain(s"Transaction sent from smart account. Requires $extraFee extra fee")
       else Chain.empty
 
     val FeeInfo(feeAssetInfo, reqs, feeAmount) = inputFee

@@ -1,19 +1,17 @@
 package com.wavesplatform.lang.v1.evaluator
 
 import cats.data.EitherT
-import cats.implicits._
+import cats.implicits.*
 import cats.{Eval, Id, Monad, StackSafeMonad}
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.FunctionHeader.User
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, NOTHING}
 import com.wavesplatform.lang.v1.evaluator.ContextfulNativeFunction.{Extended, Simple}
+import com.wavesplatform.lang.v1.evaluator.ctx.*
 import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext.Lenses
-import com.wavesplatform.lang.v1.evaluator.ctx._
-import com.wavesplatform.lang.v1.task.imports._
+import com.wavesplatform.lang.v1.task.imports.*
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.{CoevalF, EvalF, ExecutionError}
-import monix.eval.Coeval
+import com.wavesplatform.lang.{CoevalF, CommonError, EvalF, ExecutionError}
 
 import scala.collection.mutable.ListBuffer
 import scala.util.Try
@@ -33,7 +31,7 @@ object EvaluatorV1 {
 
 class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: Monad[CoevalF[F, *]]) {
   private val lenses = new Lenses[F, C]
-  import lenses._
+  import lenses.*
 
   private def evalLetBlock(let: LET, inner: EXPR): EvalM[F, C, (EvaluationContext[C, F], EVALUATED)] =
     for {
@@ -48,7 +46,7 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: M
 
   private def evalFuncBlock(func: FUNC, inner: EXPR): EvalM[F, C, (EvaluationContext[C, F], EVALUATED)] = {
     val funcHeader = FunctionHeader.User(func.name)
-    val function = UserFunction(func.name, 0, NOTHING, func.args.map(n => (n, NOTHING)): _*)(func.body)
+    val function = UserFunction(func.name, 0, NOTHING, func.args.map(n => (n, NOTHING))*)(func.body)
         .asInstanceOf[UserFunction[C]]
     local {
       modify[F, LoggedEvaluationContext[C, F], ExecutionError](funcs.modify(_)(_.updated(funcHeader, function)))
@@ -106,11 +104,11 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: M
                 case f: Simple[C]   =>
                   val r = Try(f.evaluate(ctx.ec.environment, args))
                     .toEither
-                    .leftMap(_.toString)
+                    .bimap(e => CommonError(e.toString): ExecutionError, EitherT(_))
                     .pure[F]
-                  Eval.now(EitherT(r).map(EitherT(_)).flatten.value)
+                  EitherT(r).flatten.value.pure[Eval]
                 case f: Extended[C] =>
-                  f.evaluate(ctx.ec.environment, args, Int.MaxValue, evaluateHighOrder(ctx, _, _, _))
+                  f.evaluate(ctx.ec.environment, args, Int.MaxValue)
                     .map(_.map(_._1))
                     .to[Eval]
               }
@@ -132,18 +130,6 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: M
         )
         .getOrElse(raiseError[F, LoggedEvaluationContext[C, F], ExecutionError, EVALUATED](s"function '$header' not found"))
     } yield (ctx.ec, result)
-
-  private def evaluateHighOrder(
-    ctx: LoggedEvaluationContext[C, F],
-    function: String,
-    args: List[EVALUATED],
-    limit: Int
-  ): Coeval[F[(Either[ExecutionError, EVALUATED], Int)]] =
-    Coeval.from(
-      evalExpr(FUNCTION_CALL(User(function), args))
-        .run(ctx)
-        .map { case (_, r) => r.map((_, 0)) }
-    )
 
   private def evalExprWithCtx(t: EXPR): EvalM[F, C, (EvaluationContext[C, F], EVALUATED)] =
     t match {

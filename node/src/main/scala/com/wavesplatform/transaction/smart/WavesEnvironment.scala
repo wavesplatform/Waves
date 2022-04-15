@@ -1,27 +1,26 @@
 package com.wavesplatform.transaction.smart
 
-import cats.kernel.Monoid
-import cats.syntax.either._
+import cats.syntax.either.*
 import com.wavesplatform.account
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.MultiPaymentPolicyProvider._
+import com.wavesplatform.features.MultiPaymentPolicyProvider.*
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.{Log, ScriptResult}
-import com.wavesplatform.lang.v1.traits._
-import com.wavesplatform.lang.v1.traits.domain.Recipient._
-import com.wavesplatform.lang.v1.traits.domain._
-import com.wavesplatform.state._
+import com.wavesplatform.lang.v1.traits.*
+import com.wavesplatform.lang.v1.traits.domain.*
+import com.wavesplatform.lang.v1.traits.domain.Recipient.*
+import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.invoke.{InvokeScript, InvokeScriptDiff, InvokeScriptTransactionLike}
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.Asset._
+import com.wavesplatform.transaction.Asset.*
 import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
@@ -29,9 +28,9 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
 import com.wavesplatform.transaction.smart.script.trace.InvokeScriptTrace
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, TransactionBase}
+import com.wavesplatform.transaction.{Asset, TransactionBase, TransactionType}
 import monix.eval.Coeval
-import shapeless._
+import shapeless.*
 
 import scala.util.Try
 
@@ -48,7 +47,7 @@ class WavesEnvironment(
     ds: DirectiveSet,
     override val txId: ByteStr
 ) extends Environment[Id] {
-  import com.wavesplatform.lang.v1.traits.Environment._
+  import com.wavesplatform.lang.v1.traits.Environment.*
 
   def currentBlockchain(): Blockchain = blockchain
 
@@ -61,7 +60,7 @@ class WavesEnvironment(
     blockchain
       .transactionInfo(ByteStr(id))
       .filter(_._1.succeeded)
-      .map(_._2)
+      .collect { case (_, tx) if tx.t.tpe != TransactionType.Ethereum => tx }
       .map(tx => RealTransactionWrapper(tx, blockchain, ds.stdLibVersion, paymentTarget(ds, tthis)).explicitGet())
 
   override def inputEntity: InputEntity = in()
@@ -107,7 +106,7 @@ class WavesEnvironment(
       address <- recipient match {
         case Address(bytes) =>
           com.wavesplatform.account.Address
-            .fromBytes(bytes.arr)
+            .fromBytes(bytes.arr, chainId)
             .toOption
         case Alias(name) =>
           com.wavesplatform.account.Alias
@@ -148,11 +147,12 @@ class WavesEnvironment(
       }
       address <- blockchain.resolveAlias(aoa)
       portfolio = currentBlockchain().wavesPortfolio(address)
+      effectiveBalance <- portfolio.effectiveBalance
     } yield Environment.BalanceDetails(
       portfolio.balance - portfolio.lease.out,
       portfolio.balance,
       blockchain.generatingBalance(address),
-      portfolio.effectiveBalance
+      effectiveBalance
     )).left.map(_.toString)
   }
 
@@ -207,21 +207,20 @@ class WavesEnvironment(
     PBTransactionSerializer
       .parseBytes(b)
       .toOption
-      .collect {
-        case tx: TransferTransaction => RealTransactionWrapper.mapTransferTx(tx)
+      .collect { case tx: TransferTransaction =>
+        RealTransactionWrapper.mapTransferTx(tx)
       }
 
   override def addressFromString(addressStr: String): Either[String, Address] =
     account.Address
-      .fromString(addressStr)
+      .fromString(addressStr, Some(chainId))
       .bimap(
         _.toString,
         address => Address(ByteStr(address.bytes))
       )
 
   override def addressFromPublicKey(publicKey: ByteStr): Either[String, Address] =
-    Try(PublicKey(publicKey))
-      .toEither
+    Try(PublicKey(publicKey)).toEither
       .bimap(
         _.getMessage,
         pk => Address(ByteStr(pk.toAddress.bytes))
@@ -318,6 +317,8 @@ class DAppEnvironment(
     totalComplexityLimit: Int,
     var remainingCalls: Int,
     var availableActions: Int,
+    var availableBalanceActions: Int,
+    var availableAssetActions: Int,
     var availableData: Int,
     var availableDataSize: Int,
     var currentDiff: Diff,
@@ -347,14 +348,11 @@ class DAppEnvironment(
       invoke <- traced(
         account.Address
           .fromBytes(dApp.bytes.arr)
-          .ensureOr(
-            address =>
-              GenericError(
-                s"The invocation stack contains multiple invocations of the dApp at address $address with invocations of another dApp between them"
-              )
-          )(
-            address => currentDApp == address || !calledAddresses.contains(address)
-          )
+          .ensureOr(address =>
+            GenericError(
+              s"The invocation stack contains multiple invocations of the dApp at address $address with invocations of another dApp between them"
+            )
+          )(address => currentDApp == address || !calledAddresses.contains(address))
           .map(
             InvokeScript(
               currentDAppPk,
@@ -370,28 +368,34 @@ class DAppEnvironment(
         val invocation = DAppEnvironment.DAppInvocation(invoke.dApp, invoke.funcCall, invoke.payments)
         invocationRoot.record(invocation)
       }
-      (diff, evaluated, remainingActions, remainingData, remainingDataSize) <- InvokeScriptDiff( // This is a recursive call
-        mutableBlockchain,
-        blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp + 1,
-        limitedExecution,
-        totalComplexityLimit,
-        availableComplexity,
-        remainingCalls,
-        availableActions,
-        availableData,
-        availableDataSize,
-        if (reentrant) calledAddresses else calledAddresses + invoke.sender.toAddress,
-        invocationTracker
-      )(invoke)
-    } yield {
-      val fixedDiff = diff.copy(
+      (diff, evaluated, remainingActions, remainingBalanceActions, remainingAssetActions, remainingData, remainingDataSize) <-
+        InvokeScriptDiff( // This is a recursive call
+          mutableBlockchain,
+          blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp + 1,
+          limitedExecution,
+          totalComplexityLimit,
+          availableComplexity,
+          remainingCalls,
+          availableActions,
+          availableBalanceActions,
+          availableAssetActions,
+          availableData,
+          availableDataSize,
+          if (reentrant) calledAddresses else calledAddresses + invoke.sender.toAddress,
+          invocationTracker
+        )(invoke)
+      fixedDiff = diff.copy(
         scriptResults = Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = diff.scriptResults(txId))))),
         scriptsRun = diff.scriptsRun + 1
       )
-      currentDiff = Monoid.combine(currentDiff, fixedDiff)
+      newCurrentDiff <- traced(currentDiff.combine(fixedDiff).leftMap(GenericError(_)))
+    } yield {
+      currentDiff = newCurrentDiff
       mutableBlockchain = CompositeBlockchain(blockchain, currentDiff)
       remainingCalls = remainingCalls - 1
       availableActions = remainingActions
+      availableBalanceActions = remainingBalanceActions
+      availableAssetActions = remainingAssetActions
       availableData = remainingData
       availableDataSize = remainingDataSize
       (evaluated, diff.scriptsComplexity.toInt)

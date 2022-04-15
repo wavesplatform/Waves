@@ -43,7 +43,7 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
       val script = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
       val scriptComplexity = Script
-        .estimate(Script.fromBase64String(script.bytes().base64).explicitGet(), ScriptEstimatorV3, fixEstimateOfVerifier = true, useContractVerifierLimit = true)
+        .estimate(Script.fromBase64String(script.bytes().base64).explicitGet(), ScriptEstimatorV3(fixOverflow = true, overhead = true), fixEstimateOfVerifier = true, useContractVerifierLimit = true)
         .explicitGet()
       val setScriptTx   = sender.setScript(contract, Right(Some(script)), setScriptFee, waitForTx = true)
       val setScriptTxId = PBTransactions.vanilla(setScriptTx, unsafe = false).explicitGet().id().toString

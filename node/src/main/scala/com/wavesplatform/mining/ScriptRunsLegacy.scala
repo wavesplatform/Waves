@@ -28,7 +28,7 @@ private[mining] object ScriptRunsLegacy extends ScorexLogging {
 
     val smartAccountRun = tx match {
       case x: Transaction with Authorized if blockchain.hasAccountScript(x.sender.toAddress) => 1
-      case _                                                                => 0
+      case _                                                                                 => 0
     }
 
     val assetIds = tx match {

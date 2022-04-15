@@ -17,10 +17,13 @@ class MicroBlockSynchronizerSpec extends FreeSpec with RxScheduler with BlockGen
   val defaultSettings = MicroblockSynchronizerSettings(1.second, 1.minute, 1.minute)
 
   private def withMs(
-      f: (PS[ByteStr],
+      f: (
+          PS[ByteStr],
           PS[(Channel, MicroBlockInv)],
           PS[(Channel, MicroBlockResponse)],
-          Observable[(Channel, MicroBlockSynchronizer.MicroblockData)]) => Any) = {
+          Observable[(Channel, MicroBlockSynchronizer.MicroblockData)]
+      ) => Any
+  ) = {
     val peers          = PeerDatabase.NoOp
     val lastBlockIds   = PS[ByteStr]()
     val microInvs      = PS[(Channel, MicroBlockInv)]()

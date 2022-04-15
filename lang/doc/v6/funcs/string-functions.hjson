@@ -52,20 +52,6 @@
     {
       name: "split"
       params: [ "String", "String" ]
-      doc: "Splits a string delimited by a separator into a list of substrings"
-      paramsDoc: [ "The string.", "The separator." ]
-      complexity: 51
-    }
-    {
-      name: "split"
-      params: [ "String", "String" ]
-      doc: "Splits a string delimited by a separator into a list of substrings"
-      paramsDoc: [ "The string.", "The separator." ]
-      complexity: 51
-    }
-    {
-      name: "split_1C"
-      params: [ "String", "String" ]
       doc: "Splits a string delimited by a separator into a list of substrings. Input string size limit = 500 bytes. Output list size limit = 20"
       paramsDoc: [ "The string.", "The separator." ]
       complexity: 1
@@ -76,6 +62,13 @@
       doc: "Splits a string delimited by a separator into a list of substrings. Input string size limit = 6000 bytes. Output list size limit = 100"
       paramsDoc: [ "The string.", "The separator." ]
       complexity: 4
+    }
+    {
+      name: "split_51C"
+      params: [ "String", "String" ]
+      doc: "Splits a string delimited by a separator into a list of substrings. Input string size limit = 32767 bytes. Output list size limit = 1000"
+      paramsDoc: [ "The string.", "The separator." ]
+      complexity: 51
     }
     {
       name: "size"

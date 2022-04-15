@@ -127,6 +127,9 @@ object Global extends BaseGlobal {
     tryEither {
       val base    = toJBig(b, bp)
       val exp     = toJBig(e, ep)
+
+
+
       val context = if (useNewPrecision) bigMathContext else oldBigMathContext
       val res = if (exp == BigDecimal(0.5).bigDecimal) {
         BigDecimalMath.sqrt(base, context)
@@ -152,7 +155,7 @@ object Global extends BaseGlobal {
       round: Rounding,
       precision: Int,
       result: java.math.BigDecimal
-  ): Either[ExecutionError, BigInt] = {
+  ): Either[String, BigInt] = {
     val value = result.unscaledValue()
     val scale = result.scale()
     if (scale > resultPrecision)

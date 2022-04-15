@@ -7,7 +7,7 @@ import com.wavesplatform.test._
 
 class DirectiveParserTest extends PropSpec {
 
-  def parse(s: String): Either[ExecutionError, List[Directive]] = DirectiveParser(s)
+  def parse(s: String): Either[String, List[Directive]] = DirectiveParser(s)
 
   property("parse directives") {
     parse("{-# STDLIB_VERSION 1 #-}") shouldBe Right(List(Directive(STDLIB_VERSION, V1)))
@@ -98,5 +98,10 @@ class DirectiveParserTest extends PropSpec {
       Directive(CONTENT_TYPE, Expression),
       Directive(SCRIPT_TYPE, Asset)
     ))
+  }
+
+  property("dashes, spaces, dots, underscores") {
+    parse("{-# IMPORT path/lib_1-a.ride, lib_2-b.ride #-}") shouldBe
+      Right(List(Directive(IMPORT, Imports(List("path/lib_1-a.ride", "lib_2-b.ride")))))
   }
 }

@@ -30,8 +30,8 @@ import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidRequestSignature}
-import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -104,9 +104,9 @@ case class DebugApiRoute(
           .runToFuture
           .map {
             case l if accept.exists(_.mediaRanges.exists(CustomJson.acceptsNumbersAsStrings)) =>
-              Json.obj(l.map { case (address, balance) => address.toString -> (balance.toString: JsValueWrapper) }: _*)
+              Json.obj(l.map { case (address, balance) => address.toString -> (balance.toString: JsValueWrapper) }*)
             case l =>
-              Json.obj(l.map { case (address, balance) => address.toString -> (balance: JsValueWrapper) }: _*)
+              Json.obj(l.map { case (address, balance) => address.toString -> (balance: JsValueWrapper) }*)
           }
       )
     }
@@ -286,13 +286,14 @@ case class DebugApiRoute(
             implicit val ss: JsonEntityStreamingSupport = EntityStreamingSupport.json()
 
             Source
-              .fromPublisher(
+              .future(
                 transactionsApi
                   .transactionsByAddress(address, None, Set.empty, afterOpt)
                   .take(limit)
-                  .map(Json.toJsObject(_))
-                  .toReactivePublisher
+                  .toListL
+                  .runToFuture
               )
+              .mapConcat(_.map(Json.toJsObject(_)))
           }
         }
       }

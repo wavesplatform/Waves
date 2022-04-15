@@ -17,7 +17,7 @@ import com.wavesplatform.consensus.PoSCalculator.{generationSignature, hit}
 import com.wavesplatform.crypto._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.settings.{FunctionalitySettings, GenesisSettings, GenesisTransactionSettings}
-import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.{GenesisTransaction, TxNonNegativeAmount}
 import com.wavesplatform.utils._
 import com.wavesplatform.wallet.Wallet
 import net.ceedubs.ficus.Ficus._
@@ -48,14 +48,7 @@ object GenesisBlockGenerator extends App {
     val features: Map[Short, Int] =
       preActivatedFeatures.map(_.toShort -> 0).toMap
 
-    val functionalitySettings: FunctionalitySettings = FunctionalitySettings(
-      Int.MaxValue,
-      Int.MaxValue,
-      preActivatedFeatures = features,
-      doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
-      minBlockTime = minBlockTime.getOrElse(15.seconds),
-      delayDelta = delayDelta.getOrElse(8)
-    )
+    val functionalitySettings: FunctionalitySettings = FunctionalitySettings(Int.MaxValue, Int.MaxValue, preActivatedFeatures = features, doubleFeaturesPeriodsAfterHeight = Int.MaxValue, minBlockTime = minBlockTime.getOrElse(15.seconds), delayDelta = delayDelta.getOrElse(8))
 
     def preActivated(feature: BlockchainFeature): Boolean = features.contains(feature.id)
   }
@@ -110,9 +103,12 @@ object GenesisBlockGenerator extends App {
 
   val timestamp = settings.timestamp.getOrElse(System.currentTimeMillis())
 
-  val genesisTxs: Seq[GenesisTransaction] = shares.map {
+  val genesisTxs: Seq[GenesisTransaction] = shares.flatMap {
     case (addrInfo, part) =>
-      GenesisTransaction(addrInfo.accountAddress, part, timestamp, ByteStr.empty, settings.chainId.toByte)
+      TxNonNegativeAmount
+        .from(part)
+        .toOption
+        .map(amount => GenesisTransaction(addrInfo.accountAddress, amount, timestamp, ByteStr.empty, settings.chainId.toByte))
   }
 
   report(
@@ -204,7 +200,7 @@ object GenesisBlockGenerator extends App {
       settings.initialBalance,
       Some(genesis.signature),
       genesisTxs.map { tx =>
-        GenesisTransactionSettings(tx.recipient.toString, tx.amount)
+        GenesisTransactionSettings(tx.recipient.toString, tx.amount.value)
       },
       genesis.header.baseTarget,
       settings.averageBlockDelay
@@ -223,7 +219,7 @@ object GenesisBlockGenerator extends App {
     def getHit(account: KeyPair): BigInt = {
       val gs = if (settings.preActivated(BlockchainFeatures.BlockV5)) {
         val vrfProof = crypto.signVRF(account.privateKey, hitSource.arr)
-        crypto.verifyVRF(vrfProof, hitSource.arr, account.publicKey).map(_.arr).explicitGet()
+        crypto.verifyVRF(vrfProof, hitSource.arr, account.publicKey, settings.preActivated(BlockchainFeatures.RideV6)).map(_.arr).explicitGet()
       } else generationSignature(hitSource, account.publicKey)
 
       hit(gs)

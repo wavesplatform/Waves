@@ -7,10 +7,11 @@ import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.v1.FunctionHeader.User
+import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.CompilerContext.VariableInfo
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler, Terms, TestCompiler}
+import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler, Terms, TestCompiler, Types}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
@@ -307,7 +308,7 @@ class ExpressionCompilerV1Test extends PropSpec {
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(V4, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
+          PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
           WavesContext.build(
             Global,
@@ -317,7 +318,8 @@ class ExpressionCompilerV1Test extends PropSpec {
       )
       .compilerContext
 
-    Global.compileExpression(expr, ctx, V4, Account, ScriptEstimatorV3) should produce("Script is too large: 8756 bytes > 8192 bytes")
+    val e = ScriptEstimatorV3(fixOverflow = true, overhead = true)
+    Global.compileExpression(expr, ctx, V4, Account, e) should produce("Script is too large: 8756 bytes > 8192 bytes")
   }
 
   property("extract() removed from V4") {
@@ -571,11 +573,47 @@ class ExpressionCompilerV1Test extends PropSpec {
     )
   }
 
+  property("get list element by index from variable where list is element of tuple") {
+    val script =
+      """
+        |let t = (1, [2, 3, 4], 5)
+        |let ind = 1
+        |t._2[ind] == 3
+        |""".stripMargin
+
+    ExpressionCompiler.compile(script, compilerContextV4) shouldBe Right(
+      (
+        LET_BLOCK(
+          LET("t", FUNCTION_CALL(Native(1301), List(CONST_LONG(1), FUNCTION_CALL(Native(1100), List(CONST_LONG(2), FUNCTION_CALL(Native(1100), List(CONST_LONG(3), FUNCTION_CALL(Native(1100), List(CONST_LONG(4), REF("nil"))))))), CONST_LONG(5)))),
+          LET_BLOCK(
+            LET("ind", CONST_LONG(1)),
+            FUNCTION_CALL(Native(0), List(FUNCTION_CALL(Native(401), List(GETTER(REF("t"), "_2"), REF("ind"))), CONST_LONG(3)))
+          )
+        ),
+        Types.BOOLEAN
+      )
+    )
+  }
+
+  property("trying to get list element from unknown getter") {
+    val script =
+      """
+        |let t = (1, [2, 3, 4], 5)
+        |let ind = 1
+        |t.some[ind] == 3
+        |""".stripMargin
+
+    ExpressionCompiler.compile(script, compilerContextV4) should produce(
+      "Compilation failed: [Non-matching types: expected: List[T], actual: Nothing in 39-50; Undefined field `some` of variable of type `(Int, List[Int], Int)` in 39-45]"
+    )
+  }
+
   treeTypeTest("GETTER")(
     ctx = CompilerContext(
       predefTypes = Map(pointType.name -> pointType),
       varDefs = Map("p"                -> VariableInfo(AnyPos, pointType)),
-      functionDefs = Map.empty
+      functionDefs = Map.empty,
+      provideRuntimeTypeOnCastError = false
     ),
     expr = Expressions.GETTER(
       AnyPos,
@@ -591,7 +629,8 @@ class ExpressionCompilerV1Test extends PropSpec {
     ctx = CompilerContext(
       predefTypes = Map(pointType.name -> pointType),
       varDefs = Map("p"                -> VariableInfo(AnyPos, pointType)),
-      functionDefs = Map.empty
+      functionDefs = Map.empty,
+      provideRuntimeTypeOnCastError = false
     ),
     expr = Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
     expectedResult = { res: Either[String, (EXPR, TYPE)] =>
@@ -603,7 +642,8 @@ class ExpressionCompilerV1Test extends PropSpec {
     ctx = CompilerContext(
       predefTypes = Map(pointType.name -> pointType),
       varDefs = Map("p"                -> VariableInfo(AnyPos, pointType)),
-      functionDefs = Map.empty
+      functionDefs = Map.empty,
+      provideRuntimeTypeOnCastError = false
     ),
     expr = Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
     expectedResult = { res: Either[String, (EXPR, TYPE)] =>

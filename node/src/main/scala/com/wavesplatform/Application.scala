@@ -343,7 +343,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           time
         ),
         WalletApiRoute(settings.restAPISettings, wallet),
-        UtilsApiRoute(time, settings.restAPISettings, () => blockchainUpdater.estimator, limitedScheduler, blockchainUpdater),
+        UtilsApiRoute(
+          time,
+          settings.restAPISettings,
+          () => blockchainUpdater.estimator,
+          limitedScheduler,
+          blockchainUpdater
+        ),
         PeersApiRoute(settings.restAPISettings, address => networkServer.connect(address), peerDatabase, establishedConnections),
         AddressApiRoute(
           settings.restAPISettings,
@@ -503,14 +509,15 @@ object Application extends ScorexLogging {
 
     // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
     //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
-    Kamon.reconfigure(config)
-    sys.addShutdownHook {
-      Try(Await.result(Kamon.stopModules(), 30 seconds))
-      Metrics.shutdown()
+    if (config.getBoolean("kamon.enable")) {
+      Kamon.init(config)
+    } else {
+      Kamon.reconfigure(config)
     }
 
-    if (config.getBoolean("kamon.enable")) {
-      Kamon.loadModules()
+    sys.addShutdownHook {
+      Try(Await.result(Kamon.stop(), 30 seconds))
+      Metrics.shutdown()
     }
 
     val DisabledHash = "H6nsiifwYKYEx6YzYD7woP1XCn72RVvx6tC1zjjLXqsu"

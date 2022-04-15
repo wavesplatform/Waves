@@ -71,8 +71,6 @@ object FunctionIds {
   val STRING_TO_BIGINTOPT: Short = 424
   val MEDIAN_LISTBIGINT: Short   = 425
 
-  val FOLD: Short = 450
-
   val CREATE_LIST: Short             = 1100
   val APPEND_LIST: Short             = 1101
   val CONCAT_LIST: Short             = 1102
@@ -91,10 +89,10 @@ object FunctionIds {
   val LASTINDEXOFN: Short = 1208
   val MAKESTRING: Short   = 1209
 
-  val MAKESTRING1C: Short = 1210
-  val MAKESTRING2C: Short = 1211
-  val SPLIT1C: Short      = 1212
-  val SPLIT4C: Short      = 1213
+  val MAKESTRING2C: Short  = 1210
+  val MAKESTRING11C: Short = 1211
+  val SPLIT4C: Short       = 1212
+  val SPLIT51C: Short      = 1213
 
   val CREATE_TUPLE: Short = 1300 // Reserved 22 id for tuple constructors
   val SIZE_TUPLE: Short   = 1350

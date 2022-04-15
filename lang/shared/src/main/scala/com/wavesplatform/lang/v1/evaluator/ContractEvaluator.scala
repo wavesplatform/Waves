@@ -1,14 +1,14 @@
 package com.wavesplatform.lang.v1.evaluator
 
 import cats.Id
-import cats.syntax.either._
+import cats.syntax.either.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.ExecutionError
+import com.wavesplatform.lang.{ExecutionError, CommonError}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.VerifierFunction
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.lang.v1.traits.Environment
@@ -51,7 +51,7 @@ object ContractEvaluator {
     foldDeclarations(contract.decs ++ callables, BLOCK(LET("__synthetic_call", TRUE), call))
   }
 
-  def buildExprFromInvocation(c: DApp, i: Invocation, version: StdLibVersion): Either[String, EXPR] = {
+  def buildExprFromInvocation(c: DApp, i: Invocation, version: StdLibVersion): Either[ExecutionError, EXPR] = {
     val functionName = i.funcCall.function.funcName
 
     val contractFuncAndCallOpt = c.callableFuncs.find(_.u.name == functionName).map((_, i.funcCall))
@@ -63,7 +63,7 @@ object ContractEvaluator {
           if (otherFuncs contains functionName)
             s"function '$functionName exists in the script but is not marked as @Callable, therefore cannot not be invoked"
           else s"@Callable function '$functionName' doesn't exist in the script"
-        message.asLeft[EXPR]
+        CommonError(message).asLeft[EXPR]
 
       case Some((f, fc)) =>
         val takingArgsNumber = f.u.args.size
@@ -77,7 +77,7 @@ object ContractEvaluator {
             )
           ).asRight[ExecutionError]
         } else {
-          s"function '$functionName takes $takingArgsNumber args but $passedArgsNumber were(was) given"
+          CommonError(s"function '$functionName takes $takingArgsNumber args but $passedArgsNumber were(was) given")
             .asLeft[EXPR]
         }
     }
@@ -89,8 +89,7 @@ object ContractEvaluator {
   def verify(
       decls: List[DECLARATION],
       v: VerifierFunction,
-      ctx: EvaluationContext[Environment, Id],
-      evaluate: (EvaluationContext[Environment, Id], EXPR) => (Log[Id], Int, Either[ExecutionError, EVALUATED]),
+      evaluate: EXPR => (Log[Id], Int, Either[ExecutionError, EVALUATED]),
       entity: CaseObj
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
     val verifierBlock =
@@ -99,7 +98,7 @@ object ContractEvaluator {
         BLOCK(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(entity)))
       )
 
-    evaluate(ctx, foldDeclarations(decls, verifierBlock))
+    evaluate(foldDeclarations(decls, verifierBlock))
   }
 
   def applyV2Coeval(
@@ -108,25 +107,27 @@ object ContractEvaluator {
       i: Invocation,
       version: StdLibVersion,
       limit: Int,
-      correctFunctionCallScope: Boolean
+      correctFunctionCallScope: Boolean,
+      newMode: Boolean
   ): Coeval[Either[(ExecutionError, Int, Log[Id]), (ScriptResult, Log[Id])]] =
     Coeval
       .now(buildExprFromInvocation(dApp, i, version).leftMap((_, limit, Nil)))
       .flatMap {
-        case Right(value) => applyV2Coeval(ctx, value, version, i.transactionId, limit, correctFunctionCallScope)
+        case Right(value) => applyV2Coeval(ctx, value, version, i.transactionId, limit, correctFunctionCallScope, newMode)
         case Left(error)  => Coeval.now(Left(error))
       }
 
-  def applyV2Coeval(
+  private def applyV2Coeval(
       ctx: EvaluationContext[Environment, Id],
       expr: EXPR,
       version: StdLibVersion,
       transactionId: ByteStr,
       limit: Int,
-      correctFunctionCallScope: Boolean
+      correctFunctionCallScope: Boolean,
+      newMode: Boolean
   ): Coeval[Either[(ExecutionError, Int, Log[Id]), (ScriptResult, Log[Id])]] =
     EvaluatorV2
-      .applyLimitedCoeval(expr, limit, ctx, version, correctFunctionCallScope)
+      .applyLimitedCoeval(expr, limit, ctx, version, correctFunctionCallScope, newMode)
       .map(_.flatMap {
         case (expr, unusedComplexity, log) =>
           val result =

@@ -7,7 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransactionInfo
-import com.wavesplatform.it.sync.{setScriptFee, _}
+import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
@@ -96,7 +96,7 @@ class DataTransactionBodyBytesByteVectorSuite extends BaseTransactionSuite {
     val increasedData = data.head.copy(value = data.head.value ++ ByteStr.fromBytes(1)) :: data.tail
     assertBadRequestAndMessage(
       sender.putData(address, increasedData, version = version, fee = calcDataFee(data, version) + smartFee),
-      "Too big sequence requested"
+      "Transaction is not allowed by account-script"
     )
   }
 }

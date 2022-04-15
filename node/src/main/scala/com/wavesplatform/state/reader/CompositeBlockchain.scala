@@ -1,19 +1,18 @@
 package com.wavesplatform.state.reader
 
+import cats.Id
 import cats.data.Ior
-import cats.syntax.option._
-import cats.syntax.semigroup._
-import com.google.protobuf.ByteString
+import cats.syntax.option.*
+import cats.syntax.semigroup.*
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state._
+import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
-import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 
@@ -32,7 +31,7 @@ final class CompositeBlockchain private (
     inner.balance(address, assetId) + diff.portfolios.getOrElse(address, Portfolio.empty).balanceOf(assetId)
 
   override def leaseBalance(address: Address): LeaseBalance =
-    cats.Monoid.combine(inner.leaseBalance(address), diff.portfolios.getOrElse(address, Portfolio.empty).lease)
+    inner.leaseBalance(address).combineF[Id](diff.portfolios.getOrElse(address, Portfolio.empty).lease)
 
   override def assetScript(asset: IssuedAsset): Option[AssetScriptInfo] =
     maybeDiff
@@ -40,7 +39,7 @@ final class CompositeBlockchain private (
       .getOrElse(inner.assetScript(asset))
 
   override def assetDescription(asset: IssuedAsset): Option[AssetDescription] =
-    CompositeBlockchain.assetDescription(asset, maybeDiff.orEmpty, inner.assetDescription(asset), inner.assetScript(asset), height)
+    CompositeBlockchain.assetDescription(asset, maybeDiff.getOrElse(Diff.empty), inner.assetDescription(asset))
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] =
     inner
@@ -51,8 +50,8 @@ final class CompositeBlockchain private (
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =
     diff.transactions
       .get(id)
-      .collect {
-        case NewTransactionInfo(tx: TransferTransaction, _, true, _) => (height, tx)
+      .collect { case NewTransactionInfo(tx: TransferTransaction, _, true, _) =>
+        (height, tx)
       }
       .orElse(inner.transferById(id))
 
@@ -187,74 +186,57 @@ object CompositeBlockchain {
   private def assetDescription(
       asset: IssuedAsset,
       diff: Diff,
-      innerAssetDescription: => Option[AssetDescription],
-      innerScript: => Option[AssetScriptInfo],
-      height: Int
+      innerAssetDescription: => Option[AssetDescription]
   ): Option[AssetDescription] = {
-    val script = diff.assetScripts.getOrElse(asset, innerScript)
-
-    val fromDiff = diff.issuedAssets
+    diff.issuedAssets
       .get(asset)
-      .map {
-        case NewAssetInfo(static, info, volume) =>
-          val sponsorship = diff.sponsorship.get(asset).fold(0L) {
-            case SponsorshipValue(sp) => sp
-            case SponsorshipNoInfo    => 0L
-          }
-
-          AssetDescription(
-            static.source,
-            static.issuer,
-            info.name,
-            info.description,
-            static.decimals,
-            volume.isReissuable,
-            volume.volume,
-            info.lastUpdatedAt,
-            script,
-            sponsorship,
-            static.nft
-          )
+      .map { case NewAssetInfo(static, info, volume) =>
+        AssetDescription(
+          static.source,
+          static.issuer,
+          info.name,
+          info.description,
+          static.decimals,
+          volume.isReissuable,
+          volume.volume,
+          info.lastUpdatedAt,
+          None,
+          0L,
+          static.nft
+        )
       }
-
-    val assetDescription =
-      innerAssetDescription
-        .orElse(fromDiff)
-        .map { description =>
-          diff.updatedAssets
-            .get(asset)
-            .fold(description) {
-              case Ior.Left(info) =>
-                description.copy(name = info.name, description = info.description, lastUpdatedAt = info.lastUpdatedAt)
-              case Ior.Right(vol) =>
-                description.copy(reissuable = description.reissuable && vol.isReissuable, totalVolume = description.totalVolume + vol.volume)
-              case Ior.Both(info, vol) =>
-                description
-                  .copy(
-                    reissuable = description.reissuable && vol.isReissuable,
-                    totalVolume = description.totalVolume + vol.volume,
-                    name = info.name,
-                    description = info.description,
-                    lastUpdatedAt = info.lastUpdatedAt
-                  )
-            }
-        }
-        .map { description =>
-          diff.sponsorship
-            .get(asset)
-            .fold(description) {
-              case SponsorshipNoInfo   => description.copy(sponsorship = 0L)
-              case SponsorshipValue(v) => description.copy(sponsorship = v)
-            }
-        }
-
-    assetDescription map { z =>
-      diff.transactions.values
-        .foldLeft(z.copy(script = script)) {
-          case (acc, NewTransactionInfo(ut: UpdateAssetInfoTransaction, _, true, _)) if ut.assetId == asset =>
-            acc.copy(name = ByteString.copyFromUtf8(ut.name), description = ByteString.copyFromUtf8(ut.description), lastUpdatedAt = Height(height))
-          case (acc, _) => acc
-        }
-    }
+      .orElse(innerAssetDescription)
+      .map { description =>
+        diff.updatedAssets
+          .get(asset)
+          .fold(description) {
+            case Ior.Left(info) =>
+              description.copy(name = info.name, description = info.description, lastUpdatedAt = info.lastUpdatedAt)
+            case Ior.Right(vol) =>
+              description.copy(reissuable = description.reissuable && vol.isReissuable, totalVolume = description.totalVolume + vol.volume)
+            case Ior.Both(info, vol) =>
+              description
+                .copy(
+                  reissuable = description.reissuable && vol.isReissuable,
+                  totalVolume = description.totalVolume + vol.volume,
+                  name = info.name,
+                  description = info.description,
+                  lastUpdatedAt = info.lastUpdatedAt
+                )
+          }
+      }
+      .map { description =>
+        diff.sponsorship
+          .get(asset)
+          .fold(description) {
+            case SponsorshipNoInfo   => description.copy(sponsorship = 0L)
+            case SponsorshipValue(v) => description.copy(sponsorship = v)
+          }
+      }
+      .map { description =>
+        diff.assetScripts
+          .get(asset)
+          .fold(description)(asi => description.copy(script = asi))
+      }
   }
 }

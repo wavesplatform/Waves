@@ -3,7 +3,8 @@ package com.wavesplatform.transaction.assets.exchange
 import com.wavesplatform.account.{AddressScheme, PrivateKey, PublicKey}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.*
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.serialization.impl.ExchangeTxSerializer
 import com.wavesplatform.transaction.validation.impl.ExchangeTxValidator
 import monix.eval.Coeval
@@ -15,11 +16,11 @@ case class ExchangeTransaction(
     version: TxVersion,
     order1: Order,
     order2: Order,
-    amount: Long,
-    price: Long,
+    amount: TxExchangeAmount,
+    price: TxExchangePrice,
     buyMatcherFee: Long,
     sellMatcherFee: Long,
-    fee: Long,
+    fee: TxPositiveAmount,
     timestamp: Long,
     proofs: Proofs,
     chainId: Byte
@@ -68,7 +69,24 @@ object ExchangeTransaction extends TransactionParser {
       proofs: Proofs = Proofs.empty,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, ExchangeTransaction] =
-    ExchangeTransaction(version, order1, order2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs, chainId).validatedEither
+    for {
+      fee    <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
+      amount <- TxExchangeAmount(amount)(GenericError(TxExchangeAmount.errMsg))
+      price  <- TxExchangePrice(price)(GenericError(TxExchangePrice.errMsg))
+      tx <- ExchangeTransaction(
+        version,
+        order1,
+        order2,
+        amount,
+        price,
+        buyMatcherFee,
+        sellMatcherFee,
+        fee,
+        timestamp,
+        proofs,
+        chainId
+      ).validatedEither
+    } yield tx
 
   def signed(
       version: TxVersion,
@@ -80,7 +98,8 @@ object ExchangeTransaction extends TransactionParser {
       buyMatcherFee: Long,
       sellMatcherFee: Long,
       fee: Long,
-      timestamp: Long
+      timestamp: Long,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, ExchangeTransaction] =
-    create(version, order1, order2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty).map(_.signWith(matcher))
+    create(version, order1, order2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty, chainId).map(_.signWith(matcher))
 }

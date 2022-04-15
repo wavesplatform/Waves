@@ -19,8 +19,8 @@ object TransactionType extends Enumeration(1) {
   SetAssetScript,
   InvokeScript,
   UpdateAssetInfo,
-  InvokeExpression,
-  Ethereum = Value
+  Ethereum,
+  InvokeExpression = Value
 
   implicit class ValueExt(val tpe: TransactionType) extends AnyVal {
     def transactionName: String = s"${tpe}Transaction"

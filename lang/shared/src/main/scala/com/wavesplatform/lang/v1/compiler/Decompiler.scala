@@ -1,12 +1,13 @@
 package com.wavesplatform.lang.v1.compiler
 
-import cats.instances.vector._
-import cats.syntax.traverse._
+import cats.instances.vector.*
+import cats.syntax.traverse.*
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableFunction, VerifierFunction}
+import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{ExtractedFuncPostfix, ExtractedFuncPrefix}
 import monix.eval.Coeval
@@ -202,8 +203,8 @@ object Decompiler {
             val name = extractFunctionName(ctx, header)
             argsCoeval.map(as => out(s"$name(${as.mkString(", ")})", i))
         }
-      case _: Terms.ARR       => ??? // never happens
-      case obj: Terms.CaseObj => pureOut(obj.toString, i) // never happens
+      case a: Terms.ARR       => pureOut(a.toString, i)
+      case obj: Terms.CaseObj => pureOut(obj.toString, i)
     })
   }
 
@@ -248,12 +249,13 @@ object Decompiler {
     }
   }
 
-  def apply(e: DApp, ctx: DecompilerContext): String = {
+  def apply(e: DApp, ctx: DecompilerContext, stdLibVersion: StdLibVersion): String = {
 
     def intersperse(s: Seq[Coeval[String]]): Coeval[String] = s.toVector.sequence.map(v => v.mkString(NEWLINE + NEWLINE))
 
     val dApp = ContractScriptCompactor.decompact(e)
-    import dApp._
+
+    import dApp.*
 
     val decls: Seq[Coeval[String]] = decs.map(expr => decl(pure(expr), ctx))
     val callables: Seq[Coeval[String]] = callableFuncs

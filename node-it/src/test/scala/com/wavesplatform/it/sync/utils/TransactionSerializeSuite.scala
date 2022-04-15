@@ -1,26 +1,37 @@
 package com.wavesplatform.it.sync.utils
 
+import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry}
-import com.wavesplatform.test._
-import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxVersion}
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.assets.exchange._
+import com.wavesplatform.transaction.assets.*
+import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
-import com.wavesplatform.utils._
+import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.transaction.{
+  CreateAliasTransaction,
+  DataTransaction,
+  Proofs,
+  Transaction,
+  TxDecimals,
+  TxExchangeAmount,
+  TxMatcherFee,
+  TxOrderPrice,
+  TxPositiveAmount,
+  TxVersion
+}
 import org.scalatest.Informing
 import org.scalatest.prop.TableDrivenPropertyChecks
 
@@ -32,44 +43,41 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
 
   private lazy val buyV2 = Order(
     TxVersion.V2,
-    PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").explicitGet(),
+    OrderAuthentication(PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").explicitGet()),
     PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
     AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
     OrderType.BUY,
-    2,
-    60.waves,
+    TxExchangeAmount.unsafeFrom(2),
+    TxOrderPrice.unsafeFrom(60.waves),
     tsOrderFrom,
     tsOrderTo,
-    1,
-    proofs = Proofs(Seq(ByteStr.decodeBase58("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get))
+    TxMatcherFee.unsafeFrom(1)
   )
 
   private lazy val buyV1 = Order(
     TxVersion.V1,
-    PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").explicitGet(),
+    OrderAuthentication(PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").explicitGet()),
     PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
     AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
     OrderType.BUY,
-    2,
-    60.waves,
+    TxExchangeAmount.unsafeFrom(2),
+    TxOrderPrice.unsafeFrom(60.waves),
     tsOrderFrom,
     tsOrderTo,
-    1,
-    proofs = Proofs(ByteStr.decodeBase58("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get)
+    TxMatcherFee.unsafeFrom(1)
   )
 
   private lazy val sell = Order(
     TxVersion.V1,
-    PublicKey.fromBase58String("7E9Za8v8aT6EyU1sX91CVK7tWUeAetnNYDxzKZsyjyKV").explicitGet(),
+    OrderAuthentication(PublicKey.fromBase58String("7E9Za8v8aT6EyU1sX91CVK7tWUeAetnNYDxzKZsyjyKV").explicitGet()),
     PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
     AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
     OrderType.SELL,
-    3,
-    50.waves,
+    TxExchangeAmount.unsafeFrom(3),
+    TxOrderPrice.unsafeFrom(50.waves),
     tsOrderFrom,
     tsOrderTo,
-    2,
-    proofs = Proofs(ByteStr.decodeBase58("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get)
+    TxMatcherFee.unsafeFrom(2)
   )
 
   private lazy val exV1 = ExchangeTransaction
@@ -162,29 +170,31 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
   private lazy val issueV1 = IssueTransaction(
     TxVersion.V1,
     publicKey,
-    "Gigacoin".utf8Bytes,
-    "Gigacoin".utf8Bytes,
-    someAssetAmount,
-    8.toByte,
+    ByteString.copyFromUtf8("Gigacoin"),
+    ByteString.copyFromUtf8("Gigacoin"),
+    TxPositiveAmount.unsafeFrom(someAssetAmount),
+    TxDecimals.unsafeFrom(8.toByte),
     true,
     script = None,
-    issueFee,
+    TxPositiveAmount.unsafeFrom(issueFee),
     ts,
-    Proofs(ByteStr.decodeBase58("28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ").get)
+    Proofs(ByteStr.decodeBase58("28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ").get),
+    AddressScheme.current.chainId
   )
 
   private lazy val issueV2 = IssueTransaction(
     TxVersion.V2,
     publicKey,
-    "Gigacoin".utf8Bytes,
-    "Gigacoin".utf8Bytes,
-    someAssetAmount,
-    8.toByte,
+    ByteString.copyFromUtf8("Gigacoin"),
+    ByteString.copyFromUtf8("Gigacoin"),
+    TxPositiveAmount.unsafeFrom(someAssetAmount),
+    TxDecimals.unsafeFrom(8.toByte),
     true,
     None,
-    issueFee,
+    TxPositiveAmount.unsafeFrom(issueFee),
     ts,
-    Proofs(Seq(ByteStr.decodeBase58("43TCfWBa6t2o2ggsD4bU9FpvH3kmDbSBWKE1Z6B5i5Ax5wJaGT2zAvBihSbnSS3AikZLcicVWhUk1bQAMWVzTG5g").get))
+    Proofs(Seq(ByteStr.decodeBase58("43TCfWBa6t2o2ggsD4bU9FpvH3kmDbSBWKE1Z6B5i5Ax5wJaGT2zAvBihSbnSS3AikZLcicVWhUk1bQAMWVzTG5g").get)),
+    AddressScheme.current.chainId
   )
 
   private lazy val leasecancelV1 = LeaseCancelTransaction
@@ -324,9 +334,9 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     publicKey,
     recipient,
     Waves,
-    1900000,
+    TxPositiveAmount.unsafeFrom(1900000),
     Waves,
-    minFee,
+    TxPositiveAmount.unsafeFrom(minFee),
     ByteStr.empty,
     ts,
     Proofs(Seq(ByteStr.decodeBase58("eaV1i3hEiXyYQd6DQY7EnPg9XzpAvB9VA3bnpin2qJe4G36GZXaGnYKCgSf9xiQ61DcAwcBFzjSXh6FwCgazzFz").get)),
@@ -338,9 +348,9 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     publicKey,
     recipient,
     Waves,
-    100000000,
+    TxPositiveAmount.unsafeFrom(100000000),
     Waves,
-    minFee,
+    TxPositiveAmount.unsafeFrom(minFee),
     ByteStr.empty,
     ts,
     Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get)),

@@ -2,8 +2,8 @@ package com.wavesplatform.it.sync.grpc
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.it.api.SyncGrpcApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.api.SyncGrpcApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction.{PBTransactions, Recipient}
 import com.wavesplatform.state.diffs.FeeValidation
@@ -29,7 +29,7 @@ class SponsorFeeTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       val sponsoredAssetId = PBTransactions
         .vanilla(
           sender.broadcastIssue(sponsor, "SponsoredAsset", sponsorAssetTotal, 2, reissuable = false, issueFee, waitForTx = true),
-          unsafe = false
+          true
         )
         .explicitGet()
         .id()
@@ -40,7 +40,7 @@ class SponsorFeeTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
       sender.broadcastTransfer(
         sponsor,
-        Recipient().withPublicKeyHash(aliceAddress),
+        Recipient.of(Recipient.Recipient.PublicKeyHash(aliceAddress)),
         sponsorAssetTotal / 2,
         minFee,
         assetId = sponsoredAssetId,
@@ -56,7 +56,7 @@ class SponsorFeeTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
       sender.broadcastTransfer(
         alice,
-        Recipient().withPublicKeyHash(bobAddress),
+        Recipient.of(Recipient.Recipient.PublicKeyHash(bobAddress)),
         10 * token,
         smallFee,
         assetId = sponsoredAssetId,
@@ -83,7 +83,7 @@ class SponsorFeeTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       val sponsoredAssetId = PBTransactions
         .vanilla(
           sender.broadcastIssue(sponsor, "SponsoredAsset", sponsorAssetTotal, 2, reissuable = false, issueFee, waitForTx = true),
-          unsafe = false
+          true
         )
         .explicitGet()
         .id()
@@ -103,7 +103,7 @@ class SponsorFeeTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       val sponsoredAssetId = PBTransactions
         .vanilla(
           sender.broadcastIssue(alice, "SponsoredAsset", sponsorAssetTotal, 2, reissuable = false, issueFee, waitForTx = true),
-          unsafe = false
+          true
         )
         .explicitGet()
         .id()
@@ -112,19 +112,17 @@ class SponsorFeeTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       val sponsoredAssetMinFee = Some(Amount.of(ByteString.copyFrom(Base58.decode(sponsoredAssetId)), token))
       sender.broadcastSponsorFee(alice, sponsoredAssetMinFee, fee = sponsorReducedFee, version = v, waitForTx = true)
 
-      /**
-        * Cancel sponsorship by sponsor None amount of sponsored asset.
-        * As it is optional to pass all parameters to PB objects (Amount(assetId: ByteString, amount: Long) in this case),
-        * we can simply pass unspecific (None) amount by creating Amount(assetId: ByteString). SponsorFeeTransaction with
-        * that kind of Amount will cancel sponsorship.
-        **/
+      /** Cancel sponsorship by sponsor None amount of sponsored asset. As it is optional to pass all parameters to PB objects (Amount(assetId:
+        * ByteString, amount: Long) in this case), we can simply pass unspecific (None) amount by creating Amount(assetId: ByteString).
+        * SponsorFeeTransaction with that kind of Amount will cancel sponsorship.
+        */
       val sponsoredAssetNullMinFee = Some(Amount(ByteString.copyFrom(Base58.decode(sponsoredAssetId))))
       sender.broadcastSponsorFee(alice, sponsoredAssetNullMinFee, fee = sponsorReducedFee, version = v, waitForTx = true)
 
       assertGrpcError(
         sender.broadcastTransfer(
           alice,
-          Recipient().withPublicKeyHash(bobAddress),
+          Recipient.of(Recipient.Recipient.PublicKeyHash(bobAddress)),
           10 * token,
           smallFee,
           assetId = sponsoredAssetId,
@@ -142,7 +140,7 @@ class SponsorFeeTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       val sponsoredAssetId = PBTransactions
         .vanilla(
           sender.broadcastIssue(sponsor, "SponsoredAsset", sponsorAssetTotal, 2, reissuable = false, issueFee, waitForTx = true),
-          unsafe = false
+          true
         )
         .explicitGet()
         .id()
@@ -150,7 +148,7 @@ class SponsorFeeTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
       sender.broadcastTransfer(
         sponsor,
-        Recipient().withPublicKeyHash(aliceAddress),
+        Recipient.of(Recipient.Recipient.PublicKeyHash(aliceAddress)),
         sponsorAssetTotal / 2,
         minFee,
         assetId = sponsoredAssetId,
@@ -166,7 +164,7 @@ class SponsorFeeTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       assertGrpcError(
         sender.broadcastTransfer(
           alice,
-          Recipient().withPublicKeyHash(bobAddress),
+          Recipient.of(Recipient.Recipient.PublicKeyHash(bobAddress)),
           10 * token,
           smallFee,
           assetId = sponsoredAssetId,
@@ -185,7 +183,7 @@ class SponsorFeeTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
       sender.broadcastTransfer(
         alice,
-        Recipient().withPublicKeyHash(bobAddress),
+        Recipient.of(Recipient.Recipient.PublicKeyHash(bobAddress)),
         10 * token,
         largeFee,
         assetId = sponsoredAssetId,

@@ -1,9 +1,8 @@
 package com.wavesplatform.lang.directives
 
-import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values._
 
-case class DirectiveSet private (
+case class DirectiveSet(
   stdLibVersion: StdLibVersion,
   scriptType:    ScriptType,
   contentType:   ContentType,
@@ -18,7 +17,7 @@ object DirectiveSet {
       scriptType:    ScriptType,
       contentType:   ContentType,
       imports:       Imports = Imports(Nil)
-  ): Either[ExecutionError, DirectiveSet] =
+  ): Either[String, DirectiveSet] =
     (stdLibVersion, scriptType, contentType, imports) match {
       case (v, Account, DApp, _) if v >= V3    => Right(new DirectiveSet(v, Account, DApp, imports))
       case (v, sType, Expression, _)           => Right(new DirectiveSet(v, sType, Expression, imports))

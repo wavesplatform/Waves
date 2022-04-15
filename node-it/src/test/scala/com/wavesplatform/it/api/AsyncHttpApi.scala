@@ -6,7 +6,7 @@ import java.util.concurrent.TimeoutException
 import java.util.{NoSuchElementException, UUID}
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
-import com.wavesplatform.api.http.DebugMessage._
+import com.wavesplatform.api.http.DebugMessage.*
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.{IssueRequest, TransferRequest}
 import com.wavesplatform.api.http.{ConnectReq, DebugMessage, RollbackParams, `X-Api-Key`}
@@ -15,8 +15,8 @@ import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync.invokeExpressionFee
-import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
-import com.wavesplatform.it.util._
+import com.wavesplatform.it.util.*
+import com.wavesplatform.it.util.GlobalTimer.instance as timer
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -25,26 +25,37 @@ import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.state.DataEntry.Format
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, EmptyDataEntry, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.assets.exchange.{Order, ExchangeTransaction => ExchangeTx}
+import com.wavesplatform.transaction.assets.*
+import com.wavesplatform.transaction.assets.exchange.{Order, ExchangeTransaction as ExchangeTx}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
-import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, Proofs, TxVersion}
-import org.asynchttpclient.Dsl.{delete => _delete, get => _get, post => _post, put => _put}
-import org.asynchttpclient._
+import com.wavesplatform.transaction.{
+  Asset,
+  CreateAliasTransaction,
+  DataTransaction,
+  Proofs,
+  TxDecimals,
+  TxExchangeAmount,
+  TxExchangePrice,
+  TxNonNegativeAmount,
+  TxPositiveAmount,
+  TxVersion
+}
+import org.asynchttpclient.*
+import org.asynchttpclient.Dsl.{delete as _delete, get as _get, post as _post, put as _put}
 import org.asynchttpclient.util.HttpConstants.ResponseStatusCodes.OK_200
 import org.scalactic.source.Position
 import org.scalatest.{Assertions, matchers}
+import play.api.libs.json.*
 import play.api.libs.json.Json.{stringify, toJson}
-import play.api.libs.json._
 
-import scala.compat.java8.FutureConverters._
+import scala.compat.java8.FutureConverters.*
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.Future.traverse
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.{Failure, Success}
 
 object AsyncHttpApi extends Assertions {
@@ -352,9 +363,9 @@ object AsyncHttpApi extends Assertions {
           sender.publicKey,
           AddressOrAlias.fromString(recipient).explicitGet(),
           Asset.fromString(assetId),
-          amount,
+          TxPositiveAmount.unsafeFrom(amount),
           Asset.fromString(feeAssetId),
-          fee,
+          TxPositiveAmount.unsafeFrom(fee),
           attachment.fold(ByteStr.empty)(s => ByteStr(s.getBytes)),
           System.currentTimeMillis(),
           Proofs.empty,
@@ -372,8 +383,8 @@ object AsyncHttpApi extends Assertions {
           version,
           sender.publicKey,
           AddressOrAlias.fromString(recipient).explicitGet(),
-          amount,
-          fee,
+          TxPositiveAmount.unsafeFrom(amount),
+          TxPositiveAmount.unsafeFrom(fee),
           System.currentTimeMillis(),
           Proofs.empty,
           AddressScheme.current.chainId
@@ -387,7 +398,7 @@ object AsyncHttpApi extends Assertions {
           version,
           sender.publicKey,
           ByteStr.decodeBase58(leaseId).get,
-          fee,
+          TxPositiveAmount.unsafeFrom(fee),
           System.currentTimeMillis(),
           Proofs.empty,
           AddressScheme.current.chainId
@@ -413,11 +424,11 @@ object AsyncHttpApi extends Assertions {
           sender.publicKey,
           ByteString.copyFromUtf8(name),
           ByteString.copyFromUtf8(description),
-          quantity,
-          decimals,
+          TxPositiveAmount.unsafeFrom(quantity),
+          TxDecimals.unsafeFrom(decimals),
           reissuable,
           script.map(s => ScriptReader.fromBytes(Base64.decode(s)).explicitGet()),
-          fee,
+          TxPositiveAmount.unsafeFrom(fee),
           System.currentTimeMillis(),
           Proofs.empty,
           AddressScheme.current.chainId
@@ -430,7 +441,7 @@ object AsyncHttpApi extends Assertions {
           version,
           sender.publicKey,
           script.map(s => ScriptReader.fromBytes(Base64.decode(s)).explicitGet()),
-          fee,
+          TxPositiveAmount.unsafeFrom(fee),
           System.currentTimeMillis(),
           Proofs.empty,
           AddressScheme.current.chainId
@@ -450,7 +461,7 @@ object AsyncHttpApi extends Assertions {
           sender.publicKey,
           IssuedAsset(ByteStr.decodeBase58(assetId).get),
           script.map(s => ScriptReader.fromBytes(Base64.decode(s)).explicitGet()),
-          fee,
+          TxPositiveAmount.unsafeFrom(fee),
           System.currentTimeMillis(),
           Proofs.empty,
           AddressScheme.current.chainId
@@ -474,7 +485,7 @@ object AsyncHttpApi extends Assertions {
           AddressOrAlias.fromString(dappAddress).explicitGet(),
           func.map(fn => FUNCTION_CALL(FunctionHeader.User(fn), args)),
           payment,
-          fee,
+          TxPositiveAmount.unsafeFrom(fee),
           feeAssetId.map(aid => IssuedAsset(ByteStr.decodeBase58(aid).get)).getOrElse(Asset.Waves),
           System.currentTimeMillis(),
           Proofs.empty,
@@ -494,7 +505,7 @@ object AsyncHttpApi extends Assertions {
           version,
           caller.publicKey,
           expression,
-          fee,
+          TxPositiveAmount.unsafeFrom(fee),
           feeAssetId.map(aid => IssuedAsset(ByteStr.decodeBase58(aid).get)).getOrElse(Asset.Waves),
           System.currentTimeMillis(),
           Proofs.empty,
@@ -518,7 +529,7 @@ object AsyncHttpApi extends Assertions {
         AddressOrAlias.fromString(dappAddress).explicitGet(),
         func.map(fn => FUNCTION_CALL(FunctionHeader.User(fn), args)),
         payment,
-        fee,
+        TxPositiveAmount.unsafeFrom(fee),
         feeAssetId.map(aid => IssuedAsset(ByteStr.decodeBase58(aid).get)).getOrElse(Asset.Waves),
         System.currentTimeMillis(),
         Proofs.empty,
@@ -545,7 +556,7 @@ object AsyncHttpApi extends Assertions {
         name,
         description,
         timestamp.getOrElse(System.currentTimeMillis()),
-        fee,
+        TxPositiveAmount.unsafeFrom(fee),
         if (feeAssetId.isDefined) IssuedAsset(ByteStr(Base58.decode(feeAssetId.get))) else Waves,
         Proofs.empty,
         AddressScheme.current.chainId
@@ -565,9 +576,9 @@ object AsyncHttpApi extends Assertions {
           version,
           sender.publicKey,
           IssuedAsset(ByteStr.decodeBase58(assetId).get),
-          quantity,
+          TxPositiveAmount.unsafeFrom(quantity),
           reissuable,
-          fee,
+          TxPositiveAmount.unsafeFrom(fee),
           System.currentTimeMillis(),
           Proofs.empty,
           AddressScheme.current.chainId
@@ -580,8 +591,8 @@ object AsyncHttpApi extends Assertions {
           version,
           sender.publicKey,
           IssuedAsset(ByteStr.decodeBase58(assetId).get),
-          quantity,
-          fee,
+          TxNonNegativeAmount.unsafeFrom(quantity),
+          TxPositiveAmount.unsafeFrom(fee),
           System.currentTimeMillis(),
           Proofs.empty,
           AddressScheme.current.chainId
@@ -622,8 +633,8 @@ object AsyncHttpApi extends Assertions {
           version,
           sender.publicKey,
           IssuedAsset(ByteStr.decodeBase58(assetId).get),
-          minSponsoredAssetFee,
-          fee,
+          minSponsoredAssetFee.map(TxPositiveAmount.unsafeFrom),
+          TxPositiveAmount.unsafeFrom(fee),
           System.currentTimeMillis(),
           Proofs.empty,
           AddressScheme.current.chainId
@@ -655,8 +666,8 @@ object AsyncHttpApi extends Assertions {
           version,
           sender.publicKey,
           Asset.fromString(assetId),
-          transfers.map(t => ParsedTransfer(AddressOrAlias.fromString(t.recipient).explicitGet(), t.amount)),
-          fee,
+          transfers.map(t => ParsedTransfer(AddressOrAlias.fromString(t.recipient).explicitGet(), TxNonNegativeAmount.unsafeFrom(t.amount))),
+          TxPositiveAmount.unsafeFrom(fee),
           System.currentTimeMillis(),
           attachment.fold(ByteStr.empty)(s => ByteStr(s.getBytes())),
           Proofs.empty,
@@ -668,7 +679,7 @@ object AsyncHttpApi extends Assertions {
 
     def broadcastData(
         sender: KeyPair,
-        data: Seq[DataEntry[_]],
+        data: Seq[DataEntry[?]],
         fee: Long,
         version: TxVersion = TxVersion.V2,
         timestamp: Option[Long] = None,
@@ -679,7 +690,7 @@ object AsyncHttpApi extends Assertions {
           version,
           sender.publicKey,
           data,
-          fee,
+          TxPositiveAmount.unsafeFrom(fee),
           timestamp.getOrElse(System.currentTimeMillis()),
           Proofs.empty,
           AddressScheme.current.chainId
@@ -688,23 +699,23 @@ object AsyncHttpApi extends Assertions {
       )
 
     def removeData(sender: KeyPair, data: Seq[String], fee: Long, version: Byte = 2): Future[Transaction] =
-      broadcastData(sender, data.map[DataEntry[_]](EmptyDataEntry), fee, version)
+      broadcastData(sender, data.map[DataEntry[?]](EmptyDataEntry), fee, version)
 
-    def getData(address: String, amountsAsStrings: Boolean = false): Future[List[DataEntry[_]]] =
-      get(s"/addresses/data/$address", amountsAsStrings).as[List[DataEntry[_]]](amountsAsStrings)
+    def getData(address: String, amountsAsStrings: Boolean = false): Future[List[DataEntry[?]]] =
+      get(s"/addresses/data/$address", amountsAsStrings).as[List[DataEntry[?]]](amountsAsStrings)
 
-    def getData(address: String, regexp: String): Future[List[DataEntry[_]]] = get(s"/addresses/data/$address?matches=$regexp").as[List[DataEntry[_]]]
+    def getData(address: String, regexp: String): Future[List[DataEntry[?]]] = get(s"/addresses/data/$address?matches=$regexp").as[List[DataEntry[?]]]
 
-    def getDataByKey(address: String, key: String): Future[DataEntry[_]] = get(s"/addresses/data/$address/$key").as[DataEntry[_]]
+    def getDataByKey(address: String, key: String): Future[DataEntry[?]] = get(s"/addresses/data/$address/$key").as[DataEntry[?]]
 
-    def getDataListJson(address: String, keys: String*): Future[Seq[DataEntry[_]]] =
-      postJson(s"/addresses/data/$address", Json.obj("keys" -> keys)).as[Seq[DataEntry[_]]]
+    def getDataListJson(address: String, keys: String*): Future[Seq[DataEntry[?]]] =
+      postJson(s"/addresses/data/$address", Json.obj("keys" -> keys)).as[Seq[DataEntry[?]]]
 
-    def getDataListPost(address: String, keys: String*): Future[Seq[DataEntry[_]]] =
-      postForm(s"/addresses/data/$address", keys.map("key" -> URLEncoder.encode(_, "UTF-8")): _*).as[Seq[DataEntry[_]]]
+    def getDataListPost(address: String, keys: String*): Future[Seq[DataEntry[?]]] =
+      postForm(s"/addresses/data/$address", keys.map("key" -> URLEncoder.encode(_, "UTF-8"))*).as[Seq[DataEntry[?]]]
 
-    def getDataList(address: String, keys: String*): Future[Seq[DataEntry[_]]] =
-      get(s"/addresses/data/$address?${keys.map("key=" + URLEncoder.encode(_, "UTF-8")).mkString("&")}").as[Seq[DataEntry[_]]]
+    def getDataList(address: String, keys: String*): Future[Seq[DataEntry[?]]] =
+      get(s"/addresses/data/$address?${keys.map("key=" + URLEncoder.encode(_, "UTF-8")).mkString("&")}").as[Seq[DataEntry[?]]]
 
     def getMerkleProof(ids: String*): Future[Seq[MerkleProofResponse]] =
       get(s"/transactions/merkleProof?${ids.map("id=" + URLEncoder.encode(_, "UTF-8")).mkString("&")}").as[Seq[MerkleProofResponse]]
@@ -751,8 +762,9 @@ object AsyncHttpApi extends Assertions {
 
     def createAlias(target: KeyPair, alias: String, fee: Long, version: TxVersion = TxVersion.V2): Future[Transaction] =
       signedBroadcast(
-        CreateAliasTransaction(version, target.publicKey, alias, fee, System.currentTimeMillis(), Proofs.empty, AddressScheme.current.chainId)
-          .signWith(target.privateKey)
+        CreateAliasTransaction
+          .selfSigned(version, target, alias, fee, System.currentTimeMillis())
+          .explicitGet()
           .json()
       )
 
@@ -760,8 +772,8 @@ object AsyncHttpApi extends Assertions {
         matcher: KeyPair,
         order1: Order,
         order2: Order,
-        amount: Long,
-        price: Long,
+        amount: TxExchangeAmount,
+        price: TxExchangePrice,
         buyMatcherFee: Long,
         sellMatcherFee: Long,
         fee: Long,
@@ -777,7 +789,7 @@ object AsyncHttpApi extends Assertions {
         price = price,
         buyMatcherFee = buyMatcherFee,
         sellMatcherFee = sellMatcherFee,
-        fee = fee,
+        fee = TxPositiveAmount.unsafeFrom(fee),
         proofs = Proofs.empty,
         timestamp = System.currentTimeMillis(),
         chainId = AddressScheme.current.chainId

@@ -7,17 +7,14 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.Blake2b256
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.BaseFreeSpec
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
-import org.scalatest._
+import org.scalatest.*
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-class MerkleRootTestSuite
-    extends BaseFreeSpec
-    with ActivationStatusRequest
-    with OptionValues {
-  import MerkleRootTestSuite._
+class MerkleRootTestSuite extends BaseFreeSpec with ActivationStatusRequest with OptionValues {
+  import MerkleRootTestSuite.*
 
   override protected def nodeConfigs: Seq[Config] = Configs
 
@@ -68,17 +65,18 @@ class MerkleRootTestSuite
     )
   }
   "merkle proof api returns only existent txs when existent and inexistent ids passed" in {
-    val txId1 = nodes.head.broadcastTransfer(nodes.head.keyPair, nodes.head.address, transferAmount, minFee, None, None, waitForTx = true).id
-    val txId2 = nodes.head.broadcastTransfer(nodes.head.keyPair, nodes.head.address, transferAmount, minFee, None, None, waitForTx = true).id
+    val txId1        = nodes.head.broadcastTransfer(nodes.head.keyPair, nodes.head.address, transferAmount, minFee, None, None, waitForTx = true).id
+    val txId2        = nodes.head.broadcastTransfer(nodes.head.keyPair, nodes.head.address, transferAmount, minFee, None, None, waitForTx = true).id
     val inexistentTx = "FCym43ddiKKT3d4kznawWasoMbWd1LWyX8DUrwAAbcUA"
     nodes.head.getMerkleProof(txId1, txId2, inexistentTx).map(resp => resp.id) should contain theSameElementsAs Seq(txId1, txId2)
     nodes.head.getMerkleProofPost(txId1, txId2, inexistentTx).map(resp => resp.id) should contain theSameElementsAs Seq(txId1, txId2)
   }
   "merkle proof api can handle transactionsRoot changes caused by miner settings" in {
+
     /**
       * In this case we check that when some of generated microblocks connected to one keyblock transfers to next keyblock
       * due to miner setting "min-micro-block-age" it causes transactionsRoot and merkleProof recalculation
-    */
+      */
     nodes.waitForHeightArise()
     val currentHeight               = nodes.head.height
     val txsBuf                      = collection.mutable.ListBuffer[String]()
@@ -90,15 +88,15 @@ class MerkleRootTestSuite
       if (nodes.head.height == currentHeight) {
         txsBuf += tx
         val txsSeq = txsBuf.toSeq
-        merkleProofBefore = nodes.head.getMerkleProof(txsSeq: _*).map(resp => resp.merkleProof)
-        merkleProofPostBefore = nodes.head.getMerkleProofPost(txsSeq: _*).map(resp => resp.merkleProof)
+        merkleProofBefore = nodes.head.getMerkleProof(txsSeq*).map(resp => resp.merkleProof)
+        merkleProofPostBefore = nodes.head.getMerkleProofPost(txsSeq*).map(resp => resp.merkleProof)
         blockTransactionsRootBefore = nodes.head.blockAt(currentHeight).transactionsRoot.get
       }
     }
     nodes.head.height shouldBe currentHeight + 1
     val txsSeq = txsBuf.toSeq
-    nodes.head.getMerkleProof(txsSeq: _*).map(resp => resp.merkleProof) should not be merkleProofBefore
-    nodes.head.getMerkleProofPost(txsSeq: _*).map(resp => resp.merkleProof) should not be merkleProofPostBefore
+    nodes.head.getMerkleProof(txsSeq*).map(resp => resp.merkleProof) should not be merkleProofBefore
+    nodes.head.getMerkleProofPost(txsSeq*).map(resp => resp.merkleProof) should not be merkleProofPostBefore
     nodes.head.blockAt(currentHeight).transactionsRoot.get should not be blockTransactionsRootBefore
   }
 }

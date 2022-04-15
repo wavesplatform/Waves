@@ -2,14 +2,13 @@ package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets.UTF_8
-
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.serialization._
 import com.wavesplatform.state.DataEntry.Type
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry, StringDataEntry}
-import com.wavesplatform.transaction.{DataTransaction, TxVersion}
+import com.wavesplatform.transaction.{DataTransaction, TxPositiveAmount, TxVersion}
 import com.wavesplatform.utils.StringBytes
 import play.api.libs.json.{JsObject, Json}
 
@@ -18,8 +17,7 @@ import scala.util.Try
 object DataTxSerializer {
   def toJson(tx: DataTransaction): JsObject = {
     import tx._
-    BaseTxJson.toJson(tx) ++ Json.obj("data" -> Json.toJson(data)
-    )
+    BaseTxJson.toJson(tx) ++ Json.obj("data" -> Json.toJson(data))
   }
 
   def bodyBytes(tx: DataTransaction): Array[Byte] = {
@@ -30,9 +28,9 @@ object DataTxSerializer {
           Array(tpe.id.toByte, version),
           sender.arr,
           Shorts.toByteArray(data.size.toShort),
-          Bytes.concat(data.map(serializeEntry): _*),
+          Bytes.concat(data.map(serializeEntry)*),
           Longs.toByteArray(timestamp),
-          Longs.toByteArray(fee)
+          Longs.toByteArray(fee.value)
         )
 
       case _ =>
@@ -40,7 +38,7 @@ object DataTxSerializer {
     }
   }
 
-  private def serializeEntry(e: DataEntry[_]): Array[Byte] = {
+  private def serializeEntry(e: DataEntry[?]): Array[Byte] = {
     val keyBytes = e.key.utf8Bytes
     val valueBytes = e match {
       case IntegerDataEntry(_, value) => Bytes.concat(Array(Type.Integer.id.toByte), Longs.toByteArray(value))
@@ -69,7 +67,7 @@ object DataTxSerializer {
     val sender    = buf.getPublicKey
     val data      = parseDataEntries(buf)
     val timestamp = buf.getLong // Timestamp before fee
-    val fee       = buf.getLong
+    val fee       = TxPositiveAmount.unsafeFrom(buf.getLong)
     DataTransaction(TxVersion.V1, sender, data, fee, timestamp, buf.getProofs, AddressScheme.current.chainId)
   }
 
@@ -80,7 +78,7 @@ object DataTxSerializer {
       case t if t == Type.Boolean.id => BooleanDataEntry(key, buf.get != 0)
       case t if t == Type.Binary.id  => BinaryDataEntry(key, ByteStr(Deser.parseArrayWithLength(buf)))
       case t if t == Type.String.id  => StringDataEntry(key, new String(Deser.parseArrayWithLength(buf), UTF_8))
-      case other           => throw new IllegalArgumentException(s"Unknown type $other")
+      case other                     => throw new IllegalArgumentException(s"Unknown type $other")
     }
   }
 }

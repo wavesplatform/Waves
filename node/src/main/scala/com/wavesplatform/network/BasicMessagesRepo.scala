@@ -97,7 +97,7 @@ trait SignaturesSeqSpec[A <: AnyRef] extends MessageSpec[A] {
   }
 
   override def serializeData(v: A): Array[Byte] = {
-    Bytes.concat(Ints.toByteArray(unwrap(v).length) +: unwrap(v): _*)
+    Bytes.concat((Ints.toByteArray(unwrap(v).length) +: unwrap(v))*)
   }
 }
 
@@ -205,7 +205,7 @@ object TransactionSpec extends MessageSpec[Transaction] {
   override val messageCode: MessageCode = 25: Byte
 
   // Modeled after Data Transaction https://wavesplatform.atlassian.net/wiki/spaces/MAIN/pages/119734321/Data+Transaction
-  override val maxLength: Int = 150 * 1024
+  override val maxLength: Int = (DataTransaction.MaxBytes * 1.2).toInt // 150 * 1024
 
   override def deserializeData(bytes: Array[Byte]): Try[Transaction] =
     TransactionParsers.parseBytes(bytes)
@@ -295,8 +295,8 @@ object PBMicroBlockSpec extends MessageSpec[MicroBlockResponse] {
 object PBTransactionSpec extends MessageSpec[Transaction] {
   override val messageCode: MessageCode = 31: Byte
 
-  // Signed (8 proofs) PBTransaction + max DataTransaction.DataEntry + max proto serialization meta + gap
-  override val maxLength: Int = 624 + DataTransaction.MaxProtoBytes + 5 + 100
+  //624 + DataTransaction.MaxProtoBytes + 5 + 100 // Signed (8 proofs) PBTransaction + max DataTransaction.DataEntry + max proto serialization meta + gap
+  override val maxLength: Int = (DataTransaction.MaxBytes * 1.2).toInt
 
   override def deserializeData(bytes: Array[MessageCode]): Try[Transaction] =
     PBTransactions.tryToVanilla(PBSignedTransaction.parseFrom(bytes))

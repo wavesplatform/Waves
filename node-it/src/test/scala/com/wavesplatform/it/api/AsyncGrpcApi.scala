@@ -1,40 +1,45 @@
 package com.wavesplatform.it.api
 
+import com.google.common.primitives.{Bytes, Longs}
+
+import java.util.NoSuchElementException
+
+import scala.concurrent.Future
+import scala.concurrent.duration.*
+
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.{AddressScheme, Alias, KeyPair}
+import com.wavesplatform.api.grpc.{TransactionStatus as PBTransactionStatus, *}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
-import com.wavesplatform.api.grpc.{TransactionStatus => PBTransactionStatus, _}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync.invokeExpressionFee
-import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
-import com.wavesplatform.it.util._
+import com.wavesplatform.it.util.*
+import com.wavesplatform.it.util.GlobalTimer.instance as timer
+import com.wavesplatform.lang.script.Script as Scr
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.script.{Script => Scr}
-import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
+import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.PBBlocks
+import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.{Asset, TxVersion}
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.assets.exchange.Order
 import io.grpc.stub.StreamObserver
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.subjects.ConcurrentSubject
 import play.api.libs.json.Json
 
-import java.util.NoSuchElementException
-import scala.concurrent.Future
-import scala.concurrent.duration._
-
 object AsyncGrpcApi {
   implicit class NodeAsyncGrpcApi(val n: Node) {
 
-    import com.wavesplatform.protobuf.transaction.{Transaction => PBTransaction, _}
+    import com.wavesplatform.protobuf.transaction.{Transaction as PBTransaction, *}
     import monix.execution.Scheduler.Implicits.global
 
     private[this] lazy val assets       = AssetsApiGrpc.stub(n.grpcChannel)
@@ -56,7 +61,7 @@ object AsyncGrpcApi {
       val (obs, result) = createCallObserver[TransactionResponse]
       transactions.getTransactions(request, obs)
       result.runToFuture.map { r =>
-        import com.wavesplatform.state.{InvokeScriptResult => VISR}
+        import com.wavesplatform.state.InvokeScriptResult as VISR
         r.map { r =>
           val tx = PBTransactions.vanillaUnsafe(r.getTransaction)
           assert(r.getInvokeScriptResult.transfers.forall(_.address.size() == 20))
@@ -71,7 +76,7 @@ object AsyncGrpcApi {
         address: ByteString = ByteString.EMPTY
     ): Future[Seq[(com.wavesplatform.transaction.Transaction, StateChangesDetails)]] = {
       val ids = txIds.map(id => ByteString.copyFrom(Base58.decode(id)))
-      stateChanges(TransactionsRequest().addTransactionIds(ids: _*).withSender(address))
+      stateChanges(TransactionsRequest().addTransactionIds(ids*).withSender(address))
     }
 
     def broadcastIssue(
@@ -95,10 +100,33 @@ object AsyncGrpcApi {
       )
 
       script match {
-        case Left(_) => transactions.broadcast(SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.EMPTY)))
-        case _ =>
-          val proofs =
-            crypto.sign(source.privateKey, PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = true).explicitGet().bodyBytes())
+        case Left(_)   => transactions.broadcast(SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.EMPTY)))
+        case Right(sc) =>
+          // IssueTxSerializer.bodyBytes can't be used here because we must be able to test broadcasting issue transaction with incorrect data
+          val baseBytes = Bytes.concat(
+            source.publicKey.arr,
+            Deser.serializeArrayWithLength(name.getBytes),
+            Deser.serializeArrayWithLength(description.getBytes),
+            Longs.toByteArray(quantity),
+            Array(decimals.toByte),
+            Deser.serializeBoolean(reissuable),
+            Longs.toByteArray(fee),
+            Longs.toByteArray(unsigned.timestamp)
+          )
+
+          val bodyBytes = version match {
+            case TxVersion.V1 => Bytes.concat(Array(IssueTransaction.typeId), baseBytes)
+            case TxVersion.V2 =>
+              Bytes.concat(
+                Array(IssueTransaction.typeId, version.toByte, chainId),
+                baseBytes,
+                Deser.serializeOptionOfArrayWithLength(sc)(_.bytes().arr)
+              )
+            case _ =>
+              PBUtils.encodeDeterministic(unsigned)
+          }
+
+          val proofs = crypto.sign(source.privateKey, bodyBytes)
           transactions.broadcast(SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.copyFrom(proofs.arr))))
       }
     }
@@ -196,10 +224,11 @@ object AsyncGrpcApi {
         version,
         PBTransaction.Data.DataTransaction(DataTransactionData.of(data))
       )
-      if (PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = false).isLeft) {
+      val safeCreated = PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = false)
+      if (safeCreated.isLeft) {
         transactions.broadcast(SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.EMPTY)))
       } else {
-        val proofs = crypto.sign(source.privateKey, PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = false).explicitGet().bodyBytes())
+        val proofs = crypto.sign(source.privateKey, safeCreated.explicitGet().bodyBytes())
         transactions.broadcast(SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.copyFrom(proofs.arr))))
       }
     }
@@ -378,7 +407,8 @@ object AsyncGrpcApi {
           )
         )
       )
-      val proofs = crypto.sign(sender.privateKey, PBTransactions.vanilla(SignedTransaction(SignedTransaction.Transaction.WavesTransaction(unsigned)), unsafe = true).explicitGet().bodyBytes())
+      // MassTransferTxSerializer.bodyBytes can't be used here because we must be able to test broadcasting mass transfer transaction with incorrect data
+      val proofs = TxHelpers.massTransferBodyBytes(sender, assetId, transfers, attachment, fee, unsigned.timestamp, version)
       transactions.broadcast(SignedTransaction.of(SignedTransaction.Transaction.WavesTransaction(unsigned), Seq(ByteString.copyFrom(proofs.arr))))
     }
 
@@ -400,7 +430,7 @@ object AsyncGrpcApi {
         PBTransaction.Data.InvokeScript(
           InvokeScriptTransactionData(
             Some(dApp),
-            ByteString.copyFrom(Deser.serializeOption(functionCall)(Serde.serialize(_))),
+            ByteString.copyFrom(Deser.serializeOption(functionCall)(SerdeV1.serialize(_))),
             payments
           )
         )

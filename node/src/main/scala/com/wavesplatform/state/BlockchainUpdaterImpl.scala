@@ -2,10 +2,11 @@ package com.wavesplatform.state
 
 import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
-import cats.instances.map._
-import cats.kernel.Monoid
-import cats.syntax.either._
-import cats.syntax.option._
+import cats.implicits.catsSyntaxSemigroup
+import cats.instances.map.*
+import cats.kernel.Semigroup
+import cats.syntax.either.*
+import cats.syntax.option.*
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
@@ -15,15 +16,15 @@ import com.wavesplatform.database.Storage
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.metrics.{TxsInBlockchainStats, _}
+import com.wavesplatform.metrics.{TxsInBlockchainStats, *}
 import com.wavesplatform.mining.{Miner, MiningConstraint, MiningConstraints}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
-import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.lease._
+import com.wavesplatform.transaction.lease.*
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
@@ -31,7 +32,7 @@ import monix.reactive.subjects.ReplaySubject
 import monix.reactive.{Observable, Observer}
 
 class BlockchainUpdaterImpl(
-    leveldb: Blockchain with Storage,
+    leveldb: Blockchain & Storage,
     spendableBalanceChanged: Observer[(Address, Asset)],
     wavesSettings: WavesSettings,
     time: Time,
@@ -43,7 +44,7 @@ class BlockchainUpdaterImpl(
     with NG
     with ScorexLogging {
 
-  import com.wavesplatform.state.BlockchainUpdaterImpl._
+  import com.wavesplatform.state.BlockchainUpdaterImpl.*
   import wavesSettings.blockchainSettings.functionalitySettings
 
   private def inLock[R](l: Lock, f: => R): R = {
@@ -312,10 +313,9 @@ class BlockchainUpdaterImpl(
 
                         val prevHitSource = ng.hitSource
 
-                        val liquidDiffWithCancelledLeases = ng.cancelExpiredLeases(referencedLiquidDiff)
-
-                        val referencedBlockchain =
-                          CompositeBlockchain(
+                        for {
+                          liquidDiffWithCancelledLeases <- ng.cancelExpiredLeases(referencedLiquidDiff).leftMap(GenericError(_))
+                          referencedBlockchain = CompositeBlockchain(
                             leveldb,
                             liquidDiffWithCancelledLeases,
                             referencedForgedBlock,
@@ -323,18 +323,16 @@ class BlockchainUpdaterImpl(
                             carry,
                             reward
                           )
-                        val maybeDiff = BlockDiffer
-                          .fromBlock(
-                            referencedBlockchain,
-                            Some(referencedForgedBlock),
-                            block,
-                            constraint,
-                            hitSource,
-                            verify
-                          )
-
-                        maybeDiff.map {
-                          differResult =>
+                          differResult <- BlockDiffer
+                            .fromBlock(
+                              referencedBlockchain,
+                              Some(referencedForgedBlock),
+                              block,
+                              constraint,
+                              hitSource,
+                              verify
+                            )
+                        } yield {
                             val tempBlockchain = CompositeBlockchain(
                               referencedBlockchain,
                               differResult.diff,
@@ -415,12 +413,12 @@ class BlockchainUpdaterImpl(
       lt        <- leaseTransactions
       ltMeta    <- transactionMeta(lt.id()).toSeq
       recipient <- leveldb.resolveAlias(lt.recipient).toSeq
-    } yield lt.id() -> Diff.empty.copy(
+    } yield lt.id() -> Diff(
       portfolios = Map(
-        lt.sender.toAddress -> Portfolio(0, LeaseBalance(0, -lt.amount), Map.empty),
-        recipient           -> Portfolio(0, LeaseBalance(-lt.amount, 0), Map.empty)
+        lt.sender.toAddress -> Portfolio(0, LeaseBalance(0, -lt.amount.value), Map.empty),
+        recipient           -> Portfolio(0, LeaseBalance(-lt.amount.value, 0), Map.empty)
       ),
-      leaseState = Map((lt.id(), LeaseDetails(lt.sender, lt.recipient, lt.amount, LeaseDetails.Status.Expired(height), lt.id(), ltMeta.height)))
+      leaseState = Map((lt.id(), LeaseDetails(lt.sender, lt.recipient, lt.amount.value, LeaseDetails.Status.Expired(height), lt.id(), ltMeta.height)))
     )).toMap
 
   override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[(Block, ByteStr)]] = writeLock {
@@ -696,11 +694,11 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.assetScript(asset)
   }
 
-  override def accountData(acc: Address, key: String): Option[DataEntry[_]] = readLock {
+  override def accountData(acc: Address, key: String): Option[DataEntry[?]] = readLock {
     compositeBlockchain.accountData(acc, key)
   }
 
-  override def hasData(acc: Address): Boolean = {
+  override def hasData(acc: Address): Boolean = readLock {
     compositeBlockchain.hasData(acc)
   }
 
@@ -741,7 +739,11 @@ class BlockchainUpdaterImpl(
 }
 
 object BlockchainUpdaterImpl {
-  private def diff(p1: Map[Address, Portfolio], p2: Map[Address, Portfolio]) = Monoid.combine(p1, p2.map { case (k, v) => k -> v.negate })
+  private implicit val portfolioDiffCombine: Semigroup[Portfolio] = (x: Portfolio, y: Portfolio) =>
+    Portfolio(x.balance + y.balance, LeaseBalance.empty, x.assets |+| y.assets)
+
+  private def diff(p1: Map[Address, Portfolio], p2: Map[Address, Portfolio]): Map[Address, Portfolio] =
+    p1 |+| p2.map { case (k, v) => k -> v.negate }
 
   private def displayFeatures(s: Set[Short]): String =
     s"FEATURE${if (s.size > 1) "S" else ""} ${s.mkString(", ")} ${if (s.size > 1) "have been" else "has been"}"

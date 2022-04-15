@@ -1,9 +1,9 @@
 package com.wavesplatform.http
 
+import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.TestWallet
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
-import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.api.http.BlocksApiRoute
 import com.wavesplatform.block.serialization.BlockHeaderSerializer
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -15,16 +15,11 @@ import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utils.SystemTime
 import monix.reactive.Observable
 import org.scalamock.scalatest.PathMockFactory
-import play.api.libs.json._
+import play.api.libs.json.*
 
 import scala.util.Random
 
-class BlocksApiRouteSpec
-    extends RouteSpec("/blocks")
-    with PathMockFactory
-    with RestAPISettingsHelper
-    with TestWallet
-    with WithDomain {
+class BlocksApiRouteSpec extends RouteSpec("/blocks") with PathMockFactory with RestAPISettingsHelper with TestWallet with WithDomain {
   private val blocksApi                      = mock[CommonBlocksApi]
   private val blocksApiRoute: BlocksApiRoute = BlocksApiRoute(restAPISettings, blocksApi, SystemTime)
   private val route                          = blocksApiRoute.route
@@ -82,6 +77,12 @@ class BlocksApiRouteSpec
     Get(routePath("/at/2")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock2Json
+    }
+
+    (blocksApi.blockAtHeight _).expects(3).returning(None).once()
+    Get(routePath("/at/3")) ~> route ~> check {
+      response.status shouldBe StatusCodes.NotFound
+      responseAs[String] should include("block does not exist")
     }
   }
 
@@ -175,6 +176,7 @@ class BlocksApiRouteSpec
   routePath("/headers/at/{height}") in {
     (blocksApi.metaAtHeight _).expects(1).returning(Some(testBlock1Meta)).once()
     (blocksApi.metaAtHeight _).expects(2).returning(Some(testBlock2Meta)).once()
+    (blocksApi.metaAtHeight _).expects(3).returning(None).once()
 
     Get(routePath("/headers/at/1")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -184,6 +186,11 @@ class BlocksApiRouteSpec
     Get(routePath("/headers/at/2")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock2HeaderJson
+    }
+
+    Get(routePath("/headers/at/3")) ~> route ~> check {
+      response.status shouldBe StatusCodes.NotFound
+      responseAs[String] should include("block does not exist")
     }
   }
 

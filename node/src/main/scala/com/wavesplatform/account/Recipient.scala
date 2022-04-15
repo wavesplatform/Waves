@@ -3,23 +3,23 @@ package com.wavesplatform.account
 import java.nio.ByteBuffer
 
 import com.google.common.cache.{Cache, CacheBuilder}
-import com.google.common.primitives.Bytes
+import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.v1.traits.domain.{Recipient => RideRecipient}
+import com.wavesplatform.lang.v1.traits.domain.Recipient as RideRecipient
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidAddress}
-import com.wavesplatform.utils.{base58Length, EthEncoding, StringBytes}
-import play.api.libs.json._
+import com.wavesplatform.utils.{EthEncoding, StringBytes, base58Length}
+import play.api.libs.json.*
 
 sealed trait AddressOrAlias {
   def chainId: Byte
   def bytes: Array[Byte]
 }
 
-final class Address private(val chainId: Byte, val publicKeyHash: Array[Byte], checksum: Array[Byte]) extends AddressOrAlias {
+final class Address private (val chainId: Byte, val publicKeyHash: Array[Byte], checksum: Array[Byte]) extends AddressOrAlias {
   override lazy val bytes: Array[Byte] = Bytes.concat(Array(1.toByte, chainId), publicKeyHash, checksum)
   override lazy val toString: String   = ByteStr(bytes).toString
 
@@ -27,8 +27,10 @@ final class Address private(val chainId: Byte, val publicKeyHash: Array[Byte], c
     case a: Address => java.util.Arrays.equals(publicKeyHash, a.publicKeyHash) && chainId == a.chainId
     case _          => false
   }
-  
-  override def hashCode(): Int = (ByteStr(publicKeyHash), chainId).hashCode()
+
+  private lazy val hc = Ints.fromByteArray(checksum)
+
+  override def hashCode(): Int = hc
 }
 
 final case class Alias(chainId: Byte, name: String) extends AddressOrAlias {
@@ -43,9 +45,11 @@ object AddressOrAlias {
       case RideRecipient.Alias(name)    => Alias.create(name)
     }
 
-  def fromString(s: String): Either[ValidationError, AddressOrAlias] = s match {
-    case alias if alias.startsWith(Alias.Prefix) => Alias.fromString(s)
-    case address                                 => Address.fromString(address)
+  def fromString(s: String, checkChainId: Boolean = true): Either[ValidationError, AddressOrAlias] = {
+    if (s.startsWith(Alias.Prefix))
+      Alias.fromString(s)
+    else
+      Address.fromString(s, if (checkChainId) Some(AddressScheme.current.chainId) else None)
   }
 
   def fromBytes(buf: Array[Byte]): Either[ValidationError, AddressOrAlias] = buf.headOption match {
@@ -75,17 +79,20 @@ object Address {
     .maximumSize(200000)
     .build()
 
-  def apply(publicKeyHash: Array[Byte], chainId: Byte = AddressScheme.current.chainId): Address = new Address(
-    chainId,
-    publicKeyHash,
-    crypto.secureHash(Array(1.toByte, AddressScheme.current.chainId) ++ publicKeyHash).take(4)
-  )
+  def apply(publicKeyHash: Array[Byte], chainId: Byte = AddressScheme.current.chainId): Address = {
+    require(publicKeyHash.length == HashLength, "Public key hash should be 20 bytes long")
+    val checksumPayload = Bytes.concat(Array(1.toByte, AddressScheme.current.chainId), publicKeyHash)
+    val checksum        = crypto.secureHash(checksumPayload)
+    new Address(chainId, publicKeyHash, checksum.take(4))
+  }
 
-  def fromHexString(hexString: String): Address = Address(EthEncoding.toBytes(hexString))
+  def fromHexString(hexString: String): Address =
+    Address(EthEncoding.toBytes(hexString))
 
   def fromPublicKey(publicKey: PublicKey, chainId: Byte = scheme.chainId): Address = {
     publicKeyBytesCache.get(
-      (publicKey, chainId), { () =>
+      (publicKey, chainId),
+      { () =>
         val withoutChecksum = ByteBuffer
           .allocate(1 + 1 + HashLength)
           .put(AddressVersion)
@@ -106,34 +113,34 @@ object Address {
 
   def fromBytes(addressBytes: Array[Byte], chainId: Byte = scheme.chainId): Either[InvalidAddress, Address] = {
     bytesCache.get(
-      ByteStr(addressBytes), { () =>
+      ByteStr(addressBytes),
+      { () =>
         Either
           .cond(
             addressBytes.length == Address.AddressLength,
             (),
             InvalidAddress(s"Wrong addressBytes length: expected: ${Address.AddressLength}, actual: ${addressBytes.length}")
           )
-          .flatMap {
-            _ =>
-              val Array(version, network, _*) = (addressBytes: @unchecked)
+          .flatMap { _ =>
+            val Array(version, network, _*) = addressBytes: @unchecked
 
-              (for {
-                _ <- Either.cond(version == AddressVersion, (), s"Unknown address version: $version")
-                _ <- Either.cond(
-                  network == chainId,
-                  (),
-                  s"Address belongs to another network: expected: $chainId(${chainId.toChar}), actual: $network(${network.toChar})"
-                )
-                checkSum          = addressBytes.takeRight(ChecksumLength)
-                checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
-                _ <- Either.cond(java.util.Arrays.equals(checkSum, checkSumGenerated), (), s"Bad address checksum")
-              } yield createUnsafe(addressBytes)).left.map(err => InvalidAddress(err))
+            (for {
+              _ <- Either.cond(version == AddressVersion, (), s"Unknown address version: $version")
+              _ <- Either.cond(
+                network == chainId,
+                (),
+                s"Address belongs to another network: expected: $chainId(${chainId.toChar}), actual: $network(${network.toChar})"
+              )
+              checkSum          = addressBytes.takeRight(ChecksumLength)
+              checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
+              _ <- Either.cond(java.util.Arrays.equals(checkSum, checkSumGenerated), (), s"Bad address checksum")
+            } yield createUnsafe(addressBytes)).left.map(err => InvalidAddress(err))
           }
       }
     )
   }
 
-  def fromString(addressStr: String): Either[ValidationError, Address] = {
+  def fromString(addressStr: String, chainId: Option[Byte] = Some(scheme.chainId)): Either[ValidationError, Address] = {
     val base58String = if (addressStr.startsWith(Prefix)) addressStr.drop(Prefix.length) else addressStr
     for {
       _ <- Either.cond(
@@ -142,7 +149,7 @@ object Address {
         InvalidAddress(s"Wrong address string length: max=$AddressStringLength, actual: ${base58String.length}")
       )
       byteArray <- Base58.tryDecodeWithLimit(base58String).toEither.left.map(ex => InvalidAddress(s"Unable to decode base58: ${ex.getMessage}"))
-      address   <- fromBytes(byteArray)
+      address   <- fromBytes(byteArray, chainId.getOrElse(byteArray(1)))
     } yield address
   }
 
@@ -196,7 +203,7 @@ object Alias {
 
   def fromBytes(bytes: Array[Byte]): Either[ValidationError, Alias] = {
     bytes match {
-      case Array(`AddressVersion`, chainId, _, _, rest @ _*) =>
+      case Array(`AddressVersion`, chainId, _, _, rest*) =>
         createWithChainId(new String(rest.toArray, "UTF-8"), chainId)
 
       case _ =>

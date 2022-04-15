@@ -1,32 +1,31 @@
 package com.wavesplatform.state.diffs
 
-import cats._
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.state._
-import com.wavesplatform.test._
-import org.scalacheck.Gen
+import com.wavesplatform.state.*
+import com.wavesplatform.test.*
+import com.wavesplatform.transaction.TxHelpers
 
 class GenesisTransactionDiffTest extends PropSpec with WithState {
-  def nelMax[T](g: Gen[T], max: Int = 10): Gen[List[T]] = Gen.choose(1, max).flatMap(Gen.listOfN(_, g))
 
   property("fails if height != 1") {
-    forAll(genesisGen, positiveIntGen suchThat (_ > 1)) { (gtx, h) =>
-      GenesisTransactionDiff(h)(gtx) should produce("GenesisTransaction cannot appear in non-initial block")
-    }
+    val genesis = TxHelpers.genesis(TxHelpers.address(1))
+    val height  = 2
+    GenesisTransactionDiff(height)(genesis) should produce("GenesisTransaction cannot appear in non-initial block")
   }
 
   property("Diff establishes Waves invariant") {
-    forAll(nelMax(genesisGen)) { gtxs =>
-      assertDiffAndState(Seq.empty, TestBlock.create(gtxs)) { (blockDiff, _) =>
-        val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
-        totalPortfolioDiff.balance shouldBe gtxs.map(_.amount).sum
-        totalPortfolioDiff.effectiveBalance shouldBe gtxs.map(_.amount).sum
-        totalPortfolioDiff.assets shouldBe Map.empty
+    val genesis = (1 to 10).map(idx => TxHelpers.genesis(TxHelpers.address(idx), 10000))
 
-        gtxs.foreach { gtx =>
-          blockDiff.portfolios(gtx.recipient).balance shouldBe gtx.amount
-        }
+    assertDiffAndState(Seq.empty, TestBlock.create(genesis)) { (blockDiff, _) =>
+      val totalPortfolioDiff: Portfolio = blockDiff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
+      totalPortfolioDiff.balance shouldBe genesis.map(_.amount.value).sum
+      totalPortfolioDiff.effectiveBalance.explicitGet() shouldBe genesis.map(_.amount.value).sum
+      totalPortfolioDiff.assets shouldBe Map.empty
+
+      genesis.foreach { gtx =>
+        blockDiff.portfolios(gtx.recipient).balance shouldBe gtx.amount.value
       }
     }
   }

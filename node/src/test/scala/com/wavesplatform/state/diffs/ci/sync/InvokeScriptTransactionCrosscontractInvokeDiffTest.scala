@@ -16,7 +16,7 @@ import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.{IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxVersion}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -32,8 +32,7 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
     with DBCacheSettings
     with EitherValues {
 
-  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Map(
+  private val fsWithV5 = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
       BlockchainFeatures.SmartAccounts.id    -> 0,
       BlockchainFeatures.SmartAssets.id      -> 0,
       BlockchainFeatures.Ride4DApps.id       -> 0,
@@ -41,8 +40,7 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
       BlockchainFeatures.DataTransaction.id  -> 0,
       BlockchainFeatures.BlockV5.id          -> 0,
       BlockchainFeatures.SynchronousCalls.id -> 0
-    )
-  )
+    ))
 
   property("Crosscontract call - internal invoke state update") {
 
@@ -232,7 +230,7 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
     val transferAssetAmount                = 100542
     val paymentAssetAmount                 = 99111
 
-    def paymentAssetScript(thirdAcc: Address) = {
+    def paymentAssetScript(thirdAcc: Address): Script = {
       val script = s"""
                       | {-# STDLIB_VERSION 5        #-}
                       | {-# SCRIPT_TYPE ASSET       #-}
@@ -241,10 +239,10 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
                       | getIntegerValue(Address(base58'$thirdAcc'), "$invokeEntry1Key") == $invokeEntry1Val
                       |
                     """.stripMargin
-      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1
+      ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()._1
     }
 
-    def transferAssetScript(thirdAcc: Address) = {
+    def transferAssetScript(thirdAcc: Address): Script = {
       val script = s"""
                       | {-# STDLIB_VERSION 5        #-}
                       | {-# SCRIPT_TYPE ASSET       #-}
@@ -253,7 +251,7 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
                       | getIntegerValue(Address(base58'$thirdAcc'), "$invokeEntry1Key") == $invokeEntry1Val
                       |
                     """.stripMargin
-      ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1
+      ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()._1
     }
 
     def contractMain(secondAcc: Address, thirdAcc: Address, paymentAsset: ByteStr): Script = TestCompiler(V5).compileContract(s"""

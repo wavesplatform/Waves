@@ -1,21 +1,21 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import scala.util.{Failure, Success, Try}
-
 import com.google.common.primitives.Bytes
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import net.ceedubs.ficus.readers.ValueReader
 import play.api.libs.json.{JsObject, Json}
 
+import scala.util.{Failure, Success, Try}
+
 case class AssetPair(
     amountAsset: Asset,
     priceAsset: Asset
 ) {
-  import AssetPair._
+  import AssetPair.*
 
   lazy val priceAssetStr: String  = assetIdStr(priceAsset)
   lazy val amountAssetStr: String = assetIdStr(amountAsset)
@@ -45,7 +45,7 @@ object AssetPair {
 
   def extractAssetId(a: String): Try[Asset] = a match {
     case `WavesName` => Success(Waves)
-    case other       => ByteStr.decodeBase58(other).map(IssuedAsset)
+    case other       => ByteStr.decodeBase58(other).map(IssuedAsset(_))
   }
 
   def createAssetPair(amountAsset: String, priceAsset: String): Try[AssetPair] =
@@ -65,7 +65,7 @@ object AssetPair {
 
   def fromString(s: String): Try[AssetPair] = Try(s.split("-")).flatMap {
     case Array(amtAssetStr, prcAssetStr) => AssetPair.createAssetPair(amtAssetStr, prcAssetStr)
-    case xs                              => Failure(new Exception(s"$s (incorrect assets count, expected 2 but got ${xs.size}: ${xs.mkString(", ")})"))
+    case xs => Failure(new Exception(s"$s (incorrect assets count, expected 2 but got ${xs.size}: ${xs.mkString(", ")})"))
   }
 
   implicit val assetPairReader: ValueReader[AssetPair] = (cfg, path) => fromString(cfg.getString(path)).get

@@ -1,8 +1,6 @@
 package com.wavesplatform.it.sync.transactions
 
-import scala.concurrent.duration._
-import scala.util.Random
-
+import scala.concurrent.duration.*
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.http.ApiError.{InvalidName, StateCheckFailed, TooBigArrayAllocation}
@@ -11,12 +9,13 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs.{Miners, NotMiner}
 import com.wavesplatform.it.api.{Transaction, TransactionInfo}
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
+import com.wavesplatform.transaction.assets.IssueTransaction.{MaxAssetDescriptionLength, MaxAssetNameLength, MinAssetNameLength}
 import com.wavesplatform.transaction.{TransactionType, TxVersion}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
@@ -24,7 +23,7 @@ import org.scalatest.prop.TableDrivenPropertyChecks
 import play.api.libs.json.{JsObject, Json}
 
 class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAfterFailure with TableDrivenPropertyChecks {
-  import UpdateAssetInfoTransactionSuite._
+  import UpdateAssetInfoTransactionSuite.*
   val updateInterval = 2
   override protected def nodeConfigs: Seq[Config] =
     Seq(
@@ -85,7 +84,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
       )
       .id
     nftId = sender.broadcastIssue(issuer, "asset", "description", quantity = 1, decimals = 0, reissuable = false, script = None, waitForTx = true).id
-    val script = ScriptCompiler.compile(testDapp, ScriptEstimatorV3).explicitGet()._1.bytes().base64
+    val script = ScriptCompiler.compile(testDapp, ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64
     sender.setScript(dApp, Some(script), waitForTx = true)
   }
 
@@ -264,30 +263,45 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     sender.assetsDetails(assetId).description shouldBe secondUpdatedDescription
   }
 
-  val invalidAssetsNames =
-    Table(
+  test("can update asset only with name which have valid length") {
+    val invalidNames = Seq(
       "",
-      "abc",
-      "NameIsLongerThanLimit",
+      "a" * (MinAssetNameLength - 1),
+      "a" * (MaxAssetNameLength + 1),
       "~!|#$%^&*()_+=\";:/?><|\\][{}"
     )
-
-  forAll(invalidAssetsNames) { assetName: String =>
-    test(s"not able to update name to $assetName") {
-      sender.waitForHeight(sender.height + updateInterval + 1, 3.minutes)
+    val validNames = Seq("a" * MinAssetNameLength, "a" * MaxAssetNameLength)
+    invalidNames.foreach { name =>
       assertApiError(
-        sender.updateAssetInfo(issuer, assetId, assetName, "updatedDescription", minFee),
+        sender.updateAssetInfo(issuer, assetId, name, "updatedDescription", minFee),
         InvalidName
       )
     }
+    validNames.foreach { name =>
+      sender.waitForHeight(sender.height + updateInterval + 1, 3.minutes)
+      val (tx, _) = sender.updateAssetInfo(issuer, assetId, name, "updatedDescription", minFee)
+
+      nodes.waitForHeightAriseAndTxPresent(tx.id)
+      nodes.foreach(_.assetsDetails(assetId).name shouldBe name)
+    }
   }
 
-  test("not able to set too big description") {
-    val tooBigDescription = Random.nextString(1001)
-    assertApiError(
-      sender.updateAssetInfo(issuer, assetId, "updatedName", tooBigDescription, minFee),
-      TooBigArrayAllocation
-    )
+  test("can update asset only with description which have valid length") {
+    val invalidDescs = Seq("a" * (MaxAssetDescriptionLength + 1))
+    val validDescs = Seq("", "a" * MaxAssetDescriptionLength)
+    invalidDescs.foreach { desc =>
+      assertApiError(
+        sender.updateAssetInfo(issuer, assetId, "updatedName", desc, minFee),
+        TooBigArrayAllocation
+      )
+    }
+    validDescs.foreach { desc =>
+      sender.waitForHeight(sender.height + updateInterval + 1, 3.minutes)
+      val (tx, _) = sender.updateAssetInfo(issuer, assetId, "updatedName", desc, minFee)
+
+      nodes.waitForHeightAriseAndTxPresent(tx.id)
+      nodes.foreach(_.assetsDetails(assetId).description shouldBe desc)
+    }
   }
 
   test("not able to update asset info without paying enough fee") {
@@ -322,16 +336,16 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
           |{-# STDLIB_VERSION 4 #-}
           |{-# CONTENT_TYPE EXPRESSION #-}
           |{-# SCRIPT_TYPE ASSET #-}
- 
-          |match assetInfo(fromBase58String("${smartAssetId1}")) {
+
+          |match assetInfo(fromBase58String("$smartAssetId1")) {
           |case a:Asset =>
           | a.name == "smartAsset" &&
           | this.name == "smartAsset" &&
           | a.description == "description" &&
           | this.description == "description" &&
-          | a.quantity == ${someAssetAmount} &&
-          | a.quantity == ${someAssetAmount} &&
-          | this.id == fromBase58String("${smartAssetId1}") &&
+          | a.quantity == $someAssetAmount &&
+          | a.quantity == $someAssetAmount &&
+          | this.id == fromBase58String("$smartAssetId1") &&
           | a.decimals == 8 &&
           | this.decimals == 8 &&
           | a.issuer == Address(fromBase58String("${issuer.toAddress.toString}")) &&

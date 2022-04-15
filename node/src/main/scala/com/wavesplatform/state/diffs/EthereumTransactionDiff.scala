@@ -1,14 +1,15 @@
 package com.wavesplatform.state.diffs
 
-import cats.syntax.semigroup._
+import cats.implicits.toBifunctorOps
 import com.google.protobuf.ByteString
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.v1.Serde
+import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients}
-import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
+import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.EthereumTransaction
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 
 object EthereumTransactionDiff {
@@ -37,7 +38,7 @@ object EthereumTransactionDiff {
             e.id() -> EthereumTransactionMeta(
               EthereumTransactionMeta.Payload.Invocation(
                 EthereumTransactionMeta.Invocation(
-                  ByteString.copyFrom(Serde.serialize(invocation.funcCall)),
+                  ByteString.copyFrom(SerdeV1.serialize(invocation.funcCall)),
                   invocation.payments.map(p => PBAmounts.fromAssetAndAmount(p.assetId, p.amount))
                 )
               )
@@ -56,16 +57,18 @@ object EthereumTransactionDiff {
           transfer  <- TracedResult(et.toTransferLike(e, blockchain))
           assetDiff <- TransactionDiffer.assetsVerifierDiff(blockchain, transfer, verify = true, Diff(), Int.MaxValue)
           diff      <- TransferDiff(blockchain)(e.senderAddress(), et.recipient, et.amount, asset, e.fee, e.feeAssetId)
-        } yield assetDiff |+| diff
+          result <- assetDiff.combine(diff).leftMap(GenericError(_))
+        } yield result
 
       case ei: EthereumTransaction.Invocation =>
         for {
           invocation   <- TracedResult(ei.toInvokeScriptLike(e, blockchain))
           paymentsDiff <- TransactionDiffer.assetsVerifierDiff(blockchain, invocation, verify = true, Diff(), Int.MaxValue)
           diff         <- InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution)(invocation)
-        } yield paymentsDiff |+| diff
+          result <- paymentsDiff.combine(diff).leftMap(GenericError(_))
+        } yield result
     }
 
-    baseDiff.map(_ |+| this.meta(blockchain)(e))
+    baseDiff.flatMap(bd => TracedResult(bd.combine(this.meta(blockchain)(e)).leftMap(GenericError(_))))
   }
 }

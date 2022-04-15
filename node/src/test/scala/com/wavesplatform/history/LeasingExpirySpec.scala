@@ -22,16 +22,10 @@ class LeasingExpirySpec extends FreeSpec with WithDomain {
 
   private val leasingSettings = settings.copy(
     blockchainSettings = DefaultBlockchainSettings.copy(
-      functionalitySettings = FunctionalitySettings(
-        featureCheckBlocksPeriod = 100,
-        blocksForFeatureActivation = 80,
-        doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
-        leaseExpiration = LeasingValidity,
-        preActivatedFeatures = Map(
+      functionalitySettings = FunctionalitySettings(featureCheckBlocksPeriod = 100, blocksForFeatureActivation = 80, preActivatedFeatures = Map(
           BlockchainFeatures.SmartAccounts.id   -> 0,
           BlockchainFeatures.LeaseExpiration.id -> LeasingExpiryActivationHeight
-        )
-      )
+        ), doubleFeaturesPeriodsAfterHeight = Int.MaxValue, leaseExpiration = LeasingValidity)
     )
   )
 
@@ -42,7 +36,7 @@ class LeasingExpirySpec extends FreeSpec with WithDomain {
     maxFeeAmount <- Gen.choose(100000L, 1 * Constants.UnitsInWave)
     transfer     <- transferGeneratorP(ntpTime.getTimestamp(), lessor, aliasRecipient.toAddress, maxFeeAmount)
     alias        <- aliasGen
-    createAlias  <- createAliasGen(aliasRecipient, alias, transfer.amount, ntpTime.getTimestamp())
+    createAlias  <- createAliasGen(aliasRecipient, alias, transfer.amount.value, ntpTime.getTimestamp())
     genesisBlock = TestBlock.create(
       ts,
       Seq(

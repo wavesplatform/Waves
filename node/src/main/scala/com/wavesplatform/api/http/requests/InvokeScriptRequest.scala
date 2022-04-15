@@ -1,16 +1,16 @@
 package com.wavesplatform.api.http.requests
 
-import cats.instances.list._
-import cats.syntax.either._
-import cats.syntax.traverse._
-import com.wavesplatform.account._
+import cats.instances.list.*
+import cats.syntax.either.*
+import cats.syntax.traverse.*
+import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, InvokeTransaction}
-import play.api.libs.json._
+import play.api.libs.json.*
 
 object InvokeScriptRequest {
 
@@ -30,7 +30,7 @@ object InvokeScriptRequest {
         }
       case JsDefined(JsString("string")) =>
         jv \ "value" match {
-          case JsDefined(JsString(n)) => CONST_STRING(n).fold(JsError(_), JsSuccess(_))
+          case JsDefined(JsString(n)) => CONST_STRING(n).fold(e => JsError(e.message), JsSuccess(_))
           case _                      => JsError("value is missing or not an string")
         }
       case JsDefined(JsString("binary")) =>
@@ -40,12 +40,17 @@ object InvokeScriptRequest {
               .decodeBase64(n)
               .toEither
               .leftMap(_.getMessage)
-              .flatMap(CONST_BYTESTR(_))
+              .flatMap(r => CONST_BYTESTR(r).leftMap(_.message))
               .fold(JsError(_), JsSuccess(_))
           case _ => JsError("value is missing or not an base64 encoded string")
         }
       case JsDefined(JsString("list")) =>
-        ARR((jv \ "value").as[Vector[EVALUATED]], true).fold(JsError.apply, ({v: EVALUATED => JsSuccess(v)}))
+        ARR((jv \ "value").as[Vector[EVALUATED]], true).fold(
+          e => JsError(e.message),
+          { v: EVALUATED =>
+            JsSuccess(v)
+          }
+        )
       case _ => JsError("type is missing")
     }
   }
@@ -101,7 +106,7 @@ case class SignedInvokeScriptRequest(
   def toTx: Either[ValidationError, InvokeScriptTransaction] =
     for {
       _sender      <- PublicKey.fromBase58String(senderPublicKey)
-      _dappAddress <- AddressOrAlias.fromString(dApp)
+      _dappAddress <- AddressOrAlias.fromString(dApp, checkChainId = false)
       _feeAssetId  <- parseBase58ToAsset(feeAssetId.filter(_.nonEmpty), "invalid.feeAssetId")
       t <- InvokeScriptTransaction.create(
         version.getOrElse(2.toByte),
@@ -113,7 +118,7 @@ case class SignedInvokeScriptRequest(
         _feeAssetId,
         timestamp,
         proofs,
-        chainId.getOrElse(AddressScheme.current.chainId)
+        chainId.getOrElse(_dappAddress.chainId)
       )
     } yield t
 }

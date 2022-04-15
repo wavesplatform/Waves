@@ -13,7 +13,6 @@ object LeaseCancelTxValidator extends TxValidator[LeaseCancelTransaction] {
   override def validate(tx: LeaseCancelTransaction): ValidatedNel[ValidationError, LeaseCancelTransaction] = {
     import tx._
     V.seq(tx)(
-      V.fee(fee),
       checkLeaseId(leaseId).toValidatedNel
     )
   }

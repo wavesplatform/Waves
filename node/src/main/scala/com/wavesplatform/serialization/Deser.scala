@@ -98,6 +98,6 @@ object Deser {
   def serializeArrays(bs: Seq[Array[Byte]]): Array[Byte] = {
     require(bs.length.isValidShort, s"Attempting to serialize array with size, but the size(${bs.length}) exceeds MaxShort(${Short.MaxValue})")
     val countBytes = Shorts.toByteArray(bs.length.toShort)
-    Bytes.concat(Seq(countBytes) ++ bs.map(serializeArrayWithLength): _*)
+    Bytes.concat((Seq(countBytes) ++ bs.map(serializeArrayWithLength))*)
   }
 }

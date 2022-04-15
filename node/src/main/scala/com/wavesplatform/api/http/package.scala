@@ -5,28 +5,31 @@ import java.util.concurrent.ExecutionException
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server._
+import akka.http.scaladsl.server.*
+import akka.http.scaladsl.server.Directives.*
+import com.typesafe.scalalogging.Logger
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.ApiError.{InvalidAssetId, InvalidBlockId, InvalidPublicKey, InvalidSignature, InvalidTransactionId, WrongJson}
-import com.wavesplatform.api.http.requests.DataRequest._
-import com.wavesplatform.api.http.requests.SponsorFeeRequest._
-import com.wavesplatform.api.http.requests._
+import com.wavesplatform.api.http.requests.*
+import com.wavesplatform.api.http.requests.DataRequest.*
+import com.wavesplatform.api.http.requests.SponsorFeeRequest.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction._
-import com.wavesplatform.utils.ScorexLogging
 import monix.execution.Scheduler
-import play.api.libs.json._
+import org.slf4j.LoggerFactory
+import play.api.libs.json.*
 
 import scala.concurrent.Future
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
-package object http extends ApiMarshallers with ScorexLogging {
+package object http {
+  import ApiMarshallers.*
+
   val versionReads: Reads[Byte] = {
     val defaultByteReads = implicitly[Reads[Byte]]
     val intToByteReads   = implicitly[Reads[Int]].map(_.toByte)
@@ -54,23 +57,23 @@ package object http extends ApiMarshallers with ScorexLogging {
           .fromBase58String(senderPk)
           .flatMap { senderPk =>
             TransactionType(typeId) match {
-              case TransactionType.Transfer        => txJson.as[TransferRequest].toTxFrom(senderPk)
-              case TransactionType.CreateAlias     => txJson.as[CreateAliasRequest].toTxFrom(senderPk)
-              case TransactionType.Lease           => txJson.as[LeaseRequest].toTxFrom(senderPk)
-              case TransactionType.LeaseCancel     => txJson.as[LeaseCancelRequest].toTxFrom(senderPk)
-              case TransactionType.Exchange        => txJson.as[ExchangeRequest].toTxFrom(senderPk)
-              case TransactionType.Issue           => txJson.as[IssueRequest].toTxFrom(senderPk)
-              case TransactionType.Reissue         => txJson.as[ReissueRequest].toTxFrom(senderPk)
-              case TransactionType.Burn            => txJson.as[BurnRequest].toTxFrom(senderPk)
-              case TransactionType.MassTransfer    => TransactionFactory.massTransferAsset(txJson.as[MassTransferRequest], senderPk)
-              case TransactionType.Data            => TransactionFactory.data(txJson.as[DataRequest], senderPk)
-              case TransactionType.InvokeScript    => TransactionFactory.invokeScript(txJson.as[InvokeScriptRequest], senderPk)
-              case TransactionType.SetScript       => TransactionFactory.setScript(txJson.as[SetScriptRequest], senderPk)
-              case TransactionType.SetAssetScript  => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], senderPk)
-              case TransactionType.SponsorFee      => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], senderPk)
-              case TransactionType.UpdateAssetInfo => txJson.as[UpdateAssetInfoRequest].toTxFrom(senderPk)
+              case TransactionType.Transfer         => txJson.as[TransferRequest].toTxFrom(senderPk)
+              case TransactionType.CreateAlias      => txJson.as[CreateAliasRequest].toTxFrom(senderPk)
+              case TransactionType.Lease            => txJson.as[LeaseRequest].toTxFrom(senderPk)
+              case TransactionType.LeaseCancel      => txJson.as[LeaseCancelRequest].toTxFrom(senderPk)
+              case TransactionType.Exchange         => txJson.as[ExchangeRequest].toTxFrom(senderPk)
+              case TransactionType.Issue            => txJson.as[IssueRequest].toTxFrom(senderPk)
+              case TransactionType.Reissue          => txJson.as[ReissueRequest].toTxFrom(senderPk)
+              case TransactionType.Burn             => txJson.as[BurnRequest].toTxFrom(senderPk)
+              case TransactionType.MassTransfer     => TransactionFactory.massTransferAsset(txJson.as[MassTransferRequest], senderPk)
+              case TransactionType.Data             => TransactionFactory.data(txJson.as[DataRequest], senderPk)
+              case TransactionType.InvokeScript     => TransactionFactory.invokeScript(txJson.as[InvokeScriptRequest], senderPk)
+              case TransactionType.SetScript        => TransactionFactory.setScript(txJson.as[SetScriptRequest], senderPk)
+              case TransactionType.SetAssetScript   => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], senderPk)
+              case TransactionType.SponsorFee       => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], senderPk)
+              case TransactionType.UpdateAssetInfo  => txJson.as[UpdateAssetInfoRequest].toTxFrom(senderPk)
               case TransactionType.InvokeExpression => TransactionFactory.invokeExpression(txJson.as[InvokeExpressionRequest], senderPk)
-              case other => throw new IllegalArgumentException(s"Unsupported transaction type: $other")
+              case other                            => throw new IllegalArgumentException(s"Unsupported transaction type: $other")
             }
           }
           .fold(ApiError.fromValidationError, txToResponse)
@@ -109,7 +112,7 @@ package object http extends ApiMarshallers with ScorexLogging {
   val TransactionId: PathMatcher1[ByteStr] = idOrHash(InvalidTransactionId)
   val BlockId: PathMatcher1[ByteStr]       = idOrHash(InvalidBlockId)
 
-  val AssetId: PathMatcher1[IssuedAsset] = base58Segment(Some(crypto.DigestLength), _ => InvalidAssetId).map(IssuedAsset)
+  val AssetId: PathMatcher1[IssuedAsset] = base58Segment(Some(crypto.DigestLength), _ => InvalidAssetId).map(IssuedAsset(_))
 
   val Signature: PathMatcher1[ByteStr] = base58Segment(Some(crypto.SignatureLength), _ => InvalidSignature)
 
@@ -144,10 +147,13 @@ package object http extends ApiMarshallers with ScorexLogging {
 
   def extractScheduler: Directive1[Scheduler] = extractExecutionContext.map(ec => Scheduler(ec))
 
+  private lazy val logger: Logger =
+    Logger(LoggerFactory.getLogger(getClass.getName))
+
   val uncaughtExceptionHandler: ExceptionHandler = ExceptionHandler {
     case ApiException(error)   => complete(error)
-    case e: StackOverflowError => log.error("Stack overflow error", e); complete(ApiError.Unknown)
-    case NonFatal(e)           => log.error("Uncaught error", e); complete(ApiError.Unknown)
+    case e: StackOverflowError => logger.error("Stack overflow error", e); complete(ApiError.Unknown)
+    case NonFatal(e)           => logger.error("Uncaught error", e); complete(ApiError.Unknown)
   }
 
   /** Handles all [[scala.util.control.NonFatal non-fatal]] exceptions and tries to handle fatal errors.

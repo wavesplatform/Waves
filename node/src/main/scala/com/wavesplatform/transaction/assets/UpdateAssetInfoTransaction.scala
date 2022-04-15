@@ -19,7 +19,7 @@ case class UpdateAssetInfoTransaction(
     name: String,
     description: String,
     timestamp: TxTimestamp,
-    feeAmount: TxAmount,
+    feeAmount: TxPositiveAmount,
     feeAsset: Asset,
     proofs: Proofs,
     chainId: Byte
@@ -29,7 +29,7 @@ case class UpdateAssetInfoTransaction(
     with ProvenTransaction
     with PBSince.V1 { self =>
 
-  override def assetFee: (Asset, TxAmount) = (feeAsset, feeAmount)
+  override def assetFee: (Asset, Long) = (feeAsset, feeAmount.value)
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(PBTransactionSerializer.bodyBytes(self))
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(PBTransactionSerializer.bytes(self))
@@ -60,24 +60,26 @@ object UpdateAssetInfoTransaction {
       name: String,
       description: String,
       timestamp: TxTimestamp,
-      feeAmount: TxAmount,
+      feeAmount: Long,
       feeAsset: Asset,
       proofs: Proofs,
       chainId: Byte = AddressScheme.current.chainId
-  ): Either[ValidationError, UpdateAssetInfoTransaction] = {
-    UpdateAssetInfoTransaction(
-      version,
-      sender,
-      IssuedAsset(assetId),
-      name,
-      description,
-      timestamp,
-      feeAmount,
-      feeAsset,
-      proofs,
-      chainId
-    ).validatedEither
-  }
+  ): Either[ValidationError, UpdateAssetInfoTransaction] =
+    for {
+      fee <- TxPositiveAmount(feeAmount)(TxValidationError.InsufficientFee)
+      tx <- UpdateAssetInfoTransaction(
+        version,
+        sender,
+        IssuedAsset(assetId),
+        name,
+        description,
+        timestamp,
+        fee,
+        feeAsset,
+        proofs,
+        chainId
+      ).validatedEither
+    } yield tx
 
   def selfSigned(
       version: Byte,
@@ -86,8 +88,10 @@ object UpdateAssetInfoTransaction {
       name: String,
       description: String,
       timestamp: TxTimestamp,
-      feeAmount: TxAmount,
-      feeAsset: Asset
+      feeAmount: Long,
+      feeAsset: Asset,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, UpdateAssetInfoTransaction] =
-    create(version, sender.publicKey, assetId, name, description, timestamp, feeAmount, feeAsset, Proofs.empty).map(_.signWith(sender.privateKey))
+    create(version, sender.publicKey, assetId, name, description, timestamp, feeAmount, feeAsset, Proofs.empty, chainId)
+      .map(_.signWith(sender.privateKey))
 }
