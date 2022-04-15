@@ -417,13 +417,14 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     }
   }
 
-  property("invoking payment contract results in accounts state") {
+  property("invoking ScriptTransfer contract results in accounts state") {
     val (genesis, setScript, ci) = preconditionsAndSetContract(dAppWithTransfers())
 
     testDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion)) {
-      case (blockDiff, newState) =>
+      case (blockDiff, _) =>
         blockDiff.scriptsRun shouldBe 1
-        newState.balance(thirdAddress, Waves) shouldBe amount
+        blockDiff.portfolios(thirdAddress).balance shouldBe amount
+        blockDiff.portfolios(setScript.sender.toAddress).balance shouldBe -amount
         blockDiff.transactions should contain key ci.id()
     }
   }
