@@ -428,7 +428,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     }
   }
 
-  property("invoking default func payment contract results in accounts state") {
+  property("invoking default func ScriptTransfer contract results in accounts state") {
     val (genesis, setScript, ci) = preconditionsAndSetContract(defaultTransferContract(thirdAddress), isCIDefaultFunc = true)
 
     testDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion)) {
