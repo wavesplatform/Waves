@@ -311,7 +311,7 @@ object TxHelpers {
       sender: KeyPair = defaultSigner,
       recipient: AddressOrAlias = secondAddress,
       amount: Long = 10.waves,
-      fee: Long = TestValues.fee,
+      fee: Long = FeeConstants(LeaseTransaction.typeId) * FeeUnit,
       timestamp: TxTimestamp = timestamp,
       version: TxVersion = TxVersion.V2
   ): LeaseTransaction = {
@@ -321,7 +321,7 @@ object TxHelpers {
   def leaseCancel(
       leaseId: ByteStr,
       sender: KeyPair = defaultSigner,
-      fee: Long = TestValues.fee,
+      fee: Long = FeeConstants(LeaseCancelTransaction.typeId) * FeeUnit,
       timestamp: TxTimestamp = timestamp,
       version: TxVersion = TxVersion.V2,
       chainId: Byte = AddressScheme.current.chainId
