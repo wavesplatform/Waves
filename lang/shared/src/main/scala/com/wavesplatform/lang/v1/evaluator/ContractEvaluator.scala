@@ -128,13 +128,12 @@ object ContractEvaluator {
   ): Coeval[Either[(ExecutionError, Int, Log[Id]), (ScriptResult, Log[Id])]] =
     EvaluatorV2
       .applyLimitedCoeval(expr, limit, ctx, version, correctFunctionCallScope, newMode)
-      .map(_.flatMap {
-        case (expr, unusedComplexity, log) =>
-          val result =
-            expr match {
-              case value: EVALUATED => ScriptResult.fromObj(ctx, transactionId, value, version, unusedComplexity)
-              case expr: EXPR       => Right(IncompleteResult(expr, unusedComplexity))
-            }
-          result.bimap((_, unusedComplexity, log), (_, log))
+      .map(_.flatMap { case (expr, unusedComplexity, log) =>
+        val result =
+          expr match {
+            case value: EVALUATED => ScriptResult.fromObj(ctx, transactionId, value, version, unusedComplexity)
+            case expr: EXPR       => Right(IncompleteResult(expr, unusedComplexity))
+          }
+        result.bimap((_, unusedComplexity, log), (_, log))
       })
 }

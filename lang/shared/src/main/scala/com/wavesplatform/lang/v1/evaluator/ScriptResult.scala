@@ -37,11 +37,10 @@ object ScriptResult {
     Types
       .callableReturnType(version)
       .leftMap(CommonError)
-      .flatMap(
-        t =>
-          Left(
-            callableResultError(t, actual, CallableFunction) + (if (expected.isEmpty) "" else s" instead of $expected")
-          )
+      .flatMap(t =>
+        Left(
+          callableResultError(t, actual, CallableFunction) + (if (expected.isEmpty) "" else s" instead of $expected")
+        )
       )
 
   private def processDataEntryV3(fields: Map[String, EVALUATED]): Either[ExecutionError, DataItem[_]] =
@@ -125,11 +124,13 @@ object ScriptResult {
       obj.fields("bytes") match {
         case CONST_BYTESTR(addBytes) => Right(Address(addBytes))
         case other                   => err(s"can't reconstruct address from $other", version)
-      } else if (obj.caseType.name == Types.aliasType.name && ctx.environment.multiPaymentAllowed)
+      }
+    else if (obj.caseType.name == Types.aliasType.name && ctx.environment.multiPaymentAllowed)
       obj.fields("alias") match {
         case CONST_STRING(alias) => Right(Alias(alias))
         case other               => err(s"can't reconstruct alias from $other", version)
-      } else
+      }
+    else
       err(obj, version, FieldNames.Recipient)
 
   private def processWriteSetV3(fields: Map[String, EVALUATED]): Either[ExecutionError, List[DataItem[_]]] =
@@ -142,7 +143,10 @@ object ScriptResult {
       case other => err(other, V3, s"List(${FieldNames.Data})")
     }
 
-  private def processTransferSetV3(ctx: EvaluationContext[Environment, Id], fields: Map[String, EVALUATED]): Either[ExecutionError, List[AssetTransfer]] =
+  private def processTransferSetV3(
+      ctx: EvaluationContext[Environment, Id],
+      fields: Map[String, EVALUATED]
+  ): Either[ExecutionError, List[AssetTransfer]] =
     fields(FieldNames.Transfers) match {
       case ARR(xs) =>
         xs.toList.traverse {
@@ -196,13 +200,13 @@ object ScriptResult {
       fields.get(FieldNames.IssueNonce)
     ) match {
       case (
-          Some(CONST_LONG(quantity)),
-          Some(CONST_LONG(decimals)),
-          Some(CONST_STRING(name)),
-          Some(CONST_STRING(description)),
-          Some(script),
-          Some(CONST_BOOLEAN(isReissuable)),
-          Some(CONST_LONG(nonce))
+            Some(CONST_LONG(quantity)),
+            Some(CONST_LONG(decimals)),
+            Some(CONST_STRING(name)),
+            Some(CONST_STRING(description)),
+            Some(script),
+            Some(CONST_BOOLEAN(isReissuable)),
+            Some(CONST_LONG(nonce))
           ) =>
         if (script == unit) {
           if (0 <= decimals && decimals <= 8) {
@@ -224,9 +228,9 @@ object ScriptResult {
       fields.get(FieldNames.ReissueIsReissuable)
     ) match {
       case (
-          Some(CONST_BYTESTR(assetId)),
-          Some(CONST_LONG(quantity)),
-          Some(CONST_BOOLEAN(isReissuable))
+            Some(CONST_BYTESTR(assetId)),
+            Some(CONST_LONG(quantity)),
+            Some(CONST_BOOLEAN(isReissuable))
           ) =>
         Right(Reissue(assetId, isReissuable, quantity))
       case other =>
@@ -254,7 +258,11 @@ object ScriptResult {
         err(other, version, FieldNames.SponsorFee)
     }
 
-  private def processLease(ctx: EvaluationContext[Environment, Id], fields: Map[String, EVALUATED], version: StdLibVersion): Either[ExecutionError, Lease] =
+  private def processLease(
+      ctx: EvaluationContext[Environment, Id],
+      fields: Map[String, EVALUATED],
+      version: StdLibVersion
+  ): Either[ExecutionError, Lease] =
     (fields.get(FieldNames.LeaseRecipient), fields.get(FieldNames.LeaseAmount), fields.get(FieldNames.LeaseNonce)) match {
       case (Some(recipient: CaseObj), Some(CONST_LONG(quantity)), Some(CONST_LONG(nonce))) =>
         processRecipient(recipient, ctx, version)
@@ -309,7 +317,7 @@ object ScriptResult {
   private def fromV5ActionHandlers(v: StdLibVersion): ActionHandlers =
     Map(
       FieldNames.Lease       -> { case (ctx, _, fields) => processLease(ctx, fields, v) },
-      FieldNames.LeaseCancel -> { case (_, _, fields)   => processLeaseCancel(fields, v) }
+      FieldNames.LeaseCancel -> { case (_, _, fields) => processLeaseCancel(fields, v) }
     )
 
   private val v4ActionHandlers = fromV4ActionHandlers(V4)
