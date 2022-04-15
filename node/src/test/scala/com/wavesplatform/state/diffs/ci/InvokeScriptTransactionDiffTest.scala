@@ -432,9 +432,10 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     val (genesis, setScript, ci) = preconditionsAndSetContract(defaultTransferContract(thirdAddress), isCIDefaultFunc = true)
 
     testDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion)) {
-      case (blockDiff, newState) =>
+      case (blockDiff, _) =>
         blockDiff.scriptsRun shouldBe 1
-        newState.balance(thirdAddress, Waves) shouldBe amount
+        blockDiff.portfolios(thirdAddress).balance shouldBe amount
+        blockDiff.portfolios(setScript.sender.toAddress).balance shouldBe -amount
         blockDiff.transactions should contain key ci.id()
     }
   }
