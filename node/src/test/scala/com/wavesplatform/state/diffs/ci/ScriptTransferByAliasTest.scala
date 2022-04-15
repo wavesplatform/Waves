@@ -3,14 +3,16 @@ package com.wavesplatform.state.diffs.ci
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.lang.directives.values.StdLibVersion.V5
 import com.wavesplatform.lang.directives.values.V4
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.transaction.TxHelpers.{invoke, secondSigner, setScript}
 
 class ScriptTransferByAliasTest extends PropSpec with WithDomain {
 
@@ -96,6 +98,21 @@ class ScriptTransferByAliasTest extends PropSpec with WithDomain {
       d.appendBlock(invoke2)
       d.blockchain.bestLiquidDiff.get.errorMessage(invoke2.id()) shouldBe None
       d.balance(receiver.toAddress, asset) shouldBe transferAmount
+    }
+  }
+
+  property("unexisting ScriptTransfer alias recipient") {
+    withDomain(DomainPresets.RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+      val dApp = TestCompiler(V5).compileContract(
+        """
+          | @Callable(i)
+          | func default() = [
+          |   ScriptTransfer(Alias("alias"), 1, unit)
+          | ]
+        """.stripMargin
+      )
+      d.appendBlock(setScript(secondSigner, dApp))
+      d.appendBlockE(invoke()) should produce("Alias 'alias:T:alias' does not exists")
     }
   }
 }
