@@ -22,7 +22,6 @@ class InvokeReissueTest extends PropSpec with WithDomain {
            | ]
         """.stripMargin
       )
-      val invokeTx =
       d.appendBlock(issueTx)
       d.appendBlock(setScript(secondSigner, dApp))
       d.appendAndAssertFailed(invoke(), "Asset was issued by other address")
