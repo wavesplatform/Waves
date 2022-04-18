@@ -944,4 +944,25 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       d.appendAndAssertFailed(invoke(), "Cannot lease more than own: Balance: 1, already leased: 1")
     }
   }
+
+  property("ScriptTransfer after Lease of all available balance") {
+    val setScriptFee = FeeConstants(SetScriptTransaction.typeId) * FeeUnit
+    withDomain(
+      RideV5.configure(_.copy(blockVersion3AfterHeight = 0)),
+      Seq(AddrWithBalance(secondAddress, setScriptFee + 1))
+    ) { d =>
+      val dApp = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() =
+           |   [
+           |     Lease(i.caller, 1),
+           |     ScriptTransfer(i.caller, 1, unit)
+           |   ]
+         """.stripMargin
+      )
+      d.appendBlock(setScript(secondSigner, dApp))
+      d.appendBlockE(invoke()) should produce("negative effective balance")
+    }
+  }
 }
