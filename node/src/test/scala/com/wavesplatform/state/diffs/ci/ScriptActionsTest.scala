@@ -29,4 +29,23 @@ class ScriptActionsTest extends PropSpec with WithDomain {
       d.appendBlockE(invoke()) should produce("negative asset balance")
     }
   }
+
+  property("Burn after transferring whole amount") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+      val issueTx = issue(secondSigner)
+      val asset   = IssuedAsset(issueTx.id())
+      val dApp = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() =
+           |   [
+           |     ScriptTransfer(i.caller, ${issueTx.quantity}, base58'$asset'),
+           |     Burn(base58'$asset', 1)
+           |   ]
+         """.stripMargin
+      )
+      d.appendBlock(setScript(secondSigner, dApp), issueTx)
+      d.appendBlockE(invoke()) should produce("negative asset balance")
+    }
+  }
 }
