@@ -89,8 +89,10 @@ class InvokePaymentsTest extends PropSpec with WithDomain {
   property("trying to attach lease OUT balance to invoke payment") {
     val invoker        = signer(2)
     val leaseFee       = FeeConstants(LeaseTransaction.typeId) * FeeUnit
-    val leaseCancelFee = FeeConstants(LeaseCancelTransaction.typeId) * FeeUnit
-    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner) :+ AddrWithBalance(invoker.toAddress, leaseFee + invokeFee + 1)) { d =>
+    withDomain(
+      RideV5.configure(_.copy(blockVersion3AfterHeight = 0)),
+      AddrWithBalance.enoughBalances(secondSigner) :+ AddrWithBalance(invoker.toAddress, leaseFee + invokeFee + 1)
+    ) { d =>
       val dApp = TestCompiler(V5).compileContract(
         s"""
            | @Callable(i)
@@ -98,30 +100,9 @@ class InvokePaymentsTest extends PropSpec with WithDomain {
          """.stripMargin
       )
       d.appendBlock(setScript(secondSigner, dApp))
-
-      val leaseTx = lease(sender = invoker, recipient = defaultAddress, amount = 1)
-      d.appendBlock(leaseTx)
-      d.blockchain.balance(invoker.toAddress) shouldBe invokeFee + 1
+      d.appendBlock(lease(sender = invoker, recipient = defaultAddress, amount = 1))
       d.blockchain.leaseBalance(invoker.toAddress) shouldBe LeaseBalance(0, 1)
-      d.blockchain.leaseBalance(defaultAddress) shouldBe LeaseBalance(1, 0)
-
-      val startDAppBalance = d.blockchain.balance(secondAddress)
-      val invokeTx         = invoke(invoker = invoker, payments = Seq(Payment(1, Waves)))
-      d.appendBlock(invokeTx)
-      d.liquidDiff.errorMessage(invokeTx.txId) shouldBe None
-      d.blockchain.balance(invoker.toAddress) shouldBe 0
-      d.blockchain.leaseBalance(invoker.toAddress) shouldBe LeaseBalance(0, 1)
-      d.blockchain.leaseBalance(defaultAddress) shouldBe LeaseBalance(1, 0)
-      val resultDAppBalance = d.blockchain.balance(secondAddress)
-      val dAppBalanceDiff   = resultDAppBalance - startDAppBalance
-      dAppBalanceDiff shouldBe 1
-
-      d.appendBlock(transfer(to = invoker.toAddress, amount = leaseCancelFee))
-      d.appendBlock(leaseCancel(leaseTx.id(), sender = invoker))
-      d.blockchain.balance(invoker.toAddress) shouldBe 0
-      d.blockchain.leaseBalance(invoker.toAddress) shouldBe LeaseBalance(0, 0)
-      d.blockchain.leaseBalance(defaultAddress) shouldBe LeaseBalance(0, 0)
-      d.blockchain.balance(secondAddress) shouldBe resultDAppBalance
+      d.appendBlockE(invoke(invoker = invoker, payments = Seq(Payment(1, Waves)))) should produce("negative effective balance")
     }
   }
 }
