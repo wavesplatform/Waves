@@ -214,4 +214,23 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
       }
     }
   }
+
+  property("invalid issuing asset decimals") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+      def dApp(decimals: Int) = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = [
+           |   Issue("name", "", 1000, $decimals, true, unit, 0)
+           | ]
+         """.stripMargin
+      )
+
+      def invokeTx = invoke(fee = invokeFee(issues = 1))
+      d.appendBlock(setScript(secondSigner, dApp(-1)))
+      d.appendBlockE(invokeTx) should produce("Invalid decimals -1")
+      d.appendBlock(setScript(secondSigner, dApp(9)))
+      d.appendBlockE(invokeTx) should produce("Invalid decimals 9")
+    }
+  }
 }
