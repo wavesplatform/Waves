@@ -4,14 +4,14 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.StdLibVersion.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test.{PropSpec, produce}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxHelpers.{invoke, issue, secondSigner, setScript}
 
 class ScriptActionsTest extends PropSpec with WithDomain {
   import DomainPresets._
 
-  property("set reissuable = false and try to reissue via invoke") {
+  property("ScriptTransfer after burning whole amount") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       val issueTx = issue(secondSigner)
       val asset   = IssuedAsset(issueTx.id())
@@ -20,13 +20,13 @@ class ScriptActionsTest extends PropSpec with WithDomain {
            | @Callable(i)
            | func default() =
            |   [
-           |     Reissue(base58'$asset', 1, false)
+           |     Burn(base58'$asset', ${issueTx.quantity}),
+           |     ScriptTransfer(i.caller, 1, base58'$asset')
            |   ]
          """.stripMargin
       )
       d.appendBlock(setScript(secondSigner, dApp), issueTx)
-      d.appendAndAssertSucceed(invoke())
-      d.appendAndAssertFailed(invoke(), "Asset is not reissuable")
+      d.appendBlockE(invoke()) should produce("negative asset balance")
     }
   }
 }
