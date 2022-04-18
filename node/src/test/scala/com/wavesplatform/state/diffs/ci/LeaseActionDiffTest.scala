@@ -4,6 +4,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.util.AddressOrAliasExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -12,17 +13,20 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
+import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.test.{NumericExt, PropSpec}
+import com.wavesplatform.transaction.TxHelpers.{defaultAddress, invoke, lease, secondAddress, secondSigner, setScript}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{Authorized, CreateAliasTransaction, Transaction, TxHelpers, TxVersion}
 import org.scalatest.exceptions.TestFailedException
 
 import scala.util.Random
 
 class LeaseActionDiffTest extends PropSpec with WithDomain {
+  import DomainPresets._
 
   private def features(activateV5: Boolean): FunctionalitySettings = {
     val v5ForkO = if (activateV5) Seq(BlockchainFeatures.SynchronousCalls) else Seq()
@@ -898,6 +902,46 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     ) {
       case (diff, _) =>
         diff.errorMessage(invoke.id()).get.text shouldBe "Actions count limit is exceeded"
+    }
+  }
+
+  property("trying to spend lease IN balance in Lease action") {
+    val setScriptFee = FeeConstants(SetScriptTransaction.typeId) * FeeUnit
+    withDomain(RideV5, Seq(AddrWithBalance(secondAddress, setScriptFee))) { d =>
+      val dApp = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() =
+           |   [
+           |     Lease(i.caller, 1)
+           |   ]
+         """.stripMargin
+      )
+      d.appendBlock(setScript(secondSigner, dApp))
+      d.appendBlock(lease(recipient = secondAddress, amount = 1))
+      d.appendAndAssertFailed(invoke(), "Cannot lease more than own: Balance: 0, already leased: 0")
+    }
+  }
+
+  property("trying to spend lease OUT balance in Lease action") {
+    val setScriptFee = FeeConstants(SetScriptTransaction.typeId) * FeeUnit
+    val leaseFee     = FeeConstants(LeaseTransaction.typeId) * FeeUnit
+    withDomain(
+      RideV5,
+      Seq(AddrWithBalance(secondAddress, leaseFee + setScriptFee + 1))
+    ) { d =>
+      val dApp = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() =
+           |   [
+           |     Lease(i.caller, 1)
+           |   ]
+         """.stripMargin
+      )
+      d.appendBlock(setScript(secondSigner, dApp))
+      d.appendBlock(lease(sender = secondSigner, recipient = defaultAddress, amount = 1))
+      d.appendAndAssertFailed(invoke(), "Cannot lease more than own: Balance: 1, already leased: 1")
     }
   }
 }
