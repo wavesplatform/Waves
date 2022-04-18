@@ -17,7 +17,6 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.history.{DefaultWavesSettings, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.directives.values.StdLibVersion.V5
 import com.wavesplatform.lang.directives.values.{V3, V5}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
@@ -851,7 +850,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
              | }
          """.stripMargin
         )
-        val utx = new UtxPoolImpl(ntpTime, d.blockchainUpdater, DefaultWavesSettings.utxSettings)
+        val utx = new UtxPoolImpl(ntpTime, d.blockchainUpdater, DefaultWavesSettings.utxSettings, isMiningEnabled = false)
 
         d.appendBlock(setScript(secondSigner, dApp(5)))
         utx.putIfNew(invoke()).resultE shouldBe Right(true)
