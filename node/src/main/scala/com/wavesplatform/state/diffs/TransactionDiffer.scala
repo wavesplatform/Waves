@@ -202,6 +202,7 @@ object TransactionDiffer {
             val address = i.dAppAddressOrAlias match {
               case alias: Alias     => initDiff.aliases.get(alias).map(Right(_)).getOrElse(blockchain.resolveAlias(alias))
               case address: Address => Right(address)
+              case other            => Left(GenericError(s"Unexpected $other recipient"))
             }
             address.map(Some(_))
           case _ =>
