@@ -4,7 +4,7 @@ import cats.implicits.{toFoldableOps, toTraverseOps}
 import cats.instances.either._
 import cats.syntax.either._
 import cats.syntax.functor._
-import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.account.{Address, AddressScheme, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.BlockV5
@@ -161,7 +161,13 @@ object TransactionDiffer {
   private def validateBalance(blockchain: Blockchain, txType: TxType, diff: Diff): Either[ValidationError, Unit] =
     stats.balanceValidation.measureForType(txType)(BalanceDiffValidation(blockchain)(diff).as(()))
 
-  private def transactionDiff(blockchain: Blockchain, tx: Transaction, initDiff: Diff, currentBlockTs: TxTimestamp, limitedExecution: Boolean): TracedResult[ValidationError, Diff] =
+  private def transactionDiff(
+      blockchain: Blockchain,
+      tx: Transaction,
+      initDiff: Diff,
+      currentBlockTs: TxTimestamp,
+      limitedExecution: Boolean
+  ): TracedResult[ValidationError, Diff] =
     stats.transactionDiffValidation
       .measureForType(tx.typeId) {
         tx match {
@@ -190,7 +196,20 @@ object TransactionDiffer {
           case _                                 => UnsupportedTransactionType.asLeft.traced
         }
       }
-      .flatMap(d => initDiff.combine(d.bindTransaction(tx)).leftMap(GenericError(_)))
+      .flatMap { diff =>
+        val maybeDAppAddress = tx match {
+          case i: InvokeScriptTransaction =>
+            val address = i.dAppAddressOrAlias match {
+              case alias: Alias     => initDiff.aliases.get(alias).map(Right(_)).getOrElse(blockchain.resolveAlias(alias))
+              case address: Address => Right(address)
+            }
+            address.map(Some(_))
+          case _ =>
+            Right(None)
+        }
+        maybeDAppAddress.map((diff, _))
+      }
+      .flatMap { case (diff, maybeDAppAddress) => initDiff.combine(diff.bindTransaction(tx, maybeDAppAddress)).leftMap(GenericError(_)) }
       .leftMap {
         case fte: FailedTransactionError => fte.addComplexity(initDiff.scriptsComplexity)
         case ve                          => ve
@@ -234,17 +253,22 @@ object TransactionDiffer {
                 blockchain
                   .assetDescription(asset)
                   .toRight(GenericError(s"Referenced $asset not found"))
-                  .flatMap(_ =>
-                    Diff.combine(
-                      Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))),
-                      Map(dAppAddress         -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
-                    ).leftMap(GenericError(_))
+                  .flatMap(
+                    _ =>
+                      Diff
+                        .combine(
+                          Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))),
+                          Map(dAppAddress         -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
+                        )
+                        .leftMap(GenericError(_))
                   )
               case Waves =>
-                Diff.combine(
+                Diff
+                  .combine(
                     Map(tx.sender.toAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty)),
                     Map(dAppAddress         -> Portfolio(amt, LeaseBalance.empty, Map.empty))
-                  ).leftMap(GenericError(_))
+                  )
+                  .leftMap(GenericError(_))
             }
         }
         .flatMap(_.foldM(Map.empty[Address, Portfolio])(Diff.combine).leftMap(GenericError(_)))
@@ -313,10 +337,12 @@ object TransactionDiffer {
                 Sponsorship.toWaves(fee, assetInfo.sponsorship),
                 GenericError(s"Asset $asset is not sponsored, cannot be used to pay fees")
               )
-              portfolios <- Diff.combine(
-              Map(ptx.sender.toAddress       -> Portfolio(0, LeaseBalance.empty, Map(asset         -> -fee))),
-              Map(assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> fee)))
-              ).leftMap(GenericError(_))
+              portfolios <- Diff
+                .combine(
+                  Map(ptx.sender.toAddress       -> Portfolio(0, LeaseBalance.empty, Map(asset         -> -fee))),
+                  Map(assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> fee)))
+                )
+                .leftMap(GenericError(_))
             } yield portfolios
         }
       case _ => UnsupportedTransactionType.asLeft

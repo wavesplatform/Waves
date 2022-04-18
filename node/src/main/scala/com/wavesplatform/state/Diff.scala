@@ -12,6 +12,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 
 import scala.collection.immutable.VectorMap
@@ -207,11 +208,11 @@ object Diff {
     def hashString: String =
       Integer.toHexString(d.hashCode())
 
-    def bindTransaction(tx: Transaction): Diff = {
+    def bindTransaction(tx: Transaction, maybeDApp: Option[Address] = None): Diff = {
       val calledScripts = d.scriptResults.values
         .flatMap(inv => InvokeScriptResult.Invocation.calledAddresses(inv.invokes))
 
-      val affectedAddresses = d.portfolios.keySet ++ d.accountData.keySet ++ calledScripts
+      val affectedAddresses = d.portfolios.keySet ++ d.accountData.keySet ++ calledScripts ++ maybeDApp
       d.copy(transactions = VectorMap(tx.id() -> NewTransactionInfo(tx, affectedAddresses, applied = true, d.scriptsComplexity)))
     }
   }
