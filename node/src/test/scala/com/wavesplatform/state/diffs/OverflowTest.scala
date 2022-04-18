@@ -126,8 +126,7 @@ class OverflowTest extends PropSpec with WithDomain {
         withDomain(RideV5, AddrWithBalance.enoughBalances(sender, recipientKp)) { d =>
           d.appendBlock(TxHelpers.setScript(recipientKp, dApp(amount1, amount2)))
           val invoke = TxHelpers.invoke(recipient, invoker = sender)
-          d.appendBlock(invoke)
-          d.liquidDiff.errorMessage(invoke.id()).get.text shouldBe "ScriptTransfer overflow"
+          d.appendAndAssertFailed(invoke, "ScriptTransfer overflow")
         }
     }
   }
@@ -149,8 +148,7 @@ class OverflowTest extends PropSpec with WithDomain {
           )
           val invoke = TxHelpers.invoke(recipient, invoker = sender)
           d.appendBlock(issueTx, TxHelpers.setScript(recipientKp, dApp))
-          d.appendBlock(invoke)
-          d.liquidDiff.errorMessage(invoke.id()).get.text shouldBe "Asset total value overflow"
+          d.appendAndAssertFailed(invoke, "Asset total value overflow")
         }
     }
   }

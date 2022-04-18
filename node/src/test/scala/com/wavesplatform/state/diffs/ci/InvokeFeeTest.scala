@@ -77,11 +77,11 @@ class InvokeFeeTest extends PropSpec with WithDomain {
           | ]
         """.stripMargin
       )
+      val enoughFee = invokeFee(issues = 1)
       d.appendBlock(setScript(secondSigner, dApp))
-      d.appendBlock(invoke(fee = invokeFee(issues = 1)))
-      val failed = invoke(fee = invokeFee(issues = 1) - 1)
-      d.appendBlock(failed)
-      d.liquidDiff.errorMessage(failed.id()).get.text should include(
+      d.appendBlock(invoke(fee = enoughFee))
+      d.appendAndAssertFailed(
+        invoke(fee = enoughFee - 1),
         "Fee in WAVES for InvokeScriptTransaction (100499999 in WAVES) with 1 assets issued does not exceed minimal value of 100500000 WAVES"
       )
     }

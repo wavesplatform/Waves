@@ -22,11 +22,10 @@ class InvokeReissueTest extends PropSpec with WithDomain {
            | ]
         """.stripMargin
       )
-      val invokeTx = invoke()
+      val invokeTx =
       d.appendBlock(issueTx)
       d.appendBlock(setScript(secondSigner, dApp))
-      d.appendBlock(invokeTx)
-      d.liquidDiff.errorMessage(invokeTx.id()).get.text should include("Asset was issued by other address")
+      d.appendAndAssertFailed(invoke(), "Asset was issued by other address")
     }
   }
 }

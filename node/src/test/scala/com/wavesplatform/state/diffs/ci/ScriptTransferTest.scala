@@ -62,9 +62,8 @@ class ScriptTransferTest extends PropSpec with WithDomain {
         """.stripMargin
       )
       d.appendBlock(setScript(secondSigner, dApp))
-      val invokeTx = invoke()
-      d.appendBlockE(invokeTx)
-      d.liquidDiff.errorMessage(invokeTx.id()).get.text should include(
+      d.appendAndAssertFailed(
+        invoke(),
         "Alias should contain only following characters: -.0123456789@_abcdefghijklmnopqrstuvwxyz"
       )
     }

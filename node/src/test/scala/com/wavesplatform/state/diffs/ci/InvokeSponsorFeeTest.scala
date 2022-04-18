@@ -24,11 +24,9 @@ class InvokeSponsorFeeTest extends PropSpec with WithDomain {
           | ]
         """.stripMargin
       )
-      val invokeTx = invoke()
       d.appendBlock(issueTx)
       d.appendBlock(setScript(secondSigner, dApp))
-      d.appendBlock(invokeTx)
-      d.liquidDiff.errorMessage(invokeTx.id()).get.text should include(s"SponsorFee assetId=$asset was not issued from address of current dApp")
+      d.appendAndAssertFailed(invoke(), s"SponsorFee assetId=$asset was not issued from address of current dApp")
     }
   }
 
@@ -44,11 +42,9 @@ class InvokeSponsorFeeTest extends PropSpec with WithDomain {
           | ]
         """.stripMargin
       )
-      val invokeTx = invoke()
       d.appendBlock(issueTx)
       d.appendBlock(setScript(secondSigner, dApp))
-      d.appendBlock(invokeTx)
-      d.liquidDiff.errorMessage(invokeTx.id()).get.text should include(s"Sponsorship smart assets is disabled")
+      d.appendAndAssertFailed(invoke(), s"Sponsorship smart assets is disabled")
     }
   }
 }

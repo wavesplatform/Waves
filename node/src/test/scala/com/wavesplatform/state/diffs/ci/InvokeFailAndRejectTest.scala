@@ -37,11 +37,12 @@ class InvokeFailAndRejectTest extends PropSpec with WithDomain {
           | func default() = []
         """.stripMargin
       )
-      val invokeTx = invoke(payments = Seq(Payment(1, asset)))
       d.appendBlock(i)
       d.appendBlock(setScript(secondSigner, dApp))
-      d.appendBlock(invokeTx)
-      d.liquidDiff.errorMessage(invokeTx.id()).get.text should include(s"Transaction is not allowed by script of the asset $asset")
+      d.appendAndAssertFailed(
+        invoke(payments = Seq(Payment(1, asset))),
+        s"Transaction is not allowed by script of the asset $asset"
+      )
     }
   }
 
@@ -57,11 +58,9 @@ class InvokeFailAndRejectTest extends PropSpec with WithDomain {
            | ]
          """.stripMargin
       )
-      val invokeTx = invoke()
       d.appendBlock(i)
       d.appendBlock(setScript(secondSigner, dApp))
-      d.appendBlock(invokeTx)
-      d.liquidDiff.errorMessage(invokeTx.id()).get.text should include(s"Transaction is not allowed by script of the asset $asset")
+      d.appendAndAssertFailed(invoke(), s"Transaction is not allowed by script of the asset $asset")
     }
   }
 
@@ -79,11 +78,13 @@ class InvokeFailAndRejectTest extends PropSpec with WithDomain {
            | ]
          """.stripMargin
       )
-      val invokeTx = invoke(payments = Seq(Payment(1, failAsset)))
+      val invokeTx =
       d.appendBlock(failAssetIssue, trueAssetIssue)
       d.appendBlock(setScript(secondSigner, dApp))
-      d.appendBlock(invokeTx)
-      d.liquidDiff.errorMessage(invokeTx.id()).get.text should include(s"Transaction is not allowed by script of the asset $failAsset")
+      d.appendAndAssertFailed(
+        invoke(payments = Seq(Payment(1, failAsset))),
+        s"Transaction is not allowed by script of the asset $failAsset"
+      )
     }
   }
 
@@ -209,8 +210,7 @@ class InvokeFailAndRejectTest extends PropSpec with WithDomain {
         d.appendBlock(setScript(secondSigner, dApp))
         val invokeTx = invoke()
         if (complex) {
-          d.appendBlock(invokeTx)
-          d.liquidDiff.errorMessage(invokeTx.txId).get.text should include("Data from other network: expected: 84(T), actual: 87(W)")
+          d.appendAndAssertFailed(invokeTx, "Data from other network: expected: 84(T), actual: 87(W)")
         } else
           d.appendBlockE(invokeTx) should produce("Data from other network: expected: 84(T), actual: 87(W)")
       }

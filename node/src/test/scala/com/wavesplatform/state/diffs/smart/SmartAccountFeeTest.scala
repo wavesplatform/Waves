@@ -128,9 +128,6 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
     )
   }
 
-  private def assertNoError(tx: Transaction, d: Domain) =
-    d.blockchain.bestLiquidDiff.get.errorMessage(tx.id()) shouldBe None
-
   property(s"small verifier is free after ${BlockchainFeatures.SynchronousCalls} activation") {
     val (balances, preparingTxs, enoughPaidVerifierTxs, notEnoughPaidVerifierTxs, freeVerifierTxs) = preconditions
     withDomain(domainSettingsWithFS(features), balances) { d =>
@@ -144,8 +141,7 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
       d.blockchain.bestLiquidDiff.get.scriptsRun shouldBe 0
 
       notEnoughPaidVerifierTxs.foreach(tx => appendAndAssertNotEnoughFee(tx(), d))
-      d.appendBlock(freeVerifierTxs.map(_()): _*)
-      freeVerifierTxs.foreach(tx => assertNoError(tx(), d))
+      d.appendAndAssertSucceed(freeVerifierTxs.map(_()): _*)
       d.blockchain.bestLiquidDiff.get.scriptsRun shouldBe freeVerifierTxs.size
     }
   }

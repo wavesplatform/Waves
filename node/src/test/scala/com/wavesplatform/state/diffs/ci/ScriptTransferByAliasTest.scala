@@ -81,22 +81,17 @@ class ScriptTransferByAliasTest extends PropSpec with WithDomain {
     val setDApp      = TxHelpers.setScript(dAppAcc, dApp(asset))
     val preparingTxs = Seq(createAlias, issue, setDApp)
 
-    val invoke1 = TxHelpers.invoke(dAppAcc.toAddress, func = None, invoker = invoker, fee = TxHelpers.ciFee(sc = 1))
-    val invoke2 = TxHelpers.invoke(dAppAcc.toAddress, func = None, invoker = invoker, fee = TxHelpers.ciFee(sc = 1))
+    def invoke = TxHelpers.invoke(dAppAcc.toAddress, func = None, invoker = invoker, fee = TxHelpers.ciFee(sc = 1))
 
     withDomain(domainSettingsWithFS(fsWithV5), balances) { d =>
       d.appendBlock(preparingTxs: _*)
 
-      d.appendBlock(invoke1)
-      d.blockchain.bestLiquidDiff.get.errorMessage(invoke1.id()).get.text should include(
-        s"Transaction is not allowed by script of the asset $asset: alias expected!"
-      )
+      d.appendAndAssertFailed(invoke, s"Transaction is not allowed by script of the asset $asset: alias expected!")
 
       d.appendBlock()
       d.blockchainUpdater.height shouldBe activationHeight
 
-      d.appendBlock(invoke2)
-      d.blockchain.bestLiquidDiff.get.errorMessage(invoke2.id()) shouldBe None
+      d.appendAndAssertSucceed(invoke)
       d.balance(receiver.toAddress, asset) shouldBe transferAmount
     }
   }

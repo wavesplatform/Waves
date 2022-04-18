@@ -136,10 +136,8 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
         val invalidLengthInvoke   = invoke(func = Some("invalidLength"))
         val unexistingErrorInvoke = invoke(func = Some("unexisting"))
         if (complex) {
-          d.appendBlock(invalidLengthInvoke)
-          d.liquidDiff.errorMessage(invalidLengthInvoke.txId).get.text should include(lengthError)
-          d.appendBlock(unexistingErrorInvoke)
-          d.liquidDiff.errorMessage(unexistingErrorInvoke.txId).get.text should include(unexistingError)
+          d.appendAndAssertFailed(invalidLengthInvoke, lengthError)
+          d.appendAndAssertFailed(unexistingErrorInvoke, unexistingError)
         } else {
           d.appendBlockE(invalidLengthInvoke) should produce(lengthError)
           d.appendBlockE(unexistingErrorInvoke) should produce(unexistingError)
@@ -204,20 +202,15 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
          """.stripMargin
         )
 
-        val invokeTx = invoke(fee = invokeFee(issues = 1))
+        def invokeTx = invoke(fee = invokeFee(issues = 1))
         d.appendBlock(setScript(secondSigner, dApp("aaa")))
-        d.appendBlock(invokeTx)
-        d.liquidDiff.errorMessage(invokeTx.id()).get.text should include("Invalid asset name")
+        d.appendAndAssertFailed(invokeTx, "Invalid asset name")
 
-        val invokeTx2 = invoke(fee = invokeFee(issues = 1))
         d.appendBlock(setScript(secondSigner, dApp("a" * 17)))
-        d.appendBlock(invokeTx2)
-        d.liquidDiff.errorMessage(invokeTx2.id()).get.text should include("Invalid asset name")
+        d.appendAndAssertFailed(invokeTx, "Invalid asset name")
 
-        val invokeTx3 = invoke(fee = invokeFee(issues = 1))
         d.appendBlock(setScript(secondSigner, dApp(description = "a" * 1001)))
-        d.appendBlock(invokeTx3)
-        d.liquidDiff.errorMessage(invokeTx3.id()).get.text should include("Invalid asset description")
+        d.appendAndAssertFailed(invokeTx, "Invalid asset description")
       }
     }
   }

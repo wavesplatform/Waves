@@ -62,9 +62,10 @@ class InvokePaymentsTest extends PropSpec with WithDomain {
       d.appendBlockE(invoke(invoker = invoker, func = Some("complex"), payments = Seq(Payment(1, asset)))) should produce(
         s"Transaction application leads to negative asset '$asset' balance"
       )
-      val invokeTx = invoke(invoker = invoker, func = Some("complex"), payments = Seq(Payment(1, Waves)))
-      d.appendBlock(invokeTx)
-      d.liquidDiff.errorMessage(invokeTx.txId).get.text should include("negative waves balance")
+      d.appendAndAssertFailed(
+        invoke(invoker = invoker, func = Some("complex"), payments = Seq(Payment(1, Waves))),
+        "negative waves balance"
+      )
       d.appendBlockE(invoke(invoker = invoker, payments = Seq(Payment(1, Waves)))) should produce(s"negative waves balance")
     }
   }
