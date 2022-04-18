@@ -43,6 +43,9 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
   private val v4Features = features(activateV5 = false)
   private val v5Features = features(activateV5 = true)
 
+  private val setScriptFee = FeeConstants(SetScriptTransaction.typeId) * FeeUnit
+  private val leaseFee     = FeeConstants(LeaseTransaction.typeId) * FeeUnit
+
   private def dApp(body: String): Script = TestCompiler(V5).compileContract(s"""
     | {-# STDLIB_VERSION 5       #-}
     | {-# CONTENT_TYPE   DAPP    #-}
@@ -906,7 +909,6 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
   }
 
   property("trying to spend lease IN balance in Lease action") {
-    val setScriptFee = FeeConstants(SetScriptTransaction.typeId) * FeeUnit
     withDomain(RideV5, Seq(AddrWithBalance(secondAddress, setScriptFee))) { d =>
       val dApp = TestCompiler(V5).compileContract(
         s"""
@@ -924,8 +926,6 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
   }
 
   property("trying to spend lease OUT balance in Lease action") {
-    val setScriptFee = FeeConstants(SetScriptTransaction.typeId) * FeeUnit
-    val leaseFee     = FeeConstants(LeaseTransaction.typeId) * FeeUnit
     withDomain(
       RideV5,
       Seq(AddrWithBalance(secondAddress, leaseFee + setScriptFee + 1))
@@ -963,6 +963,27 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
       )
       d.appendBlock(setScript(secondSigner, dApp))
       d.appendBlockE(invoke()) should produce("negative effective balance")
+    }
+  }
+
+  property("ScriptTransfer after LeaseCancel of transferring balance") {
+    withDomain(
+      RideV5.configure(_.copy(blockVersion3AfterHeight = 0)),
+      Seq(AddrWithBalance(secondAddress, leaseFee + setScriptFee + 1))
+    ) { d =>
+      val leaseTx = lease(secondSigner, defaultAddress, amount = 1)
+      val dApp = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() =
+           |   [
+           |     LeaseCancel(base58'${leaseTx.id()}'),
+           |     ScriptTransfer(i.caller, 1, unit)
+           |   ]
+         """.stripMargin
+      )
+      d.appendBlock(setScript(secondSigner, dApp), leaseTx)
+      d.appendAndAssertSucceed(invoke())
     }
   }
 }
