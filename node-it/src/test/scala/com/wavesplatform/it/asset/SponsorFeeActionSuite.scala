@@ -46,16 +46,16 @@ class SponsorFeeActionSuite extends BaseFreeSpec {
 
       val matchDebugResult = matchPattern {
         case Seq(
-            StateChangesDetails(
-              Nil,
-              Nil,
-              Seq(IssueInfoResponse(issueAssetId, _, _, _, _, _, _, _)),
-              Nil,
-              Nil,
-              Seq(SponsorFeeResponse(sponsorFeeAssetId, Some(`minSponsoredAssetFee`))),
-              None,
-              Nil
-            )
+              StateChangesDetails(
+                Nil,
+                Nil,
+                Seq(IssueInfoResponse(issueAssetId, _, _, _, _, _, _, _)),
+                Nil,
+                Nil,
+                Seq(SponsorFeeResponse(sponsorFeeAssetId, Some(`minSponsoredAssetFee`))),
+                None,
+                Nil
+              )
             ) if issueAssetId == sponsorFeeAssetId =>
       }
 
@@ -117,36 +117,36 @@ class SponsorFeeActionSuite extends BaseFreeSpec {
     "Cancel sponsorship" in {
       val dApp = createDApp(
         s"""
-          |
-          |{-# STDLIB_VERSION 4 #-}
-          |{-# CONTENT_TYPE DAPP #-}
-          |{-# SCRIPT_TYPE ACCOUNT #-}
-          |
-          |@Callable(i)
-          |func issue2assets() = {
-          |    let i1 = Issue("SponsoredAsset0", "SponsoredAsset description", 1000000000000000, 2, true, unit, 0)
-          |    let i2 = Issue("SponsoredAsset1", "SponsoredAsset description", 1000000000000000, 2, true, unit, 0)
-          |
-          |    let issueId0 = calculateAssetId(i1)
-          |    let issueId1 = calculateAssetId(i2)
-          |
-          |    [
-          |        BinaryEntry("cancelSponsorAssetId0", issueId0),
-          |        BinaryEntry("cancelSponsorAssetId1", issueId1),
-          |        i1, i2
-          |    ]
-          |}
-          |
-          |@Callable(i)
-          |func sponsor2assets() = [
-          |    SponsorFee(this.getBinary("cancelSponsorAssetId0").value(), $minSponsoredAssetFee),
-          |    SponsorFee(this.getBinary("cancelSponsorAssetId1").value(), $minSponsoredAssetFee)
-          |]
-          |
-          |@Callable(i)
-          |func cancelSponsorship() = [
-          |    SponsorFee(this.getBinary("cancelSponsorAssetId0").value(), unit)
-          |]
+           |
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-# SCRIPT_TYPE ACCOUNT #-}
+           |
+           |@Callable(i)
+           |func issue2assets() = {
+           |    let i1 = Issue("SponsoredAsset0", "SponsoredAsset description", 1000000000000000, 2, true, unit, 0)
+           |    let i2 = Issue("SponsoredAsset1", "SponsoredAsset description", 1000000000000000, 2, true, unit, 0)
+           |
+           |    let issueId0 = calculateAssetId(i1)
+           |    let issueId1 = calculateAssetId(i2)
+           |
+           |    [
+           |        BinaryEntry("cancelSponsorAssetId0", issueId0),
+           |        BinaryEntry("cancelSponsorAssetId1", issueId1),
+           |        i1, i2
+           |    ]
+           |}
+           |
+           |@Callable(i)
+           |func sponsor2assets() = [
+           |    SponsorFee(this.getBinary("cancelSponsorAssetId0").value(), $minSponsoredAssetFee),
+           |    SponsorFee(this.getBinary("cancelSponsorAssetId1").value(), $minSponsoredAssetFee)
+           |]
+           |
+           |@Callable(i)
+           |func cancelSponsorship() = [
+           |    SponsorFee(this.getBinary("cancelSponsorAssetId0").value(), unit)
+           |]
         """.stripMargin
       )
 
@@ -208,23 +208,23 @@ class SponsorFeeActionSuite extends BaseFreeSpec {
         """.stripMargin
       )
 
-      val dAppAddress    = dApp.toAddress.toString
-      val invokeTx       = miner.invokeScript(miner.keyPair, dAppAddress, Some("issueAndMultipleSponsor"), waitForTx = true, fee = smartMinFee + issueFee)
+      val dAppAddress = dApp.toAddress.toString
+      val invokeTx = miner.invokeScript(miner.keyPair, dAppAddress, Some("issueAndMultipleSponsor"), waitForTx = true, fee = smartMinFee + issueFee)
       val txStateChanges = miner.debugStateChanges(invokeTx._1.id).stateChanges.toSeq
       val assetId        = txStateChanges.flatMap(_.issues).head.assetId
 
       val matchDebugResult = matchPattern {
         case Seq(
-            StateChangesDetails(
-              Nil,
-              Nil,
-              Seq(IssueInfoResponse(`assetId`, _, _, _, _, _, _, _)),
-              Nil,
-              Nil,
-              sponsorFeeResponses,
-              None,
-              Nil
-            )
+              StateChangesDetails(
+                Nil,
+                Nil,
+                Seq(IssueInfoResponse(`assetId`, _, _, _, _, _, _, _)),
+                Nil,
+                Nil,
+                sponsorFeeResponses,
+                None,
+                Nil
+              )
             ) if sponsorFeeResponses.size == 9 && sponsorFeeResponses.last == SponsorFeeResponse(`assetId`, Some(`lastMinSponsoredAssetFee`)) =>
       }
       txStateChanges should matchDebugResult
@@ -263,16 +263,16 @@ class SponsorFeeActionSuite extends BaseFreeSpec {
 
       val matchDebugResult = matchPattern {
         case Seq(
-            StateChangesDetails(
-              Nil,
-              Nil,
-              Seq(IssueInfoResponse(`assetId`, _, _, _, _, _, _, _)),
-              Nil,
-              Nil,
-              Seq(SponsorFeeResponse(`assetId`, Some(100)), SponsorFeeResponse(`assetId`, None)),
-              None,
-              Nil
-            )
+              StateChangesDetails(
+                Nil,
+                Nil,
+                Seq(IssueInfoResponse(`assetId`, _, _, _, _, _, _, _)),
+                Nil,
+                Nil,
+                Seq(SponsorFeeResponse(`assetId`, Some(100)), SponsorFeeResponse(`assetId`, None)),
+                None,
+                Nil
+              )
             ) =>
       }
       txStateChanges should matchDebugResult
@@ -332,7 +332,7 @@ class SponsorFeeActionSuite extends BaseFreeSpec {
 
       assertBadRequestAndMessage(
         miner.invokeScript(miner.keyPair, dAppAddress, Some("sponsorAsset"), fee = smartMinFee),
-        "AlwaysRejectError(Negative sponsor amount = -1)"
+        "Negative sponsor amount = -1"
       )
     }
 
@@ -343,14 +343,14 @@ class SponsorFeeActionSuite extends BaseFreeSpec {
 
       val dApp = createDApp(
         s"""
-          |{-# STDLIB_VERSION 4 #-}
-          |{-# CONTENT_TYPE DAPP #-}
-          |{-# SCRIPT_TYPE ACCOUNT #-}
-          |
-          |@Callable(i)
-          |func sponsorAsset() = [
-          |    SponsorFee(base58'$assetId', 1000)
-          |]
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-# SCRIPT_TYPE ACCOUNT #-}
+           |
+           |@Callable(i)
+           |func sponsorAsset() = [
+           |    SponsorFee(base58'$assetId', 1000)
+           |]
         """.stripMargin
       )
 
@@ -370,14 +370,14 @@ class SponsorFeeActionSuite extends BaseFreeSpec {
 
       createDApp(
         s"""
-          |{-# STDLIB_VERSION 4 #-}
-          |{-# CONTENT_TYPE DAPP #-}
-          |{-# SCRIPT_TYPE ACCOUNT #-}
-          |
-          |@Callable(i)
-          |func sponsorAsset() = [
-          |    SponsorFee(base58'$assetId', 1000)
-          |]
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-# SCRIPT_TYPE ACCOUNT #-}
+           |
+           |@Callable(i)
+           |func sponsorAsset() = [
+           |    SponsorFee(base58'$assetId', 1000)
+           |]
         """.stripMargin,
         dApp
       )
@@ -392,24 +392,24 @@ class SponsorFeeActionSuite extends BaseFreeSpec {
     val minSponsoredAssetFee = 1000
     val script =
       s"""
-        | {-# STDLIB_VERSION 4 #-}
-        | {-# CONTENT_TYPE DAPP #-}
-        | {-# SCRIPT_TYPE ACCOUNT #-}
-        |
-        | @Callable(i)
-        | func issueAsset() = {
-        |     let issue = Issue("SponsoredAsset0", "SponsoredAsset description", 1000000000000000, 2, true, unit, 0)
-        |     let assetId = calculateAssetId(issue)
-        |     [
-        |         issue,
-        |         BinaryEntry("sponsoredAssetId", assetId)
-        |     ]
-        | }
-        |
-        | @Callable(i)
-        | func sponsorAsset() = [
-        |     SponsorFee(this.getBinary("sponsoredAssetId").value(), $minSponsoredAssetFee)
-        | ]
+         | {-# STDLIB_VERSION 4 #-}
+         | {-# CONTENT_TYPE DAPP #-}
+         | {-# SCRIPT_TYPE ACCOUNT #-}
+         |
+         | @Callable(i)
+         | func issueAsset() = {
+         |     let issue = Issue("SponsoredAsset0", "SponsoredAsset description", 1000000000000000, 2, true, unit, 0)
+         |     let assetId = calculateAssetId(issue)
+         |     [
+         |         issue,
+         |         BinaryEntry("sponsoredAssetId", assetId)
+         |     ]
+         | }
+         |
+         | @Callable(i)
+         | func sponsorAsset() = [
+         |     SponsorFee(this.getBinary("sponsoredAssetId").value(), $minSponsoredAssetFee)
+         | ]
       """.stripMargin
 
     "without returning to utx" in {
