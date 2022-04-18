@@ -1,7 +1,7 @@
 package com.wavesplatform.state
 
 import cats.data.Ior
-import cats.implicits.{catsSyntaxSemigroup, toFunctorOps}
+import cats.implicits.{catsSyntaxSemigroup, toFlatMapOps, toFunctorOps}
 import cats.kernel.{Monoid, Semigroup}
 import cats.{Id, Monad}
 import com.google.protobuf.ByteString
