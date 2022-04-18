@@ -68,4 +68,22 @@ class ScriptActionsTest extends PropSpec with WithDomain {
       d.appendAndAssertFailed(invoke(), "Sponsorship smart assets is disabled")
     }
   }
+
+  property("SponsorFee foreign asset") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+      val issueTx = issue()
+      val asset   = IssuedAsset(issueTx.id())
+      val dApp = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() =
+           |   [
+           |     SponsorFee(base58'$asset', 1)
+           |   ]
+         """.stripMargin
+      )
+      d.appendBlock(setScript(secondSigner, dApp), issueTx)
+      d.appendAndAssertFailed(invoke(), s"SponsorFee assetId=$asset was not issued from address of current dApp")
+    }
+  }
 }
