@@ -78,7 +78,6 @@ class InvokeFailAndRejectTest extends PropSpec with WithDomain {
            | ]
          """.stripMargin
       )
-      val invokeTx =
       d.appendBlock(failAssetIssue, trueAssetIssue)
       d.appendBlock(setScript(secondSigner, dApp))
       d.appendAndAssertFailed(
