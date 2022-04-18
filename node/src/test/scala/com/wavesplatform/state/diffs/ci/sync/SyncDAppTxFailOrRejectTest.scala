@@ -90,10 +90,10 @@ class SyncDAppTxFailOrRejectTest extends PropSpec with WithDomain {
 
   private def createTestCase(
       funcName: String,
+      failBeforeRideV6: Boolean,
+      failAfterRideV6: Boolean,
       args: Seq[EXPR] = Seq.empty,
-      setScriptTxs: Seq[SetScriptTransaction] = createSetSimpleScriptsTxs,
-      failBeforeRideV6: Boolean = true,
-      failAfterRideV6: Boolean = true
+      setScriptTxs: Seq[SetScriptTransaction] = createSetSimpleScriptsTxs
   ) =
     withDomain(settings, balances) { d =>
       val invoke = () => TxHelpers.invoke(dApp1.toAddress, func = Some(funcName), args = args, invoker = invoker)
