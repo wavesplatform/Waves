@@ -1,6 +1,5 @@
 package com.wavesplatform.utx
 
-import java.nio.file.{Files, Path}
 import cats.data.NonEmptyList
 import com.wavesplatform
 import com.wavesplatform._
