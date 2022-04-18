@@ -233,4 +233,21 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
       d.appendBlockE(invokeTx) should produce("Invalid decimals 9")
     }
   }
+
+  property("Issues with same nonces are allowed when any field differs") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+      val dApp = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = [
+           |   Issue("name", "", 1000, 1, true, unit, 0),
+           |   Issue("name", "", 1000, 0, true, unit, 0)
+           | ]
+         """.stripMargin
+      )
+      d.appendBlock(setScript(secondSigner, dApp))
+      d.appendAndAssertSucceed(invoke(fee = invokeFee(issues = 2)))
+      d.liquidDiff.issuedAssets.size shouldBe 2
+    }
+  }
 }
