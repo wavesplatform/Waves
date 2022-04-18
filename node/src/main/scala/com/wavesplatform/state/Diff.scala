@@ -1,7 +1,7 @@
 package com.wavesplatform.state
 
 import cats.data.Ior
-import cats.implicits._
+import cats.implicits.*
 import cats.kernel.{Monoid, Semigroup}
 import cats.{Id, Monad}
 import com.google.protobuf.ByteString
@@ -12,7 +12,6 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 
 import scala.collection.immutable.VectorMap
