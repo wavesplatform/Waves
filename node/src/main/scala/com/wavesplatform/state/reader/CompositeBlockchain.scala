@@ -94,10 +94,11 @@ final class CompositeBlockchain private (
     if (maybeDiff.isEmpty || to.exists(id => inner.heightOf(id).isDefined)) {
       inner.balanceSnapshots(address, from, to)
     } else {
-      val balance = this.balance(address)
-      val lease   = this.leaseBalance(address)
-      val bs      = BalanceSnapshot(height, Portfolio(balance, lease, Map.empty))
-      if (inner.height > 0 && (from < this.height || inner.isFeatureActivated(RideV6)))
+      val balance    = this.balance(address)
+      val lease      = this.leaseBalance(address)
+      val bs         = BalanceSnapshot(height, Portfolio(balance, lease, Map.empty))
+      val height2Fix = this.height == 1 && inner.isFeatureActivated(RideV6) && from < this.height + 1
+      if (inner.height > 0 && (from < this.height || height2Fix))
         bs +: inner.balanceSnapshots(address, from, to)
       else
         Seq(bs)
