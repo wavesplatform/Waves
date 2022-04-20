@@ -128,8 +128,7 @@ object Blockchain {
 
     def wavesPortfolio(address: Address): Portfolio = Portfolio(
       blockchain.balance(address),
-      blockchain.leaseBalance(address),
-      Map.empty
+      blockchain.leaseBalance(address)
     )
 
     def isMiningAllowed(height: Int, effectiveBalance: Long): Boolean =

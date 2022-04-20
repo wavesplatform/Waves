@@ -58,8 +58,8 @@ object InvokeDiffsCommon {
           )
           portfolioDiff <- Diff
             .combine(
-              Map[Address, Portfolio](tx.sender.toAddress        -> Portfolio(assets = Map(asset -> -attachedFee))),
-              Map[Address, Portfolio](assetInfo.issuer.toAddress -> Portfolio(-feeInWaves, assets = Map(asset -> attachedFee)))
+              Map[Address, Portfolio](tx.sender.toAddress        -> Portfolio.build(asset, -attachedFee)),
+              Map[Address, Portfolio](assetInfo.issuer.toAddress -> Portfolio.build(-feeInWaves, asset, attachedFee))
             )
             .leftMap(GenericError(_))
         } yield (feeInWaves, portfolioDiff)
@@ -283,8 +283,8 @@ object InvokeDiffsCommon {
         assetId match {
           case asset @ IssuedAsset(_) =>
             Diff.combine(
-              Map(tx.sender.toAddress -> Portfolio(assets = Map(asset -> -amt))),
-              Map(dAppAddress         -> Portfolio(assets = Map(asset -> amt)))
+              Map(tx.sender.toAddress -> Portfolio.build(asset, -amt)),
+              Map(dAppAddress         -> Portfolio.build(asset, amt))
             )
           case Waves =>
             Diff.combine(
@@ -649,7 +649,7 @@ object InvokeDiffsCommon {
           case f: FailedTransactionError => f.addComplexity(curDiff.scriptsComplexity)
           case e                         => e
         }
-        .flatMap(d => TracedResult(curDiff.combine(d)).leftMap(GenericError(_)))
+        .flatMap(d => TracedResult(curDiff.combineF(d)).leftMap(GenericError(_)))
     }
 
   private def validatePseudoTxWithSmartAssetScript(blockchain: Blockchain, tx: InvokeScriptLike)(
@@ -714,7 +714,11 @@ object InvokeDiffsCommon {
       val message = s"Storing data size should not exceed $limit, actual: $actual bytes"
       if (blockchain.isFeatureActivated(RideV6)) {
         error(message)
-      } else if (blockchain.isFeatureActivated(SynchronousCalls) && blockchain.height >= blockchain.settings.functionalitySettings.enforceTransferValidationAfter) {
+      } else if (
+        blockchain.isFeatureActivated(
+          SynchronousCalls
+        ) && blockchain.height >= blockchain.settings.functionalitySettings.enforceTransferValidationAfter
+      ) {
         TracedResult(Left(AlwaysRejectError(message)))
       } else
         TracedResult(Right(()))

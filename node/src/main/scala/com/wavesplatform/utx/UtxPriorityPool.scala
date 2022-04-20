@@ -111,7 +111,7 @@ final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging wi
     val oldTxs = priorityTransactions.toSet
 
     priorityDiffs = f(priorityDiffs).filterNot(_.diff.transactions.isEmpty)
-    priorityDiffsCombined = validPriorityDiffs.fold(Diff())(_.unsafeCombine(_))
+    priorityDiffsCombined = validPriorityDiffs.fold(Diff())(_.combineF(_).getOrElse(Diff.empty))
 
     val newTxs = priorityTransactions.toSet
 

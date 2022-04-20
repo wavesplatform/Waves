@@ -82,7 +82,7 @@ object BlockDiffer extends ScorexLogging {
         initialFeeFromThisBlock <- initialFeeFromThisBlockE
         totalReward             <- minerReward.combine(initialFeeFromThisBlock).flatMap(_.combine(feeFromPreviousBlock))
         patches                 <- patchesDiff(blockchainWithNewBlock)
-        resultDiff              <- Diff(portfolios = Map(block.sender.toAddress -> totalReward)).combine(patches)
+        resultDiff              <- Diff(portfolios = Map(block.sender.toAddress -> totalReward)).combineF(patches)
       } yield resultDiff
 
     for {
@@ -190,8 +190,8 @@ object BlockDiffer extends ScorexLogging {
               val minerDiff     = Diff(portfolios = Map(blockGenerator -> minerPortfolio))
 
               val result = for {
-                diff          <- currDiff.combine(thisTxDiff).flatMap(_.combine(minerDiff))
-                newParentDiff <- parentDiff.combine(minerDiff)
+                diff          <- currDiff.combineF(thisTxDiff).flatMap(_.combineF(minerDiff))
+                newParentDiff <- parentDiff.combineF(minerDiff)
               } yield Result(
                 diff,
                 carryFee + carry,
@@ -211,7 +211,7 @@ object BlockDiffer extends ScorexLogging {
         case (prevDiff, patch) =>
           patch
             .lift(CompositeBlockchain(blockchain, prevDiff))
-            .fold(prevDiff.asRight[String])(prevDiff.combine)
+            .fold(prevDiff.asRight[String])(prevDiff.combineF)
       }
   }
 }

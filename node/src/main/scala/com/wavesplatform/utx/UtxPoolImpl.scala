@@ -1,25 +1,29 @@
 package com.wavesplatform.utx
 
+import java.time.Duration
+import java.time.temporal.ChronoUnit
+import java.util.concurrent.ConcurrentHashMap
+
 import com.wavesplatform.ResponsivenessLogs
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.metrics._
+import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.UtxSettings
-import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction._
+import com.wavesplatform.state.{Blockchain, Diff}
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.TxValidationError.{AlreadyInTheState, GenericError, SenderIsBlacklisted}
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.utils.{LoggerFacade, Schedulers, ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool.PackStrategy
 import kamon.Kamon
@@ -29,11 +33,8 @@ import monix.execution.atomic.AtomicBoolean
 import monix.execution.schedulers.SchedulerService
 import org.slf4j.LoggerFactory
 
-import java.time.Duration
-import java.time.temporal.ChronoUnit
-import java.util.concurrent.ConcurrentHashMap
 import scala.annotation.tailrec
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 import scala.util.{Left, Right}
 
 //noinspection ScalaStyle
@@ -47,7 +48,7 @@ class UtxPoolImpl(
     with AutoCloseable
     with UtxPool {
 
-  import com.wavesplatform.utx.UtxPoolImpl._
+  import com.wavesplatform.utx.UtxPoolImpl.*
 
   // Context
   private[this] val cleanupScheduler: SchedulerService =
@@ -350,7 +351,7 @@ class UtxPoolImpl(
                         }
 
                         r.totalDiff
-                          .combine(newDiff)
+                          .combineF(newDiff)
                           .fold(
                             error => removeInvalid(r, tx, newCheckedAddresses, GenericError(error)),
                             PackResult(
@@ -517,7 +518,7 @@ class UtxPoolImpl(
   }
 
   override def close(): Unit = {
-    import scala.concurrent.duration._
+    import scala.concurrent.duration.*
     cleanupScheduler.shutdown()
     cleanupScheduler.awaitTermination(10 seconds)
   }

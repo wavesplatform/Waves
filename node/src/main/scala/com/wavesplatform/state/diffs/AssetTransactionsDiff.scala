@@ -49,7 +49,7 @@ object AssetTransactionsDiff extends ScorexLogging {
           script =>
             Diff(
               portfolios =
-                Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee.value, lease = LeaseBalance.empty, assets = Map(asset -> tx.quantity.value))),
+                Map(tx.sender.toAddress -> Portfolio.build(-tx.fee.value, asset, tx.quantity.value)),
               issuedAssets = Map(asset  -> NewAssetInfo(staticInfo, info, volumeInfo)),
               assetScripts = Map(asset  -> script.map(AssetScriptInfo.tupled)),
               scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
@@ -71,7 +71,7 @@ object AssetTransactionsDiff extends ScorexLogging {
       else
         Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
     } yield Diff(
-      portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee.value, lease = LeaseBalance.empty, assets = Map.empty)),
+      portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee.value)),
       assetScripts = Map(tx.asset          -> script.map(AssetScriptInfo.tupled)),
       scriptsRun = scriptsRun
     )
@@ -85,17 +85,17 @@ object AssetTransactionsDiff extends ScorexLogging {
   def reissue(blockchain: Blockchain, blockTime: Long)(tx: ReissueTransaction): Either[ValidationError, Diff] =
     DiffsCommon
       .processReissue(blockchain, tx.sender.toAddress, blockTime, tx.fee.value, Reissue(tx.asset.id, tx.reissuable, tx.quantity.value))
-      .flatMap(_.combine(Diff(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx))).leftMap(GenericError(_)))
+      .flatMap(_.combineF(Diff(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx))).leftMap(GenericError(_)))
 
   def burn(blockchain: Blockchain)(tx: BurnTransaction): Either[ValidationError, Diff] =
     DiffsCommon
       .processBurn(blockchain, tx.sender.toAddress, tx.fee.value, Burn(tx.asset.id, tx.quantity.value))
-      .flatMap(_.combine(Diff(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx))).leftMap(GenericError(_)))
+      .flatMap(_.combineF(Diff(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx))).leftMap(GenericError(_)))
 
   def sponsor(blockchain: Blockchain)(tx: SponsorFeeTransaction): Either[ValidationError, Diff] =
     DiffsCommon
       .processSponsor(blockchain, tx.sender.toAddress, tx.fee.value, SponsorFee(tx.asset.id, tx.minSponsoredAssetFee.map(_.value)))
-      .flatMap(_.combine(Diff(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx))).leftMap(GenericError(_)))
+      .flatMap(_.combineF(Diff(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx))).leftMap(GenericError(_)))
 
   def updateInfo(blockchain: Blockchain)(tx: UpdateAssetInfoTransaction): Either[ValidationError, Diff] =
     DiffsCommon.validateAsset(blockchain, tx.assetId, tx.sender.toAddress, issuerOnly = true) >> {
@@ -106,9 +106,9 @@ object AssetTransactionsDiff extends ScorexLogging {
           case IssuedAsset(asset) if blockchain.isFeatureActivated(BlockchainFeatures.RideV6) =>
             Left(GenericError(s"Invalid fee asset: ${asset.toString}, only Waves can be used to pay fees for UpdateAssetInfoTransaction"))
           case ia @ IssuedAsset(_) =>
-            Right(Portfolio(0L, LeaseBalance.empty, Map(ia -> -tx.feeAmount.value)))
+            Right(Portfolio.build(ia -> -tx.feeAmount.value))
           case Asset.Waves =>
-            Right(Portfolio(balance = -tx.feeAmount.value, LeaseBalance.empty, Map.empty))
+            Right(Portfolio(-tx.feeAmount.value))
         }
         lastUpdateHeight <- blockchain
           .assetDescription(tx.assetId)

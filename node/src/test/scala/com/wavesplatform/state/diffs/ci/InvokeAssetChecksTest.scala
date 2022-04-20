@@ -79,7 +79,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
             Diff(
               transactions = invokeInfo(true),
               portfolios = Map(
-                invoke.senderAddress -> Portfolio(-invoke.fee.value, assets = Map(asset -> 0)),
+                invoke.senderAddress -> Portfolio(-invoke.fee.value),
                 dAppAddress -> Portfolio.build(asset, 0),
                 miner -> Portfolio((setScriptTx.fee.value * 0.6 + invoke.fee.value * 0.4).toLong + 6.waves)
               ),

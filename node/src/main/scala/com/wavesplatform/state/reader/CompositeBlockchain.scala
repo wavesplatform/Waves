@@ -8,6 +8,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.*
@@ -25,10 +26,13 @@ final class CompositeBlockchain private (
 ) extends Blockchain {
   override val settings: BlockchainSettings = inner.settings
 
+  private[CompositeBlockchain] def appendDiff(newDiff: Diff) =
+    new CompositeBlockchain(inner, Some(this.maybeDiff.fold(newDiff)(_.combineF(newDiff).explicitGet())), blockMeta, carry, reward)
+
   def diff: Diff = maybeDiff.getOrElse(Diff.empty)
 
   override def balance(address: Address, assetId: Asset): Long =
-    inner.balance(address, assetId) + diff.portfolios.getOrElse(address, Portfolio.empty).balanceOf(assetId)
+    inner.balance(address, assetId) + diff.portfolios.get(address).fold(0L)(_.balanceOf(assetId))
 
   override def leaseBalance(address: Address): LeaseBalance =
     inner.leaseBalance(address).combineF[Id](diff.portfolios.getOrElse(address, Portfolio.empty).lease)
@@ -95,7 +99,7 @@ final class CompositeBlockchain private (
     } else {
       val balance = this.balance(address)
       val lease   = this.leaseBalance(address)
-      val bs      = BalanceSnapshot(height, Portfolio(balance, lease, Map.empty))
+      val bs      = BalanceSnapshot(height, Portfolio(balance, lease))
       if (inner.height > 0 && from < this.height) bs +: inner.balanceSnapshots(address, from, to) else Seq(bs)
     }
 
@@ -113,7 +117,7 @@ final class CompositeBlockchain private (
       case Some(Some(_)) => true
     }
 
-  override def accountData(acc: Address, key: String): Option[DataEntry[_]] =
+  override def accountData(acc: Address, key: String): Option[DataEntry[?]] =
     diff.accountData.get(acc).orEmpty.data.get(key).orElse(inner.accountData(acc, key)).filterNot(_.isEmpty)
 
   override def hasData(acc: Address): Boolean = {
@@ -171,7 +175,10 @@ object CompositeBlockchain {
     new CompositeBlockchain(inner, carry = inner.carryFee, reward = reward)
 
   def apply(inner: Blockchain, diff: Diff): CompositeBlockchain =
-    new CompositeBlockchain(inner, Some(diff))
+    inner match {
+      case cb: CompositeBlockchain => cb.appendDiff(diff)
+      case _                       => new CompositeBlockchain(inner, Some(diff))
+    }
 
   def apply(
       inner: Blockchain,

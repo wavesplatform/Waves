@@ -14,7 +14,7 @@ import com.wavesplatform.metrics.TxProcessingStats
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
-import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
+import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, NewTransactionInfo, Portfolio, Sponsorship}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
@@ -162,7 +162,7 @@ object TransactionDiffer {
       }
     } else Diff.empty.asRight[ValidationError].traced
 
-    diff.flatMap(d => initDiff.combine(d).leftMap(GenericError(_))).leftMap {
+    diff.flatMap(d => initDiff.combineF(d).leftMap(GenericError(_))).leftMap {
       case fte: FailedTransactionError => fte.addComplexity(initDiff.scriptsComplexity)
       case ve                          => ve
     }
@@ -183,7 +183,7 @@ object TransactionDiffer {
         tx match {
           case gtx: GenesisTransaction           => GenesisTransactionDiff(blockchain.height)(gtx).traced
           case ptx: PaymentTransaction           => PaymentTransactionDiff(blockchain)(ptx).traced
-          case ci: InvokeTransaction       => InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution)(ci)
+          case ci: InvokeTransaction             => InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution)(ci)
           case etx: ExchangeTransaction          => ExchangeTransactionDiff(blockchain)(etx).traced
           case itx: IssueTransaction             => AssetTransactionsDiff.issue(blockchain)(itx).traced
           case rtx: ReissueTransaction           => AssetTransactionsDiff.reissue(blockchain, currentBlockTs)(rtx).traced
@@ -202,7 +202,7 @@ object TransactionDiffer {
           case _                                 => UnsupportedTransactionType.asLeft.traced
         }
       }
-      .flatMap(d => initDiff.combine(d.bindTransaction(tx)).leftMap(GenericError(_)))
+      .flatMap(d => initDiff.combineF(d.bindTransaction(tx)).leftMap(GenericError(_)))
       .leftMap {
         case fte: FailedTransactionError => fte.addComplexity(initDiff.scriptsComplexity)
         case ve                          => ve
@@ -248,16 +248,16 @@ object TransactionDiffer {
                 .flatMap(_ =>
                   Diff
                     .combine(
-                      Map[Address, Portfolio](tx.senderAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))),
-                      Map[Address, Portfolio](dAppAddress      -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
+                      Map[Address, Portfolio](tx.senderAddress -> Portfolio.build(asset -> -amt)),
+                      Map[Address, Portfolio](dAppAddress      -> Portfolio.build(asset -> amt))
                     )
                     .leftMap(GenericError(_))
                 )
             case Waves =>
               Diff
                 .combine(
-                  Map[Address, Portfolio](tx.senderAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty)),
-                  Map[Address, Portfolio](dAppAddress      -> Portfolio(amt, LeaseBalance.empty, Map.empty))
+                  Map[Address, Portfolio](tx.senderAddress -> Portfolio(-amt)),
+                  Map[Address, Portfolio](dAppAddress      -> Portfolio(amt))
                 )
                 .leftMap(GenericError(_))
           }
@@ -301,7 +301,7 @@ object TransactionDiffer {
         portfolios = portfolios,
         scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
         scriptsComplexity = spentComplexity
-      ).unsafeCombine(ethereumMetaDiff)
+      ).combineF(ethereumMetaDiff).getOrElse(Diff.empty)
     }
   }
 
@@ -322,11 +322,11 @@ object TransactionDiffer {
     tx match {
       case _: GenesisTransaction => Map.empty[Address, Portfolio].asRight
       case ptx: PaymentTransaction =>
-        Map[Address, Portfolio](ptx.sender.toAddress -> Portfolio(balance = -ptx.fee.value, LeaseBalance.empty, assets = Map.empty)).asRight
+        Map[Address, Portfolio](ptx.sender.toAddress -> Portfolio(balance = -ptx.fee.value)).asRight
       case e: EthereumTransaction => Map[Address, Portfolio](e.senderAddress() -> Portfolio(-e.fee)).asRight
       case ptx: ProvenTransaction =>
         ptx.assetFee match {
-          case (Waves, fee) => Map[Address, Portfolio](ptx.sender.toAddress -> Portfolio(-fee, LeaseBalance.empty, Map.empty)).asRight
+          case (Waves, fee) => Map[Address, Portfolio](ptx.sender.toAddress -> Portfolio(-fee)).asRight
           case (asset @ IssuedAsset(_), fee) =>
             for {
               assetInfo <- blockchain
@@ -337,10 +337,12 @@ object TransactionDiffer {
                 Sponsorship.toWaves(fee, assetInfo.sponsorship),
                 GenericError(s"Asset $asset is not sponsored, cannot be used to pay fees")
               )
-              portfolios <- Diff.combine(
-                Map(ptx.sender.toAddress       -> Portfolio(0, LeaseBalance.empty, Map(asset         -> -fee))),
-                Map(assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> fee)))
-              ).leftMap(GenericError(_))
+              portfolios <- Diff
+                .combine(
+                  Map(ptx.sender.toAddress       -> Portfolio.build(asset, -fee)),
+                  Map(assetInfo.issuer.toAddress -> Portfolio.build(-wavesFee, asset, fee))
+                )
+                .leftMap(GenericError(_))
             } yield portfolios
         }
       case _ => UnsupportedTransactionType.asLeft

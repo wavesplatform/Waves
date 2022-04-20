@@ -1,9 +1,9 @@
 package com.wavesplatform.state
 
+import cats.Monad
 import cats.data.Ior
 import cats.implicits.*
 import cats.kernel.{Monoid, Semigroup}
-import cats.{Id, Monad}
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
@@ -160,15 +160,9 @@ case class Diff(
     scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty,
     ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map.empty
 ) {
-  def combine(newer: Diff): Either[String, Diff] =
-    combineF[Either[String, *]](newer)
-
-  def unsafeCombine(newer: Diff): Diff =
-    combineF[Id](newer)
-
-  private def combineF[F[_]: Monad: Summarizer](newer: Diff): F[Diff] =
+  def combineF(newer: Diff): Either[String, Diff] =
     Diff
-      .combineF[F](portfolios, newer.portfolios)
+      .combine(portfolios, newer.portfolios)
       .map(portfolios =>
         Diff(
           transactions = transactions ++ newer.transactions,
@@ -194,16 +188,21 @@ object Diff {
   val empty: Diff = Diff()
 
   def combine(portfolios1: Map[Address, Portfolio], portfolios2: Map[Address, Portfolio]): Either[String, Map[Address, Portfolio]] =
-    combineF[Either[String, *]](portfolios1, portfolios2)
-
-  def unsafeCombine(portfolios1: Map[Address, Portfolio], portfolios2: Map[Address, Portfolio]): Map[Address, Portfolio] =
-    combineF[Id](portfolios1, portfolios2)
-
-  private def combineF[F[_]: Monad: Summarizer](
-      portfolios1: Map[Address, Portfolio],
-      portfolios2: Map[Address, Portfolio]
-  ): F[Map[Address, Portfolio]] =
-    sumMapF[F, Address, Portfolio](portfolios1, portfolios2, _.combineF[F](_))
+    if (portfolios1.isEmpty) Right(portfolios2)
+    else if (portfolios2.isEmpty) Right(portfolios1)
+    else
+      portfolios2.foldLeft[Either[String, Map[Address, Portfolio]]](Right(portfolios1)) {
+        case (Right(seed), kv @ (address, pf)) =>
+          seed.get(address).fold[Either[String, Map[Address, Portfolio]]](Right(seed + kv)) { oldPf =>
+            oldPf
+              .combine(pf)
+              .bimap(
+                err => s"$address: " + err,
+                newPf => seed + (address -> newPf)
+              )
+          }
+        case (r, _) => r
+      }
 
   implicit class DiffExt(private val d: Diff) extends AnyVal {
     def errorMessage(txId: ByteStr): Option[InvokeScriptResult.ErrorMessage] =

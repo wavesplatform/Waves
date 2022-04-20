@@ -211,7 +211,7 @@ object InvokeScriptDiff {
                       remainingComplexity
                     ).map(TracedResult(_))
                   )
-                  diff <- traced(environment.currentDiff.combine(paymentsPartToResolve).leftMap(GenericError(_)))
+                  diff <- traced(environment.currentDiff.combineF(paymentsPartToResolve).leftMap(GenericError(_)))
                 } yield (
                   diff,
                   evaluated,
@@ -329,8 +329,8 @@ object InvokeScriptDiff {
             resultDiff <- traced(
               diff
                 .copy(scriptsComplexity = 0)
-                .combine(actionsDiff)
-                .flatMap(_.combine(Diff(scriptsComplexity = paymentsComplexity)))
+                .combineF(actionsDiff)
+                .flatMap(_.combineF(Diff(scriptsComplexity = paymentsComplexity)))
                 .leftMap(GenericError(_))
             )
 

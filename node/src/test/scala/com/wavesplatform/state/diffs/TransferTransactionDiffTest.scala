@@ -21,7 +21,7 @@ class TransferTransactionDiffTest extends PropSpec with WithDomain {
 
     withDomain(DomainPresets.mostRecent.copy(rewardsSettings = RewardsVotingSettings(None)), AddrWithBalance.enoughBalances(senderKp)) { d =>
       val wavesTransfer = TxHelpers.transfer(senderKp, recipient)
-      assertBalanceInvariant(d.createDiff(wavesTransfer).combine(feeDiff).explicitGet())
+      assertBalanceInvariant(d.createDiff(wavesTransfer).combineF(feeDiff).explicitGet())
 
       d.appendAndAssertSucceed(wavesTransfer)
       d.blockchain.balance(recipient) shouldBe wavesTransfer.amount.value
@@ -31,7 +31,7 @@ class TransferTransactionDiffTest extends PropSpec with WithDomain {
     withDomain(DomainPresets.mostRecent, AddrWithBalance.enoughBalances(senderKp)) { d =>
       val asset         = d.helpers.issueAsset(senderKp)
       val assetTransfer = TxHelpers.transfer(senderKp, recipient, asset = asset, amount = 1000)
-      assertBalanceInvariant(d.createDiff(assetTransfer).combine(feeDiff).explicitGet())
+      assertBalanceInvariant(d.createDiff(assetTransfer).combineF(feeDiff).explicitGet())
 
       d.appendAndAssertSucceed(assetTransfer)
       d.blockchain.balance(recipient) shouldBe 0L

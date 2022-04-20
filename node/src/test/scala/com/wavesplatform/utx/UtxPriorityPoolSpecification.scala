@@ -160,7 +160,7 @@ class UtxPriorityPoolSpecification
         new UtxPoolImpl(ntpTime, blockchain, WavesSettings.default().utxSettings)
 
       def createDiff(): Diff =
-        (1 to 5).map(_ => Diff.empty.bindTransaction(TxHelpers.issue())).reduce(_.combine(_).explicitGet())
+        (1 to 5).map(_ => Diff.empty.bindTransaction(TxHelpers.issue())).reduce(_.combineF(_).explicitGet())
 
       utx.setPriorityDiffs(Seq(createDiff(), createDiff())) // 10 total
       utx.priorityPool.nextMicroBlockSize(3) shouldBe 5

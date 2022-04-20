@@ -264,8 +264,7 @@ abstract class LevelDBWriter private[database] (
 
   private[database] def loadLposPortfolio(db: ReadOnlyDB, addressId: AddressId) = Portfolio(
     db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId)).getOrElse(0L),
-    loadLeaseBalance(db, addressId),
-    Map.empty
+    loadLeaseBalance(db, addressId)
   )
 
   override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] =

@@ -91,7 +91,7 @@ object AddressPortfolio extends ScorexLogging {
         .get(Keys.addressId(address))
         .fold[Iterator[(IssuedAsset, Long)]](Iterator())(addressId => new NFTIterator(addressId, maybeAfter, resource).asScala),
       asset => loadAssetDescription(asset).exists(_.nft),
-      diff.portfolios.getOrElse(address, Portfolio.empty).assets
+      diff.portfolios.getOrElse(address, Portfolio.empty).assets.toMap
     ).asScala
       .collect { case (asset, balance) if balance > 0 => asset }
       .flatMap(a => loadAssetDescription(a).map(a -> _))
@@ -107,7 +107,7 @@ object AddressPortfolio extends ScorexLogging {
         .get(Keys.addressId(address))
         .fold[Iterator[(IssuedAsset, Long)]](Iterator())(addressId => new AssetBalanceIterator(addressId, resource).asScala),
       includeAsset,
-      diff.portfolios.getOrElse(address, Portfolio.empty).assets
+      diff.portfolios.getOrElse(address, Portfolio.empty).assets.toMap
     ).asScala.filter {
       case (asset, balance) => includeAsset(asset) && balance > 0
     }

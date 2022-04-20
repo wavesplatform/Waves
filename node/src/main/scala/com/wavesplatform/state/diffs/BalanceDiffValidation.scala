@@ -73,4 +73,5 @@ object BalanceDiffValidation extends ScorexLogging {
     diff.assets
       .map { case (aid, balanceChange) => aid.id -> (b.balance(acc, aid) + balanceChange) }
       .filter(_._2 < 0)
+      .toMap
 }
