@@ -40,6 +40,30 @@ class InvokePaymentsTest extends PropSpec with WithDomain {
     }
   }
 
+  property("invoke fails if Transfer Transaction is allowed but Invoke payment is prohibited in payment asset") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+      val assetScript = TestCompiler(V5).compileAsset(
+        """
+          | match tx {
+          |   case tx: InvokeScriptTransaction => tx.payments[0].assetId != this.id
+          |   case _                           => true
+          | }
+        """.stripMargin
+      )
+      val dApp = TestCompiler(V5).compileContract(
+        """
+          | @Callable(i)
+          | func default() = []
+        """.stripMargin
+      )
+      val issueTx = issue(script = Some(assetScript))
+      val asset   = IssuedAsset(issueTx.id())
+      d.appendBlock(setScript(secondSigner, dApp))
+      d.appendBlock(issueTx)
+      d.appendAndAssertFailed(invoke(payments = Seq(Payment(1, asset))), "Transaction is not allowed by script of the asset")
+    }
+  }
+
   property("invoke on insufficient balance is always rejected for asset payment and fails on big complexity for waves") {
     val invoker = signer(2)
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner) :+ AddrWithBalance(invoker.toAddress, invokeFee)) { d =>
