@@ -39,28 +39,32 @@ class InvokePaymentsTest extends PropSpec with WithDomain {
     }
   }
 
-  property("invoke fails if Transfer Transaction is allowed but Invoke payment is prohibited in payment asset") {
-    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
-      val assetScript = TestCompiler(V5).compileAsset(
-        """
-          | match tx {
-          |   case tx: InvokeScriptTransaction => tx.payments[0].assetId != this.id
-          |   case _                           => true
-          | }
+  property("invoke fails if Transfer Transaction is allowed but Invoke is prohibited in payment asset") {
+    def test(invokeCheck: String) = {
+      withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+        val assetScript = TestCompiler(V5).compileAsset(
+          s"""
+             | match tx {
+             |   case tx: InvokeScriptTransaction => $invokeCheck
+             |   case _                           => true
+             | }
+           """.stripMargin
+        )
+        val dApp = TestCompiler(V5).compileContract(
+          """
+            | @Callable(i)
+            | func default() = []
         """.stripMargin
-      )
-      val dApp = TestCompiler(V5).compileContract(
-        """
-          | @Callable(i)
-          | func default() = []
-        """.stripMargin
-      )
-      val issueTx = issue(script = Some(assetScript))
-      val asset   = IssuedAsset(issueTx.id())
-      d.appendBlock(setScript(secondSigner, dApp))
-      d.appendBlock(issueTx)
-      d.appendAndAssertFailed(invoke(payments = Seq(Payment(1, asset))), "Transaction is not allowed by script of the asset")
+        )
+        val issueTx = issue(script = Some(assetScript))
+        val asset   = IssuedAsset(issueTx.id())
+        d.appendBlock(setScript(secondSigner, dApp))
+        d.appendBlock(issueTx)
+        d.appendAndAssertFailed(invoke(payments = Seq(Payment(1, asset))), "Transaction is not allowed by script of the asset")
+      }
     }
+    test("tx.payments[0].assetId != this.id")
+    test("false")
   }
 
   property("invoke on insufficient balance is always rejected for asset payment and fails on big complexity for waves") {
@@ -110,8 +114,8 @@ class InvokePaymentsTest extends PropSpec with WithDomain {
   }
 
   property("trying to attach lease OUT balance to invoke payment") {
-    val invoker        = signer(2)
-    val leaseFee       = FeeConstants(LeaseTransaction.typeId) * FeeUnit
+    val invoker  = signer(2)
+    val leaseFee = FeeConstants(LeaseTransaction.typeId) * FeeUnit
     withDomain(
       RideV5.configure(_.copy(blockVersion3AfterHeight = 0)),
       AddrWithBalance.enoughBalances(secondSigner) :+ AddrWithBalance(invoker.toAddress, leaseFee + invokeFee + 1)
