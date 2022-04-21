@@ -14,8 +14,8 @@ import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.test.PropSpec
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.TxHelpers.{invoke, secondAddress, secondSigner, setScript}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxHelpers.{invoke, issue, secondAddress, secondSigner, setScript}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 
@@ -85,7 +85,8 @@ class ScriptTransferTest extends PropSpec with WithDomain {
           REF("nil")
         )
       )
-      val dApp = ContractScriptImpl(V5, DApp(DAppMeta(), Nil, List(CallableFunction(CallableAnnotation("i"), FUNC("default", Nil, dAppResult))), None))
+      val dApp =
+        ContractScriptImpl(V5, DApp(DAppMeta(), Nil, List(CallableFunction(CallableAnnotation("i"), FUNC("default", Nil, dAppResult))), None))
       val invokeTx = invoke()
       d.appendBlock(setScript(secondSigner, dApp))
       d.appendBlockE(invokeTx)
@@ -111,5 +112,36 @@ class ScriptTransferTest extends PropSpec with WithDomain {
       d.appendAndAssertSucceed(invoke(payments = Seq(Payment(paymentAmount, Waves))))
       d.blockchain.balance(secondAddress) shouldBe paymentAmount - transferAmount
     }
+  }
+
+  property("invoke fails if Transfer Transaction is prohibited in transfer asset") {
+    def test(transferCheck: String) = {
+      withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+        val assetScript = TestCompiler(V5).compileAsset(
+          s"""
+             | match tx {
+             |   case tx: TransferTransaction => $transferCheck
+             |   case _                       => true
+             | }
+           """.stripMargin
+        )
+        val issueTx = issue(script = Some(assetScript))
+        val asset   = IssuedAsset(issueTx.id())
+        val dApp = TestCompiler(V5).compileContract(
+          s"""
+             | @Callable(i)
+             | func default() =
+             |   [
+             |     ScriptTransfer(i.caller, 1, base58'$asset')
+             |   ]
+         """.stripMargin
+        )
+        d.appendBlock(setScript(secondSigner, dApp))
+        d.appendBlock(issueTx)
+        d.appendAndAssertFailed(invoke(), "Transaction is not allowed by script of the asset")
+      }
+    }
+    test("tx.assetId != this.id")
+    test("false")
   }
 }
