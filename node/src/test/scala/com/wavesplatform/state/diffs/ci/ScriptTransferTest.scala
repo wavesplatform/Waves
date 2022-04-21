@@ -11,9 +11,13 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_STRING, FUNC, FUNCTION_CA
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.CREATE_LIST
 import com.wavesplatform.protobuf.dapp.DAppMeta
+import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.test.PropSpec
-import com.wavesplatform.transaction.TxHelpers.{invoke, secondSigner, setScript}
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.TxHelpers.{invoke, secondAddress, secondSigner, setScript}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.smart.SetScriptTransaction
 
 class ScriptTransferTest extends PropSpec with WithDomain {
   import DomainPresets._
@@ -81,11 +85,31 @@ class ScriptTransferTest extends PropSpec with WithDomain {
           REF("nil")
         )
       )
-      val dApp  = ContractScriptImpl(V5, DApp(DAppMeta(), Nil, List(CallableFunction(CallableAnnotation("i"), FUNC("default", Nil, dAppResult))), None))
+      val dApp = ContractScriptImpl(V5, DApp(DAppMeta(), Nil, List(CallableFunction(CallableAnnotation("i"), FUNC("default", Nil, dAppResult))), None))
       val invokeTx = invoke()
       d.appendBlock(setScript(secondSigner, dApp))
       d.appendBlockE(invokeTx)
       d.liquidDiff.errorMessage(invokeTx.id()).get.text should include("key not found: asset")
+    }
+  }
+
+  property("assets from payment are available in transfer") {
+    val paymentAmount  = 100
+    val transferAmount = 99
+    val setScriptFee   = FeeConstants(SetScriptTransaction.typeId) * FeeUnit
+    withDomain(RideV5, Seq(AddrWithBalance(secondAddress, setScriptFee))) { d =>
+      val dApp = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() =
+           |   [
+           |     ScriptTransfer(i.caller, $transferAmount, unit)
+           |   ]
+         """.stripMargin
+      )
+      d.appendBlock(setScript(secondSigner, dApp))
+      d.appendAndAssertSucceed(invoke(payments = Seq(Payment(paymentAmount, Waves))))
+      d.blockchain.balance(secondAddress) shouldBe paymentAmount - transferAmount
     }
   }
 }
