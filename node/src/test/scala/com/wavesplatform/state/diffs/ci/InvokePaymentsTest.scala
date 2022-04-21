@@ -35,8 +35,7 @@ class InvokePaymentsTest extends PropSpec with WithDomain {
       val asset   = IssuedAsset(issueTx.id())
       d.appendBlock(setScript(secondSigner, dApp))
       d.appendBlock(issueTx)
-      d.appendBlock(invoke(payments = Seq(Payment(1, asset))))
-      d.liquidDiff.scriptResults.head._2.error shouldBe None
+      d.appendAndAssertSucceed(invoke(payments = Seq(Payment(1, asset))))
     }
   }
 
