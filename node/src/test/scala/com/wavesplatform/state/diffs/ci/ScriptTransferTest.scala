@@ -94,7 +94,7 @@ class ScriptTransferTest extends PropSpec with WithDomain {
     }
   }
 
-  property("assets from payment are available in transfer") {
+  property("assets from payment are available in ScriptTransfer") {
     val paymentAmount  = 100
     val transferAmount = 99
     val setScriptFee   = FeeConstants(SetScriptTransaction.typeId) * FeeUnit
@@ -143,5 +143,28 @@ class ScriptTransferTest extends PropSpec with WithDomain {
     }
     test("tx.assetId != this.id")
     test("false")
+  }
+
+  property("assets from Reissue are available in ScriptTransfer") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+      val issueAmount    = 100
+      val reissueAmount  = 50
+      val transferAmount = 120
+      val issueTx        = issue(secondSigner, issueAmount)
+      val asset          = IssuedAsset(issueTx.id())
+      val dApp = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() =
+           |   [
+           |     Reissue(base58'$asset', $reissueAmount, true),
+           |     ScriptTransfer(i.caller, $transferAmount, base58'$asset')
+           |   ]
+         """.stripMargin
+      )
+      d.appendBlock(issueTx, setScript(secondSigner, dApp))
+      d.appendAndAssertSucceed(invoke())
+      d.blockchain.balance(secondAddress, asset) shouldBe issueAmount + reissueAmount - transferAmount
+    }
   }
 }

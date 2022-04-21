@@ -135,7 +135,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     appendBlock(block)
     txs.foreach { tx =>
       assert(blockchain.transactionInfo(tx.id()).isDefined, s"should be present: $tx")
-      assert(blockchain.transactionSucceeded(tx.id()), s"should succeed: $tx")
+      assert(blockchain.transactionSucceeded(tx.id()), s"should succeed but ${liquidDiff.errorMessage(tx.id())}")
     }
     lastBlock
   }
