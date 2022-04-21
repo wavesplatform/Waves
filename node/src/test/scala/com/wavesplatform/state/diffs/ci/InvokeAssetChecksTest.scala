@@ -188,7 +188,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
     }
   }
 
-  property("invalid issuing asset name and description") {
+  property("issuing asset name and description limits") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       Seq(false, true).foreach { complex =>
         val sigVerify = s"""strict c = ${(1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")} """
@@ -203,19 +203,26 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
         )
 
         def invokeTx = invoke(fee = invokeFee(issues = 1))
-        d.appendBlock(setScript(secondSigner, dApp("aaa")))
+
+        d.appendBlock(setScript(secondSigner, dApp("a" * 3)))
         d.appendAndAssertFailed(invokeTx, "Invalid asset name")
+        d.appendBlock(setScript(secondSigner, dApp("a" * 4)))
+        d.appendAndAssertSucceed(invokeTx)
 
         d.appendBlock(setScript(secondSigner, dApp("a" * 17)))
         d.appendAndAssertFailed(invokeTx, "Invalid asset name")
+        d.appendBlock(setScript(secondSigner, dApp("a" * 16)))
+        d.appendAndAssertSucceed(invokeTx)
 
         d.appendBlock(setScript(secondSigner, dApp(description = "a" * 1001)))
         d.appendAndAssertFailed(invokeTx, "Invalid asset description")
+        d.appendBlock(setScript(secondSigner, dApp(description = "a" * 1000)))
+        d.appendAndAssertSucceed(invokeTx)
       }
     }
   }
 
-  property("invalid issuing asset decimals") {
+  property("issuing asset decimals limits") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
       def dApp(decimals: Int) = TestCompiler(V5).compileContract(
         s"""
@@ -227,10 +234,16 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
       )
 
       def invokeTx = invoke(fee = invokeFee(issues = 1))
+
       d.appendBlock(setScript(secondSigner, dApp(-1)))
       d.appendBlockE(invokeTx) should produce("Invalid decimals -1")
+      d.appendBlock(setScript(secondSigner, dApp(0)))
+      d.appendAndAssertSucceed(invokeTx)
+
       d.appendBlock(setScript(secondSigner, dApp(9)))
       d.appendBlockE(invokeTx) should produce("Invalid decimals 9")
+      d.appendBlock(setScript(secondSigner, dApp(8)))
+      d.appendAndAssertSucceed(invokeTx)
     }
   }
 
