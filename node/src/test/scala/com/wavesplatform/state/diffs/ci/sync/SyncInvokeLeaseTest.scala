@@ -61,6 +61,32 @@ class SyncInvokeLeaseTest extends PropSpec with WithDomain {
     }
   }
 
+  property("double LeaseCancel for Lease from sync call current dApp") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer)) { d =>
+      val dApp = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = {
+           |   strict leaseId = this.invoke("lease", [], [])
+           |   [
+           |     LeaseCancel(leaseId.exactAs[ByteVector])
+           |   ]
+           | }
+           |
+           | @Callable(i)
+           | func lease() = {
+           |   let lease = Lease(Address(base58'$dApp2Address'), 1)
+           |   let id    = calculateLeaseId(lease)
+           |   ([lease, LeaseCancel(id)], id)
+           | }
+         """.stripMargin
+      )
+      d.appendBlock(setScript(dApp1Signer, dApp))
+      d.appendAndAssertFailed(invoke(dApp1Address), "Cannot cancel already cancelled lease")
+      d.liquidDiff.leaseState shouldBe Map()
+    }
+  }
+
   property("LeaseCancel foreign Lease") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer, dApp2Signer)) { d =>
       val dApp1 = TestCompiler(V5).compileContract(
