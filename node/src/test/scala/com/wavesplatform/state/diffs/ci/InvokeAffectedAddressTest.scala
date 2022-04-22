@@ -1,4 +1,5 @@
 package com.wavesplatform.state.diffs.ci
+
 import com.wavesplatform.account.Alias
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
@@ -11,47 +12,54 @@ import com.wavesplatform.transaction.TxHelpers._
 class InvokeAffectedAddressTest extends PropSpec with WithDomain {
   import DomainPresets._
 
+  private def dApp(failed: Boolean) =
+    TestCompiler(V5).compileContract(
+      s"""
+         | @Callable(i)
+         | func default() = [${if (failed) "Burn(base58'', 1)" else ""}]
+       """.stripMargin
+    )
+
   property("tx belongs to dApp address without actions") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
-      val dApp = TestCompiler(V5).compileContract(
-        s"""
-           | @Callable(i)
-           | func default() = []
-         """.stripMargin
-      )
-      d.appendBlock(setScript(secondSigner, dApp))
-      d.appendAndAssertSucceed(invoke(secondAddress))
-      d.liquidDiff.transactions.head._2.affected shouldBe Set(defaultAddress, secondAddress)
+      Seq(true, false).foreach { failed =>
+        d.appendBlock(setScript(secondSigner, dApp(failed)))
+        if (failed)
+          d.appendAndAssertFailed(invoke(secondAddress))
+        else
+          d.appendAndAssertSucceed(invoke(secondAddress))
+        d.liquidDiff.transactions.head._2.affected shouldBe Set(defaultAddress, secondAddress)
+      }
     }
   }
 
   property("tx belongs to dApp address when called by alias") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
-      val dApp = TestCompiler(V5).compileContract(
-        s"""
-           | @Callable(i)
-           | func default() = []
-         """.stripMargin
-      )
-      d.appendBlock(setScript(secondSigner, dApp))
       d.appendBlock(createAlias("alias", secondSigner))
-      d.appendAndAssertSucceed(invoke(Alias.create("alias").explicitGet()))
-      d.liquidDiff.transactions.head._2.affected shouldBe Set(defaultAddress, secondAddress)
+      Seq(true, false).foreach { failed =>
+        d.appendBlock(setScript(secondSigner, dApp(failed)))
+        if (failed)
+          d.appendAndAssertFailed(invoke(Alias.create("alias").explicitGet()))
+        else
+          d.appendAndAssertSucceed(invoke(Alias.create("alias").explicitGet()))
+        d.liquidDiff.transactions.head._2.affected shouldBe Set(defaultAddress, secondAddress)
+      }
     }
   }
 
   property("tx belongs to dApp address when called by alias created in current block") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
-      val dApp = TestCompiler(V5).compileContract(
-        s"""
-           | @Callable(i)
-           | func default() = []
-         """.stripMargin
-      )
-      val invokeTx = invoke(Alias.create("alias").explicitGet())
-      d.appendBlock(setScript(secondSigner, dApp))
-      d.appendAndAssertSucceed(createAlias("alias", secondSigner), invokeTx)
-      d.liquidDiff.transactions(invokeTx.id()).affected shouldBe Set(defaultAddress, secondAddress)
+      Seq(true, false).foreach { failed =>
+        val invokeTx = invoke(Alias.create(s"$failed").explicitGet())
+        val aliasTx  = createAlias(s"$failed", secondSigner)
+        d.appendBlock(setScript(secondSigner, dApp(failed)))
+        if (failed) {
+          d.appendBlock(aliasTx, invokeTx)
+          d.liquidDiff.errorMessage(invokeTx.id()) shouldBe defined
+        } else
+          d.appendAndAssertSucceed(aliasTx, invokeTx)
+        d.liquidDiff.transactions(invokeTx.id()).affected shouldBe Set(defaultAddress, secondAddress)
+      }
     }
   }
 }
