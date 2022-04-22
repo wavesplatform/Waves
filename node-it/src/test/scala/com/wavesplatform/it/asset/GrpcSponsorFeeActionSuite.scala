@@ -1,25 +1,28 @@
 package com.wavesplatform.it.asset
 
+import com.google.protobuf.ByteString
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncGrpcApi.*
 import com.wavesplatform.it.api.{IssueInfoResponse, SponsorFeeResponse, StateChangesDetails}
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.sync.grpc.GrpcBaseTransactionSuiteLike
+import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.Sponsorship
-import com.wavesplatform.test._
-import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.freespec.AnyFreeSpec
 
 class GrpcSponsorFeeActionSuite extends AnyFreeSpec with GrpcBaseTransactionSuiteLike {
   private val initialWavesBalance = 100.waves
 
-  private val minSponsoredAssetFee      = 100
-  private var sponsoredAssetId: String  = ""
-  private var globalDAppAddress: String = ""
-  private var dApp: KeyPair             = _
+  private val minSponsoredAssetFee          = 100
+  private var sponsoredAssetId: String      = ""
+  private var globalDAppAddress: ByteString = ""
+  private var dApp: KeyPair                 = _
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -39,16 +42,21 @@ class GrpcSponsorFeeActionSuite extends AnyFreeSpec with GrpcBaseTransactionSuit
       """.stripMargin
     )
 
-    globalDAppAddress = dApp.toAddress.toString
+    globalDAppAddress = byteStringAddress(dApp)
   }
 
   "State changes" - {
     "Issue and sponsor from dApp" in {
-      val invokeTx = miner.invokeScript(miner.keyPair, globalDAppAddress, Some("issueAndSponsor"), waitForTx = true, fee = smartMinFee + issueFee)
+      val invokeTx = miner.broadcastInvokeScript(
+        miner.keyPair,
+        PBRecipients.create(dApp.toAddress),
+        Some(FUNCTION_CALL(FunctionHeader.User("issueAndSponsor"), List.empty)),
+        fee = smartMinFee + issueFee,
+        waitForTx = true
+      )
 
       val matchDebugResult = matchPattern {
-        case Seq(
-            StateChangesDetails(
+        case StateChangesDetails(
               Nil,
               Nil,
               Seq(IssueInfoResponse(issueAssetId, _, _, _, _, _, _, _)),
@@ -57,132 +65,142 @@ class GrpcSponsorFeeActionSuite extends AnyFreeSpec with GrpcBaseTransactionSuit
               Seq(SponsorFeeResponse(sponsorFeeAssetId, Some(`minSponsoredAssetFee`))),
               None,
               Nil
-            )
             ) if issueAssetId == sponsorFeeAssetId =>
       }
 
-      val stateChanges = miner.debugStateChanges(invokeTx._1.id).stateChanges.toSeq
+      val (_, stateChanges) = miner.stateChanges(invokeTx.id)
       stateChanges should matchDebugResult
-      miner.debugStateChangesByAddress(globalDAppAddress, limit = 100).flatMap(_.stateChanges) should matchDebugResult
+      val (_, addressStateChanges) = miner.stateChanges(minerAddress).head
+      addressStateChanges should matchDebugResult
 
-      sponsoredAssetId = stateChanges.head.sponsorFees.head.assetId
-      miner.assetsDetails(sponsoredAssetId).minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
+      sponsoredAssetId = stateChanges.sponsorFees.head.assetId
+      miner.assetInfo(sponsoredAssetId).sponsorship shouldBe minSponsoredAssetFee
 
-      val dAppBalance = miner.assetsBalance(globalDAppAddress).balances.head
-      dAppBalance.minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
-      dAppBalance.sponsorBalance shouldBe Some(miner.balance(globalDAppAddress).balance)
+      val (assetId, _) = miner.assetsBalance(globalDAppAddress).filter(_._1.nonEmpty).head
+      val assetInfo    = miner.assetInfo(assetId)
+      assetInfo.sponsorship shouldBe minSponsoredAssetFee
+      assetInfo.sponsorBalance shouldBe miner.wavesBalance(globalDAppAddress).regular
     }
 
     "Use sponsored asset as fee" in {
-      nodes.waitForHeight(miner.height + 1)
+      nodes.foreach(_.waitForHeight(miner.height + 1))
 
-      val alice = miner.createKeyPair()
-      val bob   = miner.createKeyPair()
+      val alice = miner.generateKeyPair()
+      val bob   = miner.generateKeyPair()
 
-      val dAppAddress                  = globalDAppAddress
-      val startDAppSponsorAssetBalance = miner.assetBalance(dAppAddress, sponsoredAssetId).balance
-      val startDAppBalance             = miner.balance(dAppAddress).balance
-      val startMinerBalance            = miner.balance(miner.address).balance
+      val (_, startDAppSponsorAssetBalance) = miner.assetsBalance(globalDAppAddress, Seq(sponsoredAssetId)).head
+      val startDAppBalance                  = miner.wavesBalance(globalDAppAddress).regular
 
       val assetFee            = 100
       val assetTransferAmount = 1000
 
-      miner.transfer(
+      miner.broadcastTransfer(
         dApp,
-        alice.toAddress.toString,
+        PBRecipients.create(alice.toAddress),
         assetFee + assetTransferAmount,
-        assetId = Some(sponsoredAssetId),
+        assetId = sponsoredAssetId,
         fee = smartMinFee,
         waitForTx = true
       )
-      miner.transfer(
+      miner.broadcastTransfer(
         alice,
-        bob.toAddress.toString,
+        PBRecipients.create(bob.toAddress),
         assetTransferAmount,
-        assetId = Some(sponsoredAssetId),
+        assetId = sponsoredAssetId,
         fee = assetFee,
-        feeAssetId = Some(sponsoredAssetId),
+        feeAssetId = sponsoredAssetId,
         waitForTx = true
       )
 
-      miner.assetBalance(alice.toAddress.toString, sponsoredAssetId).balance shouldBe 0
-      miner.assetBalance(bob.toAddress.toString, sponsoredAssetId).balance shouldBe assetTransferAmount
+      miner.assetsBalance(byteStringAddress(alice), Seq(sponsoredAssetId)).head._2 shouldBe 0
+      miner.assetsBalance(byteStringAddress(bob), Seq(sponsoredAssetId)).head._2 shouldBe assetTransferAmount
 
       val dAppWavesOutgo = smartMinFee + Sponsorship.toWaves(assetFee, minSponsoredAssetFee)
-      val blockReward    = miner.lastBlock().reward.get
 
       miner.waitForHeight(miner.height + 1)
 
-      miner.assetBalance(dAppAddress, sponsoredAssetId).balance shouldBe startDAppSponsorAssetBalance - assetTransferAmount
-      miner.balance(dAppAddress).balance shouldBe startDAppBalance - dAppWavesOutgo
-      miner.balance(miner.address).balance shouldBe startMinerBalance + dAppWavesOutgo + blockReward
+      miner.assetsBalance(globalDAppAddress, Seq(sponsoredAssetId)).head._2 shouldBe startDAppSponsorAssetBalance - assetTransferAmount
+      miner.wavesBalance(globalDAppAddress).regular shouldBe startDAppBalance - dAppWavesOutgo
     }
 
     "Cancel sponsorship" in {
       val dApp = createDApp(
         s"""
-          |
-          |{-# STDLIB_VERSION 4 #-}
-          |{-# CONTENT_TYPE DAPP #-}
-          |{-# SCRIPT_TYPE ACCOUNT #-}
-          |
-          |@Callable(i)
-          |func issue2assets() = {
-          |    let i1 = Issue("SponsoredAsset0", "SponsoredAsset description", 1000000000000000, 2, true, unit, 0)
-          |    let i2 = Issue("SponsoredAsset1", "SponsoredAsset description", 1000000000000000, 2, true, unit, 0)
-          |
-          |    let issueId0 = calculateAssetId(i1)
-          |    let issueId1 = calculateAssetId(i2)
-          |
-          |    [
-          |        BinaryEntry("cancelSponsorAssetId0", issueId0),
-          |        BinaryEntry("cancelSponsorAssetId1", issueId1),
-          |        i1, i2
-          |    ]
-          |}
-          |
-          |@Callable(i)
-          |func sponsor2assets() = [
-          |    SponsorFee(this.getBinary("cancelSponsorAssetId0").value(), $minSponsoredAssetFee),
-          |    SponsorFee(this.getBinary("cancelSponsorAssetId1").value(), $minSponsoredAssetFee)
-          |]
-          |
-          |@Callable(i)
-          |func cancelSponsorship() = [
-          |    SponsorFee(this.getBinary("cancelSponsorAssetId0").value(), unit)
-          |]
+           |
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-# SCRIPT_TYPE ACCOUNT #-}
+           |
+           |@Callable(i)
+           |func issue2assets() = {
+           |    let i1 = Issue("SponsoredAsset0", "SponsoredAsset description", 1000000000000000, 2, true, unit, 0)
+           |    let i2 = Issue("SponsoredAsset1", "SponsoredAsset description", 1000000000000000, 2, true, unit, 0)
+           |
+           |    let issueId0 = calculateAssetId(i1)
+           |    let issueId1 = calculateAssetId(i2)
+           |
+           |    [
+           |        BinaryEntry("cancelSponsorAssetId0", issueId0),
+           |        BinaryEntry("cancelSponsorAssetId1", issueId1),
+           |        i1, i2
+           |    ]
+           |}
+           |
+           |@Callable(i)
+           |func sponsor2assets() = [
+           |    SponsorFee(this.getBinary("cancelSponsorAssetId0").value(), $minSponsoredAssetFee),
+           |    SponsorFee(this.getBinary("cancelSponsorAssetId1").value(), $minSponsoredAssetFee)
+           |]
+           |
+           |@Callable(i)
+           |func cancelSponsorship() = [
+           |    SponsorFee(this.getBinary("cancelSponsorAssetId0").value(), unit)
+           |]
         """.stripMargin
       )
 
-      val dAppAddress = dApp.toAddress.toString
-      val issueTx     = miner.invokeScript(miner.keyPair, dAppAddress, Some("issue2assets"), waitForTx = true, fee = smartMinFee + issueFee * 2)
-      miner.invokeScript(miner.keyPair, dAppAddress, Some("sponsor2assets"), waitForTx = true, fee = smartMinFee)
-      val cancelTx = miner.invokeScript(miner.keyPair, dAppAddress, Some("cancelSponsorship"), waitForTx = true, fee = smartMinFee)
+      val dAppAddress = byteStringAddress(dApp)
+      val issueTx = miner.broadcastInvokeScript(
+        miner.keyPair,
+        PBRecipients.create(dApp.toAddress),
+        Some(FUNCTION_CALL(FunctionHeader.User("issue2assets"), List.empty)),
+        waitForTx = true,
+        fee = smartMinFee + issueFee * 2
+      )
+      miner.broadcastInvokeScript(
+        miner.keyPair,
+        PBRecipients.create(dApp.toAddress),
+        Some(FUNCTION_CALL(FunctionHeader.User("sponsor2assets"), List.empty)),
+        waitForTx = true,
+        fee = smartMinFee
+      )
+      val cancelTx = miner.broadcastInvokeScript(
+        miner.keyPair,
+        PBRecipients.create(dApp.toAddress),
+        Some(FUNCTION_CALL(FunctionHeader.User("cancelSponsorship"), List.empty)),
+        waitForTx = true,
+        fee = smartMinFee
+      )
 
-      val assetIdByName    = miner.debugStateChanges(issueTx._1.id).stateChanges.get.issues.map(issue => (issue.name, issue.assetId)).toMap
+      val assetIdByName    = miner.stateChanges(issueTx.id)._2.issues.map(issue => (issue.name, issue.assetId)).toMap
       val sponsoredAssetId = assetIdByName("SponsoredAsset1")
       val cancelledAssetId = assetIdByName("SponsoredAsset0")
 
-      miner
-        .debugStateChanges(cancelTx._1.id)
-        .stateChanges
-        .toSeq
-        .find(_.sponsorFees == Seq(SponsorFeeResponse(`cancelledAssetId`, None)))
-        .head
+      miner.stateChanges(cancelTx.id)._2.sponsorFees shouldBe Seq(SponsorFeeResponse(cancelledAssetId, None))
+      miner.stateChanges(minerAddress).map(_._2).find(_.sponsorFees == Seq(SponsorFeeResponse(cancelledAssetId, None))) shouldBe defined
 
-      miner
-        .debugStateChangesByAddress(dAppAddress, limit = 100)
-        .flatMap(_.stateChanges)
-        .find(_.sponsorFees == Seq(SponsorFeeResponse(`cancelledAssetId`, None)))
-        .head
+      val dAppBalance = miner.assetsBalance(dAppAddress)
 
-      miner.assetsDetails(sponsoredAssetId).minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
+      dAppBalance.contains(sponsoredAssetId) shouldBe true
+      dAppBalance.contains(cancelledAssetId) shouldBe true
 
-      val dAppBalance = miner.assetsBalance(dAppAddress).balances.map(b => (b.assetId, b)).toMap
-      dAppBalance(sponsoredAssetId).minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
-      dAppBalance(sponsoredAssetId).sponsorBalance shouldBe Some(miner.balance(dAppAddress).balance)
-      dAppBalance(cancelledAssetId).minSponsoredAssetFee shouldBe None
-      dAppBalance(cancelledAssetId).sponsorBalance shouldBe None
+      val sponsoredAsset = miner.assetInfo(sponsoredAssetId)
+      sponsoredAsset.sponsorship shouldBe minSponsoredAssetFee
+      sponsoredAsset.sponsorBalance shouldBe miner.wavesBalance(dAppAddress).regular
+
+      val cancelledAsset = miner.assetInfo(cancelledAssetId)
+      cancelledAsset.sponsorship shouldBe 0
+      cancelledAsset.sponsorBalance shouldBe 0
     }
 
     "Multiple SponsorFee is available for same asset" in {
@@ -212,14 +230,20 @@ class GrpcSponsorFeeActionSuite extends AnyFreeSpec with GrpcBaseTransactionSuit
         """.stripMargin
       )
 
-      val dAppAddress    = dApp.toAddress.toString
-      val invokeTx       = miner.invokeScript(miner.keyPair, dAppAddress, Some("issueAndMultipleSponsor"), waitForTx = true, fee = smartMinFee + issueFee)
-      val txStateChanges = miner.debugStateChanges(invokeTx._1.id).stateChanges.toSeq
-      val assetId        = txStateChanges.flatMap(_.issues).head.assetId
+      val dAppAddress = byteStringAddress(dApp)
+      val invokeTx = miner.broadcastInvokeScript(
+        miner.keyPair,
+        PBRecipients.create(dApp.toAddress),
+        Some(FUNCTION_CALL(FunctionHeader.User("issueAndMultipleSponsor"), List.empty)),
+        waitForTx = true,
+        fee = smartMinFee + issueFee
+      )
+
+      val txStateChanges = miner.stateChanges(invokeTx.id)._2
+      val assetId        = txStateChanges.issues.head.assetId
 
       val matchDebugResult = matchPattern {
-        case Seq(
-            StateChangesDetails(
+        case StateChangesDetails(
               Nil,
               Nil,
               Seq(IssueInfoResponse(`assetId`, _, _, _, _, _, _, _)),
@@ -228,17 +252,16 @@ class GrpcSponsorFeeActionSuite extends AnyFreeSpec with GrpcBaseTransactionSuit
               sponsorFeeResponses,
               None,
               Nil
-            )
             ) if sponsorFeeResponses.size == 9 && sponsorFeeResponses.last == SponsorFeeResponse(`assetId`, Some(`lastMinSponsoredAssetFee`)) =>
       }
       txStateChanges should matchDebugResult
-      miner.debugStateChangesByAddress(dAppAddress, limit = 100).flatMap(_.stateChanges) should matchDebugResult
+      miner.stateChanges(minerAddress).map(_._2).head should matchDebugResult
 
-      miner.assetsDetails(assetId).minSponsoredAssetFee shouldBe Some(lastMinSponsoredAssetFee)
+      miner.assetsBalance(dAppAddress).contains(assetId) shouldBe true
 
-      val dAppBalance = miner.assetsBalance(dAppAddress).balances.head
-      dAppBalance.minSponsoredAssetFee shouldBe Some(lastMinSponsoredAssetFee)
-      dAppBalance.sponsorBalance shouldBe Some(miner.balance(dAppAddress).balance)
+      val assetInfo = miner.assetInfo(assetId)
+      assetInfo.sponsorship shouldBe lastMinSponsoredAssetFee
+      assetInfo.sponsorBalance shouldBe miner.wavesBalance(dAppAddress).regular
     }
 
     "Sponsor and cancel sponsorship is available for same asset" in {
@@ -260,14 +283,20 @@ class GrpcSponsorFeeActionSuite extends AnyFreeSpec with GrpcBaseTransactionSuit
         """.stripMargin
       )
 
+      val dAppAddress = byteStringAddress(dApp)
       val invokeTx =
-        miner.invokeScript(miner.keyPair, dApp.toAddress.toString, Some("sponsorAndCancel"), waitForTx = true, fee = smartMinFee + issueFee)
-      val txStateChanges = miner.debugStateChanges(invokeTx._1.id).stateChanges.toSeq
-      val assetId        = txStateChanges.flatMap(_.issues).head.assetId
+        miner.broadcastInvokeScript(
+          miner.keyPair,
+          PBRecipients.create(dApp.toAddress),
+          Some(FUNCTION_CALL(FunctionHeader.User("sponsorAndCancel"), List.empty)),
+          waitForTx = true,
+          fee = smartMinFee + issueFee
+        )
+      val txStateChanges = miner.stateChanges(invokeTx.id)._2
+      val assetId        = txStateChanges.issues.head.assetId
 
       val matchDebugResult = matchPattern {
-        case Seq(
-            StateChangesDetails(
+        case StateChangesDetails(
               Nil,
               Nil,
               Seq(IssueInfoResponse(`assetId`, _, _, _, _, _, _, _)),
@@ -276,131 +305,24 @@ class GrpcSponsorFeeActionSuite extends AnyFreeSpec with GrpcBaseTransactionSuit
               Seq(SponsorFeeResponse(`assetId`, Some(100)), SponsorFeeResponse(`assetId`, None)),
               None,
               Nil
-            )
             ) =>
       }
       txStateChanges should matchDebugResult
-      miner.debugStateChangesByAddress(dApp.toAddress.toString, limit = 100).flatMap(_.stateChanges) should matchDebugResult
+      miner.stateChanges(minerAddress).map(_._2).head should matchDebugResult
 
-      miner.assetsDetails(assetId).minSponsoredAssetFee shouldBe None
+      miner.assetsBalance(dAppAddress).contains(assetId) shouldBe true
 
-      val dAppBalance = miner.assetsBalance(dApp.toAddress.toString).balances.head
-      dAppBalance.minSponsoredAssetFee shouldBe None
-      dAppBalance.sponsorBalance shouldBe None
+      val assetInfo = miner.assetInfo(assetId)
+      assetInfo.sponsorship shouldBe 0
+      assetInfo.sponsorBalance shouldBe 0
     }
   }
 
   "Restrictions" - {
-    "SponsorFee actions count limit" in {
-      val minSponsoredAssetFee = 1001
-
-      val dApp = createDApp(
-        s"""
-           |{-# STDLIB_VERSION 4 #-}
-           |{-# CONTENT_TYPE DAPP #-}
-           |{-# SCRIPT_TYPE ACCOUNT #-}
-           |
-           |@Callable(i)
-           |func issue10assets() = {
-           |    let i0 = Issue("SponsoredAsset0", "SponsoredAsset description", 1000000000000000, 2, true, unit, 0)
-           |    let i1 = Issue("SponsoredAsset1", "SponsoredAsset description", 1000000000000000, 2, true, unit, 1)
-           |    let i2 = Issue("SponsoredAsset2", "SponsoredAsset description", 1000000000000000, 2, true, unit, 2)
-           |    let i3 = Issue("SponsoredAsset3", "SponsoredAsset description", 1000000000000000, 2, true, unit, 3)
-           |    let i4 = Issue("SponsoredAsset4", "SponsoredAsset description", 1000000000000000, 2, true, unit, 4)
-           |    let i5 = Issue("SponsoredAsset5", "SponsoredAsset description", 1000000000000000, 2, true, unit, 5)
-           |    let i6 = Issue("SponsoredAsset6", "SponsoredAsset description", 1000000000000000, 2, true, unit, 6)
-           |    let i7 = Issue("SponsoredAsset7", "SponsoredAsset description", 1000000000000000, 2, true, unit, 7)
-           |    let i8 = Issue("SponsoredAsset8", "SponsoredAsset description", 1000000000000000, 2, true, unit, 8)
-           |    let i9 = Issue("SponsoredAsset9", "SponsoredAsset description", 1000000000000000, 2, true, unit, 9)
-           |
-           |    let issueId0 = calculateAssetId(i0)
-           |    let issueId1 = calculateAssetId(i1)
-           |    let issueId2 = calculateAssetId(i2)
-           |    let issueId3 = calculateAssetId(i3)
-           |    let issueId4 = calculateAssetId(i4)
-           |    let issueId5 = calculateAssetId(i5)
-           |    let issueId6 = calculateAssetId(i6)
-           |    let issueId7 = calculateAssetId(i7)
-           |    let issueId8 = calculateAssetId(i8)
-           |    let issueId9 = calculateAssetId(i9)
-           |
-           |    [
-           |        BinaryEntry("sponsoredAssetId0", issueId0),
-           |        BinaryEntry("sponsoredAssetId1", issueId1),
-           |        BinaryEntry("sponsoredAssetId2", issueId2),
-           |        BinaryEntry("sponsoredAssetId3", issueId3),
-           |        BinaryEntry("sponsoredAssetId4", issueId4),
-           |        BinaryEntry("sponsoredAssetId5", issueId5),
-           |        BinaryEntry("sponsoredAssetId6", issueId6),
-           |        BinaryEntry("sponsoredAssetId7", issueId7),
-           |        BinaryEntry("sponsoredAssetId8", issueId8),
-           |        BinaryEntry("sponsoredAssetId9", issueId9),
-           |        i0,i1,i2,i3,i4,i5,i6,i7,i8,i9
-           |    ]
-           |}
-           |
-           |@Callable(i)
-           |func sponsor10assets() = [
-           |    SponsorFee(this.getBinary("sponsoredAssetId0").value(), ${minSponsoredAssetFee.toString}),
-           |    SponsorFee(this.getBinary("sponsoredAssetId1").value(), ${minSponsoredAssetFee.toString}),
-           |    SponsorFee(this.getBinary("sponsoredAssetId2").value(), ${minSponsoredAssetFee.toString}),
-           |    SponsorFee(this.getBinary("sponsoredAssetId3").value(), ${minSponsoredAssetFee.toString}),
-           |    SponsorFee(this.getBinary("sponsoredAssetId4").value(), ${minSponsoredAssetFee.toString}),
-           |    SponsorFee(this.getBinary("sponsoredAssetId5").value(), ${minSponsoredAssetFee.toString}),
-           |    SponsorFee(this.getBinary("sponsoredAssetId6").value(), ${minSponsoredAssetFee.toString}),
-           |    SponsorFee(this.getBinary("sponsoredAssetId7").value(), ${minSponsoredAssetFee.toString}),
-           |    SponsorFee(this.getBinary("sponsoredAssetId8").value(), ${minSponsoredAssetFee.toString}),
-           |    SponsorFee(this.getBinary("sponsoredAssetId9").value(), ${minSponsoredAssetFee.toString})
-           |]
-           |
-           |@Callable(i)
-           |func sponsor11assets() = [
-           |    SponsorFee(this.getBinary("sponsoredAssetId0").value(), ${minSponsoredAssetFee.toString}),
-           |    SponsorFee(this.getBinary("sponsoredAssetId1").value(), ${minSponsoredAssetFee.toString}),
-           |    SponsorFee(this.getBinary("sponsoredAssetId2").value(), ${minSponsoredAssetFee.toString}),
-           |    SponsorFee(this.getBinary("sponsoredAssetId3").value(), ${minSponsoredAssetFee.toString}),
-           |    SponsorFee(this.getBinary("sponsoredAssetId4").value(), ${minSponsoredAssetFee.toString}),
-           |    SponsorFee(this.getBinary("sponsoredAssetId5").value(), ${minSponsoredAssetFee.toString}),
-           |    SponsorFee(this.getBinary("sponsoredAssetId6").value(), ${minSponsoredAssetFee.toString}),
-           |    SponsorFee(this.getBinary("sponsoredAssetId7").value(), ${minSponsoredAssetFee.toString}),
-           |    SponsorFee(this.getBinary("sponsoredAssetId8").value(), ${minSponsoredAssetFee.toString}),
-           |    SponsorFee(this.getBinary("sponsoredAssetId9").value(), ${minSponsoredAssetFee.toString}),
-           |    SponsorFee(this.getBinary("sponsoredAssetId9").value(), ${minSponsoredAssetFee.toString})
-           |]
-        """.stripMargin
-      )
-      val dappAddress = dApp.toAddress.toString
-      val invokeTx1   = miner.invokeScript(miner.keyPair, dappAddress, Some("issue10assets"), waitForTx = true, fee = smartMinFee + issueFee * 10)
-      val invokeTx2   = miner.invokeScript(miner.keyPair, dappAddress, Some("sponsor10assets"), waitForTx = true, fee = smartMinFee)
-
-      nodes.waitForHeightAriseAndTxPresent(invokeTx1._1.id)
-      nodes.waitForHeightAriseAndTxPresent(invokeTx2._1.id)
-
-      val assetIds    = miner.debugStateChanges(invokeTx1._1.id).stateChanges.get.issues.map(_.assetId)
-      val sponsorFees = miner.debugStateChanges(invokeTx2._1.id).stateChanges.get.sponsorFees
-
-      (assetIds zip sponsorFees)
-        .foreach {
-          case (issueAssetId, sponsorFee) =>
-            issueAssetId shouldBe sponsorFee.assetId
-            sponsorFee.minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
-
-            miner.assetsDetails(issueAssetId).minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
-            val dAppBalance = miner.assetsBalance(dappAddress).balances.find(_.assetId == issueAssetId).get
-            dAppBalance.minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
-            dAppBalance.sponsorBalance shouldBe Some(miner.balance(dappAddress).balance)
-        }
-
-      assertBadRequestAndMessage(
-        miner.invokeScript(miner.keyPair, dappAddress, Some("sponsor11assets"), fee = smartMinFee),
-        "Actions count limit is exceeded"
-      )
-    }
-
     "SponsorFee is available for assets issued via transaction" in {
-      val dApp = miner.createKeyPair()
-      miner.transfer(sender.keyPair, dApp.toAddress.toString, initialWavesBalance, minFee, waitForTx = true)
-      val assetId = miner.issue(dApp, waitForTx = true).id
+      val dApp = miner.generateKeyPair()
+      miner.broadcastTransfer(sender.keyPair, PBRecipients.create(dApp.toAddress), initialWavesBalance, minFee, waitForTx = true)
+      val assetId = miner.broadcastIssue(dApp, "test", 100, 8, reissuable = true, fee = issueFee, waitForTx = true).id
 
       createDApp(
         s"""
@@ -416,14 +338,20 @@ class GrpcSponsorFeeActionSuite extends AnyFreeSpec with GrpcBaseTransactionSuit
         dApp
       )
 
-      val tx = miner.invokeScript(miner.keyPair, dApp.toAddress.toString, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee)
-      sender.debugStateChanges(tx._1.id).stateChanges.get.sponsorFees.head shouldBe SponsorFeeResponse(assetId, Some(1000))
+      val tx = miner.broadcastInvokeScript(
+        miner.keyPair,
+        PBRecipients.create(dApp.toAddress),
+        Some(FUNCTION_CALL(FunctionHeader.User("sponsorAsset"), List.empty)),
+        waitForTx = true,
+        fee = smartMinFee
+      )
+      sender.stateChanges(tx.id)._2.sponsorFees.head shouldBe SponsorFeeResponse(assetId, Some(1000))
     }
 
     "Negative fee is not available" in {
-      val dApp = miner.createKeyPair()
-      miner.transfer(sender.keyPair, dApp.toAddress.toString, initialWavesBalance, minFee, waitForTx = true)
-      val assetId = miner.issue(dApp, waitForTx = true).id
+      val dApp = miner.generateKeyPair()
+      miner.broadcastTransfer(sender.keyPair, PBRecipients.create(dApp.toAddress), initialWavesBalance, minFee, waitForTx = true)
+      val assetId = miner.broadcastIssue(dApp, "test", 100, 8, reissuable = true, fee = issueFee, waitForTx = true).id
 
       createDApp(
         s"""
@@ -439,16 +367,22 @@ class GrpcSponsorFeeActionSuite extends AnyFreeSpec with GrpcBaseTransactionSuit
         dApp
       )
 
-      assertBadRequestAndMessage(
-        miner.invokeScript(miner.keyPair, dApp.toAddress.toString, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee),
-        "AlwaysRejectError(Negative sponsor amount = -1)"
+      assertGrpcError(
+        miner.broadcastInvokeScript(
+          miner.keyPair,
+          PBRecipients.create(dApp.toAddress),
+          Some(FUNCTION_CALL(FunctionHeader.User("sponsorAsset"), List.empty)),
+          waitForTx = true,
+          fee = smartMinFee
+        ),
+        "AlwaysRejectError\\(Negative sponsor amount = -1\\)"
       )
     }
 
     "SponsorFee is available only for assets issuing from current address" in {
-      val issuer = miner.createKeyPair()
-      miner.transfer(sender.keyPair, issuer.toAddress.toString, initialWavesBalance, minFee, waitForTx = true)
-      val assetId = miner.issue(issuer, waitForTx = true).id
+      val issuer = miner.generateKeyPair()
+      miner.broadcastTransfer(sender.keyPair, PBRecipients.create(issuer.toAddress), initialWavesBalance, minFee, waitForTx = true)
+      val assetId = miner.broadcastIssue(issuer, "test", 100, 8, reissuable = true, fee = issueFee, waitForTx = true).id
 
       val dApp = createDApp(
         s"""
@@ -461,20 +395,26 @@ class GrpcSponsorFeeActionSuite extends AnyFreeSpec with GrpcBaseTransactionSuit
            |    SponsorFee(base58'$assetId', 1000)
            |]
         """.stripMargin
-      ).toAddress.toString
+      )
 
-      assertBadRequestAndMessage(
-        miner.invokeScript(miner.keyPair, dApp, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee),
+      assertGrpcError(
+        miner.broadcastInvokeScript(
+          miner.keyPair,
+          PBRecipients.create(dApp.toAddress),
+          Some(FUNCTION_CALL(FunctionHeader.User("sponsorAsset"), List.empty)),
+          waitForTx = true,
+          fee = smartMinFee
+        ),
         s"SponsorFee assetId=$assetId was not issued from address of current dApp"
       )
     }
 
     "SponsorFee is not available for scripted assets" in {
-      val dApp = miner.createKeyPair()
-      miner.transfer(sender.keyPair, dApp.toAddress.toString, initialWavesBalance, minFee, waitForTx = true)
+      val dApp = miner.generateKeyPair()
+      miner.broadcastTransfer(sender.keyPair, PBRecipients.create(dApp.toAddress), initialWavesBalance, minFee, waitForTx = true)
 
-      val script  = ScriptCompiler.compile("true", ScriptEstimatorV2).explicitGet()._1.bytes().base64
-      val assetId = miner.issue(dApp, script = Some(script), waitForTx = true).id
+      val script  = ScriptCompiler.compile("true", ScriptEstimatorV2).explicitGet()._1
+      val assetId = miner.broadcastIssue(dApp, "test", 100, 8, reissuable = true, script = Right(Some(script)), fee = issueFee, waitForTx = true).id
 
       createDApp(
         s"""
@@ -490,14 +430,19 @@ class GrpcSponsorFeeActionSuite extends AnyFreeSpec with GrpcBaseTransactionSuit
         dApp
       )
 
-      assertBadRequestAndMessage(
-        miner.invokeScript(miner.keyPair, dApp.toAddress.toString, Some("sponsorAsset"), fee = smartMinFee + smartFee),
+      assertGrpcError(
+        miner.broadcastInvokeScript(
+          miner.keyPair,
+          PBRecipients.create(dApp.toAddress),
+          Some(FUNCTION_CALL(FunctionHeader.User("sponsorAsset"), List.empty)),
+          fee = smartMinFee + smartFee
+        ),
         "Sponsorship smart assets is disabled."
       )
     }
   }
 
-  private def createDApp(script: String, address: KeyPair = miner.createKeyPair()): KeyPair = {
+  private def createDApp(script: String, address: KeyPair = miner.generateKeyPair()): KeyPair = {
     val compiledScript = ScriptCompiler
       .compile(
         script,
@@ -506,19 +451,27 @@ class GrpcSponsorFeeActionSuite extends AnyFreeSpec with GrpcBaseTransactionSuit
       .explicitGet()
       ._1
 
-    miner.transfer(sender.keyPair, address.publicKey.toAddress.toString, initialWavesBalance, minFee, waitForTx = true)
+    miner.broadcastTransfer(
+      sender.keyPair,
+      PBRecipients.create(address.toAddress),
+      initialWavesBalance,
+      fee = minFee,
+      waitForTx = true
+    )
 
-    nodes.waitForHeightAriseAndTxPresent(
-      miner
-        .signedBroadcast(
-          SetScriptTransaction
-            .selfSigned(1.toByte, address, Some(compiledScript), setScriptFee, System.currentTimeMillis())
-            .explicitGet()
-            .json()
-        )
-        .id
+    nodes.foreach(
+      _.waitForTxAndHeightArise(
+        miner
+          .setScript(address, Right(Some(compiledScript)), fee = smartMinFee + setScriptFee, timestamp = System.currentTimeMillis(), waitForTx = true)
+          .id
+      )
     )
 
     address
   }
+
+  private def byteStringAddress(account: KeyPair): ByteString =
+    PBRecipients.create(account.toAddress).getPublicKeyHash
+
+  private def minerAddress = byteStringAddress(miner.keyPair)
 }
