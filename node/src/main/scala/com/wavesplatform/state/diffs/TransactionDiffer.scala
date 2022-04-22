@@ -4,7 +4,7 @@ import cats.implicits.{toFoldableOps, toTraverseOps}
 import cats.instances.either._
 import cats.syntax.either._
 import cats.syntax.functor._
-import com.wavesplatform.account.{Address, AddressScheme, Alias}
+import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.BlockV5
@@ -14,7 +14,7 @@ import com.wavesplatform.metrics.TxProcessingStats
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
-import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
+import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, Portfolio, Sponsorship}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction._
@@ -26,7 +26,6 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import play.api.libs.json.Json
 
-import scala.collection.immutable.VectorMap
 import scala.util.control.NonFatal
 
 object TransactionDiffer {
@@ -196,21 +195,7 @@ object TransactionDiffer {
           case _                                 => UnsupportedTransactionType.asLeft.traced
         }
       }
-      .flatMap { diff =>
-        val maybeDAppAddress = tx match {
-          case i: InvokeScriptTransaction =>
-            val address = i.dAppAddressOrAlias match {
-              case alias: Alias     => initDiff.aliases.get(alias).map(Right(_)).getOrElse(blockchain.resolveAlias(alias))
-              case address: Address => Right(address)
-              case other            => Left(GenericError(s"Unexpected $other recipient"))
-            }
-            address.map(Some(_))
-          case _ =>
-            Right(None)
-        }
-        maybeDAppAddress.map((diff, _))
-      }
-      .flatMap { case (diff, maybeDAppAddress) => initDiff.combine(diff.bindTransaction(tx, maybeDAppAddress)).leftMap(GenericError(_)) }
+      .flatMap(diff => initDiff.combine(diff.bindTransaction(blockchain, tx, applied = true)).leftMap(GenericError(_)))
       .leftMap {
         case fte: FailedTransactionError => fte.addComplexity(initDiff.scriptsComplexity)
         case ve                          => ve
@@ -287,26 +272,15 @@ object TransactionDiffer {
       tx: Transaction,
       spentComplexity: Long,
       scriptResult: Option[InvokeScriptResult]
-  ): Either[ValidationError, Diff] = {
-    val extractDAppAddress = tx match {
-      case ist: InvokeScriptTransaction => blockchain.resolveAlias(ist.dAppAddressOrAlias).map(Some(_))
-      case _                            => Right(None)
-    }
-
-    for {
-      portfolios <- feePortfolios(blockchain, tx)
-      maybeDApp  <- extractDAppAddress
-      calledAddresses = scriptResult.map(inv => InvokeScriptResult.Invocation.calledAddresses(inv.invokes)).getOrElse(Nil)
-    } yield {
-      val affectedAddresses = portfolios.keySet ++ maybeDApp ++ calledAddresses
-      Diff(
-        transactions = VectorMap((tx.id(), NewTransactionInfo(tx, affectedAddresses, applied = false, spentComplexity))),
-        portfolios = portfolios,
-        scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
-        scriptsComplexity = spentComplexity
-      )
-    }
-  }
+  ): Either[ValidationError, Diff] =
+    feePortfolios(blockchain, tx).map(
+      portfolios =>
+        Diff(
+          portfolios = portfolios,
+          scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
+          scriptsComplexity = spentComplexity
+        ).bindTransaction(blockchain, tx, applied = false)
+    )
 
   private object isFailedTransaction {
     def unapply(result: TracedResult[ValidationError, Diff]): Option[(Long, Option[InvokeScriptResult], List[TraceStep], TracedResult.Attributes)] =
