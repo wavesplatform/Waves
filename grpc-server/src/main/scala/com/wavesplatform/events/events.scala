@@ -498,7 +498,7 @@ object StateUpdate {
         case ((updates, accDiff), txDiff) =>
           (
             updates :+ atomic(CompositeBlockchain(blockchainBeforeWithMinerReward, accDiff), txDiff),
-            accDiff.unsafeCombine(txDiff)
+            accDiff.combineF(txDiff).explicitGet()
           )
       }
     val blockchainAfter = CompositeBlockchain(blockchainBeforeWithMinerReward, totalDiff)
