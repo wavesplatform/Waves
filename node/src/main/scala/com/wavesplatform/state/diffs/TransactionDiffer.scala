@@ -14,7 +14,7 @@ import com.wavesplatform.metrics.TxProcessingStats
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
-import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
+import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, Portfolio, Sponsorship}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction._
@@ -26,7 +26,6 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import play.api.libs.json.Json
 
-import scala.collection.immutable.VectorMap
 import scala.util.control.NonFatal
 
 object TransactionDiffer {
@@ -161,7 +160,13 @@ object TransactionDiffer {
   private def validateBalance(blockchain: Blockchain, txType: TxType, diff: Diff): Either[ValidationError, Unit] =
     stats.balanceValidation.measureForType(txType)(BalanceDiffValidation(blockchain)(diff).as(()))
 
-  private def transactionDiff(blockchain: Blockchain, tx: Transaction, initDiff: Diff, currentBlockTs: TxTimestamp, limitedExecution: Boolean): TracedResult[ValidationError, Diff] =
+  private def transactionDiff(
+      blockchain: Blockchain,
+      tx: Transaction,
+      initDiff: Diff,
+      currentBlockTs: TxTimestamp,
+      limitedExecution: Boolean
+  ): TracedResult[ValidationError, Diff] =
     stats.transactionDiffValidation
       .measureForType(tx.typeId) {
         tx match {
@@ -190,7 +195,7 @@ object TransactionDiffer {
           case _                                 => UnsupportedTransactionType.asLeft.traced
         }
       }
-      .flatMap(d => initDiff.combine(d.bindTransaction(tx)).leftMap(GenericError(_)))
+      .flatMap(diff => initDiff.combine(diff.bindTransaction(blockchain, tx, applied = true)).leftMap(GenericError(_)))
       .leftMap {
         case fte: FailedTransactionError => fte.addComplexity(initDiff.scriptsComplexity)
         case ve                          => ve
@@ -234,17 +239,22 @@ object TransactionDiffer {
                 blockchain
                   .assetDescription(asset)
                   .toRight(GenericError(s"Referenced $asset not found"))
-                  .flatMap(_ =>
-                    Diff.combine(
-                      Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))),
-                      Map(dAppAddress         -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
-                    ).leftMap(GenericError(_))
+                  .flatMap(
+                    _ =>
+                      Diff
+                        .combine(
+                          Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))),
+                          Map(dAppAddress         -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
+                        )
+                        .leftMap(GenericError(_))
                   )
               case Waves =>
-                Diff.combine(
+                Diff
+                  .combine(
                     Map(tx.sender.toAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty)),
                     Map(dAppAddress         -> Portfolio(amt, LeaseBalance.empty, Map.empty))
-                  ).leftMap(GenericError(_))
+                  )
+                  .leftMap(GenericError(_))
             }
         }
         .flatMap(_.foldM(Map.empty[Address, Portfolio])(Diff.combine).leftMap(GenericError(_)))
@@ -262,26 +272,15 @@ object TransactionDiffer {
       tx: Transaction,
       spentComplexity: Long,
       scriptResult: Option[InvokeScriptResult]
-  ): Either[ValidationError, Diff] = {
-    val extractDAppAddress = tx match {
-      case ist: InvokeScriptTransaction => blockchain.resolveAlias(ist.dAppAddressOrAlias).map(Some(_))
-      case _                            => Right(None)
-    }
-
-    for {
-      portfolios <- feePortfolios(blockchain, tx)
-      maybeDApp  <- extractDAppAddress
-      calledAddresses = scriptResult.map(inv => InvokeScriptResult.Invocation.calledAddresses(inv.invokes)).getOrElse(Nil)
-    } yield {
-      val affectedAddresses = portfolios.keySet ++ maybeDApp ++ calledAddresses
-      Diff(
-        transactions = VectorMap((tx.id(), NewTransactionInfo(tx, affectedAddresses, applied = false, spentComplexity))),
-        portfolios = portfolios,
-        scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
-        scriptsComplexity = spentComplexity
-      )
-    }
-  }
+  ): Either[ValidationError, Diff] =
+    feePortfolios(blockchain, tx).map(
+      portfolios =>
+        Diff(
+          portfolios = portfolios,
+          scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
+          scriptsComplexity = spentComplexity
+        ).bindTransaction(blockchain, tx, applied = false)
+    )
 
   private object isFailedTransaction {
     def unapply(result: TracedResult[ValidationError, Diff]): Option[(Long, Option[InvokeScriptResult], List[TraceStep], TracedResult.Attributes)] =
@@ -313,10 +312,12 @@ object TransactionDiffer {
                 Sponsorship.toWaves(fee, assetInfo.sponsorship),
                 GenericError(s"Asset $asset is not sponsored, cannot be used to pay fees")
               )
-              portfolios <- Diff.combine(
-              Map(ptx.sender.toAddress       -> Portfolio(0, LeaseBalance.empty, Map(asset         -> -fee))),
-              Map(assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> fee)))
-              ).leftMap(GenericError(_))
+              portfolios <- Diff
+                .combine(
+                  Map(ptx.sender.toAddress       -> Portfolio(0, LeaseBalance.empty, Map(asset         -> -fee))),
+                  Map(assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> fee)))
+                )
+                .leftMap(GenericError(_))
             } yield portfolios
         }
       case _ => UnsupportedTransactionType.asLeft
