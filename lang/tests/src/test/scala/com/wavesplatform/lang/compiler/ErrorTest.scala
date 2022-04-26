@@ -2,7 +2,9 @@ package com.wavesplatform.lang.compiler
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.Common.multiplierFunction
-import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
+import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.directives.values.V5
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, TestCompiler}
 import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
@@ -86,6 +88,53 @@ class ErrorTest extends PropSpec {
         CONST_LONG(AnyPos, 1)
       )
   )
+
+  property("not allow using List[T] where T is not Any in pattern matching") {
+    def errorMsg(pos: String): String =
+      s"Compilation failed: [Unexpected generic match type: only List[Any] is allowed in $pos]"
+
+    val invalidPatternsWithError = Seq(
+      "List[Int]"              -> errorMsg("213-216"),
+      "(List[Int], List[Int])" -> errorMsg("214-217"),
+      "(List[Int], List[Any])" -> errorMsg("214-217"),
+      "(List[Any], List[Int])" -> errorMsg("225-228"),
+      "List[Int] | List[Int]"  -> errorMsg("213-216"),
+      "List[Int] | List[Any]"  -> errorMsg("213-216"),
+      "List[Any] | List[Int]"  -> errorMsg("225-228")
+    )
+    val validPatterns = Seq(
+      "List[Any]",
+      "(List[Any], List[Any])",
+      "List[Any] | List[Any]"
+    )
+
+    invalidPatternsWithError.foreach {
+      case (pattern, expectedError) =>
+        createPatternMatchScript(pattern) shouldBe Left(expectedError)
+    }
+
+    validPatterns.foreach { pattern =>
+      createPatternMatchScript(pattern).isRight shouldBe true
+    }
+  }
+
+  private def createPatternMatchScript(pattern: String): Either[String, DApp] = {
+    TestCompiler(V5).compile(
+      s"""
+         |{-# STDLIB_VERSION 5 #-}
+         |{-# CONTENT_TYPE DAPP #-}
+         |{-# SCRIPT_TYPE ACCOUNT #-}
+         |
+         |func invokeProcess(contract: Address) = {
+         |  strict result = invoke(contract, "process", [], [])
+         |  match (result) {
+         |    case r: $pattern => r
+         |    case _ => throw("Incorrect invoke result")
+         |  }
+         |}
+         |""".stripMargin
+    )
+  }
 
   private def errorTests(exprs: ((String, String), Expressions.EXPR)*): Unit = exprs.foreach {
     case ((label, error), input) =>
