@@ -7,7 +7,9 @@
  */
 
 import sbt.Def
-import sbt.Keys._
+import sbt.Keys.{concurrentRestrictions, _}
+
+import scala.collection.Seq
 
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
@@ -151,7 +153,8 @@ inScope(Global)(
     network := Network.default(),
     resolvers += Resolver.sonatypeRepo("snapshots"),
     Compile / doc / sources := Seq.empty,
-    Compile / packageDoc / publishArtifact := false
+    Compile / packageDoc / publishArtifact := false,
+    concurrentRestrictions := Seq(Tags.limit(Tags.Test, math.min(EvaluateTask.SystemProcessors, 8)))
   )
 )
 

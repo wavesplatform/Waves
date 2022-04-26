@@ -321,7 +321,6 @@ class UtxPoolImpl(
                 r.copy(iterations = r.iterations + 1, removedTransactions = r.removedTransactions + tx.id())
               } else {
                 val newScriptedAddresses = scriptedAddresses(tx)
-                println(s"\n\tchecked = ${r.checkedAddresses}\n\tnew = $newScriptedAddresses\n\tpriority = $priority\n")
                 if (!priority && r.checkedAddresses.intersect(newScriptedAddresses).nonEmpty) r
                 else {
                   val updatedBlockchain   = CompositeBlockchain(blockchain, r.totalDiff)
@@ -380,7 +379,6 @@ class UtxPoolImpl(
 
       @tailrec
       def loop(seed: PackResult): PackResult = {
-        println(s"LOOP new seed")
         def allValidated(seed: PackResult): Boolean =
           (transactions.keys().asScala ++ priorityPool.priorityTransactionIds).forall(seed.validatedTransactions)
 
