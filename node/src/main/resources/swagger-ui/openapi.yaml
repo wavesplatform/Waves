@@ -2028,7 +2028,8 @@ paths:
       summary: Information about multiple assets
       description: >-
         Get detailed information about given assets. See [fields
-        descriptions](https://docs.waves.tech/en/blockchain/token/#custom-token-parameters)
+        descriptions](https://docs.waves.tech/en/blockchain/token/#custom-token-parameters).
+        For dozens of assets, better use the POST method
       operationId: getMultipleAssetDetails
       parameters:
         - name: id
@@ -2055,6 +2056,51 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/AssetDetails'
+    post:
+      tags:
+        - assets
+      summary: Information about multiple assets
+      description: >-
+        Get detailed information about given assets. See [fields
+        descriptions](https://docs.waves.tech/en/blockchain/token/#custom-token-parameters)
+      operationId: getMultipleAssetDetailsViaPost
+      parameters:
+        - name: full
+          in: query
+          description: 'If true, the response contains `scriptDetails` for scripted assets. False by default'
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                ids:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AssetId'
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AssetId'
+            encoding:
+              id:
+                style: form
+                explode: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AssetDetails'
+      x-codegen-request-body-name: ids
   '/assets/balance/{address}/{assetId}':
     get:
       tags:

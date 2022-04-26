@@ -47,7 +47,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   def createDiffE(tx: Transaction): Either[ValidationError, Diff] = transactionDiffer(tx).resultE
   def createDiff(tx: Transaction): Diff                           = createDiffE(tx).explicitGet()
 
-  lazy val utxPool = new UtxPoolImpl(SystemTime, blockchain, settings.utxSettings)
+  lazy val utxPool = new UtxPoolImpl(SystemTime, blockchain, settings.utxSettings, settings.minerSettings.enable)
   lazy val wallet  = Wallet(settings.walletSettings.copy(file = None))
 
   object commonApi {
