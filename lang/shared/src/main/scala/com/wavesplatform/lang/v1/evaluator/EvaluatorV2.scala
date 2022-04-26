@@ -37,17 +37,16 @@ class EvaluatorV2(
       Defer {
         fc.args.indices
           .to(LazyList)
-          .foldM(limit) {
-            case (unused, argIndex) =>
-              if (unused <= 0)
-                EvaluationResult(unused)
-              else
-                root(
-                  expr = fc.args(argIndex),
-                  update = argValue => EvaluationResult(fc.args = fc.args.updated(argIndex, argValue)),
-                  limit = unused,
-                  parentBlocks
-                )
+          .foldM(limit) { case (unused, argIndex) =>
+            if (unused <= 0)
+              EvaluationResult(unused)
+            else
+              root(
+                expr = fc.args(argIndex),
+                update = argValue => EvaluationResult(fc.args = fc.args.updated(argIndex, argValue)),
+                limit = unused,
+                parentBlocks
+              )
           }
       }
 
@@ -276,13 +275,12 @@ class EvaluatorV2(
       expr = let.value,
       update = v =>
         EvaluationResult(let.value = v)
-          .map(
-            _ =>
-              let.value match {
-                case e: EVALUATED => ctx.log(let, Right(e))
-                case _            =>
+          .map(_ =>
+            let.value match {
+              case e: EVALUATED => ctx.log(let, Right(e))
+              case _            =>
             }
-        ),
+          ),
       limit = limit,
       parentBlocks = nextParentBlocks
     ).flatMap { unused =>
@@ -297,10 +295,9 @@ class EvaluatorV2(
   private def logError(let: LET, r: EvaluationResult[Int]): EvaluationResult[Int] =
     EvaluationResult(
       r.value
-        .map(_.leftMap {
-          case l @ (error, _) =>
-            ctx.log(let, Left(error))
-            l
+        .map(_.leftMap { case l @ (error, _) =>
+          ctx.log(let, Left(error))
+          l
         })
     )
 
