@@ -48,16 +48,16 @@ class GrpcSponsorFeeActionSuite extends AnyFreeSpec with GrpcBaseTransactionSuit
 
       val matchDebugResult = matchPattern {
         case Seq(
-            StateChangesDetails(
-              Nil,
-              Nil,
-              Seq(IssueInfoResponse(issueAssetId, _, _, _, _, _, _, _)),
-              Nil,
-              Nil,
-              Seq(SponsorFeeResponse(sponsorFeeAssetId, Some(`minSponsoredAssetFee`))),
-              None,
-              Nil
-            )
+              StateChangesDetails(
+                Nil,
+                Nil,
+                Seq(IssueInfoResponse(issueAssetId, _, _, _, _, _, _, _)),
+                Nil,
+                Nil,
+                Seq(SponsorFeeResponse(sponsorFeeAssetId, Some(`minSponsoredAssetFee`))),
+                None,
+                Nil
+              )
             ) if issueAssetId == sponsorFeeAssetId =>
       }
 
@@ -121,36 +121,36 @@ class GrpcSponsorFeeActionSuite extends AnyFreeSpec with GrpcBaseTransactionSuit
     "Cancel sponsorship" in {
       val dApp = createDApp(
         s"""
-          |
-          |{-# STDLIB_VERSION 4 #-}
-          |{-# CONTENT_TYPE DAPP #-}
-          |{-# SCRIPT_TYPE ACCOUNT #-}
-          |
-          |@Callable(i)
-          |func issue2assets() = {
-          |    let i1 = Issue("SponsoredAsset0", "SponsoredAsset description", 1000000000000000, 2, true, unit, 0)
-          |    let i2 = Issue("SponsoredAsset1", "SponsoredAsset description", 1000000000000000, 2, true, unit, 0)
-          |
-          |    let issueId0 = calculateAssetId(i1)
-          |    let issueId1 = calculateAssetId(i2)
-          |
-          |    [
-          |        BinaryEntry("cancelSponsorAssetId0", issueId0),
-          |        BinaryEntry("cancelSponsorAssetId1", issueId1),
-          |        i1, i2
-          |    ]
-          |}
-          |
-          |@Callable(i)
-          |func sponsor2assets() = [
-          |    SponsorFee(this.getBinary("cancelSponsorAssetId0").value(), $minSponsoredAssetFee),
-          |    SponsorFee(this.getBinary("cancelSponsorAssetId1").value(), $minSponsoredAssetFee)
-          |]
-          |
-          |@Callable(i)
-          |func cancelSponsorship() = [
-          |    SponsorFee(this.getBinary("cancelSponsorAssetId0").value(), unit)
-          |]
+           |
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-# SCRIPT_TYPE ACCOUNT #-}
+           |
+           |@Callable(i)
+           |func issue2assets() = {
+           |    let i1 = Issue("SponsoredAsset0", "SponsoredAsset description", 1000000000000000, 2, true, unit, 0)
+           |    let i2 = Issue("SponsoredAsset1", "SponsoredAsset description", 1000000000000000, 2, true, unit, 0)
+           |
+           |    let issueId0 = calculateAssetId(i1)
+           |    let issueId1 = calculateAssetId(i2)
+           |
+           |    [
+           |        BinaryEntry("cancelSponsorAssetId0", issueId0),
+           |        BinaryEntry("cancelSponsorAssetId1", issueId1),
+           |        i1, i2
+           |    ]
+           |}
+           |
+           |@Callable(i)
+           |func sponsor2assets() = [
+           |    SponsorFee(this.getBinary("cancelSponsorAssetId0").value(), $minSponsoredAssetFee),
+           |    SponsorFee(this.getBinary("cancelSponsorAssetId1").value(), $minSponsoredAssetFee)
+           |]
+           |
+           |@Callable(i)
+           |func cancelSponsorship() = [
+           |    SponsorFee(this.getBinary("cancelSponsorAssetId0").value(), unit)
+           |]
         """.stripMargin
       )
 
@@ -212,23 +212,23 @@ class GrpcSponsorFeeActionSuite extends AnyFreeSpec with GrpcBaseTransactionSuit
         """.stripMargin
       )
 
-      val dAppAddress    = dApp.toAddress.toString
-      val invokeTx       = miner.invokeScript(miner.keyPair, dAppAddress, Some("issueAndMultipleSponsor"), waitForTx = true, fee = smartMinFee + issueFee)
+      val dAppAddress = dApp.toAddress.toString
+      val invokeTx = miner.invokeScript(miner.keyPair, dAppAddress, Some("issueAndMultipleSponsor"), waitForTx = true, fee = smartMinFee + issueFee)
       val txStateChanges = miner.debugStateChanges(invokeTx._1.id).stateChanges.toSeq
       val assetId        = txStateChanges.flatMap(_.issues).head.assetId
 
       val matchDebugResult = matchPattern {
         case Seq(
-            StateChangesDetails(
-              Nil,
-              Nil,
-              Seq(IssueInfoResponse(`assetId`, _, _, _, _, _, _, _)),
-              Nil,
-              Nil,
-              sponsorFeeResponses,
-              None,
-              Nil
-            )
+              StateChangesDetails(
+                Nil,
+                Nil,
+                Seq(IssueInfoResponse(`assetId`, _, _, _, _, _, _, _)),
+                Nil,
+                Nil,
+                sponsorFeeResponses,
+                None,
+                Nil
+              )
             ) if sponsorFeeResponses.size == 9 && sponsorFeeResponses.last == SponsorFeeResponse(`assetId`, Some(`lastMinSponsoredAssetFee`)) =>
       }
       txStateChanges should matchDebugResult
@@ -267,16 +267,16 @@ class GrpcSponsorFeeActionSuite extends AnyFreeSpec with GrpcBaseTransactionSuit
 
       val matchDebugResult = matchPattern {
         case Seq(
-            StateChangesDetails(
-              Nil,
-              Nil,
-              Seq(IssueInfoResponse(`assetId`, _, _, _, _, _, _, _)),
-              Nil,
-              Nil,
-              Seq(SponsorFeeResponse(`assetId`, Some(100)), SponsorFeeResponse(`assetId`, None)),
-              None,
-              Nil
-            )
+              StateChangesDetails(
+                Nil,
+                Nil,
+                Seq(IssueInfoResponse(`assetId`, _, _, _, _, _, _, _)),
+                Nil,
+                Nil,
+                Seq(SponsorFeeResponse(`assetId`, Some(100)), SponsorFeeResponse(`assetId`, None)),
+                None,
+                Nil
+              )
             ) =>
       }
       txStateChanges should matchDebugResult
@@ -380,15 +380,14 @@ class GrpcSponsorFeeActionSuite extends AnyFreeSpec with GrpcBaseTransactionSuit
       val sponsorFees = miner.debugStateChanges(invokeTx2._1.id).stateChanges.get.sponsorFees
 
       (assetIds zip sponsorFees)
-        .foreach {
-          case (issueAssetId, sponsorFee) =>
-            issueAssetId shouldBe sponsorFee.assetId
-            sponsorFee.minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
+        .foreach { case (issueAssetId, sponsorFee) =>
+          issueAssetId shouldBe sponsorFee.assetId
+          sponsorFee.minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
 
-            miner.assetsDetails(issueAssetId).minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
-            val dAppBalance = miner.assetsBalance(dappAddress).balances.find(_.assetId == issueAssetId).get
-            dAppBalance.minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
-            dAppBalance.sponsorBalance shouldBe Some(miner.balance(dappAddress).balance)
+          miner.assetsDetails(issueAssetId).minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
+          val dAppBalance = miner.assetsBalance(dappAddress).balances.find(_.assetId == issueAssetId).get
+          dAppBalance.minSponsoredAssetFee shouldBe Some(minSponsoredAssetFee)
+          dAppBalance.sponsorBalance shouldBe Some(miner.balance(dappAddress).balance)
         }
 
       assertBadRequestAndMessage(
@@ -441,7 +440,7 @@ class GrpcSponsorFeeActionSuite extends AnyFreeSpec with GrpcBaseTransactionSuit
 
       assertBadRequestAndMessage(
         miner.invokeScript(miner.keyPair, dApp.toAddress.toString, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee),
-        "AlwaysRejectError(Negative sponsor amount = -1)"
+        "Negative sponsor amount = -1"
       )
     }
 

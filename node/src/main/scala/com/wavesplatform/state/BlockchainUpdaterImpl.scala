@@ -2,9 +2,6 @@ package com.wavesplatform.state
 
 import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
-import cats.implicits.catsSyntaxSemigroup
-import cats.instances.map.*
-import cats.kernel.Semigroup
 import cats.syntax.either.*
 import cats.syntax.option.*
 import com.wavesplatform.account.{Address, Alias}
