@@ -89,6 +89,27 @@ class ErrorTest extends PropSpec {
       )
   )
 
+  property("undefined variable in FOLD macro") {
+    TestCompiler(V5).compile(
+      s"""
+         |{-# STDLIB_VERSION 5 #-}
+         |{-# CONTENT_TYPE DAPP #-}
+         |{-# SCRIPT_TYPE ACCOUNT #-}
+         |
+         |func calc() = {
+         |
+         |  # 'let misplaced = 2' should be defined here
+         |  
+         |  func fold(totals: Int, r: String) = {
+         |    let misplaced = 0
+         |    1
+         |  }
+         |  FOLD<7>([], misplaced, fold)
+         |}
+         |""".stripMargin
+    ) shouldBe Left("Compilation failed: [A definition of 'misplaced' is not found in 234-243]")
+  }
+
   property("not allow using List[T] where T is not Any in pattern matching") {
     def errorMsg(pos: String): String =
       s"Compilation failed: [Unexpected generic match type: only List[Any] is allowed in $pos]"
@@ -118,7 +139,7 @@ class ErrorTest extends PropSpec {
     }
   }
 
-  private def createPatternMatchScript(pattern: String): Either[String, DApp] = {
+  private def createPatternMatchScript(pattern: String): Either[String, DApp] =
     TestCompiler(V5).compile(
       s"""
          |{-# STDLIB_VERSION 5 #-}
@@ -134,7 +155,6 @@ class ErrorTest extends PropSpec {
          |}
          |""".stripMargin
     )
-  }
 
   private def errorTests(exprs: ((String, String), Expressions.EXPR)*): Unit = exprs.foreach {
     case ((label, error), input) =>

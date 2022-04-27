@@ -107,8 +107,8 @@ object ExpressionCompiler {
     compileUntyped(adjustedDecls, ctx)
   }
 
-  private def compileExpr(expr: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL, Expressions.EXPR)] =
-    compileExprWithCtx(expr, allowIllFormedStrings = false).map(r => (r.expr, r.t, r.parseNodeExpr))
+  private def compileExpr(expr: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL, Expressions.EXPR, Iterable[CompilationError])] =
+    compileExprWithCtx(expr, allowIllFormedStrings = false).map(r => (r.expr, r.t, r.parseNodeExpr, r.errors))
 
   private def compileExprWithCtx(
       expr: Expressions.EXPR,
@@ -681,14 +681,14 @@ object ExpressionCompiler {
       func: PART[String]
   ): CompileM[CompilationStepResultExpr] =
     for {
-      (list, listType, _) <- compileExpr(list)
+      (list, listType, _, compileListErrors) <- compileExpr(list)
       listInnerType <- (listType match {
         case list: LIST => Right(list.innerType)
         case other      => Left(Generic(p.start, p.end, s"FOLD first argument should be List[T], but $other found"))
       }).toCompileM
-      (acc, accType, accRaw) <- compileExpr(acc)
-      funcName               <- handlePart(func)
-      ctx                    <- get[Id, CompilerContext, CompilationError]
+      (acc, accType, accRaw, compileAccErrors) <- compileExpr(acc)
+      funcName                                 <- handlePart(func)
+      ctx                                      <- get[Id, CompilerContext, CompilationError]
       function <- ctx
         .functionTypeSignaturesByName(funcName)
         .collectFirst {
@@ -703,7 +703,7 @@ object ExpressionCompiler {
         .toCompileM
       _ <- set[Id, CompilerContext, CompilationError](ctx.copy(foldIdx = ctx.foldIdx + 1))
       r <- Right(CompilerMacro.unwrapFold(ctx.foldIdx, limit, list, acc, function.header)).toCompileM
-    } yield CompilationStepResultExpr(ctx, r, function.args.head._2.asInstanceOf[FINAL], accRaw)
+    } yield CompilationStepResultExpr(ctx, r, function.args.head._2.asInstanceOf[FINAL], accRaw, compileListErrors ++ compileAccErrors)
 
   private def matchFuncOverload(
       p: Pos,
