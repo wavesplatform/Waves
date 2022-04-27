@@ -62,7 +62,7 @@ object JsAPI {
             "name" -> v._1,
             "type" -> typeRepr(v._2._1),
             "doc"  -> DocSource.varData((v._1, ver))
-        )
+          )
       )
       .toJSArray
 
@@ -281,14 +281,23 @@ object JsAPI {
                 userFunctionComplexities,
                 globalVariableComplexities
                 ) =>
+              val compactNameToOriginalName: Map[String, String] =
+                dApp.meta.compactNameAndOriginalNamePairList.map(pair => pair.compactName -> pair.originalName).toMap
+
               val resultFields: Seq[(String, Any)] = Seq(
-                "result"                     -> Global.toBuffer(bytes),
-                "ast"                        -> toJs(dApp),
-                "complexity"                 -> maxComplexity.toDouble,
-                "verifierComplexity"         -> verifierComplexity.toDouble,
-                "callableComplexities"       -> callableComplexities.view.mapValues(_.toDouble).toMap.toJSDictionary,
-                "userFunctionComplexities"   -> userFunctionComplexities.view.mapValues(_.toDouble).toMap.toJSDictionary,
-                "globalVariableComplexities" -> globalVariableComplexities.view.mapValues(_.toDouble).toMap.toJSDictionary
+                "result"               -> Global.toBuffer(bytes),
+                "ast"                  -> toJs(dApp),
+                "complexity"           -> maxComplexity.toDouble,
+                "verifierComplexity"   -> verifierComplexity.toDouble,
+                "callableComplexities" -> callableComplexities.view.mapValues(_.toDouble).toMap.toJSDictionary,
+                "userFunctionComplexities" -> userFunctionComplexities.map {
+                  case (name, complexity) =>
+                    compactNameToOriginalName.getOrElse(name, name) -> complexity.toDouble
+                }.toJSDictionary,
+                "globalVariableComplexities" -> globalVariableComplexities.map {
+                  case (name, complexity) =>
+                    compactNameToOriginalName.getOrElse(name, name) -> complexity.toDouble
+                }.toJSDictionary
               )
               val errorFieldOpt: Seq[(String, Any)] = {
                 Global
