@@ -375,7 +375,7 @@ class GrpcSponsorFeeActionSuite extends AnyFreeSpec with GrpcBaseTransactionSuit
           waitForTx = true,
           fee = smartMinFee
         ),
-        "AlwaysRejectError\\(Negative sponsor amount = -1\\)"
+        "Negative sponsor amount = -1"
       )
     }
 
