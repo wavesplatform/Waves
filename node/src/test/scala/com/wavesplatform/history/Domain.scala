@@ -55,9 +55,10 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   object commonApi {
 
-    /**
-      * @return Tuple of (asset, feeInAsset, feeInWaves)
-      * @see [[com.wavesplatform.state.diffs.FeeValidation#getMinFee(com.wavesplatform.state.Blockchain, com.wavesplatform.transaction.Transaction)]]
+    /** @return
+      *   Tuple of (asset, feeInAsset, feeInWaves)
+      * @see
+      *   [[com.wavesplatform.state.diffs.FeeValidation#getMinFee(com.wavesplatform.state.Blockchain, com.wavesplatform.transaction.Transaction)]]
       */
     def calculateFee(tx: Transaction): (Asset, Long, Long) =
       transactions.calculateFee(tx).explicitGet()
@@ -119,8 +120,8 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def solidStateSnapshot(): SortedMap[String, String] = {
     val builder = SortedMap.newBuilder[String, String]
-    db.iterateOver(Array.emptyByteArray)(
-      e => builder.addOne(EthEncoding.toHexString(e.getKey).drop(2) -> EthEncoding.toHexString(e.getValue).drop(2))
+    db.iterateOver(Array.emptyByteArray)(e =>
+      builder.addOne(EthEncoding.toHexString(e.getKey).drop(2) -> EthEncoding.toHexString(e.getValue).drop(2))
     )
     builder.result()
   }
@@ -325,7 +326,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockInfoAt(db, blockchainUpdater))
   }
 
-  //noinspection ScalaStyle
+  // noinspection ScalaStyle
   object helpers {
     def creditWavesToDefaultSigner(amount: Long = 10_0000_0000): Unit = {
       import com.wavesplatform.transaction.utils.EthConverters.*

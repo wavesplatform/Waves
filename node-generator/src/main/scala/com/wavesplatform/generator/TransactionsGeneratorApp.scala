@@ -41,6 +41,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
 
   val parser = new OptionParser[GeneratorSettings]("generator") {
     head("TransactionsGenerator - Waves load testing transactions generator")
+    opt[File]('c', "configuration").valueName("<file>").text("generator configuration path")
     opt[FiniteDuration]('d', "delay").valueName("<delay>").text("delay between iterations").action { (v, c) =>
       c.copy(worker = c.worker.copy(delay = v))
     }
@@ -143,7 +144,17 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       )
   }
 
-  val externalConf = new File("generator.local.conf")
+  val configParamParser = new OptionParser[File]("configuration") {
+    opt[String]('c', "configuration").action { case (c, _) => new File(c) }
+    override def errorOnUnknownArgument: Boolean  = false
+    override def reportWarning(msg: String): Unit = ()
+  }
+
+  val externalConf =
+    configParamParser
+      .parse(args, new File("generator.local.conf"))
+      .getOrElse(throw new RuntimeException("Failed to parse configuration path from command line parameters"))
+
   val wavesSettings = Application.loadApplicationConfig(if (externalConf.isFile) Some(externalConf) else None)
 
   val defaultConfig =
@@ -182,7 +193,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         case Mode.MULTISIG => new MultisigTransactionGenerator(finalConfig.multisig, finalConfig.privateKeyAccounts, estimator)
         case Mode.ORACLE   => new OracleTransactionGenerator(finalConfig.oracle, finalConfig.privateKeyAccounts, estimator)
         case Mode.SWARM    => new SmartGenerator(finalConfig.swarm, finalConfig.privateKeyAccounts, estimator)
-        case _ => ???
+        case _             => ???
       }
 
       val threadPool                            = Executors.newFixedThreadPool(Math.max(1, finalConfig.sendTo.size))

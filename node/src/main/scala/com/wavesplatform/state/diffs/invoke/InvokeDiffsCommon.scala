@@ -531,7 +531,7 @@ object InvokeDiffsCommon {
           if (blockchain.isFeatureActivated(RideV6) || blockchain.height < blockchain.settings.functionalitySettings.enforceTransferValidationAfter) {
             TracedResult(Left(FailedTransactionError.dAppExecution(error, 0L)), List())
           } else {
-            TracedResult(Left(AlwaysRejectError(error)))
+            TracedResult(Left(FailOrRejectError(error)))
           }
         } else {
           val staticInfo = AssetStaticInfo(TransactionId @@ itx.txId, pk, issue.decimals, blockchain.isNFT(issue))
@@ -714,8 +714,12 @@ object InvokeDiffsCommon {
       val message = s"Storing data size should not exceed $limit, actual: $actual bytes"
       if (blockchain.isFeatureActivated(RideV6)) {
         error(message)
-      } else if (blockchain.isFeatureActivated(SynchronousCalls) && blockchain.height >= blockchain.settings.functionalitySettings.enforceTransferValidationAfter) {
-        TracedResult(Left(AlwaysRejectError(message)))
+      } else if (
+        blockchain.isFeatureActivated(
+          SynchronousCalls
+        ) && blockchain.height >= blockchain.settings.functionalitySettings.enforceTransferValidationAfter
+      ) {
+        TracedResult(Left(FailOrRejectError(message)))
       } else
         TracedResult(Right(()))
     } else if (version >= V6 && balanceActionsCount > availableBalanceActions) {
@@ -751,7 +755,7 @@ object InvokeDiffsCommon {
           }
           .collect {
             case e if blockchain.isFeatureActivated(BlockchainFeatures.RideV6)                                      => GenericError(e)
-            case e if blockchain.height >= blockchain.settings.functionalitySettings.enforceTransferValidationAfter => AlwaysRejectError(e)
+            case e if blockchain.height >= blockchain.settings.functionalitySettings.enforceTransferValidationAfter => FailOrRejectError(e)
           }
           .toLeft(r)
       case _ => Right(r)
