@@ -8,6 +8,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.features.BlockchainFeatures.RideV6
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.*
@@ -93,10 +94,14 @@ final class CompositeBlockchain private (
     if (maybeDiff.isEmpty || to.exists(id => inner.heightOf(id).isDefined)) {
       inner.balanceSnapshots(address, from, to)
     } else {
-      val balance = this.balance(address)
-      val lease   = this.leaseBalance(address)
-      val bs      = BalanceSnapshot(height, Portfolio(balance, lease, Map.empty))
-      if (inner.height > 0 && from < this.height) bs +: inner.balanceSnapshots(address, from, to) else Seq(bs)
+      val balance    = this.balance(address)
+      val lease      = this.leaseBalance(address)
+      val bs         = BalanceSnapshot(height, Portfolio(balance, lease, Map.empty))
+      val height2Fix = this.height == 1 && inner.isFeatureActivated(RideV6) && from < this.height + 1
+      if (inner.height > 0 && (from < this.height || height2Fix))
+        bs +: inner.balanceSnapshots(address, from, to)
+      else
+        Seq(bs)
     }
 
   override def accountScript(address: Address): Option[AccountScriptInfo] =
