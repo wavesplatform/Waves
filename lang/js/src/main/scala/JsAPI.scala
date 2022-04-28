@@ -2,7 +2,7 @@ import JsApiUtils._
 import com.wavesplatform.DocSource
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.directives.Directive.extractDirectives
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveParser, DirectiveSet}
 import com.wavesplatform.lang.v1.ContractLimits
 
