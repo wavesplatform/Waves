@@ -1,6 +1,10 @@
 package com.wavesplatform.http
 
+import akka.http.scaladsl.model.HttpEntity.{Chunk, LastChunk}
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpHeader, MediaTypes, TransferEncodings}
+import akka.http.scaladsl.model.headers.{Accept, `Content-Type`, `Transfer-Encoding`}
 import akka.http.scaladsl.testkit.RouteTestTimeout
+import akka.stream.scaladsl.Source
 import com.google.protobuf.ByteString
 import com.wavesplatform.{TestTime, TestWallet, crypto}
 import com.wavesplatform.account.{Address, AddressOrAlias}
@@ -388,4 +392,30 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
       }
     }
   }
+
+  routePath(s"/data/{address} with Transfer-Encoding: chunked") in {
+    val account = TxHelpers.signer(1)
+
+    withDomain(DomainPresets.RideV5, balances = AddrWithBalance.enoughBalances(account)) { d =>
+      d.appendBlock(TxHelpers.dataSingle(account))
+
+      val route =
+        addressApiRoute
+          .copy(blockchain = d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(() => d.liquidDiff, d.db, d.blockchainUpdater))
+          .route
+
+      val requestBody = Json.obj("keys" -> Seq("test"))
+
+      val headers: Seq[HttpHeader] =
+        Seq(`Transfer-Encoding`(TransferEncodings.chunked), `Content-Type`(ContentTypes.`application/json`), Accept(MediaTypes.`application/json`))
+
+      Post(
+        routePath(s"/data/${account.toAddress}"),
+        HttpEntity.Chunked(ContentTypes.`application/json`, Source(Seq(Chunk(akka.util.ByteString.fromString(requestBody.toString)), LastChunk)))
+      ).withHeaders(headers) ~> route ~> check {
+        responseAs[JsValue] should matchJson("""[{"key":"test","type":"string","value":"test"}]""")
+      }
+    }
+  }
+
 }

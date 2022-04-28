@@ -31,7 +31,7 @@ object JsAPI {
             "name" -> name,
             "type" -> typeRepr(ft),
             "doc"  -> DocSource.varData((name, ver))
-        )
+          )
       }
       .toJSArray
 
@@ -158,14 +158,23 @@ object JsAPI {
               "complexity" -> complexity.toDouble
             )
           case CompileResult.DApp(di, error) =>
-            val resultFields: Seq[(String, Any)] = Seq(
-              "result"                     -> Global.toBuffer(di.bytes),
-              "ast"                        -> toJs(di.dApp),
-              "complexity"                 -> di.maxComplexity._2.toDouble,
-              "verifierComplexity"         -> di.verifierComplexity.toDouble,
-              "callableComplexities"       -> di.callableComplexities.view.mapValues(_.toDouble).toMap.toJSDictionary,
-              "userFunctionComplexities"   -> di.userFunctionComplexities.view.mapValues(_.toDouble).toMap.toJSDictionary,
-              "globalVariableComplexities" -> di.globalVariableComplexities.view.mapValues(_.toDouble).toMap.toJSDictionary
+            val compactNameToOriginalName: Map[String, String] =
+                dApp.meta.compactNameAndOriginalNamePairList.map(pair => pair.compactName -> pair.originalName).toMap
+
+              val resultFields: Seq[(String, Any)] = Seq(
+              "result"               -> Global.toBuffer(di.bytes),
+              "ast"                  -> toJs(di.dApp),
+              "complexity"           -> di.maxComplexity._2.toDouble,
+              "verifierComplexity"   -> di.verifierComplexity.toDouble,
+              "callableComplexities" -> di.callableComplexities.view.mapValues(_.toDouble).toMap.toJSDictionary,
+              "userFunctionComplexities" -> di.userFunctionComplexities.map {
+                  case (name, complexity) =>
+                    compactNameToOriginalName.getOrElse(name, name) -> complexity.toDouble
+                }.toJSDictionary,
+              "globalVariableComplexities" -> di.globalVariableComplexities.map {
+                  case (name, complexity) =>
+                    compactNameToOriginalName.getOrElse(name, name) -> complexity.toDouble
+                }.toJSDictionary
             )
             val errorFieldOpt: Seq[(String, Any)] = {
               error

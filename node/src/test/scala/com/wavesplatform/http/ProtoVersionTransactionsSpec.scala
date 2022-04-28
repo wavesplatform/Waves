@@ -409,22 +409,30 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
     "UpdateAssetInfoTransaction" in {
       val asset = IssuedAsset(bytes32gen.map(ByteStr(_)).sample.get)
 
-      val updateAssetInfoTx = UpdateAssetInfoTransaction
-        .selfSigned(
+      val updateAssetInfoTxUnsigned = UpdateAssetInfoTransaction
+        .create(
           TxVersion.V1,
-          account,
+          account.publicKey,
           asset.id,
           "Test",
           "Test",
           ntpNow,
           MinFee,
-          Asset.Waves
+          Asset.Waves,
+          Proofs.empty
         )
         .explicitGet()
+
+      val (proofs, updateAssetInfoTxJson) = Post(routePath("/sign"), updateAssetInfoTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
+        checkProofs(response, updateAssetInfoTxUnsigned)
+      }
+
+      val updateAssetInfoTx = updateAssetInfoTxUnsigned.copy(proofs = proofs)
       val base64Str = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(updateAssetInfoTx)))
 
       Post(routePath("/broadcast"), updateAssetInfoTx.json()) ~> ApiKeyHeader ~> route ~> check {
         responseAs[JsObject] shouldBe updateAssetInfoTx.json()
+        responseAs[JsObject] shouldBe updateAssetInfoTxJson
       }
 
       decode(base64Str) shouldBe updateAssetInfoTx

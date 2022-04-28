@@ -18,10 +18,4 @@ object StdLibVersion {
     override val default: StdLibVersion       = V3
     override val all: Iterable[StdLibVersion] = Seq(V1, V2, V3, V4, V5)
   }
-
-  val V1: StdLibVersion = com.wavesplatform.lang.directives.values.V1
-  val V2: StdLibVersion = com.wavesplatform.lang.directives.values.V2
-  val V3: StdLibVersion = com.wavesplatform.lang.directives.values.V3
-  val V4: StdLibVersion = com.wavesplatform.lang.directives.values.V4
-  val V5: StdLibVersion = com.wavesplatform.lang.directives.values.V5
 }

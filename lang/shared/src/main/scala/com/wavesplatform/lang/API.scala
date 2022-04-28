@@ -181,7 +181,8 @@ object API {
       estimatorVersion: Int,
       needCompaction: Boolean = false,
       removeUnusedCode: Boolean = false,
-      libraries: Map[String, String] = Map.empty
+      libraries: Map[String, String] = Map.empty,
+      defaultStdLib: StdLibVersion = StdLibVersion.VersionDic.default
   ): Either[String, CompileResult] =
     for {
       estimatorVer <- Either.cond(
@@ -190,7 +191,7 @@ object API {
         s"Version of estimator must be not greater than ${API.allEstimators.length}"
       )
       directives  <- DirectiveParser(input)
-      ds          <- extractDirectives(directives)
+      ds          <- extractDirectives(directives, defaultStdLib)
       linkedInput <- ScriptPreprocessor(input, libraries, ds.imports)
       compiled    <- compileScript(ds, linkedInput, API.allEstimators.toIndexedSeq(estimatorVer - 1), needCompaction, removeUnusedCode)
     } yield compiled

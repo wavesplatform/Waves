@@ -112,9 +112,19 @@ case class UtilsApiRoute(
     }
   }
 
+  private def defaultStdlibVersion(): StdLibVersion = {
+    val v5Activated = blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
+    if (v5Activated)
+      V5
+    else if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps))
+      V4
+    else
+      StdLibVersion.VersionDic.default
+  }
+
   def compileCode: Route = path("script" / "compileCode") {
     (post & entity(as[String]) & parameter("compact".as[Boolean] ? false)) { (code, compact) =>
-      executeLimited(API.compile(code, estimator().version, compact))(
+      executeLimited(API.compile(code, estimator().version, compact, defaultStdLib = defaultStdlibVersion()))(
         _.fold(
           e => complete(ScriptCompilerError(e)), { cr =>
             val v5Activated = blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
@@ -142,7 +152,16 @@ case class UtilsApiRoute(
   def compileWithImports: Route = path("script" / "compileWithImports") {
     import ScriptWithImportsRequest._
     (post & entity(as[ScriptWithImportsRequest])) { req =>
-      executeLimited(API.compile(req.script, estimator().version, needCompaction = false, removeUnusedCode = false, req.imports)) { result =>
+      executeLimited(
+        API.compile(
+          req.script,
+          estimator().version,
+          needCompaction = false,
+          removeUnusedCode = false,
+          req.imports,
+          defaultStdLib = defaultStdlibVersion()
+        )
+      ) { result =>
         complete(
           result
             .fold(

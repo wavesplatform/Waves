@@ -12,9 +12,9 @@ object Dependencies {
 
   private def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.2.9"
 
-  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.5.0"
+  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.5.1"
 
-  private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.13.0"
+  private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.13.2"
 
   private def catsModule(module: String, version: String = "2.6.1") = Def.setting("org.typelevel" %%% s"cats-$module" % version)
 
@@ -28,16 +28,16 @@ object Dependencies {
   val kamonCore          = kamonModule("core")
   val machinist          = "org.typelevel" %% "machinist" % "0.6.8"
   val logback            = "ch.qos.logback" % "logback-classic" % "1.2.11"
-  val janino             = "org.codehaus.janino" % "janino" % "3.1.6"
+  val janino             = "org.codehaus.janino" % "janino" % "3.1.7"
   val asyncHttpClient    = "org.asynchttpclient" % "async-http-client" % "2.12.3"
   val curve25519         = "com.wavesplatform" % "curve25519-java" % "0.6.4"
-  val nettyHandler       = "io.netty" % "netty-handler" % "4.1.75.Final"
+  val nettyHandler       = "io.netty" % "netty-handler" % "4.1.76.Final"
 
   val catsEffect = catsModule("effect", "2.1.3")
   val catsCore   = catsModule("core", "2.7.0")
   val shapeless  = Def.setting("com.chuusai" %%% "shapeless" % "2.3.7")
 
-  val scalaTest = "org.scalatest" %% "scalatest" % "3.2.11" % Test
+  val scalaTest = "org.scalatest" %% "scalatest" % "3.2.12" % Test
 
   val sttp3 = "com.softwaremill.sttp.client3" % "core_2.13" % "3.3.13"
 
@@ -105,7 +105,7 @@ object Dependencies {
       bouncyCastleProvider,
       "com.wavesplatform" % "zwaves"       % "0.1.0-SNAPSHOT",
       "com.wavesplatform" % "zwaves-bn256" % "0.1.5-SNAPSHOT",
-      "org.web3j"         % "crypto"       % "4.8.9"
+      "org.web3j"         % "crypto"       % "4.9.1"
     ) ++ langCompilerPlugins.value ++ scalapbRuntime.value ++ protobuf.value
   )
 
@@ -147,7 +147,7 @@ object Dependencies {
       "commons-net"          % "commons-net"              % "3.8.0",
       "org.apache.commons"   % "commons-lang3"            % "3.12.0",
       "com.iheart"           %% "ficus"                   % "1.5.2",
-      "net.logstash.logback" % "logstash-logback-encoder" % "7.0.1" % Runtime,
+      "net.logstash.logback" % "logstash-logback-encoder" % "7.1.1" % Runtime,
       kamonCore,
       kamonModule("system-metrics"),
       kamonModule("influxdb"),

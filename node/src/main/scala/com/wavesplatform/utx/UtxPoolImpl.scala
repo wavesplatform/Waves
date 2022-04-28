@@ -41,6 +41,7 @@ class UtxPoolImpl(
     time: Time,
     blockchain: Blockchain,
     utxSettings: UtxSettings,
+    isMiningEnabled: Boolean,
     onEvent: UtxEvent => Unit = _ => (),
     nanoTimeSource: () => TxTimestamp = () => System.nanoTime()
 ) extends ScorexLogging
@@ -261,7 +262,11 @@ class UtxPoolImpl(
         if (TxCheck.isExpired(tx)) {
           TxStateActions.removeExpired(tx)
         } else {
-          val differ = TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime())(priorityPool.compositeBlockchain, _)
+          val differ = if (!isMiningEnabled && utxSettings.forceValidateInCleanup) {
+            TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(priorityPool.compositeBlockchain, _)
+          } else {
+            TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime())(priorityPool.compositeBlockchain, _)
+          }
           val diffEi = differ(tx).resultE
           diffEi.left.foreach { error =>
             TxStateActions.removeInvalid(tx, error)
