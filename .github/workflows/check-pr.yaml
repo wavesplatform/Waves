@@ -1,5 +1,12 @@
 name: Check PR
-on: [push]
+on:
+  push:
+    branches:
+      - version-[0-9].[0-9]+.x
+    tags:
+      - v[0-9].[0-9]+.[0-9]+
+  pull_request:
+
 jobs:
   check-pr:
     runs-on: ubuntu-latest
@@ -36,6 +43,7 @@ jobs:
         run: |
           sbt_version=$(cut -d\" -f2 version.sbt)
           git_ref=${GITHUB_REF##*/}
+          echo ${{ github.event }}
           pr_number=${{ github.event.number }}
           if [[ $git_ref =~ v[0-9]+\.[0-9]+\.[0-9]+$ ]] ; then
             if [[ v$sbt_version != $git_ref ]] ; then
@@ -53,7 +61,7 @@ jobs:
           fi
       - name: Publish lang
         run: sbt ci-release
-        if: steps.filter.outputs.backend == 'true'
+        if: steps.filter.outputs.lang == 'true'
         env:
           PGP_PASSPHRASE: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
           PGP_SECRET: ${{ secrets.OSSRH_GPG_KEY_BASE64 }}
