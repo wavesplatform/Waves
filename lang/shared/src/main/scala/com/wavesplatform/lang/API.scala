@@ -85,6 +85,8 @@ object API {
 
   private val allEstimators: Seq[ScriptEstimator] = ScriptEstimator.all(fixOverflow = true)
 
+  def latestEstimatorVersion: Int = allEstimators.length
+
   def allTypes(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): Seq[Types.FINAL] =
     API.buildScriptContext(DirectiveDictionary[StdLibVersion].idMap(ver), isTokenContext, isContract).types
 
@@ -108,7 +110,7 @@ object API {
 
   def parseAndCompile(
       input: String,
-      estimatorVersion: Int,
+      estimatorVersion: Int = latestEstimatorVersion,
       needCompaction: Boolean = false,
       removeUnusedCode: Boolean = false,
       libraries: Map[String, String] = Map.empty
@@ -178,7 +180,7 @@ object API {
 
   def compile(
       input: String,
-      estimatorVersion: Int,
+      estimatorVersion: Int = latestEstimatorVersion,
       needCompaction: Boolean = false,
       removeUnusedCode: Boolean = false,
       libraries: Map[String, String] = Map.empty,

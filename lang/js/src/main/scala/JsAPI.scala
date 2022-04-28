@@ -2,7 +2,7 @@ import JsApiUtils._
 import com.wavesplatform.DocSource
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.directives.Directive.extractDirectives
-import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveParser, DirectiveSet}
 import com.wavesplatform.lang.v1.ContractLimits
 
@@ -159,7 +159,7 @@ object JsAPI {
             )
           case CompileResult.DApp(di, error) =>
             val compactNameToOriginalName: Map[String, String] =
-                dApp.meta.compactNameAndOriginalNamePairList.map(pair => pair.compactName -> pair.originalName).toMap
+                di.dApp.meta.compactNameAndOriginalNamePairList.map(pair => pair.compactName -> pair.originalName).toMap
 
               val resultFields: Seq[(String, Any)] = Seq(
               "result"               -> Global.toBuffer(di.bytes),
