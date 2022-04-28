@@ -1,5 +1,6 @@
 package com.wavesplatform.utx
 
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.v1.compiler.TestCompiler
@@ -23,6 +24,18 @@ class UtxPriorityPoolSpecification extends FreeSpec with SharedDomain {
   override def settings: WavesSettings = DomainPresets.RideV3
 
   private def pack() = domain.utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1
+
+  private def mkHeightSensitiveScript(sender: KeyPair) =
+    TxHelpers.setScript(
+      sender,
+      TestCompiler(V3).compileExpression(s"""
+           |match tx {
+           |    case _: TransferTransaction => height % 2 == ${domain.blockchain.height % 2}
+           |    case _ => true
+           |}
+           |""".stripMargin),
+      fee = 0.01.waves
+    )
 
   "priority pool" - {
     "preserves correct order of transactions" in {
@@ -72,24 +85,31 @@ class UtxPriorityPoolSpecification extends FreeSpec with SharedDomain {
       domain.utxPool.priorityPool.nextMicroBlockSize(12) shouldBe 12
     }
 
-    "doesn't run cleanup on priority pool" in {
+    "cleans up priority pool only when packing, not during cleanup" in {
+      val bob, carol = nextKeyPair
 
+      domain.appendKeyBlock()
+      val rollbackTarget = domain.appendMicroBlock(
+        TxHelpers.transfer(alice, bob.toAddress, 10.015.waves, fee = 0.001.waves),
+        mkHeightSensitiveScript(bob),
+      )
+      val transferToCarol = TxHelpers.transfer(bob, carol.toAddress, 10.waves, fee = 0.005.waves)
+      domain.appendMicroBlock(transferToCarol)
+
+      domain.appendKeyBlock(Some(rollbackTarget))
+      domain.utxPool.cleanUnconfirmed()
+      domain.utxPool.priorityPool.priorityTransactions shouldEqual Seq(transferToCarol)
+      pack() shouldBe None
+      domain.utxPool.priorityPool.priorityTransactions shouldBe empty
     }
-
-    "invalidates priority pool on different microblock" in {}
 
     "continues packing when priority diff contains no valid transactions" in {
       val bob = nextKeyPair
       domain.appendBlock(
         TxHelpers.transfer(alice, bob.toAddress, 10.016.waves, fee = 0.001.waves),
-        TxHelpers.setScript(bob, TestCompiler(V3).compileExpression(
-          s"""match tx {
-             |    case _: TransferTransaction => height % 2 == ${domain.blockchain.height % 2}
-             |    case _ => true
-             |}
-             |""".stripMargin), fee = 0.01.waves)
+        mkHeightSensitiveScript(bob)
       )
-      val ref = domain.appendKeyBlock().id()
+      val ref       = domain.appendKeyBlock().id()
       val transfer1 = TxHelpers.transfer(bob, nextKeyPair.toAddress, 10.waves, fee = 0.005.waves)
       domain.appendMicroBlock(transfer1)
       domain.appendKeyBlock(Some(ref))
