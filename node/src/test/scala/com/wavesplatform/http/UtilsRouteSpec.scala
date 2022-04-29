@@ -282,7 +282,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
        |{-# SCRIPT_TYPE ACCOUNT #-}
        |
        |func testFunctionWithLongName0() = true
-       |${(1 to 500).map(idx => s"func testFunctionWithLongName$idx() = testFunctionWithLongName${idx - 1}()").mkString("\n")}
+       |${(1 to 500).map(idx => s"func testFunctionWithLongName$idx() = testFunctionWithLongName0()").mkString("\n")}
        |func test() = true
        |""".stripMargin
 
@@ -540,7 +540,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     Post(routePath("/script/compileCode"), bigSizeDApp) ~> route ~> check {
       responseAs[JsValue] should matchJson("""{
                                              |  "error" : 305,
-                                             |  "message" : "Script is too large: 36360 bytes > 32768 bytes"
+                                             |  "message" : "Script is too large: 35470 bytes > 32768 bytes"
                                              |}""".stripMargin)
     }
 
