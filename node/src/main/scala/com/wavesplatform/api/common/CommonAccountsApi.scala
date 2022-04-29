@@ -16,7 +16,6 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
-import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
@@ -49,7 +48,7 @@ trait CommonAccountsApi {
   def resolveAlias(alias: Alias): Either[ValidationError, Address]
 }
 
-object CommonAccountsApi extends ScorexLogging {
+object CommonAccountsApi {
   def includeNft(blockchain: Blockchain)(assetId: IssuedAsset): Boolean =
     !blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee) || !blockchain.assetDescription(assetId).exists(_.nft)
 
@@ -67,15 +66,16 @@ object CommonAccountsApi extends ScorexLogging {
 
     override def balanceDetails(address: Address): Either[String, BalanceDetails] = {
       val portfolio = blockchain.wavesPortfolio(address)
-      portfolio.effectiveBalance.map(effectiveBalance =>
-        BalanceDetails(
-          portfolio.balance,
-          blockchain.generatingBalance(address),
-          portfolio.balance - portfolio.lease.out,
-          effectiveBalance,
-          portfolio.lease.in,
-          portfolio.lease.out
-        )
+      portfolio.effectiveBalance.map(
+        effectiveBalance =>
+          BalanceDetails(
+            portfolio.balance,
+            blockchain.generatingBalance(address),
+            portfolio.balance - portfolio.lease.out,
+            effectiveBalance,
+            portfolio.lease.in,
+            portfolio.lease.out
+          )
       )
     }
 

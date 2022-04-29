@@ -11,7 +11,7 @@ import org.whispersystems.curve25519.OpportunisticCurve25519Provider
 
 import scala.util.Try
 
-package object crypto extends ScorexLogging {
+package object crypto {
   // Constants
   val SignatureLength: Int = Curve25519.SignatureLength
   val KeyLength: Int       = Curve25519.KeyLength
@@ -22,9 +22,7 @@ package object crypto extends ScorexLogging {
     val constructor = classOf[OpportunisticCurve25519Provider].getDeclaredConstructors.head
       .asInstanceOf[Constructor[OpportunisticCurve25519Provider]]
     constructor.setAccessible(true)
-    val p = constructor.newInstance()
-    log.info(s"Native provider used: ${p.isNative}")
-    p
+    constructor.newInstance()
   }
 
   // Digests

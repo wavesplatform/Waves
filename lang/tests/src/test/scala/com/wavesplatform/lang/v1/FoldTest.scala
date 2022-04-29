@@ -1,7 +1,6 @@
 package com.wavesplatform.lang.v1
 
-import com.wavesplatform.lang.directives.values.StdLibVersion.V5
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V5}
 import com.wavesplatform.lang.evaluator.EvaluatorSpec
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils.functionCosts

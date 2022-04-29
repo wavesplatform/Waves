@@ -8,10 +8,9 @@ import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
 import com.wavesplatform.transaction._
-import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 
-import scala.util.{Failure, Try}
+import scala.util.Try
 
 case class MicroBlock(
     version: Byte,
@@ -33,7 +32,7 @@ case class MicroBlock(
   def stringRepr(totalBlockId: ByteStr): String = s"MicroBlock(${totalBlockId.trim} -> ${reference.trim}, txs=${transactionData.size})"
 }
 
-object MicroBlock extends ScorexLogging {
+object MicroBlock {
   def buildAndSign(
       version: Byte,
       generator: KeyPair,
@@ -48,11 +47,6 @@ object MicroBlock extends ScorexLogging {
     MicroBlockSerializer
       .parseBytes(bytes)
       .flatMap(_.validateToTry)
-      .recoverWith {
-        case t: Throwable =>
-          log.error("Error when parsing microblock", t)
-          Failure(t)
-      }
 
   def validateReferenceLength(version: Byte, length: Int): Boolean =
     length == Block.referenceLength(version)
