@@ -1,12 +1,11 @@
 package com.wavesplatform.settings
 
 import com.wavesplatform.Version
-import com.wavesplatform.utils.ScorexLogging
 
 /**
   * System constants here.
   */
-object Constants extends ScorexLogging {
+object Constants {
   val ApplicationName = "waves"
   val AgentName       = s"Waves v${Version.VersionString}"
 

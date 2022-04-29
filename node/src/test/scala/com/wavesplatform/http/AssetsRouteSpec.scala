@@ -13,6 +13,7 @@ import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Height}
+import com.wavesplatform.test.DomainPresets._
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer._
@@ -25,7 +26,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with WithDomain with RestAPIS
 
   private val MaxDistributionDepth = 1
 
-  def routeTest[A](f: (Domain, Route) => A): A = withDomain(DomainPresets.RideV4.addFeatures(BlockchainFeatures.ReduceNFTFee)) { d =>
+  def routeTest[A](f: (Domain, Route) => A): A = withDomain(RideV4.addFeatures(BlockchainFeatures.ReduceNFTFee)) { d =>
     f(
       d,
       seal(

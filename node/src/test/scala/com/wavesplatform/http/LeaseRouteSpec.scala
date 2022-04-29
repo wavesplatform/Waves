@@ -10,7 +10,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -20,6 +19,7 @@ import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{BinaryDataEntry, Blockchain, Diff, Height, TxMeta}
+import com.wavesplatform.test.DomainPresets._
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
@@ -53,10 +53,7 @@ class LeaseRouteSpec
     )
 
   private def withRoute(balances: Seq[AddrWithBalance])(f: (Domain, Route) => Unit): Unit =
-    withDomain(
-      settings = domainSettingsWithPreactivatedFeatures(BlockchainFeatures.implemented.flatMap(BlockchainFeatures.feature).toSeq: _*),
-      balances = balances
-    ) { d =>
+    withDomain(settings = mostRecent, balances = balances) { d =>
       f(d, route(d).route)
     }
 
