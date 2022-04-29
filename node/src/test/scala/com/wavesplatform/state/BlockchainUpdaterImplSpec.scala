@@ -9,7 +9,6 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{DBCacheSettings, WithDomain}
 import com.wavesplatform.events.BlockchainUpdateTriggers
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.history.{chainBaseAndMicro, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -258,31 +257,28 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
       val sender = KeyPair(Longs.toByteArray(Random.nextLong()))
 
       withDomain(
-        settings = domainSettingsWithPreactivatedFeatures(
-          BlockchainFeatures.NG,
-          BlockchainFeatures.BlockV5,
-          BlockchainFeatures.Ride4DApps
-        ),
+        DomainPresets.RideV4,
         balances = Seq(AddrWithBalance(dapp.toAddress, 10_00000000), AddrWithBalance(sender.toAddress, 10_00000000))
-    ) { d =>
-      val script = ScriptCompiler
-        .compile(
-          """
-          |{-# STDLIB_VERSION 4 #-}
-          |{-# SCRIPT_TYPE ACCOUNT #-}
-          |{-# CONTENT_TYPE DAPP #-}
-          |
-          |@Callable(i)
-          |func default() = {
-          |  [
-          |    BinaryEntry("vrf", value(value(blockInfoByHeight(height)).vrf))
-          |  ]
-          |}
-          |""".stripMargin,
-          ScriptEstimatorV2
-        )
-        .explicitGet()
-        ._1
+      ) { d =>
+        val script = ScriptCompiler
+          .compile(
+            """
+                |
+                |{-# STDLIB_VERSION 4 #-}
+                |{-# SCRIPT_TYPE ACCOUNT #-}
+                |{-# CONTENT_TYPE DAPP #-}
+                |
+                |@Callable(i)
+                |func default() = {
+                |  [
+                |    BinaryEntry("vrf", value(value(blockInfoByHeight(height)).vrf))
+                |  ]
+                |}
+                |""".stripMargin,
+            ScriptEstimatorV2
+          )
+          .explicitGet()
+          ._1
 
         d.appendBlock(
           SetScriptTransaction.selfSigned(2.toByte, dapp, Some(script), 500_0000L, ntpTime.getTimestamp()).explicitGet()

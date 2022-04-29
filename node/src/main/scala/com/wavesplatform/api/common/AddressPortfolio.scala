@@ -78,7 +78,7 @@ class BalanceIterator(
     } else nextOverride()
 }
 
-object AddressPortfolio extends ScorexLogging {
+object AddressPortfolio {
   def nftIterator(
       resource: DBResource,
       address: Address,

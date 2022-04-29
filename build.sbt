@@ -7,7 +7,9 @@
  */
 
 import sbt.Def
-import sbt.Keys._
+import sbt.Keys.{concurrentRestrictions, _}
+
+import scala.collection.Seq
 
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
@@ -138,9 +140,6 @@ inScope(Global)(
     dependencyOverrides ++= Dependencies.enforcedVersions.value,
     cancelable := true,
     parallelExecution := true,
-    Test / fork := true,
-    Test / testForkedParallel := true,
-    testListeners := Seq.empty, // Fix for doubled test reports
     /* http://www.scalatest.org/user_guide/using_the_runner
      * o - select the standard output reporter
      * I - show reminder of failed and canceled tests without stack traces
@@ -154,7 +153,8 @@ inScope(Global)(
     network := Network.default(),
     resolvers += Resolver.sonatypeRepo("snapshots"),
     Compile / doc / sources := Seq.empty,
-    Compile / packageDoc / publishArtifact := false
+    Compile / packageDoc / publishArtifact := false,
+    concurrentRestrictions := Seq(Tags.limit(Tags.Test, math.min(EvaluateTask.SystemProcessors, 8)))
   )
 )
 
