@@ -46,7 +46,17 @@ class EvaluatedPBSerializationTest
       "(1, 2, 3)"                            -> Seq("Tuple", "Int", "Int", "Int"),
       "getInteger(this,\"integerVal\")"      -> Seq("Unit"),
       "Address(base58'8t38fWQhrYJsqxXtPpi')" -> Seq("Address", "ByteVector"),
-      "BalanceDetails(10, 10, 10, 10)"       -> Seq("BalanceDetails", "Int", "Int", "Int", "Int")
+      "BalanceDetails(10, 10, 10, 10)"       -> Seq("BalanceDetails", "Int", "Int", "Int", "Int"),
+      "GenesisTransaction(1, Address(base58''), base58'', 1, 1, 1)" -> Seq(
+        "GenesisTransaction",
+        "Address",
+        "ByteVector",
+        "Int",
+        "Int",
+        "Int",
+        "ByteVector",
+        "Int"
+      )
     ).foreach {
       case (argValue, argType) =>
         withDomain(DomainPresets.RideV5, AddrWithBalance.enoughBalances(masterDApp, serviceDApp, invoker)) { d =>
