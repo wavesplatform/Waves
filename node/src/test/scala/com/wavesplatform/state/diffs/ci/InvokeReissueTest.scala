@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs.ci
 import com.wavesplatform.TestValues.invokeFee
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.lang.directives.values.StdLibVersion.V5
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.IssuedAsset

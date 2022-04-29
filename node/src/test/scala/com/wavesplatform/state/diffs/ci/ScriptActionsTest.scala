@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs.ci
 
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.lang.directives.values.StdLibVersion.V5
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.v1.ExprScript.ExprScriptImpl
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.lang.v1.compiler.TestCompiler

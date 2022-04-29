@@ -4,7 +4,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
-import com.wavesplatform.lang.directives.values.StdLibVersion.V5
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_STRING, FUNC, FUNCTION_CALL, REF}

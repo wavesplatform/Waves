@@ -3,7 +3,7 @@ import com.wavesplatform.TestValues.invokeFee
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.lang.directives.values.StdLibVersion.V5
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.FeeValidation.FeeUnit
 import com.wavesplatform.state.diffs.produce

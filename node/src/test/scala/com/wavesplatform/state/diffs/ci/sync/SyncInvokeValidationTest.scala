@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs.ci.sync
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.lang.directives.values.StdLibVersion.V5
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.test.{PropSpec, produce}
 import com.wavesplatform.transaction.Asset.Waves
@@ -228,10 +228,7 @@ class SyncInvokeValidationTest extends PropSpec with WithDomain {
       d.appendBlock(setScript(dApp1Signer, dApp1), setScript(dApp2Signer, dApp2), setScript(dApp3Signer, dApp3))
       d.appendAndAssertSucceed(invoke(dApp1Address))
 
-      // expected
-      // d.liquidDiff.transactions.head._2.affected shouldBe Set(dApp1Address, dApp2Address, dApp3Address, defaultAddress)
-      // actual
-      d.liquidDiff.transactions.head._2.affected shouldBe Set(dApp2Address, dApp3Address, defaultAddress)
+      d.liquidDiff.transactions.head._2.affected shouldBe Set(dApp1Address, dApp2Address, dApp3Address, defaultAddress)
     }
   }
 

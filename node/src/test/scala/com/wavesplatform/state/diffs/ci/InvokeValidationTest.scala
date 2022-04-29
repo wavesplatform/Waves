@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.lang.directives.values.StdLibVersion.V5
+import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_LONG}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.protobuf.transaction.PBTransactions
@@ -15,7 +15,7 @@ import com.wavesplatform.test.{PropSpec, produce}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.TxHelpers._
-import com.wavesplatform.transaction.TxVersion._
+import com.wavesplatform.transaction.TxVersion.{V1, V2}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 
 class InvokeValidationTest extends PropSpec with WithDomain {
