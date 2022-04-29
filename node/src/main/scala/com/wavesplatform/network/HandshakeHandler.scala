@@ -137,7 +137,7 @@ abstract class HandshakeHandler(
   }
 }
 
-object HandshakeHandler extends ScorexLogging {
+object HandshakeHandler {
 
   val NodeNameAttributeKey        = AttributeKey.newInstance[String]("name")
   val NodeVersionAttributeKey     = AttributeKey.newInstance[(Int, Int, Int)]("version")

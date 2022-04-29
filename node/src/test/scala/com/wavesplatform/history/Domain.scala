@@ -174,7 +174,9 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def appendKeyBlock(ref: Option[ByteStr] = None): Block = {
     val block = createBlock(Block.NgBlockVersion, Nil, ref.orElse(Some(lastBlockId)))
-    appendBlock(block)
+    val discardedDiffs = appendBlock(block)
+    utxPool.setPriorityDiffs(discardedDiffs)
+    utxPool.cleanUnconfirmed()
     lastBlock
   }
 

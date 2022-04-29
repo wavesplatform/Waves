@@ -38,8 +38,10 @@ final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging wi
     this.readLockCond(f)(shouldRecheck)
 
   private[utx] def setPriorityDiffs(discDiffs: Seq[Diff]): Set[Transaction] =
-    if (discDiffs.isEmpty) Set.empty
-    else {
+    if (discDiffs.isEmpty) {
+      clear()
+      Set.empty
+    } else {
       val transactions = updateDiffs(_ => discDiffs.map(PriorityData(_)))
       log.trace(
         s"Priority pool updated with diffs: [${discDiffs.map(_.hashString).mkString(", ")}], transactions order: [${priorityTransactionIds.mkString(", ")}]"

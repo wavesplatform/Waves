@@ -28,7 +28,8 @@ import com.wavesplatform.protobuf.transaction.InvokeScriptResult
 import com.wavesplatform.protobuf.transaction.InvokeScriptResult.{Call, Invocation}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.{AssetDescription, Blockchain, EmptyDataEntry, Height, LeaseBalance, StringDataEntry}
-import com.wavesplatform.test.{FreeSpec, _}
+import com.wavesplatform.test._
+import com.wavesplatform.test.DomainPresets._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.script.ScriptCompiler

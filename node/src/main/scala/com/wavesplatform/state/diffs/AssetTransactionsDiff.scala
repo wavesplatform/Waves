@@ -16,9 +16,8 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets._
-import com.wavesplatform.utils.ScorexLogging
 
-object AssetTransactionsDiff extends ScorexLogging {
+object AssetTransactionsDiff {
   def issue(blockchain: Blockchain)(tx: IssueTransaction): Either[ValidationError, Diff] = {
     def requireValidUtf(): Boolean = {
       def isValid(str: ByteString): Boolean = {

@@ -3,7 +3,7 @@ package com.wavesplatform.transaction.smart
 import com.wavesplatform.account.Address
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.lang.directives.values.StdLibVersion
+import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.test._
@@ -13,7 +13,7 @@ import play.api.libs.json.Json
 
 class SubInvokeStateChangesSpec extends FlatSpec with WithDomain with JsonMatchers {
   val ContractFunction            = "default"
-  val compileV5: String => Script = TestCompiler(StdLibVersion.V5).compileContract(_)
+  val compileV5: String => Script = TestCompiler(V5).compileContract(_)
 
   "Invoke state changes" should "include intermediate invokes" in {
     // Root DApp, calls addr2s and addr2f
