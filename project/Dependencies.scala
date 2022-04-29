@@ -6,7 +6,7 @@ import sbt.{Def, _}
 object Dependencies {
   // Node protobuf schemas
   private[this] val protoSchemasLib =
-    "com.wavesplatform" % "protobuf-schemas" % "1.3.3" classifier "protobuf-src" intransitive ()
+    "com.wavesplatform" % "protobuf-schemas" % "1.3.4-SNAPSHOT" classifier "protobuf-src" intransitive ()
 
   def akkaModule(module: String): ModuleID = "com.typesafe.akka" %% s"akka-$module" % "2.6.19"
 
@@ -163,8 +163,8 @@ object Dependencies {
       monixModule("reactive").value,
       nettyHandler,
       "com.typesafe.scala-logging"                       %% "scala-logging" % "3.9.4",
-      "eu.timepit" %% "refined"                 % "0.9.28" exclude("org.scala-lang.modules", "scala-xml_2.13"),
-      "eu.timepit" %% "refined-cats"            % "0.9.28" exclude("org.scala-lang.modules", "scala-xml_2.13"),
+      "eu.timepit"                                       %% "refined" % "0.9.28" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
+      "eu.timepit"                                       %% "refined-cats" % "0.9.28" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
       akkaModule("testkit")                              % Test,
       akkaHttpModule("akka-http-testkit")                % Test,
       leveldbJava().exclude("com.google.guava", "guava") % Test
