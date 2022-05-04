@@ -8,9 +8,8 @@ import com.wavesplatform.lang.script.v1.ExprScript.ExprScriptImpl
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
-import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.{Portfolio, StringDataEntry}
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test.{PropSpec, produce}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxHelpers._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -90,6 +89,31 @@ class SyncInvokeFailAndRejectTest extends PropSpec with WithDomain {
         val total               = reward + previousBlockReward + currentBlockReward - invokeFee
         Map(defaultAddress -> Portfolio.waves(total))
       }
+    }
+  }
+
+  property("sync invoke is rejected if insufficient fee is transferred at the end") {
+    val invoker = signer(10)
+    withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer, dApp2Signer)) { d =>
+      val dApp1 = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = {
+           |   strict r = Address(base58'$dApp2Address').invoke("default", [], [])
+           |   []
+           | }
+         """.stripMargin
+      )
+      val dApp2 = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = [
+           |   ScriptTransfer(i.originCaller, $invokeFee, unit)
+           | ]
+         """.stripMargin
+      )
+      d.appendBlock(setScript(dApp1Signer, dApp1), setScript(dApp2Signer, dApp2))
+      d.appendBlockE(invoke(dApp1Address, invoker = invoker)) should produce(s"negative waves balance: ${invoker.toAddress}, old: 0, new: -500000")
     }
   }
 }
