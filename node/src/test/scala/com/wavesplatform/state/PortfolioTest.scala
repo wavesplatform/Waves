@@ -52,7 +52,7 @@ class PortfolioTest extends FunSuite {
     val assetId = TestValues.asset
     val arg1    = Portfolio.build(assetId, Long.MaxValue - 1L)
     val arg2    = Portfolio.build(assetId, Long.MaxValue - 2L)
-    arg1.combine(arg2) shouldBe Left("Assets balance sum overflow")
+    arg1.combine(arg2) shouldBe Left(s"asset $assetId overflow")
   }
 
   test("prevents overflow of lease in balances") {
