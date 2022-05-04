@@ -9,10 +9,12 @@ import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.{Asset, Transaction}
 
 import scala.collection.immutable.VectorMap
@@ -160,6 +162,9 @@ case class Diff(
     scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty,
     ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map.empty
 ) {
+  @inline
+  final def combineE(newer: Diff): Either[ValidationError, Diff] = combineF(newer).leftMap(GenericError(_))
+
   def combineF(newer: Diff): Either[String, Diff] =
     Diff
       .combine(portfolios, newer.portfolios)

@@ -40,8 +40,6 @@ import com.wavesplatform.transaction.{TransactionType, TxValidationError}
 import monix.eval.Coeval
 import shapeless.Coproduct
 
-import scala.util.Right
-
 object InvokeScriptDiff {
   private val stats = TxProcessingStats
   import stats.TxTimerExt
@@ -327,9 +325,8 @@ object InvokeScriptDiff {
             resultDiff <- traced(
               diff
                 .copy(scriptsComplexity = 0)
-                .combineF(actionsDiff)
-                .flatMap(_.combineF(Diff(scriptsComplexity = paymentsComplexity)))
-                .leftMap(GenericError(_))
+                .combineE(actionsDiff)
+                .flatMap(_.combineE(Diff(scriptsComplexity = paymentsComplexity)))
             )
 
             _ <- validateIntermediateBalances(blockchain, resultDiff, resultDiff.scriptsComplexity, log)

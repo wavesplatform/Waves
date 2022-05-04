@@ -162,7 +162,7 @@ object TransactionDiffer {
       }
     } else Diff.empty.asRight[ValidationError].traced
 
-    diff.flatMap(d => initDiff.combineF(d).leftMap(GenericError(_))).leftMap {
+    diff.flatMap(d => initDiff.combineE(d)).leftMap {
       case fte: FailedTransactionError => fte.addComplexity(initDiff.scriptsComplexity)
       case ve                          => ve
     }
@@ -202,7 +202,7 @@ object TransactionDiffer {
           case _                                 => UnsupportedTransactionType.asLeft.traced
         }
       }
-      .flatMap(d => initDiff.combineF(d.bindTransaction(tx)).leftMap(GenericError(_)))
+      .flatMap(d => initDiff.combineE(d.bindTransaction(tx)))
       .leftMap {
         case fte: FailedTransactionError => fte.addComplexity(initDiff.scriptsComplexity)
         case ve                          => ve
