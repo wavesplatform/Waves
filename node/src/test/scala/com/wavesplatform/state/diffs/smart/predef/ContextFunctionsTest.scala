@@ -1,7 +1,6 @@
 package com.wavesplatform.state.diffs.smart.predef
 
 import cats.syntax.semigroup._
-import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
@@ -16,186 +15,178 @@ import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils._
-import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompiler, Terms, TestCompiler}
+import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompiler, TestCompiler}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.state._
-import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
 import com.wavesplatform.test.PropSpec
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxVersion}
-import com.wavesplatform.utils._
-import org.scalacheck.Gen
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import shapeless.Coproduct
 
 class ContextFunctionsTest extends PropSpec with WithState {
 
-  def compactDataTransactionGen(sender: KeyPair): Gen[DataTransaction] =
-    for {
-      long <- longEntryGen(dataAsciiKeyGen)
-      bool <- booleanEntryGen(dataAsciiKeyGen).filter(_.key != long.key)
-      bin  <- binaryEntryGen(40, dataAsciiKeyGen).filter(e => e.key != long.key && e.key != bool.key)
-      str  <- stringEntryGen(40, dataAsciiKeyGen).filter(e => e.key != long.key && e.key != bool.key && e.key != bin.key)
-      tx   <- dataTransactionGenP(sender, List(long, bool, bin, str))
-    } yield tx
+  private val preconditionsAndPayments = {
+    val master    = TxHelpers.signer(1)
+    val recipient = TxHelpers.signer(2)
 
-  private val preconditionsAndPayments = for {
-    master    <- accountGen
-    recipient <- accountGen
-    ts        <- positiveIntGen
-    genesis1 = GenesisTransaction.create(master.toAddress, ENOUGH_AMT * 3, ts).explicitGet()
-    genesis2 = GenesisTransaction.create(recipient.toAddress, ENOUGH_AMT * 3, ts).explicitGet()
-    dataTransaction <- compactDataTransactionGen(recipient)
-    transfer        <- transferGeneratorP(ts, master, recipient.toAddress, 100000000L)
-    transfer2       <- transferGeneratorPV2(ts + 15, master, recipient.toAddress, 100000L)
+    val genesis = Seq(master, recipient).map(acc => TxHelpers.genesis(acc.toAddress))
 
-    untypedScript <- Gen
-      .choose(1, 3)
-      .map {
-        case 1 => scriptWithV1PureFunctions(dataTransaction, transfer)
-        case 2 => scriptWithV1WavesFunctions(dataTransaction, transfer)
-        case 3 => scriptWithCryptoFunctions
+    val dataTx = TxHelpers.data(
+      account = recipient,
+      entries = Seq(
+        IntegerDataEntry("int", 1),
+        BooleanDataEntry("bool", value = true),
+        BinaryDataEntry("bin", ByteStr.fill(10)(1)),
+        StringDataEntry("str", "test")
+      )
+    )
+    val transfer  = TxHelpers.transfer(master, recipient.toAddress, 100000000L, version = TxVersion.V1)
+    val transfer2 = TxHelpers.transfer(master, recipient.toAddress, 100000L)
+
+    val setScripts = Seq(
+      scriptWithV1PureFunctions(dataTx, transfer),
+      scriptWithV1WavesFunctions(dataTx, transfer),
+      scriptWithCryptoFunctions
+    ).map(x => Parser.parseExpr(x).get.value)
+      .map { untypedScript =>
+        val typedScript = {
+          val compilerScript = ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedScript).explicitGet()._1
+          ExprScript(compilerScript).explicitGet()
+        }
+
+        TxHelpers.setScript(recipient, typedScript)
       }
-      .map(x => Parser.parseExpr(x).get.value)
 
-    typedScript = {
-      val compilerScript = ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedScript).explicitGet()._1
-      ExprScript(compilerScript).explicitGet()
-    }
-    setScriptTransaction: SetScriptTransaction = SetScriptTransaction.selfSigned(1.toByte, recipient, Some(typedScript), 100000000L, ts).explicitGet()
-
-  } yield (master, recipient, Seq(genesis1, genesis2), setScriptTransaction, dataTransaction, transfer, transfer2)
+    (master, recipient, genesis, setScripts, dataTx, transfer, transfer2)
+  }
 
   private val estimator = ScriptEstimatorV2
 
   property("validation of all functions from contexts") {
-    forAll(preconditionsAndPayments) {
-      case (_, _, genesis, setScriptTransaction, dataTransaction, transfer, _) =>
-        assertDiffAndState(smartEnabledFS) { append =>
-          append(genesis).explicitGet()
-          append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
-          append(Seq(transfer)).explicitGet()
-        }
+    val (_, _, genesis, setScriptTransactions, dataTransaction, transfer, _) = preconditionsAndPayments
+    setScriptTransactions.foreach { setScript =>
+      assertDiffAndState(smartEnabledFS) { append =>
+        append(genesis).explicitGet()
+        append(Seq(setScript, dataTransaction)).explicitGet()
+        append(Seq(transfer)).explicitGet()
+      }
     }
   }
 
   property("reading from data transaction array by key") {
-    forAll(for {
-      version       <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V3))
-      preconditions <- preconditionsAndPayments
-    } yield (version, preconditions)) {
-      case (version, (_, _, _, _, tx, _, _)) =>
+    DirectiveDictionary[StdLibVersion].all
+      .filter(_ >= V3)
+      .foreach { version =>
+        val (_, _, _, _, tx, _, _) = preconditionsAndPayments
+
         val int  = tx.data(0)
         val bool = tx.data(1)
         val bin  = tx.data(2)
         val str  = tx.data(3)
         val result = runScript(
           s"""
-               |match tx {
-               | case tx: DataTransaction => {
-               |  let d = tx.data
-               |
-               |  let int  = value(getInteger(d, "${int.key}"))
-               |  let bool = value(getBoolean(d, "${bool.key}"))
-               |  let bin  = value(getBinary(d, "${bin.key}"))
-               |  let str  = value(getString(d, "${str.key}"))
-               |
-               |  let intV  = getIntegerValue(d, "${int.key}")
-               |  let boolV = getBooleanValue(d, "${bool.key}")
-               |  let binV  = getBinaryValue(d, "${bin.key}")
-               |  let strV  = getStringValue(d, "${str.key}")
-               |
-               |  let okInt  = int  == ${int.value}
-               |  let okBool = bool == ${bool.value}
-               |  let okBin  = bin  == base58'${Base58.encode(bin.asInstanceOf[BinaryDataEntry].value.arr)}'
-               |  let okStr  = str  == "${str.value}"
-               |
-               |  let okIntV  = intV + 1  == ${int.value} + 1
-               |  let okBoolV = boolV || true == ${bool.value} || true
-               |  let okBinV  = binV  == base58'${Base58.encode(bin.asInstanceOf[BinaryDataEntry].value.arr)}'
-               |  let okStrV  = strV + ""  == "${str.value}"
-               |
-               |  let badInt  = isDefined(getInteger(d, "${bool.key}"))
-               |  let badBool = isDefined(getBoolean(d, "${bin.key}"))
-               |  let badBin  = isDefined(getBinary(d, "${str.key}"))
-               |  let badStr  = isDefined(getString(d, "${int.key}"))
-               |
-               |  let noSuchKey = isDefined(getInteger(d, "\u00a0"))
-               |
-               |  let positives = okInt && okBool && okBin && okStr && okIntV && okBoolV && okBinV && okStrV
-               |  let negatives = badInt || badBool || badBin || badStr || noSuchKey
-               |  positives && ! negatives
-               | }
-               | case _ => throw()
-               |}
-               |""".stripMargin,
+             |match tx {
+             | case tx: DataTransaction => {
+             |  let d = tx.data
+             |
+             |  let int  = value(getInteger(d, "${int.key}"))
+             |  let bool = value(getBoolean(d, "${bool.key}"))
+             |  let bin  = value(getBinary(d, "${bin.key}"))
+             |  let str  = value(getString(d, "${str.key}"))
+             |
+             |  let intV  = getIntegerValue(d, "${int.key}")
+             |  let boolV = getBooleanValue(d, "${bool.key}")
+             |  let binV  = getBinaryValue(d, "${bin.key}")
+             |  let strV  = getStringValue(d, "${str.key}")
+             |
+             |  let okInt  = int  == ${int.value}
+             |  let okBool = bool == ${bool.value}
+             |  let okBin  = bin  == base58'${Base58.encode(bin.asInstanceOf[BinaryDataEntry].value.arr)}'
+             |  let okStr  = str  == "${str.value}"
+             |
+             |  let okIntV  = intV + 1  == ${int.value} + 1
+             |  let okBoolV = boolV || true == ${bool.value} || true
+             |  let okBinV  = binV  == base58'${Base58.encode(bin.asInstanceOf[BinaryDataEntry].value.arr)}'
+             |  let okStrV  = strV + ""  == "${str.value}"
+             |
+             |  let badInt  = isDefined(getInteger(d, "${bool.key}"))
+             |  let badBool = isDefined(getBoolean(d, "${bin.key}"))
+             |  let badBin  = isDefined(getBinary(d, "${str.key}"))
+             |  let badStr  = isDefined(getString(d, "${int.key}"))
+             |
+             |  let noSuchKey = isDefined(getInteger(d, "\u00a0"))
+             |
+             |  let positives = okInt && okBool && okBin && okStr && okIntV && okBoolV && okBinV && okStrV
+             |  let negatives = badInt || badBool || badBin || badStr || noSuchKey
+             |  positives && ! negatives
+             | }
+             | case _ => throw()
+             |}
+             |""".stripMargin,
           Coproduct(tx),
           version
         )
         result shouldBe evaluated(true)
-    }
+      }
   }
 
   property("reading from data transaction array by index") {
-    forAll(preconditionsAndPayments, Gen.choose(4, 40)) {
-      case ((_, _, _, _, tx, _, _), badIndex) =>
-        val int  = tx.data(0)
-        val bool = tx.data(1)
-        val bin  = tx.data(2)
-        val str  = tx.data(3)
-        val ok = runScript(
-          s"""
-               |match tx {
-               | case tx: DataTransaction => {
-               |  let d = tx.data
-               |
-               |  let int  = extract(getInteger(d, 0))
-               |  let bool = extract(getBoolean(d, 1))
-               |  let bin  = extract(getBinary(d, 2))
-               |  let str  = extract(getString(d, 3))
-               |
-               |  let okInt  = int  == ${int.value}
-               |  let okBool = bool == ${bool.value}
-               |  let okBin  = bin  == base58'${Base58.encode(bin.asInstanceOf[BinaryDataEntry].value.arr)}'
-               |  let okStr  = str  == "${str.value}"
-               |
-               |  let badInt  = isDefined(getInteger(d, 1))
-               |  let badBool = isDefined(getBoolean(d, 2))
-               |  let badBin  = isDefined(getBinary(d, 3))
-               |  let badStr  = isDefined(getString(d, 0))
-               |
-               |  let positives = okInt && okBool && okBin && okStr
-               |  let negatives = badInt || badBool || badBin || badStr
-               |  positives && ! negatives
-               | }
-               | case _ => throw()
-               |}
-               |""".stripMargin,
-          Coproduct(tx)
-        )
-        ok shouldBe evaluated(true)
+    val (_, _, _, _, tx, _, _) = preconditionsAndPayments
+    val badIndex               = 4
 
-        val outOfBounds = runScript(
-          s"""
-             |match tx {
-             | case d: DataTransaction => isDefined(getInteger(d.data, $badIndex))
-             | case _ => false
-             |}
-             |""".stripMargin,
-          Coproduct(tx)
-        )
-        outOfBounds shouldBe Left(s"Index $badIndex out of bounds for length ${tx.data.size}")
-    }
+    val int  = tx.data(0)
+    val bool = tx.data(1)
+    val bin  = tx.data(2)
+    val str  = tx.data(3)
+    val ok = runScript(
+      s"""
+         |match tx {
+         | case tx: DataTransaction => {
+         |  let d = tx.data
+         |
+         |  let int  = extract(getInteger(d, 0))
+         |  let bool = extract(getBoolean(d, 1))
+         |  let bin  = extract(getBinary(d, 2))
+         |  let str  = extract(getString(d, 3))
+         |
+         |  let okInt  = int  == ${int.value}
+         |  let okBool = bool == ${bool.value}
+         |  let okBin  = bin  == base58'${Base58.encode(bin.asInstanceOf[BinaryDataEntry].value.arr)}'
+         |  let okStr  = str  == "${str.value}"
+         |
+         |  let badInt  = isDefined(getInteger(d, 1))
+         |  let badBool = isDefined(getBoolean(d, 2))
+         |  let badBin  = isDefined(getBinary(d, 3))
+         |  let badStr  = isDefined(getString(d, 0))
+         |
+         |  let positives = okInt && okBool && okBin && okStr
+         |  let negatives = badInt || badBool || badBin || badStr
+         |  positives && ! negatives
+         | }
+         | case _ => throw()
+         |}
+         |""".stripMargin,
+      Coproduct(tx)
+    )
+    ok shouldBe evaluated(true)
+
+    val outOfBounds = runScript(
+      s"""
+         |match tx {
+         | case d: DataTransaction => isDefined(getInteger(d.data, $badIndex))
+         | case _ => false
+         |}
+         |""".stripMargin,
+      Coproduct(tx)
+    )
+    outOfBounds shouldBe Left(s"Index $badIndex out of bounds for length ${tx.data.size}")
   }
 
   ignore("base64 amplification") {
@@ -282,463 +273,431 @@ class ContextFunctionsTest extends PropSpec with WithState {
   }
 
   property("get assetInfo by asset id") {
-    forAll(for {
-      (masterAcc, _, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) <- preconditionsAndPayments
-      version                                                                               <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V3).toSeq)
-      v4Activation                                                                          <- if (version >= V4) Gen.const(true) else Gen.oneOf(false, true)
-      v5Activation                                                                          <- if (version >= V5) Gen.const(true) else Gen.oneOf(false, true)
-    } yield (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, v4Activation, v5Activation)) {
-      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, v4Activation, v5Activation) =>
-        val fs = {
-          val features = smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (FeeSponsorship.id -> 0))
-          val features1 =
-            if (v4Activation)
-              features.copy(preActivatedFeatures = features.preActivatedFeatures + (BlockV5.id -> 0))
+    DirectiveDictionary[StdLibVersion].all
+      .filter(_ >= V3)
+      .foreach { version =>
+        val (masterAcc, _, genesis, setScriptTransactions, dataTransaction, transferTx, transfer2) = preconditionsAndPayments
+        for {
+          setScriptTransaction <- setScriptTransactions
+          v4Activation         <- if (version >= V4) Seq(true) else Seq(false, true)
+          v5Activation         <- if (version >= V5) Seq(true) else Seq(false, true)
+        } yield {
+          val fs = {
+            val features = smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (FeeSponsorship.id -> 0))
+            val features1 =
+              if (v4Activation)
+                features.copy(preActivatedFeatures = features.preActivatedFeatures + (BlockV5.id -> 0))
+              else
+                features
+            if (v5Activation)
+              features1.copy(preActivatedFeatures = features1.preActivatedFeatures + (SynchronousCalls.id -> 0))
             else
-              features
-          if (v5Activation)
-            features1.copy(preActivatedFeatures = features1.preActivatedFeatures + (SynchronousCalls.id -> 0))
-          else
-            features1
-        }
+              features1
+          }
 
-        assertDiffAndState(fs) { append =>
-          append(genesis).explicitGet()
-          append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
+          assertDiffAndState(fs) { append =>
+            append(genesis).explicitGet()
+            append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
 
-          val quantity    = 100000000L
-          val decimals    = 6.toByte
-          val reissuable  = true
-          val assetScript = None
+            val quantity    = 100000000L
+            val decimals    = 6.toByte
+            val reissuable  = true
+            val assetScript = None
 
-          val issueTx = IssueTransaction(
-            TxVersion.V2,
-            masterAcc.publicKey,
-            "testAsset".utf8Bytes,
-            "Test asset".utf8Bytes,
-            quantity,
-            decimals,
-            reissuable,
-            assetScript,
-            MinIssueFee * 2,
-            dataTransaction.timestamp + 5
-          ).signWith(masterAcc.privateKey)
+            val issueTx = TxHelpers.issue(masterAcc, quantity, decimals)
 
-          val sponsoredFee = 100
-          val sponsorTx =
-            SponsorFeeTransaction
-              .signed(
-                TxVersion.V1,
-                masterAcc.publicKey,
-                issueTx.asset,
-                Some(sponsoredFee),
-                MinIssueFee,
-                dataTransaction.timestamp + 6,
-                masterAcc.privateKey
+            val sponsoredFee = 100
+            val sponsorTx    = TxHelpers.sponsor(issueTx.asset, Some(sponsoredFee), masterAcc)
+
+            append(Seq(transferTx, issueTx)).explicitGet()
+
+            val assetId = issueTx.assetId
+
+            val sponsored =
+              if (version >= V4)
+                s"let sponsored = aInfo.minSponsoredFee == $sponsoredFee"
+              else
+                s"let sponsored = aInfo.sponsored == true"
+
+            val script = ScriptCompiler
+              .compile(
+                s"""
+                   | {-# STDLIB_VERSION ${version.id} #-}
+                   | {-# CONTENT_TYPE EXPRESSION #-}
+                   | {-# SCRIPT_TYPE ACCOUNT #-}
+                   |
+                   | let aInfoOpt        = assetInfo(base58'$assetId')
+                   | let aInfo           = aInfoOpt.value()
+                   | let id              = aInfo.id == base58'$assetId'
+                   | let quantity        = aInfo.quantity == $quantity
+                   | let decimals        = aInfo.decimals == $decimals
+                   | let issuer          = aInfo.issuer.bytes == base58'${issueTx.sender.toAddress}'
+                   | let issuerPublicKey = aInfo.issuerPublicKey == base58'${issueTx.sender}'
+                   | let scripted        = aInfo.scripted == ${assetScript.nonEmpty}
+                   | let reissuable      = aInfo.reissuable == $reissuable
+                   | $sponsored
+                   |
+                   | id              &&
+                   | quantity        &&
+                   | decimals        &&
+                   | issuer          &&
+                   | issuerPublicKey &&
+                   | scripted        &&
+                   | reissuable      &&
+                   | sponsored
+                   |
+            """.stripMargin,
+                estimator
               )
               .explicitGet()
+              ._1
 
-          append(Seq(transferTx, issueTx)).explicitGet()
+            val setScriptTx = TxHelpers.setScript(masterAcc, script)
 
-          val assetId = issueTx.assetId
-
-          val sponsored =
-            if (version >= V4)
-              s"let sponsored = aInfo.minSponsoredFee == $sponsoredFee"
-            else
-              s"let sponsored = aInfo.sponsored == true"
-
-          val script = ScriptCompiler
-            .compile(
-              s"""
-              | {-# STDLIB_VERSION ${version.id} #-}
-              | {-# CONTENT_TYPE EXPRESSION #-}
-              | {-# SCRIPT_TYPE ACCOUNT #-}
-              |
-              | let aInfoOpt        = assetInfo(base58'$assetId')
-              | let aInfo           = aInfoOpt.value()
-              | let id              = aInfo.id == base58'$assetId'
-              | let quantity        = aInfo.quantity == $quantity
-              | let decimals        = aInfo.decimals == $decimals
-              | let issuer          = aInfo.issuer.bytes == base58'${issueTx.sender.toAddress}'
-              | let issuerPublicKey = aInfo.issuerPublicKey == base58'${issueTx.sender}'
-              | let scripted        = aInfo.scripted == ${assetScript.nonEmpty}
-              | let reissuable      = aInfo.reissuable == $reissuable
-              | $sponsored
-              |
-              | id              &&
-              | quantity        &&
-              | decimals        &&
-              | issuer          &&
-              | issuerPublicKey &&
-              | scripted        &&
-              | reissuable      &&
-              | sponsored
-              |
-            """.stripMargin,
-              estimator
-            )
-            .explicitGet()
-            ._1
-
-          val setScriptTx = SetScriptTransaction.selfSigned(1.toByte, masterAcc, Some(script), 1000000L, issueTx.timestamp + 5).explicitGet()
-
-          append(Seq(sponsorTx)).explicitGet()
-          append(Seq(setScriptTx)).explicitGet()
-          append(Seq(transfer2)).explicitGet()
+            append(Seq(sponsorTx)).explicitGet()
+            append(Seq(setScriptTx)).explicitGet()
+            append(Seq(transfer2)).explicitGet()
+          }
         }
-    }
+      }
   }
 
   property("last block info check") {
-    forAll(preconditionsAndPayments) {
-      case (masterAcc, _, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
-        assertDiffAndState(smartEnabledFS) { append =>
-          append(genesis).explicitGet()
-          append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
-          append(Seq(transferTx)).explicitGet()
+    val (masterAcc, _, genesis, setScriptTransactions, dataTransaction, transferTx, transfer2) = preconditionsAndPayments
+    setScriptTransactions.foreach { setScriptTransaction =>
+      assertDiffAndState(smartEnabledFS) { append =>
+        append(genesis).explicitGet()
+        append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
+        append(Seq(transferTx)).explicitGet()
 
-          val script = ScriptCompiler
-            .compile(
-              s"""
-                 | {-# STDLIB_VERSION 3 #-}
-                 | {-# CONTENT_TYPE EXPRESSION #-}
-                 | {-# SCRIPT_TYPE ACCOUNT #-}
-                 |
-                 | let lastBlockBaseTarget = lastBlock.baseTarget == 2
-                 | let lastBlockGenerationSignature = lastBlock.generationSignature == base58'${ByteStr(
-                   Array.fill(Block.GenerationSignatureLength)(0: Byte)
-                 )}'
-                 | let lastBlockGenerator = lastBlock.generator.bytes == base58'${defaultSigner.publicKey.toAddress}'
-                 | let lastBlockGeneratorPublicKey = lastBlock.generatorPublicKey == base58'${defaultSigner.publicKey}'
-                 |
-                 | lastBlockBaseTarget && lastBlockGenerationSignature && lastBlockGenerator && lastBlockGeneratorPublicKey
-                 |
-                 |
-              """.stripMargin,
-              estimator
-            )
-            .explicitGet()
-            ._1
+        val script = ScriptCompiler
+          .compile(
+            s"""
+               | {-# STDLIB_VERSION 3 #-}
+               | {-# CONTENT_TYPE EXPRESSION #-}
+               | {-# SCRIPT_TYPE ACCOUNT #-}
+               |
+               | let lastBlockBaseTarget = lastBlock.baseTarget == 2
+               | let lastBlockGenerationSignature = lastBlock.generationSignature == base58'${ByteStr(
+                 Array.fill(Block.GenerationSignatureLength)(0: Byte)
+               )}'
+               | let lastBlockGenerator = lastBlock.generator.bytes == base58'${defaultSigner.publicKey.toAddress}'
+               | let lastBlockGeneratorPublicKey = lastBlock.generatorPublicKey == base58'${defaultSigner.publicKey}'
+               |
+               | lastBlockBaseTarget && lastBlockGenerationSignature && lastBlockGenerator && lastBlockGeneratorPublicKey
+               |
+               |
+          """.stripMargin,
+            estimator
+          )
+          .explicitGet()
+          ._1
 
-          val setScriptTx = SetScriptTransaction.selfSigned(1.toByte, masterAcc, Some(script), 1000000L, transferTx.timestamp + 5).explicitGet()
+        val setScriptTx = SetScriptTransaction.selfSigned(1.toByte, masterAcc, Some(script), 1000000L, transferTx.timestamp + 5).explicitGet()
 
-          append(Seq(setScriptTx)).explicitGet()
-          append(Seq(transfer2)).explicitGet()
-        }
+        append(Seq(setScriptTx)).explicitGet()
+        append(Seq(transfer2)).explicitGet()
+      }
     }
   }
 
   property("block info by height") {
-    forAll(for {
-      (masterAcc, _, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) <- preconditionsAndPayments
-      version                                                                               <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V3).toSeq)
-      withVrf                                                                               <- Gen.oneOf(version >= V4, true)
-    } yield (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, withVrf)) {
-      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, withVrf) =>
-        val generationSignature =
-          if (withVrf) ByteStr(new Array[Byte](Block.GenerationVRFSignatureLength)) else ByteStr(new Array[Byte](Block.GenerationSignatureLength))
+    DirectiveDictionary[StdLibVersion].all
+      .filter(_ >= V3)
+      .foreach { version =>
+        val (masterAcc, _, genesis, setScriptTransactions, dataTransaction, transferTx, transfer2) = preconditionsAndPayments
+        for {
+          setScriptTransaction <- setScriptTransactions
+          withVrf              <- Seq(version >= V4, true).distinct
+        } yield {
+          val generationSignature =
+            if (withVrf) ByteStr(new Array[Byte](Block.GenerationVRFSignatureLength)) else ByteStr(new Array[Byte](Block.GenerationSignatureLength))
 
-        val fs =
-          if (version >= V5) smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (SynchronousCalls.id -> 0))
-          else smartEnabledFS
+          val fs =
+            if (version >= V5) smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (SynchronousCalls.id -> 0))
+            else smartEnabledFS
 
-        val fsWithVrf =
-          if (withVrf) fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockV5.id -> 0))
-          else fs
+          val fsWithVrf =
+            if (withVrf) fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockV5.id -> 0))
+            else fs
 
-        val (v4DeclOpt, v4CheckOpt) =
-          if (version >= V4)
-            if (withVrf)
-              (s"let checkVrf = block.vrf != unit", "&& checkVrf")
-            else
-              (s"let checkVrf = block.vrf == unit", "&& checkVrf")
-          else ("", "")
+          val (v4DeclOpt, v4CheckOpt) =
+            if (version >= V4)
+              if (withVrf)
+                (s"let checkVrf = block.vrf != unit", "&& checkVrf")
+              else
+                (s"let checkVrf = block.vrf == unit", "&& checkVrf")
+            else ("", "")
 
-        assertDiffAndState(fsWithVrf) { append =>
-          append(genesis).explicitGet()
-          append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
-          append(Seq(transferTx)).explicitGet()
+          assertDiffAndState(fsWithVrf) { append =>
+            append(genesis).explicitGet()
+            append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
+            append(Seq(transferTx)).explicitGet()
 
-          val script = ScriptCompiler
-            .compile(
-              s"""
-                 | {-# STDLIB_VERSION ${version.id} #-}
-                 | {-# CONTENT_TYPE EXPRESSION #-}
-                 | {-# SCRIPT_TYPE ACCOUNT #-}
-                 |
-                 | let nonExistedBlockNeg = !blockInfoByHeight(-1).isDefined()
-                 | let nonExistedBlockZero = !blockInfoByHeight(0).isDefined()
-                 | let nonExistedBlockNextPlus = !blockInfoByHeight(6).isDefined()
-                 |
-                 | let block = blockInfoByHeight(3).value()
-                 | let checkHeight = block.height == 3
-                 | let checkBaseTarget = block.baseTarget == 2
-                 | let checkGenSignature = block.generationSignature == base58'$generationSignature'
-                 | let checkGenerator = block.generator.bytes == base58'${defaultSigner.publicKey.toAddress}'
-                 | let checkGeneratorPublicKey = block.generatorPublicKey == base58'${defaultSigner.publicKey}'
-                 | $v4DeclOpt
-                 |
-                 | nonExistedBlockNeg && nonExistedBlockZero && nonExistedBlockNextPlus && checkHeight && checkBaseTarget && checkGenSignature && checkGenerator && checkGeneratorPublicKey
-                 | $v4CheckOpt
-                 |
+            val script = ScriptCompiler
+              .compile(
+                s"""
+                   | {-# STDLIB_VERSION ${version.id} #-}
+                   | {-# CONTENT_TYPE EXPRESSION #-}
+                   | {-# SCRIPT_TYPE ACCOUNT #-}
+                   |
+                   | let nonExistedBlockNeg = !blockInfoByHeight(-1).isDefined()
+                   | let nonExistedBlockZero = !blockInfoByHeight(0).isDefined()
+                   | let nonExistedBlockNextPlus = !blockInfoByHeight(6).isDefined()
+                   |
+                   | let block = blockInfoByHeight(3).value()
+                   | let checkHeight = block.height == 3
+                   | let checkBaseTarget = block.baseTarget == 2
+                   | let checkGenSignature = block.generationSignature == base58'$generationSignature'
+                   | let checkGenerator = block.generator.bytes == base58'${defaultSigner.publicKey.toAddress}'
+                   | let checkGeneratorPublicKey = block.generatorPublicKey == base58'${defaultSigner.publicKey}'
+                   | $v4DeclOpt
+                   |
+                   | nonExistedBlockNeg && nonExistedBlockZero && nonExistedBlockNextPlus && checkHeight && checkBaseTarget && checkGenSignature && checkGenerator && checkGeneratorPublicKey
+                   | $v4CheckOpt
+                   |
               """.stripMargin,
-              estimator
-            )
-            .explicitGet()
-            ._1
+                estimator
+              )
+              .explicitGet()
+              ._1
 
-          val setScriptTx = SetScriptTransaction.selfSigned(1.toByte, masterAcc, Some(script), 1000000L, transferTx.timestamp + 5).explicitGet()
+            val setScriptTx = TxHelpers.setScript(masterAcc, script)
 
-          append(Seq(setScriptTx)).explicitGet()
-          append(Seq(transfer2)).explicitGet()
+            append(Seq(setScriptTx)).explicitGet()
+            append(Seq(transfer2)).explicitGet()
+          }
         }
-
-    }
+      }
   }
 
   property("blockInfoByHeight(height) is the same as lastBlock") {
-    forAll(preconditionsAndPayments) {
-      case (masterAcc, _, genesis, setScriptTransaction, dataTransaction, transferTx, _) =>
-        assertDiffAndState(smartEnabledFS) { append =>
-          append(genesis).explicitGet()
-          append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
-          append(Seq(transferTx)).explicitGet()
+    val (masterAcc, _, genesis, setScriptTransactions, dataTransaction, transferTx, _) = preconditionsAndPayments
+    setScriptTransactions.foreach { setScriptTransaction =>
+      assertDiffAndState(smartEnabledFS) { append =>
+        append(genesis).explicitGet()
+        append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
+        append(Seq(transferTx)).explicitGet()
 
-          val script =
-            s"""{-# STDLIB_VERSION 3 #-}
-               |{-# CONTENT_TYPE DAPP #-}
-               |
-               |@Callable(xx)
-               |func compareBlocks() = {
-               |     let lastBlockByHeight = extract(blockInfoByHeight(height))
-               |
-               |     if lastBlock.height              == lastBlockByHeight.height &&
-               |        lastBlock.timestamp           == lastBlockByHeight.timestamp &&
-               |        lastBlock.baseTarget          == lastBlockByHeight.baseTarget &&
-               |        lastBlock.generationSignature == lastBlockByHeight.generationSignature &&
-               |        lastBlock.generator           == lastBlockByHeight.generator &&
-               |        lastBlock.generatorPublicKey  == lastBlockByHeight.generatorPublicKey
-               |     then WriteSet([])
-               |     else throw("blocks do not match")
-               |}
-               |""".stripMargin
+        val script =
+          s"""{-# STDLIB_VERSION 3 #-}
+             |{-# CONTENT_TYPE DAPP #-}
+             |
+             |@Callable(xx)
+             |func compareBlocks() = {
+             |     let lastBlockByHeight = extract(blockInfoByHeight(height))
+             |
+             |     if lastBlock.height              == lastBlockByHeight.height &&
+             |        lastBlock.timestamp           == lastBlockByHeight.timestamp &&
+             |        lastBlock.baseTarget          == lastBlockByHeight.baseTarget &&
+             |        lastBlock.generationSignature == lastBlockByHeight.generationSignature &&
+             |        lastBlock.generator           == lastBlockByHeight.generator &&
+             |        lastBlock.generatorPublicKey  == lastBlockByHeight.generatorPublicKey
+             |     then WriteSet([])
+             |     else throw("blocks do not match")
+             |}
+             |""".stripMargin
 
-          val compiledScript = TestCompiler(V3).compileContract(script)
-          val setScriptTx =
-            SetScriptTransaction.selfSigned(1.toByte, masterAcc, Some(compiledScript), 1000000L, transferTx.timestamp + 5).explicitGet()
-          val fc = Terms.FUNCTION_CALL(FunctionHeader.User("compareBlocks"), List.empty)
+        val compiledScript = TestCompiler(V3).compileContract(script)
+        val setScriptTx    = TxHelpers.setScript(masterAcc, compiledScript)
 
-          val ci = InvokeScriptTransaction
-            .selfSigned(
-              1.toByte,
-              masterAcc,
-              masterAcc.toAddress,
-              Some(fc),
-              Seq.empty,
-              FeeValidation.FeeUnit * (FeeValidation.FeeConstants(InvokeScriptTransaction.typeId) + FeeValidation.ScriptExtraFee),
-              Waves,
-              System.currentTimeMillis()
-            )
-            .explicitGet()
+        val invoke = TxHelpers.invoke(
+          dApp = masterAcc.toAddress,
+          func = Some("compareBlocks"),
+          invoker = masterAcc,
+          fee = TxHelpers.ciFee(1),
+          version = TxVersion.V1
+        )
 
-          append(Seq(setScriptTx)).explicitGet()
-          append(Seq(ci)).explicitGet()
-        }
+        append(Seq(setScriptTx)).explicitGet()
+        append(Seq(invoke)).explicitGet()
+      }
     }
   }
 
   property("transfer transaction by id") {
-    forAll(preconditionsAndPayments) {
-      case (masterAcc, _, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
-        assertDiffAndState(smartEnabledFS) { append =>
-          append(genesis).explicitGet()
-          append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
-          append(Seq(transferTx)).explicitGet()
+    val (masterAcc, _, genesis, setScriptTransactions, dataTransaction, transferTx, transfer2) = preconditionsAndPayments
+    setScriptTransactions.foreach { setScriptTransaction =>
+      assertDiffAndState(smartEnabledFS) { append =>
+        append(genesis).explicitGet()
+        append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
+        append(Seq(transferTx)).explicitGet()
 
-          val script = ScriptCompiler
-            .compile(
-              s"""
-                 | {-# STDLIB_VERSION 3          #-}
-                 | {-# CONTENT_TYPE   EXPRESSION #-}
-                 | {-# SCRIPT_TYPE    ACCOUNT    #-}
-                 |
-                 | let transfer = extract(
-                 |   transferTransactionById(base64'${transferTx.id().base64Raw}')
-                 | )
-                 |
-                 | let checkTransferOpt = match transferTransactionById(base64'') {
-                 |  case _: Unit => true
-                 |  case _: TransferTransaction => false
-                 |  case _ => false
-                 | }
-                 |
-                 | let checkAddress = match transfer.recipient {
-                 |   case addr: Address => addr.bytes == base64'${ByteStr(transferTx.recipient.bytes).base64Raw}'
-                 |   case _             => false
-                 | }
-                 |
-                 | let checkAmount     = transfer.amount == ${transferTx.amount}
-                 | let checkAttachment = transfer.attachment == base64'${Base64.encode(transferTx.attachment.arr)}'
-                 |
-                 | let checkAssetId = match transfer.assetId {
-                 |    case _: Unit => true
-                 |    case _       => false
-                 | }
-                 |
-                 | let checkFeeAssetId = match transfer.feeAssetId {
-                 |    case _: Unit => true
-                 |    case _       => false
-                 | }
-                 |
-                 | let checkAnotherTxType = !isDefined(
-                 |   transferTransactionById(base64'${dataTransaction.id().base64Raw}')
-                 | )
-                 |
-                 | checkTransferOpt    &&
-                 | checkAmount         &&
-                 | checkAddress        &&
-                 | checkAttachment     &&
-                 | checkAssetId        &&
-                 | checkFeeAssetId     &&
-                 | checkAnotherTxType
-                 |
+        val script = ScriptCompiler
+          .compile(
+            s"""
+               | {-# STDLIB_VERSION 3          #-}
+               | {-# CONTENT_TYPE   EXPRESSION #-}
+               | {-# SCRIPT_TYPE    ACCOUNT    #-}
+               |
+               | let transfer = extract(
+               |   transferTransactionById(base64'${transferTx.id().base64Raw}')
+               | )
+               |
+               | let checkTransferOpt = match transferTransactionById(base64'') {
+               |  case _: Unit => true
+               |  case _: TransferTransaction => false
+               |  case _ => false
+               | }
+               |
+               | let checkAddress = match transfer.recipient {
+               |   case addr: Address => addr.bytes == base64'${ByteStr(transferTx.recipient.bytes).base64Raw}'
+               |   case _             => false
+               | }
+               |
+               | let checkAmount     = transfer.amount == ${transferTx.amount}
+               | let checkAttachment = transfer.attachment == base64'${Base64.encode(transferTx.attachment.arr)}'
+               |
+               | let checkAssetId = match transfer.assetId {
+               |    case _: Unit => true
+               |    case _       => false
+               | }
+               |
+               | let checkFeeAssetId = match transfer.feeAssetId {
+               |    case _: Unit => true
+               |    case _       => false
+               | }
+               |
+               | let checkAnotherTxType = !isDefined(
+               |   transferTransactionById(base64'${dataTransaction.id().base64Raw}')
+               | )
+               |
+               | checkTransferOpt    &&
+               | checkAmount         &&
+               | checkAddress        &&
+               | checkAttachment     &&
+               | checkAssetId        &&
+               | checkFeeAssetId     &&
+               | checkAnotherTxType
+               |
               """.stripMargin,
-              estimator
-            )
-            .explicitGet()
-            ._1
+            estimator
+          )
+          .explicitGet()
+          ._1
 
-          val setScriptTx = SetScriptTransaction
-            .selfSigned(1.toByte, masterAcc, Some(script), 1000000L, transferTx.timestamp + 5)
-            .explicitGet()
+        val setScriptTx = TxHelpers.setScript(masterAcc, script)
 
-          append(Seq(setScriptTx)).explicitGet()
-          append(Seq(transfer2)).explicitGet()
-        }
+        append(Seq(setScriptTx)).explicitGet()
+        append(Seq(transfer2)).explicitGet()
+      }
     }
   }
 
   property("account this") {
-    forAll(preconditionsAndPayments) {
-      case (masterAcc, _, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
-        assertDiffAndState(smartEnabledFS) { append =>
-          append(genesis).explicitGet()
-          append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
-          append(Seq(transferTx)).explicitGet()
+    val (masterAcc, _, genesis, setScriptTransactions, dataTransaction, transferTx, transfer2) = preconditionsAndPayments
+    setScriptTransactions.foreach { setScriptTransaction =>
+      assertDiffAndState(smartEnabledFS) { append =>
+        append(genesis).explicitGet()
+        append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
+        append(Seq(transferTx)).explicitGet()
 
-          val script = ScriptCompiler
-            .compile(
-              s"""
-                 | {-# STDLIB_VERSION 3 #-}
-                 | {-# CONTENT_TYPE EXPRESSION #-}
-                 | {-# SCRIPT_TYPE ACCOUNT #-}
-                 |
-                 | this.bytes == base58'${masterAcc.toAddress}'
-                 |
+        val script = ScriptCompiler
+          .compile(
+            s"""
+               | {-# STDLIB_VERSION 3 #-}
+               | {-# CONTENT_TYPE EXPRESSION #-}
+               | {-# SCRIPT_TYPE ACCOUNT #-}
+               |
+               | this.bytes == base58'${masterAcc.toAddress}'
+               |
               """.stripMargin,
-              estimator
-            )
-            .explicitGet()
-            ._1
+            estimator
+          )
+          .explicitGet()
+          ._1
 
-          val setScriptTx = SetScriptTransaction.selfSigned(1.toByte, masterAcc, Some(script), 1000000L, transferTx.timestamp + 5).explicitGet()
+        val setScriptTx = TxHelpers.setScript(masterAcc, script)
 
-          append(Seq(setScriptTx)).explicitGet()
-          append(Seq(transfer2)).explicitGet()
-        }
+        append(Seq(setScriptTx)).explicitGet()
+        append(Seq(transfer2)).explicitGet()
+      }
     }
   }
 
   property("address toString") {
-    forAll(preconditionsAndPayments) {
-      case (masterAcc, _, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
-        assertDiffAndState(smartEnabledFS) { append =>
-          append(genesis).explicitGet()
-          append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
-          append(Seq(transferTx)).explicitGet()
+    val (masterAcc, _, genesis, setScriptTransactions, dataTransaction, transferTx, transfer2) = preconditionsAndPayments
+    setScriptTransactions.foreach { setScriptTransaction =>
+      assertDiffAndState(smartEnabledFS) { append =>
+        append(genesis).explicitGet()
+        append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
+        append(Seq(transferTx)).explicitGet()
 
-          val script = ScriptCompiler
-            .compile(
-              s"""
-                 | {-# STDLIB_VERSION 3 #-}
-                 | {-# CONTENT_TYPE EXPRESSION #-}
-                 | {-# SCRIPT_TYPE ACCOUNT #-}
-                 |
-                 | let checkAddressToStrRight = this.toString() == "${masterAcc.toAddress}"
-                 | let checkAddressToStr = this.bytes.toBase58String() == this.toString()
-                 |
-                 | checkAddressToStrRight && checkAddressToStr
-                 |
+        val script = ScriptCompiler
+          .compile(
+            s"""
+               | {-# STDLIB_VERSION 3 #-}
+               | {-# CONTENT_TYPE EXPRESSION #-}
+               | {-# SCRIPT_TYPE ACCOUNT #-}
+               |
+               | let checkAddressToStrRight = this.toString() == "${masterAcc.toAddress}"
+               | let checkAddressToStr = this.bytes.toBase58String() == this.toString()
+               |
+               | checkAddressToStrRight && checkAddressToStr
+               |
               """.stripMargin,
-              estimator
-            )
-            .explicitGet()
-            ._1
+            estimator
+          )
+          .explicitGet()
+          ._1
 
-          val setScriptTx = SetScriptTransaction
-            .selfSigned(1.toByte, masterAcc, Some(script), 1000000L, transferTx.timestamp + 5)
-            .explicitGet()
+        val setScriptTx = TxHelpers.setScript(masterAcc, script)
 
-          append(Seq(setScriptTx)).explicitGet()
-          append(Seq(transfer2)).explicitGet()
-        }
+        append(Seq(setScriptTx)).explicitGet()
+        append(Seq(transfer2)).explicitGet()
+      }
     }
   }
 
   property("transactionFromProtoBytes") {
-    forAll(preconditionsAndPayments) {
-      case (masterAcc, _, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
-        val fs = smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (BlockV5.id -> 0))
+    val (masterAcc, _, genesis, setScriptTransactions, dataTransaction, transferTx, transfer2) = preconditionsAndPayments
+    setScriptTransactions.foreach { setScriptTransaction =>
+      val fs = smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (BlockV5.id -> 0))
 
-        assertDiffAndState(fs) { append =>
-          append(genesis).explicitGet()
-          append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
-          append(Seq(transferTx)).explicitGet()
+      assertDiffAndState(fs) { append =>
+        append(genesis).explicitGet()
+        append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
+        append(Seq(transferTx)).explicitGet()
 
-          val txBytesBase58 = Base58.encode(PBTransactionSerializer.bytes(transferTx))
-          val script = ScriptCompiler
-            .compile(
-              s"""
-                 |
-                 | {-# STDLIB_VERSION 4 #-}
-                 | {-# CONTENT_TYPE EXPRESSION #-}
-                 | {-# SCRIPT_TYPE ACCOUNT #-}
-                 |
-                 | let transferTx  = transferTransactionFromProto(base58'$txBytesBase58').value()
-                 | let incorrectTx = transferTransactionFromProto(base58'aaaa')
-                 |
-                 | incorrectTx          == unit                                                  &&
-                 | transferTx.id        == base58'${transferTx.id()}'                      &&
-                 | transferTx.amount    == ${transferTx.amount}                                  &&
-                 | transferTx.sender    == Address(base58'${transferTx.sender.toAddress}') &&
-                 | transferTx.recipient == Address(base58'${transferTx.recipient}')
-                 |
+        val txBytesBase58 = Base58.encode(PBTransactionSerializer.bytes(transferTx))
+        val script = ScriptCompiler
+          .compile(
+            s"""
+               |
+               | {-# STDLIB_VERSION 4 #-}
+               | {-# CONTENT_TYPE EXPRESSION #-}
+               | {-# SCRIPT_TYPE ACCOUNT #-}
+               |
+               | let transferTx  = transferTransactionFromProto(base58'$txBytesBase58').value()
+               | let incorrectTx = transferTransactionFromProto(base58'aaaa')
+               |
+               | incorrectTx          == unit                                                  &&
+               | transferTx.id        == base58'${transferTx.id()}'                      &&
+               | transferTx.amount    == ${transferTx.amount}                                  &&
+               | transferTx.sender    == Address(base58'${transferTx.sender.toAddress}') &&
+               | transferTx.recipient == Address(base58'${transferTx.recipient}')
+               |
                """.stripMargin,
-              estimator
-            )
-            .explicitGet()
-            ._1
+            estimator
+          )
+          .explicitGet()
+          ._1
 
-          val setScriptTx = SetScriptTransaction
-            .selfSigned(1.toByte, masterAcc, Some(script), 1000000L, transferTx.timestamp + 5)
-            .explicitGet()
+        val setScriptTx = SetScriptTransaction
+          .selfSigned(1.toByte, masterAcc, Some(script), 1000000L, transferTx.timestamp + 5)
+          .explicitGet()
 
-          append(Seq(setScriptTx)).explicitGet()
-          append(Seq(transfer2)).explicitGet()
-        }
+        append(Seq(setScriptTx)).explicitGet()
+        append(Seq(transfer2)).explicitGet()
+      }
     }
   }
 
   property("self-state functions") {
-    val preconditions =
-      for {
-        (masterAcc, recipient, genesis, _, dataTransaction, transferTx, _) <- preconditionsAndPayments
-        version                                                            <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V5))
-      } yield (version, masterAcc, recipient, genesis, dataTransaction, transferTx)
-
-    forAll(preconditions) {
-      case (version, masterAcc, recipient, genesis, dataTransaction, transferTx) =>
+    DirectiveDictionary[StdLibVersion].all
+      .filter(_ >= V5)
+      .foreach { version =>
+        val (masterAcc, recipient, genesis, _, dataTransaction, transferTx, _) = preconditionsAndPayments
         val fs = smartEnabledFS.copy(
           preActivatedFeatures = smartEnabledFS.preActivatedFeatures ++
             Map(BlockchainFeatures.SynchronousCalls.id -> 0)
@@ -781,27 +740,15 @@ class ContextFunctionsTest extends PropSpec with WithState {
               WavesContext.build(Global, DirectiveSet(version, Account, DApp).explicitGet())
 
           val compiledScript = ContractScript(version, ContractCompiler(ctx.compilerContext, expr, version).explicitGet()).explicitGet()
-          val setScriptTx =
-            SetScriptTransaction.selfSigned(1.toByte, recipient, Some(compiledScript), 1000000L, transferTx.timestamp + 5).explicitGet()
+          val setScriptTx    = TxHelpers.setScript(recipient, compiledScript)
 
-          val ci = InvokeScriptTransaction
-            .selfSigned(
-              1.toByte,
-              masterAcc,
-              recipient.toAddress,
-              None,
-              Seq.empty,
-              FeeUnit * (FeeConstants(InvokeScriptTransaction.typeId) + ScriptExtraFee),
-              Waves,
-              System.currentTimeMillis()
-            )
-            .explicitGet()
+          val invoke = TxHelpers.invoke(recipient.toAddress, invoker = masterAcc, version = TxVersion.V1)
 
           append(genesis).explicitGet()
           append(Seq(dataTransaction)).explicitGet()
           append(Seq(setScriptTx)).explicitGet()
-          append(Seq(ci)).explicitGet()
+          append(Seq(invoke)).explicitGet()
         }
-    }
+      }
   }
 }

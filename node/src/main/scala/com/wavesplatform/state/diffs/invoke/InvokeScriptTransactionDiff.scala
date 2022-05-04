@@ -1,10 +1,7 @@
 package com.wavesplatform.state.diffs.invoke
 
-import scala.util.Right
-
 import cats.Id
 import cats.syntax.either._
-import cats.syntax.semigroup._
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -23,17 +20,19 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator._
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain._
-import com.wavesplatform.metrics.{TxProcessingStats => Stats}
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
-import com.wavesplatform.state._
+import com.wavesplatform.metrics.{TxProcessingStats => Stats}
 import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.state.{Diff, _}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError._
-import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
+import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
 import monix.eval.Coeval
 import shapeless.Coproduct
+
+import scala.util.Right
 
 object InvokeScriptTransactionDiff {
 
@@ -102,16 +101,15 @@ object InvokeScriptTransactionDiff {
               paymentsComplexity,
               blockchain
             )
-          } yield
-            MainScriptResult(
-              environment.currentDiff,
-              result,
-              log,
-              environment.availableActions,
-              environment.availableData,
-              environment.availableDataSize,
-              fullLimit - paymentsComplexity
-            )
+          } yield MainScriptResult(
+            environment.currentDiff,
+            result,
+            log,
+            environment.availableActions,
+            environment.availableData,
+            environment.availableDataSize,
+            fullLimit - paymentsComplexity
+          )
         }
 
         TracedResult(
@@ -181,7 +179,8 @@ object InvokeScriptTransactionDiff {
           case i: IncompleteResult =>
             TracedResult(Left(GenericError(s"Evaluation was uncompleted with unused complexity = ${i.unusedComplexity}")))
         }
-      } yield invocationDiff.copy(scriptsComplexity = 0) |+| resultDiff
+        totalDiff <- TracedResult(invocationDiff.copy(scriptsComplexity = 0).combine(resultDiff)).leftMap(GenericError(_))
+      } yield totalDiff
     }
 
     def calcInvocationComplexity(
@@ -238,9 +237,11 @@ object InvokeScriptTransactionDiff {
             tx.sender,
             payments,
             tx.id(),
-            tx.fee,
+            tx.fee.value,
             tx.feeAssetId.compatId
           )
+
+          paymentsPart <- TracedResult(if (version < V5) Right(Diff.empty) else InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map()))
 
           environment = new DAppEnvironment(
             AddressScheme.current.chainId,
@@ -259,7 +260,7 @@ object InvokeScriptTransactionDiff {
             ContractLimits.MaxCallableActionsAmount(version),
             ContractLimits.MaxWriteSetSize(version),
             ContractLimits.MaxTotalWriteSetSizeInBytes,
-            if (version < V5) Diff.empty else InvokeDiffsCommon.paymentsPart(tx, dAppAddress, Map()),
+            paymentsPart,
             invocationTracker
           )
 
@@ -300,7 +301,9 @@ object InvokeScriptTransactionDiff {
           } else
             ScriptExecutionError.dAppExecution(error, log)
       }
-      .map { r => InvokeDiffsCommon.checkScriptResultFields(blockchain, r._1); r }
+      .map { r =>
+        InvokeDiffsCommon.checkScriptResultFields(blockchain, r._1); r
+      }
   }
 
   private def checkCall(fc: FUNCTION_CALL, blockchain: Blockchain): Either[ExecutionError, Unit] = {

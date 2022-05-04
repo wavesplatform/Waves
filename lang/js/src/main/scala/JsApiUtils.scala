@@ -11,7 +11,7 @@ import scala.scalajs.js.Any
 import scala.scalajs.js.Dynamic.{literal => jObj}
 import scala.scalajs.js.JSConverters._
 
-package object JsApiUtils {
+object JsApiUtils {
 
   def serPart[T](f: T => js.Any)(part: PART[T]): js.Object = {
     val partValue = Expressions.PART.toOption(part).fold(null:Any)(f)
@@ -178,24 +178,6 @@ package object JsApiUtils {
       "ctx"        -> serCtx(simpleCtx)
     )
   }
-
-  /*def serCtx(ctx: CompilerContext): js.Object = {
-    jObj.applyDynamic("apply")(
-      "vars" -> ctx.varDefs.map { vd =>
-        jObj.applyDynamic("apply")("name" -> vd._1, "type" -> vd._2.toString)
-      }.toJSArray,
-      "funcs" -> ctx.functionDefs.map { func =>
-        jObj.applyDynamic("apply")(
-          "name" -> func._1,
-          "signatureList" -> func._2.fSigList.map { sig =>
-            jObj.applyDynamic("apply")("type" -> typeRepr(sig.result), "args" -> sig.args.map { arg =>
-              jObj.applyDynamic("apply")("name" -> arg._1, "type" -> typeRepr(arg._2))
-            }.toJSArray)
-          }.toJSArray
-        )
-      }.toJSArray
-    )
-  }*/
 
   def serCtx(simpleCtx: Map[String, Pos]): js.Object = {
     simpleCtx.map { ctxEl =>

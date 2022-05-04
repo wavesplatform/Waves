@@ -17,11 +17,10 @@ import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
-import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
-import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
-import com.wavesplatform.lang.v1.compiler.{ContractScriptCompactor, ExpressionCompiler}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -29,7 +28,7 @@ import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.v1.{ContractLimits, Serde}
-import com.wavesplatform.lang.{Global, ValidationError}
+import com.wavesplatform.lang.{API, CompileResult, Global, ValidationError}
 import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.FeeValidation
@@ -113,71 +112,65 @@ case class UtilsApiRoute(
     }
   }
 
+  private def defaultStdlibVersion(): StdLibVersion = {
+    val v5Activated = blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
+    if (v5Activated)
+      V5
+    else if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps))
+      V4
+    else
+      StdLibVersion.VersionDic.default
+  }
+
   def compileCode: Route = path("script" / "compileCode") {
     (post & entity(as[String]) & parameter("compact".as[Boolean] ? false)) { (code, compact) =>
-      val v5Activated = blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
-      def stdLib: StdLibVersion = {
-        if (v5Activated) {
-          V5
-        } else if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps)) {
-          V4
-        } else {
-          StdLibVersion.VersionDic.default
-        }
-      }
-      executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator(), defaultStdLib = stdLib)) {
-        case Left(e) =>
-          complete(ScriptCompilerError(e))
+      executeLimited(API.compile(code, estimator().version, compact, defaultStdLib = defaultStdlibVersion()))(
+        _.fold(
+          e => complete(ScriptCompilerError(e)), { cr =>
+            val v5Activated = blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
+            val extraFee =
+              if (cr.verifierComplexity <= ContractLimits.FreeVerifierComplexity && v5Activated)
+                0
+              else
+                FeeValidation.ScriptExtraFee
 
-        case Right((script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity))) =>
-          val extraFee =
-            if (verifierComplexity <= ContractLimits.FreeVerifierComplexity && v5Activated)
-              0
-            else
-              FeeValidation.ScriptExtraFee
-
-          val compactedScript = script match {
-            case ContractScript.ContractScriptImpl(stdLibVersion, expr) if compact =>
-              ContractScriptImpl(stdLibVersion, ContractScriptCompactor.compact(expr))
-
-            case _ => script
+            complete(
+              Json.obj(
+                "script"               -> ByteStr(cr.bytes).base64,
+                "complexity"           -> cr.maxComplexity,
+                "verifierComplexity"   -> cr.verifierComplexity,
+                "callableComplexities" -> cr.callableComplexities,
+                "extraFee"             -> extraFee
+              )
+            )
           }
-
-          val resultJson = Json.obj(
-            "script"               -> compactedScript.bytes().base64,
-            "complexity"           -> maxComplexity,
-            "verifierComplexity"   -> verifierComplexity,
-            "callableComplexities" -> callableComplexities,
-            "extraFee"             -> extraFee
-          )
-          complete(resultJson)
-      }
-
+        )
+      )
     }
   }
 
   def compileWithImports: Route = path("script" / "compileWithImports") {
     import ScriptWithImportsRequest._
     (post & entity(as[ScriptWithImportsRequest])) { req =>
-      def stdLib: StdLibVersion =
-        if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls, blockchain.height)) {
-          V5
-        } else if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) {
-          V4
-        } else {
-          StdLibVersion.VersionDic.default
-        }
-      executeLimited(ScriptCompiler.compile(req.script, estimator(), req.imports, stdLib)) { result =>
+      executeLimited(
+        API.compile(
+          req.script,
+          estimator().version,
+          needCompaction = false,
+          removeUnusedCode = false,
+          req.imports,
+          defaultStdLib = defaultStdlibVersion()
+        )
+      ) { result =>
         complete(
           result
             .fold(
-              e => ScriptCompilerError(e), {
-                case (script, complexity) =>
-                  Json.obj(
-                    "script"     -> script.bytes().base64,
-                    "complexity" -> complexity,
-                    "extraFee"   -> FeeValidation.ScriptExtraFee
-                  )
+              e => ScriptCompilerError(e), { cr: CompileResult =>
+                Json.obj(
+                  "script"     -> ByteStr(cr.bytes).base64,
+                  "complexity" -> cr.verifierComplexity,
+                  "extraFee"   -> FeeValidation.ScriptExtraFee
+                )
               }
             )
         )
@@ -343,7 +336,14 @@ object UtilsApiRoute {
           )
         call = ContractEvaluator.buildSyntheticCall(script.expr.asInstanceOf[DApp], expr)
         limitedResult <- EvaluatorV2
-          .applyLimitedCoeval(call, limit, ctx, script.stdLibVersion, correctFunctionCallScope = blockchain.checkEstimatorSumOverflow, checkConstructorArgsTypes = true)
+          .applyLimitedCoeval(
+            call,
+            limit,
+            ctx,
+            script.stdLibVersion,
+            correctFunctionCallScope = blockchain.checkEstimatorSumOverflow,
+            checkConstructorArgsTypes = true
+          )
           .value()
           .leftMap { case (err, _, log) => ScriptExecutionError.dAppExecution(err, log) }
         result <- limitedResult match {

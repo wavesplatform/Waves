@@ -15,7 +15,7 @@ import com.wavesplatform.it.{NTPTime, NodeConfigs}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TxVersion
+import com.wavesplatform.transaction.{TxExchangePrice, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -290,29 +290,33 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
     val assetPair = AssetPair.createAssetPair("WAVES", tradeAsset)
 
     val ts = ntpTime.getTimestamp()
-    val buyOrder = Order.buy(
-      Order.V4,
-      otherCallerKP,
-      dAppKP.publicKey,
-      assetPair.get,
-      smartMatcherFee,
-      100L,
-      ts,
-      ts + Order.MaxLiveTime,
-      smartMatcherFee
-    )
+    val buyOrder = Order
+      .buy(
+        Order.V4,
+        otherCallerKP,
+        dAppKP.publicKey,
+        assetPair.get,
+        smartMatcherFee,
+        100L,
+        ts,
+        ts + Order.MaxLiveTime,
+        smartMatcherFee
+      )
+      .explicitGet()
 
-    val sellOrder = Order.sell(
-      Order.V4,
-      callerKP,
-      dAppKP.publicKey,
-      assetPair.get,
-      smartMatcherFee,
-      100L,
-      ts,
-      ts + Order.MaxLiveTime,
-      smartMatcherFee
-    )
+    val sellOrder = Order
+      .sell(
+        Order.V4,
+        callerKP,
+        dAppKP.publicKey,
+        assetPair.get,
+        smartMatcherFee,
+        100L,
+        ts,
+        ts + Order.MaxLiveTime,
+        smartMatcherFee
+      )
+      .explicitGet()
 
     assertApiError(
       sender.broadcastExchange(
@@ -320,7 +324,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
         sellOrder,
         buyOrder,
         amount = buyOrder.amount,
-        price = buyOrder.price,
+        price = TxExchangePrice.unsafeFrom(buyOrder.price.value),
         buyMatcherFee = smartMatcherFee,
         sellMatcherFee = smartMatcherFee,
         fee = priorityFee,
@@ -363,22 +367,10 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
 
     def orders: (Order, Order) = {
       val ts = ntpTime.getTimestamp()
-      val buy = Order.buy(
-        Order.V4,
-        otherCallerKP,
-        dAppKP.publicKey,
-        assetPair,
-        10L,
-        100L,
-        ts,
-        ts + Order.MaxLiveTime,
-        smartMatcherFee,
-        matcherFeeAssetId = IssuedAsset(ByteStr.decodeBase58(feeAsset).get)
-      )
-      val sell =
-        Order.sell(
+      val buy = Order
+        .buy(
           Order.V4,
-          callerKP,
+          otherCallerKP,
           dAppKP.publicKey,
           assetPair,
           10L,
@@ -388,6 +380,22 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
           smartMatcherFee,
           matcherFeeAssetId = IssuedAsset(ByteStr.decodeBase58(feeAsset).get)
         )
+        .explicitGet()
+      val sell =
+        Order
+          .sell(
+            Order.V4,
+            callerKP,
+            dAppKP.publicKey,
+            assetPair,
+            10L,
+            100L,
+            ts,
+            ts + Order.MaxLiveTime,
+            smartMatcherFee,
+            matcherFeeAssetId = IssuedAsset(ByteStr.decodeBase58(feeAsset).get)
+          )
+          .explicitGet()
       (buy, sell)
     }
 
@@ -402,9 +410,9 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
           buy,
           sell,
           buy.amount,
-          buy.price,
-          buy.matcherFee,
-          sell.matcherFee,
+          TxExchangePrice.unsafeFrom(buy.price.value),
+          buy.matcherFee.value,
+          sell.matcherFee.value,
           matcherFee + smartFee * 3,
           version = TxVersion.V3
         )
@@ -431,9 +439,9 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
           buy,
           sell,
           buy.amount,
-          buy.price,
-          buy.matcherFee,
-          sell.matcherFee,
+          TxExchangePrice.unsafeFrom(buy.price.value),
+          buy.matcherFee.value,
+          sell.matcherFee.value,
           matcherFee + smartFee * 3,
           version = TxVersion.V3
         )

@@ -30,11 +30,7 @@ import org.scalacheck.{Arbitrary, Gen}
 import scala.concurrent.duration.Duration
 
 //noinspection NameBooleanParameters
-class LevelDBWriterSpec
-    extends FreeSpec
-    with WithDB
-    with DBCacheSettings
-    with RequestGen {
+class LevelDBWriterSpec extends FreeSpec with WithDB with DBCacheSettings with RequestGen {
   "Slice" - {
     "drops tail" in {
       LevelDBWriter.slice(Seq(10, 7, 4), 7, 10) shouldEqual Seq(10, 7)
@@ -151,7 +147,6 @@ class LevelDBWriterSpec
       f(defaultWriter, account)
     } finally {
       bcu.shutdown()
-      db.close()
     }
   }
 
@@ -172,7 +167,6 @@ class LevelDBWriterSpec
       f(defaultWriter, blocks, account)
     } finally {
       bcu.shutdown()
-      db.close()
     }
   }
 
@@ -285,7 +279,6 @@ class LevelDBWriterSpec
 
     } finally {
       bcu.shutdown()
-      db.close()
     }
   }
 

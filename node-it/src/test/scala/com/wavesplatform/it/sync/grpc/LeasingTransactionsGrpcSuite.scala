@@ -189,7 +189,7 @@ class LeasingTransactionsGrpcSuite extends GrpcBaseTransactionSuite {
       originTransactionId = leaseTxId,
       sender = ByteString.copyFrom(leaseTx.sender.toAddress.bytes),
       recipient = Some(PBRecipients.create(leaseTx.recipient)),
-      amount = leaseTx.amount,
+      amount = leaseTx.amount.value,
       height = height.toInt
     )
   }

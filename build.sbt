@@ -7,7 +7,9 @@
  */
 
 import sbt.Def
-import sbt.Keys._
+import sbt.Keys.{concurrentRestrictions, _}
+
+import scala.collection.Seq
 
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
@@ -115,10 +117,10 @@ lazy val root = (project in file("."))
 
 inScope(Global)(
   Seq(
+    publish / skip := true,
     scalaVersion := "2.13.6",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
-    V.fallback := (1, 3, 12),
     organizationHomepage := Some(url("https://wavesplatform.com")),
     licenses := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
     scalacOptions ++= Seq(
@@ -137,8 +139,7 @@ inScope(Global)(
     crossPaths := false,
     dependencyOverrides ++= Dependencies.enforcedVersions.value,
     cancelable := true,
-    parallelExecution := false,
-    testListeners := Seq.empty, // Fix for doubled test reports
+    parallelExecution := true,
     /* http://www.scalatest.org/user_guide/using_the_runner
      * o - select the standard output reporter
      * I - show reminder of failed and canceled tests without stack traces
@@ -152,7 +153,8 @@ inScope(Global)(
     network := Network.default(),
     resolvers += Resolver.sonatypeRepo("snapshots"),
     Compile / doc / sources := Seq.empty,
-    Compile / packageDoc / publishArtifact := false
+    Compile / packageDoc / publishArtifact := false,
+    concurrentRestrictions := Seq(Tags.limit(Tags.Test, math.min(EvaluateTask.SystemProcessors, 8)))
   )
 )
 

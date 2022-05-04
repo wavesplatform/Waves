@@ -1,14 +1,9 @@
 package com.wavesplatform.state.diffs
 
-import scala.collection.immutable.VectorMap
-import scala.util.control.NonFatal
-
+import cats.implicits.{toFoldableOps, toTraverseOps}
 import cats.instances.either._
-import cats.instances.map._
-import cats.kernel.Monoid
 import cats.syntax.either._
 import cats.syntax.functor._
-import cats.syntax.semigroup._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
@@ -17,19 +12,21 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.metrics.TxProcessingStats
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
-import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
-import com.wavesplatform.transaction._
+import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, Portfolio, Sponsorship}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import com.wavesplatform.transaction.smart.script.trace.{TraceStep, TracedResult}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, Verifier}
-import com.wavesplatform.transaction.smart.script.trace.{TracedResult, TraceStep}
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import play.api.libs.json.Json
+
+import scala.util.control.NonFatal
 
 object TransactionDiffer {
   def apply(prevBlockTs: Option[Long], currentBlockTs: Long, verify: Boolean = true)(
@@ -135,7 +132,7 @@ object TransactionDiffer {
       } yield ()
 
   private def verifierDiff(blockchain: Blockchain, tx: Transaction) =
-    Verifier(blockchain)(tx).map(complexity => Diff.empty.copy(scriptsComplexity = complexity))
+    Verifier(blockchain)(tx).map(complexity => Diff(scriptsComplexity = complexity))
 
   private def assetsVerifierDiff(
       blockchain: Blockchain,
@@ -154,7 +151,7 @@ object TransactionDiffer {
       }
     } else Diff.empty.asRight[ValidationError].traced
 
-    diff.map(Monoid.combine(initDiff, _)).leftMap {
+    diff.flatMap(d => initDiff.combine(d).leftMap(GenericError(_))).leftMap {
       case fte: FailedTransactionError => fte.addComplexity(initDiff.scriptsComplexity)
       case ve                          => ve
     }
@@ -163,7 +160,13 @@ object TransactionDiffer {
   private def validateBalance(blockchain: Blockchain, txType: TxType, diff: Diff): Either[ValidationError, Unit] =
     stats.balanceValidation.measureForType(txType)(BalanceDiffValidation(blockchain)(diff).as(()))
 
-  private def transactionDiff(blockchain: Blockchain, tx: Transaction, initDiff: Diff, currentBlockTs: TxTimestamp, limitedExecution: Boolean) =
+  private def transactionDiff(
+      blockchain: Blockchain,
+      tx: Transaction,
+      initDiff: Diff,
+      currentBlockTs: TxTimestamp,
+      limitedExecution: Boolean
+  ): TracedResult[ValidationError, Diff] =
     stats.transactionDiffValidation
       .measureForType(tx.typeId) {
         tx match {
@@ -192,7 +195,7 @@ object TransactionDiffer {
           case _                                 => UnsupportedTransactionType.asLeft.traced
         }
       }
-      .map(d => initDiff |+| d.bindTransaction(tx))
+      .flatMap(diff => initDiff.combine(diff.bindTransaction(blockchain, tx, applied = true)).leftMap(GenericError(_)))
       .leftMap {
         case fte: FailedTransactionError => fte.addComplexity(initDiff.scriptsComplexity)
         case ve                          => ve
@@ -221,7 +224,7 @@ object TransactionDiffer {
             .assetDescription(asset)
             .toRight(GenericError(s"Asset $asset should be issued before it can be traded"))
       }
-      orderDiff = Diff.empty.copy(portfolios = Map(order.sender.toAddress -> Portfolio.build(order.matcherFeeAssetId, -matcherFee)))
+      orderDiff = Diff(portfolios = Map(order.sender.toAddress -> Portfolio.build(order.matcherFeeAssetId, -matcherFee)))
       _ <- validateBalance(blockchain, ExchangeTransaction.typeId, orderDiff)
     } yield ()
 
@@ -229,30 +232,33 @@ object TransactionDiffer {
     for {
       dAppAddress <- blockchain.resolveAlias(tx.dAppAddressOrAlias)
       portfolios <- tx.payments
-        .map {
+        .traverse {
           case InvokeScriptTransaction.Payment(amt, assetId) =>
             assetId match {
               case asset @ IssuedAsset(_) =>
                 blockchain
                   .assetDescription(asset)
                   .toRight(GenericError(s"Referenced $asset not found"))
-                  .as(
-                    Monoid.combine(
-                      Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))),
-                      Map(dAppAddress         -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
-                    )
+                  .flatMap(
+                    _ =>
+                      Diff
+                        .combine(
+                          Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))),
+                          Map(dAppAddress         -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
+                        )
+                        .leftMap(GenericError(_))
                   )
               case Waves =>
-                Monoid
+                Diff
                   .combine(
                     Map(tx.sender.toAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty)),
                     Map(dAppAddress         -> Portfolio(amt, LeaseBalance.empty, Map.empty))
                   )
-                  .asRight
+                  .leftMap(GenericError(_))
             }
         }
-        .foldLeft[Either[ValidationError, Map[Address, Portfolio]]](Right(Map.empty))(Monoid.combine)
-      paymentsDiff = Diff.empty.copy(portfolios = portfolios)
+        .flatMap(_.foldM(Map.empty[Address, Portfolio])(Diff.combine).leftMap(GenericError(_)))
+      paymentsDiff = Diff(portfolios = portfolios)
       _ <- BalanceDiffValidation(blockchain)(paymentsDiff)
     } yield ()
 
@@ -266,26 +272,15 @@ object TransactionDiffer {
       tx: Transaction,
       spentComplexity: Long,
       scriptResult: Option[InvokeScriptResult]
-  ): Either[ValidationError, Diff] = {
-    val extractDAppAddress = tx match {
-      case ist: InvokeScriptTransaction => blockchain.resolveAlias(ist.dAppAddressOrAlias).map(Some(_))
-      case _                            => Right(None)
-    }
-
-    for {
-      portfolios <- feePortfolios(blockchain, tx)
-      maybeDApp  <- extractDAppAddress
-      calledAddresses = scriptResult.map(inv => InvokeScriptResult.Invocation.calledAddresses(inv.invokes)).getOrElse(Nil)
-    } yield {
-      val affectedAddresses = portfolios.keySet ++ maybeDApp ++ calledAddresses
-      Diff.empty.copy(
-        transactions = VectorMap((tx.id(), NewTransactionInfo(tx, affectedAddresses, applied = false, spentComplexity))),
-        portfolios = portfolios,
-        scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
-        scriptsComplexity = spentComplexity
-      )
-    }
-  }
+  ): Either[ValidationError, Diff] =
+    feePortfolios(blockchain, tx).map(
+      portfolios =>
+        Diff(
+          portfolios = portfolios,
+          scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
+          scriptsComplexity = spentComplexity
+        ).bindTransaction(blockchain, tx, applied = false)
+    )
 
   private object isFailedTransaction {
     def unapply(result: TracedResult[ValidationError, Diff]): Option[(Long, Option[InvokeScriptResult], List[TraceStep], TracedResult.Attributes)] =
@@ -303,7 +298,7 @@ object TransactionDiffer {
   private def feePortfolios(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Map[Address, Portfolio]] =
     tx match {
       case _: GenesisTransaction   => Map.empty[Address, Portfolio].asRight
-      case ptx: PaymentTransaction => Map(ptx.sender.toAddress -> Portfolio(balance = -ptx.fee, LeaseBalance.empty, assets = Map.empty)).asRight
+      case ptx: PaymentTransaction => Map(ptx.sender.toAddress -> Portfolio(balance = -ptx.fee.value, LeaseBalance.empty, assets = Map.empty)).asRight
       case ptx: ProvenTransaction =>
         ptx.assetFee match {
           case (Waves, fee) => Map(ptx.sender.toAddress -> Portfolio(-fee, LeaseBalance.empty, Map.empty)).asRight
@@ -317,10 +312,13 @@ object TransactionDiffer {
                 Sponsorship.toWaves(fee, assetInfo.sponsorship),
                 GenericError(s"Asset $asset is not sponsored, cannot be used to pay fees")
               )
-            } yield Monoid.combine(
-              Map(ptx.sender.toAddress       -> Portfolio(0, LeaseBalance.empty, Map(asset         -> -fee))),
-              Map(assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> fee)))
-            )
+              portfolios <- Diff
+                .combine(
+                  Map(ptx.sender.toAddress       -> Portfolio(0, LeaseBalance.empty, Map(asset         -> -fee))),
+                  Map(assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> fee)))
+                )
+                .leftMap(GenericError(_))
+            } yield portfolios
         }
       case _ => UnsupportedTransactionType.asLeft
     }

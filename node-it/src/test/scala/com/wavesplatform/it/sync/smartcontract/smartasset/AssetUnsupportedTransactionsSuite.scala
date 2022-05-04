@@ -20,7 +20,8 @@ class AssetUnsupportedTransactionsSuite extends BaseTransactionSuite with TableD
       "SetScriptTransaction",
       "DataTransaction",
       "IssueTransaction"
-    )) { tx =>
+    )
+  ) { tx =>
     test(s"Smart Asset script should not support $tx") {
       try {
         sender.issue(
@@ -41,7 +42,8 @@ class AssetUnsupportedTransactionsSuite extends BaseTransactionSuite with TableD
                  |}""".stripMargin,
               isAssetScript = true,
               ScriptEstimatorV2
-            ).explicitGet()._1.bytes().base64),
+            ).explicitGet()._1.bytes().base64
+          ),
           waitForTx = true
         )
 
@@ -68,8 +70,10 @@ class AssetUnsupportedTransactionsSuite extends BaseTransactionSuite with TableD
         waitForTx = true
       )
       .id
-    assertBadRequestAndMessage(sender.sponsorAsset(firstKeyPair, assetId, 100, sponsorReducedFee + smartFee),
-                               "State check failed. Reason: Sponsorship smart assets is disabled.")
+    assertBadRequestAndMessage(
+      sender.sponsorAsset(firstKeyPair, assetId, 100, sponsorReducedFee + smartFee),
+      "State check failed. Reason: Sponsorship smart assets is disabled."
+    )
 
   }
 

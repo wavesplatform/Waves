@@ -27,7 +27,7 @@ class FunctionComplexityTest extends PropSpec {
   property("all functions complexities") {
     lazyContexts.foreach { case ((ds, _), ctx) =>
       ctx().functions
-        .filterNot(_.name.startsWith("_"))
+        .filterNot(_.name.startsWith("$"))
         .foreach { function =>
           val expr = FUNCTION_CALL(function.header, List.fill(function.args.size)(Terms.TRUE))
           val estimatedCost = ScriptEstimatorV3(fixOverflow = true)(

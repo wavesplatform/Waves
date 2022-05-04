@@ -10,7 +10,6 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import play.api.libs.json.{JsObject, Json}
 
-
 case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchain) extends ApiRoute {
 
   override val route: Route =

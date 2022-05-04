@@ -8,7 +8,7 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TxValidationError.InvalidAddress
-import com.wavesplatform.utils.{ScorexLogging, base58Length}
+import com.wavesplatform.utils.base58Length
 import play.api.libs.json._
 
 sealed trait Address extends AddressOrAlias {
@@ -16,7 +16,7 @@ sealed trait Address extends AddressOrAlias {
 }
 
 //noinspection ScalaDeprecation
-object Address extends ScorexLogging {
+object Address {
   val Prefix: String           = "address:"
   val AddressVersion: Byte     = 1
   val ChecksumLength: Int      = 4
@@ -87,7 +87,7 @@ object Address extends ScorexLogging {
     )
   }
 
-  def fromString(addressStr: String): Either[ValidationError, Address] = {
+  def fromString(addressStr: String, chainId: Option[Byte] = Some(scheme.chainId)): Either[ValidationError, Address] = {
     val base58String = if (addressStr.startsWith(Prefix)) addressStr.drop(Prefix.length) else addressStr
     for {
       _ <- Either.cond(
@@ -96,7 +96,7 @@ object Address extends ScorexLogging {
         InvalidAddress(s"Wrong address string length: max=$AddressStringLength, actual: ${base58String.length}")
       )
       byteArray <- Base58.tryDecodeWithLimit(base58String).toEither.left.map(ex => InvalidAddress(s"Unable to decode base58: ${ex.getMessage}"))
-      address   <- fromBytes(byteArray)
+      address   <- fromBytes(byteArray, chainId.getOrElse(byteArray(1)))
     } yield address
   }
 

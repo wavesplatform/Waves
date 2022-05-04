@@ -9,11 +9,10 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
-import com.wavesplatform.lang.v1.testing.TypedScriptGen
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.test.PropSpec
 
-class ContractScriptComplexityTest(estimator: ScriptEstimator) extends PropSpec with TypedScriptGen {
+class ContractScriptComplexityTest(estimator: ScriptEstimator) extends PropSpec {
 
   property("estimate contract script correctly") {
     val contract = DApp(
@@ -234,7 +233,7 @@ class ContractScriptComplexityTest(estimator: ScriptEstimator) extends PropSpec 
       )
     )
 
-    ContractScript.estimateUserFunctions(V3, contract, estimator) shouldBe Right(List("g" -> 82, "f" -> 37))
+    ContractScript.estimateUserFunctions(V3, contract, estimator) shouldBe Right(List("g"   -> 82, "f" -> 37))
     ContractScript.estimateGlobalVariables(V3, contract, estimator) shouldBe Right(List("y" -> 39, "z" -> 39, "w" -> 28))
   }
 }

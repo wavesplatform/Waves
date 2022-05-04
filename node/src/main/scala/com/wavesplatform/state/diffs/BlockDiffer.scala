@@ -1,8 +1,7 @@
 package com.wavesplatform.state.diffs
 
-import cats.kernel.Monoid
+import cats.implicits.{toBifunctorOps, toFoldableOps}
 import cats.syntax.either.catsSyntaxEitherId
-import cats.syntax.semigroup._
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
@@ -11,13 +10,12 @@ import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.state._
 import com.wavesplatform.state.patch._
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError.{ActivationError, _}
+import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.transaction.{Asset, Transaction}
 
-object BlockDiffer extends ScorexLogging {
+object BlockDiffer {
   final case class DetailedDiff(parentDiff: Diff, transactionDiffs: List[Diff])
   final case class Result(diff: Diff, carry: Long, totalFee: Long, constraint: MiningConstraint, detailedDiff: DetailedDiff)
 
@@ -53,34 +51,47 @@ object BlockDiffer extends ScorexLogging {
 
     val minerReward = blockchain.lastBlockReward.fold(Portfolio.empty)(Portfolio.waves)
 
-    val feeFromPreviousBlock: Portfolio =
+    val feeFromPreviousBlockE =
       if (stateHeight >= sponsorshipHeight) {
-        Portfolio(balance = blockchain.carryFee)
-      } else if (stateHeight > ngHeight) maybePrevBlock.fold(Portfolio.empty) { pb =>
+        Right(Portfolio(balance = blockchain.carryFee))
+      } else if (stateHeight > ngHeight) maybePrevBlock.fold(Portfolio.empty.asRight[String]) { pb =>
         // it's important to combine tx fee fractions (instead of getting a fraction of the combined tx fee)
         // so that we end up with the same value as when computing per-transaction fee part
         // during microblock processing below
-        Monoid.combineAll(pb.transactionData.map { t =>
-          val pf = Portfolio.build(t.assetFee)
-          pf.minus(pf.multiply(CurrentBlockFeePart))
-        })
-      } else Portfolio.empty
+        pb.transactionData
+          .map { t =>
+            val pf = Portfolio.build(t.assetFee)
+            pf.minus(pf.multiply(CurrentBlockFeePart))
+          }
+          .foldM(Portfolio.empty)(_.combine(_))
+      } else
+        Right(Portfolio.empty)
 
-    val initialFeeFromThisBlock: Portfolio =
+    val initialFeeFromThisBlockE =
       if (stateHeight < ngHeight) {
         // before NG activation, miner immediately received all the fee from the block
-        Monoid.combineAll(block.transactionData.map(_.assetFee).map(Portfolio.build))
+        block.transactionData.map(_.assetFee).map(Portfolio.build).foldM(Portfolio.empty)(_.combine(_))
       } else
-        Portfolio.empty
+        Right(Portfolio.empty)
+
+    val blockchainWithNewBlock = CompositeBlockchain(blockchain, Diff.empty, block, hitSource, 0, None)
+    val initDiffE =
+      for {
+        feeFromPreviousBlock    <- feeFromPreviousBlockE
+        initialFeeFromThisBlock <- initialFeeFromThisBlockE
+        totalReward             <- minerReward.combine(initialFeeFromThisBlock).flatMap(_.combine(feeFromPreviousBlock))
+        patches                 <- patchesDiff(blockchainWithNewBlock)
+        resultDiff              <- Diff(portfolios = Map(block.sender.toAddress -> totalReward)).combine(patches)
+      } yield resultDiff
 
     for {
-      _ <- TracedResult(Either.cond(!verify || block.signatureValid(), (), GenericError(s"Block $block has invalid signature")))
-      blockchainWithNewBlock = CompositeBlockchain(blockchain, Diff.empty, block, hitSource, 0, None)
+      _          <- TracedResult(Either.cond(!verify || block.signatureValid(), (), GenericError(s"Block $block has invalid signature")))
+      resultDiff <- TracedResult(initDiffE.leftMap(GenericError(_)))
       r <- apply(
         blockchainWithNewBlock,
         constraint,
         maybePrevBlock.map(_.header.timestamp),
-        Diff.empty.copy(portfolios = Map(block.sender.toAddress -> (minerReward |+| initialFeeFromThisBlock |+| feeFromPreviousBlock))) |+| patchesDiff(blockchainWithNewBlock),
+        resultDiff,
         stateHeight >= ngHeight,
         block.transactionData,
         verify
@@ -175,26 +186,31 @@ object BlockDiffer extends ScorexLogging {
               val carry = if (hasNg && hasSponsorship) feeAmount - currentBlockFee else 0
 
               val totalWavesFee = currTotalFee + (if (feeAsset == Waves) feeAmount else 0L)
-              val minerDiff     = Diff.empty.copy(portfolios = Map(blockGenerator -> minerPortfolio))
+              val minerDiff     = Diff(portfolios = Map(blockGenerator -> minerPortfolio))
 
-              Right(
-                Result(
-                  currDiff |+| thisTxDiff |+| minerDiff,
-                  carryFee + carry,
-                  totalWavesFee,
-                  updatedConstraint,
-                  DetailedDiff(parentDiff |+| minerDiff, thisTxDiff :: txDiffs)
-                )
+              val result = for {
+                diff          <- currDiff.combine(thisTxDiff).flatMap(_.combine(minerDiff))
+                newParentDiff <- parentDiff.combine(minerDiff)
+              } yield Result(
+                diff,
+                carryFee + carry,
+                totalWavesFee,
+                updatedConstraint,
+                DetailedDiff(newParentDiff, thisTxDiff :: txDiffs)
               )
+              TracedResult(result.leftMap(GenericError(_)))
             }
           }
       }
   }
 
-  private def patchesDiff(blockchain: Blockchain): Diff = {
-    Seq(CancelAllLeases, CancelLeaseOverflow, CancelInvalidLeaseIn, CancelLeasesToDisabledAliases).foldLeft(Diff.empty) {
-      case (prevDiff, patch) =>
-        patch.lift(CompositeBlockchain(blockchain, prevDiff)).fold(prevDiff)(prevDiff |+| _)
-    }
+  private def patchesDiff(blockchain: Blockchain): Either[String, Diff] = {
+    Seq(CancelAllLeases, CancelLeaseOverflow, CancelInvalidLeaseIn, CancelLeasesToDisabledAliases)
+      .foldM(Diff.empty) {
+        case (prevDiff, patch) =>
+          patch
+            .lift(CompositeBlockchain(blockchain, prevDiff))
+            .fold(prevDiff.asRight[String])(prevDiff.combine)
+      }
   }
 }

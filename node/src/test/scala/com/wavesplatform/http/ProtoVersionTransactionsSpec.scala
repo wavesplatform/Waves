@@ -21,7 +21,16 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxVersion, VersionedTransaction}
+import com.wavesplatform.transaction.{
+  Asset,
+  CreateAliasTransaction,
+  DataTransaction,
+  Proofs,
+  Transaction,
+  TxNonNegativeAmount,
+  TxVersion,
+  VersionedTransaction
+}
 import com.wavesplatform.utx.UtxPool
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -172,8 +181,10 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       val seller    = accountGen.sample.get
       val assetPair = assetPairGen.sample.get
 
-      val buyOrder  = Order.buy(Order.V3, buyer, account.publicKey, assetPair, Order.MaxAmount / 2, 100L, Now, Now + Order.MaxLiveTime, MinFee * 3)
-      val sellOrder = Order.sell(Order.V3, seller, account.publicKey, assetPair, Order.MaxAmount / 2, 100L, Now, Now + Order.MaxLiveTime, MinFee * 3)
+      val buyOrder =
+        Order.buy(Order.V3, buyer, account.publicKey, assetPair, Order.MaxAmount / 2, 100L, Now, Now + Order.MaxLiveTime, MinFee * 3).explicitGet()
+      val sellOrder =
+        Order.sell(Order.V3, seller, account.publicKey, assetPair, Order.MaxAmount / 2, 100L, Now, Now + Order.MaxLiveTime, MinFee * 3).explicitGet()
 
       val exchangeTx =
         ExchangeTransaction
@@ -298,7 +309,8 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
     }
 
     "MassTransferTransaction" in {
-      val transfers  = Gen.listOfN(10, accountOrAliasGen).map(accounts => accounts.map(ParsedTransfer(_, 100))).sample.get
+      val transfers =
+        Gen.listOfN(10, accountOrAliasGen).map(accounts => accounts.map(ParsedTransfer(_, TxNonNegativeAmount.unsafeFrom(100)))).sample.get
       val attachment = genBoundedBytes(0, TransferTransaction.MaxAttachmentSize).sample.get
 
       val massTransferTxUnsigned =
@@ -397,22 +409,30 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
     "UpdateAssetInfoTransaction" in {
       val asset = IssuedAsset(bytes32gen.map(ByteStr(_)).sample.get)
 
-      val updateAssetInfoTx = UpdateAssetInfoTransaction
-        .selfSigned(
+      val updateAssetInfoTxUnsigned = UpdateAssetInfoTransaction
+        .create(
           TxVersion.V1,
-          account,
+          account.publicKey,
           asset.id,
           "Test",
           "Test",
           ntpNow,
           MinFee,
-          Asset.Waves
+          Asset.Waves,
+          Proofs.empty
         )
         .explicitGet()
+
+      val (proofs, updateAssetInfoTxJson) = Post(routePath("/sign"), updateAssetInfoTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
+        checkProofs(response, updateAssetInfoTxUnsigned)
+      }
+
+      val updateAssetInfoTx = updateAssetInfoTxUnsigned.copy(proofs = proofs)
       val base64Str = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(updateAssetInfoTx)))
 
       Post(routePath("/broadcast"), updateAssetInfoTx.json()) ~> ApiKeyHeader ~> route ~> check {
         responseAs[JsObject] shouldBe updateAssetInfoTx.json()
+        responseAs[JsObject] shouldBe updateAssetInfoTxJson
       }
 
       decode(base64Str) shouldBe updateAssetInfoTx

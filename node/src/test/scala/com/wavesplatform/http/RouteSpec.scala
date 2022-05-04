@@ -15,6 +15,7 @@ abstract class RouteSpec(basePath: String) extends FreeSpec with ScalatestRouteT
   protected def routePath(suffix: String) = s"$basePath$suffix"
 
   implicit class RouteTestingOps(route: Route) {
+
     /**
       * Convenient utility for testing multi-routes created with the [[com.wavesplatform.api.http.CustomDirectives#anyParam(java.lang.String)]] directive
       * @param baseUrl Base route URL

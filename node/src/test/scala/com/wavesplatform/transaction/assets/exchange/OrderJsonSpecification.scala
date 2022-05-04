@@ -24,9 +24,9 @@ class OrderJsonSpecification extends PropSpec {
             "priceAsset": "GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44"
           },
           "orderType": "buy",
-          "amount": 0,
-          "matcherFee": 0,
-          "price": 0,
+          "amount": 1,
+          "matcherFee": 2,
+          "price": 3,
           "timestamp": 0,
           "expiration": 0,
           "signature": "signature"
@@ -40,9 +40,9 @@ class OrderJsonSpecification extends PropSpec {
         o.matcherPublicKey shouldBe PublicKey(Base58.tryDecodeWithLimit("DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ").get)
         o.assetPair.amountAsset.compatId.get shouldBe ByteStr.decodeBase58("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get
         o.assetPair.priceAsset.compatId.get shouldBe ByteStr.decodeBase58("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get
-        o.price shouldBe 0
-        o.amount shouldBe 0
-        o.matcherFee shouldBe 0
+        o.price.value shouldBe 3
+        o.amount.value shouldBe 1
+        o.matcherFee.value shouldBe 2
         o.timestamp shouldBe 0
         o.expiration shouldBe 0
         o.signature shouldBe ByteStr(Base58.decode("signature"))
@@ -58,9 +58,9 @@ class OrderJsonSpecification extends PropSpec {
             "priceAsset": "GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44"
           },
           "orderType": "buy",
-          "amount": 0,
-          "matcherFee": 0,
-          "price": 0,
+          "amount": 1,
+          "matcherFee": 2,
+          "price": 3,
           "timestamp": 0,
           "expiration": 0,
           "signature": "signature",
@@ -75,9 +75,9 @@ class OrderJsonSpecification extends PropSpec {
         o.matcherPublicKey shouldBe PublicKey(Base58.tryDecodeWithLimit("DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ").get)
         o.assetPair.amountAsset shouldBe IssuedAsset(ByteStr.decodeBase58("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get)
         o.assetPair.priceAsset shouldBe IssuedAsset(ByteStr.decodeBase58("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get)
-        o.price shouldBe 0
-        o.amount shouldBe 0
-        o.matcherFee shouldBe 0
+        o.price.value shouldBe 3
+        o.amount.value shouldBe 1
+        o.matcherFee.value shouldBe 2
         o.timestamp shouldBe 0
         o.expiration shouldBe 0
         o.signature shouldBe ByteStr(Base58.decode("signature"))
@@ -91,9 +91,9 @@ class OrderJsonSpecification extends PropSpec {
           "senderPublicKey": " ",
           "spendAssetId": "string",
           "receiveAssetId": "string",
-          "amount": 0,
-          "matcherFee": 0,
-          "price": 0,
+          "amount": 1,
+          "matcherFee": 2,
+          "price": 3,
           "timestamp": 0,
           "expiration": 0,
           "signature": "signature"
@@ -162,9 +162,9 @@ class OrderJsonSpecification extends PropSpec {
              "priceAsset": $priceAsset
            },
           "orderType": "sell",
-          "amount": 0,
-          "matcherFee": 0,
-          "price": 0,
+          "amount": 1,
+          "matcherFee": 2,
+          "price": 3,
           "timestamp": 0,
           "expiration": 0,
           "signature": "signature"

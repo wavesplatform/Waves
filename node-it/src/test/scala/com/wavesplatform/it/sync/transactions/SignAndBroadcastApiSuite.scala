@@ -1,11 +1,13 @@
 package com.wavesplatform.it.sync.transactions
 
-import com.wavesplatform.account.PublicKey
+import com.typesafe.config.Config
+import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.api.http.requests.TransferRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
-import com.wavesplatform.it.NTPTime
+import com.wavesplatform.it.{NTPTime, NodeConfigs}
+import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{someAssetAmount, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -15,7 +17,7 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.AssetPair.extractAssetId
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, _}
-import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, SponsorFeeTransaction}
+import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, SponsorFeeTransaction, UpdateAssetInfoTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
@@ -28,6 +30,13 @@ import play.api.libs.json._
 import scala.util.Random
 
 class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with BeforeAndAfterAll {
+  override protected def nodeConfigs: Seq[Config] =
+    NodeConfigs
+      .Builder(Default, 1, Seq.empty)
+      .overrideBase(_.quorum(0))
+      .overrideBase(_.raw(s"waves.blockchain.custom.functionality.min-asset-info-update-interval = 0"))
+      .buildNonConflicting()
+
   test("height should always be reported for transactions") {
     val txId = sender.transfer(firstKeyPair, secondAddress, 1.waves, fee = minFee).id
 
@@ -320,6 +329,39 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
     }
   }
 
+  test("/transactions/sign should produce update asset info transactions that are good for /transactions/broadcast") {
+    for (v <- supportedVersions) {
+
+      val assetId = signBroadcastAndCalcFee(
+        Json.obj(
+          "type"        -> IssueTransaction.typeId,
+          "name"        -> "Gigacoin",
+          "quantity"    -> 100.waves,
+          "description" -> "Gigacoin",
+          "sender"      -> firstAddress,
+          "decimals"    -> 8,
+          "reissuable"  -> true
+        ),
+        usesProofs = true,
+        version = v
+      )
+
+      signBroadcastAndCalcFee(
+        Json.obj(
+          "type" -> UpdateAssetInfoTransaction.typeId,
+          "version" -> 1,
+          "sender" -> firstAddress,
+          "assetId" -> assetId,
+          "name" -> "New name",
+          "description" -> "New description",
+          "chainId" -> AddressScheme.current.chainId
+        ),
+        usesProofs = true,
+        version = 1
+      )
+    }
+  }
+
   test("/transactions/sign/{signerAddress} should sign a transaction by key of signerAddress") {
     val firstAddress = sender.createKeyPairServerSide().toAddress.stringRepr
 
@@ -390,22 +432,24 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
       val buyAmount           = 2
       val sellAmount          = 3
       val assetPair           = AssetPair.createAssetPair("WAVES", issueTx).get
-      val buy                 = Order.buy(o1ver, buyer, matcher.publicKey, assetPair, buyAmount, buyPrice, ts, expirationTimestamp, mf, matcherFeeOrder1)
-      val sell                = Order.sell(o2ver, seller, matcher.publicKey, assetPair, sellAmount, sellPrice, ts, expirationTimestamp, mf, matcherFeeOrder2)
+      val buy =
+        Order.buy(o1ver, buyer, matcher.publicKey, assetPair, buyAmount, buyPrice, ts, expirationTimestamp, mf, matcherFeeOrder1).explicitGet()
+      val sell =
+        Order.sell(o2ver, seller, matcher.publicKey, assetPair, sellAmount, sellPrice, ts, expirationTimestamp, mf, matcherFeeOrder2).explicitGet()
 
-      val amount = math.min(buy.amount, sell.amount)
+      val amount = math.min(buy.amount.value, sell.amount.value)
       val tx =
         if (tver == 1) {
           ExchangeTransaction
             .signed(
               1.toByte,
               matcher = matcher.privateKey,
-              order1 = buy.asInstanceOf[Order],
-              order2 = sell.asInstanceOf[Order],
+              order1 = buy,
+              order2 = sell,
               amount = amount,
               price = sellPrice,
-              buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
-              sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
+              buyMatcherFee = (BigInt(mf) * amount / buy.amount.value).toLong,
+              sellMatcherFee = (BigInt(mf) * amount / sell.amount.value).toLong,
               fee = mf,
               timestamp = ts
             )
@@ -420,8 +464,8 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
               order2 = sell,
               amount = amount,
               price = sellPrice,
-              buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
-              sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
+              buyMatcherFee = (BigInt(mf) * amount / buy.amount.value).toLong,
+              sellMatcherFee = (BigInt(mf) * amount / sell.amount.value).toLong,
               fee = mf,
               timestamp = ts
             )

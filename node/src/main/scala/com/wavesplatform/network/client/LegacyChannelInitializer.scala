@@ -42,7 +42,8 @@ class ClientHandshakeHandler(handshake: Handshake, promise: Promise[Channel]) ex
 }
 
 // Used only in tests and Generator
-class LegacyChannelInitializer(trafficLoggerSettings: TrafficLogger.Settings, handshake: Handshake, promise: Promise[Channel]) extends ChannelInitializer[SocketChannel] {
+class LegacyChannelInitializer(trafficLoggerSettings: TrafficLogger.Settings, handshake: Handshake, promise: Promise[Channel])
+    extends ChannelInitializer[SocketChannel] {
   private val lengthFieldLength = 4
   private val maxFieldLength    = 1024 * 1024
 

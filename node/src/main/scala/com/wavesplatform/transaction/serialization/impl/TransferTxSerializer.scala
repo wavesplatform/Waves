@@ -1,12 +1,11 @@
 package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
-
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.serialization.{ByteBufferOps, Deser}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Proofs, TxVersion}
+import com.wavesplatform.transaction.{Proofs, TxPositiveAmount, TxVersion}
 import com.wavesplatform.utils.byteStrFormat
 import play.api.libs.json.{JsObject, Json}
 
@@ -19,7 +18,7 @@ object TransferTxSerializer {
       "recipient"  -> recipient.stringRepr,
       "assetId"    -> assetId.maybeBase58Repr,
       "feeAsset"   -> feeAssetId.maybeBase58Repr, // legacy v0.11.1 compat
-      "amount"     -> amount,
+      "amount"     -> amount.value,
       "attachment" -> attachment
     )
   }
@@ -32,8 +31,8 @@ object TransferTxSerializer {
         assetId.byteRepr,
         feeAssetId.byteRepr,
         Longs.toByteArray(timestamp),
-        Longs.toByteArray(amount),
-        Longs.toByteArray(fee),
+        Longs.toByteArray(amount.value),
+        Longs.toByteArray(fee.value),
         recipient.bytes,
         Deser.serializeArrayWithLength(attachment.arr)
       )
@@ -57,9 +56,9 @@ object TransferTxSerializer {
       val assetId    = buf.getAsset
       val feeAssetId = buf.getAsset
       val ts         = buf.getLong
-      val amount     = buf.getLong
-      val fee        = buf.getLong
-      val recipient  = buf.getAddressOrAlias
+      val amount     = TxPositiveAmount.unsafeFrom(buf.getLong)
+      val fee        = TxPositiveAmount.unsafeFrom(buf.getLong)
+      val recipient  = buf.getAddressOrAlias()
       val attachment = buf.getByteArrayWithLength
 
       TransferTransaction(version, sender, recipient, assetId, amount, feeAssetId, fee, ByteStr(attachment), ts, Proofs.empty, recipient.chainId)

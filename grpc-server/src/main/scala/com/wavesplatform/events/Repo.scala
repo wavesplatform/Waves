@@ -1,14 +1,13 @@
 package com.wavesplatform.events
 
 import java.nio.{ByteBuffer, ByteOrder}
-
 import cats.syntax.semigroup._
 import com.google.common.primitives.Ints
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.grpc._
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.{DBExt, openDB}
+import com.wavesplatform.database.DBExt
 import com.wavesplatform.events.Repo.keyForHeight
 import com.wavesplatform.events.api.grpc.protobuf.BlockchainUpdatesApiGrpc.BlockchainUpdatesApi
 import com.wavesplatform.events.api.grpc.protobuf._
@@ -23,23 +22,21 @@ import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import monix.reactive.subjects.PublishToOneSubject
+import org.iq80.leveldb.DB
 
+import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.Future
 import scala.util.Using
 import scala.util.control.Exception
 
-class Repo(dbDirectory: String, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
-    extends BlockchainUpdatesApi
-    with BlockchainUpdateTriggers
-    with ScorexLogging {
+class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler) extends BlockchainUpdatesApi with BlockchainUpdateTriggers with ScorexLogging {
   private[this] val monitor     = new Object
   private[this] var liquidState = Option.empty[LiquidState]
-  private[this] var handlers    = Set.empty[Handler]
-  private[this] val db          = openDB(dbDirectory)
+  private[this] val handlers    = ConcurrentHashMap.newKeySet[Handler]()
 
   def shutdown(): Unit = monitor.synchronized {
     db.close()
-    handlers.foreach(_.shutdown())
+    handlers.forEach(_.shutdown())
   }
 
   def height: Int =
@@ -66,12 +63,12 @@ class Repo(dbDirectory: String, blocksApi: CommonBlocksApi)(implicit s: Schedule
     )
 
     liquidState.foreach(
-      ls => db.put(keyForHeight(ls.keyBlock.height), ls.solidify().protobuf.update(_.append.update(_.block.modify(_.copy(block = None)))).toByteArray)
+      ls => db.put(keyForHeight(ls.keyBlock.height), ls.solidify().protobuf.update(_.append.block.optionalBlock := None).toByteArray)
     )
 
     val ba = BlockAppended.from(block, diff, blockchainBeforeWithMinerReward)
     liquidState = Some(LiquidState(ba, Seq.empty))
-    handlers.foreach(_.handleUpdate(ba))
+    handlers.forEach(_.handleUpdate(ba))
   }
 
   override def onProcessMicroBlock(
@@ -90,7 +87,7 @@ class Repo(dbDirectory: String, blocksApi: CommonBlocksApi)(implicit s: Schedule
     val mba = MicroBlockAppended.from(microBlock, diff, blockchainBeforeWithMinerReward, totalBlockId, totalTransactionsRoot)
     liquidState = Some(ls.copy(microBlocks = ls.microBlocks :+ mba))
 
-    handlers.foreach(_.handleUpdate(mba))
+    handlers.forEach(_.handleUpdate(mba))
   }
 
   def rollbackData(toHeight: Int): Seq[BlockAppended] =
@@ -160,7 +157,7 @@ class Repo(dbDirectory: String, blocksApi: CommonBlocksApi)(implicit s: Schedule
 
     liquidState = None
 
-    handlers.foreach(_.rollbackBlock(microRollbacks, blockRollbacks))
+    handlers.forEach(_.rollbackBlock(microRollbacks, blockRollbacks))
   }
 
   override def onMicroBlockRollback(blockchainBefore: Blockchain, toBlockId: ByteStr): Unit = monitor.synchronized {
@@ -184,7 +181,7 @@ class Repo(dbDirectory: String, blocksApi: CommonBlocksApi)(implicit s: Schedule
             }
         }
 
-        handlers.foreach(
+        handlers.forEach(
           _.rollbackMicroBlock(
             MicroBlockRollbackCompleted(
               toBlockId,
@@ -225,17 +222,17 @@ class Repo(dbDirectory: String, blocksApi: CommonBlocksApi)(implicit s: Schedule
     monitor.synchronized {
       val subject = PublishToOneSubject[BlockchainUpdated]()
       val handler = new Handler(streamId, liquidState, subject, 250)
-      handlers += handler
+      handlers.add(handler)
 
-      val removeHandler = Task(monitor.synchronized {
+      val removeHandler = Task {
         log.info(s"[$streamId] Removing handler")
-        handlers -= handler
-      })
+        handlers.remove(handler)
+      }.void
 
       (new Loader(
         db,
         blocksApi,
-        liquidState.map(ls => ls.keyBlock.height -> ls.keyBlock.id),
+        liquidState.map(ls => (ls.keyBlock.height - 1) -> ls.keyBlock.block.header.reference),
         streamId
       ).loadUpdates(fromHeight) ++
         subject.map(_.protobuf))
