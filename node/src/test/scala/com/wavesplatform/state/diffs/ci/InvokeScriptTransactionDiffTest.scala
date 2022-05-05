@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs.ci
 import cats.kernel.Monoid
 import com.google.protobuf.ByteString
 import com.wavesplatform.TestValues
+import com.wavesplatform.TestValues.invokeFee
 import com.wavesplatform.account._
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -417,24 +418,26 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     }
   }
 
-  property("invoking payment contract results in accounts state") {
+  property("invoking ScriptTransfer contract results in accounts state") {
     val (genesis, setScript, ci) = preconditionsAndSetContract(dAppWithTransfers())
 
     testDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion)) {
-      case (blockDiff, newState) =>
+      case (blockDiff, _) =>
         blockDiff.scriptsRun shouldBe 1
-        newState.balance(thirdAddress, Waves) shouldBe amount
+        blockDiff.portfolios(thirdAddress).balance shouldBe amount
+        blockDiff.portfolios(setScript.sender.toAddress).balance shouldBe -amount
         blockDiff.transactions should contain key ci.id()
     }
   }
 
-  property("invoking default func payment contract results in accounts state") {
+  property("invoking default func ScriptTransfer contract results in accounts state") {
     val (genesis, setScript, ci) = preconditionsAndSetContract(defaultTransferContract(thirdAddress), isCIDefaultFunc = true)
 
     testDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion)) {
-      case (blockDiff, newState) =>
+      case (blockDiff, _) =>
         blockDiff.scriptsRun shouldBe 1
-        newState.balance(thirdAddress, Waves) shouldBe amount
+        blockDiff.portfolios(thirdAddress).balance shouldBe amount
+        blockDiff.portfolios(setScript.sender.toAddress).balance shouldBe -amount
         blockDiff.transactions should contain key ci.id()
     }
   }
@@ -717,16 +720,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     testDiff(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci))) {
       _ should produce("Attempt to transfer unavailable funds")
     }
-  }
-
-  property("can't overflow sum of payment in contract") {
-    val (genesis, setScript, ci) = preconditionsAndSetContract(
-      dAppWithTransfers(recipientAmount = Long.MaxValue / 2 + 2, assets = List.fill(4)(Waves)),
-      payment = Some(Payment(1, Waves))
-    )
-    testDiff(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)))(
-      _ should produce("Attempt to transfer unavailable funds")
-    )
   }
 
   property("invoking contract with sponsored fee") {
@@ -1112,48 +1105,41 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     }
   }
 
-  private val transferNonIssueContract: DApp = {
-    val expr = {
-      val script =
-        s"""
-           |{-# STDLIB_VERSION 4 #-}
-           |{-# CONTENT_TYPE DAPP #-}
-           |{-#SCRIPT_TYPE ACCOUNT#-}
-           |
-           |@Callable(i)
-           |func f() = {
-           | let v = Issue("InvokeAsset", "InvokeDesc", 100, 0, true, unit, 0)
-           | [ScriptTransfer(i.caller, 1, v.calculateAssetId())]
-           |}
-           |""".stripMargin
-      Parser.parseContract(script).get.value
-    }
+  private def transferNonIssueContract(issue: Boolean) =
+    TestCompiler(V4).compileContract(
+      s"""
+         |@Callable(i)
+         |func f() = {
+         |  let issue = Issue("asset", "", 100, 0, true, unit, 0)
+         |  [ScriptTransfer(i.caller, 1, issue.calculateAssetId())${if (issue) ", issue" else ""}]
+         |}
+       """.stripMargin
+    )
 
-    compileContractFromExpr(expr, V4)
-  }
-
-  property("nonissued asset can't be transferred") {
-    val genesis1Tx  = TxHelpers.genesis(dAppAddress)
-    val genesis2Tx  = TxHelpers.genesis(invokerAddress)
-    val script      = ContractScript(V4, transferNonIssueContract).explicitGet()
-    val setScriptTx = TxHelpers.setScript(dApp, script)
-
-    val invoke = TxHelpers.invoke(dAppAddress, Some("f"))
-
-    testDiff(
-      Seq(TestBlock.create(Seq(genesis1Tx, genesis2Tx, setScriptTx))),
-      TestBlock.create(Seq(invoke), Block.ProtoBlockVersion),
-      from = V4,
-      to = V4
-    ) {
-      _ should produce("negative asset balance")
-    }
-    testDiffAndState(
-      Seq(TestBlock.create(Seq(genesis1Tx, genesis2Tx, setScriptTx))),
-      TestBlock.create(Seq(invoke), Block.ProtoBlockVersion),
-      from = V5
-    ) { (diff, _) =>
-      diff.errorMessage(invoke.id()).get.text should include("is not found on the blockchain")
+  property("non-issued asset can't be transferred") {
+    Seq(true, false).foreach { issue =>
+      val genesis1Tx  = TxHelpers.genesis(dAppAddress)
+      val genesis2Tx  = TxHelpers.genesis(invokerAddress)
+      val setScriptTx = TxHelpers.setScript(dApp, transferNonIssueContract(issue))
+      val invoke      = TxHelpers.invoke(dAppAddress, Some("f"), fee = invokeFee(issues = 1))
+      testDiff(
+        Seq(TestBlock.create(Seq(genesis1Tx, genesis2Tx, setScriptTx))),
+        TestBlock.create(Seq(invoke), Block.ProtoBlockVersion),
+        from = V4,
+        to = V4
+      ) (
+        if (issue)
+          _ shouldBe Symbol("right")
+        else
+          _ should produce("negative asset balance")
+      )
+      testDiffAndState(
+        Seq(TestBlock.create(Seq(genesis1Tx, genesis2Tx, setScriptTx))),
+        TestBlock.create(Seq(invoke), Block.ProtoBlockVersion),
+        from = V5
+      ) { (diff, _) =>
+        diff.errorMessage(invoke.id()).get.text should include("is not found on the blockchain")
+      }
     }
   }
 

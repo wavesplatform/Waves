@@ -27,6 +27,7 @@ import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{Application, TestValues, database}
 import monix.execution.Scheduler.Implicits.global
 import org.iq80.leveldb.DB
+import org.scalatest.matchers.should.Matchers._
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -134,7 +135,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     appendBlock(block)
     txs.foreach { tx =>
       assert(blockchain.transactionInfo(tx.id()).isDefined, s"should be present: $tx")
-      assert(blockchain.transactionSucceeded(tx.id()), s"should succeed: $tx")
+      assert(blockchain.transactionSucceeded(tx.id()), s"should succeed but ${liquidDiff.errorMessage(tx.id())}")
     }
     lastBlock
   }
@@ -155,8 +156,15 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     lastBlock
   }
 
+  def appendAndAssertFailed(tx: Transaction, message: String): Block = {
+    appendBlock(tx)
+    assert(!blockchain.transactionSucceeded(tx.id()), s"should fail: $tx")
+    liquidDiff.errorMessage(tx.id()).get.text should include(message)
+    lastBlock
+  }
+
   def appendBlockE(txs: Transaction*): Either[ValidationError, Seq[Diff]] =
-    appendBlockE(createBlock(blockchainUpdater.nextBlockVersion, txs))
+    appendBlockE(createBlock(Block.PlainBlockVersion, txs))
 
   def appendBlock(txs: Transaction*): Block = {
     val block = createBlock(Block.PlainBlockVersion, txs)
