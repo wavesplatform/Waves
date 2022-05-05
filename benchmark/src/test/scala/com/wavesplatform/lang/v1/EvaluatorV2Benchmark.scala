@@ -17,9 +17,9 @@ import org.openjdk.jmh.infra.Blackhole
 import java.util.concurrent.TimeUnit
 
 object EvaluatorV2Benchmark {
-  val pureContext: CTX[Environment]                       = PureContext.build(V1, fixUnicodeFunctions = true).withEnvironment[Environment]
+  val pureContext: CTX[Environment]                       = PureContext.build(V1, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment]
   val pureEvalContext: EvaluationContext[Environment, Id] = pureContext.evaluationContext(Common.emptyBlockchainEnvironment())
-  val evaluatorV2: EvaluatorV2                            = new EvaluatorV2(LoggedEvaluationContext(_ => _ => (), pureEvalContext), V1)
+  val evaluatorV2: EvaluatorV2                            = new EvaluatorV2(LoggedEvaluationContext(_ => _ => (), pureEvalContext), V1, true)
 }
 
 @OutputTimeUnit(TimeUnit.MILLISECONDS)

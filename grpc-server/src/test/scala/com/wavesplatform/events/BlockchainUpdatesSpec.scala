@@ -543,31 +543,54 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
       check()
     }
 
-    "should handle modifying last block correctly" in {
-      val startRead = new ReentrantLock()
-      withDomainAndRepo(
-        { (d, repo) =>
-          (1 to 5).foreach(_ => d.appendBlock())
-          startRead.lock()
-
-          val subscription = Future {
-            val s = repo.createSubscription(SubscribeRequest.of(1, 5))
-            s.cancel()
-            s
-          }.flatten
-
-          d.appendMicroBlock(TxHelpers.transfer())
-          d.appendKeyBlock()
-
-          startRead.unlock()
-
-          Await
-            .result(subscription, 5 seconds)
-            .map(_.getUpdate.height) shouldBe (1 to 4)
-        },
-        Some(InterferableDB(startRead))
-      )
+    "should correctly concatenate stream from DB and new blocks stream" in {
+      subscribeAndCheckResult(5, _ => (), 1 to 5)
+      subscribeAndCheckResult(5, d => d.appendMicroBlock(TxHelpers.transfer()), (1 to 5) :+ 5)
+      subscribeAndCheckResult(5, d => d.appendKeyBlock(), 1 to 5, isStreamClosed = true)
+      subscribeAndCheckResult(5, d => {
+        d.appendMicroBlock(TxHelpers.transfer())
+        d.appendKeyBlock()
+      }, (1 to 5) :+ 5, isStreamClosed = true)
+      subscribeAndCheckResult(0, _ => (), 1 to 5)
+      subscribeAndCheckResult(0, d => d.appendMicroBlock(TxHelpers.transfer()), (1 to 5) :+ 5)
+      subscribeAndCheckResult(0, d => d.appendKeyBlock(), (1 to 5) :+ 6)
+      subscribeAndCheckResult(0, d => {
+        d.appendMicroBlock(TxHelpers.transfer())
+        d.appendKeyBlock()
+      }, (1 to 5) ++ Seq(5, 6))
+      subscribeAndCheckResult(0, d => { (1 to 249).foreach(_ => d.appendMicroBlock(TxHelpers.transfer(amount = 1))) }, (1 to 4) ++ Seq.fill(250)(5))
+      subscribeAndCheckResult(0, d => { (1 to 250).foreach(_ => d.appendMicroBlock(TxHelpers.transfer(amount = 1))) }, 1 to 4, isStreamClosed = true)
     }
+  }
+
+  private def subscribeAndCheckResult(
+      toHeight: Int,
+      appendExtraBlocks: Domain => Unit,
+      expectedResult: Seq[Int],
+      isStreamClosed: Boolean = false
+  ): Unit = {
+    val startRead = new ReentrantLock()
+    withDomainAndRepo(
+      { (d, repo) =>
+        (1 to 5).foreach(_ => d.appendBlock())
+
+        startRead.lock()
+
+        val subscription = Future(repo.createSubscriptionObserver(SubscribeRequest.of(1, toHeight)))
+
+        appendExtraBlocks(d)
+
+        startRead.unlock()
+
+        val timeout = 30.seconds
+        Await
+          .result(
+            subscription.map(s => s.fetchUntil(_.map(_.getUpdate.height) == expectedResult && s.isCompleted == isStreamClosed, timeout)),
+            timeout
+          )
+      },
+      Some(InterferableDB(startRead))
+    )
   }
 
   case class InterferableDB(startRead: ReentrantLock) extends DB {
@@ -662,17 +685,18 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
 
   trait FakeObserver[T] extends StreamObserver[T] {
     def values: Seq[T]
+    def isCompleted: Boolean
   }
 
   object FakeObserver {
     implicit class FakeObserverOps[T](fo: FakeObserver[T]) {
-      def fetchUntil(conditionF: Seq[T] => Boolean): Seq[T] = {
+      def fetchUntil(conditionF: Seq[T] => Boolean, timeout: Duration = 1.minute): Seq[T] = {
         def waitRecTask: Task[Unit] =
           if (conditionF(fo.values)) Task.unit else Task.defer(waitRecTask).delayExecution(50 millis)
 
         waitRecTask
           .map(_ => fo.values)
-          .runSyncUnsafe(1.minute)
+          .runSyncUnsafe(timeout)
       }
     }
 
@@ -699,6 +723,8 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
       def onNext(value: T): Unit      = values :+= value
       def onError(t: Throwable): Unit = promise.tryFailure(t)
       def onCompleted(): Unit         = promise.trySuccess(values)
+
+      def isCompleted: Boolean = promise.isCompleted
     }
 
     val cancelableFuture = CancelableFuture(promise.future, () => obs.onCompleted())

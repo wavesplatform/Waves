@@ -93,16 +93,16 @@ object LevelDBWriterBenchmark {
 
     val db = LevelDBWriter.readOnly(rawDB, wavesSettings)
 
-    def loadBlockInfoAt(height: Int): Option[(BlockMeta, Seq[(Transaction, Boolean)])] =
+    def loadBlockInfoAt(height: Int): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
       loadBlockMetaAt(height).map { meta =>
-        meta -> rawDB.readOnly(ro => database.loadTransactions(Height(height), ro)).fold(Seq.empty[(Transaction, Boolean)])(identity)
+        meta -> rawDB.readOnly(ro => database.loadTransactions(Height(height), ro))
       }
 
     def loadBlockMetaAt(height: Int): Option[BlockMeta] = rawDB.get(Keys.blockMetaAt(Height(height)))
 
     val cba = CommonBlocksApi(db, loadBlockMetaAt, loadBlockInfoAt)
 
-    def blockById(id: ByteStr): Option[(BlockMeta, Seq[(Transaction, Boolean)])] = cba.block(id)
+    def blockById(id: ByteStr): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] = cba.block(id)
 
     @TearDown
     def close(): Unit = {
