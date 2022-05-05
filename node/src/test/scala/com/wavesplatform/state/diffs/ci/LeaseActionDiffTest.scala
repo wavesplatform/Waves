@@ -4,6 +4,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.util.AddressOrAliasExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -12,17 +13,20 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
+import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
-import com.wavesplatform.test.{PropSpec, NumericExt}
+import com.wavesplatform.test.{NumericExt, PropSpec}
+import com.wavesplatform.transaction.TxHelpers.{defaultAddress, invoke, lease, secondAddress, secondSigner, setScript}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{Authorized, CreateAliasTransaction, Transaction, TxHelpers, TxVersion}
 import org.scalatest.exceptions.TestFailedException
 
 import scala.util.Random
 
 class LeaseActionDiffTest extends PropSpec with WithDomain {
+  import DomainPresets._
 
   private def features(activateV5: Boolean): FunctionalitySettings = {
     val v5ForkO = if (activateV5) Seq(BlockchainFeatures.SynchronousCalls) else Seq()
@@ -38,6 +42,9 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
 
   private val v4Features = features(activateV5 = false)
   private val v5Features = features(activateV5 = true)
+
+  private val setScriptFee = FeeConstants(SetScriptTransaction.typeId) * FeeUnit
+  private val leaseFee     = FeeConstants(LeaseTransaction.typeId) * FeeUnit
 
   private def dApp(body: String): Script = TestCompiler(V5).compileContract(s"""
     | {-# STDLIB_VERSION 5       #-}
@@ -795,6 +802,18 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     }
   }
 
+  property("LeaseCancel foreign leaseId") {
+    val leaseTx                               = TxHelpers.lease(TxHelpers.signer(2))
+    val (preparingTxs, invoke, _, _, _, _, _) = leasePreconditions(customDApp = Some(singleLeaseCancelDApp(leaseTx.id())))
+    assertDiffAndState(
+      Seq(TestBlock.create(preparingTxs :+ leaseTx)),
+      TestBlock.create(Seq(invoke)),
+      v5Features
+    ) {
+      case (diff, _) => diff.errorMessage(invoke.id()).get.text should include("LeaseTransaction was leased by other sender")
+    }
+  }
+
   property(s"LeaseCancel actions with same lease id") {
     val recipient                             = TxHelpers.signer(3).toAddress.toRide
     val amount                                = 100
@@ -886,6 +905,85 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
     ) {
       case (diff, _) =>
         diff.errorMessage(invoke.id()).get.text shouldBe "Actions count limit is exceeded"
+    }
+  }
+
+  property("trying to spend lease IN balance in Lease action") {
+    withDomain(RideV5, Seq(AddrWithBalance(secondAddress, setScriptFee))) { d =>
+      val dApp = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() =
+           |   [
+           |     Lease(i.caller, 1)
+           |   ]
+         """.stripMargin
+      )
+      d.appendBlock(setScript(secondSigner, dApp))
+      d.appendBlock(lease(recipient = secondAddress, amount = 1))
+      d.appendAndAssertFailed(invoke(), "Cannot lease more than own: Balance: 0, already leased: 0")
+    }
+  }
+
+  property("trying to spend lease OUT balance in Lease action") {
+    withDomain(
+      RideV5,
+      Seq(AddrWithBalance(secondAddress, leaseFee + setScriptFee + 1))
+    ) { d =>
+      val dApp = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() =
+           |   [
+           |     Lease(i.caller, 1)
+           |   ]
+         """.stripMargin
+      )
+      d.appendBlock(setScript(secondSigner, dApp))
+      d.appendBlock(lease(sender = secondSigner, recipient = defaultAddress, amount = 1))
+      d.appendAndAssertFailed(invoke(), "Cannot lease more than own: Balance: 1, already leased: 1")
+    }
+  }
+
+  property("ScriptTransfer after Lease of all available balance") {
+    val setScriptFee = FeeConstants(SetScriptTransaction.typeId) * FeeUnit
+    withDomain(
+      RideV5.configure(_.copy(blockVersion3AfterHeight = 0)),
+      Seq(AddrWithBalance(secondAddress, setScriptFee + 1))
+    ) { d =>
+      val dApp = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() =
+           |   [
+           |     Lease(i.caller, 1),
+           |     ScriptTransfer(i.caller, 1, unit)
+           |   ]
+         """.stripMargin
+      )
+      d.appendBlock(setScript(secondSigner, dApp))
+      d.appendBlockE(invoke()) should produce("negative effective balance")
+    }
+  }
+
+  property("ScriptTransfer after LeaseCancel of transferring balance") {
+    withDomain(
+      RideV5.configure(_.copy(blockVersion3AfterHeight = 0)),
+      Seq(AddrWithBalance(secondAddress, leaseFee + setScriptFee + 1))
+    ) { d =>
+      val leaseTx = lease(secondSigner, defaultAddress, amount = 1)
+      val dApp = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() =
+           |   [
+           |     LeaseCancel(base58'${leaseTx.id()}'),
+           |     ScriptTransfer(i.caller, 1, unit)
+           |   ]
+         """.stripMargin
+      )
+      d.appendBlock(setScript(secondSigner, dApp), leaseTx)
+      d.appendAndAssertSucceed(invoke())
     }
   }
 }

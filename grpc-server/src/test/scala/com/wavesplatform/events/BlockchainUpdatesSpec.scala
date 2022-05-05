@@ -2,6 +2,7 @@ package com.wavesplatform.events
 
 import com.google.common.primitives.Longs
 import com.google.protobuf.ByteString
+import com.wavesplatform.TestValues
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.common.state.ByteStr
@@ -372,7 +373,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
 
     "should handle rollback properly" in {
       val transfer = TxHelpers.transfer()
-      val lease    = TxHelpers.lease()
+      val lease    = TxHelpers.lease(fee = TestValues.fee)
       val issue    = TxHelpers.issue(amount = 1000)
       val reissue  = TxHelpers.reissue(issue.asset)
       val data     = TxHelpers.dataSingle()

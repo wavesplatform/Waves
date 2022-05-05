@@ -306,7 +306,8 @@ object InvokeScriptDiff {
           } yield (resultDiff, evaluated, remainingActions1, remainingData1, remainingDataSize1)
         } yield result
 
-      case _ => traced(Left(GenericError(s"No contract at address ${tx.dAppAddress}")))
+      case Some(AccountScriptInfo(_, _, _, _)) => CoevalR(Coeval(InvokeDiffsCommon.callExpressionError))
+      case _                                   => traced(Left(GenericError(s"No contract at address ${tx.dAppAddress}")))
     }
 
     result.leftMap { err =>

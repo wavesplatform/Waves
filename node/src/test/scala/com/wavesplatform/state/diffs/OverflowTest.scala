@@ -7,11 +7,12 @@ import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.test.PropSpec
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{TxHelpers, TxNonNegativeAmount}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxHelpers.issue
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.transaction.{TxHelpers, TxNonNegativeAmount}
 
 class OverflowTest extends PropSpec with WithDomain {
   import DomainPresets._
@@ -105,6 +106,49 @@ class OverflowTest extends PropSpec with WithDomain {
         withDomain(RideV5, balances) { d =>
           d.appendBlock(TxHelpers.setScript(recipientKp, dApp(transferAmount)))
           d.appendBlockE(TxHelpers.invoke(recipient, invoker = sender)) should produce("Waves balance sum overflow")
+        }
+    }
+  }
+
+  property("invoke ScriptTransfer overflow") {
+    def dApp(amount1: Long, amount2: Long) = TestCompiler(V5).compileContract(
+      s"""
+         | @Callable(i)
+         | func default() =
+         |   [
+         |     ScriptTransfer(i.caller, $amount1, unit),
+         |     ScriptTransfer(i.caller, $amount2, unit)
+         |   ]
+       """.stripMargin
+    )
+    numPairs(0).foreach {
+      case (amount1, amount2) =>
+        withDomain(RideV5, AddrWithBalance.enoughBalances(sender, recipientKp)) { d =>
+          d.appendBlock(TxHelpers.setScript(recipientKp, dApp(amount1, amount2)))
+          val invoke = TxHelpers.invoke(recipient, invoker = sender)
+          d.appendAndAssertFailed(invoke, "ScriptTransfer overflow")
+        }
+    }
+  }
+
+  property("invoke Reissue overflow") {
+    numPairs(0).foreach {
+      case (amount1, amount2) =>
+        withDomain(RideV5, AddrWithBalance.enoughBalances(sender, recipientKp)) { d =>
+          val issueTx = issue(recipientKp, amount = amount1)
+          val asset   = IssuedAsset(issueTx.id())
+          val dApp = TestCompiler(V5).compileContract(
+            s"""
+               | @Callable(i)
+               | func default() =
+               |   [
+               |     Reissue(base58'$asset', $amount2, false)
+               |   ]
+             """.stripMargin
+          )
+          val invoke = TxHelpers.invoke(recipient, invoker = sender)
+          d.appendBlock(issueTx, TxHelpers.setScript(recipientKp, dApp))
+          d.appendAndAssertFailed(invoke, "Asset total value overflow")
         }
     }
   }

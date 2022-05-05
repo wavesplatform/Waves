@@ -3,14 +3,15 @@ package com.wavesplatform.state.diffs.ci
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.directives.values.V4
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.transaction.TxHelpers.{invoke, secondSigner, setScript}
 
 class ScriptTransferByAliasTest extends PropSpec with WithDomain {
 
@@ -79,23 +80,33 @@ class ScriptTransferByAliasTest extends PropSpec with WithDomain {
     val setDApp      = TxHelpers.setScript(dAppAcc, dApp(asset))
     val preparingTxs = Seq(createAlias, issue, setDApp)
 
-    val invoke1 = TxHelpers.invoke(dAppAcc.toAddress, func = None, invoker = invoker, fee = TxHelpers.ciFee(sc = 1))
-    val invoke2 = TxHelpers.invoke(dAppAcc.toAddress, func = None, invoker = invoker, fee = TxHelpers.ciFee(sc = 1))
+    def invoke = TxHelpers.invoke(dAppAcc.toAddress, func = None, invoker = invoker, fee = TxHelpers.ciFee(sc = 1))
 
     withDomain(domainSettingsWithFS(fsWithV5), balances) { d =>
       d.appendBlock(preparingTxs: _*)
 
-      d.appendBlock(invoke1)
-      d.blockchain.bestLiquidDiff.get.errorMessage(invoke1.id()).get.text should include(
-        s"Transaction is not allowed by script of the asset $asset: alias expected!"
-      )
+      d.appendAndAssertFailed(invoke, s"Transaction is not allowed by script of the asset $asset: alias expected!")
 
       d.appendBlock()
       d.blockchainUpdater.height shouldBe activationHeight
 
-      d.appendBlock(invoke2)
-      d.blockchain.bestLiquidDiff.get.errorMessage(invoke2.id()) shouldBe None
+      d.appendAndAssertSucceed(invoke)
       d.balance(receiver.toAddress, asset) shouldBe transferAmount
+    }
+  }
+
+  property("unexisting ScriptTransfer alias recipient") {
+    withDomain(DomainPresets.RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+      val dApp = TestCompiler(V5).compileContract(
+        """
+          | @Callable(i)
+          | func default() = [
+          |   ScriptTransfer(Alias("alias"), 1, unit)
+          | ]
+        """.stripMargin
+      )
+      d.appendBlock(setScript(secondSigner, dApp))
+      d.appendBlockE(invoke()) should produce("Alias 'alias:T:alias' does not exists")
     }
   }
 }

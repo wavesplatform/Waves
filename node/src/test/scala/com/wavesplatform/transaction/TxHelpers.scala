@@ -270,7 +270,7 @@ object TxHelpers {
   def setScript(
       acc: KeyPair,
       script: Script,
-      fee: Long = TestValues.fee,
+      fee: Long = FeeConstants(SetScriptTransaction.typeId) * FeeUnit,
       version: TxVersion = TxVersion.V1,
       chainId: Byte = AddressScheme.current.chainId
   ): SetScriptTransaction = {
@@ -281,7 +281,7 @@ object TxHelpers {
       acc: KeyPair,
       asset: IssuedAsset,
       script: Script,
-      fee: Long = TestValues.fee,
+      fee: Long = FeeConstants(SetAssetScriptTransaction.typeId) * FeeUnit,
       timestamp: TxTimestamp = timestamp,
       version: TxVersion = TxVersion.V1,
       chainId: Byte = AddressScheme.current.chainId
@@ -290,7 +290,7 @@ object TxHelpers {
   }
 
   def invoke(
-      dApp: AddressOrAlias,
+      dApp: AddressOrAlias = secondAddress,
       func: Option[String] = None,
       args: Seq[EXPR] = Nil,
       payments: Seq[Payment] = Nil,
@@ -311,7 +311,7 @@ object TxHelpers {
       sender: KeyPair = defaultSigner,
       recipient: AddressOrAlias = secondAddress,
       amount: Long = 10.waves,
-      fee: Long = TestValues.fee,
+      fee: Long = FeeConstants(LeaseTransaction.typeId) * FeeUnit,
       timestamp: TxTimestamp = timestamp,
       version: TxVersion = TxVersion.V2
   ): LeaseTransaction = {
@@ -321,7 +321,7 @@ object TxHelpers {
   def leaseCancel(
       leaseId: ByteStr,
       sender: KeyPair = defaultSigner,
-      fee: Long = TestValues.fee,
+      fee: Long = FeeConstants(LeaseCancelTransaction.typeId) * FeeUnit,
       timestamp: TxTimestamp = timestamp,
       version: TxVersion = TxVersion.V2,
       chainId: Byte = AddressScheme.current.chainId
