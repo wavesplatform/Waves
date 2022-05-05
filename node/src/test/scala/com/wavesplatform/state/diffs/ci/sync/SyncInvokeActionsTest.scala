@@ -1,0 +1,128 @@
+package com.wavesplatform.state.diffs.ci.sync
+
+import com.wavesplatform.TestValues.invokeFee
+import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.test.{PropSpec, produce}
+import com.wavesplatform.transaction.TxHelpers._
+
+class SyncInvokeActionsTest extends PropSpec with WithDomain {
+  import DomainPresets._
+
+  private val dApp1Signer  = secondSigner
+  private val dApp1Address = secondAddress
+  private val dApp2Signer  = signer(2)
+  private val dApp2Address = signer(2).toAddress
+
+  property("can't reissue asset issued by other dApp in the chain") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer, dApp2Signer)) { d =>
+      val dApp1 = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = {
+           |   strict assetId = Address(base58'$dApp2Address').invoke("default", [], [])
+           |   [
+           |     Reissue(assetId.exactAs[ByteVector], 10, true)
+           |   ]
+           | }
+         """.stripMargin
+      )
+      val dApp2 = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = {
+           |   let issue = Issue("name", "", 1000, 4, true, unit, 0)
+           |   ([issue], issue.calculateAssetId())
+           | }
+         """.stripMargin
+      )
+      d.appendBlock(setScript(dApp1Signer, dApp1), setScript(dApp2Signer, dApp2))
+      d.appendAndAssertFailed(invoke(dApp1Address, fee = invokeFee(issues = 1)), "Asset was issued by other address")
+    }
+  }
+
+  property("can transfer from parent dApp asset issued in the chain") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer, dApp2Signer)) { d =>
+      val dApp1 = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = {
+           |   strict assetId = Address(base58'$dApp2Address').invoke("default", [], [])
+           |   [
+           |     ScriptTransfer(i.caller, 1000, assetId.exactAs[ByteVector])
+           |   ]
+           | }
+         """.stripMargin
+      )
+      val dApp2 = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = {
+           |   let issue   = Issue("name", "", 1000, 4, true, unit, 0)
+           |   let assetId = issue.calculateAssetId()
+           |   ([issue, ScriptTransfer(i.caller, 1000, assetId)], assetId)
+           | }
+         """.stripMargin
+      )
+      d.appendBlock(setScript(dApp1Signer, dApp1), setScript(dApp2Signer, dApp2))
+      d.appendAndAssertSucceed(invoke(dApp1Address, fee = invokeFee(issues = 1)))
+      d.liquidDiff.portfolios(dApp1Address).assets.head._2 shouldBe 0
+      d.liquidDiff.portfolios(dApp2Address).assets.head._2 shouldBe 0
+      d.liquidDiff.portfolios(defaultAddress).assets.head._2 shouldBe 1000
+    }
+  }
+
+  property("can't transfer asset that will be issued later in the chain") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer, dApp2Signer)) { d =>
+      val dApp1 = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = {
+           |   let issue   = Issue("name", "", 1000, 4, true, unit, 0)
+           |   let assetId = issue.calculateAssetId()
+           |   strict r = Address(base58'$dApp2Address').invoke("default", [], [AttachedPayment(assetId, 1)])
+           |   [ issue ]
+           | }
+         """.stripMargin
+      )
+      val dApp2 = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = {
+           |   let assetId = i.payments[0].assetId
+           |   let amount  = i.payments[0].amount
+           |   ([ScriptTransfer(i.caller, amount, assetId)], assetId)
+           | }
+         """.stripMargin
+      )
+      d.appendBlock(setScript(dApp1Signer, dApp1), setScript(dApp2Signer, dApp2))
+      d.appendBlockE(invoke(dApp1Address, fee = invokeFee(issues = 1))) should produce("is not found on the blockchain")
+    }
+  }
+
+  property("can't issue the same asset in two dApps in the chain") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer, dApp2Signer)) { d =>
+      val dApp1 = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = {
+           |   strict r = Address(base58'$dApp2Address').invoke("default", [], [])
+           |   [ Issue("name", "", 1000, 4, true, unit, 0) ]
+           | }
+         """.stripMargin
+      )
+      val dApp2 = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = {
+           |   [ Issue("name", "", 1000, 4, true, unit, 0) ]
+           | }
+         """.stripMargin
+      )
+      d.appendBlock(setScript(dApp1Signer, dApp1), setScript(dApp2Signer, dApp2))
+      d.appendAndAssertFailed(invoke(dApp1Address, fee = invokeFee(issues = 2)), "is already issued")
+    }
+  }
+}
