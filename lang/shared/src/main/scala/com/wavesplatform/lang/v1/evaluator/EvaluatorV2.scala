@@ -182,7 +182,7 @@ class EvaluatorV2(
                       update = update,
                       limit = unused - 1,
                       parentBlocks = parentBlocks
-                  )
+                    )
                 )
               case FALSE if unused > 0 =>
                 update(i.ifFalse).flatMap(
@@ -192,7 +192,7 @@ class EvaluatorV2(
                       update = update,
                       limit = unused - 1,
                       parentBlocks = parentBlocks
-                  )
+                    )
                 )
               case _: EVALUATED => throw EvaluationException("Non-boolean result in cond", unused)
               case _            => Coeval.now(unused)
