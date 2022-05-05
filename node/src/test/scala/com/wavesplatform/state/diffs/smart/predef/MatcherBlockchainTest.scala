@@ -28,7 +28,9 @@ class MatcherBlockchainTest extends PropSpec with MockFactory with WithDomain {
       defaultLimit = 2000,
       default = null,
       useCorrectScriptVersion = true,
-      fixUnicodeFunctions = true
+      fixUnicodeFunctions = true,
+      useNewPowPrecision = true,
+      checkEstimatorSumOverflow = true
     ) shouldBe ((Nil, 0, Right(CONST_BOOLEAN(true))))
   }
 }
