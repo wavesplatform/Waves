@@ -74,7 +74,7 @@ class SyncInvokeActionsTest extends PropSpec with WithDomain {
     }
   }
 
-  property("can't transfer asset that will be issued later in the chain") {
+  property("can't attach asset that will be issued later in the chain") {
     withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer, dApp2Signer)) { d =>
       val dApp1 = TestCompiler(V5).compileContract(
         s"""
@@ -98,6 +98,28 @@ class SyncInvokeActionsTest extends PropSpec with WithDomain {
          """.stripMargin
       )
       d.appendBlock(setScript(dApp1Signer, dApp1), setScript(dApp2Signer, dApp2))
+      d.appendBlockE(invoke(dApp1Address, fee = invokeFee(issues = 1))) should produce("is not found on the blockchain")
+    }
+  }
+
+  property("can't transfer asset that will be issued later from the same dApp") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(dApp1Signer, dApp2Signer)) { d =>
+      val dApp = TestCompiler(V5).compileContract(
+        s"""
+           | let issue = Issue("name", "", 1000, 4, true, unit, 0)
+           |
+           | @Callable(i)
+           | func default() = {
+           |   strict r = this.invoke("transfer", [], [])
+           |   [issue]
+           | }
+           |
+           | @Callable(i)
+           | func transfer() =
+           |   [ScriptTransfer(i.originCaller, 1, issue.calculateAssetId())]
+         """.stripMargin
+      )
+      d.appendBlock(setScript(dApp1Signer, dApp))
       d.appendBlockE(invoke(dApp1Address, fee = invokeFee(issues = 1))) should produce("is not found on the blockchain")
     }
   }
