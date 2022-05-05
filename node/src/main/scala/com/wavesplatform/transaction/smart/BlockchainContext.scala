@@ -1,10 +1,10 @@
 package com.wavesplatform.transaction.smart
 
 import java.util
-
 import cats.Id
 import cats.syntax.semigroup._
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{ContentType, ScriptType, StdLibVersion}
 import com.wavesplatform.lang.v1.CTX

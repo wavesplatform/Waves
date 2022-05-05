@@ -25,7 +25,7 @@ class MatcherBlockchainTest extends PropSpec with MockFactory with WithDomain {
       TestCompiler(V5).compileExpression("true"),
       isAssetScript = false,
       Coproduct(Recipient.Address(ByteStr.empty)),
-      complexityLimit = 2000,
+      defaultLimit = 2000,
       default = null,
       useCorrectScriptVersion = true,
       fixUnicodeFunctions = true
