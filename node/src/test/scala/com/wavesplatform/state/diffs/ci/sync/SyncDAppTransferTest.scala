@@ -227,7 +227,7 @@ class SyncDAppTransferTest extends PropSpec with WithDomain {
        """.stripMargin
     )
 
-  private def invokerWithTransferDAppScript(dApp2: Address, amount: Long, bigComplexity: Boolean = false): Script =
+  private def invokerWithTransferDAppScript(dApp2: Address, amount: Long, bigComplexity: Boolean): Script =
     TestCompiler(V5).compileContract(
       s"""
          | @Callable(i)

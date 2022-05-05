@@ -306,7 +306,7 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
        """.stripMargin
     )
 
-  private def transferDAppScript(amount: Long, bigComplexity: Boolean = false): Script =
+  private def transferDAppScript(amount: Long, bigComplexity: Boolean): Script =
     TestCompiler(V5).compileContract(
       s"""
          | @Callable(i)
