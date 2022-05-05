@@ -43,7 +43,10 @@ object ScriptRunner {
       scriptContainerAddress,
       complexityLimit,
       default,
-      blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
+      blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls),
+      blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls),
+      blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckPaymentsHeight,
+      blockchain.checkEstimatorSumOverflow
     )
 
   def applyGeneric(
@@ -54,7 +57,10 @@ object ScriptRunner {
       scriptContainerAddress: Environment.Tthis,
       defaultLimit: Int,
       default: EVALUATED,
-      useCorrectScriptVersion: Boolean
+      useCorrectScriptVersion: Boolean,
+      fixUnicodeFunctions: Boolean,
+      useNewPowPrecision: Boolean,
+      checkEstimatorSumOverflow: Boolean
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
 
     def evalVerifier(
@@ -76,7 +82,9 @@ object ScriptRunner {
               isAssetScript,
               isContract,
               scriptContainerAddress,
-              txId
+              txId,
+              fixUnicodeFunctions,
+              useNewPowPrecision
             )
         } yield (ds, ctx)
 
@@ -92,7 +100,7 @@ object ScriptRunner {
 
       val (limit, onExceed) =
         if (defaultLimit == Int.MaxValue)
-          if (blockchain.checkEstimatorSumOverflow)
+          if (checkEstimatorSumOverflow)
             (correctedLimit, (_: EXPR) => Left(s"Verifier complexity limit = $correctedLimit is exceeded"))
           else
             (defaultLimit, (_: EXPR) => Left(s"Verifier complexity limit = $defaultLimit is exceeded"))
@@ -100,7 +108,7 @@ object ScriptRunner {
           (defaultLimit, (_: EXPR) => Right(default))
 
       val (log, unusedComplexity, result) =
-        EvaluatorV2.applyOrDefault(ctx, expr, script.stdLibVersion, limit, correctFunctionCallScope = blockchain.checkEstimatorSumOverflow, onExceed)
+        EvaluatorV2.applyOrDefault(ctx, expr, script.stdLibVersion, limit, correctFunctionCallScope = checkEstimatorSumOverflow, onExceed)
 
       (log, limit - unusedComplexity, result)
     }

@@ -1,11 +1,9 @@
 package com.wavesplatform.transaction.smart
 
 import java.util
-
 import cats.Id
 import cats.syntax.semigroup._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{ContentType, ScriptType, StdLibVersion}
 import com.wavesplatform.lang.v1.CTX
@@ -32,16 +30,16 @@ object BlockchainContext {
       isTokenContext: Boolean,
       isContract: Boolean,
       address: Environment.Tthis,
-      txId: ByteStr
+      txId: ByteStr,
+      fixUnicodeFunctions: Boolean,
+      useNewPowPrecision: Boolean
   ): Either[ExecutionError, EvaluationContext[Environment, Id]] =
     DirectiveSet(
       version,
       ScriptType.isAssetScript(isTokenContext),
       ContentType.isDApp(isContract)
     ).map { ds =>
-      val environment         = new WavesEnvironment(nByte, in, h, blockchain, address, ds, txId)
-      val fixUnicodeFunctions = blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
-      val useNewPowPrecision  = blockchain.height >= blockchain.settings.functionalitySettings.syncDAppCheckPaymentsHeight
+      val environment = new WavesEnvironment(nByte, in, h, blockchain, address, ds, txId)
       build(ds, environment, fixUnicodeFunctions, useNewPowPrecision)
     }
 
