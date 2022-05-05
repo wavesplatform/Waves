@@ -859,6 +859,40 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         utx.putIfNew(invoke()).resultE should produce("Explicit script termination")
         utx.putIfNew(invoke(), forceValidate = true).resultE should produce("Explicit script termination")
       }
+
+      "sync calls are fully validated in forceValidate mode and before 1000 complexity otherwise" in withDomain(
+        RideV5,
+        AddrWithBalance.enoughBalances(defaultSigner, secondSigner, signer(2))
+      ) { d =>
+        val innerDApp = TestCompiler(V5).compileContract(
+          s"""
+             | @Callable(i)
+             | func default() = {
+             |   strict r = Address(base58'$secondAddress').invoke("default", [], [])
+             |   []
+             | }
+         """.stripMargin
+        )
+        def dApp(sigCount: Int) = TestCompiler(V5).compileContract(
+          s"""
+             | @Callable(i)
+             | func default() = {
+             |   strict c = ${(1 to sigCount).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}
+             |   if (true) then throw() else []
+             | }
+         """.stripMargin
+        )
+        val utx = new UtxPoolImpl(ntpTime, d.blockchainUpdater, DefaultWavesSettings.utxSettings, isMiningEnabled = false)
+        d.appendBlock(setScript(signer(2), innerDApp))
+
+        d.appendBlock(setScript(secondSigner, dApp(5)))
+        utx.putIfNew(invoke(signer(2).toAddress)).resultE shouldBe Right(true)
+        utx.putIfNew(invoke(signer(2).toAddress), forceValidate = true).resultE should produce("Explicit script termination")
+
+        d.appendBlock(setScript(secondSigner, dApp(4)))
+        utx.putIfNew(invoke(signer(2).toAddress)).resultE should produce("Explicit script termination")
+        utx.putIfNew(invoke(signer(2).toAddress), forceValidate = true).resultE should produce("Explicit script termination")
+      }
     }
 
     "cleanup" - {
