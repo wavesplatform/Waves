@@ -3,10 +3,9 @@ package com.wavesplatform.mining
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.utils.ScorexLogging
 
 //noinspection ScalaStyle
-object TxEstimators extends ScorexLogging {
+object TxEstimators {
   trait Fn {
     def apply(blockchain: Blockchain, transaction: Transaction, diff: Diff): Long
     def minEstimate: Long

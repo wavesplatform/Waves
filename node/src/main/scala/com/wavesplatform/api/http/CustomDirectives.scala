@@ -1,17 +1,29 @@
 package com.wavesplatform.api.http
 
-import akka.http.scaladsl.server.{Directive1, _}
+import akka.http.scaladsl.server._
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.{Scheduler, UncaughtExceptionReporter}
 import play.api.libs.json.JsObject
 
+import scala.concurrent.duration.DurationInt
+
 trait CustomDirectives extends Directives with ApiMarshallers with ScorexLogging {
-  def anyParam(paramName: String): Directive1[Iterable[String]] =
-    (get & parameter(paramName.as[String].*).map(_.toSeq.reverse)) |
-      post & (formField(paramName.as[String].*) |
+  def anyParam(paramName: String, nonEmpty: Boolean = false, limit: Int = Int.MaxValue): Directive1[Iterable[String]] = {
+    val baseDirective = (get & pathEndOrSingleSlash & parameter(paramName.as[String].*).map(_.toSeq.reverse)) |
+      strictEntity & post & (formField(paramName.as[String].*) |
         entity(as[JsObject]).map { jso =>
           (jso \ s"${paramName}s").as[Iterable[String]]
         })
+
+    baseDirective
+      .flatMap {
+        case list if nonEmpty && list.isEmpty => reject(MissingQueryParamRejection(paramName))
+        case list if list.size > limit        => complete(ApiError.TooBigArrayAllocation(limit))
+        case list                             => provide(list)
+      }
+  }
+
+  def strictEntity: Directive0 = toStrictEntity(5 seconds)
 
   def extractScheduler: Directive1[Scheduler] =
     extractExecutionContext.map(ec => Scheduler(ec, UncaughtExceptionReporter((t: Throwable) => log.debug("Error processing request", t))))

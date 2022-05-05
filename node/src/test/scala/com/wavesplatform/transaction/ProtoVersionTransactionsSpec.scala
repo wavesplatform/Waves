@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.account.{AddressScheme, KeyPair}
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.lang.v1.FunctionHeader.User
@@ -17,7 +17,6 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.utils.StringBytes
 import org.scalacheck.Gen
 
 class ProtoVersionTransactionsSpec extends FreeSpec {
@@ -37,7 +36,7 @@ class ProtoVersionTransactionsSpec extends FreeSpec {
     "CreateAliasTransaction" in {
       val alias = aliasGen.sample.get
 
-      val aliasTx  = CreateAliasTransaction.selfSigned(TxVersion.V3, Account, alias, MinFee, Now).explicitGet()
+      val aliasTx  = CreateAliasTransaction.selfSigned(TxVersion.V3, Account, alias.name, MinFee, Now).explicitGet()
       val base64Tx = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(aliasTx)))
 
       decode(base64Tx) shouldBe aliasTx
@@ -50,20 +49,20 @@ class ProtoVersionTransactionsSpec extends FreeSpec {
       val decimals    = 2.toByte
       val reissuable  = true
 
-      val issueTx = IssueTransaction(
-        TxVersion.V3,
-        Account.publicKey,
-        name.toByteString,
-        description.toByteString,
-        quantity,
-        decimals,
-        reissuable,
-        script = None,
-        MinIssueFee,
-        Now,
-        Proofs.empty,
-        AddressScheme.current.chainId
-      ).signWith(Account.privateKey)
+      val issueTx = IssueTransaction
+        .selfSigned(
+          TxVersion.V3,
+          Account,
+          name,
+          description,
+          quantity,
+          decimals,
+          reissuable,
+          script = None,
+          MinIssueFee,
+          Now
+        )
+        .explicitGet()
       val base64IssueStr = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(issueTx)))
 
       val reissueTx = ReissueTransaction
@@ -93,8 +92,10 @@ class ProtoVersionTransactionsSpec extends FreeSpec {
       val seller    = accountGen.sample.get
       val assetPair = assetPairGen.sample.get
 
-      val buyOrder  = Order.buy(Order.V3, buyer, Account.publicKey, assetPair, Order.MaxAmount / 2, 100, Now, Now + Order.MaxLiveTime, MinFee * 3)
-      val sellOrder = Order.sell(Order.V3, seller, Account.publicKey, assetPair, Order.MaxAmount / 2, 100, Now, Now + Order.MaxLiveTime, MinFee * 3)
+      val buyOrder =
+        Order.buy(Order.V3, buyer, Account.publicKey, assetPair, Order.MaxAmount / 2, 100, Now, Now + Order.MaxLiveTime, MinFee * 3).explicitGet()
+      val sellOrder =
+        Order.sell(Order.V3, seller, Account.publicKey, assetPair, Order.MaxAmount / 2, 100, Now, Now + Order.MaxLiveTime, MinFee * 3).explicitGet()
 
       val exchangeTx =
         ExchangeTransaction
@@ -131,8 +132,9 @@ class ProtoVersionTransactionsSpec extends FreeSpec {
 
       val leaseTx = LeaseTransaction.selfSigned(TxVersion.V3, Account, recipient, 100, MinFee, Now).explicitGet()
       val leaseCancelTx =
-        LeaseCancelTransaction(TxVersion.V3, Account.publicKey, leaseTx.id(), MinFee, Now, Proofs.empty, AddressScheme.current.chainId)
-          .signWith(Account.privateKey)
+        LeaseCancelTransaction
+          .selfSigned(TxVersion.V3, Account, leaseTx.id(), MinFee, Now)
+          .explicitGet()
       val base64LeaseStr       = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(leaseTx)))
       val base64CancelLeaseStr = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(leaseCancelTx)))
 
@@ -156,7 +158,8 @@ class ProtoVersionTransactionsSpec extends FreeSpec {
     }
 
     "MassTransferTransaction" in {
-      val transfers  = Gen.listOfN(10, accountOrAliasGen).map(accounts => accounts.map(ParsedTransfer(_, 100))).sample.get
+      val transfers =
+        Gen.listOfN(10, accountOrAliasGen).map(accounts => accounts.map(ParsedTransfer(_, TxNonNegativeAmount.unsafeFrom(100)))).sample.get
       val attachment = genBoundedBytes(0, TransferTransaction.MaxAttachmentSize).sample.get
 
       val massTransferTx =

@@ -13,7 +13,6 @@ import com.wavesplatform.utils.{JsonFileStorage, randomBytes, _}
 import play.api.libs.json._
 
 import scala.collection.concurrent.TrieMap
-import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 trait Wallet {
@@ -27,7 +26,7 @@ trait Wallet {
   def privateKeyAccount(account: Address): Either[ValidationError, KeyPair]
 }
 
-object Wallet extends ScorexLogging {
+object Wallet {
   implicit class WalletExtension(private val wallet: Wallet) extends AnyVal {
     def findPrivateKey(addressString: String): Either[ValidationError, KeyPair] =
       for {
@@ -49,13 +48,7 @@ object Wallet extends ScorexLogging {
 
   @throws[IllegalArgumentException]("if invalid wallet configuration provided")
   def apply(settings: WalletSettings): Wallet =
-    try {
       new WalletImpl(settings.file, settings.password, settings.seed)
-    } catch {
-      case NonFatal(e) =>
-        log.error(s"Failed to open wallet file '${settings.file.get.getAbsolutePath}", e)
-        throw e
-    }
 
   private[this] final case class WalletData(seed: ByteStr, accountSeeds: Set[ByteStr], nonce: Int)
 
@@ -93,7 +86,9 @@ object Wallet extends ScorexLogging {
                 s"Failed to open existing wallet file '${maybeFile.get}' maybe provided password is incorrect",
                 exception
               )
-            case Success(value) => value
+            case Success(walletData) =>
+              require(maybeSeedFromConfig.forall(_ == walletData.seed), "Seed from config doesn't match the actual seed")
+              walletData
           }
         } else {
           WalletData(actualSeed, Set.empty, 0)

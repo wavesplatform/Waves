@@ -27,16 +27,18 @@ package object predef {
     for {
       compileResult <- ExpressionCompiler(compilerContext(version, Expression, isAssetScript = false), expr)
       (typedExpr, _) = compileResult
-      directives = DirectiveSet(version, Account, Expression).explicitGet()
-      evalContext <- BlockchainContext.build(version,
-                                             chainId,
-                                             Coeval.evalOnce(buildThisValue(t, blockchain, directives, Coproduct[Environment.Tthis](Environment.AssetId(Array())))).map(_.explicitGet()),
-                                             Coeval.evalOnce(blockchain.height),
-                                             blockchain,
-                                             isTokenContext = false,
-                                             isContract = false,
-                                             Coproduct[Environment.Tthis](Environment.AssetId(Array())),
-                                             ByteStr.empty,
+      directives     = DirectiveSet(version, Account, Expression).explicitGet()
+      evalContext <- BlockchainContext.build(
+        version,
+        chainId,
+        Coeval.evalOnce(buildThisValue(t, blockchain, directives, Coproduct[Environment.Tthis](Environment.AssetId(Array())))).map(_.explicitGet()),
+        Coeval.evalOnce(blockchain.height),
+        blockchain,
+        isTokenContext = false,
+        isContract = false,
+        Coproduct[Environment.Tthis](Environment.AssetId(Array())),
+        ByteStr.empty
+      ,
                                              fixUnicodeFunctions = true)
       r <- EvaluatorV1().apply[T](evalContext, typedExpr)
     } yield r
@@ -52,11 +54,11 @@ package object predef {
     runScript[T](script, V1, Coproduct(tx), blockchain, chainId)
 
   def runScriptWithCustomContext[T <: EVALUATED](
-    script: String,
-    t: In,
-    chainId: Byte,
-    ctxV: StdLibVersion = V1,
-    blockchain: Blockchain = EmptyBlockchain
+      script: String,
+      t: In,
+      chainId: Byte,
+      ctxV: StdLibVersion = V1,
+      blockchain: Blockchain = EmptyBlockchain
   ): Either[String, T] =
     runScript[T](script, ctxV, t, blockchain, chainId)
 

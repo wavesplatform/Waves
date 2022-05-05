@@ -39,12 +39,7 @@ import org.scalatest.enablers.Length
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class BlockV5Test
-    extends FlatSpec
-    with WithDomain
-    with OptionValues
-    with EitherValues
-    with BlocksTransactionsHelpers {
+class BlockV5Test extends FlatSpec with WithDomain with OptionValues with EitherValues with BlocksTransactionsHelpers {
   import BlockV5Test._
 
   private val testTime = new TestTime(1)
@@ -466,10 +461,10 @@ class BlockV5Test
   private def withMiner(blockchain: Blockchain with BlockchainUpdater with NG, time: Time, settings: WavesSettings = testSettings)(
       f: (MinerImpl, Appender, Scheduler) => Unit
   ): Unit = {
-    val pos               = PoSSelector(blockchain, settings.synchronizationSettings.maxBaseTargetOpt)
+    val pos               = PoSSelector(blockchain, settings.synchronizationSettings.maxBaseTarget)
     val allChannels       = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val wallet            = Wallet(WalletSettings(None, Some("123"), None))
-    val utxPool           = new UtxPoolImpl(time, blockchain, Observer.stopped, settings.utxSettings)
+    val utxPool           = new UtxPoolImpl(time, blockchain, settings.utxSettings, settings.minerSettings.enable)
     val minerScheduler    = Scheduler.singleThread("miner")
     val appenderScheduler = Scheduler.singleThread("appender")
     val miner             = new MinerImpl(allChannels, blockchain, settings, time, utxPool, wallet, pos, minerScheduler, appenderScheduler)

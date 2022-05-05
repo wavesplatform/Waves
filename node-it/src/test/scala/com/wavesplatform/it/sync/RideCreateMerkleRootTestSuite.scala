@@ -18,10 +18,7 @@ import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Proofs, TxVersion}
 import org.scalatest.prop.TableDrivenPropertyChecks
 
-class RideCreateMerkleRootTestSuite
-    extends BaseFunSuite
-    with TransferSending
-    with TableDrivenPropertyChecks {
+class RideCreateMerkleRootTestSuite extends BaseFunSuite with TransferSending with TableDrivenPropertyChecks {
   override def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
@@ -47,7 +44,7 @@ class RideCreateMerkleRootTestSuite
         | BinaryEntry("root", createMerkleRoot(proof, id, index))
         |]
         """.stripMargin
-    val cscript = ScriptCompiler.compile(script, ScriptEstimatorV3).explicitGet()._1.bytes().base64
+    val cscript = ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true)).explicitGet()._1.bytes().base64
     val node    = nodes.head
     nodes.waitForHeightArise()
     val tx1   = node.broadcastTransfer(node.keyPair, sender.address, setScriptFee, minFee, None, None, version = TxVersion.V3, waitForTx = false)

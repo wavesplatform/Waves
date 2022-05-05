@@ -29,7 +29,7 @@ class ContractCompilerTest extends PropSpec {
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(V3, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V3, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
           WavesContext.build(
             Global,
@@ -43,7 +43,7 @@ class ContractCompilerTest extends PropSpec {
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V4, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
           WavesContext.build(
             Global,
@@ -380,7 +380,7 @@ class ContractCompilerTest extends PropSpec {
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(V3, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V3, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
           WavesContext.build(
             Global,
@@ -517,7 +517,7 @@ class ContractCompilerTest extends PropSpec {
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(V3, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V3, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
           WavesContext.build(
             Global,
@@ -951,7 +951,7 @@ class ContractCompilerTest extends PropSpec {
       Parser.parseContract(script).get.value
     }
     val ctx =
-      PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+      PureContext.build(V4, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
 
     compiler.ContractCompiler(ctx.compilerContext, expr, V4) shouldBe Symbol("right")
@@ -961,7 +961,7 @@ class ContractCompilerTest extends PropSpec {
     val ctx = Monoid
       .combineAll(
         Seq(
-          PureContext.build(V3, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V3, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(com.wavesplatform.lang.Global, V3).withEnvironment[Environment],
           WavesContext.build(
             Global,
@@ -1008,7 +1008,7 @@ class ContractCompilerTest extends PropSpec {
         |
       """.stripMargin
 
-    Global.compileContract(dApp, dAppV4Ctx, V4, ScriptEstimatorV3, false, false) should produce("Script is too large: 37551 bytes > 32768 bytes")
+    Global.compileContract(dApp, dAppV4Ctx, V4, ScriptEstimatorV3(fixOverflow = true), false, false) should produce("Script is too large: 37551 bytes > 32768 bytes")
   }
 
   property("@Callable Invoke") {
@@ -1043,7 +1043,7 @@ class ContractCompilerTest extends PropSpec {
       Parser.parseContract(script).get.value
     }
     val ctx =
-      PureContext.build(V5, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+      PureContext.build(V5, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
 
     compiler.ContractCompiler(ctx.compilerContext, expr, V5) shouldBe Symbol("right")
@@ -1081,7 +1081,7 @@ class ContractCompilerTest extends PropSpec {
       Parser.parseContract(script).get.value
     }
     val ctx =
-      PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+      PureContext.build(V4, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
 
     compiler.ContractCompiler(ctx.compilerContext, expr, V4) shouldBe Symbol("left")
@@ -1104,7 +1104,7 @@ class ContractCompilerTest extends PropSpec {
       Parser.parseContract(script).get.value
     }
     val ctx =
-      PureContext.build(V4, fixUnicodeFunctions = true).withEnvironment[Environment] |+|
+      PureContext.build(V4, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
 
     val result = compiler.ContractCompiler(ctx.compilerContext, expr, V4)
@@ -1126,5 +1126,46 @@ class ContractCompilerTest extends PropSpec {
         | }
       """.stripMargin
     ) should produce("Non-matching types: expected: ByteVector, actual: ByteVector|Unit")
+  }
+
+  property("JsAPI compiles dApp with no errors") {
+    Global.compileContract(
+      """
+        |
+        |func xxx() = {
+        |  let some = 1 + 2
+        |  some
+        |}
+        |
+        |func yyy() = {
+        |  xxx()
+        |}
+        |
+        |let z1 = 1
+        |let z2 = xxx() + yyy()
+        |let z3 = z1 + z2
+        |
+        |@Callable(i)
+        |func call() = {
+        |  let a = xxx()
+        |  let b = yyy()
+        |  let c = z3
+        |  []
+        |}
+        |
+        |@Verifier(t)
+        |func v() = {
+        |  let a = xxx()
+        |  let b = yyy()
+        |  let c = z3
+        |  true
+        |}
+      """.stripMargin,
+      getTestContext(V4).compilerContext,
+      V4,
+      ScriptEstimatorV3(fixOverflow = true),
+      false,
+      false
+    ) shouldBe Symbol("right")
   }
 }

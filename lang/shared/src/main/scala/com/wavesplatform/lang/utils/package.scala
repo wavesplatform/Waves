@@ -1,7 +1,7 @@
 package com.wavesplatform.lang
 
 import cats.Id
-import cats.kernel.Monoid
+import cats.implicits.catsSyntaxSemigroup
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values._
@@ -61,33 +61,24 @@ package object utils {
     ): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
   }
 
-  val lazyContexts: Map[DirectiveSet, Coeval[CTX[Environment]]] = {
-    val directives = for {
-      version    <- DirectiveDictionary[StdLibVersion].all
-      cType      <- DirectiveDictionary[ContentType].all
-      scriptType <- DirectiveDictionary[ScriptType].all
-    } yield DirectiveSet(version, scriptType, cType)
-    directives
-      .filter(_.isRight)
-      .map(_.explicitGet())
-      .map(ds => {
-        val version = ds.stdLibVersion
-        val ctx = Coeval.evalOnce(
-          Monoid.combineAll(
-            Seq(
-              PureContext.build(version, fixUnicodeFunctions = true).withEnvironment[Environment],
-              CryptoContext.build(Global, version).withEnvironment[Environment],
-              WavesContext.build(Global, ds)
-            )
-          )
-        )
-        ds -> ctx
-      })
-      .toMap
-  }
+  val lazyContexts: Map[(DirectiveSet, Boolean), Coeval[CTX[Environment]]] =
+    (for {
+      version             <- DirectiveDictionary[StdLibVersion].all
+      scriptType          <- DirectiveDictionary[ScriptType].all
+      contentType         <- DirectiveDictionary[ContentType].all if contentType != DApp || (contentType == DApp && version >= V3 && scriptType == Account)
+      fixUnicodeFunctions <- Seq(true, false)
+    } yield {
+      val ds = DirectiveSet(version, scriptType, contentType).explicitGet()
+      val ctx = Coeval.evalOnce(
+        PureContext.build(version, fixUnicodeFunctions, useNewPowPrecision = true).withEnvironment[Environment] |+|
+          CryptoContext.build(Global, version).withEnvironment[Environment] |+|
+          WavesContext.build(Global, ds)
+      )
+      (ds, fixUnicodeFunctions) -> ctx
+    }).toMap
 
   private val lazyFunctionCosts: Map[DirectiveSet, Coeval[Map[FunctionHeader, Coeval[Long]]]] =
-    lazyContexts.map(el => (el._1, el._2.map(ctx => estimate(el._1.stdLibVersion, ctx.evaluationContext[Id](environment)))))
+    lazyContexts.map(el => (el._1._1, el._2.map(ctx => estimate(el._1._1.stdLibVersion, ctx.evaluationContext[Id](environment)))))
 
   private val dAppVerifierProhibitedFunctions: Map[Native, Coeval[Long]] =
     List(Native(FunctionIds.CALLDAPP), Native(FunctionIds.CALLDAPPREENTRANT))
@@ -134,10 +125,11 @@ package object utils {
     compilerContext(ds)
   }
 
-  def compilerContext(ds: DirectiveSet): CompilerContext = lazyContexts(ds.copy(imports = Imports()))().compilerContext
+  def compilerContext(ds: DirectiveSet): CompilerContext =
+    lazyContexts((ds, true))().compilerContext
 
   def getDecompilerContext(v: StdLibVersion, cType: ContentType): DecompilerContext =
-    lazyContexts(DirectiveSet(v, Account, cType).explicitGet())().decompilerContext
+    lazyContexts((DirectiveSet(v, Account, cType).explicitGet(), true))().decompilerContext
 
   def varNames(version: StdLibVersion, cType: ContentType): Set[String] =
     compilerContext(version, cType, isAssetScript = false).varDefs.keySet

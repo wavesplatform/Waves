@@ -1,9 +1,9 @@
 enablePlugins(JmhPlugin)
 
-Jmh / version := "1.32"
+Jmh / version := "1.33"
 
 libraryDependencies ++= Seq(
-  "org.scodec" %% "scodec-core" % "1.11.8"
+  "org.scodec" %% "scodec-core" % "1.11.9"
 ) ++ Dependencies.logDeps
 
 // https://github.com/ktoso/sbt-jmh#adding-to-your-project

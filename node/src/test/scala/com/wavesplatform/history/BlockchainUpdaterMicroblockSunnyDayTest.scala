@@ -23,8 +23,8 @@ class BlockchainUpdaterMicroblockSunnyDayTest extends PropSpec with DomainScenar
     fee    <- smallFeeGen
     genesis: GenesisTransaction = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
     masterToAlice: TransferTransaction <- wavesTransferGeneratorP(ts, master, alice.toAddress)
-    aliceToBob  = createWavesTransfer(alice, bob.toAddress, masterToAlice.amount - fee - 1, fee, ts).explicitGet()
-    aliceToBob2 = createWavesTransfer(alice, bob.toAddress, masterToAlice.amount - fee - 1, fee, ts + 1).explicitGet()
+    aliceToBob  = createWavesTransfer(alice, bob.toAddress, masterToAlice.amount.value - fee - 1, fee, ts).explicitGet()
+    aliceToBob2 = createWavesTransfer(alice, bob.toAddress, masterToAlice.amount.value - fee - 1, fee, ts + 1).explicitGet()
   } yield (genesis, masterToAlice, aliceToBob, aliceToBob2)
 
   property("all txs in different blocks: B0 <- B1 <- B2 <- B3!") {
@@ -83,7 +83,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest extends PropSpec with DomainScenar
 
         effBalance(genesis.recipient, domain) > 0 shouldBe true
         effBalance(masterToAlice.recipient, domain) > 0 shouldBe true
-        effBalance(aliceToBob.recipient, domain) shouldBe aliceToBob.amount
+        effBalance(aliceToBob.recipient, domain) shouldBe aliceToBob.amount.value
     }
   }
 
@@ -117,7 +117,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest extends PropSpec with DomainScenar
 
         effBalance(genesis.recipient, domain) > 0 shouldBe true
         effBalance(masterToAlice.recipient, domain) shouldBe 1
-        effBalance(aliceToBob.recipient, domain) shouldBe aliceToBob.amount
+        effBalance(aliceToBob.recipient, domain) shouldBe aliceToBob.amount.value
     }
   }
 
@@ -136,7 +136,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest extends PropSpec with DomainScenar
 
         effBalance(genesis.recipient, domain) > 0 shouldBe true
         effBalance(masterToAlice.recipient, domain) shouldBe 1
-        effBalance(aliceToBob.recipient, domain) shouldBe aliceToBob.amount
+        effBalance(aliceToBob.recipient, domain) shouldBe aliceToBob.amount.value
     }
   }
 

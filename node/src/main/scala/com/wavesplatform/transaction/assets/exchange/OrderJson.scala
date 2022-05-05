@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{Asset, Proofs, TxVersion}
+import com.wavesplatform.transaction.{Asset, Proofs, TxExchangeAmount, TxMatcherFee, TxOrderPrice, TxVersion}
 import play.api.libs.json._
 
 import scala.util.{Failure, Success}
@@ -47,11 +47,11 @@ object OrderJson {
       matcher: PublicKey,
       assetPair: AssetPair,
       orderType: OrderType,
-      amount: Long,
-      price: Long,
+      amount: TxExchangeAmount,
+      price: TxOrderPrice,
       timestamp: Long,
       expiration: Long,
-      matcherFee: Long,
+      matcherFee: TxMatcherFee,
       signature: Option[Array[Byte]],
       proofs: Option[Array[Array[Byte]]],
       version: Option[Byte]
@@ -72,11 +72,11 @@ object OrderJson {
       matcher: PublicKey,
       assetPair: AssetPair,
       orderType: OrderType,
-      amount: Long,
-      price: Long,
+      amount: TxExchangeAmount,
+      price: TxOrderPrice,
       timestamp: Long,
       expiration: Long,
-      matcherFee: Long,
+      matcherFee: TxMatcherFee,
       signature: Option[Array[Byte]],
       proofs: Option[Array[Array[Byte]]],
       version: TxVersion,
@@ -116,11 +116,20 @@ object OrderJson {
       (JsPath \ "matcherPublicKey").read[PublicKey](accountPublicKeyReads) and
       (JsPath \ "assetPair").read[AssetPair] and
       (JsPath \ "orderType").read[OrderType] and
-      (JsPath \ "amount").read[Long] and
-      (JsPath \ "price").read[Long] and
+      (JsPath \ "amount").read[Long].map(TxExchangeAmount.from).flatMapResult {
+        case Right(amount) => JsSuccess(amount)
+        case _             => JsError(TxExchangeAmount.errMsg)
+      } and
+      (JsPath \ "price").read[Long].map(TxOrderPrice.from).flatMapResult {
+        case Right(price) => JsSuccess(price)
+        case _            => JsError(TxOrderPrice.errMsg)
+      } and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "expiration").read[Long] and
-      (JsPath \ "matcherFee").read[Long] and
+      (JsPath \ "matcherFee").read[Long].map(TxMatcherFee.from).flatMapResult {
+        case Right(fee) => JsSuccess(fee)
+        case _          => JsError(TxMatcherFee.errMsg)
+      } and
       (JsPath \ "signature").readNullable[Array[Byte]] and
       (JsPath \ "proofs").readNullable[Array[Array[Byte]]] and
       (JsPath \ "version").readNullable[Byte]
@@ -132,11 +141,20 @@ object OrderJson {
       (JsPath \ "matcherPublicKey").read[PublicKey](accountPublicKeyReads) and
       (JsPath \ "assetPair").read[AssetPair] and
       (JsPath \ "orderType").read[OrderType] and
-      (JsPath \ "amount").read[Long] and
-      (JsPath \ "price").read[Long] and
+      (JsPath \ "amount").read[Long].map(TxExchangeAmount.from).flatMapResult {
+        case Right(amount) => JsSuccess(amount)
+        case _             => JsError(TxExchangeAmount.errMsg)
+      } and
+      (JsPath \ "price").read[Long].map(TxOrderPrice.from).flatMapResult {
+        case Right(price) => JsSuccess(price)
+        case _            => JsError(TxOrderPrice.errMsg)
+      } and
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "expiration").read[Long] and
-      (JsPath \ "matcherFee").read[Long] and
+      (JsPath \ "matcherFee").read[Long].map(TxMatcherFee.from).flatMapResult {
+        case Right(fee) => JsSuccess(fee)
+        case _          => JsError(TxMatcherFee.errMsg)
+      } and
       (JsPath \ "signature").readNullable[Array[Byte]] and
       (JsPath \ "proofs").readNullable[Array[Array[Byte]]] and
       (JsPath \ "version").read[Byte] and
@@ -150,7 +168,7 @@ object OrderJson {
     case jsOrder @ JsObject(map) =>
       map.getOrElse("version", JsNumber(1)) match {
         case JsNumber(x) if x.byteValue >= Order.V3 => orderV3V4Reads.reads(jsOrder)
-        case _                                        => orderV1V2Reads.reads(jsOrder)
+        case _                                      => orderV1V2Reads.reads(jsOrder)
       }
     case invalidOrder => JsError(s"Can't parse invalid order $invalidOrder")
   }

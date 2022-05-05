@@ -4,6 +4,7 @@ import java.security.Permission
 import java.util.concurrent.{Semaphore, TimeUnit}
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.WithDB
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
@@ -17,12 +18,11 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.utils.TestLevelDB
+import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction}
 import com.wavesplatform.utils.BaseTargetReachedMaximum
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.WithDB
-import com.wavesplatform.test.FreeSpec
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
@@ -123,7 +123,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithDB with DBCacheSettin
         preActivatedFeatures = Map(BlockchainFeatures.FairPoS.id -> 1)
       )
     )
-    val synchronizationSettings0 = settings0.synchronizationSettings.copy(maxBaseTargetOpt = Some(1L))
+    val synchronizationSettings0 = settings0.synchronizationSettings.copy(maxBaseTarget = Some(1L))
     val settings = settings0.copy(
       blockchainSettings = blockchainSettings0,
       minerSettings = minerSettings,
@@ -131,10 +131,11 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithDB with DBCacheSettin
       featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
     )
 
-    val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
-    val pos = PoSSelector(bcu, settings.synchronizationSettings.maxBaseTargetOpt)
+    val bcu =
+      new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
+    val pos = PoSSelector(bcu, settings.synchronizationSettings.maxBaseTarget)
 
-    val utxPoolStub                        = new UtxPoolImpl(ntpTime, bcu, ignoreSpendableBalanceChanged, settings0.utxSettings)
+    val utxPoolStub                        = new UtxPoolImpl(ntpTime, bcu, settings0.utxSettings, settings0.minerSettings.enable)
     val schedulerService: SchedulerService = Scheduler.singleThread("appender")
 
     try {
@@ -165,7 +166,6 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithDB with DBCacheSettin
       bcu.shutdown()
     } finally {
       bcu.shutdown()
-      db.close()
     }
   }
 }

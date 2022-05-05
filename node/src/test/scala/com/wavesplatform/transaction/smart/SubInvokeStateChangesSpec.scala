@@ -2,7 +2,8 @@ package com.wavesplatform.transaction.smart
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.lang.directives.values.StdLibVersion
+import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.test._
@@ -12,9 +13,9 @@ import play.api.libs.json.Json
 
 class SubInvokeStateChangesSpec extends FlatSpec with WithDomain with JsonMatchers {
   val ContractFunction            = "default"
-  val compileV5: String => Script = TestCompiler(StdLibVersion.V5).compileContract(_)
+  val compileV5: String => Script = TestCompiler(V5).compileContract(_)
 
-  "Invoke state changes" should "include intermediate invokes" in withDomain(DomainPresets.RideV5) { d =>
+  "Invoke state changes" should "include intermediate invokes" in {
     // Root DApp, calls addr2s and addr2f
     val dAppAddress = TxHelpers.signer(1)
 
@@ -26,146 +27,143 @@ class SubInvokeStateChangesSpec extends FlatSpec with WithDomain with JsonMatche
     val addr2f = TxHelpers.signer(2) // Calls addr3f
     val addr3f = TxHelpers.signer(4) // Fails
 
-    { // Prerequisites
-      val script1    = compileV5(genScript(Seq(addr2s.toAddress, addr2f.toAddress)))
-      val script2    = compileV5(genScript(Some(addr3f.toAddress)))
-      val script3    = compileV5(genScript(None, fail = true))
-      val script2alt = compileV5(genScript(Some(addr3s.toAddress)))
-      val script3alt = compileV5(genScript(None))
+    val balances = Seq(dAppAddress, addr2f, addr3f, addr2s, addr3s).map(acc => AddrWithBalance(acc.toAddress, 1.waves)) :+
+      AddrWithBalance(TxHelpers.defaultAddress)
 
-      val genesis = Seq(
-        TxHelpers.genesis(TxHelpers.defaultAddress),
-        TxHelpers.genesis(dAppAddress.toAddress, 1.waves),
-        TxHelpers.genesis(addr2f.toAddress, 1.waves),
-        TxHelpers.genesis(addr3f.toAddress, 1.waves),
-        TxHelpers.genesis(addr2s.toAddress, 1.waves),
-        TxHelpers.genesis(addr3s.toAddress, 1.waves)
+    withDomain(DomainPresets.RideV5, balances) { d =>
+      { // Prerequisites
+        val script1    = compileV5(genScript(Seq(addr2s.toAddress, addr2f.toAddress)))
+        val script2    = compileV5(genScript(Some(addr3f.toAddress)))
+        val script3    = compileV5(genScript(None, fail = true))
+        val script2alt = compileV5(genScript(Some(addr3s.toAddress)))
+        val script3alt = compileV5(genScript(None))
+
+        val setScripts = Seq(
+          TxHelpers.setScript(dAppAddress, script1),
+          TxHelpers.setScript(addr2f, script2),
+          TxHelpers.setScript(addr3f, script3),
+          TxHelpers.setScript(addr2s, script2alt),
+          TxHelpers.setScript(addr3s, script3alt)
+        )
+        d.appendBlock(setScripts: _*)
+      }
+
+      // Actual test
+      val invoke = TxHelpers.invoke(dAppAddress.toAddress, Some(ContractFunction))
+      d.appendBlock(invoke)
+
+      val stateChanges = d.commonApi.invokeScriptResult(invoke.id())
+      val json         = Json.toJson(stateChanges)
+      json should matchJson(
+        """{
+          |  "data" : [ ],
+          |  "transfers" : [ ],
+          |  "issues" : [ ],
+          |  "reissues" : [ ],
+          |  "burns" : [ ],
+          |  "sponsorFees" : [ ],
+          |  "leases" : [ ],
+          |  "leaseCancels" : [ ],
+          |  "invokes" : [ {
+          |    "dApp" : "3N4DiVEiZHzcjEhoBx2kmoKKCH7GBZMim3L",
+          |    "call" : {
+          |      "function" : "default",
+          |      "args" : [ ]
+          |    },
+          |    "payment" : [ {
+          |            "assetId" : null,
+          |            "amount" : 17
+          |    } ],
+          |    "stateChanges" : {
+          |      "data" : [ ],
+          |      "transfers" : [ ],
+          |      "issues" : [ ],
+          |      "reissues" : [ ],
+          |      "burns" : [ ],
+          |      "sponsorFees" : [ ],
+          |      "leases" : [ ],
+          |      "leaseCancels" : [ ],
+          |      "invokes" : [ {
+          |        "dApp" : "3MvAdB2DFMf6unzX6czVGgco5rA24End8Jn",
+          |        "call" : {
+          |          "function" : "default",
+          |          "args" : [ ]
+          |        },
+          |        "payment" : [ {
+          |          "assetId" : null,
+          |          "amount" : 17
+          |        } ],
+          |        "stateChanges" : {
+          |          "data" : [ ],
+          |          "transfers" : [ ],
+          |          "issues" : [ ],
+          |          "reissues" : [ ],
+          |          "burns" : [ ],
+          |          "sponsorFees" : [ ],
+          |          "leases" : [ ],
+          |          "leaseCancels" : [ ],
+          |          "invokes" : [ ]
+          |        }
+          |      } ]
+          |    }
+          |  }, {
+          |    "dApp" : "3MsY23LPQnvPZnBKpvs6YcnCvGjLVD42pSy",
+          |    "call" : {
+          |      "function" : "default",
+          |      "args" : [ ]
+          |    },
+          |    "payment" : [ {
+          |        "assetId" : null,
+          |        "amount" : 17
+          |    } ],
+          |    "stateChanges" : {
+          |      "data" : [ ],
+          |      "transfers" : [ ],
+          |      "issues" : [ ],
+          |      "reissues" : [ ],
+          |      "burns" : [ ],
+          |      "sponsorFees" : [ ],
+          |      "leases" : [ ],
+          |      "leaseCancels" : [ ],
+          |      "invokes" : [ {
+          |        "dApp" : "3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM",
+          |        "call" : {
+          |          "function" : "default",
+          |          "args" : [ ]
+          |        },
+          |        "payment" : [ {
+          |            "assetId" : null,
+          |            "amount" : 17
+          |        } ],
+          |        "stateChanges" : {
+          |          "data" : [ ],
+          |          "transfers" : [ ],
+          |          "issues" : [ ],
+          |          "reissues" : [ ],
+          |          "burns" : [ ],
+          |          "sponsorFees" : [ ],
+          |          "leases" : [ ],
+          |          "leaseCancels" : [ ],
+          |          "invokes" : [ ],
+          |          "error" : {
+          |            "code" : 1,
+          |            "text" : "boom"
+          |          }
+          |        }
+          |      } ]
+          |    }
+          |  } ],
+          |  "error" : {
+          |    "code" : 1,
+          |    "text" : "FailedTransactionError(code = 1, error = boom, log =\n\t@p = false\n)"
+          |  }
+          |}""".stripMargin
       )
-      val setScripts = Seq(
-        TxHelpers.setScript(dAppAddress, script1),
-        TxHelpers.setScript(addr2f, script2),
-        TxHelpers.setScript(addr3f, script3),
-        TxHelpers.setScript(addr2s, script2alt),
-        TxHelpers.setScript(addr3s, script3alt)
-      )
-      d.appendBlock(genesis ++ setScripts: _*)
+
+      val allAddresses = Seq(dAppAddress, addr2s, addr3s, addr2f, addr3f).map(_.toAddress)
+      for ((addr, i) <- allAddresses.zipWithIndex)
+        withClue(s"Addr #${i + 1}")(d.commonApi.addressTransactions(addr) should contain(invoke))
     }
-
-    // Actual test
-    val invoke = TxHelpers.invoke(dAppAddress.toAddress, ContractFunction)
-    d.appendBlock(invoke)
-
-    val stateChanges = d.commonApi.invokeScriptResult(invoke.id())
-    val json         = Json.toJson(stateChanges)
-    json should matchJson(
-      """{
-        |  "data" : [ ],
-        |  "transfers" : [ ],
-        |  "issues" : [ ],
-        |  "reissues" : [ ],
-        |  "burns" : [ ],
-        |  "sponsorFees" : [ ],
-        |  "leases" : [ ],
-        |  "leaseCancels" : [ ],
-        |  "invokes" : [ {
-        |    "dApp" : "3N4DiVEiZHzcjEhoBx2kmoKKCH7GBZMim3L",
-        |    "call" : {
-        |      "function" : "default",
-        |      "args" : [ ]
-        |    },
-        |    "payment" : [ {
-        |            "assetId" : null,
-        |            "amount" : 17
-        |    } ],
-        |    "stateChanges" : {
-        |      "data" : [ ],
-        |      "transfers" : [ ],
-        |      "issues" : [ ],
-        |      "reissues" : [ ],
-        |      "burns" : [ ],
-        |      "sponsorFees" : [ ],
-        |      "leases" : [ ],
-        |      "leaseCancels" : [ ],
-        |      "invokes" : [ {
-        |        "dApp" : "3MvAdB2DFMf6unzX6czVGgco5rA24End8Jn",
-        |        "call" : {
-        |          "function" : "default",
-        |          "args" : [ ]
-        |        },
-        |        "payment" : [ {
-        |          "assetId" : null,
-        |          "amount" : 17
-        |        } ],
-        |        "stateChanges" : {
-        |          "data" : [ ],
-        |          "transfers" : [ ],
-        |          "issues" : [ ],
-        |          "reissues" : [ ],
-        |          "burns" : [ ],
-        |          "sponsorFees" : [ ],
-        |          "leases" : [ ],
-        |          "leaseCancels" : [ ],
-        |          "invokes" : [ ]
-        |        }
-        |      } ]
-        |    }
-        |  }, {
-        |    "dApp" : "3MsY23LPQnvPZnBKpvs6YcnCvGjLVD42pSy",
-        |    "call" : {
-        |      "function" : "default",
-        |      "args" : [ ]
-        |    },
-        |    "payment" : [ {
-        |        "assetId" : null,
-        |        "amount" : 17
-        |    } ],
-        |    "stateChanges" : {
-        |      "data" : [ ],
-        |      "transfers" : [ ],
-        |      "issues" : [ ],
-        |      "reissues" : [ ],
-        |      "burns" : [ ],
-        |      "sponsorFees" : [ ],
-        |      "leases" : [ ],
-        |      "leaseCancels" : [ ],
-        |      "invokes" : [ {
-        |        "dApp" : "3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM",
-        |        "call" : {
-        |          "function" : "default",
-        |          "args" : [ ]
-        |        },
-        |        "payment" : [ {
-        |            "assetId" : null,
-        |            "amount" : 17
-        |        } ],
-        |        "stateChanges" : {
-        |          "data" : [ ],
-        |          "transfers" : [ ],
-        |          "issues" : [ ],
-        |          "reissues" : [ ],
-        |          "burns" : [ ],
-        |          "sponsorFees" : [ ],
-        |          "leases" : [ ],
-        |          "leaseCancels" : [ ],
-        |          "invokes" : [ ],
-        |          "error" : {
-        |            "code" : 1,
-        |            "text" : "boom"
-        |          }
-        |        }
-        |      } ]
-        |    }
-        |  } ],
-        |  "error" : {
-        |    "code" : 1,
-        |    "text" : "FailedTransactionError(code = 1, error = boom, log =\n\t@p = false\n)"
-        |  }
-        |}""".stripMargin
-    )
-
-    val allAddresses = Seq(dAppAddress, addr2s, addr3s, addr2f, addr3f).map(_.toAddress)
-    for ((addr, i) <- allAddresses.zipWithIndex)
-      withClue(s"Addr #${i + 1}")(d.commonApi.addressTransactions(addr) should contain(invoke))
   }
 
   def genScript(calls: Iterable[Address], fail: Boolean = false): String =

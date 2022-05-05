@@ -39,7 +39,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
   implicit val version: StdLibVersion = V4
 
-  private def pureContext(implicit version: StdLibVersion) = PureContext.build(version, fixUnicodeFunctions = true)
+  private def pureContext(implicit version: StdLibVersion) = PureContext.build(version, fixUnicodeFunctions = true, useNewPowPrecision = true)
 
   private def defaultCryptoContext(implicit version: StdLibVersion) = CryptoContext.build(Global, version)
 
@@ -58,7 +58,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     )
 
   private def pureEvalContext(implicit version: StdLibVersion): EvaluationContext[NoContext, Id] =
-    PureContext.build(version, fixUnicodeFunctions = true).evaluationContext
+    PureContext.build(version, fixUnicodeFunctions = true, useNewPowPrecision = true).evaluationContext
 
   private val defaultEvaluator = new EvaluatorV1[Id, Environment]()
 
@@ -66,7 +66,8 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
     defaultEvaluator[T](context, expr)
 
   private def evalV2[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] =
-    EvaluatorV2.applyCompleted(context, expr, implicitly[StdLibVersion])._3.asInstanceOf[Either[ExecutionError, T]]
+    EvaluatorV2.applyCompleted(context, expr, implicitly[StdLibVersion], correctFunctionCallScope = true)
+      ._3.asInstanceOf[Either[ExecutionError, T]]
 
   private def eval[T <: EVALUATED](context: EvaluationContext[Environment, Id], expr: EXPR): Either[ExecutionError, T] = {
     val evaluatorV1Result = evalV1[T](context, expr)
@@ -81,7 +82,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
   private def evalWithLogging(context: EvaluationContext[Environment, Id], expr: EXPR): Either[(ExecutionError, Log[Id]), (EVALUATED, Log[Id])] = {
     val evaluatorV1Result = defaultEvaluator.applyWithLogging[EVALUATED](context, expr)
-    val (evaluatorV2Log, _, evaluatorV2Result) = EvaluatorV2.applyCompleted(context, expr, implicitly[StdLibVersion])
+    val (evaluatorV2Log, _, evaluatorV2Result) = EvaluatorV2.applyCompleted(context, expr, implicitly[StdLibVersion], correctFunctionCallScope = true)
 
     evaluatorV2Result.bimap((_, evaluatorV2Log), (_, evaluatorV2Log)) shouldBe evaluatorV1Result
     evaluatorV1Result

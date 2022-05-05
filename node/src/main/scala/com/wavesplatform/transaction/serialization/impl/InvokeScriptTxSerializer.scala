@@ -1,9 +1,7 @@
 package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
-
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.v1.Serde
@@ -13,7 +11,7 @@ import com.wavesplatform.serialization._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.{Asset, TxVersion}
+import com.wavesplatform.transaction.{Asset, TxPositiveAmount, TxVersion}
 import play.api.libs.json.{JsArray, JsObject, JsString, Json}
 
 import scala.util.Try
@@ -61,7 +59,7 @@ object InvokeScriptTxSerializer {
           dAppAddressOrAlias.bytes,
           Deser.serializeOption(funcCallOpt)(Serde.serialize(_)),
           Deser.serializeArrays(payments.map(pmt => Longs.toByteArray(pmt.amount) ++ pmt.assetId.byteRepr)),
-          Longs.toByteArray(fee),
+          Longs.toByteArray(fee.value),
           feeAssetId.byteRepr,
           Longs.toByteArray(timestamp)
         )
@@ -86,13 +84,12 @@ object InvokeScriptTxSerializer {
     val buf = ByteBuffer.wrap(bytes)
     require(buf.getByte == 0 && buf.getByte == InvokeScriptTransaction.typeId && buf.getByte == 1, "transaction type mismatch")
     val chainId = buf.getByte
-    require(chainId == AddressScheme.current.chainId, "chainId mismatch")
 
     val sender       = buf.getPublicKey
-    val dApp         = buf.getAddressOrAlias
+    val dApp         = buf.getAddressOrAlias(chainId)
     val functionCall = Deser.parseOption(buf)(Serde.deserialize(_).explicitGet().asInstanceOf[FUNCTION_CALL])
     val payments     = Deser.parseArrays(buf).map(parsePayment)
-    val fee          = buf.getLong
+    val fee          = TxPositiveAmount.unsafeFrom(buf.getLong)
     val feeAssetId   = buf.getAsset
     val timestamp    = buf.getLong
     InvokeScriptTransaction(TxVersion.V1, sender, dApp, functionCall, payments, fee, feeAssetId, timestamp, buf.getProofs, chainId)

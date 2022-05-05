@@ -6,9 +6,12 @@
    2. You've checked "Make project before run"
  */
 
-import sbt.Keys._
-import sbt.{**, Compile, CrossVersion, File, IO, Project, compilerPlugin, inConfig, _}
-import sbtcrossproject.CrossPlugin.autoImport.{CrossType, crossProject}
+import sbt.Def
+import sbt.Keys.{concurrentRestrictions, _}
+
+import scala.collection.Seq
+
+Global / onChangedBuildSource := ReloadOnSourceChanges
 
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
@@ -33,7 +36,7 @@ lazy val `lang-jvm` = lang.jvm
     name := "RIDE Compiler",
     normalizedName := "lang",
     description := "The RIDE smart contract language compiler",
-    libraryDependencies += "org.scala-js" %% "scalajs-stubs" % "1.0.0" % Provided
+    libraryDependencies += "org.scala-js" %% "scalajs-stubs" % "1.1.0" % Provided
   )
 
 lazy val `lang-js` = lang.js
@@ -91,7 +94,7 @@ lazy val `repl-jvm` = repl.jvm
   .dependsOn(`lang-jvm`)
   .settings(
     libraryDependencies ++= Dependencies.circe.value ++ Seq(
-      "org.scala-js" %% "scalajs-stubs" % "1.0.0" % Provided,
+      "org.scala-js" %% "scalajs-stubs" % "1.1.0" % Provided,
       Dependencies.sttp3
     )
   )
@@ -114,10 +117,10 @@ lazy val root = (project in file("."))
 
 inScope(Global)(
   Seq(
+    publish / skip := true,
     scalaVersion := "2.13.6",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
-    V.fallback := (1, 3, 6),
     organizationHomepage := Some(url("https://wavesplatform.com")),
     licenses := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
     scalacOptions ++= Seq(
@@ -129,16 +132,14 @@ inScope(Global)(
       "-language:postfixOps",
       "-Ywarn-unused:-implicits",
       "-Xlint",
-      "-opt:l:inline",
-      "-opt-inline-from:**",
-      "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s" // Ignore gRPC warnings
+      "-Wconf:cat=deprecation&site=com.wavesplatform.api.grpc.*:s",                                // Ignore gRPC warnings
+      "-Wconf:cat=deprecation&site=com.wavesplatform.protobuf.transaction.InvokeScriptResult.*:s", // Ignore deprecated argsBytes
+      "-Wconf:cat=deprecation&site=com.wavesplatform.state.InvokeScriptResult.*:s"
     ),
     crossPaths := false,
-    scalafmtOnCompile := false,
     dependencyOverrides ++= Dependencies.enforcedVersions.value,
     cancelable := true,
-    parallelExecution := false,
-    testListeners := Seq.empty, // Fix for doubled test reports
+    parallelExecution := true,
     /* http://www.scalatest.org/user_guide/using_the_runner
      * o - select the standard output reporter
      * I - show reminder of failed and canceled tests without stack traces
@@ -149,10 +150,11 @@ inScope(Global)(
      */
     testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports"),
     testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true"),
-    network := Network(sys.props.get("network")),
+    network := Network.default(),
     resolvers += Resolver.sonatypeRepo("snapshots"),
     Compile / doc / sources := Seq.empty,
-    Compile / packageDoc / publishArtifact := false
+    Compile / packageDoc / publishArtifact := false,
+    concurrentRestrictions := Seq(Tags.limit(Tags.Test, math.min(EvaluateTask.SystemProcessors, 8)))
   )
 )
 
@@ -195,4 +197,26 @@ def checkPR: Command = Command.command("checkPR") { state =>
   state
 }
 
-commands += checkPR
+lazy val buildDebPackages = taskKey[Unit]("Build debian packages")
+buildDebPackages := {
+  (`grpc-server` / Debian / packageBin).value
+  (node / Debian / packageBin).value
+}
+
+def buildPackages: Command = Command("buildPackages")(_ => Network.networkParser) { (state, args) =>
+  args.toSet[Network].foreach { n =>
+    val newState = Project
+      .extract(state)
+      .appendWithoutSession(
+        Seq(Global / network := n),
+        state
+      )
+    Project.extract(newState).runTask(buildDebPackages, newState)
+  }
+
+  Project.extract(state).runTask(packageAll, state)
+
+  state
+}
+
+commands ++= Seq(checkPR, buildPackages)

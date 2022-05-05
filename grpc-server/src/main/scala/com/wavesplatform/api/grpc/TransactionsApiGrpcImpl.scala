@@ -83,7 +83,7 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
       val result = Observable(request.transactionIds: _*)
         .flatMap(txId => Observable.fromIterable(commonApi.transactionById(txId.toByteStr)))
         .collect {
-          case CommonTransactionsApi.TransactionMeta.Invoke(_, transaction, _, invokeScriptResult) =>
+          case CommonTransactionsApi.TransactionMeta.Invoke(_, transaction, _, _, invokeScriptResult) =>
             InvokeScriptResultResponse.of(Some(PBTransactions.protobuf(transaction)), invokeScriptResult.map(VISR.toPB))
         }
 
@@ -125,7 +125,7 @@ private object TransactionsApiGrpcImpl {
     val transactionId                          = meta.transaction.id().toByteString
     val status                                 = if (meta.succeeded) ApplicationStatus.SUCCEEDED else ApplicationStatus.SCRIPT_EXECUTION_FAILED
     val invokeScriptResult = meta match {
-      case TransactionMeta.Invoke(_, _, _, r) => r.map(VISR.toPB)
+      case TransactionMeta.Invoke(_, _, _, _, r) => r.map(VISR.toPB)
       case _                                  => None
     }
 

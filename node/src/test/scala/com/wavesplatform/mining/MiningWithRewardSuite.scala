@@ -121,8 +121,8 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
       case (blockchainUpdater, _) =>
         for {
           _ <- Task.unit
-          pos          = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTargetOpt)
-          utxPool      = new UtxPoolImpl(ntpTime, blockchainUpdater, ignoreSpendableBalanceChanged, settings.utxSettings)
+          pos          = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
+          utxPool      = new UtxPoolImpl(ntpTime, blockchainUpdater, settings.utxSettings, settings.minerSettings.enable)
           scheduler    = Scheduler.singleThread("appender")
           allChannels  = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
           wallet       = Wallet(WalletSettings(None, Some("123"), None))
@@ -159,7 +159,6 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
       case (blockchainUpdater, db) =>
         Task {
           blockchainUpdater.shutdown()
-          db.close()
         }
     }
 }

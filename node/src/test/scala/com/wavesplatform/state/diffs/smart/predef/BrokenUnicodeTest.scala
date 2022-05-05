@@ -1,28 +1,17 @@
 package com.wavesplatform.state.diffs.smart.predef
 
-import com.wavesplatform.TestTime
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.test._
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
-import org.scalacheck.Gen
+import com.wavesplatform.transaction.TxHelpers
 import org.scalatest.EitherValues
 
 class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
-
-  private val time = new TestTime
-  private def ts   = time.getTimestamp()
 
   private val activationHeight = 4
   private val fs = TestFunctionalitySettings.Enabled.copy(
@@ -190,63 +179,46 @@ class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
   private val allDAppVersions              = allVersions.filter(_ >= V3)
   private val dAppVersionsBeforeActivation = versionsBeforeActivation.filter(_ >= V3)
 
-  private val scenario =
-    for {
-      recipient     <- accountGen
-      invoker       <- accountGen
-      accWithFix    <- Gen.listOfN(allVersions.size, accountGen).map(_.zip(allVersions))
-      accWithNoFix  <- Gen.listOfN(versionsBeforeActivation.size, accountGen).map(_.zip(versionsBeforeActivation))
-      dAppWithFix   <- Gen.listOfN(allDAppVersions.size, accountGen).map(_.zip(allDAppVersions))
-      dAppWithNoFix <- Gen.listOfN(dAppVersionsBeforeActivation.size, accountGen).map(_.zip(dAppVersionsBeforeActivation))
-      fee           <- ciFee()
-      genesisTxs     = (accWithFix ::: accWithNoFix ::: dAppWithFix ::: dAppWithNoFix).map(a => GenesisTransaction.create(a._1.toAddress, ENOUGH_AMT, ts).explicitGet())
-      invokerGenesis = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-      setNoFix       = accWithNoFix.map(a => SetScriptTransaction.selfSigned(1.toByte, a._1, Some(checkNoFixScript(a._2)), fee, ts).explicitGet())
-      setFix         = accWithFix.map(a => SetScriptTransaction.selfSigned(1.toByte, a._1, Some(checkFixScript(a._2)), fee, ts).explicitGet())
-      setNoFixDApp   = dAppWithNoFix.map(a => SetScriptTransaction.selfSigned(1.toByte, a._1, Some(checkNoFixDAppScript(a._2)), fee, ts).explicitGet())
-      setFixDApp     = dAppWithFix.map(a => SetScriptTransaction.selfSigned(1.toByte, a._1, Some(checkFixDAppScript(a._2)), fee, ts).explicitGet())
-      checkFix = accWithFix
-        .map(
-          a =>
-            TransferTransaction
-              .selfSigned(TxVersion.V2, a._1, recipient.toAddress, Waves, 1, Waves, fee, ByteStr.empty, ts)
-              .explicitGet()
-        )
-      checkNoFix = () =>
-        accWithNoFix.map(
-          a =>
-            TransferTransaction
-              .selfSigned(TxVersion.V2, a._1, recipient.toAddress, Waves, 1, Waves, fee, ByteStr.empty, ts)
-              .explicitGet()
-        )
-      checkFixDApp = dAppWithFix
-        .map(
-          a =>
-            InvokeScriptTransaction
-              .selfSigned(TxVersion.V2, invoker, a._1.toAddress, None, Nil, fee, Waves, ts)
-              .explicitGet()
-        )
-      checkNoFixDApp = () =>
-        dAppWithNoFix.map(
-          a =>
-            InvokeScriptTransaction
-              .selfSigned(TxVersion.V2, invoker, a._1.toAddress, None, Nil, fee, Waves, ts)
-              .explicitGet()
-        )
-    } yield (invokerGenesis :: genesisTxs, setNoFix, setFix, checkFix, checkNoFix, setNoFixDApp, setFixDApp, checkFixDApp, checkNoFixDApp)
+  private val scenario = {
+    val recipient  = TxHelpers.signer(0)
+    val invoker    = TxHelpers.signer(1)
+    val accWithFix = (1 to allVersions.size).map(idx => TxHelpers.signer(idx + 1)).zip(allVersions).toList
+    val accWithNoFix =
+      (1 to versionsBeforeActivation.size).map(idx => TxHelpers.signer(idx + allVersions.size + 1)).zip(versionsBeforeActivation).toList
+    val dAppWithFix =
+      (1 to allDAppVersions.size).map(idx => TxHelpers.signer(idx + allVersions.size + versionsBeforeActivation.size + 1)).zip(allDAppVersions).toList
+    val dAppWithNoFix = (1 to dAppVersionsBeforeActivation.size)
+      .map(idx => TxHelpers.signer(idx + allVersions.size + versionsBeforeActivation.size + allDAppVersions.size + 1))
+      .zip(dAppVersionsBeforeActivation)
+      .toList
+
+    val balances = (accWithFix ::: accWithNoFix ::: dAppWithFix ::: dAppWithNoFix)
+      .map { case (acc, _) => AddrWithBalance(acc.toAddress) }
+    val invokerBalance = AddrWithBalance(invoker.toAddress)
+
+    val setNoFix     = accWithNoFix.map { case (acc, v)  => TxHelpers.setScript(acc, checkNoFixScript(v)) }
+    val setFix       = accWithFix.map { case (acc, v)    => TxHelpers.setScript(acc, checkFixScript(v)) }
+    val setNoFixDApp = dAppWithNoFix.map { case (acc, v) => TxHelpers.setScript(acc, checkNoFixDAppScript(v)) }
+    val setFixDApp   = dAppWithFix.map { case (acc, v)   => TxHelpers.setScript(acc, checkFixDAppScript(v)) }
+
+    val checkFix       = accWithFix.map { case (acc, _) => TxHelpers.transfer(acc, recipient.toAddress, 1) }
+    val checkNoFix     = () => accWithNoFix.map { case (acc, _) => TxHelpers.transfer(acc, recipient.toAddress, 1) }
+    val checkFixDApp   = dAppWithFix.map { case (acc, _) => TxHelpers.invoke(acc.toAddress, func = None, invoker = invoker) }
+    val checkNoFixDApp = () => dAppWithNoFix.map { case (acc, _) => TxHelpers.invoke(acc.toAddress, func = None, invoker = invoker) }
+
+    (invokerBalance :: balances, setNoFix, setFix, checkFix, checkNoFix, setNoFixDApp, setFixDApp, checkFixDApp, checkNoFixDApp)
+  }
 
   property(s"string functions return correct results for unicode input after ${BlockchainFeatures.SynchronousCalls} activation") {
-    val (genesisTxs, setNoFix, setFix, checkFix, checkNoFix, setNoFixDApp, setFixDApp, checkFixDApp, checkNoFixDApp) = scenario.sample.get
-    withDomain(domainSettingsWithFS(fs)) { d =>
-      d.appendBlock(genesisTxs: _*)
-
+    val (balances, setNoFix, setFix, checkFix, checkNoFix, setNoFixDApp, setFixDApp, checkFixDApp, checkNoFixDApp) = scenario
+    withDomain(domainSettingsWithFS(fs), balances) { d =>
       val checkNoFix1     = checkNoFix()
       val checkNoFixDApp1 = checkNoFixDApp()
       d.appendBlock(setNoFix ::: setNoFixDApp: _*)
 
       val checkNoFixTxs = checkNoFix1 ::: checkNoFixDApp1
       d.appendBlock(checkNoFixTxs: _*)
-      checkNoFixTxs.foreach(tx => d.blockchain.transactionMeta(tx.id.value()).get._2 shouldBe true)
+      checkNoFixTxs.foreach(tx => d.blockchain.transactionSucceeded(tx.id.value()) shouldBe true)
 
       d.appendBlock()
       d.blockchain.height shouldBe activationHeight
@@ -254,12 +226,12 @@ class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
       val checkFixTxs = checkFix ::: checkFixDApp
       d.appendBlock(setFix ::: setFixDApp: _*)
       d.appendBlock(checkFixTxs: _*)
-      checkFixTxs.foreach(tx => d.blockchain.transactionMeta(tx.id.value()).get._2 shouldBe true)
+      checkFixTxs.foreach(tx => d.blockchain.transactionSucceeded(tx.id.value()) shouldBe true)
       checkNoFix().foreach { tx =>
-        (the[RuntimeException] thrownBy d.appendBlock(tx)).getMessage should include("TransactionNotAllowedByScript")
+        d.appendBlockE(tx) should produce("TransactionNotAllowedByScript")
       }
       checkNoFixDApp().foreach { tx =>
-        (the[RuntimeException] thrownBy d.appendBlock(tx)).getMessage should include("ScriptExecutionError(error = DApp")
+        d.appendBlockE(tx) should produce("ScriptExecutionError(error = DApp")
       }
     }
   }

@@ -16,7 +16,6 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
-import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
@@ -28,7 +27,7 @@ trait CommonAccountsApi {
 
   def effectiveBalance(address: Address, confirmations: Int = 0): Long
 
-  def balanceDetails(address: Address): BalanceDetails
+  def balanceDetails(address: Address): Either[String, BalanceDetails]
 
   def assetBalance(address: Address, asset: IssuedAsset): Long
 
@@ -49,7 +48,7 @@ trait CommonAccountsApi {
   def resolveAlias(alias: Alias): Either[ValidationError, Address]
 }
 
-object CommonAccountsApi extends ScorexLogging {
+object CommonAccountsApi {
   def includeNft(blockchain: Blockchain)(assetId: IssuedAsset): Boolean =
     !blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee) || !blockchain.assetDescription(assetId).exists(_.nft)
 
@@ -65,15 +64,18 @@ object CommonAccountsApi extends ScorexLogging {
       blockchain.effectiveBalance(address, confirmations)
     }
 
-    override def balanceDetails(address: Address): BalanceDetails = {
+    override def balanceDetails(address: Address): Either[String, BalanceDetails] = {
       val portfolio = blockchain.wavesPortfolio(address)
-      BalanceDetails(
-        portfolio.balance,
-        blockchain.generatingBalance(address),
-        portfolio.balance - portfolio.lease.out,
-        portfolio.effectiveBalance,
-        portfolio.lease.in,
-        portfolio.lease.out
+      portfolio.effectiveBalance.map(
+        effectiveBalance =>
+          BalanceDetails(
+            portfolio.balance,
+            blockchain.generatingBalance(address),
+            portfolio.balance - portfolio.lease.out,
+            effectiveBalance,
+            portfolio.lease.in,
+            portfolio.lease.out
+          )
       )
     }
 
@@ -81,18 +83,17 @@ object CommonAccountsApi extends ScorexLogging {
 
     override def portfolio(address: Address): Observable[(IssuedAsset, Long)] = {
       val currentDiff = diff()
-        db.resourceObservable.flatMap { resource =>
-          Observable.fromIterator(Task(assetBalanceIterator(resource, address, currentDiff, includeNft(blockchain))))
-        }
+      db.resourceObservable.flatMap { resource =>
+        Observable.fromIterator(Task(assetBalanceIterator(resource, address, currentDiff, includeNft(blockchain))))
       }
+    }
 
-    override def nftList(address: Address, after: Option[IssuedAsset]): Observable[(IssuedAsset, AssetDescription)] =
-      {
-        val currentDiff = diff()
-        db.resourceObservable.flatMap { resource =>
-          Observable.fromIterator(Task(nftIterator(resource, address, currentDiff, after, blockchain.assetDescription)))
-        }
+    override def nftList(address: Address, after: Option[IssuedAsset]): Observable[(IssuedAsset, AssetDescription)] = {
+      val currentDiff = diff()
+      db.resourceObservable.flatMap { resource =>
+        Observable.fromIterator(Task(nftIterator(resource, address, currentDiff, after, blockchain.assetDescription)))
       }
+    }
 
     override def script(address: Address): Option[AccountScriptInfo] = blockchain.accountScript(address)
 
@@ -101,8 +102,7 @@ object CommonAccountsApi extends ScorexLogging {
 
     override def dataStream(address: Address, regex: Option[String]): Observable[DataEntry[_]] = Observable.defer {
       val pattern = regex.map(_.r.pattern)
-      val entriesFromDiff = diff()
-        .accountData
+      val entriesFromDiff = diff().accountData
         .get(address)
         .fold[Map[String, DataEntry[_]]](Map.empty)(_.data.filter { case (k, _) => pattern.forall(_.matcher(k).matches()) })
 
@@ -143,12 +143,12 @@ object CommonAccountsApi extends ScorexLogging {
               lt.id(),
               lt.sender.toAddress,
               blockchain.resolveAlias(lt.recipient).explicitGet(),
-              lt.amount,
+              lt.amount.value,
               leaseHeight,
               LeaseInfo.Status.Active
             )
           )
-        case TransactionMeta.Invoke(invokeHeight, originTransaction, true, Some(scriptResult)) =>
+        case TransactionMeta.Invoke(invokeHeight, originTransaction, true, _, Some(scriptResult)) =>
           def extractLeases(sender: Address, result: InvokeScriptResult): Seq[LeaseInfo] =
             result.leases.collect {
               case lease if leaseIsActive(lease.id) =>

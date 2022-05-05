@@ -9,12 +9,24 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.AddressPortfolio
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
-import com.wavesplatform.database.{AddressId, DBExt, KeyTags, Keys, LevelDBWriter, openDB, readTransactionBytes, readTransactionHNSeqAndType}
-import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
+import com.wavesplatform.database.{
+  AddressId,
+  DBExt,
+  KeyTags,
+  Keys,
+  LevelDBWriter,
+  openDB,
+  readAccountScriptInfo,
+  readTransaction,
+  readTransactionHNSeqAndType
+}
+import com.wavesplatform.lang.script.ContractScript
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.settings.Constants
+import com.wavesplatform.state.diffs.{DiffsCommon, SetScriptTransactionDiff}
 import com.wavesplatform.state.{Blockchain, Diff, Height, Portfolio, TxNum}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.{Transaction, TransactionParsers}
+import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB
 
@@ -244,10 +256,7 @@ object Explorer extends ScorexLogging {
 
               for {
                 idx <- Try(Shorts.fromByteArray(k.slice(6, 8)))
-                tx = readTransactionBytes(entry.getValue) match {
-                  case (_, Left(legacyBytes)) => TransactionParsers.parseBytes(legacyBytes).get
-                  case (_, Right(newBytes))   => PBTransactions.vanilla(PBSignedTransaction.parseFrom(newBytes)).explicitGet()
-                }
+                (_, tx) = readTransaction(h)(entry.getValue)
               } txs.append((TxNum(idx), tx))
             }
           } finally iterator.close()
@@ -286,8 +295,26 @@ object Explorer extends ScorexLogging {
             txCounts(Longs.fromByteArray(e.getKey.slice(2, 10)).toInt) += readTransactionHNSeqAndType(e.getValue)._2.size
           }
           log.info("Sorting result")
-          txCounts.zipWithIndex.sorted.takeRight(100).foreach { case (count, id) =>
-            log.info(s"${db.get(Keys.idToAddress(AddressId(id.toLong)))}: $count")
+          txCounts.zipWithIndex.sorted.takeRight(100).foreach {
+            case (count, id) =>
+              log.info(s"${db.get(Keys.idToAddress(AddressId(id.toLong)))}: $count")
+          }
+        case "ES" =>
+          db.iterateOver(KeyTags.AddressScript) { e =>
+            val asi = readAccountScriptInfo(e.getValue)
+            val estimationResult = asi.script match {
+              case ContractScript.ContractScriptImpl(stdLibVersion, expr) =>
+                SetScriptTransactionDiff.estimate(reader, stdLibVersion, expr, checkOverflow = true)
+              case script: ExprScript =>
+                DiffsCommon.countVerifierComplexity(Some(script), reader, isAsset = false)
+              case _ => ???
+            }
+
+            estimationResult.left.foreach { error =>
+              val addressId = Longs.fromByteArray(e.getKey.drop(2).dropRight(4))
+              val address   = db.get(Keys.idToAddress(AddressId(addressId)))
+              log.info(s"$address: $error")
+            }
           }
 
       }

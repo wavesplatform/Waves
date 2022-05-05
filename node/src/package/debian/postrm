@@ -1,5 +1,4 @@
 ${{header}}
-${{detect-loader}}
 
 if [ "$1" = purge ]; then
     rm -rf /var/lib/${{app_name}}/data

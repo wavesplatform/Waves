@@ -112,6 +112,9 @@ object RxExtensionLoader extends ScorexLogging {
 
     def onNewSignatures(state: State, ch: Channel, sigs: Signatures): State = {
       state.loaderState match {
+        case LoaderState.ExpectingSignatures(c, _, _) if c.channel == ch && sigs.signatures.isEmpty =>
+          peerDatabase.blacklistAndClose(ch, s"Peer did not return any signatures and is likely on a fork")
+          syncNext(state.withIdleLoader)
         case LoaderState.ExpectingSignatures(c, known, _) if c.channel == ch =>
           val (_, unknown) = sigs.signatures.span(id => known.contains(id))
 
@@ -260,7 +263,8 @@ object RxExtensionLoader extends ScorexLogging {
         timeout: CancelableFuture[Unit]
     ) extends WithPeer {
       override def toString: String =
-        s"ExpectingBlocks($channel,totalBlocks=${allBlocks.size},received=${received.size},expected=${if (expected.size == 1) expected.head.trim else expected.size})"
+        s"ExpectingBlocks($channel,totalBlocks=${allBlocks.size},received=${received.size},expected=${if (expected.size == 1) expected.head.trim
+        else expected.size})"
     }
 
   }

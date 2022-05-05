@@ -49,7 +49,6 @@ object Keys {
   def sponsorshipAssets(height: Int): Key[Seq[IssuedAsset]] =
     Key(SponsoredAssets, h(height), d => readAssetIds(d).map(IssuedAsset), ias => writeAssetIds(ias.map(_.id)))
 
-
   def leaseBalanceHistory(addressId: AddressId): Key[Seq[Int]] = historyKey(LeaseBalanceHistory, addressId.toByteArray)
   def leaseBalance(addressId: AddressId)(height: Int): Key[LeaseBalance] =
     Key(LeaseBalance, hAddr(height, addressId), readLeaseBalance, writeLeaseBalance)
@@ -115,11 +114,11 @@ object Keys {
       unsupported("Can not explicitly write block bytes")
     )
 
-  def transactionAt(height: Height, n: TxNum): Key[Option[(Transaction, Boolean)]] =
-    Key.opt[(Transaction, Boolean)](
+  def transactionAt(height: Height, n: TxNum): Key[Option[(TxMeta, Transaction)]] =
+    Key.opt[(TxMeta, Transaction)](
       NthTransactionInfoAtHeight,
       hNum(height, n),
-      readTransaction,
+      readTransaction(height),
       writeTransaction
     )
 

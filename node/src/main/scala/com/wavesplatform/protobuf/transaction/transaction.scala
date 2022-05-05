@@ -1,5 +1,6 @@
 package com.wavesplatform.protobuf
 
+//noinspection TypeAnnotation
 package object transaction {
   type PBOrder = com.wavesplatform.protobuf.order.Order
   val PBOrder = com.wavesplatform.protobuf.order.Order

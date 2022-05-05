@@ -1,9 +1,7 @@
 package com.wavesplatform.state
 
-import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
-
-import cats.instances.map._
-import cats.kernel.Monoid
+import cats.implicits.catsSyntaxSemigroup
+import cats.kernel.Semigroup
 import cats.syntax.either._
 import cats.syntax.option._
 import com.wavesplatform.account.{Address, Alias}
@@ -29,6 +27,8 @@ import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceSt
 import kamon.Kamon
 import monix.reactive.subjects.ReplaySubject
 import monix.reactive.{Observable, Observer}
+
+import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
 class BlockchainUpdaterImpl(
     leveldb: Blockchain with Storage,
@@ -78,11 +78,14 @@ class BlockchainUpdaterImpl(
 
   def liquidBlock(id: ByteStr): Option[Block] = readLock(ngState.flatMap(_.totalDiffOf(id).map(_._1)))
 
-  def liquidTransactions(id: ByteStr): Option[Seq[(Transaction, Boolean)]] =
+  def liquidTransactions(id: ByteStr): Option[Seq[(TxMeta, Transaction)]] =
     readLock(
       ngState
         .flatMap(_.totalDiffOf(id))
-        .map { case (_, diff, _, _, _) => diff.transactions.values.toSeq.map(info => (info.transaction, info.applied)) }
+        .map {
+          case (_, diff, _, _, _) =>
+            diff.transactions.values.toSeq.map(info => (TxMeta(Height(height), info.applied, info.spentComplexity), info.transaction))
+        }
     )
 
   def liquidBlockMeta: Option[BlockMeta] =
@@ -309,10 +312,9 @@ class BlockchainUpdaterImpl(
 
                         val prevHitSource = ng.hitSource
 
-                        val liquidDiffWithCancelledLeases = ng.cancelExpiredLeases(referencedLiquidDiff)
-
-                        val referencedBlockchain =
-                          CompositeBlockchain(
+                        for {
+                          liquidDiffWithCancelledLeases <- ng.cancelExpiredLeases(referencedLiquidDiff).leftMap(GenericError(_))
+                          referencedBlockchain = CompositeBlockchain(
                             leveldb,
                             liquidDiffWithCancelledLeases,
                             referencedForgedBlock,
@@ -320,18 +322,16 @@ class BlockchainUpdaterImpl(
                             carry,
                             reward
                           )
-                        val maybeDiff = BlockDiffer
-                          .fromBlock(
-                            referencedBlockchain,
-                            Some(referencedForgedBlock),
-                            block,
-                            constraint,
-                            hitSource,
-                            verify
-                          )
-
-                        maybeDiff.map {
-                          differResult =>
+                          differResult <- BlockDiffer
+                            .fromBlock(
+                              referencedBlockchain,
+                              Some(referencedForgedBlock),
+                              block,
+                              constraint,
+                              hitSource,
+                              verify
+                            )
+                        } yield {
                             val tempBlockchain = CompositeBlockchain(
                               referencedBlockchain,
                               differResult.diff,
@@ -409,15 +409,15 @@ class BlockchainUpdaterImpl(
 
   private def cancelLeases(leaseTransactions: Seq[LeaseTransaction], height: Int): Map[ByteStr, Diff] =
     (for {
-      lt               <- leaseTransactions
-      (leaseHeight, _) <- transactionMeta(lt.id()).toSeq
-      recipient        <- leveldb.resolveAlias(lt.recipient).toSeq
-    } yield lt.id() -> Diff.empty.copy(
+      lt        <- leaseTransactions
+      ltMeta    <- transactionMeta(lt.id()).toSeq
+      recipient <- leveldb.resolveAlias(lt.recipient).toSeq
+    } yield lt.id() -> Diff(
       portfolios = Map(
-        lt.sender.toAddress -> Portfolio(0, LeaseBalance(0, -lt.amount), Map.empty),
-        recipient           -> Portfolio(0, LeaseBalance(-lt.amount, 0), Map.empty)
+        lt.sender.toAddress -> Portfolio(0, LeaseBalance(0, -lt.amount.value), Map.empty),
+        recipient           -> Portfolio(0, LeaseBalance(-lt.amount.value, 0), Map.empty)
       ),
-      leaseState = Map((lt.id(), LeaseDetails(lt.sender, lt.recipient, lt.amount, LeaseDetails.Status.Expired(height), lt.id(), leaseHeight)))
+      leaseState = Map((lt.id(), LeaseDetails(lt.sender, lt.recipient, lt.amount.value, LeaseDetails.Status.Expired(height), lt.id(), ltMeta.height)))
     )).toMap
 
   override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[(Block, ByteStr)]] = writeLock {
@@ -646,7 +646,7 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.transferById(id)
   }
 
-  override def transactionInfo(id: ByteStr): Option[(Int, Transaction, Boolean)] = readLock {
+  override def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)] = readLock {
     compositeBlockchain.transactionInfo(id)
   }
 
@@ -701,7 +701,7 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.hasData(acc)
   }
 
-  override def transactionMeta(id: ByteStr): Option[(Int, Boolean)] = readLock {
+  override def transactionMeta(id: ByteStr): Option[TxMeta] = readLock {
     compositeBlockchain.transactionMeta(id)
   }
 
@@ -734,7 +734,11 @@ class BlockchainUpdaterImpl(
 }
 
 object BlockchainUpdaterImpl {
-  private def diff(p1: Map[Address, Portfolio], p2: Map[Address, Portfolio]) = Monoid.combine(p1, p2.map { case (k, v) => k -> v.negate })
+  private implicit val portfolioDiffCombine: Semigroup[Portfolio] = (x: Portfolio, y: Portfolio) =>
+    Portfolio(x.balance + y.balance, LeaseBalance.empty, x.assets |+| y.assets)
+
+  private def diff(p1: Map[Address, Portfolio], p2: Map[Address, Portfolio]): Map[Address, Portfolio] =
+    p1 |+| p2.map { case (k, v) => k -> v.negate }
 
   private def displayFeatures(s: Set[Short]): String =
     s"FEATURE${if (s.size > 1) "S" else ""} ${s.mkString(", ")} ${if (s.size > 1) "have been" else "has been"}"

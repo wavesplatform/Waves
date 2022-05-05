@@ -1,12 +1,7 @@
 package com.wavesplatform.lang.v1.compiler
 
+import cats.implicits._
 import cats.{Id, Show}
-import cats.syntax.either._
-import cats.syntax.applicative._
-import cats.instances.list._
-import cats.syntax.traverse._
-import cats.instances.option._
-import cats.syntax.monadError._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.compiler.CompilationError._
 import com.wavesplatform.lang.v1.compiler.CompilerContext._
@@ -16,7 +11,18 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
-import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, CompositePattern, ConstsPat, MATCH_CASE, ObjPat, PART, Pos, TypedVar}
+import com.wavesplatform.lang.v1.parser.Expressions.{
+  BINARY_OP,
+  CompositePattern,
+  ConstsPat,
+  MATCH_CASE,
+  ObjPat,
+  PART,
+  Pos,
+  Single,
+  TuplePat,
+  TypedVar
+}
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.{BaseGlobal, ContractLimits, FunctionHeader}
@@ -101,10 +107,14 @@ object ExpressionCompiler {
     compileUntyped(adjustedDecls, ctx)
   }
 
-  private def compileExpr(expr: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL, Expressions.EXPR)] =
-    compileExprWithCtx(expr, allowIllFormedStrings = false).map(r => (r.expr, r.t, r.parseNodeExpr))
+  private def compileExpr(expr: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL, Expressions.EXPR, Iterable[CompilationError])] =
+    compileExprWithCtx(expr, allowIllFormedStrings = false).map(r => (r.expr, r.t, r.parseNodeExpr, r.errors))
 
-  private def compileExprWithCtx(expr: Expressions.EXPR, saveExprContext: Boolean = false, allowIllFormedStrings: Boolean): CompileM[CompilationStepResultExpr] = {
+  private def compileExprWithCtx(
+      expr: Expressions.EXPR,
+      saveExprContext: Boolean = false,
+      allowIllFormedStrings: Boolean
+  ): CompileM[CompilationStepResultExpr] = {
     get[Id, CompilerContext, CompilationError].flatMap { ctx =>
       def adjustByteStr(expr: Expressions.CONST_BYTESTR, b: ByteStr) =
         CONST_BYTESTR(b)
@@ -135,13 +145,15 @@ object ExpressionCompiler {
             List(Generic(x.position.start, x.position.end, x.message))
           ).pure[CompileM]
 
-        case Expressions.GETTER(p, ref, field, _, _)        => compileGetter(p, field, ref, saveExprContext, allowIllFormedStrings)
+        case Expressions.GETTER(p, ref, field, _, _, c)     => compileGetter(p, field, ref, saveExprContext, allowIllFormedStrings, c)
         case Expressions.BLOCK(p, dec, body, _, _)          => compileBlock(p, dec, body, saveExprContext, allowIllFormedStrings)
         case Expressions.IF(p, cond, ifTrue, ifFalse, _, _) => compileIf(p, cond, ifTrue, ifFalse, saveExprContext, allowIllFormedStrings)
         case Expressions.REF(p, key, _, _)                  => compileRef(p, key, saveExprContext)
         case Expressions.FUNCTION_CALL(p, name, args, _, _) => compileFunctionCall(p, name, args, saveExprContext, allowIllFormedStrings)
         case Expressions.MATCH(p, ex, cases, _, _)          => compileMatch(p, ex, cases.toList, saveExprContext, allowIllFormedStrings)
         case Expressions.FOLD(p, limit, list, acc, f, _, _) => compileFold(p, limit, list, acc, f.key)
+        case Expressions.GENERIC_FUNCTION_CALL(p, e, name, t, _, _) =>
+          compileGenericFunctionCall(p, e, name, t, saveExprContext, allowIllFormedStrings)
         case Expressions.BINARY_OP(p, a, op, b, _, _) =>
           op match {
             case AND_OP => compileIf(p, a, b, Expressions.FALSE(p), saveExprContext, allowIllFormedStrings)
@@ -275,7 +287,7 @@ object ExpressionCompiler {
       ifCasesWithErr <- inspectFlat[Id, CompilerContext, CompilationError, Expressions.EXPR](
         updatedCtx => {
           val ref = Expressions.REF(p, PART.VALID(p, refTmpKey), ctxOpt = saveExprContext.toOption(updatedCtx.getSimpleContext()))
-          mkIfCases(cases, matchTypes, ref, defaultType, allowShadowVarName).toCompileM
+          mkIfCases(cases, matchTypes, ref, defaultType, allowShadowVarName, updatedCtx).toCompileM
         }
       ).handleError()
       compiledMatch <- compileLetBlock(
@@ -330,7 +342,7 @@ object ExpressionCompiler {
 
   private def exprContainsRef(expr: Expressions.EXPR, ref: String): Boolean =
     expr match {
-      case Expressions.GETTER(_, expr, _, _, _) =>
+      case Expressions.GETTER(_, expr, _, _, _, _) =>
         exprContainsRef(expr, ref)
 
       case Expressions.BLOCK(_, decl, body, _, _) =>
@@ -550,13 +562,15 @@ object ExpressionCompiler {
       fieldPart: PART[String],
       refExpr: Expressions.EXPR,
       saveExprContext: Boolean,
-      allowIllFormedStrings: Boolean
+      allowIllFormedStrings: Boolean,
+      checkObjectType: Boolean
   ): CompileM[CompilationStepResultExpr] =
     for {
-      ctx           <- get[Id, CompilerContext, CompilationError]
-      fieldWithErr  <- handlePart(fieldPart).handleError()
-      compiledRef   <- compileExprWithCtx(refExpr, saveExprContext, allowIllFormedStrings)
-      getterWithErr <- mkGetter(p, ctx, compiledRef.t.typeList, fieldWithErr._1.getOrElse("NO_NAME"), compiledRef.expr).toCompileM.handleError()
+      ctx          <- get[Id, CompilerContext, CompilationError]
+      fieldWithErr <- handlePart(fieldPart).handleError()
+      compiledRef  <- compileExprWithCtx(refExpr, saveExprContext, allowIllFormedStrings)
+      getterWithErr <- mkGetter(p, ctx, compiledRef.t, fieldWithErr._1.getOrElse("NO_NAME"), compiledRef.expr, checkObjectType).toCompileM
+        .handleError()
 
       errorList     = fieldWithErr._2 ++ getterWithErr._2
       parseNodeExpr = Expressions.GETTER(p, compiledRef.parseNodeExpr, fieldPart, ctxOpt = saveExprContext.toOption(ctx.getSimpleContext()))
@@ -614,6 +628,21 @@ object ExpressionCompiler {
       }
     } yield result
 
+  private def compileGenericFunctionCall(
+      p: Pos,
+      e: Expressions.EXPR,
+      namePart: PART[String],
+      rawType: Expressions.Type,
+      saveExprContext: Boolean,
+      allowIllFormedStrings: Boolean
+  ): CompileM[CompilationStepResultExpr] =
+    for {
+      ctx         <- get[Id, CompilerContext, CompilationError]
+      name        <- handlePart(namePart)
+      handledType <- handleCompositeType(p, rawType, None, None)
+      handledExpr <- compileExprWithCtx(e, saveExprContext, allowIllFormedStrings)
+    } yield TypeCast(p, name, handledExpr, handledType)
+
   private def compileRef(p: Pos, keyPart: PART[String], saveExprContext: Boolean): CompileM[CompilationStepResultExpr] =
     for {
       keyWithErr <- handlePart(keyPart).handleError()
@@ -652,14 +681,14 @@ object ExpressionCompiler {
       func: PART[String]
   ): CompileM[CompilationStepResultExpr] =
     for {
-      (list, listType, _) <- compileExpr(list)
+      (list, listType, _, compileListErrors) <- compileExpr(list)
       listInnerType <- (listType match {
         case list: LIST => Right(list.innerType)
         case other      => Left(Generic(p.start, p.end, s"FOLD first argument should be List[T], but $other found"))
       }).toCompileM
-      (acc, accType, accRaw) <- compileExpr(acc)
-      funcName               <- handlePart(func)
-      ctx                    <- get[Id, CompilerContext, CompilationError]
+      (acc, accType, accRaw, compileAccErrors) <- compileExpr(acc)
+      funcName                                 <- handlePart(func)
+      ctx                                      <- get[Id, CompilerContext, CompilationError]
       function <- ctx
         .functionTypeSignaturesByName(funcName)
         .collectFirst {
@@ -672,8 +701,9 @@ object ExpressionCompiler {
           Left(Generic(p.start, p.end, s"Can't find suitable function $funcName(a: $accTypeStr, b: $listInnerTypeStr) for FOLD"))
         }
         .toCompileM
-      r <- Right(CompilerMacro.unwrapFold(limit, list, acc, function.header)).toCompileM
-    } yield CompilationStepResultExpr(ctx, r, function.args.head._2.asInstanceOf[FINAL], accRaw)
+      _ <- set[Id, CompilerContext, CompilationError](ctx.copy(foldIdx = ctx.foldIdx + 1))
+      r <- Right(CompilerMacro.unwrapFold(ctx.foldIdx, limit, list, acc, function.header)).toCompileM
+    } yield CompilationStepResultExpr(ctx, r, function.args.head._2.asInstanceOf[FINAL], accRaw, compileListErrors ++ compileAccErrors)
 
   private def matchFuncOverload(
       p: Pos,
@@ -711,18 +741,20 @@ object ExpressionCompiler {
       caseTypes: List[FINAL],
       refTmp: Expressions.REF,
       defaultType: FINAL,
-      allowShadowVarName: Option[String]
+      allowShadowVarName: Option[String],
+      ctx: CompilerContext
   ): Either[CompilationError, Expressions.EXPR] = {
 
-    def mkGet(path: Seq[PART[String]], ref: Expressions.EXPR, pos: Pos): Expressions.EXPR = {
-      path.foldRight(ref) { (field, exp) =>
-        Expressions.GETTER(pos, exp, field)
-      }
-    }
+    def resolveFieldType(p: Pos, field: String, t: Single): Either[CompilationError, Option[FINAL]] =
+      handleCompositeType(p, t, None, allowShadowVarName)
+        .run(ctx)
+        .value
+        ._2
+        .map(_.asInstanceOf[CASETYPEREF].fields.find(_._1 == field).map(_._2))
 
     def f(mc: MATCH_CASE, caseType: FINAL, further: Expressions.EXPR): Either[CompilationError, Expressions.EXPR] = {
-      val blockWithNewVar = mc.pattern match {
-        case TypedVar(None, _) | ConstsPat(_, _) => mc.expr
+      val blockWithNewVarE = mc.pattern match {
+        case TypedVar(None, _) | ConstsPat(_, _) => mc.expr.asRight[CompilationError]
         case TypedVar(Some(nv), _) =>
           val allowShadowing = nv match {
             case PART.VALID(_, x) => allowShadowVarName.contains(x)
@@ -736,115 +768,110 @@ object ExpressionCompiler {
               }
             case _ => caseType
           }
-          Expressions.BLOCK(mc.position, Expressions.LET(mc.position, nv, refTmp, Some(t), allowShadowing), mc.expr)
-        case (p: CompositePattern) =>
+          Expressions.BLOCK(mc.position, Expressions.LET(mc.position, nv, refTmp, Some(t), allowShadowing), mc.expr).asRight[CompilationError]
+        case p: CompositePattern =>
           val newRef = p.caseType.fold(refTmp)(t => refTmp.copy(resultType = Some(caseType)))
-          val expr = p.subpatterns.foldRight(mc.expr) { (pa, exp) =>
-            pa match {
-              case (TypedVar(Some(nv), t), path) =>
-                val accs = mkGet(path, newRef, nv.position)
-                val allowShadowing = nv match {
-                  case PART.VALID(_, x) => allowShadowVarName.contains(x)
-                  case _                => false
+          val exprE = p.subpatterns.foldRight(mc.expr.asRight[CompilationError]) { (pa, nextExprE) =>
+            (nextExprE, pa) match {
+              case (Right(nextExpr), (TypedVar(Some(nv), t), path)) =>
+                val (field, objType) = path.head
+                for {
+                  resolvedField     <- handlePart(field).run(ctx).value._2
+                  resolvedFieldType <- objType.flatTraverse(resolveFieldType(nv.position, resolvedField, _))
+                  typeFromContext   <- handleCompositeType(nv.position, t, None, allowShadowVarName).run(ctx).value._2
+                } yield {
+                  val resolvedType = resolvedFieldType.fold(typeFromContext)(t => UNION.reduce(UNION(t, typeFromContext)))
+                  val accs         = mkGet(path, newRef, nv.position)
+                  val allowShadowing = nv match {
+                    case PART.VALID(_, x) => allowShadowVarName.contains(x)
+                    case _                => false
+                  }
+                  Expressions.BLOCK(mc.position, Expressions.LET(nv.position, nv, accs, Some(resolvedType), allowShadowing), nextExpr)
                 }
-                Expressions.BLOCK(mc.position, Expressions.LET(nv.position, nv, accs, None, allowShadowing), exp)
-              case _ => exp
+              case _ => nextExprE
             }
           }
-          p.caseType.fold(expr)(_ => Expressions.BLOCK(p.position, Expressions.LET(p.position, newRef.key, newRef, Some(caseType), true), expr))
+          exprE.map(
+            expr =>
+              p.caseType.fold(expr) { _ =>
+                val let = Expressions.LET(p.position, newRef.key, newRef, Some(caseType), allowShadowing = true)
+                Expressions.BLOCK(p.position, let, expr)
+              }
+          )
       }
 
       def isInst(matchType: String): Expressions.EXPR =
         Expressions
           .FUNCTION_CALL(
             mc.position,
-            PART.VALID(mc.position, "_isInstanceOf"),
+            PART.VALID(mc.position, IsInstanceOf),
             List(refTmp, Expressions.CONST_STRING(mc.position, PART.VALID(mc.position, matchType)))
           )
 
-      (mc.pattern, caseType.unfold) match {
-        case (_: TypedVar, ANY)           => Right(blockWithNewVar)
-        case (_: TypedVar, UNION(Nil, _)) => Right(blockWithNewVar)
-        case (x: TypedVar, UNION(types, _)) =>
-          for {
-            cases <- types.map(_.name) match {
-              case hType :: tTypes =>
-                val typeIf =
-                  tTypes.foldLeft(isInst(hType))((other, matchType) => BINARY_OP(mc.position, isInst(matchType), BinaryOperation.OR_OP, other))
-                Right(Expressions.IF(mc.position, typeIf, blockWithNewVar, further))
-              case Nil => ???
-            }
-          } yield cases
-        case (_: TypedVar, t) =>
-          Right(Expressions.IF(mc.position, isInst(t.name), blockWithNewVar, further))
-
-        case (ConstsPat(consts, _), _) =>
-          val cond = consts
-            .map(c => BINARY_OP(mc.position, c, BinaryOperation.EQ_OP, refTmp))
-            .reduceRight((c, r) => BINARY_OP(mc.position, c, BinaryOperation.OR_OP, r))
-          Right(Expressions.IF(mc.position, cond, blockWithNewVar, further))
-
-        case (p: CompositePattern, _) =>
-          val pos    = p.position
-          val newRef = p.caseType.fold(refTmp)(t => refTmp.copy(resultType = Some(caseType)))
-          val conds = p.subpatterns collect {
-            case (pat @ TypedVar(_, Expressions.Union(types)), path) if types.nonEmpty =>
-              val pos = pat.position
-              val v   = mkGet(path, newRef, pos)
-              types map {
-                case Expressions.Single(t, None) =>
-                  Expressions.FUNCTION_CALL(pos, PART.VALID(pos, "_isInstanceOf"), List(v, Expressions.CONST_STRING(pos, t))): Expressions.EXPR
-                case Expressions.Single(PART.VALID(pos, "List"), Some(PART.VALID(_, Expressions.AnyType(_)))) =>
-                  Expressions.FUNCTION_CALL(
-                    pos,
-                    PART.VALID(pos, "_isInstanceOf"),
-                    List(v, Expressions.CONST_STRING(pos, PART.VALID(pos, "List[Any]")))
-                  ): Expressions.EXPR
-                case _ => ???
-              } reduceRight { (c, r) =>
-                BINARY_OP(pos, c, BinaryOperation.OR_OP, r): Expressions.EXPR
+      blockWithNewVarE.flatMap { blockWithNewVar =>
+        (mc.pattern, caseType.unfold) match {
+          case (_: TypedVar, ANY)           => Right(blockWithNewVar)
+          case (_: TypedVar, UNION(Nil, _)) => Right(blockWithNewVar)
+          case (_: TypedVar, UNION(types, _)) =>
+            for {
+              cases <- types.map(_.name) match {
+                case hType :: tTypes =>
+                  val typeIf =
+                    tTypes.foldLeft(isInst(hType))((other, matchType) => BINARY_OP(mc.position, isInst(matchType), BinaryOperation.OR_OP, other))
+                  Right(Expressions.IF(mc.position, typeIf, blockWithNewVar, further))
+                case Nil => ???
               }
-            case (pat @ TypedVar(_, Expressions.Single(PART.VALID(pos, "List"), Some(PART.VALID(_, Expressions.AnyType(_))))), path) =>
-              val pos = pat.position
-              val v   = mkGet(path, newRef, pos)
-              Expressions.FUNCTION_CALL(pos, PART.VALID(pos, "_isInstanceOf"), List(v, Expressions.CONST_STRING(pos, PART.VALID(pos, "List[Any]")))): Expressions.EXPR
-            case (pat @ TypedVar(_, Expressions.Single(t, None)), path) =>
-              val pos = pat.position
-              val v   = mkGet(path, newRef, pos)
-              Expressions.FUNCTION_CALL(pos, PART.VALID(pos, "_isInstanceOf"), List(v, Expressions.CONST_STRING(pos, t))): Expressions.EXPR
-            case (pat @ TypedVar(_, Expressions.Single(_, _)), _) => ???
-            case (pat @ ConstsPat(consts, pos), path) =>
-              val pos = pat.position
-              val v   = mkGet(path, newRef, pos)
-              consts map { c =>
-                BINARY_OP(pos, c, BinaryOperation.EQ_OP, v)
-              } reduceRight { (c, r) =>
-                BINARY_OP(pos, c, BinaryOperation.OR_OP, r)
+            } yield cases
+          case (_: TypedVar, t) =>
+            Right(Expressions.IF(mc.position, isInst(t.name), blockWithNewVar, further))
+
+          case (ConstsPat(consts, _), _) =>
+            val cond = consts
+              .map(c => BINARY_OP(mc.position, c, BinaryOperation.EQ_OP, refTmp))
+              .reduceRight((c, r) => BINARY_OP(mc.position, c, BinaryOperation.OR_OP, r))
+            Right(Expressions.IF(mc.position, cond, blockWithNewVar, further))
+
+          case (p: CompositePattern, _) =>
+            val pos        = p.position
+            val newRef     = p.caseType.fold(refTmp)(t => refTmp.copy(resultType = Some(caseType)))
+            val conditions = makeConditionsFromCompositePattern(p, newRef)
+            val cond = if (conditions.isEmpty) {
+              Expressions.TRUE(pos): Expressions.EXPR
+            } else {
+              conditions.reduceRight { (c, r) =>
+                BINARY_OP(pos, c, BinaryOperation.AND_OP, r): Expressions.EXPR
               }
-          }
-          val cond = if (conds.isEmpty) {
-            Expressions.TRUE(pos): Expressions.EXPR
-          } else {
-            conds.reduceRight { (c, r) =>
-              BINARY_OP(pos, c, BinaryOperation.AND_OP, r): Expressions.EXPR
             }
-          }
-          Right(
-            Expressions.IF(
-              mc.position,
-              p.caseType.fold(cond)(
-                t =>
-                  BINARY_OP(
-                    pos,
-                    Expressions.FUNCTION_CALL(pos, PART.VALID(pos, "_isInstanceOf"), List(refTmp, Expressions.CONST_STRING(pos, t.name))),
-                    BinaryOperation.AND_OP,
-                    Expressions.BLOCK(pos, Expressions.LET(pos, newRef.key, newRef, Some(caseType), true), cond)
-                  )
-              ),
-              blockWithNewVar,
-              further
+            val checkingCond =
+              if (p.isInstanceOf[TuplePat]) {
+                val (resolvedTypes, size) = resolveTypesFromCompositePattern(p)
+                if (p.patternsWithFields.size == size) {
+                  val typeChecks =
+                    resolvedTypes
+                      .map(t => Expressions.FUNCTION_CALL(pos, PART.VALID(pos, IsInstanceOf), List(refTmp, Expressions.CONST_STRING(pos, t))))
+                      .reduceLeft[Expressions.EXPR] { case (c, r) => BINARY_OP(pos, c, BinaryOperation.OR_OP, r) }
+                  BINARY_OP(pos, cond, BinaryOperation.AND_OP, typeChecks)
+                } else
+                  cond
+              } else
+                cond
+            Right(
+              Expressions.IF(
+                mc.position,
+                p.caseType.fold(checkingCond)(
+                  t =>
+                    BINARY_OP(
+                      pos,
+                      Expressions.FUNCTION_CALL(pos, PART.VALID(pos, IsInstanceOf), List(refTmp, Expressions.CONST_STRING(pos, t.name))),
+                      BinaryOperation.AND_OP,
+                      Expressions.BLOCK(pos, Expressions.LET(pos, newRef.key, newRef, Some(caseType), true), checkingCond)
+                    )
+                ),
+                blockWithNewVar,
+                further
+              )
             )
-          )
+        }
       }
     }
 
@@ -866,28 +893,123 @@ object ExpressionCompiler {
     }
   }
 
+  private def mkGet(path: Seq[(PART[String], Option[Single])], ref: Expressions.EXPR, pos: Pos): Expressions.EXPR =
+    path.map(_._1).foldRight(ref) { (field, exp) =>
+      Expressions.GETTER(pos, exp, field, checkObjectType = false)
+    }
+
+  private def makeConditionsFromCompositePattern(p: CompositePattern, newRef: Expressions.REF): Seq[Expressions.EXPR] =
+    p.subpatterns collect {
+      case (pat @ TypedVar(_, Expressions.Union(types)), path) if types.nonEmpty =>
+        val pos = pat.position
+        val v   = mkGet(path, newRef, pos)
+        types
+          .map {
+            case Expressions.Single(t, None) =>
+              Expressions.FUNCTION_CALL(pos, PART.VALID(pos, IsInstanceOf), List(v, Expressions.CONST_STRING(pos, t))): Expressions.EXPR
+            case Expressions.Single(PART.VALID(pos, "List"), Some(PART.VALID(_, Expressions.AnyType(_)))) =>
+              val t = PART.VALID(pos, "List[Any]")
+              Expressions.FUNCTION_CALL(
+                pos,
+                PART.VALID(pos, IsInstanceOf),
+                List(v, Expressions.CONST_STRING(pos, t))
+              ): Expressions.EXPR
+            case _ => ???
+          }
+          .reduceRight[Expressions.EXPR] { (c, r) =>
+            BINARY_OP(pos, c, BinaryOperation.OR_OP, r)
+          }
+      case (pat @ TypedVar(_, Expressions.Single(PART.VALID(_, "List"), Some(PART.VALID(_, Expressions.AnyType(_))))), path) =>
+        val pos = pat.position
+        val v   = mkGet(path, newRef, pos)
+        val t   = PART.VALID(pos, "List[Any]")
+        Expressions.FUNCTION_CALL(pos, PART.VALID(pos, IsInstanceOf), List(v, Expressions.CONST_STRING(pos, t))): Expressions.EXPR
+      case (pat @ TypedVar(_, Expressions.Single(t, None)), path) =>
+        val pos = pat.position
+        val v   = mkGet(path, newRef, pos)
+        Expressions.FUNCTION_CALL(pos, PART.VALID(pos, IsInstanceOf), List(v, Expressions.CONST_STRING(pos, t))): Expressions.EXPR
+      case (TypedVar(_, Expressions.Single(_, _)), _) => ???
+      case (pat @ ConstsPat(consts, _), path) =>
+        val pos = pat.position
+        val v   = mkGet(path, newRef, pos)
+        consts
+          .map { c =>
+            BINARY_OP(pos, c, BinaryOperation.EQ_OP, v)
+          }
+          .reduceRight[BINARY_OP] { (c, r) =>
+            BINARY_OP(pos, c, BinaryOperation.OR_OP, r)
+          }
+    }
+
+  private def resolveTypesFromCompositePattern(p: CompositePattern): (Seq[PART[String]], Int) = {
+    val rawTypes = p.patternsWithFields.collect {
+      case (_, TypedVar(_, Expressions.Union(types))) if types.nonEmpty =>
+        types
+          .map {
+            case Expressions.Single(t, None) =>
+              List(t)
+            case Expressions.Single(PART.VALID(pos, "List"), Some(PART.VALID(_, Expressions.AnyType(_)))) =>
+              val t = PART.VALID(pos, "List[Any]")
+              List(t)
+            case _ => ???
+          }
+          .reduceRight[Seq[PART[String]]] { (ct, rt) =>
+            rt ++ ct
+          }
+      case (_, pat @ TypedVar(_, Expressions.Single(PART.VALID(_, "List"), Some(PART.VALID(_, Expressions.AnyType(_)))))) =>
+        val pos = pat.position
+        val t   = PART.VALID(pos, "List[Any]")
+        List(t)
+      case (_, TypedVar(_, Expressions.Single(t, None))) =>
+        List(t)
+      case (_, TypedVar(_, Expressions.Single(_, _))) => ???
+      case (_, pat @ ConstsPat(consts, _)) =>
+        val pos = pat.position
+        consts
+          .map { c =>
+            val t = c match {
+              case e: Expressions.INVALID => PART.INVALID(pos, e.message)
+              case a                      => a.resultType.map(t => PART.VALID(pos, t.name)).getOrElse(PART.VALID(pos, "Any"))
+            }
+            List(t)
+          }
+          .reduceRight[Seq[PART[String]]] { (ct, rt) =>
+            rt ++ ct
+          }
+      case (_, c: TuplePat) =>
+        resolveTypesFromCompositePattern(c)._1
+      case (_, c: ObjPat) =>
+        Seq(c.objType.name)
+    }
+    val resolvedType =
+      regroup(rawTypes).map {
+        _.toList
+          .traverse {
+            case PART.VALID(_, v) => Right(v)
+            case invalid          => Left(invalid)
+          }
+          .fold(identity, types => PART.VALID(p.position, if (types.size == 1) types.head else types.mkString("(", ", ", ")")))
+      }.distinct
+    (resolvedType, rawTypes.size)
+  }
+
   private def mkGetter(
       p: Pos,
       ctx: CompilerContext,
-      types: List[FINAL],
+      objectType: FINAL,
       fieldName: String,
-      expr: EXPR
+      expr: EXPR,
+      checkObjectType: Boolean
   ): Either[CompilationError, (CompilerContext, GETTER, FINAL)] = {
-
-    lazy val errMsg =
-      if (types.length == 1) types.head.toString
-      else s"""Union(${types.mkString("|")})"""
-
     lazy val err =
-      FieldNotFound(p.start, p.end, fieldName, errMsg)
+      FieldNotFound(p.start, p.end, fieldName, objectType.name)
         .asLeft[(CompilerContext, GETTER, FINAL)]
 
     val getter = GETTER(expr, fieldName)
-
-    types
+    objectType.typeList
       .traverse(_.fields.find(_._1 == fieldName).map(_._2))
       .map(TypeInferrer.findCommonType)
-      .fold(err)(t => Right((ctx, getter, t)))
+      .fold(err)(t => if (t == NOTHING && checkObjectType) err else Right((ctx, getter, t)))
   }
 
   private def handleCompositeType(

@@ -1,21 +1,17 @@
 package com.wavesplatform.state.diffs.ci
 
-import com.wavesplatform.TestTime
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{DBCacheSettings, WithDomain}
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test._
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
-import org.scalamock.scalatest.MockFactory
 import org.scalatest.{EitherValues, Inside}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
@@ -24,13 +20,9 @@ class InvokeActionsAvailabilityTest
     with ScalaCheckPropertyChecks
     with Inside
     with DBCacheSettings
-    with MockFactory
     with WithDomain
     with EitherValues {
   import DomainPresets._
-
-  private val time = new TestTime
-  private def ts   = time.getTimestamp()
 
   private val transferAmount       = 100
   private val issueAmount          = 200
@@ -108,43 +100,39 @@ class InvokeActionsAvailabilityTest
 
   private val paymentAmount = 12345
 
-  private val scenario =
-    for {
-      invoker     <- accountGen
-      callingDApp <- accountGen
-      proxyDApp   <- accountGen
-      fee         <- ciFee(nonNftIssue = 1)
-      gTx1     = GenesisTransaction.create(callingDApp.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx2     = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, ts).explicitGet()
-      gTx3     = GenesisTransaction.create(proxyDApp.toAddress, ENOUGH_AMT, ts).explicitGet()
-      issue    = IssueTransaction.selfSigned(2.toByte, invoker, "name", "description", ENOUGH_AMT, 1, true, None, fee, ts).explicitGet()
-      ssTx     = SetScriptTransaction.selfSigned(1.toByte, callingDApp, Some(callingDAppScript), fee, ts).explicitGet()
-      ssTx2    = SetScriptTransaction.selfSigned(1.toByte, proxyDApp, Some(proxyDAppScript(callingDApp.toAddress)), fee, ts).explicitGet()
-      asset    = IssuedAsset(issue.id.value())
-      payments = Seq(Payment(paymentAmount, asset))
-      invoke   = InvokeScriptTransaction.selfSigned(TxVersion.V3, invoker, proxyDApp.toAddress, None, payments, fee, Waves, ts).explicitGet()
-    } yield (Seq(gTx1, gTx2, gTx3, ssTx, ssTx2, issue), invoke, proxyDApp.toAddress, callingDApp.toAddress)
-
   property("actions availability in sync call") {
-    val (preparingTxs, invoke, proxyDApp, callingDApp) = scenario.sample.get
-    withDomain(RideV5) { d =>
+    val invoker     = TxHelpers.signer(0)
+    val callingDApp = TxHelpers.signer(1)
+    val proxyDApp   = TxHelpers.signer(2)
+
+    val balances = AddrWithBalance.enoughBalances(invoker, callingDApp, proxyDApp)
+
+    val issue                = TxHelpers.issue(invoker, ENOUGH_AMT)
+    val setScriptCallingDApp = TxHelpers.setScript(callingDApp, callingDAppScript)
+    val setScriptProxyDApp   = TxHelpers.setScript(proxyDApp, proxyDAppScript(callingDApp.toAddress))
+    val asset                = IssuedAsset(issue.id.value())
+    val payments             = Seq(Payment(paymentAmount, asset))
+    val preparingTxs         = Seq(issue, setScriptCallingDApp, setScriptProxyDApp)
+    val invoke               = TxHelpers.invoke(proxyDApp.toAddress, func = None, invoker = invoker, payments = payments, fee = 1.005.waves)
+
+    withDomain(RideV5, balances) { d =>
       d.appendBlock(preparingTxs: _*)
 
-      val startProxyDAppBalance   = d.blockchain.balance(proxyDApp)
-      val startCallingDAppBalance = d.blockchain.balance(callingDApp)
+      val startProxyDAppBalance   = d.blockchain.balance(proxyDApp.toAddress)
+      val startCallingDAppBalance = d.blockchain.balance(callingDApp.toAddress)
 
       d.appendBlock(invoke)
-      d.blockchain.transactionInfo(invoke.id.value()).get._3 shouldBe true
+      d.blockchain.transactionSucceeded(invoke.id.value()) shouldBe true
 
-      d.blockchain.accountData(callingDApp, "key").get.value shouldBe "value"
-      d.blockchain.balance(proxyDApp) shouldBe startProxyDAppBalance + transferAmount
-      d.blockchain.balance(callingDApp) shouldBe startCallingDAppBalance - transferAmount
+      d.blockchain.accountData(callingDApp.toAddress, "key").get.value shouldBe "value"
+      d.blockchain.balance(proxyDApp.toAddress) shouldBe startProxyDAppBalance + transferAmount
+      d.blockchain.balance(callingDApp.toAddress) shouldBe startCallingDAppBalance - transferAmount
 
-      val asset = d.blockchain.accountData(callingDApp, "assetId").get.value.asInstanceOf[ByteStr]
-      d.blockchain.balance(callingDApp, IssuedAsset(asset)) shouldBe issueAmount + reissueAmount - burnAmount
+      val asset = d.blockchain.accountData(callingDApp.toAddress, "assetId").get.value.asInstanceOf[ByteStr]
+      d.blockchain.balance(callingDApp.toAddress, IssuedAsset(asset)) shouldBe issueAmount + reissueAmount - burnAmount
 
-      d.blockchain.effectiveBalance(callingDApp, 0) shouldBe startCallingDAppBalance - transferAmount - leaseAmount
-      d.blockchain.effectiveBalance(proxyDApp, 0) shouldBe startProxyDAppBalance + transferAmount + leaseAmount
+      d.blockchain.effectiveBalance(callingDApp.toAddress, 0) shouldBe startCallingDAppBalance - transferAmount - leaseAmount
+      d.blockchain.effectiveBalance(proxyDApp.toAddress, 0) shouldBe startProxyDAppBalance + transferAmount + leaseAmount
     }
   }
 }

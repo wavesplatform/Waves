@@ -18,6 +18,9 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.utils._
 import play.api.libs.json._
+import PBInvokeScriptResult.Call.Argument
+import PBInvokeScriptResult.Call.Argument.Value
+import com.wavesplatform.lang.v1.compiler.{Terms, Types}
 
 final case class InvokeScriptResult(
     data: Seq[R.DataEntry] = Nil,
@@ -181,7 +184,7 @@ object InvokeScriptResult {
       case ScriptResultV3(ds, ts, _) =>
         InvokeScriptResult(data = ds.map(DataEntry.fromLangDataOp), transfers = ts.map(langTransferToPayment))
 
-      case ScriptResultV4(actions, _, ret) =>
+      case ScriptResultV4(actions, _, _) =>
         // XXX need return value processing
         val issues       = actions.collect { case i: lang.Issue         => i }
         val reissues     = actions.collect { case ri: lang.Reissue      => ri }
@@ -191,13 +194,18 @@ object InvokeScriptResult {
         val transfers    = actions.collect { case t: lang.AssetTransfer => langTransferToPayment(t) }
         val leases       = actions.collect { case l: lang.Lease         => langLeaseToLease(l) }
         val leaseCancels = actions.collect { case l: lang.LeaseCancel   => l }
-        val invokes     = result.invokes.map {
-          case (dApp, fname, args, payments, r) => Invocation(langAddressToAddress(dApp), Call(fname, args), (payments.map { case CaseObj(t, fields) =>
-            ((fields("assetId"), fields("amount")): @unchecked) match {
+        val invokes = result.invokes.map {
+          case (dApp, fname, args, payments, r) =>
+            Invocation(
+              langAddressToAddress(dApp),
+              Call(fname, args),
+              payments.map {
+                case CaseObj(_, fields) =>
+                  ((fields("assetId"), fields("amount")): @unchecked) match {
                     case (CONST_BYTESTR(b), CONST_LONG(a)) => InvokeScriptResult.AttachedPayment(IssuedAsset(b), a)
                     case (_, CONST_LONG(a))                => InvokeScriptResult.AttachedPayment(Waves, a)
                   }
-              }),
+              },
               fromLangResult(invokeId, r)
             )
         }
@@ -207,8 +215,25 @@ object InvokeScriptResult {
     }
   }
 
+  import com.wavesplatform.protobuf.transaction.{InvokeScriptResult => PBISR}
+
+  def rideExprToPB(arg: Terms.EXPR): PBISR.Call.Argument.Value = {
+    import PBISR.Call.Argument.Value
+
+    arg match {
+      case Terms.CONST_LONG(t)     => Value.IntegerValue(t)
+      case bs: Terms.CONST_BYTESTR => Value.BinaryValue(bs.bs.toByteString)
+      case str: Terms.CONST_STRING => Value.StringValue(str.s)
+      case Terms.CONST_BOOLEAN(b)  => Value.BooleanValue(b)
+      case Terms.ARR(xs)           => Value.List(Argument.List(xs.map(x => Argument(rideExprToPB(x)))))
+      case caseObj: Terms.CaseObj  => Value.CaseObj(ByteString.copyFrom(Serde.serialize(caseObj, allowObjects = true)))
+      case _                       => Value.Empty
+    }
+  }
+
   private def toPbCall(c: Call): PBInvokeScriptResult.Call = {
-    PBInvokeScriptResult.Call(c.function, c.args.map(b => ByteString.copyFrom(Serde.serialize(b, true))))
+    // argsBytes = c.args.map(b => ByteString.copyFrom(Serde.serialize(b, true)))
+    PBInvokeScriptResult.Call(c.function, args = c.args.map(a => PBISR.Call.Argument(rideExprToPB(a))))
   }
 
   private def toPbInvocation(i: Invocation) = {
@@ -253,7 +278,29 @@ object InvokeScriptResult {
     PBInvokeScriptResult.ErrorMessage(em.code, em.text)
 
   private def toVanillaCall(i: PBInvokeScriptResult.Call): Call = {
-    Call(i.function, i.args.map(a => Serde.deserialize(a.toByteArray, true, true).explicitGet()._1.asInstanceOf[EVALUATED]))
+    import com.wavesplatform.lang.v1.compiler.Terms
+
+    def toVanillaTerm(v: Argument.Value): Terms.EVALUATED =
+      v match {
+        case Value.IntegerValue(value) => Terms.CONST_LONG(value)
+        case Value.BinaryValue(value)  => Terms.CONST_BYTESTR(value.toByteStr).explicitGet()
+        case Value.StringValue(value)  => Terms.CONST_STRING(value).explicitGet()
+        case Value.BooleanValue(value) => Terms.CONST_BOOLEAN(value)
+        case Value.List(value)         => Terms.ARR(value.items.map(a => toVanillaTerm(a.value)).toVector, limited = true).explicitGet()
+        case Value.CaseObj(bytes) =>
+          Serde
+            .deserialize(bytes.toByteArray, allowObjects = true)
+            .toOption
+            .collect { case (obj: CaseObj, _) => obj }
+            .getOrElse(Terms.CaseObj(Types.UNIT, Map.empty))
+        case _ => Terms.CaseObj(Types.UNIT, Map.empty)
+      }
+
+    val args = if (i.argsBytes.nonEmpty) i.argsBytes.map { bytes =>
+      val (value, _) = Serde.deserialize(bytes.toByteArray, allowObjects = true).explicitGet()
+      value.asInstanceOf[EVALUATED]
+    } else i.args.map(a => toVanillaTerm(a.value))
+    Call(i.function, args)
   }
 
   private def toVanillaInvocation(i: PBInvokeScriptResult.Invocation): Invocation = {

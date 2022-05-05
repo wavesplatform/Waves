@@ -10,7 +10,6 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.testing.TypedScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import com.wavesplatform.lang.{Global, utils}
@@ -20,7 +19,7 @@ import com.wavesplatform.transaction.smart.WavesEnvironment
 import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
 
-class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with TypedScriptGen {
+class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec {
   private val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, null, DirectiveSet.contractDirectiveSet, ByteStr.empty)
 
   private def estimate(expr: EXPR, ctx: CTX[Environment], funcCosts: Map[FunctionHeader, Coeval[Long]]): Either[String, Long] = {
@@ -32,13 +31,14 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(V1, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V1, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, V1).withEnvironment[Environment],
           WavesContext.build(
             Global,
             DirectiveSet(V1, Account, Expression).explicitGet()
           )
-        ))
+        )
+      )
   }
   private val funcCostsV1 = utils.functionCosts(V1)
 
@@ -97,13 +97,14 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(V2, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V2, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, V2).withEnvironment[Environment],
           WavesContext.build(
             Global,
             DirectiveSet(V2, Account, Expression).explicitGet()
           )
-        ))
+        )
+      )
   }
   private val funcCostsV2 = utils.functionCosts(V2)
 
@@ -162,13 +163,14 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(V3, fixUnicodeFunctions = true).withEnvironment[Environment],
+          PureContext.build(V3, fixUnicodeFunctions = true, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, V3).withEnvironment[Environment],
           WavesContext.build(
             Global,
             DirectiveSet(V3, Account, Expression).explicitGet()
           )
-        ))
+        )
+      )
   }
   private val funcCostsV3 = utils.functionCosts(V3)
 

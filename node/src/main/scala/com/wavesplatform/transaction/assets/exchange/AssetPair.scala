@@ -11,10 +11,9 @@ import play.api.libs.json.{JsObject, Json}
 
 import scala.util.{Failure, Success, Try}
 
-
 case class AssetPair(
-     amountAsset: Asset,
-     priceAsset: Asset
+    amountAsset: Asset,
+    priceAsset: Asset
 ) {
   import AssetPair._
 

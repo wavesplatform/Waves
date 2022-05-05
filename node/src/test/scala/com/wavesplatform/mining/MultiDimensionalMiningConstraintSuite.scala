@@ -15,7 +15,10 @@ class MultiDimensionalMiningConstraintSuite extends FreeSpec with PathMockFactor
         if isLeft || isRight
         leftMaxSize  <- if (isLeft) Gen.const(0) else Gen.chooseNum(1, Int.MaxValue)
         rightMaxSize <- if (isRight) Gen.const(0) else Gen.chooseNum(1, Int.MaxValue)
-      } yield MultiDimensionalMiningConstraint(createConstConstraint(leftMaxSize, 1, "leftMaxSize"), createConstConstraint(rightMaxSize, 1, "rightMaxSize"))
+      } yield MultiDimensionalMiningConstraint(
+        createConstConstraint(leftMaxSize, 1, "leftMaxSize"),
+        createConstConstraint(rightMaxSize, 1, "rightMaxSize")
+      )
 
       "should be true if one dimension is full" in forAll(emptyConstraintGen) { constraint =>
         constraint.isFull shouldBe true
@@ -25,7 +28,10 @@ class MultiDimensionalMiningConstraintSuite extends FreeSpec with PathMockFactor
       val nonEmptyConstraintGen: Gen[MultiDimensionalMiningConstraint] = for {
         leftMaxSize  <- Gen.chooseNum(1, Int.MaxValue)
         rightMaxSize <- Gen.chooseNum(1, Int.MaxValue)
-      } yield MultiDimensionalMiningConstraint(createConstConstraint(leftMaxSize, 1, "leftMaxSize"), createConstConstraint(rightMaxSize, 1, "rightMaxSize"))
+      } yield MultiDimensionalMiningConstraint(
+        createConstConstraint(leftMaxSize, 1, "leftMaxSize"),
+        createConstConstraint(rightMaxSize, 1, "rightMaxSize")
+      )
 
       "should be false is both of two dimensions are not full" in forAll(nonEmptyConstraintGen) { constraint =>
         constraint.isFull should not be true
@@ -38,8 +44,9 @@ class MultiDimensionalMiningConstraintSuite extends FreeSpec with PathMockFactor
     }
   }
 
-  private def tests(estimator: Int => MiningConstraint)(
-      fold: (MultiDimensionalMiningConstraint, Seq[Transaction]) => MultiDimensionalMiningConstraint): Unit = {
+  private def tests(
+      estimator: Int => MiningConstraint
+  )(fold: (MultiDimensionalMiningConstraint, Seq[Transaction]) => MultiDimensionalMiningConstraint): Unit = {
     "should return None if the operation is unsuccessful for one of dimensions" - {
       val noOverfillGen: Gen[MultiDimensionalMiningConstraint] = for {
         commonLimit <- Gen.chooseNum(1, 5)

@@ -24,11 +24,11 @@ object BaseTargetChecker {
       .withFallback(defaultReference())
       .resolve()
 
-    val settings          = WavesSettings.fromRootConfig(sharedConfig)
-    val db                = openDB("/tmp/tmp-db")
-    val ntpTime           = new NTP("ntp.pool.org")
+    val settings               = WavesSettings.fromRootConfig(sharedConfig)
+    val db                     = openDB("/tmp/tmp-db")
+    val ntpTime                = new NTP("ntp.pool.org")
     val (blockchainUpdater, _) = StorageFactory(settings, db, ntpTime, Observer.empty, BlockchainUpdateTriggers.noop)
-    val poSSelector       = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTargetOpt)
+    val poSSelector            = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
 
     try {
       val genesisBlock = Block.genesis(settings.blockchainSettings.genesisSettings).explicitGet()
@@ -37,8 +37,8 @@ object BaseTargetChecker {
       NodeConfigs.Default.map(_.withFallback(sharedConfig)).collect {
         case cfg if cfg.as[Boolean]("waves.miner.enable") =>
           val account = KeyPair.fromSeed(cfg.getString("account-seed")).explicitGet()
-          val address   = account.toAddress
-          val balance   = blockchainUpdater.balance(address, Waves)
+          val address = account.toAddress
+          val balance = blockchainUpdater.balance(address, Waves)
           val timeDelay = poSSelector
             .getValidBlockDelay(blockchainUpdater.height, account, genesisBlock.header.baseTarget, balance)
             .explicitGet()

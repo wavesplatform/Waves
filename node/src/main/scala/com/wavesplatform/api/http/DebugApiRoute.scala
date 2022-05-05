@@ -8,7 +8,6 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.Source
-import cats.kernel.Monoid
 import cats.syntax.either._
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.account.Address
@@ -26,8 +25,8 @@ import com.wavesplatform.state.{Blockchain, Height, LeaseBalance, NG, Portfolio,
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidRequestSignature}
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -80,7 +79,7 @@ case class DebugApiRoute(
 
   override lazy val route: Route = pathPrefix("debug") {
     stateChanges ~ balanceHistory ~ stateHash ~ validate ~ withAuth {
-      state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ configInfo ~ print
+      state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ minerInfo ~ configInfo ~ print
     }
   }
 
@@ -89,18 +88,6 @@ case class DebugApiRoute(
       log.debug(params.message.take(250))
       ""
     })
-
-  def portfolios: Route = path("portfolios" / AddrSegment) { address =>
-    (get & parameter("considerUnspent".as[Boolean].?)) { considerUnspent =>
-      extractScheduler { implicit s =>
-        complete(accountsApi.portfolio(address).toListL.runToFuture.map { assetList =>
-          val bd   = accountsApi.balanceDetails(address)
-          val base = Portfolio(bd.regular, LeaseBalance(bd.leaseIn, bd.leaseOut), assetList.toMap)
-          if (considerUnspent.getOrElse(true)) Monoid.combine(base, utxStorage.pessimisticPortfolio(address)) else base
-        })
-      }
-    }
-  }
 
   def balanceHistory: Route = (path("balances" / "history" / AddrSegment) & get) { address =>
     complete(Json.toJson(loadBalanceHistory(address).map {
@@ -246,21 +233,25 @@ case class DebugApiRoute(
       val transactionJson = parsedTransaction.fold(_ => jsv, _.json())
 
       val serializer = tracedDiff.resultE
-        .fold(_ => this.serializer, { case (_, diff) =>
-          val compositeBlockchain = CompositeBlockchain(blockchain, diff)
-          this.serializer.copy(blockchain = compositeBlockchain)
+        .fold(_ => this.serializer, {
+          case (_, diff) =>
+            val compositeBlockchain = CompositeBlockchain(blockchain, diff)
+            this.serializer.copy(blockchain = compositeBlockchain)
         })
 
       val extendedJson = tracedDiff.resultE
-        .fold(_ => jsv, { case (tx, diff) =>
-          val meta = tx match {
-            case ist: InvokeScriptTransaction =>
-              val result = diff.scriptResults.get(ist.id())
-              TransactionMeta.Invoke(Height(blockchain.height), ist, succeeded = true, result)
-            case tx => TransactionMeta.Default(Height(blockchain.height), tx, succeeded = true)
+        .fold(
+          _ => jsv, {
+            case (tx, diff) =>
+              val meta = tx match {
+                case ist: InvokeScriptTransaction =>
+                  val result = diff.scriptResults.get(ist.id())
+                  TransactionMeta.Invoke(Height(blockchain.height), ist, succeeded = true, diff.scriptsComplexity, result)
+                case tx => TransactionMeta.Default(Height(blockchain.height), tx, succeeded = true, diff.scriptsComplexity)
+              }
+              serializer.transactionWithMetaJson(meta)
           }
-          serializer.transactionWithMetaJson(meta)
-        })
+        )
 
       val response = Json.obj(
         "valid"          -> error.isEmpty,
@@ -295,13 +286,14 @@ case class DebugApiRoute(
             implicit val ss: JsonEntityStreamingSupport = EntityStreamingSupport.json()
 
             Source
-              .fromPublisher(
+              .future(
                 transactionsApi
                   .transactionsByAddress(address, None, Set.empty, afterOpt)
                   .take(limit)
-                  .map(Json.toJsObject(_))
-                  .toReactivePublisher
+                  .toListL
+                  .runToFuture
               )
+              .mapConcat(_.map(Json.toJsObject(_)))
           }
         }
       }

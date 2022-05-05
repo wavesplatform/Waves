@@ -13,11 +13,10 @@ import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._
-import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import play.api.libs.json._
 
-import scala.util.{Failure, Try}
+import scala.util.Try
 
 case class BlockHeader(
     version: Byte,
@@ -70,10 +69,10 @@ case class Block(
 
   override def toString: String =
     s"Block(${id()},${header.reference},${header.generator.toAddress}," +
-      s"${header.timestamp},${header.featureVotes.mkString("[",",","]")}${if (header.rewardVote >= 0) s",${header.rewardVote}" else ""})"
+      s"${header.timestamp},${header.featureVotes.mkString("[", ",", "]")}${if (header.rewardVote >= 0) s",${header.rewardVote}" else ""})"
 }
 
-object Block extends ScorexLogging {
+object Block {
   def idFromHeader(h: BlockHeader, signature: ByteStr): ByteStr =
     if (h.version >= ProtoBlockVersion) protoHeaderHash(h)
     else signature
@@ -127,17 +126,13 @@ object Block extends ScorexLogging {
       featureVotes: Seq[Short],
       rewardVote: Long
   ): Either[GenericError, Block] =
-    create(version, timestamp, reference, baseTarget, generationSignature, signer.publicKey, featureVotes, rewardVote, txs).validate.map(_.sign(signer.privateKey))
+    create(version, timestamp, reference, baseTarget, generationSignature, signer.publicKey, featureVotes, rewardVote, txs).validate
+      .map(_.sign(signer.privateKey))
 
   def parseBytes(bytes: Array[Byte]): Try[Block] =
     BlockSerializer
       .parseBytes(bytes)
       .flatMap(_.validateToTry)
-      .recoverWith {
-        case t: Throwable =>
-          log.error("Error when parsing block", t)
-          Failure(t)
-      }
 
   def genesis(genesisSettings: GenesisSettings): Either[ValidationError, Block] = {
     import cats.instances.either._
@@ -153,7 +148,17 @@ object Block extends ScorexLogging {
       }.sequence
       baseTarget = genesisSettings.initialBaseTarget
       timestamp  = genesisSettings.blockTimestamp
-      block      = create(GenesisBlockVersion, timestamp, GenesisReference, baseTarget, GenesisGenerationSignature, GenesisGenerator.publicKey, Seq(), -1L, txs)
+      block = create(
+        GenesisBlockVersion,
+        timestamp,
+        GenesisReference,
+        baseTarget,
+        GenesisGenerationSignature,
+        GenesisGenerator.publicKey,
+        Seq(),
+        -1L,
+        txs
+      )
       signedBlock = genesisSettings.signature match {
         case None             => block.sign(GenesisGenerator.privateKey)
         case Some(predefined) => block.copy(signature = predefined)

@@ -1,6 +1,5 @@
 package com.wavesplatform.http
 
-import scala.concurrent.duration._
 import akka.http.scaladsl.testkit.RouteTestTimeout
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.PublicKey
@@ -17,29 +16,32 @@ import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.directives.values.{V2, V3}
-import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.{FunctionHeader, Serde}
+import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.{FunctionHeader, Serde}
 import com.wavesplatform.protobuf.dapp.DAppMeta
-import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
-import com.wavesplatform.state.{AccountScriptInfo, Blockchain, IntegerDataEntry}
+import com.wavesplatform.protobuf.dapp.DAppMeta.{CallableFuncSignature, CompactNameAndOriginalNamePair}
 import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.state.{AccountScriptInfo, Blockchain, IntegerDataEntry, LeaseBalance}
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.utils.{Schedulers, Time}
 import io.netty.util.HashedWheelTimer
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
+import org.scalatest.Inside
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
 
-class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks with PathMockFactory {
-  implicit val routeTestTimeout = RouteTestTimeout(10.seconds)
-  implicit val timeout          = routeTestTimeout.duration
+import scala.concurrent.duration._
+
+class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks with PathMockFactory with Inside {
+  implicit val routeTestTimeout: RouteTestTimeout = RouteTestTimeout(10.seconds)
+  implicit val timeout: FiniteDuration            = routeTestTimeout.duration
 
   private val estimator = ScriptEstimatorV2
 
@@ -63,12 +65,12 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   (() => utilsApi.blockchain.activatedFeatures).when().returning(Map()).anyNumberOfTimes()
   private val route = seal(utilsApi.route)
 
-  val script = FUNCTION_CALL(
+  val script: FUNCTION_CALL = FUNCTION_CALL(
     function = PureContext.eq.header,
     args = List(CONST_LONG(1), CONST_LONG(2))
   )
 
-  val dappVer = DApp(
+  val dappVer: DApp = DApp(
     meta = DAppMeta(),
     decs = List.empty,
     callableFuncs = List.empty,
@@ -77,7 +79,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     )
   )
 
-  val badScript =
+  val badScript: String =
     """
       |{-# STDLIB_VERSION 3 #-}
       |{-# CONTENT_TYPE EXPRESSION #-}
@@ -189,7 +191,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   val badScriptBase64 =
     "AwoBAAAAAmYwAAAAAAYKAQAAAAJmMQAAAAADBgkBAAAAAmYwAAAAAAkBAAAAAmYwAAAAAAoBAAAAAmYyAAAAAAMGCQEAAAACZjEAAAAACQEAAAACZjEAAAAACgEAAAACZjMAAAAAAwYJAQAAAAJmMgAAAAAJAQAAAAJmMgAAAAAKAQAAAAJmNAAAAAADBgkBAAAAAmYzAAAAAAkBAAAAAmYzAAAAAAoBAAAAAmY1AAAAAAMGCQEAAAACZjQAAAAACQEAAAACZjQAAAAACgEAAAACZjYAAAAAAwYJAQAAAAJmNQAAAAAJAQAAAAJmNQAAAAAKAQAAAAJmNwAAAAADBgkBAAAAAmY2AAAAAAkBAAAAAmY2AAAAAAoBAAAAAmY4AAAAAAMGCQEAAAACZjcAAAAACQEAAAACZjcAAAAACgEAAAACZjkAAAAAAwYJAQAAAAJmOAAAAAAJAQAAAAJmOAAAAAAKAQAAAANmMTAAAAAAAwYJAQAAAAJmOQAAAAAJAQAAAAJmOQAAAAAKAQAAAANmMTEAAAAAAwYJAQAAAANmMTAAAAAACQEAAAADZjEwAAAAAAoBAAAAA2YxMgAAAAADBgkBAAAAA2YxMQAAAAAJAQAAAANmMTEAAAAACgEAAAADZjEzAAAAAAMGCQEAAAADZjEyAAAAAAkBAAAAA2YxMgAAAAAKAQAAAANmMTQAAAAAAwYJAQAAAANmMTMAAAAACQEAAAADZjEzAAAAAAoBAAAAA2YxNQAAAAADBgkBAAAAA2YxNAAAAAAJAQAAAANmMTQAAAAACgEAAAADZjE2AAAAAAMGCQEAAAADZjE1AAAAAAkBAAAAA2YxNQAAAAAKAQAAAANmMTcAAAAAAwYJAQAAAANmMTYAAAAACQEAAAADZjE2AAAAAAoBAAAAA2YxOAAAAAADBgkBAAAAA2YxNwAAAAAJAQAAAANmMTcAAAAACgEAAAADZjE5AAAAAAMGCQEAAAADZjE4AAAAAAkBAAAAA2YxOAAAAAAKAQAAAANmMjAAAAAAAwYJAQAAAANmMTkAAAAACQEAAAADZjE5AAAAAAoBAAAAA2YyMQAAAAADBgkBAAAAA2YyMAAAAAAJAQAAAANmMjAAAAAACgEAAAADZjIyAAAAAAMGCQEAAAADZjIxAAAAAAkBAAAAA2YyMQAAAAAKAQAAAANmMjMAAAAAAwYJAQAAAANmMjIAAAAACQEAAAADZjIyAAAAAAoBAAAAA2YyNAAAAAADBgkBAAAAA2YyMwAAAAAJAQAAAANmMjMAAAAACgEAAAADZjI1AAAAAAMGCQEAAAADZjI0AAAAAAkBAAAAA2YyNAAAAAAKAQAAAANmMjYAAAAAAwYJAQAAAANmMjUAAAAACQEAAAADZjI1AAAAAAoBAAAAA2YyNwAAAAADBgkBAAAAA2YyNgAAAAAJAQAAAANmMjYAAAAACgEAAAADZjI4AAAAAAMGCQEAAAADZjI3AAAAAAkBAAAAA2YyNwAAAAAKAQAAAANmMjkAAAAAAwYJAQAAAANmMjgAAAAACQEAAAADZjI4AAAAAAoBAAAAA2YzMAAAAAADBgkBAAAAA2YyOQAAAAAJAQAAAANmMjkAAAAACgEAAAADZjMxAAAAAAMGCQEAAAADZjMwAAAAAAkBAAAAA2YzMAAAAAAKAQAAAANmMzIAAAAAAwYJAQAAAANmMzEAAAAACQEAAAADZjMxAAAAAAoBAAAAA2YzMwAAAAADBgkBAAAAA2YzMgAAAAAJAQAAAANmMzIAAAAACgEAAAADZjM0AAAAAAMGCQEAAAADZjMzAAAAAAkBAAAAA2YzMwAAAAAKAQAAAANmMzUAAAAAAwYJAQAAAANmMzQAAAAACQEAAAADZjM0AAAAAAoBAAAAA2YzNgAAAAADBgkBAAAAA2YzNQAAAAAJAQAAAANmMzUAAAAACgEAAAADZjM3AAAAAAMGCQEAAAADZjM2AAAAAAkBAAAAA2YzNgAAAAAKAQAAAANmMzgAAAAAAwYJAQAAAANmMzcAAAAACQEAAAADZjM3AAAAAAoBAAAAA2YzOQAAAAADBgkBAAAAA2YzOAAAAAAJAQAAAANmMzgAAAAACgEAAAADZjQwAAAAAAMGCQEAAAADZjM5AAAAAAkBAAAAA2YzOQAAAAAKAQAAAANmNDEAAAAAAwYJAQAAAANmNDAAAAAACQEAAAADZjQwAAAAAAoBAAAAA2Y0MgAAAAADBgkBAAAAA2Y0MQAAAAAJAQAAAANmNDEAAAAACgEAAAADZjQzAAAAAAMGCQEAAAADZjQyAAAAAAkBAAAAA2Y0MgAAAAAKAQAAAANmNDQAAAAAAwYJAQAAAANmNDMAAAAACQEAAAADZjQzAAAAAAoBAAAAA2Y0NQAAAAADBgkBAAAAA2Y0NAAAAAAJAQAAAANmNDQAAAAACgEAAAADZjQ2AAAAAAMGCQEAAAADZjQ1AAAAAAkBAAAAA2Y0NQAAAAAKAQAAAANmNDcAAAAAAwYJAQAAAANmNDYAAAAACQEAAAADZjQ2AAAAAAoBAAAAA2Y0OAAAAAADBgkBAAAAA2Y0NwAAAAAJAQAAAANmNDcAAAAACgEAAAADZjQ5AAAAAAMGCQEAAAADZjQ4AAAAAAkBAAAAA2Y0OAAAAAAKAQAAAANmNTAAAAAAAwYJAQAAAANmNDkAAAAACQEAAAADZjQ5AAAAAAoBAAAAA2Y1MQAAAAADBgkBAAAAA2Y1MAAAAAAJAQAAAANmNTAAAAAACgEAAAADZjUyAAAAAAMGCQEAAAADZjUxAAAAAAkBAAAAA2Y1MQAAAAAKAQAAAANmNTMAAAAAAwYJAQAAAANmNTIAAAAACQEAAAADZjUyAAAAAAoBAAAAA2Y1NAAAAAADBgkBAAAAA2Y1MwAAAAAJAQAAAANmNTMAAAAACgEAAAADZjU1AAAAAAMGCQEAAAADZjU0AAAAAAkBAAAAA2Y1NAAAAAAKAQAAAANmNTYAAAAAAwYJAQAAAANmNTUAAAAACQEAAAADZjU1AAAAAAoBAAAAA2Y1NwAAAAADBgkBAAAAA2Y1NgAAAAAJAQAAAANmNTYAAAAACgEAAAADZjU4AAAAAAMGCQEAAAADZjU3AAAAAAkBAAAAA2Y1NwAAAAAKAQAAAANmNTkAAAAAAwYJAQAAAANmNTgAAAAACQEAAAADZjU4AAAAAAoBAAAAA2Y2MAAAAAADBgkBAAAAA2Y1OQAAAAAJAQAAAANmNTkAAAAACgEAAAADZjYxAAAAAAMGCQEAAAADZjYwAAAAAAkBAAAAA2Y2MAAAAAAKAQAAAANmNjIAAAAAAwYJAQAAAANmNjEAAAAACQEAAAADZjYxAAAAAAoBAAAAA2Y2MwAAAAADBgkBAAAAA2Y2MgAAAAAJAQAAAANmNjIAAAAACgEAAAADZjY0AAAAAAMGCQEAAAADZjYzAAAAAAkBAAAAA2Y2MwAAAAAKAQAAAANmNjUAAAAAAwYJAQAAAANmNjQAAAAACQEAAAADZjY0AAAAAAoBAAAAA2Y2NgAAAAADBgkBAAAAA2Y2NQAAAAAJAQAAAANmNjUAAAAACgEAAAADZjY3AAAAAAMGCQEAAAADZjY2AAAAAAkBAAAAA2Y2NgAAAAAKAQAAAANmNjgAAAAAAwYJAQAAAANmNjcAAAAACQEAAAADZjY3AAAAAAoBAAAAA2Y2OQAAAAADBgkBAAAAA2Y2OAAAAAAJAQAAAANmNjgAAAAACgEAAAADZjcwAAAAAAMGCQEAAAADZjY5AAAAAAkBAAAAA2Y2OQAAAAAKAQAAAANmNzEAAAAAAwYJAQAAAANmNzAAAAAACQEAAAADZjcwAAAAAAoBAAAAA2Y3MgAAAAADBgkBAAAAA2Y3MQAAAAAJAQAAAANmNzEAAAAACgEAAAADZjczAAAAAAMGCQEAAAADZjcyAAAAAAkBAAAAA2Y3MgAAAAAKAQAAAANmNzQAAAAAAwYJAQAAAANmNzMAAAAACQEAAAADZjczAAAAAAoBAAAAA2Y3NQAAAAADBgkBAAAAA2Y3NAAAAAAJAQAAAANmNzQAAAAACgEAAAADZjc2AAAAAAMGCQEAAAADZjc1AAAAAAkBAAAAA2Y3NQAAAAAKAQAAAANmNzcAAAAAAwYJAQAAAANmNzYAAAAACQEAAAADZjc2AAAAAAoBAAAAA2Y3OAAAAAADBgkBAAAAA2Y3NwAAAAAJAQAAAANmNzcAAAAACgEAAAADZjc5AAAAAAMGCQEAAAADZjc4AAAAAAkBAAAAA2Y3OAAAAAAKAQAAAANmODAAAAAAAwYJAQAAAANmNzkAAAAACQEAAAADZjc5AAAAAAoBAAAAA2Y4MQAAAAADBgkBAAAAA2Y4MAAAAAAJAQAAAANmODAAAAAACgEAAAADZjgyAAAAAAMGCQEAAAADZjgxAAAAAAkBAAAAA2Y4MQAAAAAKAQAAAANmODMAAAAAAwYJAQAAAANmODIAAAAACQEAAAADZjgyAAAAAAoBAAAAA2Y4NAAAAAADBgkBAAAAA2Y4MwAAAAAJAQAAAANmODMAAAAACgEAAAADZjg1AAAAAAMGCQEAAAADZjg0AAAAAAkBAAAAA2Y4NAAAAAAKAQAAAANmODYAAAAAAwYJAQAAAANmODUAAAAACQEAAAADZjg1AAAAAAoBAAAAA2Y4NwAAAAADBgkBAAAAA2Y4NgAAAAAJAQAAAANmODYAAAAACgEAAAADZjg4AAAAAAMGCQEAAAADZjg3AAAAAAkBAAAAA2Y4NwAAAAAKAQAAAANmODkAAAAAAwYJAQAAAANmODgAAAAACQEAAAADZjg4AAAAAAoBAAAAA2Y5MAAAAAADBgkBAAAAA2Y4OQAAAAAJAQAAAANmODkAAAAACgEAAAADZjkxAAAAAAMGCQEAAAADZjkwAAAAAAkBAAAAA2Y5MAAAAAAKAQAAAANmOTIAAAAAAwYJAQAAAANmOTEAAAAACQEAAAADZjkxAAAAAAoBAAAAA2Y5MwAAAAADBgkBAAAAA2Y5MgAAAAAJAQAAAANmOTIAAAAACgEAAAADZjk0AAAAAAMGCQEAAAADZjkzAAAAAAkBAAAAA2Y5MwAAAAAKAQAAAANmOTUAAAAAAwYJAQAAAANmOTQAAAAACQEAAAADZjk0AAAAAAoBAAAAA2Y5NgAAAAADBgkBAAAAA2Y5NQAAAAAJAQAAAANmOTUAAAAACgEAAAADZjk3AAAAAAMGCQEAAAADZjk2AAAAAAkBAAAAA2Y5NgAAAAAKAQAAAANmOTgAAAAAAwYJAQAAAANmOTcAAAAACQEAAAADZjk3AAAAAAoBAAAAA2Y5OQAAAAADBgkBAAAAA2Y5OAAAAAAJAQAAAANmOTgAAAAACgEAAAAEZjEwMAAAAAADBgkBAAAAA2Y5OQAAAAAJAQAAAANmOTkAAAAACQEAAAAEZjEwMAAAAAD7+x+p"
 
-  val dAppWithFreeVerifier =
+  val dAppWithFreeVerifier: String =
     """
       |{-# STDLIB_VERSION 3 #-}
       |{-# CONTENT_TYPE DAPP #-}
@@ -217,7 +219,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       |func verify() = sigVerify(base58'', base58'', base58'')
     """.stripMargin
 
-  val dAppWithoutVerifier =
+  val dAppWithoutVerifier: String =
     """
       |{-# STDLIB_VERSION 3 #-}
       |{-# CONTENT_TYPE DAPP #-}
@@ -242,14 +244,23 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       |}
     """.stripMargin
 
-  val emptyDApp =
+  val emptyDApp: String =
     """
       |{-# STDLIB_VERSION 3 #-}
       |{-# CONTENT_TYPE DAPP #-}
       |{-# SCRIPT_TYPE ACCOUNT #-}
     """.stripMargin
 
-  val dAppWithPaidVerifier =
+  val dAppWithNonCallable: String =
+    """
+      |{-# STDLIB_VERSION 3 #-}
+      |{-# CONTENT_TYPE DAPP #-}
+      |{-# SCRIPT_TYPE ACCOUNT #-}
+      |
+      |func test() = true
+    """.stripMargin
+
+  val dAppWithPaidVerifier: String =
     """
       |{-# STDLIB_VERSION 3 #-}
       |{-# CONTENT_TYPE DAPP #-}
@@ -263,6 +274,17 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       |@Verifier(tx)
       |func verify() = sigVerify(base58'', base58'', base58'') && sigVerify(base58'', base58'', base58'')
     """.stripMargin
+
+  val bigSizeDApp: String =
+    s"""
+       |{-# STDLIB_VERSION 5 #-}
+       |{-# CONTENT_TYPE DAPP #-}
+       |{-# SCRIPT_TYPE ACCOUNT #-}
+       |
+       |func testFunctionWithLongName0() = true
+       |${(1 to 500).map(idx => s"func testFunctionWithLongName$idx() = testFunctionWithLongName0()").mkString("\n")}
+       |func test() = true
+       |""".stripMargin
 
   routePath("/script/decompile") in {
     val base64 = ExprScript(script).explicitGet().bytes().base64
@@ -499,6 +521,36 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   }
 
   routePath("/script/compileCode") in {
+    Post(routePath("/script/compileCode?compact=true"), dAppWithNonCallable) ~> route ~> check {
+      responseAs[JsValue] should matchJson("""{
+                                             |  "script" : "base64:AAIDAAAAAAAAAA0IARoJCgFhEgR0ZXN0AAAAAQEAAAABYQAAAAAGAAAAAAAAAAA00atG",
+                                             |  "complexity" : 0,
+                                             |  "verifierComplexity" : 0,
+                                             |  "callableComplexities" : { },
+                                             |  "extraFee" : 400000
+                                             |}""".stripMargin)
+
+      val script = (responseAs[JsValue] \ "script").as[String]
+      inside(Script.fromBase64String(script).explicitGet()) {
+        case ContractScript.ContractScriptImpl(_, expr) =>
+          expr.meta.compactNameAndOriginalNamePairList shouldBe Seq(CompactNameAndOriginalNamePair("a", "test"))
+      }
+    }
+
+    Post(routePath("/script/compileCode"), bigSizeDApp) ~> route ~> check {
+      responseAs[JsValue] should matchJson("""{
+                                             |  "error" : 305,
+                                             |  "message" : "Script is too large: 35470 bytes > 32768 bytes"
+                                             |}""".stripMargin)
+    }
+
+    Post(routePath("/script/compileCode?compact=true"), bigSizeDApp) ~> route ~> check {
+      (responseAs[JsValue] \ "script").toOption shouldBe defined
+      (responseAs[JsValue] \ "complexity").as[Long] shouldBe 0
+      (responseAs[JsValue] \ "verifierComplexity").as[Long] shouldBe 0
+      (responseAs[JsValue] \ "extraFee").as[Long] shouldBe 400000
+    }
+
     Post(routePath("/script/compileCode"), "{-# STDLIB_VERSION 2 #-}\n(1 == 2)") ~> route ~> check {
       val json           = responseAs[JsValue]
       val expectedScript = ExprScript(V2, script).explicitGet()
@@ -763,6 +815,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     }
 
     (utilsApi.blockchain.hasAccountScript _).when(dAppAddress).returning(false).once()
+    (() => utilsApi.blockchain.settings).when().returning(DefaultBlockchainSettings).anyNumberOfTimes()
 
     evalScript("testNone()") ~> route ~> check {
       responseAs[JsObject] shouldBe Json.obj("error" -> 199, "message" -> s"Address $dAppAddress is not dApp")
@@ -819,9 +872,9 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     }
 
     evalScript("""match test(123) {
-        |  case i: Int => i * 123
-        |  case _ => throw("")
-        |}""".stripMargin) ~> route ~> check {
+                 |  case i: Int => i * 123
+                 |  case _ => throw("")
+                 |}""".stripMargin) ~> route ~> check {
       responseJson shouldBe Json.obj("type" -> "Int", "value" -> 151290)
     }
 
@@ -849,6 +902,10 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     (() => utilsApi.blockchain.settings)
       .when()
       .returning(DefaultBlockchainSettings)
+      .anyNumberOfTimes()
+    (utilsApi.blockchain.leaseBalance _)
+      .when(*)
+      .returning(LeaseBalance.empty)
       .anyNumberOfTimes()
 
     evalScript(""" testSyncinvoke() """) ~> route ~> check {

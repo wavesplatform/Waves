@@ -45,7 +45,9 @@ object InvokeScriptRequest {
           case _ => JsError("value is missing or not an base64 encoded string")
         }
       case JsDefined(JsString("list")) =>
-        ARR((jv \ "value").as[Vector[EVALUATED]], true).fold(JsError.apply, ({v: EVALUATED => JsSuccess(v)}))
+        ARR((jv \ "value").as[Vector[EVALUATED]], true).fold(JsError.apply, ({ v: EVALUATED =>
+          JsSuccess(v)
+        }))
       case _ => JsError("type is missing")
     }
   }
@@ -99,7 +101,7 @@ case class SignedInvokeScriptRequest(
   def toTx: Either[ValidationError, InvokeScriptTransaction] =
     for {
       _sender      <- PublicKey.fromBase58String(senderPublicKey)
-      _dappAddress <- AddressOrAlias.fromString(dApp)
+      _dappAddress <- AddressOrAlias.fromString(dApp, checkChainId = false)
       _feeAssetId  <- parseBase58ToAsset(feeAssetId.filter(_.length > 0), "invalid.feeAssetId")
       t <- InvokeScriptTransaction.create(
         version.getOrElse(2.toByte),

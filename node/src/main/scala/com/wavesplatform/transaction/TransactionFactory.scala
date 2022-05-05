@@ -19,7 +19,7 @@ import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import play.api.libs.json.{JsObject, JsValue}
 
-object  TransactionFactory {
+object TransactionFactory {
   def transferAsset(request: TransferRequest, wallet: Wallet, time: Time): Either[ValidationError, TransferTransaction] =
     for {
       _  <- Either.cond(request.sender.nonEmpty, (), GenericError("invalid.sender"))
@@ -86,7 +86,14 @@ object  TransactionFactory {
         case None | Some("") => Right(None)
         case Some(s)         => Script.fromBase64String(s).map(Some(_))
       }
-      tx <- SetScriptTransaction.signed(request.version.getOrElse(1.toByte), sender.publicKey, script, request.fee, request.timestamp.getOrElse(time.getTimestamp()), signer.privateKey)
+      tx <- SetScriptTransaction.signed(
+        request.version.getOrElse(1.toByte),
+        sender.publicKey,
+        script,
+        request.fee,
+        request.timestamp.getOrElse(time.getTimestamp()),
+        signer.privateKey
+      )
     } yield tx
 
   def setScript(request: SetScriptRequest, sender: PublicKey): Either[ValidationError, SetScriptTransaction] =
@@ -251,7 +258,14 @@ object  TransactionFactory {
     for {
       sender <- wallet.findPrivateKey(request.sender)
       signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
-      tx     <- DataTransaction.signed(request.version, sender.publicKey, request.data, request.fee, request.timestamp.getOrElse(time.getTimestamp()), signer.privateKey)
+      tx <- DataTransaction.signed(
+        request.version,
+        sender.publicKey,
+        request.data,
+        request.fee,
+        request.timestamp.getOrElse(time.getTimestamp()),
+        signer.privateKey
+      )
     } yield tx
 
   def data(request: DataRequest, sender: PublicKey): Either[ValidationError, DataTransaction] =
@@ -345,6 +359,18 @@ object  TransactionFactory {
       )
     } yield tx
 
+  def updateAssetInfo(request: UpdateAssetInfoRequest, wallet: Wallet, signerAddress: String, time: Time): Either[ValidationError, UpdateAssetInfoTransaction] =
+    for {
+      sender <- request.sender match {
+        case Some(sender) => wallet.findPrivateKey(sender)
+        case None => Left(GenericError("invalid.sender"))
+      }
+      signer <- if (request.sender.contains(signerAddress)) Right(sender) else wallet.findPrivateKey(signerAddress)
+      tx <- request.copy(timestamp = request.timestamp.orElse(Some(time.getTimestamp()))).toTxFrom(sender.publicKey)
+    } yield {
+      tx.signWith(signer.privateKey)
+    }
+
   def fromSignedRequest(jsv: JsValue): Either[ValidationError, Transaction] = {
     import InvokeScriptRequest._
     val chainId = (jsv \ "chainId").asOpt[Byte]
@@ -393,20 +419,21 @@ object  TransactionFactory {
           case None => Left(UnsupportedTypeAndVersion(typeId, version))
           case Some(x) =>
             x match {
-              case TransferTransaction       => TransactionFactory.transferAsset(txJson.as[TransferRequest], wallet, signerAddress, time)
-              case CreateAliasTransaction    => TransactionFactory.createAlias(txJson.as[CreateAliasRequest], wallet, signerAddress, time)
-              case LeaseTransaction          => TransactionFactory.lease(txJson.as[LeaseRequest], wallet, signerAddress, time)
-              case LeaseCancelTransaction    => TransactionFactory.leaseCancel(txJson.as[LeaseCancelRequest], wallet, signerAddress, time)
-              case IssueTransaction          => TransactionFactory.issue(txJson.as[IssueRequest], wallet, signerAddress, time)
-              case ReissueTransaction        => TransactionFactory.reissue(txJson.as[ReissueRequest], wallet, signerAddress, time)
-              case BurnTransaction           => TransactionFactory.burn(txJson.as[BurnRequest], wallet, signerAddress, time)
-              case MassTransferTransaction   => TransactionFactory.massTransferAsset(txJson.as[MassTransferRequest], wallet, signerAddress, time)
-              case DataTransaction           => TransactionFactory.data(txJson.as[DataRequest], wallet, signerAddress, time)
-              case InvokeScriptTransaction   => TransactionFactory.invokeScript(txJson.as[InvokeScriptRequest], wallet, signerAddress, time)
-              case SetScriptTransaction      => TransactionFactory.setScript(txJson.as[SetScriptRequest], wallet, signerAddress, time)
-              case SetAssetScriptTransaction => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], wallet, signerAddress, time)
-              case SponsorFeeTransaction     => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], wallet, signerAddress, time)
-              case _                         => Left(TxValidationError.UnsupportedTransactionType)
+              case TransferTransaction        => TransactionFactory.transferAsset(txJson.as[TransferRequest], wallet, signerAddress, time)
+              case CreateAliasTransaction     => TransactionFactory.createAlias(txJson.as[CreateAliasRequest], wallet, signerAddress, time)
+              case LeaseTransaction           => TransactionFactory.lease(txJson.as[LeaseRequest], wallet, signerAddress, time)
+              case LeaseCancelTransaction     => TransactionFactory.leaseCancel(txJson.as[LeaseCancelRequest], wallet, signerAddress, time)
+              case IssueTransaction           => TransactionFactory.issue(txJson.as[IssueRequest], wallet, signerAddress, time)
+              case ReissueTransaction         => TransactionFactory.reissue(txJson.as[ReissueRequest], wallet, signerAddress, time)
+              case BurnTransaction            => TransactionFactory.burn(txJson.as[BurnRequest], wallet, signerAddress, time)
+              case MassTransferTransaction    => TransactionFactory.massTransferAsset(txJson.as[MassTransferRequest], wallet, signerAddress, time)
+              case DataTransaction            => TransactionFactory.data(txJson.as[DataRequest], wallet, signerAddress, time)
+              case InvokeScriptTransaction    => TransactionFactory.invokeScript(txJson.as[InvokeScriptRequest], wallet, signerAddress, time)
+              case SetScriptTransaction       => TransactionFactory.setScript(txJson.as[SetScriptRequest], wallet, signerAddress, time)
+              case SetAssetScriptTransaction  => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], wallet, signerAddress, time)
+              case SponsorFeeTransaction      => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], wallet, signerAddress, time)
+              case UpdateAssetInfoTransaction => TransactionFactory.updateAssetInfo(txJson.as[UpdateAssetInfoRequest], wallet, signerAddress, time)
+              case _                          => Left(TxValidationError.UnsupportedTransactionType)
             }
         }
     }

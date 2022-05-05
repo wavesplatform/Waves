@@ -2,24 +2,26 @@ package com.wavesplatform.db
 
 import java.nio.file.Files
 
-import cats.Monoid
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter, TestStorageFactory, loadActiveLeases}
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.BlockchainUpdateTriggers
-import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.directives.DirectiveDictionary
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, TestSettings, WavesSettings, loadConfig, TestFunctionalitySettings => TFS}
-import com.wavesplatform.state.diffs.{BlockDiffer, produce}
+import com.wavesplatform.settings.{TestFunctionalitySettings => TFS, _}
+import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT, produce}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.utils.TestLevelDB
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Portfolio}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers}
 import com.wavesplatform.{NTPTime, TestHelpers}
 import monix.reactive.Observer
 import monix.reactive.subjects.{PublishSubject, Subject}
@@ -73,7 +75,8 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
   def assertDiffEi(preconditions: Seq[Block], block: Block, state: LevelDBWriter)(
       assertion: Either[ValidationError, Diff] => Unit
   ): Unit = {
-    def differ(blockchain: Blockchain, b: Block) = BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature)
+    def differ(blockchain: Blockchain, b: Block) =
+      BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature)
 
     preconditions.foreach { precondition =>
       val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) = differ(state, precondition).explicitGet()
@@ -86,7 +89,8 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
   def assertDiffEiTraced(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)(
       assertion: TracedResult[ValidationError, Diff] => Unit
   ): Unit = withLevelDBWriter(fs) { state =>
-    def differ(blockchain: Blockchain, b: Block) = BlockDiffer.fromBlockTraced(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature, verify = true)
+    def differ(blockchain: Blockchain, b: Block) =
+      BlockDiffer.fromBlockTraced(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature, verify = true)
 
     preconditions.foreach { precondition =>
       val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) = differ(state, precondition).resultE.explicitGet()
@@ -128,7 +132,8 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
 
   def assertDiffAndState(fs: FunctionalitySettings)(test: (Seq[Transaction] => Either[ValidationError, Unit]) => Unit): Unit =
     withLevelDBWriter(fs) { state =>
-      def differ(blockchain: Blockchain, b: Block) = BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature)
+      def differ(blockchain: Blockchain, b: Block) =
+        BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature)
 
       test(txs => {
         val nextHeight = state.height + 1
@@ -141,10 +146,10 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
     }
 
   def assertBalanceInvariant(diff: Diff): Unit = {
-    val portfolioDiff = Monoid.combineAll(diff.portfolios.values)
+    val portfolioDiff = diff.portfolios.values.fold(Portfolio())(_.combine(_).explicitGet())
     portfolioDiff.balance shouldBe 0
-    portfolioDiff.effectiveBalance shouldBe 0
-    portfolioDiff.assets.values.foreach(_ shouldBe 0)
+    portfolioDiff.effectiveBalance.explicitGet() shouldBe 0
+    all(portfolioDiff.assets.values) shouldBe 0
   }
 
   def assertLeft(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)(errorMessage: String): Unit =
@@ -152,54 +157,16 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
 }
 
 trait WithDomain extends WithState { _: Suite =>
-  implicit class WavesSettingsOps(ws: WavesSettings) {
-    def withFeatures(fs: BlockchainFeature*): WavesSettings = {
-      val functionalitySettings = ws.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = fs.map(_.id -> 0).toMap)
-      ws.copy(blockchainSettings = ws.blockchainSettings.copy(functionalitySettings = functionalitySettings))
-    }
-
-    def addFeatures(fs: BlockchainFeature*): WavesSettings = {
-      val newFeatures           = ws.blockchainSettings.functionalitySettings.preActivatedFeatures ++ fs.map(_.id -> 0)
-      val functionalitySettings = ws.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = newFeatures)
-      ws.copy(blockchainSettings = ws.blockchainSettings.copy(functionalitySettings = functionalitySettings))
-    }
-  }
-
-  lazy val SettingsFromDefaultConfig: WavesSettings =
-    WavesSettings.fromRootConfig(loadConfig(None))
+  val DomainPresets = com.wavesplatform.test.DomainPresets
+  import DomainPresets._
 
   def domainSettingsWithFS(fs: FunctionalitySettings): WavesSettings =
-    SettingsFromDefaultConfig.copy(
-      blockchainSettings = SettingsFromDefaultConfig.blockchainSettings.copy(functionalitySettings = fs)
-    )
+    DomainPresets.domainSettingsWithFS(fs)
 
-  def domainSettingsWithPreactivatedFeatures(fs: BlockchainFeature*): WavesSettings =
-    domainSettingsWithFeatures(fs.map(_ -> 0): _*)
-
-  def domainSettingsWithFeatures(fs: (BlockchainFeature, Int)*): WavesSettings =
-    domainSettingsWithFS(SettingsFromDefaultConfig.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = fs.map { case (f, h) => f.id -> h }.toMap))
-
-  object DomainPresets {
-    val NG = domainSettingsWithPreactivatedFeatures(
-      BlockchainFeatures.MassTransfer, // Removes limit of 100 transactions per block
-      BlockchainFeatures.NG
-    )
-
-    val RideV4 = NG.addFeatures(
-      BlockchainFeatures.SmartAccounts,
-      BlockchainFeatures.DataTransaction,
-      BlockchainFeatures.Ride4DApps,
-      BlockchainFeatures.SmartAssets,
-      BlockchainFeatures.BlockV5
-    )
-
-    val RideV5 = RideV4.addFeatures(BlockchainFeatures.SynchronousCalls)
-  }
-
-
-  def withDomain[A](settings: WavesSettings = SettingsFromDefaultConfig)(
-      test: Domain => A
-  ): A =
+  def withDomain[A](
+      settings: WavesSettings = DomainPresets.SettingsFromDefaultConfig.addFeatures(BlockchainFeatures.SmartAccounts), // SmartAccounts to allow V2 transfers by default
+      balances: Seq[AddrWithBalance] = Seq.empty
+  )(test: Domain => A): A =
     withLevelDBWriter(settings) { blockchain =>
       var domain: Domain = null
       val bcu = new BlockchainUpdaterImpl(
@@ -211,7 +178,37 @@ trait WithDomain extends WithState { _: Suite =>
         loadActiveLeases(db, _, _)
       )
       domain = Domain(db, bcu, blockchain, settings)
+      val genesis = balances.map {
+        case AddrWithBalance(address, amount) =>
+          TxHelpers.genesis(address, amount)
+      }
+      if (genesis.nonEmpty) {
+        domain.appendBlock(genesis: _*)
+      }
       try test(domain)
       finally bcu.shutdown()
     }
+
+  private val allVersions = DirectiveDictionary[StdLibVersion].all
+  private val lastVersion = allVersions.last
+
+  def testDomain(
+      balances: Seq[AddrWithBalance] = Nil,
+      from: StdLibVersion = V3,
+      to: StdLibVersion = lastVersion
+  )(assertion: (StdLibVersion, Domain) => Unit): Unit =
+    allVersions
+      .filter(v => v >= from && v <= to)
+      .foreach(v => withDomain(DomainPresets.settingsFor(v), balances)(assertion(v, _)))
+}
+
+object WithState {
+  case class AddrWithBalance(address: Address, balance: Long = ENOUGH_AMT)
+
+  object AddrWithBalance {
+    def enoughBalances(accs: KeyPair*): Seq[AddrWithBalance] =
+      accs.map(acc => AddrWithBalance(acc.toAddress))
+
+    implicit def toAddrWithBalance(v: (KeyPair, Long)): AddrWithBalance = AddrWithBalance(v._1.toAddress, v._2)
+  }
 }

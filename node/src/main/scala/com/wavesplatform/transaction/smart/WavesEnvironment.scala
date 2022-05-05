@@ -1,7 +1,6 @@
 package com.wavesplatform.transaction.smart
 
 import cats.syntax.either._
-import cats.syntax.semigroup._
 import com.wavesplatform.account
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.block.BlockHeader
@@ -58,7 +57,7 @@ class WavesEnvironment(
     // There are no new transactions in currentBlockchain
     blockchain
       .transactionInfo(ByteStr(id))
-      .filter(_._3)
+      .filter(_._1.succeeded)
       .map(_._2)
       .map(tx => RealTransactionWrapper(tx, blockchain, ds.stdLibVersion, paymentTarget(ds, tthis)).explicitGet())
 
@@ -105,7 +104,7 @@ class WavesEnvironment(
       address <- recipient match {
         case Address(bytes) =>
           com.wavesplatform.account.Address
-            .fromBytes(bytes.arr)
+            .fromBytes(bytes.arr, chainId)
             .toOption
         case Alias(name) =>
           com.wavesplatform.account.Alias
@@ -146,17 +145,18 @@ class WavesEnvironment(
       }
       address <- blockchain.resolveAlias(aoa)
       portfolio = currentBlockchain().wavesPortfolio(address)
+      effectiveBalance <- portfolio.effectiveBalance
     } yield Environment.BalanceDetails(
       portfolio.balance - portfolio.lease.out,
       portfolio.balance,
       blockchain.generatingBalance(address),
-      portfolio.effectiveBalance
+      effectiveBalance
     )).left.map(_.toString)
   }
 
   override def transactionHeightById(id: Array[Byte]): Option[Long] =
     // There are no new transactions in currentBlockchain
-    blockchain.transactionMeta(ByteStr(id)).collect { case (h, true) => h.toLong }
+    blockchain.transactionMeta(ByteStr(id)).collect { case tm if tm.succeeded => tm.height.toLong }
 
   override def assetInfoById(id: Array[Byte]): Option[domain.ScriptAssetInfo] = {
     for {
@@ -211,7 +211,7 @@ class WavesEnvironment(
 
   override def addressFromString(addressStr: String): Either[String, Address] =
     account.Address
-      .fromString(addressStr)
+      .fromString(addressStr, Some(chainId))
       .bimap(
         _.toString,
         address => Address(ByteStr(address.bytes))
@@ -305,6 +305,7 @@ class DAppEnvironment(
     var remainingCalls: Int,
     var availableActions: Int,
     var availableData: Int,
+    var availableDataSize: Int,
     var currentDiff: Diff,
     val invocationRoot: DAppEnvironment.InvocationTreeTracker
 ) extends WavesEnvironment(nByte, in, h, blockchain, tthis, ds, tx.map(_.id()).getOrElse(ByteStr.empty)) {
@@ -356,7 +357,7 @@ class DAppEnvironment(
         val invocation = DAppEnvironment.DAppInvocation(invoke.dAppAddress, invoke.funcCall, invoke.payments)
         invocationRoot.record(invocation)
       }
-      (diff, evaluated, remainingActions, remainingData) <- InvokeScriptDiff( // This is a recursive call
+      (diff, evaluated, remainingActions, remainingData, remainingDataSize) <- InvokeScriptDiff( // This is a recursive call
         mutableBlockchain,
         blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp + 1,
         limitedExecution,
@@ -365,19 +366,22 @@ class DAppEnvironment(
         remainingCalls,
         availableActions,
         availableData,
+        availableDataSize,
         if (reentrant) calledAddresses else calledAddresses + invoke.senderAddress,
         invocationTracker
       )(invoke)
-    } yield {
-      val fixedDiff = diff.copy(
+      fixedDiff = diff.copy(
         scriptResults = Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = diff.scriptResults(txId))))),
         scriptsRun = diff.scriptsRun + 1
       )
-      currentDiff = currentDiff |+| fixedDiff
+      newCurrentDiff <- traced(currentDiff.combine(fixedDiff).leftMap(GenericError(_)))
+    } yield {
+      currentDiff = newCurrentDiff
       mutableBlockchain = CompositeBlockchain(blockchain, currentDiff)
       remainingCalls = remainingCalls - 1
       availableActions = remainingActions
       availableData = remainingData
+      availableDataSize = remainingDataSize
       (evaluated, diff.scriptsComplexity.toInt)
     }
 

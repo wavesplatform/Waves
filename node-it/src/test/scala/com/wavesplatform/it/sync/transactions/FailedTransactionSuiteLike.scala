@@ -116,7 +116,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
                    |    if (check) then false else $result
                    |}
                    |""".stripMargin,
-                ScriptEstimatorV3
+                ScriptEstimatorV3(fixOverflow = true)
               )
               .explicitGet()
               ._1
@@ -147,7 +147,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
                    |    if (check) then false else $r
                    |}
                    |""".stripMargin,
-                ScriptEstimatorV3
+                ScriptEstimatorV3(fixOverflow = true)
               )
               .explicitGet()
               ._1
@@ -224,7 +224,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
                    |    if (check) then false else $result
                    |}
                    |""".stripMargin,
-                  ScriptEstimatorV3
+                  ScriptEstimatorV3(fixOverflow = true)
                 )
                 .explicitGet()
                 ._1
@@ -253,7 +253,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
                    |  case _ => $r
                    |}
                    |""".stripMargin,
-                  ScriptEstimatorV3
+                  ScriptEstimatorV3(fixOverflow = true)
                 )
                 .toOption
                 .map(_._1)
@@ -286,18 +286,18 @@ object FailedTransactionSuiteLike {
     val ts   = System.currentTimeMillis()
     val bmfa = Asset.fromString(Some(buyMatcherFeeAsset))
     val smfa = Asset.fromString(Some(sellMatcherFeeAsset))
-    val buy  = Order.buy(Order.V4, buyer, matcher.publicKey, assetPair, 100, 100, ts, ts + Order.MaxLiveTime, buyMatcherFee, bmfa)
-    val sell = Order.sell(Order.V4, seller, matcher.publicKey, assetPair, 100, 100, ts, ts + Order.MaxLiveTime, sellMatcherFee, smfa)
+    val buy  = Order.buy(Order.V4, buyer, matcher.publicKey, assetPair, 100, 100, ts, ts + Order.MaxLiveTime, buyMatcherFee, bmfa).explicitGet()
+    val sell = Order.sell(Order.V4, seller, matcher.publicKey, assetPair, 100, 100, ts, ts + Order.MaxLiveTime, sellMatcherFee, smfa).explicitGet()
     ExchangeTransaction
       .signed(
         TxVersion.V3,
         matcher.privateKey,
         buy,
         sell,
-        buy.amount,
-        buy.price,
-        buy.matcherFee,
-        sell.matcherFee,
+        buy.amount.value,
+        buy.price.value,
+        buy.matcherFee.value,
+        sell.matcherFee.value,
         fee,
         ts
       )

@@ -27,8 +27,8 @@ class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
       .buildNonConflicting()
 
   private lazy val (caller, callerAddress) = (firstKeyPair, firstAddress)
-  private lazy val (dApp1, dAppAddress1) = (secondKeyPair, secondAddress)
-  private lazy val (dApp2, dAppAddress2) = (thirdKeyPair, thirdAddress)
+  private lazy val (dApp1, dAppAddress1)   = (secondKeyPair, secondAddress)
+  private lazy val (dApp2, dAppAddress2)   = (thirdKeyPair, thirdAddress)
 
   private val dAppScript1 = ScriptCompiler(
     s"""
@@ -49,7 +49,7 @@ class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
        |
          """.stripMargin,
     isAssetScript = false,
-    ScriptEstimatorV3
+    ScriptEstimatorV3(fixOverflow = true)
   ).explicitGet()._1.bytes().base64
 
   private val dAppScript2 = ScriptCompiler(
@@ -72,7 +72,7 @@ class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
        |
          """.stripMargin,
     isAssetScript = false,
-    ScriptEstimatorV3
+    ScriptEstimatorV3(fixOverflow = true)
   ).explicitGet()._1.bytes().base64
 
   protected override def beforeAll(): Unit = {
@@ -83,7 +83,7 @@ class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
 
   test("self payment fails when dapp invokes itself") {
     val callerBalanceBefore = sender.balance(callerAddress).balance
-    val dApp1BalanceBefore = sender.balance(dAppAddress1).balance
+    val dApp1BalanceBefore  = sender.balance(dAppAddress1).balance
     assertApiError(
       sender.invokeScript(caller, dAppAddress1, Some("foo"), fee = 2 * invokeFee, waitForTx = true),
       AssertiveApiError(
@@ -106,7 +106,7 @@ class SelfPaymentDappToDappSuite extends BaseTransactionSuite {
 
   test("self payment fails including if invoked dApp calls caller dApp with payment") {
     val callerBalanceBefore = sender.balance(dAppAddress1).balance
-    val invFee = 2 * invokeFee + smartFee
+    val invFee              = 2 * invokeFee + smartFee
     assertApiError(
       sender.invokeScript(dApp1, dAppAddress2, Some("bar"), fee = invFee, waitForTx = true),
       AssertiveApiError(

@@ -25,7 +25,6 @@ tags:
   - name: alias
   - name: assets
   - name: leasing
-  - name: consensus
   - name: activation
   - name: debug
   - name: node
@@ -71,7 +70,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
   '/addresses/seq/{from}/{to}':
     get:
       tags:
@@ -131,7 +130,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
   '/addresses/publicKey/{publicKey}':
     get:
       tags:
@@ -241,7 +240,8 @@ paths:
                   minItems: 1
                   maxItems: 1000
                 height:
-                  $ref: '#/components/schemas/Height'
+                  allOf:
+                    - $ref: '#/components/schemas/Height'
                   description: >-
                     For balance at height requests. Max number of blocks back
                     from the current height is set by
@@ -469,7 +469,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
   '/addresses/balance/details/{address}':
     get:
       tags:
@@ -599,7 +599,7 @@ paths:
                 $ref: '#/components/schemas/Block'
   '/blocks/heightByTimestamp/{timestamp}':
     get:
-      tags: [blocks]
+      tags: [ blocks ]
       operationId: getHeightByTimestamp
       summary: Blockchain height for timestamp
       description: >-
@@ -889,7 +889,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
       x-codegen-request-body-name: body
   /peers/clearblacklist:
     post:
@@ -913,7 +913,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
   /peers/all:
     get:
       tags:
@@ -1223,7 +1223,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
       x-codegen-request-body-name: json
   /transactions/unconfirmed:
     get:
@@ -1388,7 +1388,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
       x-codegen-request-body-name: json
   /transactions/broadcast:
     post:
@@ -1402,7 +1402,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [yes]
+            enum: [ yes ]
           description: Return trace
       requestBody:
         description: >-
@@ -1514,29 +1514,6 @@ paths:
                 properties:
                   seed:
                     type: string
-  /utils/script/compile:
-    post:
-      tags:
-        - utils
-      summary: Compile
-      description: Compiles string code to base64 script representation
-      operationId: compileScript
-      requestBody:
-        description: Script code
-        content:
-          application/json:
-            schema:
-              type: string
-        required: true
-      responses:
-        '200':
-          description: successful operation
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CompiledScript'
-      deprecated: true
-      x-codegen-request-body-name: code
   /utils/time:
     get:
       tags:
@@ -1601,6 +1578,12 @@ paths:
             schema:
               type: string
         required: true
+      parameters:
+        - name: compact
+          in: query
+          description: 'If true, compacts the contract. False by default'
+          schema:
+            type: boolean
       responses:
         '200':
           description: successful operation
@@ -1748,7 +1731,7 @@ paths:
                     properties:
                       type:
                         type: string
-                      value: {}
+                      value: { }
   /utils/seed:
     get:
       tags:
@@ -1875,7 +1858,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
   '/alias/by-alias/{alias}':
     get:
       tags:
@@ -1927,71 +1910,71 @@ paths:
     get:
       tags:
         - assets
-      summary: Account balances in all assets
+      summary: Asset balances
       description: >-
-        Get account balances in all assets (excluding WAVES and NFTs) at a given
-        address
-      operationId: getAllAssetBalancesByAddress
+        Get account balances in all or specified assets (excluding WAVES) at a given address.<br>
+        Note: Full portfolio also excludes NFTs.
+      operationId: getAssetBalances
       parameters:
         - $ref: '#/components/parameters/address'
+        - name: id
+          in: query
+          required: false
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/AssetId'
+            minItems: 1
+            maxItems: 100
       responses:
         '200':
           description: successful operation
           content:
             application/json:
               schema:
-                required:
-                  - address
-                  - balances
-                type: object
-                properties:
-                  address:
-                    type: string
-                  balances:
-                    type: array
-                    items:
-                      required:
-                        - assetId
-                        - balance
-                        - issueTransaction
-                        - minSponsoredAssetFee
-                        - quantity
-                        - reissuable
-                        - sponsorBalance
-                      type: object
-                      properties:
-                        assetId:
-                          type: string
-                          description: Asset ID base58 encoded
-                        balance:
-                          type: integer
-                          format: int64
-                          description: Account balance in the asset
-                        reissuable:
-                          type: boolean
-                          description: Indicates if the asset is reissuable
-                        minSponsoredAssetFee:
-                          type: integer
-                          format: int64
-                          nullable: true
-                          description: >-
-                            For [sponsored
-                            asset](https://docs.waves.tech/en/blockchain/waves-protocol/sponsored-fee)
-                            only: the equivalent of 0.001 WAVES
-                        sponsorBalance:
-                          type: integer
-                          format: int64
-                          nullable: true
-                          description: >-
-                            For [sponsored
-                            asset](https://docs.waves.tech/en/blockchain/waves-protocol/sponsored-fee)
-                            only: the sponsor balance in WAVES
-                        quantity:
-                          type: integer
-                          format: int64
-                          description: Total supply of the asset
-                        issueTransaction:
-                          $ref: '#/components/schemas/IssueTransaction'
+                $ref: '#/components/schemas/AssetBalancesResponse'
+    post:
+      tags:
+        - assets
+      summary: Asset balances
+      description: >-
+        Get account balances in specified assets (excluding WAVES) at a given address
+      operationId: getAssetBalancesViaPost
+      parameters:
+        - $ref: '#/components/parameters/address'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                ids:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AssetId'
+                  minItems: 1
+                  maxItems: 100
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AssetId'
+            encoding:
+              id:
+                style: form
+                explode: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetBalancesResponse'
+      x-codegen-request-body-name: ids
   '/assets/details/{assetId}':
     get:
       tags:
@@ -2005,7 +1988,7 @@ paths:
         - $ref: '#/components/parameters/assetId'
         - name: full
           in: query
-          description: 'false'
+          description: 'If true, the response contains `scriptDetails` for scripted assets. False by default'
           schema:
             type: boolean
       responses:
@@ -2022,7 +2005,8 @@ paths:
       summary: Information about multiple assets
       description: >-
         Get detailed information about given assets. See [fields
-        descriptions](https://docs.waves.tech/en/blockchain/token/#custom-token-parameters)
+        descriptions](https://docs.waves.tech/en/blockchain/token/#custom-token-parameters).
+        For dozens of assets, better use the POST method
       operationId: getMultipleAssetDetails
       parameters:
         - name: id
@@ -2037,7 +2021,7 @@ paths:
               type: string
         - name: full
           in: query
-          description: 'false'
+          description: 'If true, the response contains `scriptDetails` for scripted assets. False by default'
           schema:
             type: boolean
       responses:
@@ -2049,6 +2033,51 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/AssetDetails'
+    post:
+      tags:
+        - assets
+      summary: Information about multiple assets
+      description: >-
+        Get detailed information about given assets. See [fields
+        descriptions](https://docs.waves.tech/en/blockchain/token/#custom-token-parameters)
+      operationId: getMultipleAssetDetailsViaPost
+      parameters:
+        - name: full
+          in: query
+          description: 'If true, the response contains `scriptDetails` for scripted assets. False by default'
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                ids:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AssetId'
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AssetId'
+            encoding:
+              id:
+                style: form
+                explode: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AssetDetails'
+      x-codegen-request-body-name: ids
   '/assets/balance/{address}/{assetId}':
     get:
       tags:
@@ -2201,8 +2230,8 @@ paths:
       tags:
         - leasing
       summary: Lease info
-      description: Get lease info.
-      operationId: lease_info_get
+      description: Get lease parameters by lease ID
+      operationId: getLease
       parameters:
         - name: id
           in: path
@@ -2221,13 +2250,13 @@ paths:
     get:
       tags:
         - leasing
-      summary: Lease transactions
-      description: Get lease transactions info.
-      operationId: lease_infos_get
+      summary: Multiple leases info
+      description: Get lease parameters by lease IDs
+      operationId: getMultipleLeases
       parameters:
         - name: id
           in: query
-          description: Transaction IDs base58 encoded
+          description: Lease ID base58 encoded
           required: true
           style: form
           explode: true
@@ -2250,9 +2279,9 @@ paths:
     post:
       tags:
         - leasing
-      summary: Lease transactions
-      description: Get lease transactions info.
-      operationId: lease_infos_post
+      summary: Multiple leases info
+      description: Get lease parameters by lease IDs
+      operationId: getMultipleLeasesViaPost
       requestBody:
         content:
           application/json:
@@ -2314,7 +2343,8 @@ paths:
                 type: object
                 properties:
                   height:
-                    $ref: '#/components/schemas/Height'
+                    allOf:
+                      - $ref: '#/components/schemas/Height'
                     description: Current blockchain height on the node
                   votingInterval:
                     type: integer
@@ -2386,11 +2416,11 @@ paths:
       responses:
         '200':
           description: Success
-          content: {}
+          content: { }
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
       x-codegen-request-body-name: body
   /debug/state:
     get:
@@ -2416,7 +2446,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
   /debug/info:
     get:
       tags:
@@ -2503,7 +2533,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
   '/debug/stateHash/{height}':
     get:
       tags:
@@ -2570,14 +2600,14 @@ paths:
       responses:
         '200':
           description: Success
-          content: {}
+          content: { }
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
         '404':
           description: There are no peer with such address
-          content: {}
+          content: { }
       security:
-        - APIKey: []
+        - APIKey: [ ]
       x-codegen-request-body-name: address
   '/debug/portfolios/{address}':
     get:
@@ -2635,7 +2665,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
   '/debug/rollback-to/{id}':
     delete:
       tags:
@@ -2660,7 +2690,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
   /debug/validate:
     post:
       tags:
@@ -2762,7 +2792,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
   /debug/rollback:
     post:
       tags:
@@ -2804,7 +2834,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
       x-codegen-request-body-name: body
   /debug/minerInfo:
     get:
@@ -2836,7 +2866,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
   /debug/configInfo:
     get:
       tags:
@@ -2854,11 +2884,11 @@ paths:
       responses:
         '200':
           description: Json config
-          content: {}
+          content: { }
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
   /node/stop:
     post:
       tags:
@@ -2881,7 +2911,7 @@ paths:
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
-        - APIKey: []
+        - APIKey: [ ]
   /node/status:
     get:
       tags:
@@ -2995,20 +3025,23 @@ components:
       minimum: 0
     TransactionBase:
       type: object
-      required: [id, timestamp, type, fee]
+      required: [ id, timestamp, type, fee ]
       properties:
         timestamp:
           $ref: '#/components/schemas/Timestamp'
         sender:
-          $ref: '#/components/schemas/Address'
+          allOf:
+            - $ref: '#/components/schemas/Address'
           readOnly: true
         senderPublicKey:
           $ref: '#/components/schemas/PublicKey'
         id:
-          $ref: '#/components/schemas/TransactionId'
+          allOf:
+            - $ref: '#/components/schemas/TransactionId'
           readOnly: true
         applicationStatus:
-          $ref: '#/components/schemas/ApplicationStatus'
+          allOf:
+            - $ref: '#/components/schemas/ApplicationStatus'
           readOnly: true
         version:
           type: integer
@@ -3025,13 +3058,14 @@ components:
         fee:
           $ref: '#/components/schemas/Amount'
         feeAssetId:
-          $ref: '#/components/schemas/AssetId'
+          allOf:
+            - $ref: '#/components/schemas/AssetId'
           nullable: true
     TransactionInfo:
       allOf:
         - $ref: '#/components/schemas/TransactionBase'
         - type: object
-          required: [height, sender, senderPublicKey, proofs, signature]
+          required: [ height, sender, senderPublicKey, proofs, signature ]
     ApiError:
       required:
         - error
@@ -3125,6 +3159,61 @@ components:
                   format: byte
                 scriptText:
                   type: string
+    AssetBalanceAndDetails:
+      required:
+        - assetId
+        - balance
+        - issueTransaction
+        - minSponsoredAssetFee
+        - quantity
+        - reissuable
+        - sponsorBalance
+      type: object
+      properties:
+        assetId:
+          type: string
+          description: Asset ID base58 encoded
+        balance:
+          type: integer
+          format: int64
+          description: Account balance in the asset
+        reissuable:
+          type: boolean
+          description: Indicates if the asset is reissuable
+        minSponsoredAssetFee:
+          type: integer
+          format: int64
+          nullable: true
+          description: >-
+            For [sponsored
+            asset](https://docs.waves.tech/en/blockchain/waves-protocol/sponsored-fee)
+            only: the equivalent of 0.001 WAVES
+        sponsorBalance:
+          type: integer
+          format: int64
+          nullable: true
+          description: >-
+            For [sponsored
+            asset](https://docs.waves.tech/en/blockchain/waves-protocol/sponsored-fee)
+            only: the sponsor balance in WAVES
+        quantity:
+          type: integer
+          format: int64
+          description: Total supply of the asset
+        issueTransaction:
+          $ref: '#/components/schemas/IssueTransaction'
+    AssetBalancesResponse:
+      required:
+        - address
+        - balances
+      type: object
+      properties:
+        address:
+          type: string
+        balances:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssetBalanceAndDetails'
     Balance:
       required:
         - address
@@ -3386,7 +3475,8 @@ components:
         id:
           type: string
         sender:
-          $ref: '#/components/schemas/Address'
+          allOf:
+            - $ref: '#/components/schemas/Address'
           readOnly: true
         senderPublicKey:
           $ref: '#/components/schemas/PublicKey'
@@ -3461,7 +3551,7 @@ components:
           format: int32
         votes:
           type: object
-          required: [decrease, increase]
+          required: [ decrease, increase ]
           properties:
             increase:
               type: integer
@@ -3480,7 +3570,7 @@ components:
         signature:
           $ref: '#/components/schemas/Signature'
     NonGenesisTransaction:
-      required: [sender, senderPublicKey, applicationStatus, version, proofs, signature, feeAssetId]
+      required: [ sender, senderPublicKey, applicationStatus, version, proofs, signature, feeAssetId ]
       allOf:
         - $ref: '#/components/schemas/TransactionBase'
       oneOf:
@@ -3519,11 +3609,9 @@ components:
       enum:
         - active
         - canceled
-        - expired
       description: |
         * `active`: lease is active; 
-        * `canceled`: lease was cancelled by transaction; 
-        * `expired`: lease has expired
+        * `canceled`: lease has been canceled
     LeaseInfo:
       required:
         - id
@@ -3536,36 +3624,40 @@ components:
       type: object
       properties:
         id:
-          $ref: '#/components/schemas/LeaseId'
+          allOf:
+            - $ref: '#/components/schemas/LeaseId'
+          description: Lease ID
         originTransactionId:
-          $ref: '#/components/schemas/TransactionId'
+          allOf:
+            - $ref: '#/components/schemas/TransactionId'
+          description: ID of Lease or Invoke Script transaction that created the lease
         sender:
           $ref: '#/components/schemas/Address'
         recipient:
-          $ref: '#/components/schemas/Address'
-          description: Lease recipient id
+          allOf:
+            - $ref: '#/components/schemas/Address'
+          description: Lease recipient address
         amount:
           type: integer
           format: int32
-          description: Leased Waves amount
+          description: Leased WAVES amount
+          allOf:
+            - $ref: '#/components/schemas/Amount'
         height:
-          $ref: '#/components/schemas/Height'
+          allOf:
+            - $ref: '#/components/schemas/Height'
           description: >-
-            The sequential number of the block that contains the lease
-            transaction
+            The sequential number of the block that contains the origin transaction
         status:
           $ref: '#/components/schemas/LeaseStatus'
-          description: >-
-            active: lease is active; canceled: lease was cancelled by
-            transaction; expired: lease has expired
         cancelHeight:
-          $ref: '#/components/schemas/Height'
-          description: >-
-            The sequential number of the block that contains the lease cancel
-            transaction
+          allOf:
+            - $ref: '#/components/schemas/Height'
+          description: "The sequential number of the block that contains the cancel transaction"
         cancelTransactionId:
-          $ref: '#/components/schemas/TransactionId'
-          description: Lease cancel/invoke with cancellation transaction ID
+          allOf:
+            - $ref: '#/components/schemas/TransactionId'
+          description: ID of Lease Cancel or Invoke Script transaction that canceled the lease
     TransactionStatus:
       type: object
       properties:
@@ -3582,7 +3674,8 @@ components:
             * `unconfirmed`: transaction is in the UTX pool
             * `confirmed`: transaction is added to the block or microblock
         height:
-          $ref: '#/components/schemas/Height'
+          allOf:
+            - $ref: '#/components/schemas/Height'
           description: The sequential number of the block that contains the transaction
         confirmations:
           type: integer
@@ -3612,7 +3705,7 @@ components:
             $ref: '#/components/schemas/Hash'
     BurnTransaction:
       type: object
-      required: [assetId, amount]
+      required: [ assetId, amount ]
       properties:
         assetId:
           $ref: '#/components/schemas/AssetId'
@@ -3620,14 +3713,14 @@ components:
           $ref: '#/components/schemas/Amount'
     CreateAliasTransaction:
       type: object
-      required: [alias]
+      required: [ alias ]
       properties:
         alias:
           type: string
           pattern: '^[\-\.0-9@_a-z]{4,30}$'
     DataTransaction:
       type: object
-      required: [data]
+      required: [ data ]
       properties:
         data:
           type: array
@@ -3700,7 +3793,8 @@ components:
               amount:
                 $ref: '#/components/schemas/Amount'
               assetId:
-                $ref: '#/components/schemas/AssetId'
+                allOf:
+                  - $ref: '#/components/schemas/AssetId'
                 nullable: true
         call:
           type: object
@@ -3725,7 +3819,7 @@ components:
                       - string
                   value:
                     type: object
-                    properties: {}
+                    properties: { }
                     description: >-
                       binary/boolean/integer/string value or list of { type,
                       value } objects
@@ -3743,7 +3837,8 @@ components:
         - script
       properties:
         assetId:
-          $ref: '#/components/schemas/AssetId'
+          allOf:
+            - $ref: '#/components/schemas/AssetId'
           readOnly: true
         name:
           $ref: '#/components/schemas/AssetName'
@@ -3798,7 +3893,8 @@ components:
           format: int32
           readOnly: true
         totalAmount:
-          $ref: '#/components/schemas/Amount'
+          allOf:
+            - $ref: '#/components/schemas/Amount'
           readOnly: true
         transfers:
           type: array
@@ -3865,10 +3961,12 @@ components:
         recipient:
           $ref: '#/components/schemas/AddressOrAlias'
         assetId:
-          $ref: '#/components/schemas/AssetId'
+          allOf:
+            - $ref: '#/components/schemas/AssetId'
           nullable: true
         feeAsset:
-          $ref: '#/components/schemas/AssetId'
+          allOf:
+            - $ref: '#/components/schemas/AssetId'
           nullable: true
         amount:
           $ref: '#/components/schemas/Amount'
@@ -3898,10 +3996,11 @@ components:
         - asset
         - amount
       properties:
-        address: 
+        address:
           $ref: '#/components/schemas/Address'
         asset:
-          $ref: '#/components/schemas/AssetId'
+          allOf:
+            - $ref: '#/components/schemas/AssetId'
           nullable: true
         amount:
           $ref: '#/components/schemas/Amount'
@@ -3923,7 +4022,7 @@ components:
         - assetId
         - isReissuable
         - quantity
-      properties: 
+      properties:
         assetId:
           $ref: '#/components/schemas/AssetId'
         isReissuable:
@@ -3936,13 +4035,13 @@ components:
       required:
         - assetId
         - quantity
-      properties: {}
+      properties: { }
     SponsorFeeAction:
       type: object
       required:
         - assetId
         - minSponsoredAssetFee
-      properties: {}
+      properties: { }
     LeaseAction:
       allOf:
         - $ref: '#/components/schemas/LeaseInfo'
@@ -3950,7 +4049,7 @@ components:
       type: object
       required:
         - recipient
-      properties: {}
+      properties: { }
     InvokeAction:
       type: object
       required:
@@ -4019,7 +4118,7 @@ components:
         application/json:
           schema:
             type: object
-            required: [height]
+            required: [ height ]
             properties:
               height:
                 $ref: '#/components/schemas/Height'
