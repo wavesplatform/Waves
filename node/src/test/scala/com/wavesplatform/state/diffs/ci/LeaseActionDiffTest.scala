@@ -18,12 +18,12 @@ import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produceRejectOrFailedDiff}
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.TxHelpers.{defaultAddress, invoke, lease, secondAddress, secondSigner, setScript}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.{Authorized, CreateAliasTransaction, Transaction, TransactionType, TxHelpers, TxVersion}
 import org.scalatest.exceptions.TestFailedException
-import DomainPresets.*
 
 import scala.util.Random
 
@@ -35,6 +35,9 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
 
   private val v4Features = features(V4)
   private val v5Features = features(V5)
+
+  private val setScriptFee = FeeConstants(TransactionType.SetScript) * FeeUnit
+  private val leaseFee     = FeeConstants(TransactionType.Lease) * FeeUnit
 
   private def dApp(body: String, version: StdLibVersion = V5): Script =
     TestCompiler(version).compileContract(s"""
@@ -936,7 +939,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
   }
 
   property("trying to spend lease IN balance in Lease action") {
-    withDomain(RideV5, Seq(AddrWithBalance(secondAddress, 0.005.waves))) { d =>
+    withDomain(RideV5, Seq(AddrWithBalance(secondAddress, setScriptFee))) { d =>
       val dApp = TestCompiler(V5).compileContract(
         s"""
            | @Callable(i)
@@ -955,7 +958,7 @@ class LeaseActionDiffTest extends PropSpec with WithDomain {
   property("trying to spend lease OUT balance in Lease action") {
     withDomain(
       RideV5,
-      Seq(AddrWithBalance(secondAddress, 1.006.waves))
+      Seq(AddrWithBalance(secondAddress, leaseFee + setScriptFee + 1))
     ) { d =>
       val dApp = TestCompiler(V5).compileContract(
         s"""
