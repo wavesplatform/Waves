@@ -84,7 +84,7 @@ class Handler(id: String, maybeLiquidState: Option[LiquidState], subject: Publis
   }
 
   private def sendUpdate(): Unit =
-    if (queue.nonEmpty && !cancelled)
+    if (queue.nonEmpty && subject.subscription.isCompleted && !cancelled)
       s.execute(
         () =>
           queue.synchronized {

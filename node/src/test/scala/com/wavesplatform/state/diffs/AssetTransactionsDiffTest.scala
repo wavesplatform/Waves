@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs
 
-import com.wavesplatform.{BlocksTransactionsHelpers, TestValues}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -22,10 +21,12 @@ import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySetti
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxHelpers, TxVersion}
+import com.wavesplatform.{BlocksTransactionsHelpers, TestValues}
 import fastparse.Parsed
 
 class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers with WithDomain {

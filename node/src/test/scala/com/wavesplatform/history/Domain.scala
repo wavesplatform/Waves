@@ -26,6 +26,7 @@ import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{Application, TestValues, database}
 import monix.execution.Scheduler.Implicits.global
 import org.iq80.leveldb.DB
+import org.scalatest.matchers.should.Matchers.*
 import play.api.libs.json.{JsNull, JsValue, Json}
 
 import scala.collection.immutable.SortedMap
@@ -47,11 +48,11 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   val transactionDiffer: Transaction => TracedResult[ValidationError, Diff] =
     TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis())(blockchain, _)
 
-  lazy val utxPool: UtxPoolImpl = new UtxPoolImpl(SystemTime, blockchain, settings.utxSettings)
-  lazy val wallet: Wallet       = Wallet(settings.walletSettings.copy(file = None))
-
   def createDiffE(tx: Transaction): Either[ValidationError, Diff] = transactionDiffer(tx).resultE
   def createDiff(tx: Transaction): Diff                           = createDiffE(tx).explicitGet()
+
+  lazy val utxPool: UtxPoolImpl = new UtxPoolImpl(SystemTime, blockchain, settings.utxSettings, settings.minerSettings.enable)
+  lazy val wallet: Wallet = Wallet(settings.walletSettings.copy(file = None))
 
   object commonApi {
 
@@ -209,6 +210,13 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     }
   }
 
+  def appendAndAssertFailed(tx: Transaction, message: String): Block = {
+    appendBlock(tx)
+    assert(!blockchain.transactionSucceeded(tx.id()), s"should fail: $tx")
+    liquidDiff.errorMessage(tx.id()).get.text should include(message)
+    lastBlock
+  }
+
   def appendBlockE(txs: Transaction*): Either[ValidationError, Seq[Diff]] =
     appendBlockE(createBlock(Block.PlainBlockVersion, txs))
 
@@ -220,7 +228,9 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def appendKeyBlock(ref: Option[ByteStr] = None): Block = {
     val block = createBlock(Block.NgBlockVersion, Nil, ref.orElse(Some(lastBlockId)))
-    appendBlock(block)
+    val discardedDiffs = appendBlock(block)
+    utxPool.setPriorityDiffs(discardedDiffs)
+    utxPool.cleanUnconfirmed()
     lastBlock
   }
 

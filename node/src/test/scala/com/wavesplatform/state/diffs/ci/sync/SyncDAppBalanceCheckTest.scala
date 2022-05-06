@@ -4,13 +4,14 @@ import com.wavesplatform.TransactionGenBase
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.features.BlockchainFeatures.*
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.utils.Signed
@@ -62,7 +63,7 @@ class SyncDAppBalanceCheckTest extends PropSpec with WithDomain with Transaction
     val settings =
       DomainPresets.RideV5
         .configure(_.copy(enforceTransferValidationAfter = 2))
-        .setFeaturesHeight(RideV6 -> 4)
+        .setFeaturesHeight(BlockchainFeatures.RideV6 -> 4)
 
     withDomain(settings) { d =>
       d.appendBlock(preparingTxs*)

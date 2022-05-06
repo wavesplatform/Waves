@@ -1,5 +1,7 @@
 package com.wavesplatform.transaction.smart.script
 
+import java.io.{PrintWriter, StringWriter}
+
 import com.wavesplatform.lang.directives.*
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -7,9 +9,8 @@ import com.wavesplatform.lang.script.{ContractScript, Script, ScriptPreprocessor
 import com.wavesplatform.lang.utils.*
 import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompiler}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.utils.*
 
-object ScriptCompiler extends ScorexLogging {
+object ScriptCompiler {
 
   @Deprecated
   def apply(
@@ -80,10 +81,11 @@ object ScriptCompiler extends ScorexLogging {
       }
     } catch {
       case ex: Throwable =>
-        log.error("Error compiling script", ex)
-        log.error(src)
+        val sw = new StringWriter()
+        ex.printStackTrace(new PrintWriter(sw))
         val msg = Option(ex.getMessage).getOrElse("Parsing failed: Unknown error")
-        Left(msg)
+
+        Left(s"$msg\n${sw.toString}")
     }
   }
 }

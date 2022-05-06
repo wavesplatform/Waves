@@ -20,8 +20,6 @@ import kamon.trace.Span
 import monix.eval.Task
 import monix.execution.Scheduler
 
-import scala.util.Right
-
 object BlockAppender extends ScorexLogging {
   def apply(
       blockchainUpdater: BlockchainUpdater with Blockchain,

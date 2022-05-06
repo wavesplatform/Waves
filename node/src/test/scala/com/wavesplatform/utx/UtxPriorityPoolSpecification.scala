@@ -1,238 +1,128 @@
 package com.wavesplatform.utx
 
-import cats.data.NonEmptyList
-import com.wavesplatform.account.{Address, KeyPair, PublicKey}
-import com.wavesplatform.block.SignedBlockHeader
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.TransactionsOrdering
-import com.wavesplatform.db.WithDomain
-import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.mining.{MultiDimensionalMiningConstraint, OneDimensionalMiningConstraint, TxEstimators}
+import com.wavesplatform.account.KeyPair
+import com.wavesplatform.db.WithState
+import com.wavesplatform.lang.directives.values.V3
+import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Diff, LeaseBalance, Portfolio}
-import com.wavesplatform.test.FreeSpec
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Transaction, TxHelpers, TxVersion}
-import com.wavesplatform.utils.Time
+import com.wavesplatform.test.*
+import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utx.UtxPool.PackStrategy
-import com.wavesplatform.{BlocksTransactionsHelpers, TestValues}
-import org.scalacheck.Gen
-import org.scalacheck.Gen.chooseNum
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.EitherValues
-import org.scalatest.concurrent.Eventually
-import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
-class UtxPriorityPoolSpecification
-    extends FreeSpec
-    with MockFactory
-    with ScalaCheckDrivenPropertyChecks
-    with BlocksTransactionsHelpers
-    with WithDomain
-    with EitherValues
-    with Eventually {
+class UtxPriorityPoolSpecification extends FreeSpec with SharedDomain {
+  private val alice = TxHelpers.signer(100)
+
+  private var lastKeyPair = 0
+  private def nextKeyPair = {
+    lastKeyPair += 1
+    TxHelpers.signer(lastKeyPair)
+  }
+
+  override val genesisBalances: Seq[WithState.AddrWithBalance] = Seq(alice -> 10000.waves)
+
+  override def settings: WavesSettings = DomainPresets.RideV3
+
+  private def pack() = domain.utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1
+
+  private def mkHeightSensitiveScript(sender: KeyPair) =
+    TxHelpers.setScript(
+      sender,
+      TestCompiler(V3).compileExpression(s"""
+           |match tx {
+           |    case _: TransferTransaction => height % 2 == ${domain.blockchain.height % 2}
+           |    case _ => true
+           |}
+           |""".stripMargin),
+      fee = 0.01.waves
+    )
+
   "priority pool" - {
-    import TestValues.{script as testScript, scriptComplexity as testScriptComplexity}
-    implicit class UtxPoolImplExt(utx: UtxPoolImpl) {
-      def setPriorityTxs(txs: Seq[Transaction]): Unit = {
-        val asDiffs = txs.map {
-          case tt: TransferTransaction =>
-            val pfs = Map(
-              tt.sender.toAddress                -> -(tt.fee.value + tt.amount.value),
-              tt.recipient.asInstanceOf[Address] -> tt.amount.value
-            ).view.mapValues(Portfolio.waves).toMap
-            Diff(portfolios = pfs).bindTransaction(tt)
+    "preserves correct order of transactions" in {
+      val id = domain.appendKeyBlock().id()
+      val t1 = TxHelpers.transfer(alice, nextKeyPair.toAddress, fee = 0.001.waves)
+      val t2 = TxHelpers.transfer(alice, nextKeyPair.toAddress, fee = 0.01.waves, timestamp = t1.timestamp - 10000)
 
-          case _ => Diff.empty
-        }
-        utx.setPriorityDiffs(asDiffs)
-      }
+      domain.appendMicroBlock(t1)
+      domain.appendMicroBlock(t2)
+      domain.appendKeyBlock(Some(id))
+
+      val expectedTransactions = Seq(t1, t2)
+      domain.utxPool.priorityPool.priorityTransactions shouldBe expectedTransactions
+      pack() shouldBe Some(expectedTransactions)
     }
 
-    val gen = for {
-      acc         <- accountGen
-      acc1        <- accountGen
-      acc2        <- accountGen
-      tx1         <- transferV2(acc, ENOUGH_AMT / 3, ntpTime)
-      nonScripted <- Gen.nonEmptyListOf(transferV2(acc1, 10000000L, ntpTime).suchThat(_.fee.value < tx1.fee.value))
-      scripted    <- Gen.nonEmptyListOf(transferV2(acc2, 10000000L, ntpTime).suchThat(_.fee.value < tx1.fee.value))
-    } yield (tx1, nonScripted, scripted)
+    "takes into account priority txs when packing" in {
+      val id        = domain.appendKeyBlock().id()
+      val bob       = nextKeyPair
+      val transfer1 = TxHelpers.transfer(alice, bob.toAddress, 10.001.waves, fee = 0.001.waves)
 
-    def createState(scripted: Address, settings: WavesSettings = WavesSettings.default(), setBalance: Boolean = true): Blockchain = {
-      val blockchain = stub[Blockchain]
-      (() => blockchain.settings).when().returning(settings.blockchainSettings)
-      (() => blockchain.height).when().returning(1)
-      (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.SmartAccounts.id -> 0))
+      domain.appendMicroBlock(transfer1)
+        domain.appendKeyBlock(Some(id))
 
-      if (setBalance) (blockchain.balance _).when(*, *).returning(ENOUGH_AMT)
-      (blockchain.leaseBalance _).when(*).returning(LeaseBalance(0, 0))
+      domain.utxPool.priorityPool.priorityTransactions shouldBe Seq(transfer1)
 
-      (blockchain.accountScript _)
-        .when(scripted)
-        .returns(Some(AccountScriptInfo(PublicKey(new Array[Byte](32)), testScript, testScriptComplexity, Map.empty)))
-      (blockchain.accountScript _).when(*).returns(None)
-      val tb = TestBlock.create(Nil)
-      (blockchain.blockHeader _).when(*).returning(Some(SignedBlockHeader(tb.header, tb.signature)))
-      (blockchain.transactionMeta _).when(*).returning(None)
-      (blockchain.resolveERC20Address _).when(*).returning(None)
-      blockchain
-    }
+      val transfer2 = TxHelpers.transfer(bob, nextKeyPair.toAddress, 10.waves, fee = 0.001.waves)
 
-    "preserves correct order of transactions" in forAll(gen) { case (tx1, nonScripted, scripted) =>
-      val blockchain = createState(scripted.head.sender.toAddress)
-      val utx =
-        new UtxPoolImpl(ntpTime, blockchain, WavesSettings.default().utxSettings)
-      utx.putIfNew(tx1).resultE should beRight
-      val minedTxs = scripted ++ nonScripted
-      utx.setPriorityTxs(minedTxs)
-
-      utx
-        .packUnconfirmed(
-          MultiDimensionalMiningConstraint(NonEmptyList.of(OneDimensionalMiningConstraint(1, TxEstimators.one, ""))),
-          PackStrategy.Unlimited
-        )
-        ._1 shouldBe Some(minedTxs.head +: Nil)
-      val expectedTxs = minedTxs :+ tx1
-      utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(expectedTxs)
-      utx.all shouldBe expectedTxs
-
-      val (left, right) = minedTxs.splitAt(minedTxs.length / 2)
-
-      utx.removeAll(left)
-      utx.priorityPool.priorityTransactions should not be empty
-
-      val expectedTxs1 = right :+ tx1
-      all(right.map(utx.putIfNew(_).resultE)) shouldBe Right(false)
-      val test = utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1
-      test shouldBe Some(expectedTxs1)
-      utx.all shouldBe expectedTxs1
-
-      val expectedTxs2 = expectedTxs1 ++ left.sorted(TransactionsOrdering.InUTXPool(Set()))
-      utx.removeAll(expectedTxs2)
-      left.foreach(utx.putIfNew(_).resultE should beRight)
-      utx.setPriorityTxs(expectedTxs1)
-      utx.all shouldBe expectedTxs2
-
-      utx.removeAll(expectedTxs2)
-      utx.all shouldBe empty
-      utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe empty
-    }
-
-    "removes priority transactions from ordinary pool on pack" in forAll(gen) { case (_, nonScripted, scripted) =>
-      val blockchain = createState(scripted.head.sender.toAddress)
-      val utx =
-        new UtxPoolImpl(ntpTime, blockchain, WavesSettings.default().utxSettings)
-
-      utx.setPriorityTxs(nonScripted)
-      nonScripted.foreach(utx.putIfNew(_).resultE should beRight)
-      utx.nonPriorityTransactions shouldBe empty
-      utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(nonScripted)
-      utx.nonPriorityTransactions shouldBe empty
-    }
-
-    val genDependent = for {
-      acc  <- accountGen
-      acc1 <- accountGen
-      tx1  <- transferV2WithRecipient(acc, acc1.publicKey, ENOUGH_AMT / 3, ntpTime).suchThat(_.amount.value > 20000000L)
-      tx2  <- transferV2(acc1, tx1.amount.value / 2, ntpTime)
-    } yield (tx1, tx2)
-
-    "takes into account priority txs when pack" in forAll(genDependent) { case (tx1, tx2) =>
-      val blockchain = createState(tx1.sender.toAddress, setBalance = false)
-      (blockchain.balance _).when(tx1.sender.toAddress, *).returning(ENOUGH_AMT)
-      (blockchain.balance _).when(*, *).returning(0) // Should be overriden in composite blockchain
-
-      val utx =
-        new UtxPoolImpl(ntpTime, blockchain, WavesSettings.default().utxSettings)
-      utx.setPriorityTxs(Seq(tx1))
-      utx.putNewTx(tx2, verify = false, forceValidate = false).resultE should beRight
-      utx.nonPriorityTransactions shouldBe Seq(tx2)
-      utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(tx1 :: tx2 :: Nil)
+      domain.utxPool.putIfNew(transfer2).resultE should beRight
+      domain.utxPool.nonPriorityTransactions shouldBe Seq(transfer2)
+      pack() shouldBe Some(Seq(transfer1, transfer2))
     }
 
     "counts microblock size from priority diffs" in {
-      val blockchain = createState(TxHelpers.defaultSigner.toAddress)
-      val utx =
-        new UtxPoolImpl(ntpTime, blockchain, WavesSettings.default().utxSettings)
+      val ref = domain.appendKeyBlock().id()
+      domain.appendMicroBlock(Seq.tabulate(5) { i =>
+        TxHelpers.transfer(alice, TxHelpers.signer(200 + i).toAddress)
+      }: _*)
+      domain.appendMicroBlock(Seq.tabulate(5) { i =>
+        TxHelpers.transfer(alice, TxHelpers.signer(300 + i).toAddress)
+      }: _*)
 
-      def createDiff(): Diff =
-        (1 to 5).map(_ => Diff.empty.bindTransaction(TxHelpers.issue())).reduce(_.combine(_).explicitGet())
-
-      utx.setPriorityDiffs(Seq(createDiff(), createDiff())) // 10 total
-      utx.priorityPool.nextMicroBlockSize(3) shouldBe 5
-      utx.priorityPool.nextMicroBlockSize(5) shouldBe 5
-      utx.priorityPool.nextMicroBlockSize(8) shouldBe 5
-      utx.priorityPool.nextMicroBlockSize(10) shouldBe 10
-      utx.priorityPool.nextMicroBlockSize(12) shouldBe 12
+      domain.appendKeyBlock(Some(ref))
+      // priority pool contains two microblocks, 5 txs each
+      domain.utxPool.priorityPool.nextMicroBlockSize(3) shouldBe 5
+      domain.utxPool.priorityPool.nextMicroBlockSize(5) shouldBe 5
+      domain.utxPool.priorityPool.nextMicroBlockSize(8) shouldBe 5
+      domain.utxPool.priorityPool.nextMicroBlockSize(10) shouldBe 10
+      domain.utxPool.priorityPool.nextMicroBlockSize(12) shouldBe 12
     }
 
-    "doesnt run cleanup on priority pool" in forAll(genDependent) { case (tx1, tx2) =>
-      val blockchain = createState(tx1.sender.toAddress, setBalance = false)
-      (blockchain.balance _).when(*, *).returning(0) // All invalid
+    "cleans up priority pool only when packing, not during cleanup" in {
 
-      val utx =
-        new UtxPoolImpl(ntpTime, blockchain, WavesSettings.default().utxSettings)
-      utx.setPriorityTxs(Seq(tx1, tx2))
-      utx.cleanUnconfirmed()
-      utx.all shouldBe Seq(tx1, tx2)
+      val bob, carol = nextKeyPair
+
+      domain.appendKeyBlock()
+      val rollbackTarget = domain.appendMicroBlock(
+        TxHelpers.transfer(alice, bob.toAddress, 10.015.waves, fee = 0.001.waves),
+        mkHeightSensitiveScript(bob),
+      )
+      val transferToCarol = TxHelpers.transfer(bob, carol.toAddress, 10.waves, fee = 0.005.waves)
+      domain.appendMicroBlock(transferToCarol)
+
+      domain.appendKeyBlock(Some(rollbackTarget))
+      domain.utxPool.cleanUnconfirmed()
+      domain.utxPool.priorityPool.priorityTransactions shouldEqual Seq(transferToCarol)
+      pack() shouldBe None
+      domain.utxPool.priorityPool.priorityTransactions shouldBe empty
     }
 
-    "invalidates priority pool on different microblock" in forAll(genDependent) { case (tx1, tx2) =>
-      val blockchain = createState(tx1.sender.toAddress, setBalance = false)
-      (blockchain.balance _).when(TxHelpers.defaultSigner.toAddress, *).returning(ENOUGH_AMT)
-      (blockchain.balance _).when(*, *).returning(0L)
+    "continues packing when priority diff contains no valid transactions" in {
+      val bob = nextKeyPair
+      domain.appendBlock(
+        TxHelpers.transfer(alice, bob.toAddress, 10.016.waves, fee = 0.001.waves),
+        mkHeightSensitiveScript(bob)
+      )
+      val ref       = domain.appendKeyBlock().id()
+      val transfer1 = TxHelpers.transfer(bob, nextKeyPair.toAddress, 10.waves, fee = 0.005.waves)
+      domain.appendMicroBlock(transfer1)
+      domain.appendKeyBlock(Some(ref))
+      domain.utxPool.priorityPool.priorityTransactions shouldEqual Seq(transfer1)
 
-      val utx =
-        new UtxPoolImpl(ntpTime, blockchain, WavesSettings.default().utxSettings)
+      val createAlias = TxHelpers.createAlias("0xbob", bob, 0.001.waves)
+      domain.utxPool.putIfNew(createAlias).resultE should beRight
+      domain.utxPool.all shouldEqual Seq(transfer1, createAlias)
 
-      utx.setPriorityTxs(Seq(tx1, tx2))
-      utx.removeAll(Seq(TxHelpers.issue()))
-
-      utx.priorityPool.validPriorityDiffs shouldBe empty
-      utx.priorityPool.priorityTransactions shouldBe Seq(tx1, tx2)
-
-      val profitableTx = TxHelpers.issue()
-      utx.putIfNew(profitableTx).resultE should beRight
-
-      utx.all shouldBe Seq(tx1, tx2, profitableTx)
-      utx.putIfNew(tx2).resultE should beLeft // Diff not counted
-    }
-
-    "takes into account priority diff on putIfNew" in forAll(genDependent) { case (tx1, tx2) =>
-      val blockchain = createState(tx1.sender.toAddress, setBalance = false)
-      (blockchain.balance _).when(tx1.sender.toAddress, *).returning(ENOUGH_AMT)
-      (blockchain.balance _).when(tx2.sender.toAddress, *).returning(ENOUGH_AMT).noMoreThanOnce()
-      (blockchain.balance _).when(tx2.sender.toAddress, *).returning(0)
-
-      val utx =
-        new UtxPoolImpl(ntpTime, blockchain, WavesSettings.default().utxSettings)
-      utx.setPriorityTxs(Seq(tx1))
-      utx.putNewTx(tx2, true, false).resultE.explicitGet()
-      utx.nonPriorityTransactions shouldBe Seq(tx2)
-      utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Unlimited)._1 shouldBe Some(tx1 :: tx2 :: Nil)
+      pack() shouldEqual Some(Seq(createAlias))
     }
   }
-
-  private def transferV2(sender: KeyPair, maxAmount: Long, time: Time) =
-    (for {
-      amount    <- chooseNum(1, (maxAmount * 0.9).toLong)
-      recipient <- accountGen
-      fee       <- chooseNum(ScriptExtraFee, (maxAmount * 0.1).toLong)
-    } yield TransferTransaction
-      .selfSigned(TxVersion.V2, sender, recipient.toAddress, Waves, amount, Waves, fee, ByteStr.empty, time.getTimestamp())
-      .explicitGet())
-      .label("transferTransactionV2")
-
-  private def transferV2WithRecipient(sender: KeyPair, recipient: PublicKey, maxAmount: Long, time: Time) =
-    (for {
-      amount <- chooseNum(1, (maxAmount * 0.9).toLong)
-      fee    <- chooseNum(ScriptExtraFee, (maxAmount * 0.1).toLong)
-    } yield TransferTransaction
-      .selfSigned(TxVersion.V2, sender, recipient.toAddress, Waves, amount, Waves, fee, ByteStr.empty, time.getTimestamp())
-      .explicitGet())
-      .label("transferWithRecipient")
 }

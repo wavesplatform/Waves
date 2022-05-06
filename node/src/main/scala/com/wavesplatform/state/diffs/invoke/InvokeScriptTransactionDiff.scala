@@ -315,7 +315,7 @@ object InvokeScriptTransactionDiff {
           case other                       => other
         }
 
-      case Left(error) => TracedResult(Left(error))
+      case Left(error)                               => TracedResult(Left(error))
     }
   }
 

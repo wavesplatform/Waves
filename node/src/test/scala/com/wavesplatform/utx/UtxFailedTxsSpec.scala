@@ -293,7 +293,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     val balances = AddrWithBalance.enoughBalances(TxHelpers.defaultSigner, dApp)
 
     withDomain(settings, balances) { d =>
-      val utx = new UtxPoolImpl(ntpTime, d.blockchainUpdater, settings.utxSettings)
+      val utx = new UtxPoolImpl(ntpTime, d.blockchainUpdater, settings.utxSettings, settings.minerSettings.enable)
       f(d, utx)
       utx.close()
     }

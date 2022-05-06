@@ -7,6 +7,7 @@ import scala.util.Random
 
 import com.google.common.primitives.Longs
 import com.google.protobuf.ByteString
+import com.wavesplatform.TestValues
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.common.state.ByteStr
@@ -34,6 +35,7 @@ import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctio
 import com.wavesplatform.state.{AssetDescription, Blockchain, EmptyDataEntry, Height, LeaseBalance, StringDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.{Asset, GenesisTransaction, PaymentTransaction, TxHelpers}
+import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -350,7 +352,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
 
     "should handle rollback properly" in {
       val transfer = TxHelpers.transfer()
-      val lease    = TxHelpers.lease()
+      val lease    = TxHelpers.lease(fee = TestValues.fee)
       val issue    = TxHelpers.issue(amount = 1000)
       val reissue  = TxHelpers.reissue(issue.asset)
       val data     = TxHelpers.dataSingle()
@@ -516,29 +518,54 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
       check()
     }
 
-    "should handle modifying last block correctly" in {
-      val startRead = new ReentrantLock()
-      withDomainAndRepo()(
-        { (d, repo) =>
-          (1 to 5).foreach(_ => d.appendBlock())
-          startRead.lock()
-
-          val subscription = Future {
-            repo.createFakeObserver(SubscribeRequest.of(1, 5))
-          }
-
-          d.appendMicroBlock(TxHelpers.transfer())
-          d.appendKeyBlock()
-
-          startRead.unlock()
-
-          Await
-            .result(subscription, 5 seconds)
-            .values.map(_.getUpdate.height) shouldBe (1 to 4)
-        },
-        Some(InterferableDB(startRead))
-      )
+    "should correctly concatenate stream from DB and new blocks stream" in {
+      subscribeAndCheckResult(5, _ => (), 1 to 5)
+      subscribeAndCheckResult(5, d => d.appendMicroBlock(TxHelpers.transfer()), (1 to 5) :+ 5)
+      subscribeAndCheckResult(5, d => d.appendKeyBlock(), 1 to 5, isStreamClosed = true)
+      subscribeAndCheckResult(5, d => {
+        d.appendMicroBlock(TxHelpers.transfer())
+        d.appendKeyBlock()
+      }, (1 to 5) :+ 5, isStreamClosed = true)
+      subscribeAndCheckResult(0, _ => (), 1 to 5)
+      subscribeAndCheckResult(0, d => d.appendMicroBlock(TxHelpers.transfer()), (1 to 5) :+ 5)
+      subscribeAndCheckResult(0, d => d.appendKeyBlock(), (1 to 5) :+ 6)
+      subscribeAndCheckResult(0, d => {
+        d.appendMicroBlock(TxHelpers.transfer())
+        d.appendKeyBlock()
+      }, (1 to 5) ++ Seq(5, 6))
+      subscribeAndCheckResult(0, d => { (1 to 249).foreach(_ => d.appendMicroBlock(TxHelpers.transfer(amount = 1))) }, (1 to 4) ++ Seq.fill(250)(5))
+      subscribeAndCheckResult(0, d => { (1 to 250).foreach(_ => d.appendMicroBlock(TxHelpers.transfer(amount = 1))) }, 1 to 4, isStreamClosed = true)
     }
+  }
+
+  private def subscribeAndCheckResult(
+      toHeight: Int,
+      appendExtraBlocks: Domain => Unit,
+      expectedResult: Seq[Int],
+      isStreamClosed: Boolean = false
+  ): Unit = {
+    val startRead = new ReentrantLock()
+    withDomainAndRepo()(
+      { (d, repo) =>
+        (1 to 5).foreach(_ => d.appendBlock())
+
+        startRead.lock()
+
+        val subscription = Future(repo.createSubscriptionObserver(SubscribeRequest.of(1, toHeight)))
+
+        appendExtraBlocks(d)
+
+        startRead.unlock()
+
+        val timeout = 30.seconds
+        Await
+          .result(
+            subscription.map(s => s.fetchUntil(_.values.map(_.getUpdate.height) == expectedResult && s.isCompleted == isStreamClosed, timeout)),
+            timeout
+          )
+      },
+      Some(InterferableDB(startRead))
+    )
   }
 
   case class InterferableDB(startRead: ReentrantLock) extends DB {
@@ -623,8 +650,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
 
   trait FakeObserver[T] extends StreamObserver[T] {
     def values: Seq[T]
-    def completed: Boolean
-    def error: Option[Throwable]
+    def isCompleted: Boolean
   }
 
   object FakeObserver {
@@ -650,7 +676,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
     }
 
     implicit class FakeObserverOps[T](fo: FakeObserver[T]) {
-      def fetchUntil(conditionF: Seq[T] => Boolean): Seq[T] = {
+      def fetchUntil(conditionF: Seq[T] => Boolean, timeout: Duration = 1.minute): Seq[T] = {
         def waitRecTask: Task[Unit] = {
           if (fo.error.isDefined) Task.raiseError(fo.error.get)
           else if (conditionF(fo.values)) Task.unit
@@ -659,7 +685,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
 
         waitRecTask
           .map(_ => fo.values)
-          .runSyncUnsafe(1.minute)
+          .runSyncUnsafe(timeout)
       }
     }
     implicit class EventsFakeObserverOps(fo: FakeObserver[SubscribeEvent]) {
@@ -671,6 +697,28 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
       def lastAppendEvent(bc: Blockchain): BlockAppended =
         fetchAllEvents(bc).last.getUpdate.vanillaAppend
     }
+  }
+
+  def createFakeObserver[T](): (FakeObserver[T], CancelableFuture[Seq[T]]) = {
+    val promise = Promise[Seq[T]]()
+    val obs: CallStreamObserver[T] with FakeObserver[T] = new CallStreamObserver[T] with FakeObserver[T] {
+      @volatile var values = Seq.empty[T]
+
+      override def isReady: Boolean                                  = true
+      override def setOnReadyHandler(onReadyHandler: Runnable): Unit = ()
+      override def disableAutoInboundFlowControl(): Unit             = ()
+      override def request(count: Int): Unit                         = ()
+      override def setMessageCompression(enable: Boolean): Unit      = ()
+
+      def onNext(value: T): Unit      = values :+= value
+      def onError(t: Throwable): Unit = promise.tryFailure(t)
+      def onCompleted(): Unit         = promise.trySuccess(values)
+
+      def isCompleted: Boolean = promise.isCompleted
+    }
+
+    val cancelableFuture = CancelableFuture(promise.future, () => obs.onCompleted())
+    (obs, cancelableFuture)
   }
 
   implicit class UpdatesRepoExt(ur: Repo) {

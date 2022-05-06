@@ -18,6 +18,7 @@ import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{BinaryDataEntry, Blockchain, Diff, Height, TxMeta}
+import com.wavesplatform.test.DomainPresets._
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -53,10 +54,7 @@ class LeaseRouteSpec
     )
 
   private def withRoute(balances: Seq[AddrWithBalance])(f: (Domain, Route) => Unit): Unit =
-    withDomain(
-      settings = DomainPresets.ContinuationTransaction,
-      balances = balances
-    ) { d =>
+    withDomain(settings = mostRecent, balances = balances) { d =>
       f(d, route(d).route)
     }
 

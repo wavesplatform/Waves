@@ -42,6 +42,9 @@ import shapeless.Coproduct
 import scala.util.{Failure, Right, Success, Try}
 
 object InvokeDiffsCommon {
+  val callExpressionError: TracedResult[GenericError, Nothing] =
+    TracedResult(Left(GenericError("Trying to call dApp on the account with expression script")))
+
   def txFeeDiff(blockchain: Blockchain, tx: InvokeScriptTransactionLike): Either[GenericError, (Long, Map[Address, Portfolio])] = {
     val attachedFee = tx.fee
     tx.feeAssetId match {
@@ -326,7 +329,7 @@ object InvokeDiffsCommon {
   private def checkOverflow(dataList: Iterable[Long]): Either[String, Unit] = {
     Try(dataList.foldLeft(0L)(Math.addExact))
       .fold(
-        _ => "Attempt to transfer unavailable funds in contract payment".asLeft[Unit],
+        _ => "ScriptTransfer overflow".asLeft[Unit],
         _ => ().asRight[String]
       )
   }
@@ -422,13 +425,13 @@ object InvokeDiffsCommon {
     }
   }
 
-  private def resolveAddress(recipient: Recipient.Address, blockchain: Blockchain): TracedResult[FailedTransactionError, Address] =
+  private def resolveAddress(recipient: Recipient.Address, blockchain: Blockchain): TracedResult[ValidationError, Address] =
     TracedResult {
       val address = Address.fromBytes(recipient.bytes.arr)
       if (blockchain.isFeatureActivated(BlockchainFeatures.RideV6))
         address.leftMap(e => FailedTransactionError.dAppExecution(e.reason, 0))
       else
-        address.explicitGet().asRight
+        address
     }
 
   private def foldActions(
