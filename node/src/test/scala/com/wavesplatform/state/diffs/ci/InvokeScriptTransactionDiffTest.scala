@@ -526,24 +526,22 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
 
   property("invoking ScriptTransfer contract results in accounts state") {
     val (genesis, setScript, ci) = preconditionsAndSetContract(dAppWithTransfers())
-    testDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion)) {
-      case (blockDiff, _) =>
-        blockDiff.scriptsRun shouldBe 1
-        blockDiff.portfolios(thirdAddress).balance shouldBe amount
-        blockDiff.portfolios(setScript.sender.toAddress).balance shouldBe -amount
-        blockDiff.transactions should contain key ci.id()
+    testDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion)) { case (blockDiff, _) =>
+      blockDiff.scriptsRun shouldBe 1
+      blockDiff.portfolios(thirdAddress).balance shouldBe amount
+      blockDiff.portfolios(setScript.sender.toAddress).balance shouldBe -amount
+      blockDiff.transactions should contain key ci.id()
     }
   }
 
   property("invoking default func ScriptTransfer contract results in accounts state") {
     val (genesis, setScript, ci) = preconditionsAndSetContract(defaultTransferContract(thirdAddress), isCIDefaultFunc = true)
 
-    testDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion)) {
-      case (blockDiff, _) =>
-        blockDiff.scriptsRun shouldBe 1
-        blockDiff.portfolios(thirdAddress).balance shouldBe amount
-        blockDiff.portfolios(setScript.sender.toAddress).balance shouldBe -amount
-        blockDiff.transactions should contain key ci.id()
+    testDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion)) { case (blockDiff, _) =>
+      blockDiff.scriptsRun shouldBe 1
+      blockDiff.portfolios(thirdAddress).balance shouldBe amount
+      blockDiff.portfolios(setScript.sender.toAddress).balance shouldBe -amount
+      blockDiff.transactions should contain key ci.id()
     }
   }
 
@@ -848,16 +846,6 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       _ should produceRejectOrFailedDiff("Attempt to transfer unavailable funds")
 
     }
-  }
-
-  property("can't overflow sum of payment in contract") {
-    val (genesis, setScript, ci) = preconditionsAndSetContract(
-      dAppWithTransfers(recipientAmount = Long.MaxValue / 2 + 2, assets = List.fill(4)(Waves)),
-      payment = Some(Payment(1, Waves))
-    )
-    testDiff(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)))(
-      _ should produceRejectOrFailedDiff("Attempt to transfer unavailable funds")
-    )
   }
 
   property("invoking contract with sponsored fee") {
@@ -1252,18 +1240,18 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
         TestBlock.create(Seq(invoke), Block.ProtoBlockVersion),
         from = V4,
         to = V4
-      ) (
+      )(
         if (issue)
           _ shouldBe Symbol("right")
         else
           _ should produce("negative asset balance")
       )
-      testDiffAndState(
+      testDiff(
         Seq(TestBlock.create(Seq(genesis1Tx, genesis2Tx, setScriptTx))),
         TestBlock.create(Seq(invoke), Block.ProtoBlockVersion),
         from = V5
-      ) { (diff, _) =>
-        diff.errorMessage(invoke.id()).get.text should include("is not found on the blockchain")
+      ) {
+        _ should produceRejectOrFailedDiff("is not found on the blockchain")
       }
     }
   }

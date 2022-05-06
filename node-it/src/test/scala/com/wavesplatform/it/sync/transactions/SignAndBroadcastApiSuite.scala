@@ -8,16 +8,16 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.it.{NTPTime, NodeConfigs}
 import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync.{someAssetAmount, _}
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.state._
-import com.wavesplatform.test._
+import com.wavesplatform.state.*
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.assets.exchange.AssetPair.extractAssetId
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, _}
-import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, SponsorFeeTransaction, UpdateAssetInfoTransaction}
+import com.wavesplatform.transaction.assets.exchange.*
+import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
@@ -25,7 +25,7 @@ import com.wavesplatform.transaction.transfer.{MassTransferTransaction, Transfer
 import org.asynchttpclient.util.HttpConstants
 import org.scalatest
 import org.scalatest.BeforeAndAfterAll
-import play.api.libs.json._
+import play.api.libs.json.*
 
 import scala.util.Random
 
@@ -348,13 +348,13 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
 
       signBroadcastAndCalcFee(
         Json.obj(
-          "type" -> UpdateAssetInfoTransaction.typeId,
-          "version" -> 1,
-          "sender" -> firstAddress,
-          "assetId" -> assetId,
-          "name" -> "New name",
+          "type"        -> TransactionType.UpdateAssetInfo.id,
+          "version"     -> 1,
+          "sender"      -> firstAddress,
+          "assetId"     -> assetId,
+          "name"        -> "New name",
           "description" -> "New description",
-          "chainId" -> AddressScheme.current.chainId
+          "chainId"     -> AddressScheme.current.chainId
         ),
         usesProofs = true,
         version = 1

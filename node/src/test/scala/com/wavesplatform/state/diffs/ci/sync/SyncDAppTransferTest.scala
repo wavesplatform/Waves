@@ -5,6 +5,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
@@ -16,6 +17,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_STRING, FUNC, FUNCTION_CA
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.CREATE_LIST
 import com.wavesplatform.protobuf.dapp.DAppMeta
+import com.wavesplatform.state.diffs.produceRejectOrFailedDiff
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -41,27 +43,30 @@ class SyncDAppTransferTest extends PropSpec with WithDomain {
 
       val preparingTxs = Seq(issue, setScript1, setScript2)
 
-      val invoke1 = TxHelpers.invoke(dApp1.toAddress, func = Some("foo"), invoker = invoker)
-      val invoke2 = TxHelpers.invoke(dApp1.toAddress, func = Some("foo"), invoker = invoker)
+      val invoke = TxHelpers.invoke(dApp1.toAddress, func = Some("foo"), invoker = invoker)
 
-      withDomain(RideV5.configure(_.copy(enforceTransferValidationAfter = 4)), balances) { d =>
+      withDomain(
+        RideV5
+          .configure(_.copy(enforceTransferValidationAfter = 3))
+          .setFeaturesHeight(BlockchainFeatures.RideV6 -> 4),
+        balances
+      ) { d =>
         d.appendBlock(preparingTxs*)
 
-        if (bigComplexityDApp1 || bigComplexityDApp2) {
-          d.appendBlock(invoke1)
-          d.liquidDiff.errorMessage(invoke1.txId).get.text should include("Negative amount")
-        } else {
-          d.appendBlockE(invoke1) should produce("Negative amount")
-          d.appendBlock()
-        }
+        d.appendAndCatchError(invoke).toString should include("Negative transfer amount")
 
         d.appendBlock()
-        d.appendBlockE(invoke2) should produce("Negative transfer amount = -1")
+
+        if (!bigComplexityDApp1 && !bigComplexityDApp2) {
+          d.appendAndCatchError(invoke).toString should include("Negative transfer amount")
+        } else {
+          d.appendAndAssertFailed(invoke)
+        }
       }
     }
   }
 
-  property("negative balance always rejects tx after syncDAppCheckTransfersHeight") {
+  property("negative balance rejects or fails tx") {
     for {
       bigComplexityDApp1 <- Seq(false, true)
       bigComplexityDApp2 <- Seq(false, true)
@@ -77,17 +82,25 @@ class SyncDAppTransferTest extends PropSpec with WithDomain {
 
       val preparingTxs = Seq(setScript1, setScript2)
 
-      val invoke1 = TxHelpers.invoke(dApp1.toAddress, func = Some("foo"), invoker = invoker)
-      val invoke2 = TxHelpers.invoke(dApp1.toAddress, func = Some("foo"), invoker = invoker)
+      val invoke = TxHelpers.invoke(dApp1.toAddress, func = Some("foo"), invoker = invoker)
 
-      withDomain(RideV5.configure(_.copy(enforceTransferValidationAfter = 5)), balances) { d =>
+      withDomain(
+        RideV5
+          .configure(_.copy(enforceTransferValidationAfter = 3))
+          .setFeaturesHeight(BlockchainFeatures.RideV6 -> 4),
+        balances
+      ) { d =>
         d.appendBlock(preparingTxs*)
 
-        d.appendBlock(invoke1)
-        d.blockchain.transactionSucceeded(invoke1.id.value()) shouldBe true
+        d.appendAndCatchError(invoke).toString should include("Negative waves balance")
 
         d.appendBlock()
-        d.appendBlockE(invoke2) should produce(s"Sync call leads to temporary negative balance = -100 for address ${dApp2.toAddress}")
+
+        if (!bigComplexityDApp1 && !bigComplexityDApp2) {
+          d.appendAndCatchError(invoke).toString should include("negative waves balance")
+        } else {
+          d.appendAndAssertFailed(invoke)
+        }
       }
     }
   }
@@ -198,7 +211,7 @@ class SyncDAppTransferTest extends PropSpec with WithDomain {
 
       d.appendBlock(setInvokerScript, setSenderScript)
 
-      d.appendBlockE(invoke) should produce("key not found: asset")
+      d.createDiffE(invoke) should produceRejectOrFailedDiff("key not found: asset")
     }
   }
 

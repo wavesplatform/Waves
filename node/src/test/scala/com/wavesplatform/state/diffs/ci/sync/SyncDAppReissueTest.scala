@@ -3,11 +3,10 @@ package com.wavesplatform.state.diffs.ci.sync
 import com.wavesplatform.account.Address
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.features.BlockchainFeatures.{BlockV5, SynchronousCalls}
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -56,25 +55,24 @@ class SyncDAppReissueTest extends PropSpec with WithDomain {
 
       val preparingTxs = Seq(issue, setScript1, setScript2)
 
-      val invoke1 = TxHelpers.invoke(dApp1.toAddress, func = None, invoker = invoker)
-      val invoke2 = TxHelpers.invoke(dApp1.toAddress, func = None, invoker = invoker)
+      val invoke = TxHelpers.invoke(dApp1.toAddress, func = None, invoker = invoker)
 
       withDomain(
-        DomainPresets
-          .domainSettingsWithFS(
-            TestFunctionalitySettings
-              .withFeatures(BlockV5, SynchronousCalls)
-              .copy(enforceTransferValidationAfter = 4)
-          ),
+        RideV5
+          .setFeaturesHeight(BlockchainFeatures.RideV6 -> 4)
+          .configure(_.copy(enforceTransferValidationAfter = 2)),
         balances
       ) { d =>
         d.appendBlock(preparingTxs*)
-
-        d.appendBlock(invoke1)
-        d.blockchain.transactionSucceeded(invoke1.txId) shouldBe true
-        d.blockchain.balance(dApp2.toAddress, asset) shouldBe 99
-
-        d.appendBlockE(invoke2) should produce("Negative reissue quantity = -1")
+        // enforceTransferValidationAfter <= height < RideV6
+        d.appendAndCatchError(invoke).toString should include("Negative reissue quantity")
+        d.appendBlock()
+        // RideV6 <= height
+        if (!bigComplexityDApp1 && !bigComplexityDApp2) {
+          d.appendAndCatchError(invoke).toString should include("Negative reissue quantity")
+        } else {
+          d.appendAndAssertFailed(invoke)
+        }
       }
     }
   }

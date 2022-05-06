@@ -11,7 +11,7 @@ import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.{Portfolio, StringDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TransactionType
+import com.wavesplatform.transaction.{TransactionType, TxHelpers}
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 
@@ -186,7 +186,7 @@ class InvokeFailAndRejectTest extends PropSpec with WithDomain {
       )
       val invokeTx = invoke()
       d.appendBlock(setScript(secondSigner, dApp))
-      d.appendBlockE(invokeTx) should produce("Data from other network: expected: 84(T), actual: 87(W)")
+      d.appendBlockE(invokeTx) should produce("Address belongs to another network: expected: 84(T), actual: 87(W)")
     }
   }
 
@@ -196,20 +196,20 @@ class InvokeFailAndRejectTest extends PropSpec with WithDomain {
       Seq(false, true).foreach { complex =>
         val dApp = TestCompiler(V5).compileContract(
           s"""
-               | @Callable(i)
-               | func default() = {
-               |   ${if (complex) sigVerify else ""}
-               |   strict r = Address(base58'3P2pTpQhGbZrJXATKr75A1uZjeTrb4PHMYf').invoke("bar", [], [])
-               |   []
-               | }
+             | @Callable(i)
+             | func default() = {
+             |   ${if (complex) sigVerify else ""}
+             |   strict r = Address(base58'3P2pTpQhGbZrJXATKr75A1uZjeTrb4PHMYf').invoke("bar", [], [])
+             |   []
+             | }
              """.stripMargin
         )
         d.appendBlock(setScript(secondSigner, dApp))
         val invokeTx = invoke()
         if (complex) {
-          d.appendAndAssertFailed(invokeTx, "Data from other network: expected: 84(T), actual: 87(W)")
+          d.appendAndAssertFailed(invokeTx, "Address belongs to another network: expected: 84(T), actual: 87(W)")
         } else
-          d.appendBlockE(invokeTx) should produce("Data from other network: expected: 84(T), actual: 87(W)")
+          d.appendBlockE(invokeTx) should produce("Address belongs to another network: expected: 84(T), actual: 87(W)")
       }
     }
   }
@@ -230,7 +230,7 @@ class InvokeFailAndRejectTest extends PropSpec with WithDomain {
       )
       d.appendBlock(setScript(secondSigner, dApp))
       d.appendBlock(setScript(defaultSigner, verifier))
-      d.appendBlockE(invoke()) should produce("Script returned not a boolean result")
+      d.appendBlockE(invoke(fee = TxHelpers.ciFee(1))) should produce("Script returned not a boolean result")
     }
   }
 }

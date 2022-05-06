@@ -18,7 +18,7 @@ import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers}
 
 class SyncDAppPaymentTest extends PropSpec with WithDomain {
 
-  property("negative sync dApp payments amount rejects tx after forbidSyncDAppNegativePaymentHeight") {
+  property("negative sync dApp payments amount rejects tx after enforceTransferValidationAfter") {
     def scenario(
         bigComplexityDApp1: Boolean,
         bigComplexityDApp2: Boolean,
@@ -125,7 +125,7 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
     }
   }
 
-  property("negative balance produces error after syncDAppCheckPaymentsHeight and always rejects tx after syncDAppCheckTransfersHeight") {
+  property("negative balance rejects or fails") {
     for {
       bigComplexityDApp1 <- Seq(false, true)
       bigComplexityDApp2 <- Seq(false, true)
@@ -141,28 +141,16 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
 
       val preparingTxs = Seq(setScript1, setScript2)
 
-      val invoke1 = TxHelpers.invoke(dApp1.toAddress, func = None, invoker = invoker)
-      val invoke2 = TxHelpers.invoke(dApp1.toAddress, func = None, invoker = invoker)
-      val invoke3 = TxHelpers.invoke(dApp1.toAddress, func = None, invoker = invoker)
+      val invoke = TxHelpers.invoke(dApp1.toAddress, func = None, invoker = invoker)
 
-      withDomain(RideV5.configure(_.copy(estimatorSumOverflowFixHeight = 4, enforceTransferValidationAfter = 6)), balances) { d =>
+      withDomain(RideV6, balances) { d =>
         d.appendBlock(preparingTxs*)
 
-        val error = s"Sync call leads to temporary negative balance = -100 for address ${invoke1.dApp}"
-        d.appendBlock(invoke1)
-        d.blockchain.transactionSucceeded(invoke1.id.value()) shouldBe true
-
-        d.appendBlock()
-
-        if (bigComplexityDApp1) {
-          d.appendBlock(invoke2)
-          d.liquidDiff.errorMessage(invoke2.txId).get.text should include(error)
+        if (!bigComplexityDApp1 && !bigComplexityDApp2) {
+          d.appendAndCatchError(invoke).toString should include("negative waves balance")
         } else {
-          d.appendBlockE(invoke2) should produce(error)
-          d.appendBlock()
+          d.appendAndAssertFailed(invoke)
         }
-
-        d.appendBlockE(invoke3) should produce(error)
       }
     }
   }
