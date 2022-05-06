@@ -517,7 +517,7 @@ class TransactionsRouteSpec
                                     |  "id" : "${leaseCancel.id()}",
                                     |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                     |  "senderPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
-                                    |  "fee" : 1000000,
+                                    |  "fee" : 100000,
                                     |  "feeAssetId" : null,
                                     |  "timestamp" : ${leaseCancel.timestamp},
                                     |  "proofs" : [ "${leaseCancel.signature}" ],
