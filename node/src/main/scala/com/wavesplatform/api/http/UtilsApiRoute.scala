@@ -136,15 +136,18 @@ case class UtilsApiRoute(
 
   def compileCode: Route = path("script" / "compileCode") {
     (post & entity(as[String]) & parameter("compact".as[Boolean] ? false)) { (code, compact) =>
-      executeLimited(API.compile(
-        code,
-        estimator().version,
-        compact,
-        defaultStdLib = defaultStdlibVersion(),
-        allowFreeCall = blockchain.isFeatureActivated(BlockchainFeatures.ContinuationTransaction)
-      ))(
+      executeLimited(
+        API.compile(
+          code,
+          estimator(),
+          compact,
+          defaultStdLib = defaultStdlibVersion(),
+          allowFreeCall = blockchain.isFeatureActivated(BlockchainFeatures.ContinuationTransaction)
+        )
+      )(
         _.fold(
-          e => complete(ScriptCompilerError(e)), { cr =>
+          e => complete(ScriptCompilerError(e)),
+          { cr =>
             val v5Activated = blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
             val extraFee =
               if (cr.verifierComplexity <= ContractLimits.FreeVerifierComplexity && v5Activated)
@@ -173,7 +176,7 @@ case class UtilsApiRoute(
       executeLimited(
         API.compile(
           req.script,
-          estimator().version,
+          estimator(),
           needCompaction = false,
           removeUnusedCode = false,
           req.imports,

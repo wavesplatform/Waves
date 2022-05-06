@@ -25,13 +25,12 @@ object JsAPI {
   def getVarsDoc(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object with js.Dynamic] =
     API
       .allVars(ver, isTokenContext, isContract)
-      .map {
-        case (name, ft) =>
+      .map { case (name, ft) =>
         js.Dynamic.literal(
           "name" -> name,
           "type" -> typeRepr(ft),
           "doc"  -> DocSource.varData((name, ver))
-          )
+        )
       }
       .toJSArray
 
@@ -39,20 +38,18 @@ object JsAPI {
   def getFunctionsDoc(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): js.Array[js.Object with js.Dynamic] =
     API
       .allFunctions(ver, isTokenContext, isContract)
-      .map {
-        case (name, args, signature) =>
-          val (funcDoc, paramsDoc, _) = DocSource.funcData((name, signature.args.map(_._2.toString).toList, ver))
+      .map { case (name, args, signature) =>
+        val (funcDoc, paramsDoc, _) = DocSource.funcData((name, signature.args.map(_._2.toString).toList, ver))
 
-            js.Dynamic.literal(
-              "name"       -> name,
-              "doc"        -> funcDoc,
-              "resultType" -> typeRepr(signature.result),
-              "args" -> (args zip signature.args zip paramsDoc).map { arg =>
-                js.Dynamic.literal("name" -> arg._1._1, "type" -> typeRepr(arg._1._2._2), "doc" -> arg._2)
-              }.toJSArray
-            )
-          }
-
+        js.Dynamic.literal(
+          "name"       -> name,
+          "doc"        -> funcDoc,
+          "resultType" -> typeRepr(signature.result),
+          "args" -> (args zip signature.args zip paramsDoc).map { arg =>
+            js.Dynamic.literal("name" -> arg._1._1, "type" -> typeRepr(arg._1._2._2), "doc" -> arg._2)
+          }.toJSArray
+        )
+      }
       .toJSArray
 
   @JSExportTopLevel("contractLimits")
@@ -102,7 +99,8 @@ object JsAPI {
     API
       .parseAndCompile(input, estimatorVersion, needCompaction, removeUnusedCode, libraries.toMap)
       .fold(
-        e => js.Dynamic.literal("error" -> e), {
+        e => js.Dynamic.literal("error" -> e),
+        {
           case CompileAndParseResult.Expression(bytes, complexity, expr, errors) =>
             js.Dynamic.literal(
               "result"     -> Global.toBuffer(bytes),
@@ -135,11 +133,14 @@ object JsAPI {
       removeUnusedCode: Boolean = false,
       libraries: Dictionary[String] = Dictionary.empty
   ): js.Dynamic =
-    API
-      .compile(input, estimatorVersion, needCompaction, removeUnusedCode, libraries.toMap)
+    (for {
+      estimator <- API.estimatorByVersion(estimatorVersion)
+      result    <- API.compile(input, estimator, needCompaction, removeUnusedCode, libraries.toMap)
+    } yield result)
       .fold(
-        e => js.Dynamic.literal("error" -> e), {
-          case CompileResult.Expression(bytes, complexity, expr, error) =>
+        e => js.Dynamic.literal("error" -> e),
+        {
+          case CompileResult.Expression(bytes, complexity, expr, error, _) =>
             val resultFields: Seq[(String, Any)] = Seq(
               "result"     -> Global.toBuffer(bytes),
               "ast"        -> toJs(expr),
@@ -160,22 +161,20 @@ object JsAPI {
             )
           case CompileResult.DApp(di, error) =>
             val compactNameToOriginalName: Map[String, String] =
-                di.dApp.meta.compactNameAndOriginalNamePairList.map(pair => pair.compactName -> pair.originalName).toMap
+              di.dApp.meta.compactNameAndOriginalNamePairList.map(pair => pair.compactName -> pair.originalName).toMap
 
-              val resultFields: Seq[(String, Any)] = Seq(
+            val resultFields: Seq[(String, Any)] = Seq(
               "result"               -> Global.toBuffer(di.bytes),
               "ast"                  -> toJs(di.dApp),
               "complexity"           -> di.maxComplexity._2.toDouble,
               "verifierComplexity"   -> di.verifierComplexity.toDouble,
               "callableComplexities" -> di.callableComplexities.view.mapValues(_.toDouble).toMap.toJSDictionary,
-              "userFunctionComplexities" -> di.userFunctionComplexities.map {
-                  case (name, complexity) =>
-                    compactNameToOriginalName.getOrElse(name, name) -> complexity.toDouble
-                }.toJSDictionary,
-              "globalVariableComplexities" -> di.globalVariableComplexities.map {
-                  case (name, complexity) =>
-                    compactNameToOriginalName.getOrElse(name, name) -> complexity.toDouble
-                }.toJSDictionary
+              "userFunctionComplexities" -> di.userFunctionComplexities.map { case (name, complexity) =>
+                compactNameToOriginalName.getOrElse(name, name) -> complexity.toDouble
+              }.toJSDictionary,
+              "globalVariableComplexities" -> di.globalVariableComplexities.map { case (name, complexity) =>
+                compactNameToOriginalName.getOrElse(name, name) -> complexity.toDouble
+              }.toJSDictionary
             )
             val errorFieldOpt: Seq[(String, Any)] = {
               error

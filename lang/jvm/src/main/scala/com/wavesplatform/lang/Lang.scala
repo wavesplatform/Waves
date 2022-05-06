@@ -9,8 +9,10 @@ object Lang {
   def compile(input: String): EXPR = compile(input, API.latestEstimatorVersion)
 
   def compile(input: String, estimatorVersion: Int): EXPR =
-    API
-      .compile(input, estimatorVersion)
+    (for {
+      estimator <- API.estimatorByVersion(estimatorVersion)
+      result    <- API.compile(input, estimator)
+    } yield result)
       .fold(
         error => throw new IllegalArgumentException(error),
         {

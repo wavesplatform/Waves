@@ -177,7 +177,7 @@ object API {
 
   def compile(
       input: String,
-      estimatorVersion: Int = latestEstimatorVersion,
+      estimator: ScriptEstimator,
       needCompaction: Boolean = false,
       removeUnusedCode: Boolean = false,
       libraries: Map[String, String] = Map.empty,
@@ -185,16 +185,20 @@ object API {
       allowFreeCall: Boolean = true
   ): Either[String, CompileResult] =
     for {
-      estimatorVer <- Either.cond(
-        estimatorVersion > 0 && estimatorVersion <= API.allEstimators.length,
-        estimatorVersion,
-        s"Version of estimator must be not greater than ${API.allEstimators.length}"
-      )
       directives  <- DirectiveParser(input)
       ds          <- extractDirectives(directives, defaultStdLib)
       linkedInput <- ScriptPreprocessor(input, libraries, ds.imports)
-      compiled    <- compileScript(ds, linkedInput, API.allEstimators.toIndexedSeq(estimatorVer - 1), needCompaction, removeUnusedCode, allowFreeCall)
+      compiled    <- compileScript(ds, linkedInput, estimator, needCompaction, removeUnusedCode, allowFreeCall)
     } yield compiled
+
+  def estimatorByVersion(version: Int): Either[String, ScriptEstimator] =
+    Either
+      .cond(
+        version > 0 && version <= allEstimators.length,
+        version,
+        s"Version of estimator must be not greater than ${API.allEstimators.length}"
+      )
+      .map(v => allEstimators.toIndexedSeq(v - 1))
 
   private def compileScript(
       ds: DirectiveSet,
