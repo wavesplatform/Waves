@@ -3,7 +3,7 @@ package com.wavesplatform.lang
 import cats.kernel.Monoid
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.Directive.extractDirectives
-import com.wavesplatform.lang.directives.values.{Asset, Expression, Library, ScriptType, StdLibVersion, V3, DApp as DAppType}
+import com.wavesplatform.lang.directives.values.{Asset, Call, Expression, Library, ScriptType, StdLibVersion, V3, DApp as DAppType}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveParser, DirectiveSet}
 import com.wavesplatform.lang.script.ScriptPreprocessor
 import com.wavesplatform.lang.v1.BaseGlobal.DAppInfo
@@ -38,11 +38,12 @@ sealed trait CompileResult {
   def bytes: Array[Byte]
   def verifierComplexity: Long
   def callableComplexities: Map[String, Long]
-  def maxComplexity: Long = callableComplexities.values.maxOption.fold(verifierComplexity)(_.max(verifierComplexity))
+  def maxComplexity: Long
 }
 object CompileResult {
-  case class Expression(bytes: Array[Byte], verifierComplexity: Long, expr: EXPR, error: Either[String, Unit]) extends CompileResult {
+  case class Expression(bytes: Array[Byte], maxComplexity: Long, expr: EXPR, error: Either[String, Unit], isFreeCall: Boolean) extends CompileResult {
     override val callableComplexities: Map[String, Long] = Map.empty
+    override val verifierComplexity: Long                = if (isFreeCall) 0 else maxComplexity
   }
 
   case class Library(bytes: Array[Byte], complexity: Long, expr: EXPR) extends CompileResult {
@@ -55,6 +56,7 @@ object CompileResult {
     override def bytes: Array[Byte]                      = dAppInfo.bytes
     override def verifierComplexity: Long                = dAppInfo.verifierComplexity
     override def callableComplexities: Map[String, Long] = dAppInfo.callableComplexities
+    override val maxComplexity: Long                     = callableComplexities.values.maxOption.fold(verifierComplexity)(_.max(verifierComplexity))
   }
 }
 
@@ -139,42 +141,36 @@ object API {
     ds.contentType match {
       case Expression =>
         G.parseAndCompileExpression(
-            input,
-            API.buildScriptContext(stdLibVer, isAsset, ds.contentType == DAppType).compilerContext,
-            G.LetBlockVersions.contains(stdLibVer),
-            stdLibVer,
-            estimator
-          )
-          .map {
-            case (bytes, complexity, exprScript, errors) =>
-              CompileAndParseResult.Expression(bytes, complexity, exprScript, errors.toSeq)
-          }
+          input,
+          API.buildScriptContext(stdLibVer, isAsset, ds.contentType == DAppType).compilerContext,
+          G.LetBlockVersions.contains(stdLibVer),
+          stdLibVer,
+          estimator
+        ).map { case (bytes, complexity, exprScript, errors) =>
+          CompileAndParseResult.Expression(bytes, complexity, exprScript, errors.toSeq)
+        }
       case Library =>
         G.compileDecls(
-            input,
-            API.buildScriptContext(stdLibVer, isAsset, ds.contentType == DAppType).compilerContext,
-            stdLibVer,
-            ds.scriptType,
-            estimator
-          )
-          .map {
-            case (bytes, expr, complexity) =>
-              CompileAndParseResult.Library(bytes, complexity, expr)
-          }
+          input,
+          API.buildScriptContext(stdLibVer, isAsset, ds.contentType == DAppType).compilerContext,
+          stdLibVer,
+          ds.scriptType,
+          estimator
+        ).map { case (bytes, expr, complexity) =>
+          CompileAndParseResult.Library(bytes, complexity, expr)
+        }
 
       case DAppType =>
         G.parseAndCompileContract(
-            input,
-            API.fullDAppContext(ds.stdLibVersion).compilerContext,
-            stdLibVer,
-            estimator,
-            needCompaction,
-            removeUnusedCode
-          )
-          .map {
-            case (bytes, (verifierComplexity, callableComplexities), dapp, errors) =>
-              CompileAndParseResult.Contract(bytes, verifierComplexity, callableComplexities, dapp, errors.toSeq)
-          }
+          input,
+          API.fullDAppContext(ds.stdLibVersion).compilerContext,
+          stdLibVer,
+          estimator,
+          needCompaction,
+          removeUnusedCode
+        ).map { case (bytes, (verifierComplexity, callableComplexities), dapp, errors) =>
+          CompileAndParseResult.Contract(bytes, verifierComplexity, callableComplexities, dapp, errors.toSeq)
+        }
 
     }
   }
@@ -185,7 +181,8 @@ object API {
       needCompaction: Boolean = false,
       removeUnusedCode: Boolean = false,
       libraries: Map[String, String] = Map.empty,
-      defaultStdLib: StdLibVersion = StdLibVersion.VersionDic.default
+      defaultStdLib: StdLibVersion = StdLibVersion.VersionDic.default,
+      allowFreeCall: Boolean = true
   ): Either[String, CompileResult] =
     for {
       estimatorVer <- Either.cond(
@@ -196,7 +193,7 @@ object API {
       directives  <- DirectiveParser(input)
       ds          <- extractDirectives(directives, defaultStdLib)
       linkedInput <- ScriptPreprocessor(input, libraries, ds.imports)
-      compiled    <- compileScript(ds, linkedInput, API.allEstimators.toIndexedSeq(estimatorVer - 1), needCompaction, removeUnusedCode)
+      compiled    <- compileScript(ds, linkedInput, API.allEstimators.toIndexedSeq(estimatorVer - 1), needCompaction, removeUnusedCode, allowFreeCall)
     } yield compiled
 
   private def compileScript(
@@ -204,25 +201,36 @@ object API {
       input: String,
       estimator: ScriptEstimator,
       needCompaction: Boolean,
-      removeUnusedCode: Boolean
+      removeUnusedCode: Boolean,
+      allowFreeCall: Boolean
   ): Either[String, CompileResult] = {
     val version = ds.stdLibVersion
     val isAsset = ds.scriptType == Asset
-    ds.contentType match {
-      case Expression =>
-        G.compileExpression(input, API.buildScriptContext(version, isAsset, ds.contentType == DAppType).compilerContext, version, ds.scriptType, estimator)
-          .map {
-            case (bytes, expr, complexity) =>
-              CompileResult.Expression(bytes, complexity, expr, G.checkExpr(expr, complexity, version, ds.scriptType, estimator))
+    (ds.contentType, ds.scriptType) match {
+      case (Expression, Call) if allowFreeCall =>
+        G.compileFreeCall(input, utils.compilerContext(ds), version, ds.scriptType, estimator)
+          .map { case (bytes, expr, complexity) =>
+            CompileResult.Expression(bytes, complexity, expr, G.checkExpr(expr, complexity, version, ds.scriptType, estimator), isFreeCall = true)
+          }
+      case (Expression, Call) =>
+        Left("Invoke Expression Transaction is not activated yet")
+      case (Expression, _) =>
+        G.compileExpression(
+          input,
+          API.buildScriptContext(version, isAsset, ds.contentType == DAppType).compilerContext,
+          version,
+          ds.scriptType,
+          estimator
+        ).map { case (bytes, expr, complexity) =>
+          CompileResult.Expression(bytes, complexity, expr, G.checkExpr(expr, complexity, version, ds.scriptType, estimator), isFreeCall = false)
 
-          }
-      case Library =>
+        }
+      case (Library, _) =>
         G.compileDecls(input, API.buildScriptContext(version, isAsset, ds.contentType == DAppType).compilerContext, version, ds.scriptType, estimator)
-          .map {
-            case (bytes, expr, complexity) =>
-              CompileResult.Library(bytes, complexity, expr)
+          .map { case (bytes, expr, complexity) =>
+            CompileResult.Library(bytes, complexity, expr)
           }
-      case DAppType =>
+      case (DAppType, _) =>
         // Just ignore stdlib version here
         G.compileContract(input, API.fullDAppContext(ds.stdLibVersion).compilerContext, version, estimator, needCompaction, removeUnusedCode)
           .map { di =>

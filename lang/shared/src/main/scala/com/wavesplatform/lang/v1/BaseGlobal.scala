@@ -149,6 +149,9 @@ trait BaseGlobal {
   val compileExpression: (String, CompilerContext, StdLibVersion, ScriptType, ScriptEstimator) => Either[String, (Array[Byte], EXPR, Long)] =
     compile(_, _, _, _, _, ExpressionCompiler.compileBoolean)
 
+  val compileFreeCall: (String, CompilerContext, StdLibVersion, ScriptType, ScriptEstimator) => Either[String, (Array[Byte], EXPR, Long)] =
+    (input, ctx, version, scriptType, estimator) => compile(input, ctx, version, scriptType, estimator, ContractCompiler.compileFreeCall(_, _, version))
+
   val compileDecls: (String, CompilerContext, StdLibVersion, ScriptType, ScriptEstimator) => Either[String, (Array[Byte], EXPR, Long)] =
     compile(_, _, _, _, _, ExpressionCompiler.compileDecls)
 

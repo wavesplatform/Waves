@@ -14,8 +14,8 @@ object Lang {
       .fold(
         error => throw new IllegalArgumentException(error),
         {
-          case CompileResult.Expression(_, _, expr, _) => expr
-          case _                                       => throw new IllegalArgumentException("not an expression")
+          case CompileResult.Expression(_, _, expr, _, _) => expr
+          case _                                          => throw new IllegalArgumentException("not an expression")
         }
       )
 

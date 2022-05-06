@@ -136,7 +136,13 @@ case class UtilsApiRoute(
 
   def compileCode: Route = path("script" / "compileCode") {
     (post & entity(as[String]) & parameter("compact".as[Boolean] ? false)) { (code, compact) =>
-      executeLimited(API.compile(code, estimator().version, compact, defaultStdLib = defaultStdlibVersion()))(
+      executeLimited(API.compile(
+        code,
+        estimator().version,
+        compact,
+        defaultStdLib = defaultStdlibVersion(),
+        allowFreeCall = blockchain.isFeatureActivated(BlockchainFeatures.ContinuationTransaction)
+      ))(
         _.fold(
           e => complete(ScriptCompilerError(e)), { cr =>
             val v5Activated = blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
