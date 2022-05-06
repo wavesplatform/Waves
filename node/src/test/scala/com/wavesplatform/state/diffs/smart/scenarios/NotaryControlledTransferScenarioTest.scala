@@ -80,10 +80,10 @@ class NotaryControlledTransferScenarioTest extends PropSpec with WithState {
     )
   }
 
-  def dummyEvalContext: EvaluationContext[Environment, Id] = {
+  private val dummyEvalContext: EvaluationContext[Environment, Id] = {
     val ds          = DirectiveSet(V1, Asset, Expression).explicitGet()
     val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, null, ds, ByteStr.empty)
-    lazyContexts(ds)().evaluationContext(environment)
+    lazyContexts((ds, true))().evaluationContext(environment)
   }
 
   private def eval(code: String) = {

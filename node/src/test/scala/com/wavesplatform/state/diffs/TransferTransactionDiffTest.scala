@@ -4,7 +4,7 @@ import com.wavesplatform.TestValues
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.lang.directives.values.StdLibVersion
+import com.wavesplatform.lang.directives.values.V1
 import com.wavesplatform.settings.RewardsVotingSettings
 import com.wavesplatform.state.{Diff, Portfolio}
 import com.wavesplatform.test.{NumericExt, PropSpec}
@@ -57,7 +57,7 @@ class TransferTransactionDiffTest extends PropSpec with WithDomain {
 
   property("fails, if smart asset used as a fee") {
     withDomain(DomainPresets.mostRecent, AddrWithBalance.enoughBalances(TxHelpers.defaultSigner)) { d =>
-      val asset    = d.helpers.issueAsset(script = TxHelpers.exprScript(StdLibVersion.V1)("true"), amount = 100000000)
+      val asset    = d.helpers.issueAsset(script = TxHelpers.exprScript(V1)("true"), amount = 100000000)
       val transfer = TxHelpers.transfer(feeAsset = asset)
 
       val diffOrError = TransferTransactionDiff(d.blockchain)(transfer)

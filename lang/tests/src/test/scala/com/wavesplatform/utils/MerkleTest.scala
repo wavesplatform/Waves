@@ -54,11 +54,10 @@ class MerkleTest extends PropSpec {
     val leaves = testData()
     val tree   = mkScryptoLevels(leaves)
 
-    forAll(Gen.oneOf(leaves.zipWithIndex)) {
-      case (leaf, index) =>
-        val proofs = Merkle.mkProofs(index, tree)
-        val bytes  = proofBytes(index, proofs)
-        eval(scriptSrc(tree.head.head, bytes, leaf)) shouldBe Right(CONST_BOOLEAN(true))
+    forAll(Gen.oneOf(leaves.zipWithIndex)) { case (leaf, index) =>
+      val proofs = Merkle.mkProofs(index, tree)
+      val bytes  = proofBytes(index, proofs)
+      eval(scriptSrc(tree.head.head, bytes, leaf)) shouldBe Right(CONST_BOOLEAN(true))
     }
   }
 
@@ -82,9 +81,8 @@ class MerkleTest extends PropSpec {
 
     val tree2 = mkScryptoLevels(testData())
 
-    forAll(Gen.oneOf(leaves.zipWithIndex)) {
-      case (leaf, index) =>
-        eval(scriptSrc(tree2.head.head, proofBytes(index, Merkle.mkProofs(index, tree1)), leaf)) shouldBe Right(CONST_BOOLEAN(false))
+    forAll(Gen.oneOf(leaves.zipWithIndex)) { case (leaf, index) =>
+      eval(scriptSrc(tree2.head.head, proofBytes(index, Merkle.mkProofs(index, tree1)), leaf)) shouldBe Right(CONST_BOOLEAN(false))
     }
   }
 
@@ -101,15 +99,14 @@ class MerkleTest extends PropSpec {
     val leaves = testData()
     val tree   = mkScryptoLevels(leaves)
 
-    forAll(Gen.oneOf(leaves.zipWithIndex), Gen.containerOf[Array, Byte](Arbitrary.arbitrary[Byte])) {
-      case ((leaf, index), bytes) =>
-        eval(scriptSrc(bytes, proofBytes(index, Merkle.mkProofs(index, tree)), leaf)) shouldBe Right(CONST_BOOLEAN(false))
+    forAll(Gen.oneOf(leaves.zipWithIndex), Gen.containerOf[Array, Byte](Arbitrary.arbitrary[Byte])) { case ((leaf, index), bytes) =>
+      eval(scriptSrc(bytes, proofBytes(index, Merkle.mkProofs(index, tree)), leaf)) shouldBe Right(CONST_BOOLEAN(false))
     }
   }
 
   private def eval(code: String, version: StdLibVersion = V3): Either[String, EVALUATED] = {
     val untyped = Parser.parseExpr(code).get.value
-    val ctx     = lazyContexts(DirectiveSet(version, Account, Expression).explicitGet())()
+    val ctx     = lazyContexts(DirectiveSet(version, Account, Expression).explicitGet() -> true)()
     val evalCtx = ctx.evaluationContext[Id](Common.emptyBlockchainEnvironment())
     val typed   = ExpressionCompiler(ctx.compilerContext, untyped)
     typed.flatMap(v => EvaluatorV2.applyCompleted(evalCtx, v._1, version, true, true)._3.leftMap(_.toString))
@@ -138,19 +135,18 @@ class MerkleTest extends PropSpec {
     val leaves = testData()
     val levels = Merkle.mkLevels(leaves)
 
-    forAll(Gen.oneOf(leaves.zipWithIndex)) {
-      case (leaf, index) =>
-        val proofs = mkProofs(index, levels).reverse
+    forAll(Gen.oneOf(leaves.zipWithIndex)) { case (leaf, index) =>
+      val proofs = mkProofs(index, levels).reverse
 
-        eval(scriptCreateRootSrc(proofs, hash(leaf), index), V4) shouldBe CONST_BYTESTR(ByteStr(levels.head.head))
-        eval(scriptCreateRootSrc(proofs, hash(leaf), index + (1 << proofs.length)), V4) should produce("out of range allowed by proof list length")
+      eval(scriptCreateRootSrc(proofs, hash(leaf), index), V4) shouldBe CONST_BYTESTR(ByteStr(levels.head.head))
+      eval(scriptCreateRootSrc(proofs, hash(leaf), index + (1 << proofs.length)), V4) should produce("out of range allowed by proof list length")
     }
   }
 
   private def proofBytes(index: Int, proofs: Seq[Array[Byte]]): Array[Byte] =
     proofs.reverse
-      .foldLeft(index -> Array.emptyByteArray) {
-        case ((index, buf), proof) => (index / 2, buf ++ Array(((index + 0) % 2).toByte, proof.length.toByte) ++ proof)
+      .foldLeft(index -> Array.emptyByteArray) { case ((index, buf), proof) =>
+        (index / 2, buf ++ Array(((index + 0) % 2).toByte, proof.length.toByte) ++ proof)
       }
       ._2
 }

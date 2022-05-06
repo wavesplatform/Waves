@@ -2,7 +2,6 @@ package com.wavesplatform.network
 
 import java.net.{InetAddress, InetSocketAddress}
 
-import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.Channel
 
 trait PeerDatabase extends AutoCloseable {
@@ -34,7 +33,7 @@ trait PeerDatabase extends AutoCloseable {
   def suspendAndClose(channel: Channel): Unit
 }
 
-object PeerDatabase extends ScorexLogging {
+object PeerDatabase {
 
   object NoOp extends PeerDatabase {
     override def addCandidate(socketAddress: InetSocketAddress): Boolean = true

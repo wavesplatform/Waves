@@ -123,7 +123,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
         for {
           _ <- Task.unit
           pos          = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
-          utxPool      = new UtxPoolImpl(ntpTime, blockchainUpdater, settings.utxSettings)
+          utxPool      = new UtxPoolImpl(ntpTime, blockchainUpdater, settings.utxSettings, settings.minerSettings.enable)
           scheduler    = Scheduler.singleThread("appender")
           allChannels  = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
           wallet       = Wallet(WalletSettings(None, Some("123"), None))

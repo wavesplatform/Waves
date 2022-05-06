@@ -5,16 +5,15 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.Asset
 import com.wavesplatform.{BlockGen, TestWallet}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.OptionValues
@@ -59,14 +58,7 @@ class SpentComplexitySpec
       |i1 + i2 < 10
       |""".stripMargin)
 
-  private val settings =
-    domainSettingsWithPreactivatedFeatures(
-      BlockchainFeatures.SmartAccounts,
-      BlockchainFeatures.SmartAssets,
-      BlockchainFeatures.Ride4DApps,
-      BlockchainFeatures.BlockV5,
-      BlockchainFeatures.SynchronousCalls
-    )
+  private val settings = DomainPresets.RideV5
 
   private val sender = testWallet.generateNewAccount().get
 
@@ -100,7 +92,7 @@ class SpentComplexitySpec
           .explicitGet()
 
         val transferAsset = TransferTransaction
-          .selfSigned(2.toByte, sender, recipient.toAddress, issue.asset, 50_00L, Waves, 40_0000L, ByteStr.empty, ntpTime.getTimestamp())
+          .selfSigned(2.toByte, sender, recipient.toAddress, issue.asset, 50_00L, Waves, 90_0000L, ByteStr.empty, ntpTime.getTimestamp())
           .explicitGet()
 
         val invokeTx = Signed
@@ -138,11 +130,11 @@ class SpentComplexitySpec
         .explicitGet()
 
       val transferAsset = TransferTransaction
-        .selfSigned(2.toByte, sender, recipient.toAddress, issue.asset, 50_00L, Waves, 40_0000L, ByteStr.empty, ntpTime.getTimestamp())
+        .selfSigned(2.toByte, sender, recipient.toAddress, issue.asset, 50_00L, Waves, 90_0000L, ByteStr.empty, ntpTime.getTimestamp())
         .explicitGet()
 
       val returnFrom = TransferTransaction
-        .selfSigned(2.toByte, recipient, sender.toAddress, issue.asset, 49_00L, Waves, 40_0000L, ByteStr.empty, ntpTime.getTimestamp())
+        .selfSigned(2.toByte, recipient, sender.toAddress, issue.asset, 49_00L, Waves, 90_0000L, ByteStr.empty, ntpTime.getTimestamp())
         .explicitGet()
 
       d.appendBlock(

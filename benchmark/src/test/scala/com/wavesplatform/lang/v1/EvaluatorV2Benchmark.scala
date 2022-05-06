@@ -17,8 +17,9 @@ import org.openjdk.jmh.infra.Blackhole
 import scala.annotation.tailrec
 
 object EvaluatorV2Benchmark {
-  val pureContext: CTX[Environment]                       = PureContext.build(V1, useNewPowPrecision = true).withEnvironment[Environment]
+  val pureContext: CTX[Environment]                       = PureContext.build(V1, useNewPowPrecision = true, useNewPowPrecision = true).withEnvironment[Environment]
   val pureEvalContext: EvaluationContext[Environment, Id] = pureContext.evaluationContext(Common.emptyBlockchainEnvironment())
+  val evaluatorV2: EvaluatorV2                            = new EvaluatorV2(LoggedEvaluationContext(_ => _ => (), pureEvalContext), V1, true)
 }
 
 @OutputTimeUnit(TimeUnit.MILLISECONDS)

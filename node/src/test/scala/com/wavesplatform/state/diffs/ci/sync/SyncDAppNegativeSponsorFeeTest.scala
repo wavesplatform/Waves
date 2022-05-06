@@ -3,11 +3,12 @@ package com.wavesplatform.state.diffs.ci.sync
 import com.wavesplatform.account.Address
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.features.BlockchainFeatures.*
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, TxHelpers}
 
@@ -44,7 +45,7 @@ class SyncDAppNegativeSponsorFeeTest extends PropSpec with WithDomain {
   private val settings =
     DomainPresets.RideV5
       .configure(_.copy(enforceTransferValidationAfter = 3))
-      .setFeaturesHeight(RideV6 -> 4)
+      .setFeaturesHeight(BlockchainFeatures.RideV6 -> 4)
 
   property("negative sponsor amount") {
     for {
