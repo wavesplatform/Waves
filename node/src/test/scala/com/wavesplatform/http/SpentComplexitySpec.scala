@@ -92,7 +92,7 @@ class SpentComplexitySpec
           .explicitGet()
 
         val transferAsset = TransferTransaction
-          .selfSigned(2.toByte, sender, recipient.toAddress, issue.asset, 50_00L, Waves, 40_0000L, ByteStr.empty, ntpTime.getTimestamp())
+          .selfSigned(2.toByte, sender, recipient.toAddress, issue.asset, 50_00L, Waves, 90_0000L, ByteStr.empty, ntpTime.getTimestamp())
           .explicitGet()
 
         val invokeTx = Signed
@@ -130,11 +130,11 @@ class SpentComplexitySpec
         .explicitGet()
 
       val transferAsset = TransferTransaction
-        .selfSigned(2.toByte, sender, recipient.toAddress, issue.asset, 50_00L, Waves, 40_0000L, ByteStr.empty, ntpTime.getTimestamp())
+        .selfSigned(2.toByte, sender, recipient.toAddress, issue.asset, 50_00L, Waves, 90_0000L, ByteStr.empty, ntpTime.getTimestamp())
         .explicitGet()
 
       val returnFrom = TransferTransaction
-        .selfSigned(2.toByte, recipient, sender.toAddress, issue.asset, 49_00L, Waves, 40_0000L, ByteStr.empty, ntpTime.getTimestamp())
+        .selfSigned(2.toByte, recipient, sender.toAddress, issue.asset, 49_00L, Waves, 90_0000L, ByteStr.empty, ntpTime.getTimestamp())
         .explicitGet()
 
       d.appendBlock(
