@@ -166,7 +166,7 @@ package object utils {
     lazyContexts((ds, true))().compilerContext
 
   def getDecompilerContext(v: StdLibVersion, cType: ContentType): DecompilerContext =
-    lazyContexts((DirectiveSet(v, Account, cType).explicitGet(), true))().decompilerContext
+    combinedContext((v, cType)).decompilerContext
 
   def varNames(version: StdLibVersion, cType: ContentType): Set[String] =
     compilerContext(version, cType, isAssetScript = false).varDefs.keySet
