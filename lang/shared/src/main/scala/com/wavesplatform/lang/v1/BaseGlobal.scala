@@ -169,7 +169,7 @@ trait BaseGlobal {
       expr <- if (isFreeCall) ContractCompiler.compileFreeCall(input, context, version) else compiler(input, context)
       bytes = serializeExpression(expr, version)
       _          <- ExprScript.validateBytes(bytes, isFreeCall)
-      complexity <- ExprScript.estimateExact(expr, version, isFreeCall, estimator)
+      complexity <- ExprScript.estimate(expr, version, isFreeCall, estimator, scriptType == Account)
     } yield (bytes, expr, complexity)
   }
 
@@ -211,6 +211,7 @@ trait BaseGlobal {
       userFunctionComplexities   <- ContractScript.estimateUserFunctions(stdLibVersion, dApp, estimator)
       globalVariableComplexities <- ContractScript.estimateGlobalVariables(stdLibVersion, dApp, estimator)
       (maxComplexity, annotatedComplexities) <- ContractScript.estimateComplexityExact(stdLibVersion, dApp, estimator, fixEstimateOfVerifier = true)
+      _ <- ContractScript.checkComplexity(stdLibVersion, dApp, maxComplexity, annotatedComplexities, useReducedVerifierLimit = true)
       (verifierComplexity, callableComplexities) = dApp.verifierFuncOpt.fold(
         (0L, annotatedComplexities)
       )(v => (annotatedComplexities(v.u.name), annotatedComplexities - v.u.name))
