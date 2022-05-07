@@ -140,7 +140,7 @@ object JsAPI {
       .fold(
         e => js.Dynamic.literal("error" -> e),
         {
-          case CompileResult.Expression(bytes, complexity, expr, error, _) =>
+          case CompileResult.Expression(_, bytes, complexity, expr, error, _) =>
             val resultFields: Seq[(String, Any)] = Seq(
               "result"     -> Global.toBuffer(bytes),
               "ast"        -> toJs(expr),
@@ -153,13 +153,13 @@ object JsAPI {
                   _ => Seq()
                 )
             js.Dynamic.literal.applyDynamic("apply")(resultFields ++ errorFieldOpt: _*)
-          case CompileResult.Library(bytes, complexity, expr) =>
+          case CompileResult.Library(_, bytes, complexity, expr) =>
             js.Dynamic.literal(
               "result"     -> Global.toBuffer(bytes),
               "ast"        -> toJs(expr),
               "complexity" -> complexity.toDouble
             )
-          case CompileResult.DApp(di, error) =>
+          case CompileResult.DApp(_, di, error) =>
             val compactNameToOriginalName: Map[String, String] =
               di.dApp.meta.compactNameAndOriginalNamePairList.map(pair => pair.compactName -> pair.originalName).toMap
 
