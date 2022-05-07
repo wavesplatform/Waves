@@ -309,7 +309,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
       1,
       Proofs.empty,
       AddressScheme.current.chainId
-    ) should produce("TooBigArray")
+    ) should produce("InvokeScriptTransaction bytes length = 5223 exceeds limit = 5120")
   }
 
   property("can't have zero amount") {
