@@ -65,9 +65,9 @@ package object utils {
 
   val lazyContexts: Map[(DirectiveSet, Boolean), Coeval[CTX[Environment]]] =
     (for {
-      version             <- DirectiveDictionary[StdLibVersion].all
-      scriptType          <- DirectiveDictionary[ScriptType].all
-      contentType         <- DirectiveDictionary[ContentType].all if contentType != DApp || (contentType == DApp && version >= V3 && scriptType == Account)
+      version     <- DirectiveDictionary[StdLibVersion].all
+      scriptType  <- DirectiveDictionary[ScriptType].all
+      contentType <- DirectiveDictionary[ContentType].all if contentType != DApp || (contentType == DApp && version >= V3 && scriptType == Account)
       useNewPowPrecision <- Seq(false, true)
     } yield {
       val ds = DirectiveSet(version, scriptType, contentType).explicitGet()
@@ -157,13 +157,22 @@ package object utils {
     costs.toMap
   }
 
+  def ctx(version: Int, isTokenContext: Boolean, isContract: Boolean): CTX[Environment] = {
+    val ds = DirectiveSet(
+      DirectiveDictionary[StdLibVersion].idMap(version),
+      ScriptType.isAssetScript(isTokenContext),
+      if (isContract) DApp else Expression
+    )
+    lazyContexts((ds.explicitGet(), true)).value()
+  }
+
   def compilerContext(version: StdLibVersion, cType: ContentType, isAssetScript: Boolean): CompilerContext = {
     val ds = DirectiveSet(version, ScriptType.isAssetScript(isAssetScript), cType).explicitGet()
     compilerContext(ds)
   }
 
   def compilerContext(ds: DirectiveSet): CompilerContext =
-    lazyContexts((ds, true))().compilerContext
+    lazyContexts((ds.copy(imports = Imports()), true))().compilerContext
 
   def getDecompilerContext(v: StdLibVersion, cType: ContentType): DecompilerContext =
     combinedContext((v, cType)).decompilerContext
