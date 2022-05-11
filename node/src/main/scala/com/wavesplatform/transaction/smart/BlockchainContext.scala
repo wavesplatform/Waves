@@ -3,7 +3,7 @@ package com.wavesplatform.transaction.smart
 import java.util
 
 import cats.Id
-import cats.syntax.semigroup._
+import cats.syntax.semigroup.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.Global
@@ -14,14 +14,14 @@ import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.state._
+import com.wavesplatform.state.*
 import monix.eval.Coeval
 
 object BlockchainContext {
 
   type In = WavesEnvironment.In
 
-  private[this] val cache = new util.HashMap[(StdLibVersion, Boolean, DirectiveSet), CTX[Environment]]()
+  private[this] val cache = new util.HashMap[(StdLibVersion, Boolean, Boolean, DirectiveSet), CTX[Environment]]()
 
   def build(
       version: StdLibVersion,
@@ -41,7 +41,9 @@ object BlockchainContext {
     ).map { ds =>
       val environment         = new WavesEnvironment(nByte, in, h, blockchain, address, ds, txId)
       val fixUnicodeFunctions = blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
-      val useNewPowPrecision  = blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls) && blockchain.height > blockchain.settings.functionalitySettings.enforceTransferValidationAfter
+      val useNewPowPrecision = blockchain.isFeatureActivated(
+        BlockchainFeatures.SynchronousCalls
+      ) && blockchain.height > blockchain.settings.functionalitySettings.enforceTransferValidationAfter
       build(ds, environment, fixUnicodeFunctions, useNewPowPrecision)
     }
 
@@ -54,7 +56,8 @@ object BlockchainContext {
     cache
       .synchronized(
         cache.computeIfAbsent(
-          (ds.stdLibVersion, fixUnicodeFunctions, ds), { _ =>
+          (ds.stdLibVersion, fixUnicodeFunctions, useNewPowPrecision, ds),
+          { _ =>
             PureContext.build(ds.stdLibVersion, useNewPowPrecision).withEnvironment[Environment] |+|
               CryptoContext.build(Global, ds.stdLibVersion).withEnvironment[Environment] |+|
               WavesContext.build(Global, ds)
