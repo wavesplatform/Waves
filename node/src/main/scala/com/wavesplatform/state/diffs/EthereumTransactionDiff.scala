@@ -60,10 +60,9 @@ object EthereumTransactionDiff {
 
       case ei: EthereumTransaction.Invocation =>
         for {
-          invocation   <- TracedResult(ei.toInvokeScriptLike(e, blockchain))
-          paymentsDiff <- TransactionDiffer.assetsVerifierDiff(blockchain, invocation, verify = true, Diff(), Int.MaxValue)
-          diff         <- InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution)(invocation)
-          result       <- paymentsDiff.combineE(diff)
+          invocation <- TracedResult(ei.toInvokeScriptLike(e, blockchain))
+          diff       <- InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution)(invocation)
+          result     <- TransactionDiffer.assetsVerifierDiff(blockchain, invocation, verify = true, diff, Int.MaxValue)
         } yield result
     }
 
