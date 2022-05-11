@@ -10,7 +10,6 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, TxValidationError}
 
-import scala.util.Right
 import scala.util.control.NonFatal
 
 object TransferTransactionDiff {
@@ -50,22 +49,22 @@ object TransferDiff {
         case asset @ IssuedAsset(_) =>
           Diff
             .combine(
-              Map(senderAddress -> Portfolio(assets = Map(asset -> -amount))),
-              Map(recipient     -> Portfolio(assets = Map(asset -> amount)))
+              Map(senderAddress -> Portfolio.build(asset -> -amount)),
+              Map(recipient     -> Portfolio.build(asset -> amount))
             )
             .leftMap(GenericError(_))
       }
       feePf <- feeAssetId match {
         case Waves => Right(Map(senderAddress -> Portfolio(-fee)))
         case asset @ IssuedAsset(_) =>
-          val senderPf = Map(senderAddress -> Portfolio(assets = Map(asset -> -fee)))
+          val senderPf = Map(senderAddress -> Portfolio.build(asset -> -fee))
           if (blockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
             val sponsorPf = blockchain
               .assetDescription(asset)
               .collect {
                 case desc if desc.sponsorship > 0 =>
                   val feeInWaves = Sponsorship.toWaves(fee, desc.sponsorship)
-                  Map[Address, Portfolio](desc.issuer.toAddress -> Portfolio(-feeInWaves, LeaseBalance.empty, Map(asset -> fee)))
+                  Map[Address, Portfolio](desc.issuer.toAddress -> Portfolio.build(-feeInWaves, asset, fee))
               }
               .getOrElse(Map.empty)
             Diff.combine(senderPf, sponsorPf).leftMap(GenericError(_))

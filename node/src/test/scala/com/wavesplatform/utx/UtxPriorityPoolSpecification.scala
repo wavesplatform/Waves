@@ -73,10 +73,10 @@ class UtxPriorityPoolSpecification extends FreeSpec with SharedDomain {
       val ref = domain.appendKeyBlock().id()
       domain.appendMicroBlock(Seq.tabulate(5) { i =>
         TxHelpers.transfer(alice, TxHelpers.signer(200 + i).toAddress)
-      }: _*)
+      }*)
       domain.appendMicroBlock(Seq.tabulate(5) { i =>
         TxHelpers.transfer(alice, TxHelpers.signer(300 + i).toAddress)
-      }: _*)
+      }*)
 
       domain.appendKeyBlock(Some(ref))
       // priority pool contains two microblocks, 5 txs each

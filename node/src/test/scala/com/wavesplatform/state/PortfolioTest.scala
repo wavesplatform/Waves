@@ -1,11 +1,11 @@
 package com.wavesplatform.state
 
+import java.nio.charset.StandardCharsets
+
 import com.wavesplatform.TestValues
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.test.FunSuite
 import com.wavesplatform.transaction.Asset.IssuedAsset
-
-import java.nio.charset.StandardCharsets
 
 class PortfolioTest extends FunSuite {
   test("pessimistic - should return only withdraws") {
@@ -37,9 +37,7 @@ class PortfolioTest extends FunSuite {
 
   test("pessimistic - positive balance is turned into zero") {
     val orig = Portfolio(
-      balance = 10,
-      lease = LeaseBalance(0, 0),
-      assets = Map.empty
+      balance = 10
     )
 
     val p = orig.pessimistic
@@ -52,28 +50,27 @@ class PortfolioTest extends FunSuite {
 
   test("prevents overflow of assets") {
     val assetId = TestValues.asset
-    val arg1    = Portfolio(0L, LeaseBalance.empty, Map(assetId -> (Long.MaxValue - 1L)))
-    val arg2    = Portfolio(0L, LeaseBalance.empty, Map(assetId -> (Long.MaxValue - 2L)))
-    arg1.combine(arg2) shouldBe Left("Assets balance sum overflow")
+    val arg1    = Portfolio.build(assetId, Long.MaxValue - 1L)
+    val arg2    = Portfolio.build(assetId, Long.MaxValue - 2L)
+    arg1.combine(arg2) shouldBe Left(s"asset $assetId overflow")
   }
 
   test("prevents overflow of lease in balances") {
-    val arg1 = Portfolio(0L, LeaseBalance(in = Long.MaxValue - 1L, out = 0), Map())
-    val arg2 = Portfolio(0L, LeaseBalance(in = Long.MaxValue - 1L, out = 0), Map())
+    val arg1 = Portfolio(0L, LeaseBalance(in = Long.MaxValue - 1L, out = 0))
+    val arg2 = Portfolio(0L, LeaseBalance(in = Long.MaxValue - 1L, out = 0))
     arg1.combine(arg2) shouldBe Left("Lease in sum overflow")
   }
 
   test("prevents overflow of lease out balances") {
-    val arg1 = Portfolio(0L, LeaseBalance(out = Long.MaxValue - 1L, in = 0), Map())
-    val arg2 = Portfolio(0L, LeaseBalance(out = Long.MaxValue - 1L, in = 0), Map())
+    val arg1 = Portfolio(0L, LeaseBalance(out = Long.MaxValue - 1L, in = 0))
+    val arg2 = Portfolio(0L, LeaseBalance(out = Long.MaxValue - 1L, in = 0))
     arg1.combine(arg2) shouldBe Left("Lease out sum overflow")
   }
 
   test("prevents overflow of effective balance") {
     Portfolio(
       Long.MaxValue - 2L,
-      LeaseBalance(in = Long.MaxValue - 1L, out = 0),
-      Map()
+      LeaseBalance(in = Long.MaxValue - 1L, out = 0)
     ).effectiveBalance shouldBe Left("Effective balance sum overflow")
   }
 }

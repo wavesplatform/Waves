@@ -92,7 +92,7 @@ class ScriptsCountTest extends PropSpec with WithState with Inside {
           val newDiff  = TransactionDiffer(Some(tx.timestamp), tx.timestamp)(newState, tx).resultE.explicitGet()
           val oldRuns  = ScriptsCountTest.calculateLegacy(newState, tx)
           if (newDiff.scriptsRun != oldRuns) throw new IllegalArgumentException(s"$tx ${newDiff.scriptsRun} != $oldRuns")
-          diff.combine(newDiff).explicitGet()
+          diff.combineF(newDiff).explicitGet()
         }
     }
 

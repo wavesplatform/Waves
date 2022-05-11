@@ -22,10 +22,10 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
   import DomainPresets.*
 
   private val invalidLengthAsset = IssuedAsset(ByteStr.decodeBase58("WAVES").get)
-  private val unexistingAsset    = IssuedAsset(ByteStr.decodeBase58("WAVESwavesWAVESwavesWAVESwavesWAVESwaves123").get)
+  private val nonExistentAsset    = IssuedAsset(ByteStr.decodeBase58("WAVESwavesWAVESwavesWAVESwavesWAVESwaves123").get)
 
   private val lengthError     = s"Transfer error: invalid asset ID '$invalidLengthAsset' length = 4 bytes, must be 32"
-  private val unexistingError = s"Transfer error: asset '$unexistingAsset' is not found on the blockchain"
+  private val nonExistentError = s"Transfer error: asset '$nonExistentAsset' is not found on the blockchain"
 
   property("invoke asset checks") {
     val dApp = TestCompiler(V4).compileContract(
@@ -41,7 +41,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
          |func unexisting() =
          |  [
          |    ScriptTransfer(i.caller, 0, unit),
-         |    ScriptTransfer(i.caller, 0, base58'$unexistingAsset')
+         |    ScriptTransfer(i.caller, 0, base58'$nonExistentAsset')
          |  ]
        """.stripMargin
     )
@@ -58,7 +58,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
         val setScriptTx = TxHelpers.setScript(master, dApp)
         val invoke = TxHelpers.invoke(master.toAddress, Some(func), invoker = invoker)
 
-        val dAppAddress = invoke.dApp.asInstanceOf[Address]
+        val dAppAddress = master.toAddress
 
         def invokeInfo(succeeded: Boolean): VectorMap[ByteStr, NewTransactionInfo] =
           VectorMap(invoke.id() -> NewTransactionInfo(invoke, Set(invoke.senderAddress, dAppAddress), succeeded, if (!succeeded) 8L else 18L))
@@ -69,7 +69,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
               if (func == "invalidLength")
                 lengthError
               else
-                unexistingError
+                nonExistentError
             Diff(
               transactions = invokeInfo(false),
               portfolios = Map(
@@ -80,7 +80,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
               scriptResults = Map(invoke.id() -> InvokeScriptResult(error = Some(ErrorMessage(1, expectingMessage))))
             )
           } else {
-            val asset = if (func == "invalidLength") invalidLengthAsset else unexistingAsset
+            val asset = if (func == "invalidLength") invalidLengthAsset else nonExistentAsset
             Diff(
               transactions = invokeInfo(true),
               portfolios = Map(
@@ -124,7 +124,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
          |@Callable(i)
          |func unexisting() = {
          |  ${if (complex) sigVerify else ""}
-         |  strict r = invoke(this, "default", [], [AttachedPayment(base58'$unexistingAsset', 1)])
+         |  strict r = invoke(this, "default", [], [AttachedPayment(base58'$nonExistentAsset', 1)])
          |  []
          |}
          |
@@ -139,10 +139,10 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
         val unexistingErrorInvoke = invoke(func = Some("unexisting"))
         if (complex) {
           d.appendAndAssertFailed(invalidLengthInvoke, lengthError)
-          d.appendAndAssertFailed(unexistingErrorInvoke, unexistingError)
+          d.appendAndAssertFailed(unexistingErrorInvoke, nonExistentError)
         } else {
           d.appendBlockE(invalidLengthInvoke) should produce(lengthError)
-          d.appendBlockE(unexistingErrorInvoke) should produce(unexistingError)
+          d.appendBlockE(unexistingErrorInvoke) should produce(nonExistentError)
         }
       }
     }
@@ -161,7 +161,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
          |
          |@Callable(i)
          |func unexisting() = {
-         |  strict r = invoke(callingDApp, "default", [], [AttachedPayment(base58'$unexistingAsset', 1)])
+         |  strict r = invoke(callingDApp, "default", [], [AttachedPayment(base58'$nonExistentAsset', 1)])
          |  []
          |}
        """.stripMargin
@@ -186,7 +186,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
     withDomain(RideV5) { d =>
       d.appendBlock(genesis, genesis2, setDApp, setDApp2)
       d.appendBlockE(invokeInvalidLength) should produce(lengthError)
-      d.appendBlockE(invokeUnexisting) should produce(unexistingError)
+      d.appendBlockE(invokeUnexisting) should produce(nonExistentError)
     }
   }
 
