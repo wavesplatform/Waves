@@ -460,19 +460,19 @@ class BlockchainUpdaterImpl(
   }
 
   private def notifyChangedSpendable(prevNgState: Option[NgState], newNgState: Option[NgState]): Unit = {
-//    val changedPortfolios = (prevNgState, newNgState) match {
-//      case (Some(p), Some(n)) => diff(p.bestLiquidDiff.portfolios, n.bestLiquidDiff.portfolios)
-//      case (Some(x), _)       => x.bestLiquidDiff.portfolios
-//      case (_, Some(x))       => x.bestLiquidDiff.portfolios
-//      case _                  => Map.empty
-//    }
-//
-//    changedPortfolios.foreach {
-//      case (addr, p) =>
-//        p.assetIds.view
-//          .filter(x => p.spendableBalanceOf(x) != 0)
-//          .foreach(assetId => spendableBalanceChanged.onNext(addr -> assetId))
-//    }
+    val changedPortfolios = (prevNgState, newNgState) match {
+      case (Some(p), Some(n)) =>
+        Diff.combine(p.bestLiquidDiff.portfolios, n.bestLiquidDiff.portfolios.view.mapValues(_.negate).toMap).getOrElse(Map.empty)
+      case (Some(x), _) => x.bestLiquidDiff.portfolios
+      case (_, Some(x)) => x.bestLiquidDiff.portfolios
+      case _            => Map.empty
+    }
+
+    changedPortfolios.foreach { case (addr, p) =>
+      p.assetIds.view
+        .filter(x => p.spendableBalanceOf(x) != 0)
+        .foreach(assetId => spendableBalanceChanged.onNext(addr -> assetId))
+    }
   }
 
   override def processMicroBlock(microBlock: MicroBlock, verify: Boolean = true): Either[ValidationError, BlockId] = writeLock {
@@ -734,12 +734,6 @@ class BlockchainUpdaterImpl(
 }
 
 object BlockchainUpdaterImpl {
-//  private implicit val portfolioDiffCombine: Semigroup[Portfolio] = (x: Portfolio, y: Portfolio) =>
-//    Portfolio(x.balance + y.balance, LeaseBalance.empty, x.assets |+| y.assets)
-
-//  private def diff(p1: Map[Address, Portfolio], p2: Map[Address, Portfolio]): Map[Address, Portfolio] =
-//    p1 |+| p2.map { case (k, v) => k -> v.negate }
-
   private def displayFeatures(s: Set[Short]): String =
     s"FEATURE${if (s.size > 1) "S" else ""} ${s.mkString(", ")} ${if (s.size > 1) "have been" else "has been"}"
 
