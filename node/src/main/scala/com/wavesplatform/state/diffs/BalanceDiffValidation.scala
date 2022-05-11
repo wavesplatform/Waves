@@ -7,11 +7,10 @@ import com.wavesplatform.state
 import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.AccountBalanceError
-import com.wavesplatform.utils.ScorexLogging
 
 import scala.util.{Left, Right}
 
-object BalanceDiffValidation extends ScorexLogging {
+object BalanceDiffValidation {
   def cond(b: Blockchain, cond: Blockchain => Boolean)(d: Diff): Either[AccountBalanceError, Diff] = {
     if (cond(b)) apply(b)(d)
     else Right(d)

@@ -2,9 +2,6 @@ package com.wavesplatform.state
 
 import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
-import cats.implicits.catsSyntaxSemigroup
-import cats.instances.map.*
-import cats.kernel.Semigroup
 import cats.syntax.either.*
 import cats.syntax.option.*
 import com.wavesplatform.account.{Address, Alias}
@@ -83,9 +80,8 @@ class BlockchainUpdaterImpl(
     readLock(
       ngState
         .flatMap(_.totalDiffOf(id))
-        .map {
-          case (_, diff, _, _, _) =>
-            diff.transactions.values.toSeq.map(info => (TxMeta(Height(height), info.applied, info.spentComplexity), info.transaction))
+        .map { case (_, diff, _, _, _) =>
+          diff.transactions.values.toSeq.map(info => (TxMeta(Height(height), info.applied, info.spentComplexity), info.transaction))
         }
     )
 
@@ -171,18 +167,17 @@ class BlockchainUpdaterImpl(
           case _ => None
         }
       }
-      .flatMap {
-        case (votes, currentReward) =>
-          val lt        = votes.count(_ < currentReward)
-          val gt        = votes.count(_ > currentReward)
-          val threshold = settings.votingInterval / 2 + 1
+      .flatMap { case (votes, currentReward) =>
+        val lt        = votes.count(_ < currentReward)
+        val gt        = votes.count(_ > currentReward)
+        val threshold = settings.votingInterval / 2 + 1
 
-          if (lt >= threshold)
-            Some(math.max(currentReward - settings.minIncrement, 0))
-          else if (gt >= threshold)
-            Some(currentReward + settings.minIncrement)
-          else
-            Some(currentReward)
+        if (lt >= threshold)
+          Some(math.max(currentReward - settings.minIncrement, 0))
+        else if (gt >= threshold)
+          Some(currentReward + settings.minIncrement)
+        else
+          Some(currentReward)
       }
       .orElse(lastBlockReward)
   }
@@ -198,40 +193,69 @@ class BlockchainUpdaterImpl(
           (),
           GenericError(s"UNIMPLEMENTED ${displayFeatures(notImplementedFeatures)} ACTIVATED ON BLOCKCHAIN, UPDATE THE NODE IMMEDIATELY")
         )
-        .flatMap[ValidationError, Seq[Diff]](
-          _ =>
-            (ngState match {
-              case None =>
-                leveldb.lastBlockId match {
-                  case Some(uniqueId) if uniqueId != block.header.reference =>
-                    val logDetails = s"The referenced block(${block.header.reference})" +
-                      s" ${if (leveldb.contains(block.header.reference)) "exits, it's not last persisted" else "doesn't exist"}"
-                    Left(BlockAppendError(s"References incorrect or non-existing block: " + logDetails, block))
-                  case lastBlockId =>
-                    val height            = lastBlockId.fold(0)(leveldb.unsafeHeightOf)
-                    val miningConstraints = MiningConstraints(leveldb, height)
-                    val reward            = nextReward()
+        .flatMap[ValidationError, Seq[Diff]](_ =>
+          (ngState match {
+            case None =>
+              leveldb.lastBlockId match {
+                case Some(uniqueId) if uniqueId != block.header.reference =>
+                  val logDetails = s"The referenced block(${block.header.reference})" +
+                    s" ${if (leveldb.contains(block.header.reference)) "exits, it's not last persisted" else "doesn't exist"}"
+                  Left(BlockAppendError(s"References incorrect or non-existing block: " + logDetails, block))
+                case lastBlockId =>
+                  val height            = lastBlockId.fold(0)(leveldb.unsafeHeightOf)
+                  val miningConstraints = MiningConstraints(leveldb, height)
+                  val reward            = nextReward()
 
-                    val referencedBlockchain = CompositeBlockchain(leveldb, reward)
-                    BlockDiffer
-                      .fromBlock(
-                        referencedBlockchain,
-                        leveldb.lastBlock,
-                        block,
-                        miningConstraints.total,
-                        hitSource,
-                        verify
+                  val referencedBlockchain = CompositeBlockchain(leveldb, reward)
+                  BlockDiffer
+                    .fromBlock(
+                      referencedBlockchain,
+                      leveldb.lastBlock,
+                      block,
+                      miningConstraints.total,
+                      hitSource,
+                      verify
+                    )
+                    .map { r =>
+                      val updatedBlockchain = CompositeBlockchain(leveldb, r.diff, block, hitSource, r.carry, reward)
+                      miner.scheduleMining(Some(updatedBlockchain))
+                      blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, reward, referencedBlockchain)
+                      Option((r, Nil, reward, hitSource))
+                    }
+              }
+            case Some(ng) =>
+              if (ng.base.header.reference == block.header.reference) {
+                if (block.blockScore() > ng.base.blockScore()) {
+                  val height            = leveldb.unsafeHeightOf(ng.base.header.reference)
+                  val miningConstraints = MiningConstraints(leveldb, height)
+
+                  blockchainUpdateTriggers.onRollback(this, ng.base.header.reference, leveldb.height)
+
+                  val referencedBlockchain = CompositeBlockchain(leveldb, ng.reward)
+                  BlockDiffer
+                    .fromBlock(
+                      referencedBlockchain,
+                      leveldb.lastBlock,
+                      block,
+                      miningConstraints.total,
+                      hitSource,
+                      verify
+                    )
+                    .map { r =>
+                      log.trace(
+                        s"Better liquid block(score=${block.blockScore()}) received and applied instead of existing(score=${ng.base.blockScore()})"
                       )
-                      .map { r =>
-                        val updatedBlockchain = CompositeBlockchain(leveldb, r.diff, block, hitSource, r.carry, reward)
-                        miner.scheduleMining(Some(updatedBlockchain))
-                        blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, reward, referencedBlockchain)
-                        Option((r, Nil, reward, hitSource))
-                      }
-                }
-              case Some(ng) =>
-                if (ng.base.header.reference == block.header.reference) {
-                  if (block.blockScore() > ng.base.blockScore()) {
+                      val (mbs, diffs) = ng.allDiffs.unzip
+                      log.trace(s"Discarded microblocks = $mbs, diffs = ${diffs.map(_.hashString)}")
+                      blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, ng.reward, referencedBlockchain)
+                      Some((r, diffs, ng.reward, hitSource))
+                    }
+                } else if (areVersionsOfSameBlock(block, ng.base)) {
+                  if (block.transactionData.lengthCompare(ng.transactions.size) <= 0) {
+                    log.trace(s"Existing liquid block is better than new one, discarding $block")
+                    Right(None)
+                  } else {
+                    log.trace(s"New liquid block is better version of existing, swapping")
                     val height            = leveldb.unsafeHeightOf(ng.base.header.reference)
                     val miningConstraints = MiningConstraints(leveldb, height)
 
@@ -248,149 +272,120 @@ class BlockchainUpdaterImpl(
                         verify
                       )
                       .map { r =>
-                        log.trace(
-                          s"Better liquid block(score=${block.blockScore()}) received and applied instead of existing(score=${ng.base.blockScore()})"
-                        )
-                        val (mbs, diffs) = ng.allDiffs.unzip
-                        log.trace(s"Discarded microblocks = $mbs, diffs = ${diffs.map(_.hashString)}")
                         blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, ng.reward, referencedBlockchain)
-                        Some((r, diffs, ng.reward, hitSource))
-                      }
-                  } else if (areVersionsOfSameBlock(block, ng.base)) {
-                    if (block.transactionData.lengthCompare(ng.transactions.size) <= 0) {
-                      log.trace(s"Existing liquid block is better than new one, discarding $block")
-                      Right(None)
-                    } else {
-                      log.trace(s"New liquid block is better version of existing, swapping")
-                      val height            = leveldb.unsafeHeightOf(ng.base.header.reference)
-                      val miningConstraints = MiningConstraints(leveldb, height)
-
-                      blockchainUpdateTriggers.onRollback(this, ng.base.header.reference, leveldb.height)
-
-                      val referencedBlockchain = CompositeBlockchain(leveldb, ng.reward)
-                      BlockDiffer
-                        .fromBlock(
-                          referencedBlockchain,
-                          leveldb.lastBlock,
-                          block,
-                          miningConstraints.total,
-                          hitSource,
-                          verify
-                        )
-                        .map { r =>
-                          blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, ng.reward, referencedBlockchain)
-                          Some((r, Nil, ng.reward, hitSource))
-                        }
-                    }
-                  } else
-                    Left(
-                      BlockAppendError(
-                        s"Competitors liquid block $block(score=${block.blockScore()}) is not better than existing (ng.base ${ng.base}(score=${ng.base
-                          .blockScore()}))",
-                        block
-                      )
-                    )
-                } else
-                  metrics.forgeBlockTimeStats.measureOptional(ng.totalDiffOf(block.header.reference)) match {
-                    case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))
-                    case Some((referencedForgedBlock, referencedLiquidDiff, carry, totalFee, discarded)) =>
-                      if (!verify || referencedForgedBlock.signatureValid()) {
-                        val height = leveldb.heightOf(referencedForgedBlock.header.reference).getOrElse(0)
-
-                        if (discarded.nonEmpty) {
-                          blockchainUpdateTriggers.onMicroBlockRollback(this, block.header.reference)
-                          metrics.microBlockForkStats.increment()
-                          metrics.microBlockForkHeightStats.record(discarded.size)
-                        }
-
-                        val constraint: MiningConstraint = {
-                          val miningConstraints = MiningConstraints(leveldb, height)
-                          miningConstraints.total
-                        }
-
-                        val prevReward = ng.reward
-                        val reward     = nextReward()
-
-                        val prevHitSource = ng.hitSource
-
-                        for {
-                          liquidDiffWithCancelledLeases <- ng.cancelExpiredLeases(referencedLiquidDiff).leftMap(GenericError(_))
-                          referencedBlockchain = CompositeBlockchain(
-                            leveldb,
-                            liquidDiffWithCancelledLeases,
-                            referencedForgedBlock,
-                            ng.hitSource,
-                            carry,
-                            reward
-                          )
-                          differResult <- BlockDiffer
-                            .fromBlock(
-                              referencedBlockchain,
-                              Some(referencedForgedBlock),
-                              block,
-                              constraint,
-                              hitSource,
-                              verify
-                            )
-                        } yield {
-                            val tempBlockchain = CompositeBlockchain(
-                              referencedBlockchain,
-                              differResult.diff,
-                              block,
-                              hitSource,
-                              differResult.carry,
-                              reward
-                            )
-                            miner.scheduleMining(Some(tempBlockchain))
-
-                            blockchainUpdateTriggers.onProcessBlock(block, differResult.detailedDiff, reward, referencedBlockchain)
-
-                            leveldb.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)
-                            BlockStats.appended(referencedForgedBlock, referencedLiquidDiff.scriptsComplexity)
-                            TxsInBlockchainStats.record(ng.transactions.size)
-                            val (discardedMbs, discardedDiffs) = discarded.unzip
-                            if (discardedMbs.nonEmpty) {
-                              log.trace(s"Discarded microblocks: $discardedMbs")
-                            }
-
-                            Some((differResult, discardedDiffs, reward, hitSource))
-                        }
-                      } else {
-                        val errorText = s"Forged block has invalid signature. Base: ${ng.base}, requested reference: ${block.header.reference}"
-                        log.error(errorText)
-                        Left(BlockAppendError(errorText, block))
+                        Some((r, Nil, ng.reward, hitSource))
                       }
                   }
-            }).map {
-              _ map {
-                case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint, _), discDiffs, reward, hitSource) =>
-                  val newHeight   = leveldb.height + 1
-                  val prevNgState = ngState
-
-                  restTotalConstraint = updatedTotalConstraint
-                  ngState = Some(
-                    new NgState(
-                      block,
-                      newBlockDiff,
-                      carry,
-                      totalFee,
-                      featuresApprovedWithBlock(block),
-                      reward,
-                      hitSource,
-                      cancelLeases(collectLeasesToCancel(newHeight), newHeight)
+                } else
+                  Left(
+                    BlockAppendError(
+                      s"Competitors liquid block $block(score=${block.blockScore()}) is not better than existing (ng.base ${ng.base}(score=${ng.base
+                        .blockScore()}))",
+                      block
                     )
                   )
-                  notifyChangedSpendable(prevNgState, ngState)
-                  publishLastBlockInfo()
+              } else
+                metrics.forgeBlockTimeStats.measureOptional(ng.totalDiffOf(block.header.reference)) match {
+                  case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))
+                  case Some((referencedForgedBlock, referencedLiquidDiff, carry, totalFee, discarded)) =>
+                    if (!verify || referencedForgedBlock.signatureValid()) {
+                      val height = leveldb.heightOf(referencedForgedBlock.header.reference).getOrElse(0)
 
-                  if ((block.header.timestamp > time
-                        .getTimestamp() - wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (newHeight % 100 == 0)) {
-                    log.info(s"New height: $newHeight")
-                  }
+                      if (discarded.nonEmpty) {
+                        blockchainUpdateTriggers.onMicroBlockRollback(this, block.header.reference)
+                        metrics.microBlockForkStats.increment()
+                        metrics.microBlockForkHeightStats.record(discarded.size)
+                      }
 
-                  discDiffs
-              } getOrElse Nil
-            }
+                      val constraint: MiningConstraint = {
+                        val miningConstraints = MiningConstraints(leveldb, height)
+                        miningConstraints.total
+                      }
+
+                      val prevReward = ng.reward
+                      val reward     = nextReward()
+
+                      val prevHitSource = ng.hitSource
+
+                      for {
+                        liquidDiffWithCancelledLeases <- ng.cancelExpiredLeases(referencedLiquidDiff).leftMap(GenericError(_))
+                        referencedBlockchain = CompositeBlockchain(
+                          leveldb,
+                          liquidDiffWithCancelledLeases,
+                          referencedForgedBlock,
+                          ng.hitSource,
+                          carry,
+                          reward
+                        )
+                        differResult <- BlockDiffer
+                          .fromBlock(
+                            referencedBlockchain,
+                            Some(referencedForgedBlock),
+                            block,
+                            constraint,
+                            hitSource,
+                            verify
+                          )
+                      } yield {
+                        val tempBlockchain = CompositeBlockchain(
+                          referencedBlockchain,
+                          differResult.diff,
+                          block,
+                          hitSource,
+                          differResult.carry,
+                          reward
+                        )
+                        miner.scheduleMining(Some(tempBlockchain))
+
+                        blockchainUpdateTriggers.onProcessBlock(block, differResult.detailedDiff, reward, referencedBlockchain)
+
+                        leveldb.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)
+                        BlockStats.appended(referencedForgedBlock, referencedLiquidDiff.scriptsComplexity)
+                        TxsInBlockchainStats.record(ng.transactions.size)
+                        val (discardedMbs, discardedDiffs) = discarded.unzip
+                        if (discardedMbs.nonEmpty) {
+                          log.trace(s"Discarded microblocks: $discardedMbs")
+                        }
+
+                        Some((differResult, discardedDiffs, reward, hitSource))
+                      }
+                    } else {
+                      val errorText = s"Forged block has invalid signature. Base: ${ng.base}, requested reference: ${block.header.reference}"
+                      log.error(errorText)
+                      Left(BlockAppendError(errorText, block))
+                    }
+                }
+          }).map {
+            _ map { case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint, _), discDiffs, reward, hitSource) =>
+              val newHeight   = leveldb.height + 1
+              val prevNgState = ngState
+
+              restTotalConstraint = updatedTotalConstraint
+              ngState = Some(
+                new NgState(
+                  block,
+                  newBlockDiff,
+                  carry,
+                  totalFee,
+                  featuresApprovedWithBlock(block),
+                  reward,
+                  hitSource,
+                  cancelLeases(collectLeasesToCancel(newHeight), newHeight)
+                )
+              )
+              notifyChangedSpendable(prevNgState, ngState)
+              publishLastBlockInfo()
+
+              if (
+                (block.header.timestamp > time
+                  .getTimestamp() - wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (newHeight % 100 == 0)
+              ) {
+                log.info(s"New height: $newHeight")
+              }
+
+              discDiffs
+            } getOrElse Nil
+          }
         )
     }
 
@@ -415,8 +410,8 @@ class BlockchainUpdaterImpl(
       recipient <- leveldb.resolveAlias(lt.recipient).toSeq
     } yield lt.id() -> Diff(
       portfolios = Map(
-        lt.sender.toAddress -> Portfolio(0, LeaseBalance(0, -lt.amount.value), Map.empty),
-        recipient           -> Portfolio(0, LeaseBalance(-lt.amount.value, 0), Map.empty)
+        lt.sender.toAddress -> Portfolio(0, LeaseBalance(0, -lt.amount.value)),
+        recipient           -> Portfolio(0, LeaseBalance(-lt.amount.value, 0))
       ),
       leaseState = Map((lt.id(), LeaseDetails(lt.sender, lt.recipient, lt.amount.value, LeaseDetails.Status.Expired(height), lt.id(), ltMeta.height)))
     )).toMap
@@ -466,17 +461,17 @@ class BlockchainUpdaterImpl(
 
   private def notifyChangedSpendable(prevNgState: Option[NgState], newNgState: Option[NgState]): Unit = {
     val changedPortfolios = (prevNgState, newNgState) match {
-      case (Some(p), Some(n)) => diff(p.bestLiquidDiff.portfolios, n.bestLiquidDiff.portfolios)
-      case (Some(x), _)       => x.bestLiquidDiff.portfolios
-      case (_, Some(x))       => x.bestLiquidDiff.portfolios
-      case _                  => Map.empty
+      case (Some(p), Some(n)) =>
+        Diff.combine(p.bestLiquidDiff.portfolios, n.bestLiquidDiff.portfolios.view.mapValues(_.negate).toMap).getOrElse(Map.empty)
+      case (Some(x), _) => x.bestLiquidDiff.portfolios
+      case (_, Some(x)) => x.bestLiquidDiff.portfolios
+      case _            => Map.empty
     }
 
-    changedPortfolios.foreach {
-      case (addr, p) =>
-        p.assetIds.view
-          .filter(x => p.spendableBalanceOf(x) != 0)
-          .foreach(assetId => spendableBalanceChanged.onNext(addr -> assetId))
+    changedPortfolios.foreach { case (addr, p) =>
+      p.assetIds.view
+        .filter(x => p.spendableBalanceOf(x) != 0)
+        .foreach(assetId => spendableBalanceChanged.onNext(addr -> assetId))
     }
   }
 
@@ -500,11 +495,10 @@ class BlockchainUpdaterImpl(
               totalSignatureValid <- ng
                 .totalDiffOf(microBlock.reference)
                 .toRight(GenericError(s"No referenced block exists: $microBlock"))
-                .map {
-                  case (accumulatedBlock, _, _, _, _) =>
-                    Block
-                      .create(accumulatedBlock, accumulatedBlock.transactionData ++ microBlock.transactionData, microBlock.totalResBlockSig)
-                      .signatureValid()
+                .map { case (accumulatedBlock, _, _, _, _) =>
+                  Block
+                    .create(accumulatedBlock, accumulatedBlock.transactionData ++ microBlock.transactionData, microBlock.totalResBlockSig)
+                    .signatureValid()
                 }
               _ <- Either
                 .cond(
@@ -640,7 +634,8 @@ class BlockchainUpdaterImpl(
   override def blockHeader(height: Int): Option[SignedBlockHeader] = readLock {
     if (height == leveldb.height + 1) ngState.map { x =>
       SignedBlockHeader(x.bestLiquidBlock.header, x.bestLiquidBlock.signature)
-    } else leveldb.blockHeader(height)
+    }
+    else leveldb.blockHeader(height)
   }
 
   override def transferById(id: BlockId): Option[(Int, TransferTransactionLike)] = readLock {
@@ -728,7 +723,7 @@ class BlockchainUpdaterImpl(
   private[this] def compositeBlockchain =
     ngState.fold(leveldb: Blockchain)(CompositeBlockchain(leveldb, _))
 
-  //noinspection ScalaStyle,TypeAnnotation
+  // noinspection ScalaStyle,TypeAnnotation
   private[this] object metrics {
     val blockMicroForkStats       = Kamon.counter("blockchain-updater.block-micro-fork").withoutTags()
     val microMicroForkStats       = Kamon.counter("blockchain-updater.micro-micro-fork").withoutTags()
@@ -739,12 +734,6 @@ class BlockchainUpdaterImpl(
 }
 
 object BlockchainUpdaterImpl {
-  private implicit val portfolioDiffCombine: Semigroup[Portfolio] = (x: Portfolio, y: Portfolio) =>
-    Portfolio(x.balance + y.balance, LeaseBalance.empty, x.assets |+| y.assets)
-
-  private def diff(p1: Map[Address, Portfolio], p2: Map[Address, Portfolio]): Map[Address, Portfolio] =
-    p1 |+| p2.map { case (k, v) => k -> v.negate }
-
   private def displayFeatures(s: Set[Short]): String =
     s"FEATURE${if (s.size > 1) "S" else ""} ${s.mkString(", ")} ${if (s.size > 1) "have been" else "has been"}"
 

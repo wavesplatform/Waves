@@ -1,10 +1,7 @@
 package com.wavesplatform.state
 
-import scala.util.Random
-
 import com.google.common.primitives.Longs
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.{EitherMatchers, NTPTime}
 import com.wavesplatform.TestHelpers.enableNG
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
@@ -12,22 +9,24 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{DBCacheSettings, WithDomain}
 import com.wavesplatform.events.BlockchainUpdateTriggers
-import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.history.{chainBaseAndMicro, randomSig}
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
+import com.wavesplatform.history.{chainBaseAndMicro, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.settings.{loadConfig, WavesSettings}
+import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.{Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.transaction.{Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.Time
+import com.wavesplatform.{EitherMatchers, NTPTime}
 import org.scalamock.scalatest.MockFactory
+
+import scala.util.Random
 
 class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDomain with NTPTime with DBCacheSettings with MockFactory {
 
@@ -259,31 +258,28 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
       val sender = KeyPair(Longs.toByteArray(Random.nextLong()))
 
       withDomain(
-        settings = domainSettingsWithPreactivatedFeatures(
-          BlockchainFeatures.NG,
-          BlockchainFeatures.BlockV5,
-          BlockchainFeatures.Ride4DApps
-        ),
+        DomainPresets.RideV4,
         balances = Seq(AddrWithBalance(dapp.toAddress, 10_00000000), AddrWithBalance(sender.toAddress, 10_00000000))
-    ) { d =>
-      val script = ScriptCompiler
-        .compile(
-          """
-          |{-# STDLIB_VERSION 4 #-}
-          |{-# SCRIPT_TYPE ACCOUNT #-}
-          |{-# CONTENT_TYPE DAPP #-}
-          |
-          |@Callable(i)
-          |func default() = {
-          |  [
-          |    BinaryEntry("vrf", value(value(blockInfoByHeight(height)).vrf))
-          |  ]
-          |}
-          |""".stripMargin,
-          ScriptEstimatorV2
-        )
-        .explicitGet()
-        ._1
+      ) { d =>
+        val script = ScriptCompiler
+          .compile(
+            """
+                |
+                |{-# STDLIB_VERSION 4 #-}
+                |{-# SCRIPT_TYPE ACCOUNT #-}
+                |{-# CONTENT_TYPE DAPP #-}
+                |
+                |@Callable(i)
+                |func default() = {
+                |  [
+                |    BinaryEntry("vrf", value(value(blockInfoByHeight(height)).vrf))
+                |  ]
+                |}
+                |""".stripMargin,
+            ScriptEstimatorV2
+          )
+          .explicitGet()
+          ._1
 
         d.appendBlock(
           SetScriptTransaction.selfSigned(2.toByte, dapp, Some(script), 500_0000L, ntpTime.getTimestamp()).explicitGet()

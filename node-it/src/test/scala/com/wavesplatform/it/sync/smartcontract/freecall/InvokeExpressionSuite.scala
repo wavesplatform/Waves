@@ -9,7 +9,7 @@ import com.wavesplatform.it.api.{PutDataResponse, StateChangesDetails, Transacti
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.invokeExpressionFee
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.lang.directives.values.StdLibVersion.V6
+import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.transaction.smart.InvokeExpressionTransaction

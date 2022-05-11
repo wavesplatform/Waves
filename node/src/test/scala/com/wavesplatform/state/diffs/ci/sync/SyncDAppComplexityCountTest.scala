@@ -191,16 +191,16 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
           Map(TestBlock.defaultSigner.toAddress -> Portfolio(CurrentBlockFeePart(invokeTx.fee.value))) |+|
             Map(invokeTx.sender.toAddress       -> Portfolio(-invokeTx.fee.value))
         val paymentsPortfolios =
-          Map(invokeTx.sender.toAddress -> Portfolio(assets = Map(asset -> -1))) |+|
-            Map(dAppAddress             -> Portfolio(assets = Map(asset -> 1)))
+          Map(invokeTx.sender.toAddress -> Portfolio.build(asset, -1)) |+|
+            Map(dAppAddress             -> Portfolio.build(asset, 1))
         val throughTransfersPortfolios =
-          Map(invokeTx.sender.toAddress -> Portfolio(assets = Map(asset -> 1))) |+|
-            Map(lastCallingDApp         -> Portfolio(assets = Map(asset -> -1)))
+          Map(invokeTx.sender.toAddress -> Portfolio.build(asset, 1)) |+|
+            Map(lastCallingDApp         -> Portfolio.build(asset, -1))
         val throughPaymentsPortfolios =
-          Map(lastCallingDApp -> Portfolio(assets = Map(asset -> 1))) |+|
-            Map(dAppAddress   -> Portfolio(assets = Map(asset -> -1)))
+          Map(lastCallingDApp -> Portfolio.build(asset, 1)) |+|
+            Map(dAppAddress   -> Portfolio.build(asset, -1))
 
-        val overlappedPortfolio = Portfolio(assets = Map(asset -> 0))
+        val overlappedPortfolio = Portfolio.build(asset, 0)
         val emptyPortfolios     = Map.empty[Address, Portfolio]
 
         val additionalPortfolios =

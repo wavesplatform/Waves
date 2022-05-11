@@ -97,12 +97,14 @@ object ExpressionCompiler {
     compileUntyped(adjustedDecls, ctx)
   }
 
-  private def compileExpr(expr: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL, Expressions.EXPR)] =
-    compileExprWithCtx(expr, allowIllFormedStrings = false).map(r => (r.expr, r.t, r.parseNodeExpr))
+  private def compileExpr(expr: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL, Expressions.EXPR, Iterable[CompilationError])] =
+    compileExprWithCtx(expr, allowIllFormedStrings = false).map(r => (r.expr, r.t, r.parseNodeExpr, r.errors))
 
-  private def compileExprWithCtx(expr: Expressions.EXPR,
-                                 saveExprContext: Boolean = false,
-                                 allowIllFormedStrings: Boolean): CompileM[CompilationStepResultExpr] = {
+  private def compileExprWithCtx(
+      expr: Expressions.EXPR,
+      saveExprContext: Boolean = false,
+      allowIllFormedStrings: Boolean
+  ): CompileM[CompilationStepResultExpr] = {
     get[Id, CompilerContext, CompilationError].flatMap { ctx =>
       def adjustByteStr(expr: Expressions.CONST_BYTESTR, b: ByteStr) =
         CONST_BYTESTR(b)
@@ -669,13 +671,13 @@ object ExpressionCompiler {
       func: PART[String]
   ): CompileM[CompilationStepResultExpr] =
     for {
-      (compiledList, listType, _) <- compileExpr(list)
+      (compiledList, listType, _, compileListErrors) <- compileExpr(list)
       name = s"FOLD<$limit>"
       listInnerType <- (listType match {
         case list: LIST => Right(list.innerType)
         case other      => Left(Generic(p.start, p.end, s"First $name argument should be List[A], but $other found"))
       }).toCompileM
-      (compiledAcc, accType, accRaw) <- compileExpr(acc)
+      (compiledAcc, accType, accRaw, compileAccErrors) <- compileExpr(acc)
       funcName                       <- handlePart(func)
       ctx                            <- get[Id, CompilerContext, CompilationError]
       compiledFunc <- ctx
@@ -694,7 +696,7 @@ object ExpressionCompiler {
       resultType = compiledFunc.args.head._2.asInstanceOf[FINAL]
       compiledFold <- {
         val unwrapped = CompilerMacro.unwrapFold(ctx.foldIdx, limit, compiledList, compiledAcc, compiledFunc.header)
-        CompilationStepResultExpr(ctx, unwrapped, resultType, accRaw)
+        CompilationStepResultExpr(ctx, unwrapped, resultType, accRaw, compileListErrors ++ compileAccErrors)
           .asRight[CompilationError]
           .toCompileM
       }
@@ -864,7 +866,7 @@ object ExpressionCompiler {
                       Expressions.FUNCTION_CALL(pos, PART.VALID(pos, IsInstanceOf), List(refTmp, Expressions.CONST_STRING(pos, t.name))),
                       BinaryOperation.AND_OP,
                       Expressions.BLOCK(pos, Expressions.LET(pos, newRef.key, newRef, Some(caseType), true), checkingCond)
-                )
+                    )
                 ),
                 blockWithNewVar,
                 further
@@ -1075,6 +1077,6 @@ object ExpressionCompiler {
             res.errors.isEmpty,
             (res.ctx, res.expr, res.t),
             s"Compilation failed: [${res.errors.map(e => Show[CompilationError].show(e)).mkString("; ")}]"
-        )
+          )
       )
 }

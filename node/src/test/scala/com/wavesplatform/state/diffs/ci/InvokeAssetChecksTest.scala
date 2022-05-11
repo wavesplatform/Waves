@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs.ci
 
+import com.wavesplatform.TestValues.invokeFee
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.db.WithState.AddrWithBalance
@@ -12,6 +13,7 @@ import com.wavesplatform.state.{Diff, InvokeScriptResult, NewTransactionInfo, Po
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.transaction.TxHelpers.{invoke, secondSigner, setScript}
 import org.scalatest.{EitherValues, Inside}
 
 import scala.collection.immutable.VectorMap
@@ -20,7 +22,10 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
   import DomainPresets.*
 
   private val invalidLengthAsset = IssuedAsset(ByteStr.decodeBase58("WAVES").get)
-  private val unexistingAsset    = IssuedAsset(ByteStr.decodeBase58("WAVESwavesWAVESwavesWAVESwavesWAVESwaves123").get)
+  private val nonExistentAsset    = IssuedAsset(ByteStr.decodeBase58("WAVESwavesWAVESwavesWAVESwavesWAVESwaves123").get)
+
+  private val lengthError     = s"Transfer error: invalid asset ID '$invalidLengthAsset' length = 4 bytes, must be 32"
+  private val nonExistentError = s"Transfer error: asset '$nonExistentAsset' is not found on the blockchain"
 
   property("invoke asset checks") {
     val dApp = TestCompiler(V4).compileContract(
@@ -36,7 +41,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
          |func unexisting() =
          |  [
          |    ScriptTransfer(i.caller, 0, unit),
-         |    ScriptTransfer(i.caller, 0, base58'$unexistingAsset')
+         |    ScriptTransfer(i.caller, 0, base58'$nonExistentAsset')
          |  ]
        """.stripMargin
     )
@@ -53,7 +58,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
         val setScriptTx = TxHelpers.setScript(master, dApp)
         val invoke = TxHelpers.invoke(master.toAddress, Some(func), invoker = invoker)
 
-        val dAppAddress = invoke.dApp.asInstanceOf[Address]
+        val dAppAddress = master.toAddress
 
         def invokeInfo(succeeded: Boolean): VectorMap[ByteStr, NewTransactionInfo] =
           VectorMap(invoke.id() -> NewTransactionInfo(invoke, Set(invoke.senderAddress, dAppAddress), succeeded, if (!succeeded) 8L else 18L))
@@ -62,9 +67,9 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
           if (activated) {
             val expectingMessage =
               if (func == "invalidLength")
-                s"Transfer error: invalid asset ID '$invalidLengthAsset' length = 4 bytes, must be 32"
+                lengthError
               else
-                s"Transfer error: asset '$unexistingAsset' is not found on the blockchain"
+                nonExistentError
             Diff(
               transactions = invokeInfo(false),
               portfolios = Map(
@@ -75,7 +80,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
               scriptResults = Map(invoke.id() -> InvokeScriptResult(error = Some(ErrorMessage(1, expectingMessage))))
             )
           } else {
-            val asset = if (func == "invalidLength") invalidLengthAsset else unexistingAsset
+            val asset = if (func == "invalidLength") invalidLengthAsset else nonExistentAsset
             Diff(
               transactions = invokeInfo(true),
               portfolios = Map(
@@ -105,6 +110,44 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
     }
   }
 
+  property("attached invoke payment asset checks") {
+    val sigVerify = s"""strict c = ${(1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}"""
+    def dApp(complex: Boolean) = TestCompiler(V5).compileContract(
+      s"""
+         |@Callable(i)
+         |func invalidLength() = {
+         |  ${if (complex) sigVerify else ""}
+         |  strict r = invoke(this, "default", [], [AttachedPayment(base58'$invalidLengthAsset', 1)])
+         |  []
+         |}
+         |
+         |@Callable(i)
+         |func unexisting() = {
+         |  ${if (complex) sigVerify else ""}
+         |  strict r = invoke(this, "default", [], [AttachedPayment(base58'$nonExistentAsset', 1)])
+         |  []
+         |}
+         |
+         |@Callable(i)
+         |func default() = []
+       """.stripMargin
+    )
+    Seq(true, false).foreach { complex =>
+      withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+        d.appendBlock(setScript(secondSigner, dApp(complex)))
+        val invalidLengthInvoke   = invoke(func = Some("invalidLength"))
+        val unexistingErrorInvoke = invoke(func = Some("unexisting"))
+        if (complex) {
+          d.appendAndAssertFailed(invalidLengthInvoke, lengthError)
+          d.appendAndAssertFailed(unexistingErrorInvoke, nonExistentError)
+        } else {
+          d.appendBlockE(invalidLengthInvoke) should produce(lengthError)
+          d.appendBlockE(unexistingErrorInvoke) should produce(nonExistentError)
+        }
+      }
+    }
+  }
+
   property("sync invoke asset checks") {
     def dApp(callingDApp: Address): ContractScriptImpl = TestCompiler(V5).compileContract(
       s"""
@@ -118,7 +161,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
          |
          |@Callable(i)
          |func unexisting() = {
-         |  strict r = invoke(callingDApp, "default", [], [AttachedPayment(base58'$unexistingAsset', 1)])
+         |  strict r = invoke(callingDApp, "default", [], [AttachedPayment(base58'$nonExistentAsset', 1)])
          |  []
          |}
        """.stripMargin
@@ -142,8 +185,84 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
 
     withDomain(RideV5) { d =>
       d.appendBlock(genesis, genesis2, setDApp, setDApp2)
-      d.appendBlockE(invokeInvalidLength) should produce(s"Transfer error: invalid asset ID '$invalidLengthAsset' length = 4 bytes, must be 32")
-      d.appendBlockE(invokeUnexisting) should produce(s"Transfer error: asset '$unexistingAsset' is not found on the blockchain")
+      d.appendBlockE(invokeInvalidLength) should produce(lengthError)
+      d.appendBlockE(invokeUnexisting) should produce(nonExistentError)
+    }
+  }
+
+  property("issuing asset name and description limits") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+      Seq(false, true).foreach { complex =>
+        val sigVerify = s"""strict c = ${(1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")} """
+        def dApp(name: String = "name", description: String = "") = TestCompiler(V5).compileContract(
+          s"""
+           | @Callable(i)
+           | func default() = [
+           |   ${if (complex) sigVerify else ""}
+           |   Issue("$name", "$description", 1000, 4, true, unit, 0)
+           | ]
+         """.stripMargin
+        )
+
+        def invokeTx = invoke(fee = invokeFee(issues = 1))
+
+        d.appendBlock(setScript(secondSigner, dApp("a" * 3)))
+        d.appendAndAssertFailed(invokeTx, "Invalid asset name")
+        d.appendBlock(setScript(secondSigner, dApp("a" * 4)))
+        d.appendAndAssertSucceed(invokeTx)
+
+        d.appendBlock(setScript(secondSigner, dApp("a" * 17)))
+        d.appendAndAssertFailed(invokeTx, "Invalid asset name")
+        d.appendBlock(setScript(secondSigner, dApp("a" * 16)))
+        d.appendAndAssertSucceed(invokeTx)
+
+        d.appendBlock(setScript(secondSigner, dApp(description = "a" * 1001)))
+        d.appendAndAssertFailed(invokeTx, "Invalid asset description")
+        d.appendBlock(setScript(secondSigner, dApp(description = "a" * 1000)))
+        d.appendAndAssertSucceed(invokeTx)
+      }
+    }
+  }
+
+  property("issuing asset decimals limits") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+      def dApp(decimals: Int) = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = [
+           |   Issue("name", "", 1000, $decimals, true, unit, 0)
+           | ]
+         """.stripMargin
+      )
+
+      def invokeTx = invoke(fee = invokeFee(issues = 1))
+
+      d.appendBlock(setScript(secondSigner, dApp(-1)))
+      d.appendBlockE(invokeTx) should produce("Invalid decimals -1")
+      d.appendBlock(setScript(secondSigner, dApp(0)))
+      d.appendAndAssertSucceed(invokeTx)
+
+      d.appendBlock(setScript(secondSigner, dApp(9)))
+      d.appendBlockE(invokeTx) should produce("Invalid decimals 9")
+      d.appendBlock(setScript(secondSigner, dApp(8)))
+      d.appendAndAssertSucceed(invokeTx)
+    }
+  }
+
+  property("Issues with same nonces are allowed when any field differs") {
+    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+      val dApp = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = [
+           |   Issue("name", "", 1000, 1, true, unit, 0),
+           |   Issue("name", "", 1000, 0, true, unit, 0)
+           | ]
+         """.stripMargin
+      )
+      d.appendBlock(setScript(secondSigner, dApp))
+      d.appendAndAssertSucceed(invoke(fee = invokeFee(issues = 2)))
+      d.liquidDiff.issuedAssets.size shouldBe 2
     }
   }
 }

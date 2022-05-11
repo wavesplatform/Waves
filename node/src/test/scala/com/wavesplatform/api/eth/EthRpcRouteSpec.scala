@@ -6,7 +6,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.{DefaultWavesSettings, Domain, settingsWithFeatures}
 import com.wavesplatform.http.RouteSpec
-import com.wavesplatform.lang.directives.values.StdLibVersion.V5
+import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.BinaryDataEntry
 import com.wavesplatform.test.*

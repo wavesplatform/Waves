@@ -15,9 +15,11 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.network.TransactionPublisher
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{BinaryDataEntry, Blockchain, Diff, Height, TxMeta}
+import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -52,11 +54,8 @@ class LeaseRouteSpec
       CommonAccountsApi(() => domain.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), domain.db, domain.blockchain)
     )
 
-  private def withRoute(balances: Seq[AddrWithBalance])(f: (Domain, Route) => Unit): Unit =
-    withDomain(
-      settings = DomainPresets.ContinuationTransaction,
-      balances = balances
-    ) { d =>
+  private def withRoute(balances: Seq[AddrWithBalance], settings: WavesSettings = mostRecent)(f: (Domain, Route) => Unit): Unit =
+    withDomain(settings = settings, balances = balances) { d =>
       f(d, route(d).route)
     }
 
@@ -66,26 +65,26 @@ class LeaseRouteSpec
         TxVersion.V2,
         sender,
         Some(TestCompiler(V5).compileContract("""
-          |{-# STDLIB_VERSION 4 #-}
-          |{-# CONTENT_TYPE DAPP #-}
-          |{-# SCRIPT_TYPE ACCOUNT #-}
-          |
-          |@Callable(inv)
-          |func leaseTo(recipient: ByteVector, amount: Int) = {
-          |  let lease = Lease(Address(recipient), amount)
-          |  [
-          |    lease,
-          |    BinaryEntry("leaseId", lease.calculateLeaseId())
-          |  ]
-          |}
-          |
-          |@Callable(inv)
-          |func cancelLease(id: ByteVector) = {
-          |  [
-          |    LeaseCancel(id)
-          |  ]
-          |}
-          |""".stripMargin)),
+                                                |{-# STDLIB_VERSION 4 #-}
+                                                |{-# CONTENT_TYPE DAPP #-}
+                                                |{-# SCRIPT_TYPE ACCOUNT #-}
+                                                |
+                                                |@Callable(inv)
+                                                |func leaseTo(recipient: ByteVector, amount: Int) = {
+                                                |  let lease = Lease(Address(recipient), amount)
+                                                |  [
+                                                |    lease,
+                                                |    BinaryEntry("leaseId", lease.calculateLeaseId())
+                                                |  ]
+                                                |}
+                                                |
+                                                |@Callable(inv)
+                                                |func cancelLease(id: ByteVector) = {
+                                                |  [
+                                                |    LeaseCancel(id)
+                                                |  ]
+                                                |}
+                                                |""".stripMargin)),
         0.01.waves,
         ntpTime.getTimestamp()
       )
@@ -122,8 +121,8 @@ class LeaseRouteSpec
     Get(routePath(s"/active/$address")) ~> route ~> check {
       val resp = responseAs[Seq[JsObject]]
       resp.size shouldEqual expectedDetails.size
-      resp.zip(expectedDetails).foreach {
-        case (json, (id, details)) => checkDetails(id, details, json)
+      resp.zip(expectedDetails).foreach { case (json, (id, details)) =>
+        checkDetails(id, details, json)
       }
     }
 
@@ -215,8 +214,8 @@ class LeaseRouteSpec
           d.appendBlock(invoke)
           val leaseId = d.blockchain
             .accountData(sender.toAddress, "leaseId")
-            .collect {
-              case i: BinaryDataEntry => i.value
+            .collect { case i: BinaryDataEntry =>
+              i.value
             }
             .get
           val expectedDetails = Seq(leaseId -> LeaseDetails(setScript.sender, recipient, 10_000.waves, LeaseDetails.Status.Active, invoke.id(), 1))
@@ -235,34 +234,33 @@ class LeaseRouteSpec
         }
     }
 
-    "created and canceled by InvokeScriptTransaction" in forAll(setScriptAndInvoke) {
-      case (sender, setScript, invoke, recipient) =>
-        withRoute(Seq(AddrWithBalance(sender.toAddress))) { (d, r) =>
-          d.appendBlock(setScript)
-          d.appendBlock(invoke)
-          val invokeStatus = d.blockchain.transactionMeta(invoke.id()).get.succeeded
-          assert(invokeStatus, "Invoke has failed")
+    "created and canceled by InvokeScriptTransaction" in forAll(setScriptAndInvoke) { case (sender, setScript, invoke, recipient) =>
+      withRoute(Seq(AddrWithBalance(sender.toAddress))) { (d, r) =>
+        d.appendBlock(setScript)
+        d.appendBlock(invoke)
+        val invokeStatus = d.blockchain.transactionMeta(invoke.id()).get.succeeded
+        assert(invokeStatus, "Invoke has failed")
 
-          val leaseId = d.blockchain
-            .accountData(sender.toAddress, "leaseId")
-            .collect {
-              case i: BinaryDataEntry => i.value
-            }
-            .get
-          val expectedDetails = Seq(leaseId -> LeaseDetails(setScript.sender, recipient, 10_000.waves, LeaseDetails.Status.Active, invoke.id(), 1))
-
-          d.liquidAndSolidAssert { () =>
-            checkActiveLeasesFor(sender.toAddress, r, expectedDetails)
-            checkActiveLeasesFor(recipient, r, expectedDetails)
+        val leaseId = d.blockchain
+          .accountData(sender.toAddress, "leaseId")
+          .collect { case i: BinaryDataEntry =>
+            i.value
           }
+          .get
+        val expectedDetails = Seq(leaseId -> LeaseDetails(setScript.sender, recipient, 10_000.waves, LeaseDetails.Status.Active, invoke.id(), 1))
 
-          d.appendMicroBlock(invokeLeaseCancel(sender, leaseId))
-
-          d.liquidAndSolidAssert { () =>
-            checkActiveLeasesFor(sender.toAddress, r, Seq.empty)
-            checkActiveLeasesFor(recipient, r, Seq.empty)
-          }
+        d.liquidAndSolidAssert { () =>
+          checkActiveLeasesFor(sender.toAddress, r, expectedDetails)
+          checkActiveLeasesFor(recipient, r, expectedDetails)
         }
+
+        d.appendMicroBlock(invokeLeaseCancel(sender, leaseId))
+
+        d.liquidAndSolidAssert { () =>
+          checkActiveLeasesFor(sender.toAddress, r, Seq.empty)
+          checkActiveLeasesFor(recipient, r, Seq.empty)
+        }
+      }
     }
 
     val invokeExpression = for {
@@ -286,35 +284,34 @@ class LeaseRouteSpec
       recipient.toAddress
     )
 
-    "created by InvokeExpressionTransaction and canceled by CancelLeaseTransaction" in forAll(invokeExpression) {
-      case (sender, invoke, recipient) =>
-        withRoute(AddrWithBalance.enoughBalances(sender)) { (d, r) =>
-          d.appendBlock(invoke)
-          val leaseId = d.blockchain
-            .accountData(sender.toAddress, "leaseId")
-            .collect {
-              case i: BinaryDataEntry => i.value
-            }
-            .get
-          val expectedDetails = Seq(leaseId -> LeaseDetails(sender.publicKey, recipient, 10_000.waves, LeaseDetails.Status.Active, invoke.id(), 1))
-
-          d.liquidAndSolidAssert { () =>
-            checkActiveLeasesFor(sender.toAddress, r, expectedDetails)
-            checkActiveLeasesFor(recipient, r, expectedDetails)
+    "created by InvokeExpressionTransaction and canceled by CancelLeaseTransaction" in forAll(invokeExpression) { case (sender, invoke, recipient) =>
+      withRoute(AddrWithBalance.enoughBalances(sender), DomainPresets.ContinuationTransaction) { (d, r) =>
+        d.appendBlock(invoke)
+        val leaseId = d.blockchain
+          .accountData(sender.toAddress, "leaseId")
+          .collect { case i: BinaryDataEntry =>
+            i.value
           }
+          .get
+        val expectedDetails = Seq(leaseId -> LeaseDetails(sender.publicKey, recipient, 10_000.waves, LeaseDetails.Status.Active, invoke.id(), 1))
 
-          d.appendMicroBlock(leaseCancelTransaction(sender, leaseId))
-
-          d.liquidAndSolidAssert { () =>
-            checkActiveLeasesFor(sender.toAddress, r, Seq.empty)
-            checkActiveLeasesFor(recipient, r, Seq.empty)
-          }
+        d.liquidAndSolidAssert { () =>
+          checkActiveLeasesFor(sender.toAddress, r, expectedDetails)
+          checkActiveLeasesFor(recipient, r, expectedDetails)
         }
+
+        d.appendMicroBlock(leaseCancelTransaction(sender, leaseId))
+
+        d.liquidAndSolidAssert { () =>
+          checkActiveLeasesFor(sender.toAddress, r, Seq.empty)
+          checkActiveLeasesFor(recipient, r, Seq.empty)
+        }
+      }
     }
 
     val genesisWithEthereumInvoke = for {
-      sender <- ethAccountGen
-      dApp    <- accountGen
+      sender    <- ethAccountGen
+      dApp      <- accountGen
       recipient <- accountGen
       invokeEth <- ethereumInvokeTransactionGen(
         sender,
@@ -336,8 +333,8 @@ class LeaseRouteSpec
           d.appendBlock(invoke)
           val leaseId = d.blockchain
             .accountData(dApp.toAddress, "leaseId")
-            .collect {
-              case i: BinaryDataEntry => i.value
+            .collect { case i: BinaryDataEntry =>
+              i.value
             }
             .get
           val expectedDetails = Seq(leaseId -> LeaseDetails(dApp.publicKey, recipient, 10_000.waves, LeaseDetails.Status.Active, invoke.id(), 1))
@@ -416,8 +413,8 @@ class LeaseRouteSpec
         d.appendBlock(ist)
         val leaseId = d.blockchain
           .accountData(target.toAddress, "leaseId")
-          .collect {
-            case i: BinaryDataEntry => i.value
+          .collect { case i: BinaryDataEntry =>
+            i.value
           }
           .get
 
@@ -462,16 +459,16 @@ class LeaseRouteSpec
     Get(routePath(s"/info/${lease.id()}")) ~> route ~> check {
       val response = responseAs[JsObject]
       response should matchJson(s"""{
-                               |  "id" : "${lease.id()}",
-                               |  "originTransactionId" : "${lease.id()}",
-                               |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                               |  "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
-                               |  "amount" : 1000000000,
-                               |  "height" : 1,
-                               |  "status" : "canceled",
-                               |  "cancelHeight" : 2,
-                               |  "cancelTransactionId" : "${leaseCancel.id()}"
-                               |}""".stripMargin)
+                                   |  "id" : "${lease.id()}",
+                                   |  "originTransactionId" : "${lease.id()}",
+                                   |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                                   |  "recipient" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
+                                   |  "amount" : 1000000000,
+                                   |  "height" : 1,
+                                   |  "status" : "canceled",
+                                   |  "cancelHeight" : 2,
+                                   |  "cancelTransactionId" : "${leaseCancel.id()}"
+                                   |}""".stripMargin)
     }
 
     val leasesListJson = Json.parse(s"""[{
@@ -535,11 +532,11 @@ class LeaseRouteSpec
     Get(routePath(s"/info?id=nonvalid&id=${leaseCancel.id()}")) ~> route ~> check {
       val response = responseAs[JsObject]
       response should matchJson(s"""
-                               |{
-                               |  "error" : 116,
-                               |  "message" : "Request contains invalid IDs. nonvalid, ${leaseCancel.id()}",
-                               |  "ids" : [ "nonvalid", "${leaseCancel.id()}" ]
-                               |}""".stripMargin)
+                                   |{
+                                   |  "error" : 116,
+                                   |  "message" : "Request contains invalid IDs. nonvalid, ${leaseCancel.id()}",
+                                   |  "ids" : [ "nonvalid", "${leaseCancel.id()}" ]
+                                   |}""".stripMargin)
     }
   }
 }

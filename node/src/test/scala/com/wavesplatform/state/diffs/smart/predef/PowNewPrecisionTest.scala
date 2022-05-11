@@ -4,6 +4,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.V4
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 

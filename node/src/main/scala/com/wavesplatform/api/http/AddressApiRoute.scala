@@ -201,19 +201,21 @@ case class AddressApiRoute(
         complete(accountDataEntry(address, key))
       } ~ extractScheduler(
         implicit sc =>
-          (formField("matches") | parameter("matches")) { matches =>
-            Try(matches.r)
-              .fold(
-                { e =>
-                  log.trace(s"Error compiling regex $matches: ${e.getMessage}")
-                  complete(ApiError.fromValidationError(GenericError(s"Cannot compile regex")))
-                },
-                _ => complete(accountData(address, matches))
-              )
-          } ~ anyParam("key").filter(_.nonEmpty) { keys =>
-            complete(accountDataList(address, keys.toSeq*))
-          } ~ get {
-            complete(accountData(address))
+          strictEntity {
+            (formField("matches") | parameter("matches")) { matches =>
+              Try(matches.r)
+                .fold(
+                  { e =>
+                    log.trace(s"Error compiling regex $matches: ${e.getMessage}")
+                    complete(ApiError.fromValidationError(GenericError(s"Cannot compile regex")))
+                  },
+                  _ => complete(accountData(address, matches))
+                )
+            } ~ anyParam("key").filter(_.nonEmpty) { keys =>
+              complete(accountDataList(address, keys.toSeq*))
+            } ~ get {
+              complete(accountData(address))
+            }
           }
       )
     }

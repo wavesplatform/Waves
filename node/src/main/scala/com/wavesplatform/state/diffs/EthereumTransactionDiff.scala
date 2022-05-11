@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs
 
-import cats.implicits.toBifunctorOps
 import com.google.protobuf.ByteString
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.lang.ValidationError
@@ -9,7 +8,6 @@ import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients}
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
 import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.EthereumTransaction
-import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 
 object EthereumTransactionDiff {
@@ -57,7 +55,7 @@ object EthereumTransactionDiff {
           transfer  <- TracedResult(et.toTransferLike(e, blockchain))
           assetDiff <- TransactionDiffer.assetsVerifierDiff(blockchain, transfer, verify = true, Diff(), Int.MaxValue)
           diff      <- TransferDiff(blockchain)(e.senderAddress(), et.recipient, et.amount, asset, e.fee, e.feeAssetId)
-          result <- assetDiff.combine(diff).leftMap(GenericError(_))
+          result    <- assetDiff.combineE(diff)
         } yield result
 
       case ei: EthereumTransaction.Invocation =>
@@ -65,10 +63,10 @@ object EthereumTransactionDiff {
           invocation   <- TracedResult(ei.toInvokeScriptLike(e, blockchain))
           paymentsDiff <- TransactionDiffer.assetsVerifierDiff(blockchain, invocation, verify = true, Diff(), Int.MaxValue)
           diff         <- InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution)(invocation)
-          result <- paymentsDiff.combine(diff).leftMap(GenericError(_))
+          result       <- paymentsDiff.combineE(diff)
         } yield result
     }
 
-    baseDiff.flatMap(bd => TracedResult(bd.combine(this.meta(blockchain)(e)).leftMap(GenericError(_))))
+    baseDiff.flatMap(bd => TracedResult(bd.combineE(this.meta(blockchain)(e))))
   }
 }

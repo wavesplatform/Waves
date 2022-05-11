@@ -9,11 +9,10 @@ import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.WalletSettings
 import com.wavesplatform.transaction.TxValidationError.MissingSenderPrivateKey
-import com.wavesplatform.utils.{JsonFileStorage, randomBytes, *}
+import com.wavesplatform.utils.*
 import play.api.libs.json.*
 
 import scala.collection.concurrent.TrieMap
-import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 trait Wallet {
@@ -27,7 +26,7 @@ trait Wallet {
   def privateKeyAccount(account: Address): Either[ValidationError, KeyPair]
 }
 
-object Wallet extends ScorexLogging {
+object Wallet {
   implicit class WalletExtension(private val wallet: Wallet) extends AnyVal {
     def findPrivateKey(addressString: String): Either[ValidationError, KeyPair] =
       for {
@@ -49,13 +48,7 @@ object Wallet extends ScorexLogging {
 
   @throws[IllegalArgumentException]("if invalid wallet configuration provided")
   def apply(settings: WalletSettings): Wallet =
-    try {
       new WalletImpl(settings.file, settings.password, settings.seed)
-    } catch {
-      case NonFatal(e) =>
-        log.error(s"Failed to open wallet file '${settings.file.get.getAbsolutePath}", e)
-        throw e
-    }
 
   private[this] final case class WalletData(seed: ByteStr, accountSeeds: Set[ByteStr], nonce: Int)
 

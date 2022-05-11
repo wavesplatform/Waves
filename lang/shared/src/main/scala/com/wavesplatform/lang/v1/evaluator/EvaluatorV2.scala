@@ -209,7 +209,7 @@ class EvaluatorV2(
                     update = update,
                     limit = unused - overheadCost,
                     parentBlocks = parentBlocks
-                  )
+                    )
                 )
               case FALSE if unused > 0 =>
                 update(i.ifFalse).flatMap(_ =>
@@ -218,7 +218,7 @@ class EvaluatorV2(
                     update = update,
                     limit = unused - overheadCost,
                     parentBlocks = parentBlocks
-                  )
+                    )
                 )
               case _: EVALUATED => EvaluationResult("Non-boolean result in cond", unused)
               case _            => EvaluationResult(unused)

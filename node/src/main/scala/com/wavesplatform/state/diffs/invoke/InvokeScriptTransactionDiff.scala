@@ -222,7 +222,7 @@ object InvokeScriptTransactionDiff {
           case i: IncompleteResult =>
             TracedResult(Left(GenericError(s"Evaluation was uncompleted with unused complexity = ${i.unusedComplexity}")))
         }
-        totalDiff <- TracedResult(invocationDiff.copy(scriptsComplexity = 0).combine(resultDiff)).leftMap(GenericError(_))
+        totalDiff <- TracedResult(invocationDiff.copy(scriptsComplexity = 0).combineF(resultDiff)).leftMap(GenericError(_))
       } yield totalDiff
     }
 
@@ -324,10 +324,13 @@ object InvokeScriptTransactionDiff {
       scriptOpt: Option[AccountScriptInfo]
   ): Either[GenericError, (PublicKey, StdLibVersion, FUNCTION_CALL, DApp, Map[Int, Map[String, Long]])] =
     scriptOpt
-      .collect { case AccountScriptInfo(publicKey, ContractScriptImpl(version, dApp), _, complexities) =>
-        (publicKey, version, tx.funcCall, dApp, complexities)
+      .map {
+        case AccountScriptInfo(publicKey, ContractScriptImpl(version, dApp), _, complexities) =>
+          Right((publicKey, version, tx.funcCall, dApp, complexities))
+        case _ =>
+          InvokeDiffsCommon.callExpressionError
       }
-      .toRight(GenericError(s"No contract at address ${tx.dApp}"))
+      .getOrElse(Left(GenericError(s"No contract at address ${tx.dApp}")))
 
   private def extractFreeCall(
       tx: InvokeExpressionTransaction,

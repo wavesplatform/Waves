@@ -1,10 +1,10 @@
 package com.wavesplatform.transaction.smart.script.trace
 
-import cats.instances.either._
-import cats.instances.list._
+import cats.instances.either.*
+import cats.instances.list.*
 import cats.kernel.Semigroup
-import cats.syntax.either._
-import cats.syntax.semigroup._
+import cats.syntax.either.*
+import cats.syntax.semigroup.*
 import cats.{Monad, StackSafeMonad}
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.transaction.Transaction

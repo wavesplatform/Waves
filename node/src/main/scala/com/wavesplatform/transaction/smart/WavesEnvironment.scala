@@ -337,15 +337,9 @@ class DAppEnvironment(
       availableComplexity: Int,
       reentrant: Boolean
   ): Coeval[(Either[ValidationError, EVALUATED], Int)] = {
-    val invocation = InvokeScriptResult.Invocation(
-      account.Address.fromBytes(dApp.bytes.arr).explicitGet(),
-      InvokeScriptResult.Call(func, args),
-      payments.map(p => InvokeScriptResult.AttachedPayment(p._1.fold(Asset.Waves: Asset)(a => IssuedAsset(ByteStr(a))), p._2)),
-      InvokeScriptResult.empty
-    )
 
     val r = for {
-      invoke <- traced(
+      address <- traced(
         account.Address
           .fromBytes(dApp.bytes.arr)
           .ensureOr(address =>
@@ -353,21 +347,25 @@ class DAppEnvironment(
               s"The invocation stack contains multiple invocations of the dApp at address $address with invocations of another dApp between them"
             )
           )(address => currentDApp == address || !calledAddresses.contains(address))
-          .map(
-            InvokeScript(
-              currentDAppPk,
-              _,
-              FUNCTION_CALL(User(func, func), args),
-              payments.map(p => Payment(p._2, p._1.fold(Waves: Asset)(a => IssuedAsset(ByteStr(a))))),
-              tx
-            )
-          )
+      )
+      invoke = InvokeScript(
+        currentDAppPk,
+        address,
+        FUNCTION_CALL(User(func, func), args),
+        payments.map(p => Payment(p._2, p._1.fold(Waves: Asset)(a => IssuedAsset(ByteStr(a))))),
+        tx
       )
       invocationTracker = {
         // Log sub-contract invocation
         val invocation = DAppEnvironment.DAppInvocation(invoke.dApp, invoke.funcCall, invoke.payments)
         invocationRoot.record(invocation)
       }
+      invocation = InvokeScriptResult.Invocation(
+        address,
+        InvokeScriptResult.Call(func, args),
+        payments.map(p => InvokeScriptResult.AttachedPayment(p._1.fold(Asset.Waves: Asset)(a => IssuedAsset(ByteStr(a))), p._2)),
+        InvokeScriptResult.empty
+      )
       (diff, evaluated, remainingActions, remainingBalanceActions, remainingAssetActions, remainingData, remainingDataSize) <-
         InvokeScriptDiff( // This is a recursive call
           mutableBlockchain,
@@ -388,7 +386,7 @@ class DAppEnvironment(
         scriptResults = Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = diff.scriptResults(txId))))),
         scriptsRun = diff.scriptsRun + 1
       )
-      newCurrentDiff <- traced(currentDiff.combine(fixedDiff).leftMap(GenericError(_)))
+      newCurrentDiff <- traced(currentDiff.combineF(fixedDiff).leftMap(GenericError(_)))
     } yield {
       currentDiff = newCurrentDiff
       mutableBlockchain = CompositeBlockchain(blockchain, currentDiff)

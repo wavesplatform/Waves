@@ -31,14 +31,14 @@ import com.wavesplatform.lang.v1.serialization.{SerdeV1, SerdeV2}
 /** This is a hack class for IDEA. The Global class is in JS/JVM modules. And IDEA can't find the Global class in the "shared" module, but it should!
   */
 trait BaseGlobal {
-  val MaxBase16Bytes: Int = 8 * 1024
-  val MaxBase16String: Int = 32 * 1024
-  val MaxBase58Bytes               = 64
-  val MaxBase58String              = 100
-  val MaxBase64Bytes: Int = 32 * 1024
-  val MaxBase64String: Int = 44 * 1024
-  val MaxLiteralLength: Int = 12 * 1024
-  val MaxAddressLength             = 36
+  val MaxBase16Bytes: Int               = 8 * 1024
+  val MaxBase16String: Int              = 32 * 1024
+  val MaxBase58Bytes                    = 64
+  val MaxBase58String                   = 100
+  val MaxBase64Bytes: Int               = 32 * 1024
+  val MaxBase64String: Int              = 44 * 1024
+  val MaxLiteralLength: Int             = 12 * 1024
+  val MaxAddressLength                  = 36
   val MaxByteStrSizeForVerifyFuncs: Int = 32 * 1024
 
   val LetBlockVersions: Set[StdLibVersion] = Set[StdLibVersion](V1, V2)
@@ -149,6 +149,10 @@ trait BaseGlobal {
   val compileExpression: (String, CompilerContext, StdLibVersion, ScriptType, ScriptEstimator) => Either[String, (Array[Byte], EXPR, Long)] =
     compile(_, _, _, _, _, ExpressionCompiler.compileBoolean)
 
+  val compileFreeCall: (String, CompilerContext, StdLibVersion, ScriptType, ScriptEstimator) => Either[String, (Array[Byte], EXPR, Long)] =
+    (input, ctx, version, scriptType, estimator) =>
+      compile(input, ctx, version, scriptType, estimator, ContractCompiler.compileFreeCall(_, _, version))
+
   val compileDecls: (String, CompilerContext, StdLibVersion, ScriptType, ScriptEstimator) => Either[String, (Array[Byte], EXPR, Long)] =
     compile(_, _, _, _, _, ExpressionCompiler.compileDecls)
 
@@ -165,7 +169,7 @@ trait BaseGlobal {
       expr <- if (isFreeCall) ContractCompiler.compileFreeCall(input, context, version) else compiler(input, context)
       bytes = serializeExpression(expr, version)
       _          <- ExprScript.validateBytes(bytes, isFreeCall)
-      complexity <- ExprScript.estimateExact(expr, version, isFreeCall, estimator)
+      complexity <- ExprScript.estimate(expr, version, isFreeCall, estimator, scriptType == Account)
     } yield (bytes, expr, complexity)
   }
 
@@ -202,14 +206,15 @@ trait BaseGlobal {
   ): Either[String, DAppInfo] =
     for {
       dApp                       <- ContractCompiler.compile(input, ctx, stdLibVersion, CallableFunction, needCompaction, removeUnusedCode)
+      bytes                      <- serializeContract(dApp, stdLibVersion)
+      _                          <- ContractScript.validateBytes(bytes)
       userFunctionComplexities   <- ContractScript.estimateUserFunctions(stdLibVersion, dApp, estimator)
       globalVariableComplexities <- ContractScript.estimateGlobalVariables(stdLibVersion, dApp, estimator)
       (maxComplexity, annotatedComplexities) <- ContractScript.estimateComplexityExact(stdLibVersion, dApp, estimator, fixEstimateOfVerifier = true)
+      _ <- ContractScript.checkComplexity(stdLibVersion, dApp, maxComplexity, annotatedComplexities, useReducedVerifierLimit = true)
       (verifierComplexity, callableComplexities) = dApp.verifierFuncOpt.fold(
         (0L, annotatedComplexities)
       )(v => (annotatedComplexities(v.u.name), annotatedComplexities - v.u.name))
-      bytes <- serializeContract(dApp, stdLibVersion)
-      _     <- ContractScript.validateBytes(bytes)
     } yield DAppInfo(
       bytes,
       dApp,

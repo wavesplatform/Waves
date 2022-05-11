@@ -5,28 +5,28 @@ import com.wavesplatform.TestValues
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
-import com.wavesplatform.lang.directives.values.StdLibVersion
+import com.wavesplatform.lang.directives.values.*
+import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript.ExprScriptImpl
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.state.{DataEntry, StringDataEntry}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit, ScriptExtraFee}
+import com.wavesplatform.state.{DataEntry, StringDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order, OrderPriceMode, OrderType}
 import com.wavesplatform.transaction.assets.*
+import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.transaction.utils.Signed
 import org.web3j.crypto.ECKeyPair
@@ -289,7 +289,7 @@ object TxHelpers {
       case other              => throw new IllegalStateException(s"Not an expression: $other")
     }
 
-  def freeCallScript(scriptText: String, version: StdLibVersion = StdLibVersion.V6): ExprScriptImpl =
+  def freeCallScript(scriptText: String, version: StdLibVersion = V6): ExprScriptImpl =
     TestCompiler(version).compileFreeCall(scriptText) match {
       case es: ExprScriptImpl => es
       case other              => throw new IllegalStateException(s"Not an expression: $other")
@@ -332,7 +332,7 @@ object TxHelpers {
   def setScript(
       acc: KeyPair,
       script: Script,
-      fee: Long = TestValues.fee,
+      fee: Long = FeeConstants(TransactionType.SetScript) * FeeUnit,
       version: TxVersion = TxVersion.V1,
       chainId: Byte = AddressScheme.current.chainId
   ): SetScriptTransaction = {
@@ -343,7 +343,7 @@ object TxHelpers {
       acc: KeyPair,
       asset: IssuedAsset,
       script: Script,
-      fee: Long = TestValues.fee,
+      fee: Long = FeeConstants(TransactionType.SetAssetScript) * FeeUnit,
       timestamp: TxTimestamp = timestamp,
       version: TxVersion = TxVersion.V1,
       chainId: Byte = AddressScheme.current.chainId
@@ -352,7 +352,7 @@ object TxHelpers {
   }
 
   def invoke(
-      dApp: AddressOrAlias,
+      dApp: AddressOrAlias = secondAddress,
       func: Option[String] = None,
       args: Seq[EXPR] = Nil,
       payments: Seq[Payment] = Nil,
@@ -381,7 +381,7 @@ object TxHelpers {
       sender: KeyPair = defaultSigner,
       recipient: AddressOrAlias = secondAddress,
       amount: Long = 10.waves,
-      fee: Long = TestValues.fee,
+      fee: Long = FeeConstants(TransactionType.Lease) * FeeUnit,
       timestamp: TxTimestamp = timestamp,
       version: TxVersion = TxVersion.V2
   ): LeaseTransaction = {
@@ -391,7 +391,7 @@ object TxHelpers {
   def leaseCancel(
       leaseId: ByteStr,
       sender: KeyPair = defaultSigner,
-      fee: Long = TestValues.fee,
+      fee: Long = FeeConstants(TransactionType.LeaseCancel) * FeeUnit,
       timestamp: TxTimestamp = timestamp,
       version: TxVersion = TxVersion.V2,
       chainId: Byte = AddressScheme.current.chainId

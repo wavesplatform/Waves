@@ -97,9 +97,9 @@ class EthereumTransactionSpec
     val transfer        = EthTxGenerator.generateEthTransfer(senderAccount, recipientAddress, LongMaxMinusFee, Waves)
     val assetTransfer   = EthTxGenerator.generateEthTransfer(senderAccount, recipientAddress, Long.MaxValue, TestAsset)
 
-    differ(transfer).combine(differ(assetTransfer)).explicitGet().portfolios shouldBe Map(
-      senderAddress    -> Portfolio(-Long.MaxValue, assets = Map(TestAsset -> -Long.MaxValue)),
-      recipientAddress -> Portfolio(LongMaxMinusFee, assets = Map(TestAsset -> Long.MaxValue))
+    differ(transfer).combineF(differ(assetTransfer)).explicitGet().portfolios shouldBe Map(
+      senderAddress    -> Portfolio.build(-Long.MaxValue, TestAsset, -Long.MaxValue),
+      recipientAddress -> Portfolio.build(LongMaxMinusFee, TestAsset, Long.MaxValue)
     )
   }
 
