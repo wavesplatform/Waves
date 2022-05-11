@@ -1,8 +1,8 @@
 package com.wavesplatform.state.diffs
 
-import cats.syntax.either._
+import cats.syntax.either.*
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state._
+import com.wavesplatform.state.*
 import com.wavesplatform.transaction.DataTransaction
 import com.wavesplatform.transaction.validation.impl.DataTxValidator
 
@@ -13,7 +13,7 @@ object DataTransactionDiff {
       // Validate data size
       _ <- DataTxValidator.payloadSizeValidation(blockchain, tx).toEither.leftMap(_.head)
     } yield Diff(
-      portfolios = Map(sender  -> Portfolio(-tx.fee.value, LeaseBalance.empty, Map.empty)),
+      portfolios = Map(sender -> Portfolio(-tx.fee.value)),
       accountData = Map(sender -> AccountDataInfo(tx.data.map(item => item.key -> item).toMap)),
       scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
     )

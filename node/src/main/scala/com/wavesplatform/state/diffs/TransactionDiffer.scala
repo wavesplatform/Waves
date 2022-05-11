@@ -14,7 +14,7 @@ import com.wavesplatform.metrics.TxProcessingStats
 import com.wavesplatform.metrics.TxProcessingStats.TxTimerExt
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
-import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, LeaseBalance, NewTransactionInfo, Portfolio, Sponsorship}
+import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, NewTransactionInfo, Portfolio, Sponsorship}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
@@ -162,7 +162,7 @@ object TransactionDiffer {
       }
     } else Diff.empty.asRight[ValidationError].traced
 
-    diff.flatMap(d => initDiff.combine(d).leftMap(GenericError(_))).leftMap {
+    diff.flatMap(d => initDiff.combineE(d)).leftMap {
       case fte: FailedTransactionError => fte.addComplexity(initDiff.scriptsComplexity)
       case ve                          => ve
     }
@@ -202,7 +202,7 @@ object TransactionDiffer {
           case _                                 => UnsupportedTransactionType.asLeft.traced
         }
       }
-      .flatMap(diff => initDiff.combine(diff.bindTransaction(blockchain, tx, applied = true)).leftMap(GenericError(_)))
+      .flatMap(diff => initDiff.combineE(diff.bindTransaction(blockchain, tx, applied = true)))
       .leftMap {
         case fte: FailedTransactionError => fte.addComplexity(initDiff.scriptsComplexity)
         case ve                          => ve
@@ -248,16 +248,16 @@ object TransactionDiffer {
                 .flatMap(_ =>
                   Diff
                     .combine(
-                      Map[Address, Portfolio](tx.senderAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))),
-                      Map[Address, Portfolio](dAppAddress      -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
+                      Map[Address, Portfolio](tx.senderAddress -> Portfolio.build(asset -> -amt)),
+                      Map[Address, Portfolio](dAppAddress      -> Portfolio.build(asset -> amt))
                     )
                     .leftMap(GenericError(_))
                 )
             case Waves =>
               Diff
                 .combine(
-                  Map[Address, Portfolio](tx.senderAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty)),
-                  Map[Address, Portfolio](dAppAddress      -> Portfolio(amt, LeaseBalance.empty, Map.empty))
+                  Map[Address, Portfolio](tx.senderAddress -> Portfolio(-amt)),
+                  Map[Address, Portfolio](dAppAddress      -> Portfolio(amt))
                 )
                 .leftMap(GenericError(_))
           }
@@ -301,7 +301,7 @@ object TransactionDiffer {
         portfolios = portfolios,
         scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
         scriptsComplexity = spentComplexity
-      ).unsafeCombine(ethereumMetaDiff)
+      ).combineF(ethereumMetaDiff).getOrElse(Diff.empty)
     }
   }
 
@@ -322,11 +322,11 @@ object TransactionDiffer {
     tx match {
       case _: GenesisTransaction => Map.empty[Address, Portfolio].asRight
       case ptx: PaymentTransaction =>
-        Map[Address, Portfolio](ptx.sender.toAddress -> Portfolio(balance = -ptx.fee.value, LeaseBalance.empty, assets = Map.empty)).asRight
+        Map[Address, Portfolio](ptx.sender.toAddress -> Portfolio(balance = -ptx.fee.value)).asRight
       case e: EthereumTransaction => Map[Address, Portfolio](e.senderAddress() -> Portfolio(-e.fee)).asRight
       case ptx: ProvenTransaction =>
         ptx.assetFee match {
-          case (Waves, fee) => Map[Address, Portfolio](ptx.sender.toAddress -> Portfolio(-fee, LeaseBalance.empty, Map.empty)).asRight
+          case (Waves, fee) => Map[Address, Portfolio](ptx.sender.toAddress -> Portfolio(-fee)).asRight
           case (asset @ IssuedAsset(_), fee) =>
             for {
               assetInfo <- blockchain
@@ -339,8 +339,8 @@ object TransactionDiffer {
               )
               portfolios <- Diff
                 .combine(
-                  Map(ptx.sender.toAddress       -> Portfolio(0, LeaseBalance.empty, Map(asset -> -fee))),
-                  Map(assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> fee)))
+                  Map(ptx.sender.toAddress       -> Portfolio.build(asset, -fee)),
+                  Map(assetInfo.issuer.toAddress -> Portfolio.build(-wavesFee, asset, fee))
                 )
                 .leftMap(GenericError(_))
             } yield portfolios

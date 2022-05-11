@@ -309,8 +309,10 @@ class BlockchainUpdatesSpec extends FreeSpec with WithDomain with ScalaFutures w
       genesis.amountBefore shouldBe reward
       genesis.getAmountAfter.assetId shouldBe empty
 
-      val payment = results.last.getAppend.transactionStateUpdates.last.balances.last
-      payment.address.toAddress shouldBe TxHelpers.secondAddress
+      val payment = results.last.getAppend.transactionStateUpdates.last.balances.find {
+        bu => bu.address.toAddress == TxHelpers.secondAddress
+      }.get
+
       payment.getAmountAfter.amount shouldBe 100
       payment.amountBefore shouldBe 0
       payment.getAmountAfter.assetId shouldBe empty
