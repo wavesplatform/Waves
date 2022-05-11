@@ -5,11 +5,12 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.Portfolio
-import com.wavesplatform.state.diffs.ENOUGH_AMT
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, produceRejectOrFailedDiff}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -267,6 +268,49 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
     }
   }
 
+  property("forbid sync call when invoke is not allowed by asset script after RideV6") {
+    val invoker     = TxHelpers.signer(1)
+    val masterDApp  = TxHelpers.signer(2)
+    val serviceDApp = TxHelpers.signer(3)
+
+    withDomain(
+      DomainPresets.RideV5.setFeaturesHeight(BlockchainFeatures.RideV6 -> 4),
+      AddrWithBalance.enoughBalances(invoker, masterDApp, serviceDApp)
+    ) { d =>
+      val issue              = TxHelpers.issue(masterDApp, script = Some(forbidInvokeAssetScript))
+      val setSenderScript    = TxHelpers.setScript(masterDApp, invokerDAppScript(serviceDApp.toAddress, asset = issue.asset, amount = 1))
+      val setRecipientScript = TxHelpers.setScript(serviceDApp, simpleDAppScript())
+      val invoke             = () => TxHelpers.invoke(masterDApp.toAddress, invoker = invoker)
+
+      d.appendBlock(issue, setSenderScript, setRecipientScript)
+      d.appendAndAssertSucceed(invoke())
+
+      d.appendBlockE(invoke()) should produceRejectOrFailedDiff(s"Transaction is not allowed by script of the asset ${issue.assetId}")
+    }
+  }
+
+  property("allow sync call when transfer is not allowed by asset script after RideV6") {
+    val invoker     = TxHelpers.signer(1)
+    val masterDApp  = TxHelpers.signer(2)
+    val serviceDApp = TxHelpers.signer(3)
+
+    withDomain(
+      DomainPresets.RideV5.setFeaturesHeight(BlockchainFeatures.RideV6 -> 4),
+      AddrWithBalance.enoughBalances(invoker, masterDApp, serviceDApp)
+    ) { d =>
+      val issue              = TxHelpers.issue(masterDApp, script = Some(forbidTransferAssetScript))
+      val setSenderScript    = TxHelpers.setScript(masterDApp, invokerDAppScript(serviceDApp.toAddress, asset = issue.asset, amount = 1))
+      val setRecipientScript = TxHelpers.setScript(serviceDApp, simpleDAppScript())
+      val invoke             = () => TxHelpers.invoke(masterDApp.toAddress, invoker = invoker)
+
+      d.appendBlock(issue, setSenderScript, setRecipientScript)
+      d.appendBlockE(invoke()) should produceRejectOrFailedDiff(s"Transaction is not allowed by script of the asset ${issue.assetId}")
+
+      d.appendBlock()
+      d.appendAndAssertSucceed(invoke())
+    }
+  }
+
   private def sigVerify(c: Boolean) =
     s""" strict c = ${if (c) (1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ") else "true"} """
 
@@ -328,4 +372,33 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
          """.stripMargin
     )
 
+  private def forbidInvokeAssetScript: Script =
+    TestCompiler(V5).compileAsset(
+      s"""
+         |{-# STDLIB_VERSION 5 #-}
+         |{-# CONTENT_TYPE EXPRESSION #-}
+         |{-# SCRIPT_TYPE ASSET #-}
+         |
+         |match tx {
+         |  case t : InvokeScriptTransaction => false
+         |  case _ => true
+         |}
+         |
+       """.stripMargin
+    )
+
+  private def forbidTransferAssetScript: Script =
+    TestCompiler(V5).compileAsset(
+      s"""
+         |{-# STDLIB_VERSION 5 #-}
+         |{-# CONTENT_TYPE EXPRESSION #-}
+         |{-# SCRIPT_TYPE ASSET #-}
+         |
+         |match tx {
+         |  case t : TransferTransaction => false
+         |  case _ => true
+         |}
+         |
+       """.stripMargin
+    )
 }
