@@ -473,7 +473,7 @@ object InvokeDiffsCommon {
                   .fold {
                     val r = checkAsset(blockchain, id)
                       .map(_ => nextDiff)
-                      .leftMap(FailedTransactionError.dAppExecution(_, 0))
+                      .leftMap(FailedTransactionError.dAppExecution(_, 0): ValidationError)
                     TracedResult(r)
                   } { case AssetScriptInfo(script, complexity) =>
                     val assetVerifierDiff =
@@ -499,8 +499,9 @@ object InvokeDiffsCommon {
                       tx.timestamp,
                       tx.txId
                     )
-                    val assetValidationDiff =
-                      validatePseudoTxWithSmartAssetScript(blockchain, tx)(
+                    val assetValidationDiff = for {
+                      _ <- BalanceDiffValidation.cond(blockchain, _.isFeatureActivated(BlockchainFeatures.RideV6))(assetVerifierDiff)
+                      assetValidationDiff <- validatePseudoTxWithSmartAssetScript(blockchain, tx)(
                         pseudoTx,
                         a.id,
                         assetVerifierDiff,
@@ -508,6 +509,7 @@ object InvokeDiffsCommon {
                         complexity,
                         complexityLimit
                       )
+                    } yield assetValidationDiff
                     val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
                     TracedResult(
                       assetValidationDiff.map(d => nextDiff.copy(scriptsComplexity = d.scriptsComplexity)),

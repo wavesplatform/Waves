@@ -730,7 +730,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
   }
 
   property("invoking contract disable by payment smart asset") {
-    val issue = TxHelpers.issue(script = Some(assetBanned))
+    val issue = TxHelpers.issue(dApp, script = Some(assetBanned))
     val (genesis, setScript, ci) =
       preconditionsAndSetContract(dAppWithTransfers(assets = List(IssuedAsset(issue.id()))), fee = TestValues.invokeFee(1))
 
@@ -772,7 +772,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
 
   property("trace not contains attached asset script invocation result when transferring asset script produce error") {
     val attachedAsset     = TxHelpers.issue()
-    val transferringAsset = TxHelpers.issue(name = "test2", script = Some(throwingAsset))
+    val transferringAsset = TxHelpers.issue(dApp, name = "test2", script = Some(throwingAsset))
 
     val (genesis, setScript, ci) = preconditionsAndSetContract(
       dAppWithTransfers(assets = List(IssuedAsset(transferringAsset.id()))),
@@ -1432,7 +1432,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     val gTx1             = TxHelpers.genesis(dAppAddress)
     val gTx2             = TxHelpers.genesis(invokerAddress)
     val (assetScript, _) = ScriptCompiler.compile("false", ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()
-    val iTx              = TxHelpers.issue(dApp, script = Some(assetScript), fee = 1.004.waves)
+    val iTx              = TxHelpers.issue(dApp, amount = Long.MaxValue, script = Some(assetScript), fee = 1.004.waves)
 
     val ssTx = TxHelpers.setScript(dApp, contract(iTx.assetId.toString))
     Seq("throw", "insufficient fee", "negative amount", "overflow amount", "self payment", "max actions", "invalid data entries", "ok").foreach {
