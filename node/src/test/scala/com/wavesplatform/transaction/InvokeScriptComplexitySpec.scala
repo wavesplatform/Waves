@@ -10,6 +10,7 @@ import com.wavesplatform.lang.directives.values.{V4, V5}
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CONST_STRING}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.*
 
 class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
   private[this] val dApp1 = TestCompiler(V5).compileContract("""

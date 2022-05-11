@@ -23,6 +23,7 @@ import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import monix.execution.Scheduler
 import monix.reactive.Observable
+import DomainPresets.*
 
 class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
 
@@ -64,7 +65,7 @@ class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
       d.blockchainUpdater,
       wavesSettings,
       ntpTime,
-      new UtxPoolImpl(ntpTime, d.blockchainUpdater, wavesSettings.utxSettings),
+      new UtxPoolImpl(ntpTime, d.blockchainUpdater, wavesSettings.utxSettings, isMiningEnabled = wavesSettings.minerSettings.enable),
       Wallet(WalletSettings(None, Some("123"), Some(ByteStr(minerAcc.seed)))),
       PoSSelector(d.blockchainUpdater, wavesSettings.synchronizationSettings.maxBaseTarget),
       Scheduler.singleThread("miner"),

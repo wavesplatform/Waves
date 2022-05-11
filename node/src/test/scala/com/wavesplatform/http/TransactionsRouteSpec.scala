@@ -14,7 +14,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures as BF
 import com.wavesplatform.history.{Domain, settingsWithFeatures}
-import com.wavesplatform.lang.directives.values.StdLibVersion.V5
+import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
@@ -517,7 +517,7 @@ class TransactionsRouteSpec
                                     |  "id" : "${leaseCancel.id()}",
                                     |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
                                     |  "senderPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
-                                    |  "fee" : 1000000,
+                                    |  "fee" : 100000,
                                     |  "feeAssetId" : null,
                                     |  "timestamp" : ${leaseCancel.timestamp},
                                     |  "proofs" : [ "${leaseCancel.signature}" ],

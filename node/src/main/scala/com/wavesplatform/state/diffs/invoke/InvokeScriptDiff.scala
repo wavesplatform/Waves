@@ -40,8 +40,6 @@ import com.wavesplatform.transaction.{TransactionType, TxValidationError}
 import monix.eval.Coeval
 import shapeless.Coproduct
 
-import scala.util.Right
-
 object InvokeScriptDiff {
   private val stats = TxProcessingStats
   import stats.TxTimerExt
@@ -211,7 +209,7 @@ object InvokeScriptDiff {
                       remainingComplexity
                     ).map(TracedResult(_))
                   )
-                  diff <- traced(environment.currentDiff.combine(paymentsPartToResolve).leftMap(GenericError(_)))
+                  diff <- traced(environment.currentDiff.combineF(paymentsPartToResolve).leftMap(GenericError(_)))
                 } yield (
                   diff,
                   evaluated,
@@ -226,9 +224,7 @@ object InvokeScriptDiff {
             _               = invocationRoot.setLog(log)
             spentComplexity = remainingComplexity - scriptResult.unusedComplexity.max(0)
 
-            _ <- validateIntermediateBalances(
-                  blockchain,
-                  diff, spentComplexity, log)
+            _ <- validateIntermediateBalances(blockchain, diff, spentComplexity, log)
 
             doProcessActions = (actions: List[CallableAction], unusedComplexity: Int) => {
               val storingComplexity = if (blockchain.storeEvaluatedComplexity) complexityAfterPayments - unusedComplexity else invocationComplexity
@@ -329,20 +325,18 @@ object InvokeScriptDiff {
             resultDiff <- traced(
               diff
                 .copy(scriptsComplexity = 0)
-                .combine(actionsDiff)
-                .flatMap(_.combine(Diff(scriptsComplexity = paymentsComplexity)))
-                .leftMap(GenericError(_))
+                .combineE(actionsDiff)
+                .flatMap(_.combineE(Diff(scriptsComplexity = paymentsComplexity)))
             )
 
-            _ <- validateIntermediateBalances(
-                  blockchain,
-                  resultDiff, resultDiff.scriptsComplexity, log)
+            _ <- validateIntermediateBalances(blockchain, resultDiff, resultDiff.scriptsComplexity, log)
 
             _ = invocationRoot.setResult(scriptResult)
           } yield (resultDiff, evaluated, remainingActions1, remainingBalanceActions1, remainingAssetActions1, remainingData1, remainingDataSize1)
         } yield result
 
-      case _ => traced(Left(GenericError(s"No contract at address ${tx.dApp}")))
+      case Some(AccountScriptInfo(_, _, _, _)) => traced(InvokeDiffsCommon.callExpressionError)
+      case _                                   => traced(Left(GenericError(s"No contract at address ${tx.dApp}")))
     }
 
     result.leftMap { err =>
@@ -365,8 +359,8 @@ object InvokeScriptDiff {
       .applyV2Coeval(evaluationCtx, contract, invocation, version, limit, blockchain.correctFunctionCallScope, blockchain.newEvaluatorMode)
       .map(
         _.leftMap[ValidationError] {
-          case (reject: AlwaysRejectError, _, _) =>
-            reject
+          case (reject @ FailOrRejectError(_, true), _, _) =>
+            reject.copy(skipInvokeComplexity = false)
           case (error, unusedComplexity, log) =>
             val usedComplexity = startComplexityLimit - unusedComplexity
             FailedTransactionError.dAppExecution(error.message, usedComplexity, log)
@@ -374,7 +368,7 @@ object InvokeScriptDiff {
           InvokeDiffsCommon
             .checkScriptResultFields(blockchain, r)
             .leftMap[ValidationError]({
-              case reject: AlwaysRejectError => reject
+              case reject: FailOrRejectError => reject
               case error =>
                 val usedComplexity = startComplexityLimit - r.unusedComplexity
                 FailedTransactionError.dAppExecution(error.toString, usedComplexity, log)
@@ -406,7 +400,7 @@ object InvokeScriptDiff {
             case ia: IssuedAsset =>
               s"$address: Negative asset $ia balance: old = ${blockchain.balance(address, ia)}, new = ${compositeBlockchain.balance(address, ia)}"
           }
-          Left(AlwaysRejectError(msg))
+          Left(FailOrRejectError(msg))
         }
 
     } else Right(())
@@ -422,7 +416,7 @@ object InvokeScriptDiff {
       case Some(e)
           if blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls) &&
             blockchain.height >= blockchain.settings.functionalitySettings.enforceTransferValidationAfter =>
-        Left(AlwaysRejectError(e))
+        Left(FailOrRejectError(e))
       case _ => Right(())
     }
   }

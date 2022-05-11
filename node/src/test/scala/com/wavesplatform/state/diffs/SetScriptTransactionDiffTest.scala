@@ -74,7 +74,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
   private[this] def exactSizeExpr(version: StdLibVersion, size: Int): ExprScript = new ExprScript {
     val stdLibVersion: StdLibVersion     = version
     val isFreeCall: Boolean              = false
-    val expr: EXPR                       = TxHelpers.exprScript(StdLibVersion.V6)("true").expr
+    val expr: EXPR                       = TxHelpers.exprScript(V6)("true").expr
     val bytes: Coeval[ByteStr]           = Coeval(ByteStr(new Array[Byte](size)))
     val containsBlockV2: Coeval[Boolean] = Coeval(false)
     val containsArray: Boolean           = false
@@ -84,14 +84,14 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     withDomain(DomainPresets.RideV5) { d =>
       d.helpers.creditWavesToDefaultSigner()
 
-      d.appendAndAssertSucceed(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeContract(StdLibVersion.V5, 32768), version = TxVersion.V2))
-      d.appendAndCatchError(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeContract(StdLibVersion.V5, 32769), version = TxVersion.V2))
+      d.appendAndAssertSucceed(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeContract(V5, 32768), version = TxVersion.V2))
+      d.appendAndCatchError(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeContract(V5, 32769), version = TxVersion.V2))
         .toString should include(
         "32769 bytes > 32768 bytes"
       )
 
-      d.appendAndAssertSucceed(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeExpr(StdLibVersion.V5, 8192), version = TxVersion.V2))
-      d.appendAndCatchError(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeExpr(StdLibVersion.V5, 8193), version = TxVersion.V2))
+      d.appendAndAssertSucceed(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeExpr(V5, 8192), version = TxVersion.V2))
+      d.appendAndCatchError(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeExpr(V5, 8193), version = TxVersion.V2))
         .toString should include(
         "Script is too large: 8193 bytes > 8192 bytes"
       )
@@ -102,17 +102,17 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     withDomain(DomainPresets.RideV6) { d =>
       d.helpers.creditWavesToDefaultSigner()
 
-      val setScript160kb = TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeContract(StdLibVersion.V6, 160 * 1024), 0.16.waves, version = TxVersion.V2)
+      val setScript160kb = TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeContract(V6, 160 * 1024), 0.16.waves, version = TxVersion.V2)
       d.commonApi.calculateWavesFee(setScript160kb) shouldBe 0.16.waves
       d.appendAndAssertSucceed(setScript160kb)
 
-      d.appendAndCatchError(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeContract(StdLibVersion.V6, 160 * 1024 + 1), 0.161.waves, version = TxVersion.V2))
+      d.appendAndCatchError(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeContract(V6, 160 * 1024 + 1), 0.161.waves, version = TxVersion.V2))
         .toString should include(
         "Script is too large: 163841 bytes > 163840 bytes"
       )
 
-      d.appendAndAssertSucceed(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeExpr(StdLibVersion.V6, 8 * 1024), 0.008.waves, version = TxVersion.V2))
-      d.appendAndCatchError(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeExpr(StdLibVersion.V6, 8 * 1024 + 1), 0.009.waves, version = TxVersion.V2))
+      d.appendAndAssertSucceed(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeExpr(V6, 8 * 1024), 0.008.waves, version = TxVersion.V2))
+      d.appendAndCatchError(TxHelpers.setScript(TxHelpers.defaultSigner, exactSizeExpr(V6, 8 * 1024 + 1), 0.009.waves, version = TxVersion.V2))
         .toString should include(
         "Script is too large: 8193 bytes > 8192 bytes"
       )
@@ -121,7 +121,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     def byteVectorsList(size: Int): String =
       (1 to size).map(_ => s"base64'${ByteStr(new Array[Byte](1000)).base64Raw}'").mkString("[", ", ", "]")
 
-    intercept[RuntimeException](TxHelpers.exprScript(StdLibVersion.V6)(s"""
+    intercept[RuntimeException](TxHelpers.exprScript(V6)(s"""
                                                                           |strict a = ${byteVectorsList(9)}
                                                                           |true
                                                                           |""".stripMargin)).toString should include(
@@ -195,7 +195,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
       val scriptV5 = Try(TxHelpers.scriptV5(scriptText))
       scriptV5 shouldBe Symbol("success")
 
-      val scriptV6 = scriptV5.get.copy(stdLibVersion = StdLibVersion.V6)
+      val scriptV6 = scriptV5.get.copy(stdLibVersion = V6)
 
       intercept[RuntimeException](TxHelpers.scriptV6(scriptText)).toString should include("Can't find a function")
 

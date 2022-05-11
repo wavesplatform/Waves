@@ -20,7 +20,7 @@ import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, Contextful
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader}
-import com.wavesplatform.lang.{AlwaysRejectError, CoevalF, CommonError, ExecutionError}
+import com.wavesplatform.lang.{FailOrRejectError, CoevalF, CommonError, ExecutionError}
 import monix.eval.Coeval
 import shapeless.Coproduct.unsafeGet
 
@@ -477,16 +477,15 @@ object Functions {
               env
                 .accountWavesBalanceOf(caseObjToRecipient(c))
                 .map(
-                  _.map(
-                    b =>
-                      CaseObj(
-                        balanceDetailsType,
-                        Map(
-                          "available"  -> CONST_LONG(b.available),
-                          "regular"    -> CONST_LONG(b.regular),
-                          "generating" -> CONST_LONG(b.generating),
-                          "effective"  -> CONST_LONG(b.effective)
-                        )
+                  _.map(b =>
+                    CaseObj(
+                      balanceDetailsType,
+                      Map(
+                        "available"  -> CONST_LONG(b.available),
+                        "regular"    -> CONST_LONG(b.regular),
+                        "generating" -> CONST_LONG(b.generating),
+                        "effective"  -> CONST_LONG(b.effective)
+                      )
                     )
                   ).leftMap(CommonError)
                 )
@@ -628,7 +627,7 @@ object Functions {
                 )
                 .map(_.map { case (result, spentComplexity) =>
                   val mappedError = result.leftMap {
-                    case reject: AlwaysRejectError => reject
+                    case reject: FailOrRejectError => reject
                     case other                     => CommonError(other.toString)
                   }
                   (mappedError, availableComplexity - spentComplexity)
@@ -643,8 +642,8 @@ object Functions {
   }
 
   private def withExtract[C[_[_]]](f: BaseFunction[C], version: StdLibVersion): BaseFunction[C] = {
-    val args = f.signature.args.zip(f.args).map {
-      case ((name, ty), _) => ("@" ++ name, ty)
+    val args = f.signature.args.zip(f.args).map { case ((name, ty), _) =>
+      ("@" ++ name, ty)
     }
     UserFunction(
       f.name ++ ExtractedFuncPostfix,
@@ -793,10 +792,9 @@ object Functions {
             case List(CONST_BYTESTR(bytes)) =>
               env
                 .transferTransactionFromProto(bytes.arr)
-                .map(
-                  tx =>
-                    (tx.map(transactionObject(_, proofsEnabled, version)): EVALUATED)
-                      .asRight[ExecutionError]
+                .map(tx =>
+                  (tx.map(transactionObject(_, proofsEnabled, version)): EVALUATED)
+                    .asRight[ExecutionError]
                 )
 
             case xs => notImplemented[F, EVALUATED](s"transferTransactionFromProto(bytes: ByteVector)", xs)

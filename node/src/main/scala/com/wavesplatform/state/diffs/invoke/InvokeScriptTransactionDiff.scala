@@ -222,7 +222,7 @@ object InvokeScriptTransactionDiff {
           case i: IncompleteResult =>
             TracedResult(Left(GenericError(s"Evaluation was uncompleted with unused complexity = ${i.unusedComplexity}")))
         }
-        totalDiff <- TracedResult(invocationDiff.copy(scriptsComplexity = 0).combine(resultDiff)).leftMap(GenericError(_))
+        totalDiff <- TracedResult(invocationDiff.copy(scriptsComplexity = 0).combineF(resultDiff)).leftMap(GenericError(_))
       } yield totalDiff
     }
 
@@ -324,10 +324,13 @@ object InvokeScriptTransactionDiff {
       scriptOpt: Option[AccountScriptInfo]
   ): Either[GenericError, (PublicKey, StdLibVersion, FUNCTION_CALL, DApp, Map[Int, Map[String, Long]])] =
     scriptOpt
-      .collect { case AccountScriptInfo(publicKey, ContractScriptImpl(version, dApp), _, complexities) =>
-        (publicKey, version, tx.funcCall, dApp, complexities)
+      .map {
+        case AccountScriptInfo(publicKey, ContractScriptImpl(version, dApp), _, complexities) =>
+          Right((publicKey, version, tx.funcCall, dApp, complexities))
+        case _ =>
+          InvokeDiffsCommon.callExpressionError
       }
-      .toRight(GenericError(s"No contract at address ${tx.dApp}"))
+      .getOrElse(Left(GenericError(s"No contract at address ${tx.dApp}")))
 
   private def extractFreeCall(
       tx: InvokeExpressionTransaction,
@@ -365,20 +368,22 @@ object InvokeScriptTransactionDiff {
       .leftMap(error => (error.getMessage: ExecutionError, 0, Nil: Log[Id]))
       .flatten
       .leftMap[ValidationError] {
-        case (AlwaysRejectError(msg), _, log) =>
-          ScriptExecutionError.dAppExecution(msg, log) case (error, unusedComplexity, log) =>
-        val usedComplexity = startLimit - unusedComplexity.max(0)
-        if (usedComplexity > failFreeLimit) {
-          val storingComplexity = if (blockchain.storeEvaluatedComplexity) usedComplexity else estimatedComplexity
-          FailedTransactionError.dAppExecution(error.message, storingComplexity + paymentsComplexity, log)
-        } else
-          ScriptExecutionError.dAppExecution(error.message, log)
+        case (FailOrRejectError(msg, true), _, log) =>
+          ScriptExecutionError.dAppExecution(msg, log)
+        case (error, unusedComplexity, log) =>
+          val usedComplexity = startLimit - unusedComplexity.max(0)
+          if (usedComplexity > failFreeLimit) {
+            val storingComplexity = if (blockchain.storeEvaluatedComplexity) usedComplexity else estimatedComplexity
+            FailedTransactionError.dAppExecution(error.message, storingComplexity + paymentsComplexity, log)
+          } else
+            ScriptExecutionError.dAppExecution(error.message, log)
       }
       .flatTap { case (r, log) =>
         InvokeDiffsCommon
           .checkScriptResultFields(blockchain, r)
           .leftMap[ValidationError] {
-            case reject: AlwaysRejectError => reject
+            case FailOrRejectError(message, true) =>
+              ScriptExecutionError.dAppExecution(message, log)
             case error =>
               val usedComplexity = startLimit - r.unusedComplexity
               if (usedComplexity > failFreeLimit) {

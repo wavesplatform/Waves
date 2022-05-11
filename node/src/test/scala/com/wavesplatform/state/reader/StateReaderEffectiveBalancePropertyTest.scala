@@ -1,15 +1,18 @@
 package com.wavesplatform.state.reader
 
-import com.wavesplatform.db.WithState
+import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures.*
 import com.wavesplatform.lagonaki.mocks.TestBlock.create as block
 import com.wavesplatform.settings.TestFunctionalitySettings.Enabled
-import com.wavesplatform.state.LeaseBalance
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.*
+import com.wavesplatform.state.{BalanceSnapshot, LeaseBalance}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.transaction.TxHelpers.{defaultAddress, transfer}
 
-class StateReaderEffectiveBalancePropertyTest extends PropSpec with WithState {
+class StateReaderEffectiveBalancePropertyTest extends PropSpec with WithDomain {
+  import DomainPresets.*
 
   property("No-interactions genesis account's effectiveBalance doesn't depend on depths") {
     val master = TxHelpers.signer(1)
@@ -51,5 +54,64 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with WithState {
       portfolio.lease shouldBe LeaseBalance(0, expectedBalance)
       portfolio.effectiveBalance shouldBe Right(0)
     }
+  }
+
+  property("correct balance snapshots at height = 2") {
+    def assert(settings: WavesSettings, fixed: Boolean) =
+      withDomain(settings) { d =>
+        d.appendBlock()
+        d.blockchain.balanceSnapshots(defaultAddress, 1, None) shouldBe List(
+          BalanceSnapshot(0, 600000000, 0, 0)
+        )
+
+        d.appendMicroBlock(transfer(amount = 1))
+        d.appendKeyBlock()
+        d.blockchain.balanceSnapshots(defaultAddress, 1, None) shouldBe (
+          if (fixed)
+            List(
+              BalanceSnapshot(1, 1199999999, 0, 0),
+              BalanceSnapshot(1, 599399999, 0, 0)
+            )
+          else
+            List(BalanceSnapshot(1, 1199999999, 0, 0))
+        )
+        d.blockchain.balanceSnapshots(defaultAddress, 2, None) shouldBe List(
+          BalanceSnapshot(1, 1199999999, 0, 0)
+        )
+
+        d.appendMicroBlock(transfer(amount = 1))
+        d.appendKeyBlock()
+        d.blockchain.balanceSnapshots(defaultAddress, 1, None) shouldBe List(
+          BalanceSnapshot(2, 1799999998, 0, 0),
+          BalanceSnapshot(2, 1199399998, 0, 0),
+          BalanceSnapshot(1, 599399999, 0, 0)
+        )
+        d.blockchain.balanceSnapshots(defaultAddress, 2, None) shouldBe List(
+          BalanceSnapshot(2, 1799999998, 0, 0)
+        )
+        d.blockchain.balanceSnapshots(defaultAddress, 3, None) shouldBe List(
+          BalanceSnapshot(2, 1799999998, 0, 0)
+        )
+
+        d.appendMicroBlock(transfer(amount = 1))
+        d.appendKeyBlock()
+        d.blockchain.balanceSnapshots(defaultAddress, 1, None) shouldBe List(
+          BalanceSnapshot(3, 2399999997L, 0, 0),
+          BalanceSnapshot(3, 1799399997, 0, 0),
+          BalanceSnapshot(2, 1199399998, 0, 0),
+          BalanceSnapshot(1, 599399999, 0, 0)
+        )
+        d.blockchain.balanceSnapshots(defaultAddress, 2, None) shouldBe List(
+          BalanceSnapshot(3, 2399999997L, 0, 0),
+          BalanceSnapshot(3, 1799399997, 0, 0),
+          BalanceSnapshot(2, 1199399998, 0, 0)
+        )
+        d.blockchain.balanceSnapshots(defaultAddress, 3, None) shouldBe List(
+          BalanceSnapshot(3, 2399999997L, 0, 0)
+        )
+      }
+
+    assert(RideV5, fixed = false)
+    assert(RideV6, fixed = true)
   }
 }

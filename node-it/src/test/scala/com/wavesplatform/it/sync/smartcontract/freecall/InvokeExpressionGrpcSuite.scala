@@ -10,7 +10,7 @@ import com.wavesplatform.it.api.SyncGrpcApi.*
 import com.wavesplatform.it.api.{PutDataResponse, StateChangesDetails}
 import com.wavesplatform.it.sync.grpc.GrpcBaseTransactionSuite
 import com.wavesplatform.it.sync.invokeExpressionFee
-import com.wavesplatform.lang.directives.values.StdLibVersion.V6
+import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.protobuf.block.VanillaBlock

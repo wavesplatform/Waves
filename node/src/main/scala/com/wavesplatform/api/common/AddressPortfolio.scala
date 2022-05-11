@@ -1,6 +1,6 @@
 package com.wavesplatform.api.common
 
-import cats.syntax.semigroup._
+import cats.syntax.semigroup.*
 import com.google.common.collect.AbstractIterator
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
@@ -11,7 +11,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utils.ScorexLogging
 
 import scala.annotation.tailrec
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 class NFTIterator(addressId: AddressId, maybeAfter: Option[IssuedAsset], resource: DBResource)
     extends AbstractIterator[(IssuedAsset, Long)]
@@ -78,7 +78,7 @@ class BalanceIterator(
     } else nextOverride()
 }
 
-object AddressPortfolio extends ScorexLogging {
+object AddressPortfolio {
   def nftIterator(
       resource: DBResource,
       address: Address,

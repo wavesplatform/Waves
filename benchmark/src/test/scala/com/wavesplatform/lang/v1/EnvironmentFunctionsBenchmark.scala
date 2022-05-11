@@ -88,7 +88,7 @@ class EnvironmentFunctionsBenchmark {
   @Benchmark
   def addressFromString(st: AddressFromString, bh: Blackhole): Unit = {
     val i = Random.nextInt(100)
-    bh.consume(eval(st.ctx, st.expr(i), V4))
+    bh.consume(eval(st.ctx, st.expr(i), V4, true))
   }
 }
 

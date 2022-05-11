@@ -8,5 +8,6 @@ case class UtxSettings(
     allowBlacklistedTransferTo: Set[String],
     fastLaneAddresses: Set[String],
     allowTransactionsFromSmartAccounts: Boolean,
-    allowSkipChecks: Boolean
+    allowSkipChecks: Boolean,
+    forceValidateInCleanup: Boolean
 )

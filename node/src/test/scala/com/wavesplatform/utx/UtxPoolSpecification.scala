@@ -2,10 +2,6 @@ package com.wavesplatform.utx
 
 import java.nio.file.{Files, Path}
 
-import scala.collection.mutable.ListBuffer
-import scala.concurrent.duration.*
-import scala.util.Random
-
 import cats.data.NonEmptyList
 import com.wavesplatform
 import com.wavesplatform.*
@@ -14,42 +10,48 @@ import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.TransactionsOrdering
-import com.wavesplatform.database.{openDB, LevelDBWriter, TestStorageFactory}
+import com.wavesplatform.database.{LevelDBWriter, TestStorageFactory, openDB}
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.history.{randomSig, settingsWithFeatures, DefaultWavesSettings}
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
+import com.wavesplatform.history.{DefaultWavesSettings, randomSig, settingsWithFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.directives.values.StdLibVersion.V6
-import com.wavesplatform.lang.directives.values.V3
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.mining.*
 import com.wavesplatform.settings.*
 import com.wavesplatform.state.*
-import com.wavesplatform.state.diffs.*
+import com.wavesplatform.state.diffs.{invoke as _, *}
 import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.{Asset, Transaction, *}
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.TxValidationError.{GenericError, SenderIsBlacklisted}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.transaction.{Asset, Transaction, *}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool.PackStrategy
 import monix.reactive.subjects.PublishSubject
 import org.iq80.leveldb.DB
-import org.scalacheck.{Arbitrary, Gen}
 import org.scalacheck.Gen.*
+import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
 import org.scalatest.concurrent.Eventually
+
+import scala.collection.mutable.ListBuffer
+import scala.concurrent.duration.*
+import scala.util.Random
 
 private object UtxPoolSpecification {
   private val ignoreSpendableBalanceChanged = PublishSubject[(Address, Asset)]()
@@ -69,6 +71,7 @@ private object UtxPoolSpecification {
 class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransactionsHelpers with WithDomain with EitherValues with Eventually {
   private val PoolDefaultMaxBytes = 50 * 1024 * 1024 // 50 MB
 
+  import DomainPresets.*
   import FeeValidation.ScriptExtraFee as extraFee
   import FunctionalitySettings.TESTNET.maxTransactionTimeBackOffset as maxAge
   import UtxPoolSpecification.*
@@ -194,8 +197,10 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           Set.empty,
           Set.empty,
           allowTransactionsFromSmartAccounts = true,
-          allowSkipChecks = false
-        )
+          allowSkipChecks = false,
+          forceValidateInCleanup = false
+        ),
+        isMiningEnabled = true
       )
     val amountPart = (senderBalance - fee) / 2 - fee
     val txs        = for (_ <- 1 to n) yield createWavesTransfer(sender, recipient.toAddress, amountPart, fee, time.getTimestamp()).explicitGet()
@@ -217,9 +222,10 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         Set.empty,
         Set.empty,
         allowTransactionsFromSmartAccounts = true,
-        allowSkipChecks = false
+        allowSkipChecks = false,
+        forceValidateInCleanup = false
       )
-    val utxPool = new UtxPoolImpl(time, bcu, settings)
+    val utxPool = new UtxPoolImpl(time, bcu, settings, isMiningEnabled = true)
     (sender, utxPool, txs)
   }).label("withBlacklisted")
 
@@ -238,9 +244,10 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         Set(recipient.toAddress.toString),
         Set.empty,
         allowTransactionsFromSmartAccounts = true,
-        allowSkipChecks = false
+        allowSkipChecks = false,
+        forceValidateInCleanup = false
       )
-    val utxPool = new UtxPoolImpl(time, bcu, settings)
+    val utxPool = new UtxPoolImpl(time, bcu, settings, isMiningEnabled = true)
     (sender, utxPool, txs)
   }).label("withBlacklistedAndAllowedByRule")
 
@@ -259,9 +266,10 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         Set.empty,
         Set(sender.toAddress.toString),
         allowTransactionsFromSmartAccounts = true,
-        allowSkipChecks = false
+        allowSkipChecks = false,
+        forceValidateInCleanup = false
       )
-    val utxPool = new UtxPoolImpl(time, bcu, settings)
+    val utxPool = new UtxPoolImpl(time, bcu, settings, isMiningEnabled = true)
     (sender, utxPool, txs)
   }).label("withBlacklistedAndWhitelisted")
 
@@ -284,9 +292,10 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           whitelist,
           Set.empty,
           allowTransactionsFromSmartAccounts = true,
-          allowSkipChecks = false
+          allowSkipChecks = false,
+          forceValidateInCleanup = false
         )
-      val utxPool = new UtxPoolImpl(time, bcu, settings)
+      val utxPool = new UtxPoolImpl(time, bcu, settings, isMiningEnabled = true)
       (sender, utxPool, txs)
     }).label("massTransferWithBlacklisted")
 
@@ -295,7 +304,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
       val time = TestTime()
 
       forAll(listOfN(count, transfer(sender, senderBalance / 2, time))) { txs =>
-        val utx = new UtxPoolImpl(time, bcu, utxSettings)
+        val utx = new UtxPoolImpl(time, bcu, utxSettings, isMiningEnabled = true)
         f(txs, utx, time)
       }
     }
@@ -320,8 +329,10 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           Set.empty,
           Set.empty,
           allowTransactionsFromSmartAccounts = true,
-          allowSkipChecks = false
-        )
+          allowSkipChecks = false,
+          forceValidateInCleanup = false
+        ),
+        isMiningEnabled = true
       )
       (utx, time, tx1, tx2)
     }
@@ -358,8 +369,10 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           Set.empty,
           Set.empty,
           allowTransactionsFromSmartAccounts = scEnabled,
-          allowSkipChecks = false
-        )
+          allowSkipChecks = false,
+          forceValidateInCleanup = false
+        ),
+        isMiningEnabled = true
       )
 
       (sender, senderBalance, utx, bcu.lastBlockTimestamp.getOrElse(0L))
@@ -375,14 +388,34 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
 
   "UTX Pool" - {
     "does not add new transactions when full" in utxTest(
-      UtxSettings(1, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
+      UtxSettings(
+        1,
+        PoolDefaultMaxBytes,
+        1000,
+        Set.empty,
+        Set.empty,
+        Set.empty,
+        allowTransactionsFromSmartAccounts = true,
+        allowSkipChecks = false,
+        forceValidateInCleanup = false
+      )
     ) { (txs, utx, _) =>
       utx.putIfNew(txs.head).resultE should beRight
       all(txs.tail.map(t => utx.putIfNew(t).resultE)) should produce("pool size limit")
     }
 
     "does not add new transactions when full in bytes" in utxTest(
-      UtxSettings(999999, 152, 1000, Set.empty, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
+      UtxSettings(
+        999999,
+        152,
+        1000,
+        Set.empty,
+        Set.empty,
+        Set.empty,
+        allowTransactionsFromSmartAccounts = true,
+        allowSkipChecks = false,
+        forceValidateInCleanup = false
+      )
     ) { (txs, utx, _) =>
       utx.putIfNew(txs.head).resultE should beRight
       all(txs.tail.map(t => utx.putIfNew(t).resultE)) should produce("pool bytes size limit")
@@ -408,9 +441,9 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
               Set.empty,
               Set.empty,
               allowTransactionsFromSmartAccounts = true,
-              allowSkipChecks = allowSkipChecks == 1
-            )
-          val utx = new UtxPoolImpl(time, bcu, utxSettings)
+              allowSkipChecks = allowSkipChecks == 1,
+            forceValidateInCleanup = false)
+          val utx = new UtxPoolImpl(time, bcu, utxSettings, isMiningEnabled = true)
 
           utx.putIfNew(headTransaction).resultE should beRight
           utx.putIfNew(vipTransaction).resultE should matchPattern {
@@ -453,9 +486,9 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
               Set.empty,
               Set(sender2.toAddress.toString, sender3.toAddress.toString),
               allowTransactionsFromSmartAccounts = true,
-              allowSkipChecks = allowSkipChecks
-            )
-          val utx = new UtxPoolImpl(time, bcu, utxSettings)
+              allowSkipChecks = allowSkipChecks,
+            forceValidateInCleanup = false)
+          val utx = new UtxPoolImpl(time, bcu, utxSettings, isMiningEnabled = true)
 
           utx.putIfNew(headTransaction).resultE.explicitGet()
           utx.putIfNew(vipTransaction).resultE.explicitGet()
@@ -472,7 +505,8 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         Set.empty,
         Set.empty,
         allowTransactionsFromSmartAccounts = true,
-        allowSkipChecks = false
+        allowSkipChecks = false,
+        forceValidateInCleanup = false
       )
     ) { (txs, utx, _) =>
       utx.putIfNew(txs.head).resultE should matchPattern { case Right(true) => }
@@ -523,9 +557,9 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
               Set.empty,
               Set(sender2.toAddress.toString, sender3.toAddress.toString),
               allowTransactionsFromSmartAccounts = true,
-              allowSkipChecks = allowSkipChecks
-            )
-          val utx = new UtxPoolImpl(time, bcu, utxSettings)
+              allowSkipChecks = allowSkipChecks,
+            forceValidateInCleanup = false)
+          val utx = new UtxPoolImpl(time, bcu, utxSettings, isMiningEnabled = true)
 
           Random.shuffle(whitelistedTxs ++ txs).foreach(tx => utx.putIfNew(tx))
 
@@ -603,8 +637,10 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
             Set.empty,
             Set.empty,
             allowTransactionsFromSmartAccounts = true,
-            allowSkipChecks = false
-          )
+            allowSkipChecks = false,
+            forceValidateInCleanup = false
+          ),
+          isMiningEnabled = true
         )
         (scripted ++ unscripted).foreach(tx => utx.putIfNew(tx).resultE.explicitGet())
 
@@ -707,9 +743,9 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
               Set.empty,
               Set.empty,
               allowTransactionsFromSmartAccounts = true,
-              allowSkipChecks = false
-            )
-          val utxPool = new UtxPoolImpl(time, bcu, settings, nanoTimeSource = () => nanoTimeSource())
+              allowSkipChecks = false,
+            forceValidateInCleanup = false)
+          val utxPool = new UtxPoolImpl(time, bcu, settings, isMiningEnabled = true, nanoTimeSource = () => nanoTimeSource())
 
           utxPool.putIfNew(transfer).resultE should beRight
           val (tx, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Limit(100 nanos))
@@ -726,9 +762,10 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
               Set.empty,
               allowTransactionsFromSmartAccounts = true,
               allowSkipChecks = false,
-              fastLaneAddresses = Set.empty
+              fastLaneAddresses = Set.empty,
+              forceValidateInCleanup = false
             )
-          val utxPool     = new UtxPoolImpl(ntpTime, d.blockchainUpdater, settings)
+          val utxPool     = new UtxPoolImpl(ntpTime, d.blockchainUpdater, settings, isMiningEnabled = true)
           val startTime   = System.nanoTime()
           val (result, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, PackStrategy.Estimate(3 seconds))
           result shouldBe None
@@ -736,13 +773,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         }
       }
 
-      "dApp to dApp call chain in force validate mode" in withDomain(
-        settingsWithFeatures(
-          BlockchainFeatures.Ride4DApps,
-          BlockchainFeatures.BlockV5,
-          BlockchainFeatures.SynchronousCalls
-        )
-      ) { d =>
+      "dApp to dApp call chain in force validate mode" in withDomain(RideV5) { d =>
         def dApp(otherDApp: Option[Address]): Script =
           ScriptCompiler
             .compile(
@@ -784,11 +815,69 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         d.appendBlock(setScripts*)
 
         val invoke = TxHelpers.invoke(genesisTxs.head.recipient, Some("default"))
-        val utx    = new UtxPoolImpl(ntpTime, d.blockchainUpdater, DefaultWavesSettings.utxSettings)
+        val utx    = new UtxPoolImpl(ntpTime, d.blockchainUpdater, DefaultWavesSettings.utxSettings, isMiningEnabled = true)
         utx.putIfNew(invoke, forceValidate = true).resultE.explicitGet() shouldBe true
         utx.removeAll(Seq(invoke))
         utx.putIfNew(invoke, forceValidate = false).resultE.explicitGet() shouldBe true
         utx.close()
+      }
+
+      "InvokeScriptTransaction is fully validated in forceValidate mode and before 1000 complexity otherwise" in withDomain(
+        RideV5,
+        AddrWithBalance.enoughBalances(defaultSigner, secondSigner)
+      ) { d =>
+        def dApp(sigCount: Int) = TestCompiler(V5).compileContract(
+          s"""
+             | @Callable(i)
+             | func default() = {
+             |   strict c = ${(1 to sigCount).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}
+             |   if (true) then throw() else []
+             | }
+         """.stripMargin
+        )
+        val utx = new UtxPoolImpl(ntpTime, d.blockchainUpdater, DefaultWavesSettings.utxSettings, isMiningEnabled = false)
+
+        d.appendBlock(setScript(secondSigner, dApp(5)))
+        utx.putIfNew(invoke()).resultE shouldBe Right(true)
+        utx.putIfNew(invoke(), forceValidate = true).resultE should produce("Explicit script termination")
+
+        d.appendBlock(setScript(secondSigner, dApp(4)))
+        utx.putIfNew(invoke()).resultE should produce("Explicit script termination")
+        utx.putIfNew(invoke(), forceValidate = true).resultE should produce("Explicit script termination")
+      }
+
+      "sync calls are fully validated in forceValidate mode and before 1000 complexity otherwise" in withDomain(
+        RideV5,
+        AddrWithBalance.enoughBalances(defaultSigner, secondSigner, signer(2))
+      ) { d =>
+        val innerDApp = TestCompiler(V5).compileContract(
+          s"""
+             | @Callable(i)
+             | func default() = {
+             |   strict r = Address(base58'$secondAddress').invoke("default", [], [])
+             |   []
+             | }
+         """.stripMargin
+        )
+        def dApp(sigCount: Int) = TestCompiler(V5).compileContract(
+          s"""
+             | @Callable(i)
+             | func default() = {
+             |   strict c = ${(1 to sigCount).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}
+             |   if (true) then throw() else []
+             | }
+         """.stripMargin
+        )
+        val utx = new UtxPoolImpl(ntpTime, d.blockchainUpdater, DefaultWavesSettings.utxSettings, isMiningEnabled = false)
+        d.appendBlock(setScript(signer(2), innerDApp))
+
+        d.appendBlock(setScript(secondSigner, dApp(5)))
+        utx.putIfNew(invoke(signer(2).toAddress)).resultE shouldBe Right(true)
+        utx.putIfNew(invoke(signer(2).toAddress), forceValidate = true).resultE should produce("Explicit script termination")
+
+        d.appendBlock(setScript(secondSigner, dApp(4)))
+        utx.putIfNew(invoke(signer(2).toAddress)).resultE should produce("Explicit script termination")
+        utx.putIfNew(invoke(signer(2).toAddress), forceValidate = true).resultE should produce("Explicit script termination")
       }
 
       "invoke expression" in {
@@ -804,7 +893,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
 
           val expr   = TestCompiler(V6).compileFreeCall(""" [ BooleanEntry("check", true) ] """)
           val invoke = TxHelpers.invokeExpression(expr)
-          val utx    = new UtxPoolImpl(ntpTime, d.blockchainUpdater, DefaultWavesSettings.utxSettings)
+          val utx    = new UtxPoolImpl(ntpTime, d.blockchainUpdater, DefaultWavesSettings.utxSettings, true)
 
           utx.putIfNew(invoke).resultE.explicitGet() shouldBe true
           utx.all shouldBe Seq(invoke)
@@ -851,17 +940,16 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           (() => blockchain.activatedFeatures).when().returning(Map.empty)
 
           val utx =
-            new UtxPoolImpl(ntpTime, blockchain, WavesSettings.default().utxSettings)
+            new UtxPoolImpl(ntpTime, blockchain, WavesSettings.default().utxSettings, isMiningEnabled = true)
           (blockchain.balance _).when(*, *).returning(ENOUGH_AMT).repeat((rest.length + 1) * 2)
 
 
           (blockchain.balance _).when(*, *).returning(ENOUGH_AMT)
 
           (blockchain.leaseBalance _).when(*).returning(LeaseBalance(0, 0))
-          (blockchain.accountScript _).when(*).onCall {
-              _: Address =>
-                utx.removeAll(rest)
-                None
+          (blockchain.accountScript _).when(*).onCall { _: Address =>
+              utx.removeAll(rest)
+              None
             }
           val tb = TestBlock.create(Nil)
           (blockchain.blockHeader _).when(*).returning(Some(SignedBlockHeader(tb.header, tb.signature)))
@@ -873,6 +961,19 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           }
           utx.all shouldBe Seq(tx1)
         }
+      }
+
+      "force validate transactions on non-miner node while cleanup when forceValidateInCleanup is turned on" in {
+        checkCleanupForceValidateTxScenario(forceValidateInCleanup = true, isMiningEnabled = false)
+      }
+
+      "limited execution for transactions on non-miner node while cleanup when forceValidateInCleanup is turned off" in {
+        checkCleanupForceValidateTxScenario(forceValidateInCleanup = false, isMiningEnabled = false)
+      }
+
+      "limited execution for transactions on miner node while cleanup" in {
+        checkCleanupForceValidateTxScenario(forceValidateInCleanup = true, isMiningEnabled = true)
+        checkCleanupForceValidateTxScenario(forceValidateInCleanup = false, isMiningEnabled = true)
       }
     }
 
@@ -898,7 +999,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
             val time   = TestTime()
             val events = new ListBuffer[UtxEvent]
             val utxPool =
-              new UtxPoolImpl(time, d.blockchainUpdater, WavesSettings.default().utxSettings, events += _)
+              new UtxPoolImpl(time, d.blockchainUpdater, WavesSettings.default().utxSettings, isMiningEnabled = true, events += _)
 
             def assertEvents(f: PartialFunction[Seq[UtxEvent], Unit]): Unit = {
               val currentEvents = events.toList
@@ -907,7 +1008,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
             }
 
             def addUnverified(tx: Transaction): Unit = {
-              utxPool.addTransaction(tx, false)
+              utxPool.addTransaction(tx, verify = false)
             }
 
             val differ = TransactionDiffer(d.blockchainUpdater.lastBlockTimestamp, System.currentTimeMillis(), verify = false)(
@@ -945,4 +1046,77 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
     OneDimensionalMiningConstraint(n, TxEstimators.one, "one")
   )
 
+  private def checkCleanupForceValidateTxScenario(forceValidateInCleanup: Boolean, isMiningEnabled: Boolean): Unit = {
+    val dApp    = TxHelpers.signer(1)
+    val invoker = TxHelpers.signer(2)
+
+    val simpleContract: Script =
+      TestCompiler(V5).compileContract(
+        s"""
+           |{-# STDLIB_VERSION 5 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-# SCRIPT_TYPE ACCOUNT #-}
+           |
+           |@Callable(i)
+           |func test() = {
+           |  let flag = ${"sigVerify(base58'', base58'', base58'') ||" * 10} true
+           |  (
+           |    [ScriptTransfer(i.caller, -1, unit)],
+           |    flag
+           |  )
+           |}
+           |""".stripMargin
+      )
+
+    val selfInvokeContract =
+      TestCompiler(V5).compileContract(
+        s"""
+           |{-# STDLIB_VERSION 5 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-# SCRIPT_TYPE ACCOUNT #-}
+           |
+           |@Callable(i)
+           |func test( r: Int ) = {
+           |  if( r == 0 ) then [ ScriptTransfer(i.caller, -1, unit ) ] else
+           |  let f = fraction( fraction( r, 1, 1 ), 1, 1 )
+           |  strict g = invoke( this, "test", [ f - 1 ], [] )
+           |  []
+           |}
+           |""".stripMargin
+      )
+
+    val settings = DomainPresets.RideV5.copy(
+      utxSettings = DomainPresets.RideV5.utxSettings.copy(
+        forceValidateInCleanup = forceValidateInCleanup
+      ),
+      minerSettings = DomainPresets.RideV5.minerSettings.copy(
+        enable = isMiningEnabled
+      )
+    )
+
+    Seq(
+      (simpleContract, Seq.empty),
+      (selfInvokeContract, Seq(CONST_LONG(9)))
+    ).foreach {
+      case (contract, args) =>
+        withDomain(settings, balances = AddrWithBalance.enoughBalances(dApp, invoker)) { d =>
+          val setScript = TxHelpers.setScript(dApp, contract)
+          val invoke    = TxHelpers.invoke(dApp.toAddress, func = Some("test"), args = args, invoker = invoker)
+
+          d.appendBlock(setScript)
+          d.utxPool.addTransaction(invoke, verify = true)
+
+          d.utxPool.size shouldBe 1
+
+          d.utxPool.cleanUnconfirmed()
+
+          val expectedResult = if (!isMiningEnabled && forceValidateInCleanup) {
+            None
+          } else {
+            Some(invoke)
+          }
+          d.utxPool.transactionById(invoke.id()) shouldBe expectedResult
+        }
+    }
+  }
 }

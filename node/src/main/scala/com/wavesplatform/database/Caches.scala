@@ -143,6 +143,10 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
   private[database] def addressId(address: Address): Option[AddressId] = addressIdCache.get(address)
 
+  protected val aliasCache: LoadingCache[Alias, Option[Address]] = cache(dbSettings.maxCacheSize, loadAlias)
+  protected def loadAlias(alias: Alias): Option[Address]
+  protected def discardAlias(alias: Alias): Unit = aliasCache.invalidate(alias)
+
   @volatile
   protected var approvedFeaturesCache: Map[Short, Int] = loadApprovedFeatures()
   protected def loadApprovedFeatures(): Map[Short, Int]
@@ -307,6 +311,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     for ((orderId, volumeAndFee) <- newFills) volumeAndFeeCache.put(orderId, volumeAndFee)
     for ((address, assetMap)     <- updatedBalances; (asset, balance) <- assetMap) balancesCache.put((address, asset), balance)
     for (id                      <- assetsToInvalidate) assetDescriptionCache.invalidate(id)
+    for ((alias, address)        <- diff.aliases) aliasCache.put(alias, Some(address))
     leaseBalanceCache.putAll(updatedLeaseBalances.asJava)
     scriptCache.putAll(diff.scripts.asJava)
     assetScriptCache.putAll(diff.assetScripts.asJava)

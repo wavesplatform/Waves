@@ -7,21 +7,15 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, TransactionMeta}
 import com.wavesplatform.protobuf.transaction.PBRecipients
-import com.wavesplatform.state._
+import com.wavesplatform.state.*
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.utils._
+import com.wavesplatform.utils.*
 
 object Keys {
-  import KeyHelpers._
-  import KeyTags.{
-    AddressId => AddressIdTag,
-    EthereumTransactionMeta => EthereumTransactionMetaTag,
-    InvokeScriptResult => InvokeScriptResultTag,
-    LeaseDetails => LeaseDetailsTag,
-    _
-  }
+  import KeyHelpers.*
+  import KeyTags.{AddressId as AddressIdTag, EthereumTransactionMeta as EthereumTransactionMetaTag, InvokeScriptResult as InvokeScriptResultTag, LeaseDetails as LeaseDetailsTag, *}
 
   val version: Key[Int]               = intKey(Version, default = 1)
   val height: Key[Int]                = intKey(Height)
@@ -88,7 +82,7 @@ object Keys {
   // public key hash is used here so it's possible to populate bloom filter by just scanning all the history keys
   def dataHistory(address: Address, key: String): Key[Seq[Int]] =
     historyKey(DataHistory, PBRecipients.publicKeyHash(address) ++ key.utf8Bytes)
-  def data(addressId: AddressId, key: String)(height: Int): Key[Option[DataEntry[_]]] =
+  def data(addressId: AddressId, key: String)(height: Int): Key[Option[DataEntry[?]]] =
     Key.opt(Data, hBytes(addressId.toByteArray ++ key.utf8Bytes, height), readDataEntry(key), writeDataEntry)
 
   def sponsorshipHistory(asset: IssuedAsset): Key[Seq[Int]] = historyKey(SponsorshipHistory, asset.id.arr)

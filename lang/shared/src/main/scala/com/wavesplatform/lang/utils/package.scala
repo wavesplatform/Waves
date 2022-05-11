@@ -1,8 +1,8 @@
 package com.wavesplatform.lang
 
-import cats.Id
+import cats.{Id, Monoid}
 import cats.syntax.traverse.*
-import cats.kernel.Monoid
+import cats.implicits.catsSyntaxSemigroup
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values.*
@@ -63,34 +63,24 @@ package object utils {
     ): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
   }
 
-  val lazyContextsAll: Map[(DirectiveSet, Boolean), Coeval[CTX[Environment]]] = {
-    val directives = for {
-      version            <- DirectiveDictionary[StdLibVersion].all
-      cType              <- DirectiveDictionary[ContentType].all
-      scriptType         <- DirectiveDictionary[ScriptType].all
+  val lazyContexts: Map[(DirectiveSet, Boolean), Coeval[CTX[Environment]]] =
+    (for {
+      version     <- DirectiveDictionary[StdLibVersion].all
+      scriptType  <- DirectiveDictionary[ScriptType].all
+      contentType <- DirectiveDictionary[ContentType].all if contentType != DApp || (contentType == DApp && version >= V3 && scriptType == Account)
       useNewPowPrecision <- Seq(false, true)
-    } yield (DirectiveSet(version, scriptType, cType), useNewPowPrecision)
-
-    directives.collect { case (Right(ds), useNewPowPrecision) =>
-      val version = ds.stdLibVersion
+    } yield {
+      val ds = DirectiveSet(version, scriptType, contentType).explicitGet()
       val ctx = Coeval.evalOnce(
-        Monoid.combineAll(
-          Seq(
-            PureContext.build(version, useNewPowPrecision).withEnvironment[Environment],
-            CryptoContext.build(Global, version).withEnvironment[Environment],
-            WavesContext.build(Global, ds)
-          )
-        )
+        PureContext.build(version, useNewPowPrecision).withEnvironment[Environment] |+|
+          CryptoContext.build(Global, version).withEnvironment[Environment] |+|
+          WavesContext.build(Global, ds)
       )
       (ds, useNewPowPrecision) -> ctx
-    }.toMap
-  }
-
-  val lazyContexts: Map[DirectiveSet, Coeval[CTX[Environment]]] =
-    lazyContextsAll.collect { case ((ds, true), ctx) => ds -> ctx }
+    }).toMap
 
   private val lazyFunctionCosts: Map[DirectiveSet, Coeval[Map[FunctionHeader, Coeval[Long]]]] =
-    lazyContexts.map(el => (el._1, el._2.map(ctx => estimate(el._1.stdLibVersion, ctx.evaluationContext[Id](environment)))))
+    lazyContexts.map(el => (el._1._1, el._2.map(ctx => estimate(el._1._1.stdLibVersion, ctx.evaluationContext[Id](environment)))))
 
   private val dAppVerifierProhibitedFunctions: Map[Native, Coeval[Long]] =
     List(Native(FunctionIds.CALLDAPP), Native(FunctionIds.CALLDAPPREENTRANT))
@@ -109,7 +99,7 @@ package object utils {
   private val combinedContext: Map[(StdLibVersion, ContentType), CTX[Environment]] =
     lazyContexts
       .groupBy { case (ds, _) =>
-        (ds.stdLibVersion, ds.contentType)
+        (ds._1.stdLibVersion, ds._1.contentType)
       }
       .view
       .mapValues(
@@ -167,12 +157,22 @@ package object utils {
     costs.toMap
   }
 
+  def ctx(version: Int, isTokenContext: Boolean, isContract: Boolean): CTX[Environment] = {
+    val ds = DirectiveSet(
+      DirectiveDictionary[StdLibVersion].idMap(version),
+      ScriptType.isAssetScript(isTokenContext),
+      if (isContract) DApp else Expression
+    )
+    lazyContexts((ds.explicitGet(), true)).value()
+  }
+
   def compilerContext(version: StdLibVersion, cType: ContentType, isAssetScript: Boolean): CompilerContext = {
     val ds = DirectiveSet(version, ScriptType.isAssetScript(isAssetScript), cType).explicitGet()
     compilerContext(ds)
   }
 
-  def compilerContext(ds: DirectiveSet): CompilerContext = lazyContexts(ds.copy(imports = Imports()))().compilerContext
+  def compilerContext(ds: DirectiveSet): CompilerContext =
+    lazyContexts((ds.copy(imports = Imports()), true))().compilerContext
 
   def getDecompilerContext(v: StdLibVersion, cType: ContentType): DecompilerContext =
     combinedContext((v, cType)).decompilerContext
