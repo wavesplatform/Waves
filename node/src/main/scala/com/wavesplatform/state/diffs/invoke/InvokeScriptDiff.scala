@@ -30,6 +30,7 @@ import com.wavesplatform.state.diffs.invoke.CallArgumentPolicy.*
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
@@ -97,7 +98,7 @@ object InvokeScriptDiff {
               GenericError(s"Invoke payments limit = ${ContractLimits.MaxTotalPaymentAmountRideV6} is exceeded")
             )
           )
-          _ <- ensurePaymentsAreNotNegative(blockchain, tx, invoker, dAppAddress)
+          _ <- ensurePaymentsAreValid(blockchain, tx, invoker, dAppAddress)
           invocationComplexity <- traced {
             InvokeDiffsCommon.getInvocationComplexity(blockchain, tx.funcCall, callableComplexities, dAppAddress)
           }
@@ -417,18 +418,19 @@ object InvokeScriptDiff {
     } else Right(())
   )
 
-  private def ensurePaymentsAreNotNegative(blockchain: Blockchain, tx: InvokeScript, invoker: Address, dAppAddress: Address) = traced {
-    tx.payments.collectFirst {
-      case p if p.amount < 0 =>
-        s"DApp $invoker invoked DApp $dAppAddress with attached ${p.assetId.fold("WAVES")(a => s"token $a")} amount = ${p.amount}"
-    } match {
-      case Some(e) if blockchain.isFeatureActivated(BlockchainFeatures.RideV6) =>
-        Left(GenericError(e))
-      case Some(e)
-          if blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls) &&
-            blockchain.height >= blockchain.settings.functionalitySettings.enforceTransferValidationAfter =>
-        Left(FailOrRejectError(e))
-      case _ => Right(())
-    }
+  private def ensurePaymentsAreValid(blockchain: Blockchain, tx: InvokeScript, invoker: Address, dAppAddress: Address) = traced {
+    def errMsg(payment: Payment) =
+      s"DApp $invoker invoked DApp $dAppAddress with attached ${payment.assetId.fold("WAVES")(a => s"token $a")} amount = ${payment.amount}"
+
+    tx.payments
+      .collectFirst {
+        case p if p.amount <= 0 && blockchain.isFeatureActivated(BlockchainFeatures.RideV6) =>
+          Left(GenericError(errMsg(p)))
+        case p
+            if p.amount < 0 && blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls) &&
+              blockchain.height >= blockchain.settings.functionalitySettings.enforceTransferValidationAfter =>
+          Left(FailOrRejectError(errMsg(p)))
+      }
+      .getOrElse(Right(()))
   }
 }
