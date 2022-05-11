@@ -18,9 +18,9 @@ object Dependencies {
 
   private def catsModule(module: String, version: String = "2.6.1") = Def.setting("org.typelevel" %%% s"cats-$module" % version)
 
-  private def web3jModule(module: String) = "org.web3j" % module % "4.9.1"
+  private def web3jModule(module: String) = "org.web3j" % module % "4.9.2"
 
-  def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %%% s"monix-$module" % "3.4.0")
+  def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %%% s"monix-$module" % "3.4.1")
 
   val kindProjector = compilerPlugin("org.typelevel" % "kind-projector" % "0.13.2" cross CrossVersion.full)
 
@@ -33,7 +33,7 @@ object Dependencies {
   val janino             = "org.codehaus.janino" % "janino" % "3.1.7"
   val asyncHttpClient    = "org.asynchttpclient" % "async-http-client" % "2.12.3"
   val curve25519         = "com.wavesplatform" % "curve25519-java" % "0.6.4"
-  val nettyHandler       = "io.netty" % "netty-handler" % "4.1.76.Final"
+  val nettyHandler       = "io.netty" % "netty-handler" % "4.1.77.Final"
 
   val catsEffect = catsModule("effect", "2.1.3")
   val catsCore   = catsModule("core", "2.7.0")
@@ -41,7 +41,7 @@ object Dependencies {
 
   val scalaTest = "org.scalatest" %% "scalatest" % "3.2.12" % Test
 
-  val sttp3 = "com.softwaremill.sttp.client3" % "core_2.13" % "3.5.1"
+  val sttp3 = "com.softwaremill.sttp.client3" % "core_2.13" % "3.6.1"
 
   val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk15on" % "1.70"
 
@@ -110,7 +110,7 @@ object Dependencies {
       web3jModule("crypto"),
       web3jModule("abi"),
       web3jModule("rlp"),
-      "com.esaulpaugh" % "headlong" % "6.1.1"
+      "com.esaulpaugh" % "headlong" % "6.3.0"
     ) ++ langCompilerPlugins.value ++ scalapbRuntime.value ++ protobuf.value
   )
 
@@ -123,8 +123,8 @@ object Dependencies {
 
   lazy val test = scalaTest +: Seq(
     logback,
-    "org.scalatestplus" %% "scalacheck-1-15" % "3.2.11.0",
-    "org.scalacheck"    %% "scalacheck"      % "1.15.4",
+    "org.scalatestplus" %% "scalacheck-1-16" % "3.2.12.0",
+    "org.scalacheck"    %% "scalacheck"      % "1.16.0",
     "org.mockito"       % "mockito-all"      % "1.10.19",
     "org.scalamock"     %% "scalamock"       % "5.2.0"
   ).map(_ % Test)
@@ -168,8 +168,8 @@ object Dependencies {
       monixModule("reactive").value,
       nettyHandler,
       "com.typesafe.scala-logging"                       %% "scala-logging" % "3.9.4",
-      "eu.timepit"                                       %% "refined" % "0.9.28" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
-      "eu.timepit"                                       %% "refined-cats" % "0.9.28" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
+      "eu.timepit"                                       %% "refined" % "0.9.29" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
+      "eu.timepit"                                       %% "refined-cats" % "0.9.29" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
       akkaModule("testkit")                              % Test,
       akkaHttpModule("akka-http-testkit")                % Test,
       leveldbJava().exclude("com.google.guava", "guava") % Test

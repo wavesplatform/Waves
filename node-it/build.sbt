@@ -16,4 +16,4 @@ inTask(docker)(
 )
 
 val packageAll = taskKey[Unit]("build all packages")
-docker := docker.dependsOn(LocalProject("root") / packageAll).value
+docker := docker.dependsOn(LocalProject("waves-node") / packageAll).value

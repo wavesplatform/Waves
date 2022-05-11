@@ -121,7 +121,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
                 case tx: EthereumTransaction =>
                   Json.obj(
                     "transactionHash"   -> toHexString(tm.transaction.id().arr),
-                    "transactionIndex"  -> "0x01",
+                    "transactionIndex"  -> "0x1",
                     "blockHash"         -> toHexString(blockchain.lastBlockId.get.arr),
                     "blockNumber"       -> toHexString(BigInteger.valueOf(tm.height)),
                     "from"              -> toHexString(tx.senderAddress().publicKeyHash),
