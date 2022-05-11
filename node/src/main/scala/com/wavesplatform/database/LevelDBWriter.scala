@@ -264,8 +264,7 @@ abstract class LevelDBWriter private[database] (
 
   private[database] def loadLposPortfolio(db: ReadOnlyDB, addressId: AddressId) = Portfolio(
     db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId)).getOrElse(0L),
-    loadLeaseBalance(db, addressId),
-    Map.empty
+    loadLeaseBalance(db, addressId)
   )
 
   override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] =
@@ -611,6 +610,7 @@ abstract class LevelDBWriter private[database] (
         val scriptsToDiscard        = Seq.newBuilder[Address]
         val assetScriptsToDiscard   = Seq.newBuilder[IssuedAsset]
         val accountDataToInvalidate = Seq.newBuilder[(Address, String)]
+        val aliasesToInvalidate = Seq.newBuilder[Alias]
 
         val discardedBlock = readWrite { rw =>
           rw.put(Keys.height, currentHeight - 1)
@@ -709,7 +709,9 @@ abstract class LevelDBWriter private[database] (
               case _: InvokeScriptTransaction | _: InvokeExpressionTransaction =>
                 rw.delete(Keys.invokeScriptResult(currentHeight, num))
 
-              case tx: CreateAliasTransaction => rw.delete(Keys.addressIdOfAlias(tx.alias))
+              case tx: CreateAliasTransaction =>
+                rw.delete(Keys.addressIdOfAlias(tx.alias))
+                aliasesToInvalidate += tx.alias
               case tx: ExchangeTransaction =>
                 ordersToInvalidate += rollbackOrderFill(rw, tx.buyOrder.id(), currentHeight)
                 ordersToInvalidate += rollbackOrderFill(rw, tx.sellOrder.id(), currentHeight)
@@ -749,6 +751,7 @@ abstract class LevelDBWriter private[database] (
         scriptsToDiscard.result().foreach(discardScript)
         assetScriptsToDiscard.result().foreach(discardAssetScript)
         accountDataToInvalidate.result().foreach(discardAccountData)
+        aliasesToInvalidate.result().foreach(discardAlias)
         discardedBlock
       }
 
@@ -829,12 +832,13 @@ abstract class LevelDBWriter private[database] (
     }
   }
 
-  override def resolveAlias(alias: Alias): Either[ValidationError, Address] = readOnly { db =>
+  override def resolveAlias(alias: Alias): Either[ValidationError, Address] =
     if (disabledAliases.contains(alias)) Left(AliasIsDisabled(alias))
-    else
-      db.get(Keys.addressIdOfAlias(alias))
-        .map(addressId => db.get(Keys.idToAddress(addressId)))
-        .toRight(AliasDoesNotExist(alias))
+    else aliasCache.get(alias).toRight(AliasDoesNotExist(alias))
+
+  override protected def loadAlias(alias: Alias): Option[Address] = readOnly { db =>
+    db.get(Keys.addressIdOfAlias(alias))
+      .map(addressId => db.get(Keys.idToAddress(addressId)))
   }
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readOnly { db =>

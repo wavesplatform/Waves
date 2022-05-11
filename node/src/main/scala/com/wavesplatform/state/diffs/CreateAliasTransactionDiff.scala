@@ -2,11 +2,9 @@ package com.wavesplatform.state.diffs
 
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
+import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.CreateAliasTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
-
-import scala.util.Right
 
 object CreateAliasTransactionDiff {
   def apply(blockchain: Blockchain)(tx: CreateAliasTransaction): Either[ValidationError, Diff] =
@@ -17,8 +15,8 @@ object CreateAliasTransactionDiff {
     else
       Right(
         Diff(
-          portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee.value, LeaseBalance.empty, Map.empty)),
-          aliases = Map(tx.alias               -> tx.sender.toAddress),
+          portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee.value)),
+          aliases = Map(tx.alias -> tx.sender.toAddress),
           scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
         )
       )
