@@ -5,7 +5,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.directives.DirectiveDictionary
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V6}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V5, V6}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.ContractLimits
@@ -34,14 +34,14 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
     def sigVerifyList(size: Int): String = (1 to size).map(_ => "sigVerify(base58'', base58'', base58'')").mkString("[", ", ", "]")
 
     val script = TxHelpers.freeCallScript(s"""
-                                             |strict a = ${sigVerifyList(ContractLimits.MaxTotalInvokeComplexity(StdLibVersion.V6) / 181)}
+                                             |strict a = ${sigVerifyList(ContractLimits.MaxTotalInvokeComplexity(V6) / 181)}
                                              |[]
                                              |""".stripMargin)
 
     TxHelpers.estimate(script) shouldBe 51949
 
     val bigScript = TxHelpers.freeCallScript(s"""
-                                                |strict a = ${sigVerifyList(ContractLimits.MaxTotalInvokeComplexity(StdLibVersion.V6) / 181 + 1)}
+                                                |strict a = ${sigVerifyList(ContractLimits.MaxTotalInvokeComplexity(V6) / 181 + 1)}
                                                 |[]
                                                 |""".stripMargin)
 
@@ -84,11 +84,11 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
            |strict transfer = $constructor
            |true
            |""".stripMargin
-      val scriptV5 = Try(TxHelpers.exprScript(StdLibVersion.V5)(scriptText))
+      val scriptV5 = Try(TxHelpers.exprScript(V5)(scriptText))
       scriptV5 shouldBe Symbol("success")
 
-      val scriptV6 = scriptV5.get.copy(stdLibVersion = StdLibVersion.V6, isFreeCall = true)
-      intercept[RuntimeException](TxHelpers.exprScript(StdLibVersion.V6)(scriptText)).toString should include("Can't find a function")
+      val scriptV6 = scriptV5.get.copy(stdLibVersion = V6, isFreeCall = true)
+      intercept[RuntimeException](TxHelpers.exprScript(V6)(scriptText)).toString should include("Can't find a function")
 
       withDomain(ContinuationTransaction) { d =>
         d.helpers.creditWavesToDefaultSigner()

@@ -13,11 +13,10 @@ import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._
-import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import play.api.libs.json._
 
-import scala.util.{Failure, Try}
+import scala.util.Try
 
 case class BlockHeader(
     version: Byte,
@@ -73,7 +72,7 @@ case class Block(
       s"${header.timestamp},${header.featureVotes.mkString("[", ",", "]")}${if (header.rewardVote >= 0) s",${header.rewardVote}" else ""})"
 }
 
-object Block extends ScorexLogging {
+object Block {
   def idFromHeader(h: BlockHeader, signature: ByteStr): ByteStr =
     if (h.version >= ProtoBlockVersion) protoHeaderHash(h)
     else signature
@@ -134,11 +133,6 @@ object Block extends ScorexLogging {
     BlockSerializer
       .parseBytes(bytes)
       .flatMap(_.validateToTry)
-      .recoverWith {
-        case t: Throwable =>
-          log.error("Error when parsing block", t)
-          Failure(t)
-      }
 
   def genesis(genesisSettings: GenesisSettings, rideV6Activated: Boolean): Either[ValidationError, Block] = {
     import cats.instances.either._

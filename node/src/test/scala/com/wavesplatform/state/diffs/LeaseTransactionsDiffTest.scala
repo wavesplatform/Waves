@@ -11,6 +11,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.*
 import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers, TxVersion}
@@ -252,7 +253,7 @@ class LeaseTransactionsDiffTest extends PropSpec with WithDomain {
 
   property(s"fee is not required prior to ${BlockchainFeatures.SynchronousCalls}") {
     val (balances, lt) = scenario
-    withDomain(domainSettingsWithFeatures(BlockchainFeatures.SynchronousCalls -> 5), balances) { d =>
+    withDomain(RideV4.setFeaturesHeight(BlockchainFeatures.SynchronousCalls -> 5), balances) { d =>
       d.appendBlock(lt)
     }
   }
@@ -260,7 +261,7 @@ class LeaseTransactionsDiffTest extends PropSpec with WithDomain {
   property(s"fee is not required once ${BlockchainFeatures.SynchronousCalls} is activated") {
     val (balances, lt) = scenario
 
-    withDomain(domainSettingsWithFeatures(BlockchainFeatures.SynchronousCalls -> 1), balances) { d =>
+    withDomain(RideV4.setFeaturesHeight(BlockchainFeatures.SynchronousCalls -> 1), balances) { d =>
       d.blockchainUpdater.processBlock(d.createBlock(Block.PlainBlockVersion, Seq(lt))) should produce("Cannot lease more than own")
     }
   }

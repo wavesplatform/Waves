@@ -20,6 +20,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, BinaryDataEntry, Height}
+import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction

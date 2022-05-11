@@ -6,7 +6,7 @@ import com.wavesplatform.account.PublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
-import com.wavesplatform.transaction.{AssetIdStringLength, Proofs, Transaction, TxTimestamp, TxVersion}
+import com.wavesplatform.transaction.{AssetIdStringLength, Proofs, TxTimestamp, TxVersion}
 import play.api.libs.json.Json
 
 case class UpdateAssetInfoRequest(
@@ -22,7 +22,7 @@ case class UpdateAssetInfoRequest(
     feeAssetId: Option[String],
     proofs: Option[Proofs]
 ) extends TxBroadcastRequest {
-  override def toTxFrom(sender: PublicKey): Either[ValidationError, Transaction] =
+  override def toTxFrom(sender: PublicKey): Either[ValidationError, UpdateAssetInfoTransaction] =
     for {
       _assetId <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength)
       _feeAssetId <- feeAssetId

@@ -1,7 +1,7 @@
 package com.wavesplatform.state
 
 import cats.data.Ior
-import cats.implicits.*
+import cats.implicits.{catsSyntaxSemigroup, toFlatMapOps, toFunctorOps}
 import cats.kernel.{Monoid, Semigroup}
 import cats.{Id, Monad}
 import com.google.protobuf.ByteString
@@ -13,7 +13,8 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.smart.InvokeTransaction
+import com.wavesplatform.transaction.{Asset, EthereumTransaction, Transaction}
 
 import scala.collection.immutable.VectorMap
 
@@ -212,12 +213,24 @@ object Diff {
     def hashString: String =
       Integer.toHexString(d.hashCode())
 
-    def bindTransaction(tx: Transaction): Diff = {
-      val calledScripts = d.scriptResults.values
-        .flatMap(inv => InvokeScriptResult.Invocation.calledAddresses(inv.invokes))
-
-      val affectedAddresses = d.portfolios.keySet ++ d.accountData.keySet ++ calledScripts
-      d.copy(transactions = VectorMap(tx.id() -> NewTransactionInfo(tx, affectedAddresses, applied = true, d.scriptsComplexity)))
+    def bindTransaction(blockchain: Blockchain, tx: Transaction, applied: Boolean): Diff = {
+      val calledScripts = d.scriptResults.values.flatMap(inv => InvokeScriptResult.Invocation.calledAddresses(inv.invokes))
+      val maybeDApp = tx match {
+        case i: InvokeTransaction =>
+          i.dApp match {
+            case alias: Alias     => d.aliases.get(alias).orElse(blockchain.resolveAlias(alias).toOption)
+            case address: Address => Some(address)
+          }
+        case et: EthereumTransaction =>
+          et.payload match {
+            case EthereumTransaction.Invocation(dApp, _) => Some(dApp)
+            case _ => None
+          }
+        case _ =>
+          None
+      }
+      val affectedAddresses = d.portfolios.keySet ++ d.accountData.keySet ++ calledScripts ++ maybeDApp
+      d.copy(transactions = VectorMap(tx.id() -> NewTransactionInfo(tx, affectedAddresses, applied, d.scriptsComplexity)))
     }
   }
 }

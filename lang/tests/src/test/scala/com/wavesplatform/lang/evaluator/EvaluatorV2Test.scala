@@ -19,7 +19,7 @@ import scala.util.Random
 
 class EvaluatorV2Test extends PropSpec with Inside {
   private val version     = V4
-  private val ctx         = lazyContexts(DirectiveSet(version, Account, DApp).explicitGet())()
+  private val ctx         = lazyContexts(DirectiveSet(version, Account, DApp).explicitGet() -> true)()
   private val environment = Common.emptyBlockchainEnvironment()
 
   private def evalEither(expr: EXPR, limit: Int, newMode: Boolean): Either[String, (EXPR, Int)] =

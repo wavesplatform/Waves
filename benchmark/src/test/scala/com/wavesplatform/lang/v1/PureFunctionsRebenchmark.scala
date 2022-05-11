@@ -222,10 +222,10 @@ object PureFunctionsRebenchmark {
       .evaluationContext(Common.emptyBlockchainEnvironment())
 
   val eval: EXPR => (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
-    v1.eval(context, _, V4)
+    v1.eval(context, _, V4, true)
 
   val evalV5: EXPR => (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
-    v1.eval(context, _, V5)
+    v1.eval(context, _, V5, true)
 
   def randomBytes(length: Int): Array[Byte] = {
     val bytes = new Array[Byte](length)
