@@ -384,6 +384,7 @@ object UtilsApiRoute {
               availableActions = ContractLimits.MaxCallableActionsAmountBeforeV6(script.stdLibVersion),
               availableBalanceActions = ContractLimits.MaxBalanceScriptActionsAmountV6,
               availableAssetActions = ContractLimits.MaxAssetScriptActionsAmountV6,
+              availablePayments = ContractLimits.MaxTotalPaymentAmountRideV6,
               availableData = ContractLimits.MaxWriteSetSize,
               availableDataSize = ContractLimits.MaxTotalWriteSetSizeInBytes,
               currentDiff = Diff.empty,
