@@ -57,15 +57,14 @@ object EthereumTransactionDiff {
           transfer  <- TracedResult(et.toTransferLike(e, blockchain))
           assetDiff <- TransactionDiffer.assetsVerifierDiff(blockchain, transfer, verify = true, Diff(), Int.MaxValue)
           diff      <- TransferDiff(blockchain)(e.senderAddress(), et.recipient, et.amount, asset, e.fee, e.feeAssetId)
-          result <- assetDiff.combine(diff).leftMap(GenericError(_))
+          result    <- assetDiff.combine(diff).leftMap(GenericError(_))
         } yield result
 
       case ei: EthereumTransaction.Invocation =>
         for {
-          invocation   <- TracedResult(ei.toInvokeScriptLike(e, blockchain))
-          paymentsDiff <- TransactionDiffer.assetsVerifierDiff(blockchain, invocation, verify = true, Diff(), Int.MaxValue)
-          diff         <- InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution)(invocation)
-          result <- paymentsDiff.combine(diff).leftMap(GenericError(_))
+          invocation <- TracedResult(ei.toInvokeScriptLike(e, blockchain))
+          diff       <- InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution)(invocation)
+          result     <- TransactionDiffer.assetsVerifierDiff(blockchain, invocation, verify = true, diff, Int.MaxValue)
         } yield result
     }
 
