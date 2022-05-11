@@ -10,11 +10,11 @@ import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values.StdLibVersion
-import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Diff, LeaseBalance, Portfolio}
+import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 
@@ -43,7 +43,7 @@ object SetScriptTransactionDiff {
         }
         .traverseTap(checkOverflow(blockchain, _))
     } yield Diff(
-      portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee.value, LeaseBalance.empty, Map.empty)),
+      portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee.value)),
       scripts = Map(tx.sender.toAddress -> scriptWithComplexities),
       scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
     )

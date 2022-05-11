@@ -35,12 +35,12 @@ object CommonValidation {
           allowFeeOverdraft: Boolean = false
       ): Either[ValidationError, T] = {
         val amountDiff = assetId match {
-          case aid @ IssuedAsset(_) => Portfolio(0, LeaseBalance.empty, Map(aid -> -amount))
-          case Waves                => Portfolio(-amount, LeaseBalance.empty, Map.empty)
+          case aid @ IssuedAsset(_) => Portfolio.build(aid -> -amount)
+          case Waves                => Portfolio(-amount)
         }
         val feeDiff = feeAssetId match {
-          case aid @ IssuedAsset(_) => Portfolio(0, LeaseBalance.empty, Map(aid -> -feeAmount))
-          case Waves                => Portfolio(-feeAmount, LeaseBalance.empty, Map.empty)
+          case aid @ IssuedAsset(_) => Portfolio.build(aid -> -feeAmount)
+          case Waves                => Portfolio(-feeAmount)
         }
 
         val checkedTx = for {
@@ -87,7 +87,8 @@ object CommonValidation {
           val foldPayments: Iterable[Payment] => Iterable[Payment] =
             if (blockchain.useCorrectPaymentCheck)
               _.groupBy(_.assetId)
-                .map { case (assetId, p) => Payment(p.map(_.amount).sum, assetId) } else
+                .map { case (assetId, p) => Payment(p.map(_.amount).sum, assetId) }
+            else
               identity
 
           for {
@@ -249,8 +250,8 @@ object CommonValidation {
       Left(
         Mistiming(
           s"""Transaction timestamp ${tx.timestamp}
-       |is more than ${settings.maxTransactionTimeForwardOffset.toMillis}ms in the future
-       |relative to block timestamp $time""".stripMargin
+             |is more than ${settings.maxTransactionTimeForwardOffset.toMillis}ms in the future
+             |relative to block timestamp $time""".stripMargin
             .replaceAll("\n", " ")
             .replaceAll("\r", "")
         )
@@ -264,8 +265,8 @@ object CommonValidation {
         Left(
           Mistiming(
             s"""Transaction timestamp ${tx.timestamp}
-         |is more than ${settings.maxTransactionTimeBackOffset.toMillis}ms in the past
-         |relative to previous block timestamp $prevBlockTime""".stripMargin
+               |is more than ${settings.maxTransactionTimeBackOffset.toMillis}ms in the past
+               |relative to previous block timestamp $prevBlockTime""".stripMargin
               .replaceAll("\n", " ")
               .replaceAll("\r", "")
           )

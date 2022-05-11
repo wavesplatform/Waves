@@ -2,9 +2,6 @@ package com.wavesplatform.state
 
 import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
-import cats.implicits.catsSyntaxSemigroup
-import cats.instances.map.*
-import cats.kernel.Semigroup
 import cats.syntax.either.*
 import cats.syntax.option.*
 import com.wavesplatform.account.{Address, Alias}
@@ -413,8 +410,8 @@ class BlockchainUpdaterImpl(
       recipient <- leveldb.resolveAlias(lt.recipient).toSeq
     } yield lt.id() -> Diff(
       portfolios = Map(
-        lt.sender.toAddress -> Portfolio(0, LeaseBalance(0, -lt.amount.value), Map.empty),
-        recipient           -> Portfolio(0, LeaseBalance(-lt.amount.value, 0), Map.empty)
+        lt.sender.toAddress -> Portfolio(0, LeaseBalance(0, -lt.amount.value)),
+        recipient           -> Portfolio(0, LeaseBalance(-lt.amount.value, 0))
       ),
       leaseState = Map((lt.id(), LeaseDetails(lt.sender, lt.recipient, lt.amount.value, LeaseDetails.Status.Expired(height), lt.id(), ltMeta.height)))
     )).toMap
@@ -464,10 +461,11 @@ class BlockchainUpdaterImpl(
 
   private def notifyChangedSpendable(prevNgState: Option[NgState], newNgState: Option[NgState]): Unit = {
     val changedPortfolios = (prevNgState, newNgState) match {
-      case (Some(p), Some(n)) => diff(p.bestLiquidDiff.portfolios, n.bestLiquidDiff.portfolios)
-      case (Some(x), _)       => x.bestLiquidDiff.portfolios
-      case (_, Some(x))       => x.bestLiquidDiff.portfolios
-      case _                  => Map.empty
+      case (Some(p), Some(n)) =>
+        Diff.combine(p.bestLiquidDiff.portfolios, n.bestLiquidDiff.portfolios.view.mapValues(_.negate).toMap).getOrElse(Map.empty)
+      case (Some(x), _) => x.bestLiquidDiff.portfolios
+      case (_, Some(x)) => x.bestLiquidDiff.portfolios
+      case _            => Map.empty
     }
 
     changedPortfolios.foreach { case (addr, p) =>
@@ -736,12 +734,6 @@ class BlockchainUpdaterImpl(
 }
 
 object BlockchainUpdaterImpl {
-  private implicit val portfolioDiffCombine: Semigroup[Portfolio] = (x: Portfolio, y: Portfolio) =>
-    Portfolio(x.balance + y.balance, LeaseBalance.empty, x.assets |+| y.assets)
-
-  private def diff(p1: Map[Address, Portfolio], p2: Map[Address, Portfolio]): Map[Address, Portfolio] =
-    p1 |+| p2.map { case (k, v) => k -> v.negate }
-
   private def displayFeatures(s: Set[Short]): String =
     s"FEATURE${if (s.size > 1) "S" else ""} ${s.mkString(", ")} ${if (s.size > 1) "have been" else "has been"}"
 
