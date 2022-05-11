@@ -46,11 +46,11 @@ case object CancelLeasesToDisabledAliases extends PatchOnFeature(BlockchainFeatu
               id -> ld.copy(status = LeaseDetails.Status.Expired(blockchain.height))
             ),
             portfolios = Diff
-              .unsafeCombine(
+              .combine(
                 Map[Address, Portfolio](ld.sender.toAddress -> Portfolio(lease = LeaseBalance(0, -ld.amount))),
                 Map(recipientAddress    -> Portfolio(lease = LeaseBalance(-ld.amount, 0)))
-              )
+              ).getOrElse(Map.empty)
           )
       }
-      .foldLeft(Diff.empty)(_.unsafeCombine(_))
+      .foldLeft(Diff.empty)(_.combineF(_).getOrElse(Diff.empty))
 }

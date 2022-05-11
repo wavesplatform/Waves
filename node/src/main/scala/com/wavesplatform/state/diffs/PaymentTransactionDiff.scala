@@ -1,13 +1,10 @@
 package com.wavesplatform.state.diffs
 
 import cats.implicits.toBifunctorOps
-import com.wavesplatform.account.Address
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
+import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.PaymentTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
-
-import scala.util.Left
 
 object PaymentTransactionDiff {
 
@@ -18,14 +15,8 @@ object PaymentTransactionDiff {
     else
       Diff
         .combine(
-          Map[Address, Portfolio](tx.recipient -> Portfolio(balance = tx.amount.value, LeaseBalance.empty, assets = Map.empty)),
-          Map(
-            Address.fromPublicKey(tx.sender) -> Portfolio(
-              balance = -tx.amount.value - tx.fee.value,
-              LeaseBalance.empty,
-              assets = Map.empty
-            )
-          )
+          Map(tx.recipient        -> Portfolio(tx.amount.value)),
+          Map(tx.sender.toAddress -> Portfolio(-tx.amount.value - tx.fee.value))
         )
         .bimap(GenericError(_), p => Diff(portfolios = p))
   }
