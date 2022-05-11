@@ -1,7 +1,5 @@
 package com.wavesplatform.state
 
-import java.util.concurrent.TimeUnit
-
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{Keys, LevelDBWriter}
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
@@ -9,6 +7,7 @@ import com.wavesplatform.transaction.smart.Verifier
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
+import java.util.concurrent.TimeUnit
 import scala.util.Random
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)

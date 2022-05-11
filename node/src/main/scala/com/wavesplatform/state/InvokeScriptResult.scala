@@ -19,8 +19,8 @@ import com.wavesplatform.utils._
 import play.api.libs.json._
 import PBInvokeScriptResult.Call.Argument
 import PBInvokeScriptResult.Call.Argument.Value
-import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.serialization.SerdeV1
+import com.wavesplatform.lang.v1.compiler.{Terms, Types}
 
 final case class InvokeScriptResult(
     data: Seq[R.DataEntry] = Nil,
@@ -218,7 +218,6 @@ object InvokeScriptResult {
   import com.wavesplatform.protobuf.transaction.{InvokeScriptResult => PBISR}
 
   def rideExprToPB(arg: Terms.EXPR): PBISR.Call.Argument.Value = {
-    import PBISR.Call.Argument
     import PBISR.Call.Argument.Value
 
     arg match {
@@ -227,6 +226,7 @@ object InvokeScriptResult {
       case str: Terms.CONST_STRING => Value.StringValue(str.s)
       case Terms.CONST_BOOLEAN(b)  => Value.BooleanValue(b)
       case Terms.ARR(xs)           => Value.List(Argument.List(xs.map(x => Argument(rideExprToPB(x)))))
+      case caseObj: Terms.CaseObj  => Value.CaseObj(ByteString.copyFrom(SerdeV1.serialize(caseObj, allowObjects = true)))
       case _                       => Value.Empty
     }
   }
@@ -280,14 +280,21 @@ object InvokeScriptResult {
   private def toVanillaCall(i: PBInvokeScriptResult.Call): Call = {
     import com.wavesplatform.lang.v1.compiler.Terms
 
-    def toVanillaTerm(v: Argument.Value): Terms.EVALUATED = v match {
-      case Value.IntegerValue(value) => Terms.CONST_LONG(value)
-      case Value.BinaryValue(value)  => Terms.CONST_BYTESTR(value.toByteStr).explicitGet()
-      case Value.StringValue(value)  => Terms.CONST_STRING(value).explicitGet()
-      case Value.BooleanValue(value) => Terms.CONST_BOOLEAN(value)
-      case Value.List(value)         => Terms.ARR(value.items.map(a => toVanillaTerm(a.value)).toVector, limited = true).explicitGet()
-      case Value.Empty               => ???
-    }
+    def toVanillaTerm(v: Argument.Value): Terms.EVALUATED =
+      v match {
+        case Value.IntegerValue(value) => Terms.CONST_LONG(value)
+        case Value.BinaryValue(value)  => Terms.CONST_BYTESTR(value.toByteStr).explicitGet()
+        case Value.StringValue(value)  => Terms.CONST_STRING(value).explicitGet()
+        case Value.BooleanValue(value) => Terms.CONST_BOOLEAN(value)
+        case Value.List(value)         => Terms.ARR(value.items.map(a => toVanillaTerm(a.value)).toVector, limited = true).explicitGet()
+        case Value.CaseObj(bytes) =>
+          SerdeV1
+            .deserialize(bytes.toByteArray, allowObjects = true)
+            .toOption
+            .collect { case (obj: CaseObj, _) => obj }
+            .getOrElse(Terms.CaseObj(Types.UNIT, Map.empty))
+        case _ => Terms.CaseObj(Types.UNIT, Map.empty)
+      }
 
     val args = if (i.argsBytes.nonEmpty) i.argsBytes.map { bytes =>
       val (value, _) = SerdeV1.deserialize(bytes.toByteArray, allowObjects = true).explicitGet()

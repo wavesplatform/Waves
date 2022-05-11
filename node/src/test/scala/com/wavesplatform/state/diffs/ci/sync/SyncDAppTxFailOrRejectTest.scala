@@ -10,6 +10,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, EXPR}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 

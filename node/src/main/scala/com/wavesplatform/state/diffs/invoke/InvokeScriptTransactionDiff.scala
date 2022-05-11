@@ -324,10 +324,13 @@ object InvokeScriptTransactionDiff {
       scriptOpt: Option[AccountScriptInfo]
   ): Either[GenericError, (PublicKey, StdLibVersion, FUNCTION_CALL, DApp, Map[Int, Map[String, Long]])] =
     scriptOpt
-      .collect { case AccountScriptInfo(publicKey, ContractScriptImpl(version, dApp), _, complexities) =>
-        (publicKey, version, tx.funcCall, dApp, complexities)
+      .map {
+        case AccountScriptInfo(publicKey, ContractScriptImpl(version, dApp), _, complexities) =>
+          Right((publicKey, version, tx.funcCall, dApp, complexities))
+        case _ =>
+          InvokeDiffsCommon.callExpressionError
       }
-      .toRight(GenericError(s"No contract at address ${tx.dApp}"))
+      .getOrElse(Left(GenericError(s"No contract at address ${tx.dApp}")))
 
   private def extractFreeCall(
       tx: InvokeExpressionTransaction,

@@ -1,20 +1,21 @@
 package com.wavesplatform.api.http
 
-import scala.util.Try
-
-import akka.http.scaladsl.server._
+import akka.http.scaladsl.server.*
 import cats.data.{Validated, ValidatedNel}
-import cats.instances.vector._
-import cats.syntax.traverse._
+import cats.instances.vector.*
+import cats.syntax.traverse.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.utils.{EthEncoding, ScorexLogging}
 import monix.execution.{Scheduler, UncaughtExceptionReporter}
 import play.api.libs.json.JsObject
 
+import scala.concurrent.duration.DurationInt
+import scala.util.Try
+
 trait CustomDirectives extends Directives with ApiMarshallers with ScorexLogging {
   def anyParam(paramName: String, nonEmpty: Boolean = false, limit: Int = Int.MaxValue): Directive1[Iterable[String]] = {
     val baseDirective = (get & pathEndOrSingleSlash & parameter(paramName.as[String].*).map(_.toSeq.reverse)) |
-      post & (formField(paramName.as[String].*) |
+      strictEntity & post & (formField(paramName.as[String].*) |
         entity(as[JsObject]).map { jso =>
           (jso \ s"${paramName}s").as[Iterable[String]]
         })
@@ -26,6 +27,8 @@ trait CustomDirectives extends Directives with ApiMarshallers with ScorexLogging
         case list                             => provide(list)
       }
   }
+
+  def strictEntity: Directive0 = toStrictEntity(5 seconds)
 
   implicit class SeqDirectiveValidationExt[Source](dir: Directive1[Iterable[Source]]) {
     def massValidate[Result](f: Source => Validated[Source, Result]): Directive1[ValidatedNel[Source, Vector[Result]]] = {

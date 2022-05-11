@@ -202,7 +202,7 @@ object TransactionDiffer {
           case _                                 => UnsupportedTransactionType.asLeft.traced
         }
       }
-      .flatMap(d => initDiff.combineE(d.bindTransaction(tx)))
+      .flatMap(diff => initDiff.combineE(diff.bindTransaction(blockchain, tx, applied = true)))
       .leftMap {
         case fte: FailedTransactionError => fte.addComplexity(initDiff.scriptsComplexity)
         case ve                          => ve

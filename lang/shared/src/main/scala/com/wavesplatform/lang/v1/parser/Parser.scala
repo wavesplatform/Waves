@@ -1,19 +1,18 @@
 package com.wavesplatform.lang.v1.parser
 
-import cats.instances.either._
-import cats.instances.list._
-import cats.instances.option._
-import cats.syntax.either._
-import cats.syntax.traverse._
+import cats.instances.either.*
+import cats.instances.list.*
+import cats.syntax.either.*
+import cats.syntax.traverse.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.v1.{ContractLimits, compiler}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
-import com.wavesplatform.lang.v1.parser.BinaryOperation._
+import com.wavesplatform.lang.v1.parser.BinaryOperation.*
+import com.wavesplatform.lang.v1.parser.Expressions.*
 import com.wavesplatform.lang.v1.parser.Expressions.PART.VALID
-import com.wavesplatform.lang.v1.parser.Expressions._
-import com.wavesplatform.lang.v1.parser.UnaryOperation._
-import fastparse.MultiLineWhitespace._
-import fastparse._
+import com.wavesplatform.lang.v1.parser.UnaryOperation.*
+import com.wavesplatform.lang.v1.{ContractLimits, compiler}
+import fastparse.*
+import fastparse.MultiLineWhitespace.*
 
 import scala.annotation.tailrec
 
@@ -120,7 +119,7 @@ object Parser {
   }
 
   def invalid[A: P]: P[INVALID] = {
-    import fastparse.NoWhitespace._
+    import fastparse.NoWhitespace.*
     P(Index ~~ CharPred(_ != '\n').rep(1) ~~ Index)
       .map {
         case (start, end) => INVALID(Pos(start, end), "can't parse the expression")
@@ -249,7 +248,7 @@ object Parser {
       P(unionTypeP).rep(
         ContractLimits.MinTupleSize,
         comment ~ "," ~ comment,
-        ContractLimits.MaxTupleSize,
+        ContractLimits.MaxTupleSize
       )
       ~ ")")
       .map(Tuple)
@@ -281,13 +280,17 @@ object Parser {
           parameter
             .toLeft(Some(name.position))
             .leftMap {
-              case VALID(position, _)              => INVALID(position, s"Unexpected generic match type $t")
+              case VALID(position, _)              => INVALID(position, s"Unexpected generic match type: only List[Any] is allowed")
               case PART.INVALID(position, message) => INVALID(position, message)
             }
         case Union(types) =>
-          types.lastOption.flatTraverse(checkForGenericAndGetLastPos)
+          types
+            .traverse(checkForGenericAndGetLastPos)
+            .map(_.lastOption.flatten)
         case Tuple(types) =>
-          types.lastOption.flatTraverse(checkForGenericAndGetLastPos)
+          types
+            .traverse(checkForGenericAndGetLastPos)
+            .map(_.lastOption.flatten)
         case AnyType(pos) => Right(Some(pos))
       }
 
@@ -306,22 +309,23 @@ object Parser {
     def pattern(implicit c: fastparse.P[Any]): P[Pattern] =
       (varDefP ~ comment ~ typesDefP).map { case (v, t) => TypedVar(v, t) } |
         (Index ~ "(" ~ pattern.rep(min = 2, sep = ",") ~ ")" ~ Index).map(p => TuplePat(p._2, Pos(p._1, p._3))) |
-        (Index ~ anyVarName ~ "(" ~ (anyVarName ~ "=" ~ pattern).rep(sep = ",") ~ ")" ~ Index).map(p =>
-          ObjPat(p._3.map(kp => (PART.toOption(kp._1).get, kp._2)).toMap, Single(p._2, None), Pos(p._1, p._4))) |
+        (Index ~ anyVarName ~ "(" ~ (anyVarName ~ "=" ~ pattern).rep(sep = ",") ~ ")" ~ Index)
+          .map(p => ObjPat(p._3.map(kp => (PART.toOption(kp._1).get, kp._2)).toMap, Single(p._2, None), Pos(p._1, p._4))) |
         (Index ~ baseExpr.rep(min = 1, sep = "|") ~ Index).map(p => ConstsPat(p._2, Pos(p._1, p._3)))
 
-    def checkPattern(p: Pattern): Either[INVALID, Option[Pos]] = p match {
-      case TypedVar(_, t)    => checkForGenericAndGetLastPos(t)
-      case ConstsPat(_, pos) => Right(Some(pos))
-      case TuplePat(ps, pos) =>
-        ps.toList traverse checkPattern map { _ =>
-          Some(pos)
-        }
-      case ObjPat(ps, _, pos) =>
-        ps.values.toList traverse checkPattern map { _ =>
-          Some(pos)
-        }
-    }
+    def checkPattern(p: Pattern): Either[INVALID, Option[Pos]] =
+      p match {
+        case TypedVar(_, t)    => checkForGenericAndGetLastPos(t)
+        case ConstsPat(_, pos) => Right(Some(pos))
+        case TuplePat(ps, pos) =>
+          ps.toList traverse checkPattern map { _ =>
+            Some(pos)
+          }
+        case ObjPat(ps, _, pos) =>
+          ps.values.toList traverse checkPattern map { _ =>
+            Some(pos)
+          }
+      }
 
     P(
       Index ~~ "case" ~~ &(border) ~ comment ~/ (
@@ -366,7 +370,7 @@ object Parser {
   def genericMethodName(implicit c: fastparse.P[Any]): P[PART[String]] =
     accessorName.filter {
       case VALID(_, name) if GenericMethod.KnownMethods.contains(name) => true
-      case _ => false
+      case _                                                           => false
     }
 
   def accessP[A: P]: P[(Int, Accessor, Int)] = P(
@@ -425,35 +429,36 @@ object Parser {
     (Index ~ anyVarName.?).map(Seq(_))
 
   def variableDefP[A: P](key: String): P[Seq[LET]] =
-    P(Index ~~ key ~~ &(CharIn(" \t\n\r")) ~/ comment ~ (destructuredTupleValuesP | letNameP) ~ comment ~ Index ~ ("=" ~/ Index ~ baseExpr.?).? ~~ Index)
-      .map {
-        case (start, names, valuePos, valueRaw, end) =>
-          val value = extractValue(valuePos, valueRaw)
-          val pos   = Pos(start, end)
-          if (names.length == 1)
-            names.map {
-              case (nameStart, nameRaw) =>
-                val name = extractName(Pos(nameStart, nameStart), nameRaw)
-                LET(pos, name, value)
-            } else {
-            val exprRefName = "$t0" + s"${pos.start}${pos.end}"
-            val exprRef     = LET(pos, VALID(pos, exprRefName), value)
-            val tupleValues =
-              names.zipWithIndex
-                .map {
-                  case ((nameStart, nameRaw), i) =>
-                    val namePos = Pos(nameStart, nameStart)
-                    val name    = extractName(namePos, nameRaw)
-                    val getter = GETTER(
-                      namePos,
-                      REF(namePos, VALID(namePos, exprRefName)),
-                      VALID(namePos, s"_${i + 1}")
-                    )
-                    LET(pos, name, getter)
-                }
-            exprRef +: tupleValues
-          }
-      }
+    P(
+      Index ~~ key ~~ &(CharIn(" \t\n\r")) ~/ comment ~ (destructuredTupleValuesP | letNameP) ~ comment ~ Index ~ ("=" ~/ Index ~ baseExpr.?).? ~~ Index
+    ).map {
+      case (start, names, valuePos, valueRaw, end) =>
+        val value = extractValue(valuePos, valueRaw)
+        val pos   = Pos(start, end)
+        if (names.length == 1)
+          names.map {
+            case (nameStart, nameRaw) =>
+              val name = extractName(Pos(nameStart, nameStart), nameRaw)
+              LET(pos, name, value)
+          } else {
+          val exprRefName = "$t0" + s"${pos.start}${pos.end}"
+          val exprRef     = LET(pos, VALID(pos, exprRefName), value)
+          val tupleValues =
+            names.zipWithIndex
+              .map {
+                case ((nameStart, nameRaw), i) =>
+                  val namePos = Pos(nameStart, nameStart)
+                  val name    = extractName(namePos, nameRaw)
+                  val getter = GETTER(
+                    namePos,
+                    REF(namePos, VALID(namePos, exprRefName)),
+                    VALID(namePos, s"_${i + 1}")
+                  )
+                  LET(pos, name, getter)
+              }
+          exprRef +: tupleValues
+        }
+    }
 
   // Hack to force parse of "\n". Otherwise it is treated as a separator
   def newLineSep(implicit c: fastparse.P[Any]) = {
@@ -542,15 +547,17 @@ object Parser {
   }
 
   def binaryOp(atomA: fastparse.P[Any] => P[EXPR], rest: List[Either[List[BinaryOperation], List[BinaryOperation]]])(
-      implicit c: fastparse.P[Any]): P[EXPR] = {
+      implicit c: fastparse.P[Any]
+  ): P[EXPR] = {
     def atom(implicit c: fastparse.P[Any]) = atomA(c)
     rest match {
       case Nil => unaryOp(atom(_), unaryOps)
       case Left(kinds) :: restOps =>
         def operand(implicit c: fastparse.P[Any]) = binaryOp(atom(_), restOps)
         val kindc = kinds
-          .map(o => { implicit c: fastparse.P[Any] =>
-            o.parser
+          .map(o => {
+            implicit c: fastparse.P[Any] =>
+              o.parser
           })
           .reduce((plc, prc) => {
             def pl(implicit c: fastparse.P[Any]) = plc(c)
@@ -567,8 +574,9 @@ object Parser {
       case Right(kinds) :: restOps =>
         def operand(implicit c: fastparse.P[Any]) = binaryOp(atom(_), restOps)
         val kindc = kinds
-          .map(o => { implicit c: fastparse.P[Any] =>
-            o.parser
+          .map(o => {
+            implicit c: fastparse.P[Any] =>
+              o.parser
           })
           .reduce((plc, prc) => {
             def pl(implicit c: fastparse.P[Any]) = plc(c)

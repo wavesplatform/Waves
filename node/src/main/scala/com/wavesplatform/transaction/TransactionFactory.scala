@@ -382,6 +382,18 @@ object TransactionFactory {
       )
     } yield tx
 
+  def updateAssetInfo(request: UpdateAssetInfoRequest, wallet: Wallet, signerAddress: String, time: Time): Either[ValidationError, UpdateAssetInfoTransaction] =
+    for {
+      sender <- request.sender match {
+        case Some(sender) => wallet.findPrivateKey(sender)
+        case None => Left(GenericError("invalid.sender"))
+      }
+      signer <- if (request.sender.contains(signerAddress)) Right(sender) else wallet.findPrivateKey(signerAddress)
+      tx <- request.copy(timestamp = request.timestamp.orElse(Some(time.getTimestamp()))).toTxFrom(sender.publicKey)
+    } yield {
+      tx.signWith(signer.privateKey)
+    }
+
   def fromSignedRequest(jsv: JsValue): Either[ValidationError, Transaction] = {
     import InvokeScriptRequest.*
     val chainId = (jsv \ "chainId").asOpt[Byte]
@@ -442,7 +454,8 @@ object TransactionFactory {
           case TransactionType.InvokeScript   => TransactionFactory.invokeScript(txJson.as[InvokeScriptRequest], wallet, signerAddress, time)
           case TransactionType.SetScript      => TransactionFactory.setScript(txJson.as[SetScriptRequest], wallet, signerAddress, time)
           case TransactionType.SetAssetScript => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], wallet, signerAddress, time)
-          case TransactionType.SponsorFee     => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], wallet, signerAddress, time)
+          case TransactionType.SponsorFee      => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], wallet, signerAddress, time)
+          case TransactionType.UpdateAssetInfo => TransactionFactory.updateAssetInfo(txJson.as[UpdateAssetInfoRequest], wallet, signerAddress, time)
         } catch {
           case _: NoSuchElementException => Left(UnsupportedTypeAndVersion(typeId, version))
           case _: MatchError => Left(UnsupportedTransactionType)
