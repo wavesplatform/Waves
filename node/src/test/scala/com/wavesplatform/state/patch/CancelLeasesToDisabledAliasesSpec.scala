@@ -8,7 +8,8 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.test.FlatSpec
+import com.wavesplatform.test._
+import com.wavesplatform.test.DomainPresets._
 import com.wavesplatform.transaction.TxHelpers
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterAll

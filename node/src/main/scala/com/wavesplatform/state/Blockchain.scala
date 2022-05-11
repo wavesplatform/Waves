@@ -1,7 +1,7 @@
 package com.wavesplatform.state
 
-import com.wavesplatform.account._
-import com.wavesplatform.block.Block._
+import com.wavesplatform.account.*
+import com.wavesplatform.block.Block.*
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
@@ -66,7 +66,7 @@ trait Blockchain {
 
   def assetScript(id: IssuedAsset): Option[AssetScriptInfo]
 
-  def accountData(acc: Address, key: String): Option[DataEntry[_]]
+  def accountData(acc: Address, key: String): Option[DataEntry[?]]
   def hasData(address: Address): Boolean
 
   def leaseBalance(address: Address): LeaseBalance

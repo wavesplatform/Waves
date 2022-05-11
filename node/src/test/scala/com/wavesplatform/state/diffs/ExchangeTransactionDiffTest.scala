@@ -21,6 +21,7 @@ import com.wavesplatform.state.diffs.ExchangeTransactionDiff.getOrderFeePortfoli
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.*
+import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AccountBalanceError
 import com.wavesplatform.transaction.assets.IssueTransaction

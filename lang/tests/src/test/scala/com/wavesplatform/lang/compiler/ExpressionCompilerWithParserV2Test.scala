@@ -1,9 +1,8 @@
 package com.wavesplatform.lang.compiler
 
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.directives.values.Imports
 import com.wavesplatform.lang.directives.{Directive, DirectiveParser}
-import com.wavesplatform.lang.utils.lazyContexts
+import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.parser.Expressions
@@ -18,7 +17,7 @@ class ExpressionCompilerWithParserV2Test extends PropSpec {
     val result = for {
       directives <- DirectiveParser(script)
       ds         <- Directive.extractDirectives(directives)
-      ctx = lazyContexts(ds.copy(imports = Imports()))().compilerContext
+      ctx = utils.compilerContext(ds)
       compResult <- ExpressionCompiler.compileWithParseResult(script, ctx, saveExprContext)
     } yield compResult
 

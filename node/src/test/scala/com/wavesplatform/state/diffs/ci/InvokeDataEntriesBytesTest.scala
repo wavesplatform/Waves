@@ -10,6 +10,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.TxHelpers
 
 class InvokeDataEntriesBytesTest extends PropSpec with WithDomain {
