@@ -110,7 +110,7 @@ lazy val `repl-js` = repl.js.dependsOn(`lang-js`)
 
 lazy val `curve25519-test` = project.dependsOn(node)
 
-lazy val root = (project in file("."))
+lazy val `waves-node` = (project in file("."))
   .aggregate(
     `lang-js`,
     `lang-jvm`,
@@ -189,7 +189,7 @@ packageAll := {
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
 checkPRRaw := Def
   .sequential(
-    root / clean,
+    `waves-node` / clean,
     Def.task {
       (Test / compile).value
       (`lang-tests` / Test / test).value

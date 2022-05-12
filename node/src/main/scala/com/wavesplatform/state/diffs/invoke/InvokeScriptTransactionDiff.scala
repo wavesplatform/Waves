@@ -291,6 +291,7 @@ object InvokeScriptTransactionDiff {
             ContractLimits.MaxCallableActionsAmountBeforeV6(version),
             ContractLimits.MaxBalanceScriptActionsAmountV6,
             ContractLimits.MaxAssetScriptActionsAmountV6,
+            ContractLimits.MaxTotalPaymentAmountRideV6 - tx.payments.size,
             ContractLimits.MaxWriteSetSize,
             ContractLimits.MaxTotalWriteSetSizeInBytes,
             paymentsPart,
