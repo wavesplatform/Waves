@@ -6,6 +6,7 @@ import com.wavesplatform.TestHelpers.enableNG
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.database.loadActiveLeases
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{DBCacheSettings, WithDomain}
 import com.wavesplatform.events.BlockchainUpdateTriggers
@@ -17,18 +18,25 @@ import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{Transaction, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.{EitherMatchers, NTPTime}
+import monix.execution.Ack
+import monix.execution.Ack.Continue
+import monix.reactive.Observer
 import org.scalamock.scalatest.MockFactory
 
+import scala.collection.mutable.ArrayBuffer
+import scala.concurrent.Future
 import scala.util.Random
 
 class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDomain with NTPTime with DBCacheSettings with MockFactory {
+  import DomainPresets.*
 
   private val FEE_AMT = 1000000L
 
@@ -258,24 +266,24 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
       val sender = KeyPair(Longs.toByteArray(Random.nextLong()))
 
       withDomain(
-        DomainPresets.RideV4,
+        RideV4,
         balances = Seq(AddrWithBalance(dapp.toAddress, 10_00000000), AddrWithBalance(sender.toAddress, 10_00000000))
       ) { d =>
         val script = ScriptCompiler
           .compile(
             """
-                |
-                |{-# STDLIB_VERSION 4 #-}
-                |{-# SCRIPT_TYPE ACCOUNT #-}
-                |{-# CONTENT_TYPE DAPP #-}
-                |
-                |@Callable(i)
-                |func default() = {
-                |  [
-                |    BinaryEntry("vrf", value(value(blockInfoByHeight(height)).vrf))
-                |  ]
-                |}
-                |""".stripMargin,
+              |
+              |{-# STDLIB_VERSION 4 #-}
+              |{-# SCRIPT_TYPE ACCOUNT #-}
+              |{-# CONTENT_TYPE DAPP #-}
+              |
+              |@Callable(i)
+              |func default() = {
+              |  [
+              |    BinaryEntry("vrf", value(value(blockInfoByHeight(height)).vrf))
+              |  ]
+              |}
+              |""".stripMargin,
             ScriptEstimatorV2
           )
           .explicitGet()
@@ -289,6 +297,33 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
           Signed.invokeScript(3.toByte, sender, dapp.toAddress, None, Seq.empty, 50_0000L, Waves, ntpTime.getTimestamp())
 
         d.appendBlock(d.createBlock(5.toByte, Seq(invoke)))
+      }
+    }
+
+    "spendableBalanceChanged" in {
+      withLevelDBWriter(RideV6) { levelDb =>
+        val spendableBalanceChanged = ArrayBuffer.empty[(Address, Asset)]
+        val observer = new Observer[(Address, Asset)] {
+          override def onNext(elem: (Address, Asset)): Future[Ack] = Future.successful { spendableBalanceChanged += elem; Continue }
+          override def onError(ex: Throwable): Unit                = throw ex
+          override def onComplete(): Unit                          = ()
+        }
+        val blockchain = new BlockchainUpdaterImpl(
+          levelDb,
+          observer,
+          RideV6,
+          ntpTime,
+          BlockchainUpdateTriggers.noop,
+          loadActiveLeases(db, _, _)
+        )
+
+        val block = TestBlock.create(Seq(genesis(defaultAddress)))
+        blockchain.processBlock(block)
+        spendableBalanceChanged shouldBe Seq((TestBlock.defaultSigner.toAddress, Waves), (defaultAddress, Waves))
+
+        spendableBalanceChanged.clear()
+        blockchain.processBlock(TestBlock.create(block.header.timestamp, block.id(), Seq(transfer())))
+        spendableBalanceChanged shouldBe Seq((TestBlock.defaultSigner.toAddress, Waves), (defaultAddress, Waves), (secondAddress, Waves))
       }
     }
   }
