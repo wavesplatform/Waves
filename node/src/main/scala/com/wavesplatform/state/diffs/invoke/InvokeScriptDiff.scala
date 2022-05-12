@@ -21,7 +21,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, Log, ScriptResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
+import com.wavesplatform.lang.v1.traits.domain.Tx.{InvokePseudoTx, ScriptTransfer}
 import com.wavesplatform.lang.v1.traits.domain.{Recipient as RideRecipient, *}
 import com.wavesplatform.metrics.*
 import com.wavesplatform.state.*
@@ -128,15 +128,29 @@ object InvokeScriptDiff {
             case (error @ TracedResult(Left(_), _, _), _) => error
             case (TracedResult(Right(nextRemainingComplexity), _, _), (script, amount, assetId)) =>
               val usedComplexity = totalComplexityLimit - nextRemainingComplexity
-              val pseudoTx = ScriptTransfer(
-                Some(assetId),
-                RideRecipient.Address(ByteStr(tx.sender.toAddress.bytes)),
-                tx.sender,
-                RideRecipient.Address(ByteStr(tx.dApp.bytes)),
-                amount,
-                tx.timestamp,
-                tx.txId
-              )
+              val pseudoTx = if (blockchain.isFeatureActivated(BlockchainFeatures.RideV6)) {
+                InvokePseudoTx(
+                  tx.txId,
+                  tx.timestamp,
+                  RideRecipient.Address(ByteStr(tx.sender.toAddress.bytes)),
+                  tx.sender,
+                  RideRecipient.Address(ByteStr(tx.dApp.bytes)),
+                  None,
+                  Some(tx.funcCall.function.funcName),
+                  tx.funcCall.args.collect { case ev: EVALUATED => ev },
+                  payments
+                )
+              } else {
+                ScriptTransfer(
+                  Some(assetId),
+                  RideRecipient.Address(ByteStr(tx.sender.toAddress.bytes)),
+                  tx.sender,
+                  RideRecipient.Address(ByteStr(tx.dApp.bytes)),
+                  amount,
+                  tx.timestamp,
+                  tx.txId
+                )
+              }
               val (log, evaluatedComplexity, result) = ScriptRunner(
                 Coproduct[TxOrd](pseudoTx: PseudoTx),
                 blockchain,
