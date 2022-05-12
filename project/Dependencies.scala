@@ -41,7 +41,7 @@ object Dependencies {
 
   val scalaTest = "org.scalatest" %% "scalatest" % "3.2.12" % Test
 
-  val sttp3 = "com.softwaremill.sttp.client3" % "core_2.13" % "3.6.1"
+  val sttp3 = "com.softwaremill.sttp.client3" % "core_2.13" % "3.5.2"
 
   val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk15on" % "1.70"
 
