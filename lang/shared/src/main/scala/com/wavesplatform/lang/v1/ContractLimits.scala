@@ -62,8 +62,9 @@ object ContractLimits {
   val MaxBalanceScriptActionsAmountV6: Int = 100
   val MaxAssetScriptActionsAmountV6: Int   = 30
 
-  val MaxAttachedPaymentAmount   = 2
-  val MaxAttachedPaymentAmountV5 = 10
+  val MaxAttachedPaymentAmount    = 2
+  val MaxAttachedPaymentAmountV5  = 10
+  val MaxTotalPaymentAmountRideV6 = 100
 
   // Data weight related constants
   val OBJ_WEIGHT      = 40L

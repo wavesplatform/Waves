@@ -319,6 +319,7 @@ class DAppEnvironment(
     var availableActions: Int,
     var availableBalanceActions: Int,
     var availableAssetActions: Int,
+    var availablePayments: Int,
     var availableData: Int,
     var availableDataSize: Int,
     var currentDiff: Diff,
@@ -366,7 +367,7 @@ class DAppEnvironment(
         payments.map(p => InvokeScriptResult.AttachedPayment(p._1.fold(Asset.Waves: Asset)(a => IssuedAsset(ByteStr(a))), p._2)),
         InvokeScriptResult.empty
       )
-      (diff, evaluated, remainingActions, remainingBalanceActions, remainingAssetActions, remainingData, remainingDataSize) <-
+      (diff, evaluated, remainingActions, remainingBalanceActions, remainingAssetActions, remainingPayments, remainingData, remainingDataSize) <-
         InvokeScriptDiff( // This is a recursive call
           mutableBlockchain,
           blockchain.settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp + 1,
@@ -377,6 +378,7 @@ class DAppEnvironment(
           availableActions,
           availableBalanceActions,
           availableAssetActions,
+          availablePayments,
           availableData,
           availableDataSize,
           if (reentrant) calledAddresses else calledAddresses + invoke.sender.toAddress,
@@ -394,6 +396,7 @@ class DAppEnvironment(
       availableActions = remainingActions
       availableBalanceActions = remainingBalanceActions
       availableAssetActions = remainingAssetActions
+      availablePayments = remainingPayments
       availableData = remainingData
       availableDataSize = remainingDataSize
       (evaluated, diff.scriptsComplexity.toInt)
