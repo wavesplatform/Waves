@@ -64,10 +64,13 @@ object Bindings {
     )
 
   def ordType(o: OrdType): CaseObj =
-    CaseObj((o match {
-      case OrdType.Buy  => buyType
-      case OrdType.Sell => sellType
-    }), Map.empty)
+    CaseObj(
+      (o match {
+        case OrdType.Buy  => buyType
+        case OrdType.Sell => sellType
+      }),
+      Map.empty
+    )
 
   private def buildPayments(payments: AttachedPayments): (String, EVALUATED) =
     payments match {
@@ -196,6 +199,24 @@ object Bindings {
       version
     )
 
+  def mapInvokePseudoTx(inv: InvokePseudoTx, version: StdLibVersion): CaseObj =
+    invokeScriptTransactionObject(
+      proofsEnabled = false,
+      p = Proven(
+        h = Header(id = inv.id, fee = 0, timestamp = inv.timestamp, version = 0),
+        sender = inv.sender,
+        bodyBytes = ByteStr.empty,
+        senderPk = inv.senderPk,
+        proofs = IndexedSeq.empty
+      ),
+      dApp = inv.dApp,
+      feeAssetId = inv.feeAssetId,
+      funcName = inv.funcName,
+      funcArgs = inv.funcArgs,
+      payments = inv.payments,
+      version = version
+    )
+
   def transactionObject(tx: Tx, proofsEnabled: Boolean, version: StdLibVersion): CaseObj =
     tx match {
       case Tx.Genesis(h, amount, recipient) =>
@@ -226,20 +247,7 @@ object Bindings {
       case Tx.Burn(p, quantity, assetId) =>
         burnTransactionObject(proofsEnabled, p, quantity, assetId, version)
       case CI(p, addressOrAlias, payments, feeAssetId, funcName, funcArgs) =>
-        CaseObj(
-          buildInvokeScriptTransactionType(proofsEnabled, version),
-          combine(
-            Map(
-              "dApp"       -> mapRecipient(addressOrAlias)._2,
-              "feeAssetId" -> feeAssetId,
-              "function"   -> funcName,
-              "args"       -> funcArgs
-            ),
-            Map(buildPayments(payments)),
-            provenTxPart(p, proofsEnabled, version)
-          )
-        )
-
+        invokeScriptTransactionObject(proofsEnabled, p, addressOrAlias, feeAssetId, funcName, funcArgs, payments, version)
       case Tx.Lease(p, amount, recipient) =>
         CaseObj(
           buildLeaseTransactionType(proofsEnabled),
@@ -419,6 +427,30 @@ object Bindings {
           "attachment" -> tx.attachment
         ),
         provenTxPart(tx.p, proofsEnabled, version) + mapRecipient(tx.recipient)
+      )
+    )
+
+  def invokeScriptTransactionObject(
+      proofsEnabled: Boolean,
+      p: Proven,
+      dApp: Recipient,
+      feeAssetId: Option[ByteStr],
+      funcName: Option[String],
+      funcArgs: List[EVALUATED],
+      payments: AttachedPayments,
+      version: StdLibVersion
+  ): CaseObj =
+    CaseObj(
+      buildInvokeScriptTransactionType(proofsEnabled, version),
+      combine(
+        Map(
+          "dApp"       -> mapRecipient(dApp)._2,
+          "feeAssetId" -> feeAssetId,
+          "function"   -> funcName,
+          "args"       -> funcArgs
+        ),
+        Map(buildPayments(payments)),
+        provenTxPart(p, proofsEnabled, version)
       )
     )
 
