@@ -7,5 +7,5 @@ package object test {
     def waves(implicit n: Numeric[N]): Long = (BigDecimal(n.toDouble(x)) * 1_0000_0000L).toLong
   }
 
-  def produce(err: String): Matcher[Either[_, _]] = new ProduceError(err)
+  def produce(err: String): Matcher[Either[?, ?]] = new ProduceError(err)
 }

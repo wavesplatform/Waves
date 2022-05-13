@@ -6,18 +6,18 @@ import com.wavesplatform.api.http.ApiError.{AssetDoesNotExist, TransactionDoesNo
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.BaseFreeSpec
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.{AssetInfo, BurnInfoResponse, IssueInfoResponse, ReissueInfoResponse, StateChangesDetails, Transaction}
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_LONG}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class IssueReissueBurnAssetSuite extends BaseFreeSpec {
   override val nodeConfigs: Seq[Config] =
@@ -194,40 +194,6 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
 
       sender.assetsDetails(assetId).quantity should be(simpleReissuableAsset.quantity)
     }
-
-    "Issue 10 assets should not produce an error" in {
-      val acc = createDapp(script(simpleNonreissuableAsset))
-      val tx  = invokeScript(acc, "issue10Assets", fee = invocationCost(10))
-      for (nth <- 0 to 9) {
-        val assetId = validateIssuedAssets(acc, tx, simpleNonreissuableAsset, nth, CallableMethod)
-        assertQuantity(assetId)(simpleNonreissuableAsset.quantity, reissuable = false)
-        sender.assertAssetBalance(acc.toAddress.toString, assetId, simpleNonreissuableAsset.quantity)
-      }
-    }
-
-    "Issue more than 10 assets should produce an error" in {
-      val acc = createDapp(script(simpleNonreissuableAsset))
-      assertApiError(invokeScript(acc, "issue11Assets").id) { e =>
-        e.message should include("Actions count limit is exceeded")
-      }
-    }
-
-    "More than 10 actions Issue/Reissue/Burn should produce an error" in {
-      val acc     = createDapp(script(simpleReissuableAsset))
-      val txIssue = issue(acc, method, simpleReissuableAsset, invocationCost(1))
-      val assetId = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
-
-      assertApiError(invokeScript(acc, "process11actions", assetId = assetId).id) { e =>
-        e.message should include("Actions count limit is exceeded")
-      }
-    }
-
-    "More than 10 issue action in one invocation should produce an error" in {
-      val acc = createDapp(script(simpleNonreissuableAsset))
-      assertApiError(invokeScript(acc, "issue11Assets").id) { e =>
-        e.message should include("Actions count limit is exceeded")
-      }
-    }
   }
 
   "State changes" - {
@@ -286,16 +252,16 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
       val asset = issueValidated(acc, simpleReissuableAsset)
       invokeScript(acc, "transferAndBurn", assetId = asset, count = 100)
       nodes.waitForHeightArise()
-      sender.assetDistribution(asset).map { case (a, v) => a.stringRepr -> v } shouldBe Map(
+      sender.assetDistribution(asset).map { case (a, v) => a.toString -> v } shouldBe Map(
         miner.address            -> 100L,
-        acc.toAddress.stringRepr -> (simpleReissuableAsset.quantity - 200)
+        acc.toAddress.toString -> (simpleReissuableAsset.quantity - 200)
       )
       reissue(acc, CallableMethod, asset, 400, reissuable = false)
       invokeScript(acc, "transferAndBurn", assetId = asset, count = 100)
       nodes.waitForHeightArise()
-      sender.assetDistribution(asset).map { case (a, v) => a.stringRepr -> v } shouldBe Map(
+      sender.assetDistribution(asset).map { case (a, v) => a.toString -> v } shouldBe Map(
         miner.address            -> 200L,
-        acc.toAddress.stringRepr -> simpleReissuableAsset.quantity
+        acc.toAddress.toString -> simpleReissuableAsset.quantity
       )
     }
 
@@ -491,7 +457,7 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
       case CallableMethod =>
         val tx = invokeScript(account, "issueAsset", fee = fee)
         assertStateChanges(tx) { sd =>
-          sd.issues match {
+          (sd.issues: @unchecked) match {
             case Seq(issue) => validateIssue(issue, data)
           }
         }

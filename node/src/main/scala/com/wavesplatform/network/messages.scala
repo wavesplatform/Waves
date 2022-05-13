@@ -8,7 +8,7 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.transaction.{LegacyPBSwitch, ProtobufOnly, Signed, Transaction}
+import com.wavesplatform.transaction.{PBSince, Signed, Transaction}
 import monix.eval.Coeval
 
 sealed trait Message
@@ -34,16 +34,17 @@ case class RawBytes(code: Byte, data: Array[Byte]) extends Message {
 
   override def equals(obj: Any): Boolean = obj match {
     case o: RawBytes => o.code == code && util.Arrays.equals(o.data, data)
-    case _ => false
+    case _           => false
   }
 }
 
 object RawBytes {
-  def fromTransaction(tx: Transaction): RawBytes = tx match {
-    case p: LegacyPBSwitch if p.isProtobufVersion => RawBytes(PBTransactionSpec.messageCode, PBTransactionSpec.serializeData(tx))
-    case _: ProtobufOnly                          => RawBytes(PBTransactionSpec.messageCode, PBTransactionSpec.serializeData(tx))
-    case tx                                       => RawBytes(TransactionSpec.messageCode, TransactionSpec.serializeData(tx))
-  }
+  def fromTransaction(tx: Transaction, forceProtobuf: Boolean): RawBytes =
+    tx match {
+      case p: PBSince if p.isProtobufVersion => RawBytes(PBTransactionSpec.messageCode, PBTransactionSpec.serializeData(tx))
+      case _ if forceProtobuf                => RawBytes(PBTransactionSpec.messageCode, PBTransactionSpec.serializeData(tx))
+      case tx                                => RawBytes(TransactionSpec.messageCode, TransactionSpec.serializeData(tx))
+    }
 
   def fromBlock(b: Block): RawBytes =
     if (b.header.version < Block.ProtoBlockVersion) RawBytes(BlockSpec.messageCode, BlockSpec.serializeData(b))
@@ -71,7 +72,7 @@ object MicroBlockResponse {
 }
 
 case class MicroBlockInv(sender: PublicKey, totalBlockId: ByteStr, reference: ByteStr, signature: ByteStr) extends Message with Signed {
-  override val signatureValid: Coeval[Boolean] =
+  override protected val signatureValid: Coeval[Boolean] =
     Coeval.evalOnce(crypto.verify(signature, sender.toAddress.bytes ++ totalBlockId.arr ++ reference.arr, sender))
 
   override def toString: String = s"MicroBlockInv(${totalBlockId.trim} ~> ${reference.trim})"

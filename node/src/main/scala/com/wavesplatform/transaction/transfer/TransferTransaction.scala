@@ -20,31 +20,35 @@ case class TransferTransaction(
     sender: PublicKey,
     recipient: AddressOrAlias,
     assetId: Asset,
-    amount: TxAmount,
+    amount: TxPositiveAmount,
     feeAssetId: Asset,
-    fee: TxAmount,
+    fee: TxPositiveAmount,
     attachment: ByteStr,
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends VersionedTransaction
-    with SigProofsSwitch
+) extends Transaction(TransactionType.Transfer, assetId match {
+      case Waves          => Seq()
+      case a: IssuedAsset => Seq(a)
+    })
+    with TransferTransactionLike
+    with VersionedTransaction
     with FastHashId
+    with SigProofsSwitch
     with TxWithFee.InCustomAsset
-    with LegacyPBSwitch.V3 {
+    with PBSince.V3 {
 
-  override val typeId: TxType = TransferTransaction.typeId
+  val bodyBytes: Coeval[TxByteArray] = Coeval.evalOnce(TransferTxSerializer.bodyBytes(this))
+  val bytes: Coeval[TxByteArray]     = Coeval.evalOnce(TransferTxSerializer.toBytes(this))
+  final val json: Coeval[JsObject]   = Coeval.evalOnce(TransferTxSerializer.toJson(this))
+}
 
-  val bodyBytes: Coeval[TxByteArray] = Coeval.evalOnce(TransferTransaction.serializer.bodyBytes(this))
-  val bytes: Coeval[TxByteArray]     = Coeval.evalOnce(TransferTransaction.serializer.toBytes(this))
-  final val json: Coeval[JsObject]   = Coeval.evalOnce(TransferTransaction.serializer.toJson(this))
-
-  override def checkedAssets: Seq[IssuedAsset] = assetId match {
-    case a: IssuedAsset => Seq(a)
-    case Waves          => Nil
-  }
-
-  override def builder: TransactionParser = TransferTransaction
+trait TransferTransactionLike extends TransactionBase with Authorized {
+  val sender: PublicKey
+  val recipient: AddressOrAlias
+  val assetId: Asset
+  val amount: TxPositiveAmount
+  val attachment: ByteStr
 }
 
 object TransferTransaction extends TransactionParser {
@@ -61,48 +65,53 @@ object TransferTransaction extends TransactionParser {
   implicit def sign(tx: TransferTransaction, privateKey: PrivateKey): TransferTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
-  val serializer = TransferTxSerializer
-
-  override def parseBytes(bytes: TxByteArray): Try[TransferTransaction] = serializer.parseBytes(bytes)
+  override def parseBytes(bytes: TxByteArray): Try[TransferTransaction] = TransferTxSerializer.parseBytes(bytes)
 
   def create(
       version: TxVersion,
       sender: PublicKey,
       recipient: AddressOrAlias,
       asset: Asset,
-      amount: TxAmount,
+      amount: Long,
       feeAsset: Asset,
-      fee: TxAmount,
+      fee: Long,
       attachment: ByteStr,
       timestamp: TxTimestamp,
-      proofs: Proofs
+      proofs: Proofs,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, TransferTransaction] =
-    TransferTransaction(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, proofs, recipient.chainId).validatedEither
+    for {
+      amount <- TxPositiveAmount(amount)(TxValidationError.NonPositiveAmount(amount, asset.maybeBase58Repr.getOrElse("waves")))
+      fee    <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
+      tx     <- TransferTransaction(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, proofs, chainId).validatedEither
+    } yield tx
 
   def signed(
       version: TxVersion,
       sender: PublicKey,
       recipient: AddressOrAlias,
       asset: Asset,
-      amount: TxAmount,
+      amount: Long,
       feeAsset: Asset,
-      fee: TxAmount,
+      fee: Long,
       attachment: ByteStr,
       timestamp: TxTimestamp,
-      signer: PrivateKey
+      signer: PrivateKey,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, TransferTransaction] =
-    create(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, Proofs.empty).map(_.signWith(signer))
+    create(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, Proofs.empty, chainId).map(_.signWith(signer))
 
   def selfSigned(
       version: TxVersion,
       sender: KeyPair,
       recipient: AddressOrAlias,
       asset: Asset,
-      amount: TxAmount,
+      amount: Long,
       feeAsset: Asset,
-      fee: TxAmount,
+      fee: Long,
       attachment: ByteStr,
-      timestamp: TxTimestamp
+      timestamp: TxTimestamp,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, TransferTransaction] =
-    signed(version, sender.publicKey, recipient, asset, amount, feeAsset, fee, attachment, timestamp, sender.privateKey)
+    signed(version, sender.publicKey, recipient, asset, amount, feeAsset, fee, attachment, timestamp, sender.privateKey, chainId)
 }

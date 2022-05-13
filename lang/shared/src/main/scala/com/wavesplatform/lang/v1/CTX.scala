@@ -6,13 +6,14 @@ import com.wavesplatform.lang.v1.compiler.CompilerContext.{FunctionInfo, Variabl
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
-import com.wavesplatform.lang.v1.evaluator.ctx._
+import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, EvaluationContext, LazyVal}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal}
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 
 import scala.annotation.meta.field
-import scala.scalajs.js.annotation._
+import scala.scalajs.js.annotation.*
 
 @JSExportTopLevel("CTX")
 case class CTX[C[_[_]]](
@@ -46,7 +47,8 @@ case class CTX[C[_[_]]](
   lazy val compilerContext: CompilerContext = CompilerContext(
     typeDefs,
     vars.view.mapValues(v => VariableInfo(AnyPos, v._1)).toMap,
-    functions.groupBy(_.name).map { case (k, v) => k -> FunctionInfo(AnyPos, v.map(_.signature).toList) }
+    functions.groupBy(_.name).map { case (k, v) => k -> FunctionInfo(AnyPos, v.map(_.signature).toList) },
+    provideRuntimeTypeOnCastError = functions.exists(_ == PureContext._getType)
   )
 
   val opsNames = BinaryOperation.opsByPriority

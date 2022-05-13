@@ -6,7 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.transfer._
 import org.scalacheck.Gen
@@ -57,8 +57,8 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest extends Prop
         domain.blockchainUpdater.processMicroBlock(micros.head) should beRight
         domain.blockchainUpdater.processBlock(emptyBlock) should beRight
 
-        domain.balance(miner.toAddress) shouldBe payment.fee
-        domain.balance(genesis.recipient) shouldBe (genesis.amount - payment.fee)
+        domain.balance(miner.toAddress) shouldBe payment.fee.value
+        domain.balance(genesis.recipient) shouldBe (genesis.amount.value - payment.fee.value)
     }
   }
 

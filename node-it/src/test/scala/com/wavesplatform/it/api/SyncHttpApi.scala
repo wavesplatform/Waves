@@ -1,7 +1,6 @@
 package com.wavesplatform.it.api
 
 import java.net.InetSocketAddress
-
 import akka.http.scaladsl.model.StatusCodes.BadRequest
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
@@ -12,26 +11,27 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus}
 import com.wavesplatform.it.Node
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.*
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
+import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, TxVersion}
+import com.wavesplatform.transaction.{Asset, TxExchangeAmount, TxExchangePrice, TxVersion}
 import io.grpc.Status.Code
 import org.asynchttpclient.Response
 import org.scalactic.source.Position
 import org.scalatest.{Assertion, Assertions, matchers}
+import play.api.libs.json.*
 import play.api.libs.json.Json.parse
-import play.api.libs.json._
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.concurrent.{Await, Awaitable, Future}
-import scala.util._
+import scala.util.*
 import scala.util.control.NonFatal
 
 object SyncHttpApi extends Assertions with matchers.should.Matchers {
@@ -42,9 +42,9 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
   case class GenericApiError(id: Int, message: String, statusCode: Int, json: JsObject)
 
   object GenericApiError {
-    import play.api.libs.functional.syntax._
-    import play.api.libs.json.Reads._
-    import play.api.libs.json._
+    import play.api.libs.functional.syntax.*
+    import play.api.libs.json.*
+    import play.api.libs.json.Reads.*
 
     def apply(id: Int, message: String, code: StatusCode, json: JsObject): GenericApiError =
       new GenericApiError(id, message, code.intValue(), json)
@@ -56,18 +56,24 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     )((id, message, json) => GenericApiError(id, message, StatusCodes.BadRequest.intValue, json))
   }
 
+  /**
+    *
+    * @param id Expected API error code
+    * @param message Expected API error full message or regex template
+    * @param code Expected HTTP status code, 400/Bad Request by default
+    * @param matchMessage When true, uses `message` as regular expression to find it in response. When false, fully tests `message` equality with received error message.
+    */
   case class AssertiveApiError(id: Int, message: String, code: StatusCode = StatusCodes.BadRequest, matchMessage: Boolean = false)
 
   implicit class ApiErrorOps(error: ApiError) {
     def assertive(matchMessage: Boolean = false): AssertiveApiError = AssertiveApiError(error.id, error.message, error.code, matchMessage)
-    def assertiveRegex: AssertiveApiError = assertive(matchMessage = true)
+    def assertiveRegex: AssertiveApiError                           = assertive(matchMessage = true)
   }
 
   def assertBadRequestAndResponse[R](f: => R, errorRegex: String): Assertion = Try(f) match {
     case Failure(ApiCallException(UnexpectedStatusCodeException(_, _, statusCode, responseBody))) =>
       Assertions.assert(
-        statusCode == BadRequest.intValue && responseBody.replace("\n", "").matches(s".*$errorRegex.*"),
-        s"\nexpected '$errorRegex'\nactual '$responseBody'"
+        statusCode == BadRequest.intValue && responseBody.replace("\n", "").matches(s".*$errorRegex.*"), s"\nexpected '$errorRegex'\nactual '$responseBody'"
       )
     case Failure(e) => Assertions.fail(e)
     case _          => Assertions.fail("Expecting bad request")
@@ -112,7 +118,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
   def assertApiError[R](f: => R, expectedError: ApiError): Assertion =
     Try(f) match {
       case Failure(ApiCallException(UnexpectedStatusCodeException(_, _, statusCode, responseBody))) =>
-        import play.api.libs.json._
+        import play.api.libs.json.*
         parse(responseBody).validate[JsObject] match {
           case JsSuccess(json, _) => (json - "trace") shouldBe expectedError.json
           case JsError(_)         => Assertions.fail(s"Expecting error: ${expectedError.json}, but handle $responseBody")
@@ -143,7 +149,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
   //noinspection ScalaStyle
   implicit class NodeExtSync(n: Node) extends Assertions with matchers.should.Matchers {
-    import com.wavesplatform.it.api.AsyncHttpApi.{NodeAsyncHttpApi => async}
+    import com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi as async
 
     private def maybeWaitForTransaction(tx: Transaction, wait: Boolean): Transaction = {
       if (wait) waitForTransaction(tx.id)
@@ -187,7 +193,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def blockHeaderForId(id: String, amountsAsStrings: Boolean = false): BlockHeader = sync(async(n).blockHeaderForId(id, amountsAsStrings))
 
     def postForm(path: String, params: (String, String)*): Response =
-      sync(async(n).postForm(path, params: _*))
+      sync(async(n).postForm(path, params*))
 
     def postJson[A: Writes](path: String, body: A): Response =
       sync(async(n).postJson(path, body))
@@ -253,9 +259,6 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def assetDistribution(asset: String): AssetDistribution =
       sync(async(n).assetDistribution(asset))
-
-    def debugPortfoliosFor(address: String, considerUnspent: Boolean, amountsAsStrings: Boolean = false): Portfolio =
-      sync(async(n).debugPortfoliosFor(address, considerUnspent, amountsAsStrings))
 
     def broadcastIssue(
         source: KeyPair,
@@ -402,8 +405,8 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
         matcher: KeyPair,
         order1: Order,
         order2: Order,
-        amount: Long,
-        price: Long,
+        amount: TxExchangeAmount,
+        price: TxExchangePrice,
         buyMatcherFee: Long,
         sellMatcherFee: Long,
         fee: Long,
@@ -498,7 +501,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def putData(
         sender: KeyPair,
-        data: List[DataEntry[_]],
+        data: List[DataEntry[?]],
         fee: Long,
         waitForTx: Boolean = false,
         version: TxVersion = 1.toByte,
@@ -508,7 +511,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
     def broadcastData(
         sender: KeyPair,
-        data: List[DataEntry[_]],
+        data: List[DataEntry[?]],
         fee: Long,
         version: TxVersion = TxVersion.V2,
         timestamp: Option[Long] = None,
@@ -519,27 +522,27 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def removeData(sender: KeyPair, data: Seq[String], fee: Long, version: Byte = 2): Transaction =
       sync(async(n).removeData(sender, data, fee, version))
 
-    def getData(sourceAddress: String, amountsAsStrings: Boolean = false): List[DataEntry[_]] =
+    def getData(sourceAddress: String, amountsAsStrings: Boolean = false): List[DataEntry[?]] =
       sync(async(n).getData(sourceAddress, amountsAsStrings))
 
-    def getData(sourceAddress: String, regexp: String): List[DataEntry[_]] =
+    def getData(sourceAddress: String, regexp: String): List[DataEntry[?]] =
       sync(async(n).getData(sourceAddress, regexp))
 
-    def getDataByKey(sourceAddress: String, key: String): DataEntry[_] =
+    def getDataByKey(sourceAddress: String, key: String): DataEntry[?] =
       sync(async(n).getDataByKey(sourceAddress, key))
 
-    def getDataList(sourceAddress: String, keys: String*): Seq[DataEntry[_]] =
-      sync(async(n).getDataList(sourceAddress, keys: _*))
+    def getDataList(sourceAddress: String, keys: String*): Seq[DataEntry[?]] =
+      sync(async(n).getDataList(sourceAddress, keys*))
 
-    def getDataListJson(sourceAddress: String, keys: String*): Seq[DataEntry[_]] =
-      sync(async(n).getDataListJson(sourceAddress, keys: _*))
+    def getDataListJson(sourceAddress: String, keys: String*): Seq[DataEntry[?]] =
+      sync(async(n).getDataListJson(sourceAddress, keys*))
 
-    def getDataListPost(sourceAddress: String, keys: String*): Seq[DataEntry[_]] =
-      sync(async(n).getDataListPost(sourceAddress, keys: _*))
+    def getDataListPost(sourceAddress: String, keys: String*): Seq[DataEntry[?]] =
+      sync(async(n).getDataListPost(sourceAddress, keys*))
 
-    def getMerkleProof(ids: String*): Seq[MerkleProofResponse] = sync(async(n).getMerkleProof(ids: _*))
+    def getMerkleProof(ids: String*): Seq[MerkleProofResponse] = sync(async(n).getMerkleProof(ids*))
 
-    def getMerkleProofPost(ids: String*): Seq[MerkleProofResponse] = sync(async(n).getMerkleProofPost(ids: _*))
+    def getMerkleProofPost(ids: String*): Seq[MerkleProofResponse] = sync(async(n).getMerkleProofPost(ids*))
 
     def broadcastRequest[A: Writes](req: A): Transaction =
       sync(async(n).broadcastRequest(req))
@@ -626,9 +629,6 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def blockHeadersSeq(fromHeight: Int, toHeight: Int, amountsAsStrings: Boolean = false): Seq[BlockHeader] =
       sync(async(n).blockHeadersSeq(fromHeight, toHeight, amountsAsStrings))
 
-    def generatingBalance(address: String, amountsAsStrings: Boolean = false): GeneratingBalance =
-      sync(async(n).generatingBalance(address, amountsAsStrings))
-
     def rollback(to: Int, returnToUTX: Boolean = true): Unit =
       sync(async(n).rollback(to, returnToUTX))
 
@@ -697,6 +697,18 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
       }
     }
 
+    def invokeExpression(
+        caller: KeyPair,
+        expression: ExprScript,
+        fee: Long = invokeExpressionFee,
+        feeAssetId: Option[String] = None,
+        version: TxVersion = TxVersion.V1,
+        waitForTx: Boolean = false
+    ): (Transaction, JsValue) =
+      sync(async(n).invokeExpression(caller, expression, fee, feeAssetId, version)) match {
+        case (tx, js) => maybeWaitForTransaction(tx, waitForTx) -> js
+      }
+
     def validateInvokeScript(
         caller: KeyPair,
         dappAddress: String,
@@ -736,7 +748,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
 
-    import com.wavesplatform.it.api.AsyncHttpApi.{NodesAsyncHttpApi => async}
+    import com.wavesplatform.it.api.AsyncHttpApi.NodesAsyncHttpApi as async
 
     private val TxInBlockchainAwaitTime = 8 * nodes.head.blockDelay
     private val ConditionAwaitTime      = 5.minutes

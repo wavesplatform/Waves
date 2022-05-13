@@ -3,28 +3,30 @@ package com.wavesplatform.database
 import java.util
 
 import cats.data.Ior
-import cats.syntax.monoid._
-import cats.syntax.option._
-import com.google.common.cache._
+import cats.syntax.monoid.*
+import cats.syntax.option.*
+import com.google.common.cache.*
+import com.google.common.collect.ArrayListMultimap
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.settings.DBSettings
-import com.wavesplatform.state._
-import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.state.*
 import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.ObservedLoadingCache
 import monix.reactive.Observer
 
-import scala.jdk.CollectionConverters._
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
+import scala.jdk.CollectionConverters.*
 import scala.reflect.ClassTag
 
 abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) extends Blockchain with Storage {
-  import Caches._
+  import Caches.*
 
   val dbSettings: DBSettings
 
@@ -54,7 +56,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     case _                                                 => loadHeightOf(blockId)
   }
 
-  private val blocksTs                               = new util.TreeMap[Int, Long] // Height -> block timestamp, assume sorted by key.
+  private val blocksTs                               = new util.TreeMap[Int, Long]      // Height -> block timestamp, assume sorted by key.
   private var oldestStoredBlockTimestamp             = Long.MaxValue
   private val transactionIds                         = new util.HashMap[ByteStr, Int]() // TransactionId -> height
   protected def forgetTransaction(id: ByteStr): Unit = transactionIds.remove(id)
@@ -128,15 +130,22 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   protected def addressIdWithFallback(address: Address, newAddresses: Map[Address, AddressId]): AddressId =
     newAddresses.getOrElse(address, addressIdCache.get(address).get)
 
-  private val accountDataCache: LoadingCache[(Address, String), Option[DataEntry[_]]] = cache(dbSettings.maxCacheSize, {
-    case (k, v) => loadAccountData(k, v)
-  })
+  private val accountDataCache: LoadingCache[(Address, String), Option[DataEntry[?]]] = cache(
+    dbSettings.maxCacheSize,
+    { case (k, v) =>
+      loadAccountData(k, v)
+    }
+  )
 
-  override def accountData(acc: Address, key: String): Option[DataEntry[_]] = accountDataCache.get((acc, key))
+  override def accountData(acc: Address, key: String): Option[DataEntry[?]] = accountDataCache.get((acc, key))
   protected def discardAccountData(addressWithKey: (Address, String)): Unit = accountDataCache.invalidate(addressWithKey)
-  protected def loadAccountData(acc: Address, key: String): Option[DataEntry[_]]
+  protected def loadAccountData(acc: Address, key: String): Option[DataEntry[?]]
 
   private[database] def addressId(address: Address): Option[AddressId] = addressIdCache.get(address)
+
+  protected val aliasCache: LoadingCache[Alias, Option[Address]] = cache(dbSettings.maxCacheSize, loadAlias)
+  protected def loadAlias(alias: Alias): Option[Address]
+  protected def discardAlias(alias: Alias): Unit = aliasCache.invalidate(alias)
 
   @volatile
   protected var approvedFeaturesCache: Map[Short, Int] = loadApprovedFeatures()
@@ -148,14 +157,14 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   protected def loadActivatedFeatures(): Map[Short, Int]
   override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
 
-  //noinspection ScalaStyle
+  // noinspection ScalaStyle
   protected def doAppend(
       block: Block,
       carry: Long,
       newAddresses: Map[Address, AddressId],
       balances: Map[AddressId, Map[Asset, Long]],
       leaseBalances: Map[AddressId, LeaseBalance],
-      addressTransactions: Map[AddressId, Seq[TransactionId]],
+      addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       leaseStates: Map[ByteStr, LeaseDetails],
       issuedAssets: Map[IssuedAsset, NewAssetInfo],
       reissuedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
@@ -169,8 +178,9 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       reward: Option[Long],
       hitSource: ByteStr,
       scriptResults: Map[ByteStr, InvokeScriptResult],
-      failedTransactionIds: Set[ByteStr],
-      stateHash: StateHashBuilder.Result
+      transactionMeta: Seq[(TxMeta, Transaction)],
+      stateHash: StateHashBuilder.Result,
+      ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta]
   ): Unit
 
   override def append(diff: Diff, carryFee: Long, totalFee: Long, reward: Option[Long], hitSource: ByteStr, block: Block): Unit = {
@@ -180,11 +190,9 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
     val newAddresses = Set.newBuilder[Address]
     newAddresses ++= diff.portfolios.keys.filter(addressIdCache.get(_).isEmpty)
-    for (NewTransactionInfo(_, addresses, _) <- diff.transactions.values; address <- addresses if addressIdCache.get(address).isEmpty) {
+    for (NewTransactionInfo(_, addresses, _, _) <- diff.transactions.values; address <- addresses if addressIdCache.get(address).isEmpty) {
       newAddresses += address
     }
-
-    val failedTransactionIds: Set[ByteStr] = diff.transactions.collect { case (id, NewTransactionInfo(_, _, false)) => id }.toSet
 
     val newAddressIds = (for {
       (address, offset) <- newAddresses.result().zipWithIndex
@@ -200,29 +208,15 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       (orderId, fillInfo) <- diff.orderFills
     } yield orderId -> volumeAndFeeCache.get(orderId).combine(fillInfo)
 
-    val transactionList = diff.transactions.toList
-
-    transactionList.foreach {
-      case (_, NewTransactionInfo(tx, _, _)) =>
-        transactionIds.put(tx.id(), newHeight)
+    val transactionMeta     = Seq.newBuilder[(TxMeta, Transaction)]
+    val addressTransactions = ArrayListMultimap.create[AddressId, TransactionId]()
+    for (((id, nti), _) <- diff.transactions.zipWithIndex) {
+      transactionIds.put(id, newHeight)
+      transactionMeta += (TxMeta(Height(newHeight), nti.applied, nti.spentComplexity) -> nti.transaction)
+      for (addr <- nti.affected) {
+        addressTransactions.put(addressIdWithFallback(addr, newAddressIds), TransactionId(id))
+      }
     }
-
-    val addressTransactions: Map[AddressId, Seq[TransactionId]] =
-      transactionList
-        .flatMap {
-          case (_, NewTransactionInfo(tx, addrs, _)) =>
-            transactionIds.put(tx.id(), newHeight) // be careful here!
-
-            addrs.map { addr =>
-              addressIdWithFallback(addr, newAddressIds) -> TransactionId(tx.id())
-            }
-        }
-        .groupBy(_._1)
-        .view
-        .mapValues(_.map {
-          case (_, txId) => txId
-        })
-        .toMap
 
     current = (newHeight, current._2 + block.blockScore(), Some(block))
 
@@ -234,9 +228,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       case asset: IssuedAsset => stateHash.addAssetBalance(address, asset, balance)
     }
 
-    updatedLeaseBalances foreach {
-      case (address, balance) =>
-        stateHash.addLeaseBalance(address, balance.in, balance.out)
+    updatedLeaseBalances foreach { case (address, balance) =>
+      stateHash.addLeaseBalance(address, balance.in, balance.out)
     }
 
     for {
@@ -244,9 +237,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       entry           <- data.data.values
     } stateHash.addDataEntry(address, entry)
 
-    diff.aliases.foreach {
-      case (alias, address) =>
-        stateHash.addAlias(address, alias.name)
+    diff.aliases.foreach { case (alias, address) =>
+      stateHash.addAlias(address, alias.name)
     }
 
     for {
@@ -259,17 +251,18 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       script = sv.map(_.script)
     } stateHash.addAssetScript(address, script)
 
-    diff.leaseState.foreach {
-      case (leaseId, details) =>
-        stateHash.addLeaseStatus(TransactionId @@ leaseId, details.isActive)
+    diff.leaseState.foreach { case (leaseId, details) =>
+      stateHash.addLeaseStatus(TransactionId @@ leaseId, details.isActive)
     }
 
-    diff.sponsorship.foreach {
-      case (asset, sponsorship) =>
-        stateHash.addSponsorship(asset, sponsorship match {
+    diff.sponsorship.foreach { case (asset, sponsorship) =>
+      stateHash.addSponsorship(
+        asset,
+        sponsorship match {
           case SponsorshipValue(minFee) => minFee
           case SponsorshipNoInfo        => 0L
-        })
+        }
+      )
     }
 
     doAppend(
@@ -278,7 +271,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       newAddressIds,
       updatedBalances.map { case (a, v) => addressIdWithFallback(a, newAddressIds) -> v },
       leaseBalances,
-      addressTransactions,
+      addressTransactions.asMap(),
       diff.leaseState,
       diff.issuedAssets,
       diff.updatedAssets,
@@ -292,32 +285,33 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       reward,
       hitSource,
       diff.scriptResults,
-      failedTransactionIds,
-      stateHash.result()
+      transactionMeta.result(),
+      stateHash.result(),
+      diff.ethereumTransactionMeta
     )
 
-    val emptyData = Map.empty[(Address, String), Option[DataEntry[_]]]
+    val emptyData = Map.empty[(Address, String), Option[DataEntry[?]]]
 
     val newData =
-      diff.accountData.foldLeft(emptyData) {
-        case (data, (a, d)) =>
-          val updData = data ++ d.data.map {
-            case (k, v) =>
-              (a, k) -> v.some
-          }
+      diff.accountData.foldLeft(emptyData) { case (data, (a, d)) =>
+        val updData = data ++ d.data.map { case (k, v) =>
+          (a, k) -> v.some
+        }
 
-          updData
+        updData
       }
 
     val assetsToInvalidate =
       diff.issuedAssets.keySet ++
         diff.updatedAssets.keySet ++
-        diff.sponsorship.keySet
+        diff.sponsorship.keySet ++
+        diff.assetScripts.keySet
 
     for ((address, id)           <- newAddressIds) addressIdCache.put(address, Some(id))
     for ((orderId, volumeAndFee) <- newFills) volumeAndFeeCache.put(orderId, volumeAndFee)
     for ((address, assetMap)     <- updatedBalances; (asset, balance) <- assetMap) balancesCache.put((address, asset), balance)
     for (id                      <- assetsToInvalidate) assetDescriptionCache.invalidate(id)
+    for ((alias, address)        <- diff.aliases) aliasCache.put(alias, Some(address))
     leaseBalanceCache.putAll(updatedLeaseBalances.asJava)
     scriptCache.putAll(diff.scripts.asJava)
     assetScriptCache.putAll(diff.assetScripts.asJava)

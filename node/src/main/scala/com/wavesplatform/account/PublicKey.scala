@@ -6,6 +6,7 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto._
 import com.wavesplatform.transaction.TxValidationError.InvalidAddress
 import com.wavesplatform.utils.base58Length
+import org.web3j.crypto.Keys
 import play.api.libs.json.{Format, Writes}
 import supertagged._
 import supertagged.postfix._
@@ -15,8 +16,10 @@ object PublicKey extends TaggedType[ByteStr] {
 
   val KeyStringLength: Int = base58Length(KeyLength)
 
+  def isValidSize(length: Int): Boolean = length == KeyLength || length == EthereumKeyLength
+
   def apply(publicKey: ByteStr): PublicKey = {
-    require(publicKey.arr.length == KeyLength, s"invalid public key length: ${publicKey.arr.length}")
+    require(isValidSize(publicKey.size), s"invalid public key length: ${publicKey.arr.length}")
     interner.intern(publicKey @@ this)
   }
 
@@ -33,8 +36,12 @@ object PublicKey extends TaggedType[ByteStr] {
     Some(apply(arg))
 
   implicit class PublicKeyImplicitOps(private val pk: PublicKey) extends AnyVal {
-    def toAddress: Address                = Address.fromPublicKey(pk)
-    def toAddress(chainId: Byte): Address = Address.fromPublicKey(pk, chainId)
+    def toAddress: Address = toAddress(AddressScheme.current.chainId)
+    def toAddress(chainId: Byte): Address = pk.size match {
+      case KeyLength         => Address.fromPublicKey(pk, chainId)
+      case EthereumKeyLength => Address(Keys.getAddress(pk.arr), chainId)
+      case other             => throw new IllegalArgumentException(s"Unexpected public key length: $other")
+    }
   }
 
   implicit lazy val jsonFormat: Format[PublicKey] = Format[PublicKey](

@@ -1,15 +1,15 @@
 package com.wavesplatform.it.sync.transactions
 
-import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressScheme, KeyPair}
-import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidName, NonPositiveAmount, TooBigArrayAllocation}
+import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidDecimals, InvalidName, NonPositiveAmount}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.IssueTransactionInfo
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.{Proofs, TxVersion}
+import com.wavesplatform.transaction.TxVersion
 import org.scalatest.prop.TableDrivenPropertyChecks
 import play.api.libs.json.{JsNull, JsString, JsValue, Json}
 
@@ -115,20 +115,20 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     test(s"Try to put incorrect script=$script") {
       for (v <- issueTxSupportedVersions) {
         val json = {
-          val tx = IssueTransaction(
-            TxVersion.V1,
-            firstKeyPair.publicKey,
-            ByteString.copyFromUtf8("123"),
-            ByteString.EMPTY,
-            1,
-            2,
-            false,
-            None,
-            issueFee,
-            System.currentTimeMillis(),
-            Proofs.empty,
-            AddressScheme.current.chainId
-          )
+          val tx = IssueTransaction
+            .selfSigned(
+              TxVersion.V1,
+              firstKeyPair,
+              "1234",
+              "",
+              1,
+              2,
+              false,
+              None,
+              issueFee,
+              System.currentTimeMillis()
+            )
+            .explicitGet()
           tx.json() ++ Json.obj("script" -> script)
         }
 
@@ -144,9 +144,9 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     Table(
       ("assetVal", "decimals", "message"),
       (0L, 2, NonPositiveAmount("0 of assets").assertive(true)),
-      (1L, 9, TooBigArrayAllocation.assertive()),
+      (1L, 9, InvalidDecimals("9").assertive()),
       (-1L, 1, NonPositiveAmount("-1 of assets").assertive(true)),
-      (1L, -1, TooBigArrayAllocation.assertive())
+      (1L, -1, InvalidDecimals("-1").assertive())
     )
 
   forAll(invalidAssetValue) { (assetVal: Long, decimals: Int, message: AssertiveApiError) =>

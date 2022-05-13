@@ -63,7 +63,7 @@ private[jna] class LevelDBJNADB(levelDB: LevelDB) extends DB {
 
   override def getApproximateSizes(ranges: org.iq80.leveldb.Range*): Array[Long] = {
     val jnaRanges = ranges.map(r => new com.protonail.leveldb.jna.Range(r.start(), r.limit()))
-    levelDB.approximateSizes(jnaRanges: _*)
+    levelDB.approximateSizes(jnaRanges*)
   }
 
   override def getProperty(name: String): String =
@@ -117,10 +117,10 @@ private object LevelDBJNADB {
       false
 
     override def prev(): DBEntry =
-      ???
+      throw new NotImplementedError("prev() is not implemented")
 
     override def peekPrev(): DBEntry =
-      ???
+      throw new NotImplementedError("peekPrev() is not implemented")
 
     override def seekToLast(): Unit =
       iterator.seekToLast()
@@ -136,7 +136,7 @@ private object LevelDBJNADB {
         new DBEntry {
           override def getKey: Array[Byte]                       = pair.getKey
           override def getValue: Array[Byte]                     = pair.getValue
-          override def setValue(value: Array[Byte]): Array[Byte] = ???
+          override def setValue(value: Array[Byte]): Array[Byte] = throw new NotImplementedError("setValue(Array[Byte]) is not implemented")
         }
       } else {
         this.endOfData()

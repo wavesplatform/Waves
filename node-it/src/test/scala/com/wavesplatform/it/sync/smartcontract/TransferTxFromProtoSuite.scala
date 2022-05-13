@@ -48,7 +48,7 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
       |}
       |
       |""".stripMargin
-  private val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV3).explicitGet()._1.bytes().base64
+  private val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64
 
   test("TransferTransaction with Waves from proto bytes") {
     sender.setScript(dApp, Some(script), waitForTx = true)
@@ -78,8 +78,8 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
       waitForTx = true
     )
 
-    sender.getDataByKey(dAppAddress, "amount").value shouldBe transferTx.amount
-    sender.getDataByKey(dAppAddress, "fee").value shouldBe transferTx.fee
+    sender.getDataByKey(dAppAddress, "amount").value shouldBe transferTx.amount.value
+    sender.getDataByKey(dAppAddress, "fee").value shouldBe transferTx.fee.value
     sender.getDataByKey(dAppAddress, "id").value shouldBe transferTx.id().toString
     sender.getDataByKey(dAppAddress, "assetId").value shouldBe "WAVES"
     sender.getDataByKey(dAppAddress, "feeAssetId").value shouldBe "WAVES"

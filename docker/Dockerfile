@@ -1,4 +1,4 @@
-FROM debian:stable-slim
+FROM debian:buster-slim
 ARG WAVES_LOG_LEVEL="INFO"
 ARG WAVES_HEAP_SIZE="2g"
 ARG WAVES_NETWORK="mainnet"

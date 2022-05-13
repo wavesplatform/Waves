@@ -4,10 +4,10 @@ import com.google.common.primitives.{Bytes, Longs, Shorts}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.traits.domain.{DataItem, DataOp}
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.state.DataEntry._
+import com.wavesplatform.state.DataEntry.*
 import com.wavesplatform.transaction.TxVersion
-import com.wavesplatform.utils._
-import play.api.libs.json._
+import com.wavesplatform.utils.*
+import play.api.libs.json.*
 
 sealed abstract class DataEntry[T](val `type`: String, val key: String, val value: T) {
   def valueBytes: Array[Byte]

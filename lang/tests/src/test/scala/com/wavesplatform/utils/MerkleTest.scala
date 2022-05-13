@@ -1,22 +1,21 @@
 package com.wavesplatform.utils
 
 import cats.Id
-import cats.syntax.monoid._
+import cats.implicits.*
 import com.google.common.primitives.Ints
-import com.wavesplatform.common.merkle.Merkle._
-import com.wavesplatform.common.merkle._
+import com.wavesplatform.common.merkle.*
+import com.wavesplatform.common.merkle.Merkle.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base64
-import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.lang.Common
+import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values.*
+import com.wavesplatform.lang.utils.lazyContexts
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
-import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import org.scalacheck.{Arbitrary, Gen}
 
 import scala.annotation.tailrec
@@ -55,11 +54,10 @@ class MerkleTest extends PropSpec {
     val leaves = testData()
     val tree   = mkScryptoLevels(leaves)
 
-    forAll(Gen.oneOf(leaves.zipWithIndex)) {
-      case (leaf, index) =>
-        val proofs = Merkle.mkProofs(index, tree)
-        val bytes  = proofBytes(index, proofs)
-        eval(scriptSrc(tree.head.head, bytes, leaf)) shouldBe Right(CONST_BOOLEAN(true))
+    forAll(Gen.oneOf(leaves.zipWithIndex)) { case (leaf, index) =>
+      val proofs = Merkle.mkProofs(index, tree)
+      val bytes  = proofBytes(index, proofs)
+      eval(scriptSrc(tree.head.head, bytes, leaf)) shouldBe Right(CONST_BOOLEAN(true))
     }
   }
 
@@ -83,9 +81,8 @@ class MerkleTest extends PropSpec {
 
     val tree2 = mkScryptoLevels(testData())
 
-    forAll(Gen.oneOf(leaves.zipWithIndex)) {
-      case (leaf, index) =>
-        eval(scriptSrc(tree2.head.head, proofBytes(index, Merkle.mkProofs(index, tree1)), leaf)) shouldBe Right(CONST_BOOLEAN(false))
+    forAll(Gen.oneOf(leaves.zipWithIndex)) { case (leaf, index) =>
+      eval(scriptSrc(tree2.head.head, proofBytes(index, Merkle.mkProofs(index, tree1)), leaf)) shouldBe Right(CONST_BOOLEAN(false))
     }
   }
 
@@ -102,19 +99,17 @@ class MerkleTest extends PropSpec {
     val leaves = testData()
     val tree   = mkScryptoLevels(leaves)
 
-    forAll(Gen.oneOf(leaves.zipWithIndex), Gen.containerOf[Array, Byte](Arbitrary.arbitrary[Byte])) {
-      case ((leaf, index), bytes) =>
-        eval(scriptSrc(bytes, proofBytes(index, Merkle.mkProofs(index, tree)), leaf)) shouldBe Right(CONST_BOOLEAN(false))
+    forAll(Gen.oneOf(leaves.zipWithIndex), Gen.containerOf[Array, Byte](Arbitrary.arbitrary[Byte])) { case ((leaf, index), bytes) =>
+      eval(scriptSrc(bytes, proofBytes(index, Merkle.mkProofs(index, tree)), leaf)) shouldBe Right(CONST_BOOLEAN(false))
     }
   }
 
-  private val evaluator = new EvaluatorV1[Id, NoContext]()
-
-  private def eval[T <: EVALUATED](code: String, version: StdLibVersion = V3): Either[String, T] = {
+  private def eval(code: String, version: StdLibVersion = V3): Either[String, EVALUATED] = {
     val untyped = Parser.parseExpr(code).get.value
-    val ctx     = PureContext.build(version, fixUnicodeFunctions = true) |+| CryptoContext.build(Global, version)
+    val ctx     = lazyContexts(DirectiveSet(version, Account, Expression).explicitGet() -> true)()
+    val evalCtx = ctx.evaluationContext[Id](Common.emptyBlockchainEnvironment())
     val typed   = ExpressionCompiler(ctx.compilerContext, untyped)
-    typed.flatMap(v => evaluator.apply[T](ctx.evaluationContext, v._1))
+    typed.flatMap(v => EvaluatorV2.applyCompleted(evalCtx, v._1, version, true, true)._3.leftMap(_.toString))
   }
 
   private def scriptSrc(root: Array[Byte], proof: Array[Byte], value: Array[Byte]): String = {
@@ -140,19 +135,18 @@ class MerkleTest extends PropSpec {
     val leaves = testData()
     val levels = Merkle.mkLevels(leaves)
 
-    forAll(Gen.oneOf(leaves.zipWithIndex)) {
-      case (leaf, index) =>
-        val proofs = mkProofs(index, levels).reverse
+    forAll(Gen.oneOf(leaves.zipWithIndex)) { case (leaf, index) =>
+      val proofs = mkProofs(index, levels).reverse
 
-        eval(scriptCreateRootSrc(proofs, hash(leaf), index), V4) shouldBe CONST_BYTESTR(ByteStr(levels.head.head))
-        eval(scriptCreateRootSrc(proofs, hash(leaf), index + (1 << proofs.length)), V4) should produce("out of range allowed by proof list length")
+      eval(scriptCreateRootSrc(proofs, hash(leaf), index), V4) shouldBe CONST_BYTESTR(ByteStr(levels.head.head))
+      eval(scriptCreateRootSrc(proofs, hash(leaf), index + (1 << proofs.length)), V4) should produce("out of range allowed by proof list length")
     }
   }
 
   private def proofBytes(index: Int, proofs: Seq[Array[Byte]]): Array[Byte] =
     proofs.reverse
-      .foldLeft(index -> Array.emptyByteArray) {
-        case ((index, buf), proof) => (index / 2, buf ++ Array(((index + 0) % 2).toByte, proof.length.toByte) ++ proof)
+      .foldLeft(index -> Array.emptyByteArray) { case ((index, buf), proof) =>
+        (index / 2, buf ++ Array(((index + 0) % 2).toByte, proof.length.toByte) ++ proof)
       }
       ._2
 }

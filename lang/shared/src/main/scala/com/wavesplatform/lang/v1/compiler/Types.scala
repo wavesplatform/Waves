@@ -1,7 +1,9 @@
 package com.wavesplatform.lang.v1.compiler
 
-import cats.syntax.traverse._
-import cats.instances.list._
+import cats.syntax.traverse.*
+import cats.instances.list.*
+
+import scala.annotation.tailrec
 
 object Types {
 
@@ -20,8 +22,8 @@ object Types {
 
   case class TYPEPARAM(char: Byte)               extends PARAMETERIZED with SINGLE { override def toString: String = char.toChar.toString }
   case class PARAMETERIZEDLIST(t: TYPE)          extends PARAMETERIZED with SINGLE { override def toString: String = s"List[$t]" }
+  case class PARAMETERIZEDTUPLE(t: List[TYPE])   extends PARAMETERIZED with SINGLE { override def toString: String = t.mkString("(", ", ", ")") }
   case class PARAMETERIZEDUNION(l: List[SINGLE]) extends PARAMETERIZED             { override def toString: String = l.mkString("|")}
-  case class PARAMETERIZEDTUPLE(t: List[TYPE])   extends PARAMETERIZED             { override def toString: String = t.mkString("(", ", ", ")") }
   case object NOTHING                            extends REAL { override val name = "Nothing"; override val typeList = List() }
   case object LONG                               extends REAL { override val name = "Int"; override val typeList = List(this) }
   case object BIGINT                             extends REAL { override val name = "BigInt"; override val typeList = List(this) }
@@ -150,6 +152,19 @@ object Types {
     }
 
     def <=(l2: FINAL): Boolean = l2 >= l1
+
+    def containsUnion: Boolean = {
+      @tailrec
+      def check(tpe: FINAL): Boolean = {
+        tpe match {
+          case Types.UNION(types, _) if types.size > 1 => true
+          case Types.LIST(Types.UNION(types, _)) if types.size > 1 => true
+          case Types.LIST(inner@Types.LIST(_)) => check(inner)
+          case _ => false
+        }
+      }
+      check(l1)
+    }
   }
 
   val UNIT: CASETYPEREF    = CASETYPEREF("Unit", List.empty)

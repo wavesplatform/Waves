@@ -1,13 +1,11 @@
 package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
-
 import com.google.common.primitives.{Bytes, Longs, Shorts}
-import com.wavesplatform.account.{AddressOrAlias, AddressScheme}
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
 import com.wavesplatform.serialization._
-import com.wavesplatform.transaction.TxVersion
+import com.wavesplatform.transaction.{TxNonNegativeAmount, TxPositiveAmount, TxVersion}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
 import com.wavesplatform.utils.byteStrFormat
@@ -17,7 +15,7 @@ import scala.util.Try
 
 object MassTransferTxSerializer {
   def transfersJson(transfers: Seq[ParsedTransfer]): JsValue =
-    Json.toJson(transfers.map { case ParsedTransfer(address, amount) => Transfer(address.stringRepr, amount) })
+    Json.toJson(transfers.map { case ParsedTransfer(address, amount) => Transfer(address.toString, amount.value) })
 
   def toJson(tx: MassTransferTransaction): JsObject = {
     import tx._
@@ -25,7 +23,7 @@ object MassTransferTxSerializer {
       "assetId"       -> assetId.maybeBase58Repr,
       "attachment"    -> attachment,
       "transferCount" -> transfers.size,
-      "totalAmount"   -> transfers.map(_.amount).sum,
+      "totalAmount"   -> transfers.map(_.amount.value).sum,
       "transfers"     -> transfersJson(transfers)
     )
   }
@@ -34,16 +32,16 @@ object MassTransferTxSerializer {
     import tx._
     version match {
       case TxVersion.V1 =>
-        val transferBytes = transfers.map { case ParsedTransfer(recipient, amount) => Bytes.concat(recipient.bytes, Longs.toByteArray(amount)) }
+        val transferBytes = transfers.map { case ParsedTransfer(recipient, amount) => Bytes.concat(recipient.bytes, Longs.toByteArray(amount.value)) }
 
         Bytes.concat(
-          Array(builder.typeId, version),
+          Array(tpe.id.toByte, version),
           sender.arr,
           assetId.byteRepr,
           Shorts.toByteArray(transfers.size.toShort),
-          Bytes.concat(transferBytes: _*),
+          Bytes.concat(transferBytes*),
           Longs.toByteArray(timestamp),
-          Longs.toByteArray(fee),
+          Longs.toByteArray(fee.value),
           Deser.serializeArrayWithLength(attachment.arr)
         )
 
@@ -59,8 +57,8 @@ object MassTransferTxSerializer {
   def parseBytes(bytes: Array[Byte]): Try[MassTransferTransaction] = Try {
     def parseTransfers(buf: ByteBuffer): Seq[MassTransferTransaction.ParsedTransfer] = {
       def readTransfer(buf: ByteBuffer): ParsedTransfer = {
-        val addressOrAlias = AddressOrAlias.fromBytes(buf).explicitGet()
-        val amount         = buf.getLong
+        val addressOrAlias = buf.getAddressOrAlias()
+        val amount         = TxNonNegativeAmount.unsafeFrom(buf.getLong)
         ParsedTransfer(addressOrAlias, amount)
       }
 
@@ -76,7 +74,7 @@ object MassTransferTxSerializer {
     val assetId    = buf.getAsset
     val transfers  = parseTransfers(buf)
     val timestamp  = buf.getLong // Timestamp before fee
-    val fee        = buf.getLong
+    val fee        = TxPositiveAmount.unsafeFrom(buf.getLong)
     val attachment = Deser.parseArrayWithLength(buf)
     val proofs     = buf.getProofs
     MassTransferTransaction(TxVersion.V1, sender, assetId, transfers, fee, timestamp, ByteStr(attachment), proofs, AddressScheme.current.chainId)

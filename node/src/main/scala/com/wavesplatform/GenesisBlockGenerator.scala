@@ -16,13 +16,14 @@ import com.wavesplatform.consensus.PoSCalculator.{generationSignature, hit}
 import com.wavesplatform.crypto._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.settings.{FunctionalitySettings, GenesisSettings, GenesisTransactionSettings}
-import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.{GenesisTransaction, TxNonNegativeAmount}
 import com.wavesplatform.utils._
 import com.wavesplatform.wallet.Wallet
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 
 object GenesisBlockGenerator {
+
   private type SeedText = String
   private type Share    = Long
 
@@ -46,14 +47,7 @@ object GenesisBlockGenerator {
     private val features: Map[Short, Int] =
       preActivatedFeatures.getOrElse(List(BlockchainFeatures.FairPoS.id.toInt, BlockchainFeatures.BlockV5.id.toInt)).map(f => f.toShort -> 0).toMap
 
-    val functionalitySettings: FunctionalitySettings = FunctionalitySettings(
-      Int.MaxValue,
-      Int.MaxValue,
-      preActivatedFeatures = features,
-      doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
-      minBlockTime = minBlockTime.getOrElse(15.seconds),
-      delayDelta = delayDelta.getOrElse(8)
-    )
+    val functionalitySettings: FunctionalitySettings = FunctionalitySettings(Int.MaxValue, Int.MaxValue, preActivatedFeatures = features, doubleFeaturesPeriodsAfterHeight = Int.MaxValue, minBlockTime = minBlockTime.getOrElse(15.seconds), delayDelta = delayDelta.getOrElse(8))
 
     def preActivated(feature: BlockchainFeature): Boolean = features.contains(feature.id)
   }
@@ -202,7 +196,7 @@ object GenesisBlockGenerator {
       def getHit(account: KeyPair): BigInt = {
         val gs = if (settings.preActivated(BlockchainFeatures.BlockV5)) {
           val vrfProof = crypto.signVRF(account.privateKey, hitSource.arr)
-          crypto.verifyVRF(vrfProof, hitSource.arr, account.publicKey).map(_.arr).explicitGet()
+          crypto.verifyVRF(vrfProof, hitSource.arr, account.publicKey, settings.preActivated(BlockchainFeatures.RideV6)).map(_.arr).explicitGet()
         } else generationSignature(hitSource, account.publicKey)
 
         hit(gs)

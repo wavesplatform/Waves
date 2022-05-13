@@ -12,7 +12,7 @@ object RideFullContext {
   def build(ds: DirectiveSet): CTX[Environment] = {
     val wavesCtx  = WavesContext.build(Global,ds)
     val cryptoCtx = CryptoContext.build(Global, ds.stdLibVersion).withEnvironment[Environment]
-    val pureCtx = PureContext.build(ds.stdLibVersion).withEnvironment[Environment]
+    val pureCtx = PureContext.build().withEnvironment[Environment]
     pureCtx |+| cryptoCtx |+| wavesCtx
   }
 }

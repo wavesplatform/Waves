@@ -1,10 +1,10 @@
 package com.wavesplatform.it.transactions
 
-import com.wavesplatform.it._
-import org.scalatest._
+import com.wavesplatform.it.*
+import org.scalatest.*
 
 trait BaseTransactionSuiteLike extends WaitForHeight2 with IntegrationSuiteWithThreeAddresses with BeforeAndAfterAll with NodesFromDocker {
-  this: TestSuite with Nodes =>
+  this: TestSuite & Nodes =>
 
 }
 

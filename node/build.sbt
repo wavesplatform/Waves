@@ -1,8 +1,4 @@
-import CommonSettings.autoImport.network
-import com.typesafe.sbt.SbtNativePackager.Universal
-import sbtassembly.MergeStrategy
-
-name := "waves"
+name       := "waves"
 maintainer := "com.wavesplatform"
 
 enablePlugins(RunApplicationSettings, JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, GitVersioning, VersionObject)
@@ -16,7 +12,7 @@ inConfig(Compile)(
     PB.generate / includeFilter := { (f: File) =>
       (** / "waves" / "*.proto").matches(f.toPath)
     },
-    PB.deleteTargetDirectory := false,
+    PB.deleteTargetDirectory     := false,
     packageDoc / publishArtifact := false,
     packageSrc / publishArtifact := false
   )
@@ -24,7 +20,7 @@ inConfig(Compile)(
 
 inTask(assembly)(
   Seq(
-    test := {},
+    test            := {},
     assemblyJarName := s"waves-all-${version.value}.jar",
     assemblyMergeStrategy := {
       case p
@@ -32,8 +28,15 @@ inTask(assembly)(
             p.endsWith("module-info.class") ||
             p.endsWith("io.netty.versions.properties") =>
         MergeStrategy.discard
-      case "scala-collection-compat.properties" => MergeStrategy.discard
-      case other                                => (assembly / assemblyMergeStrategy).value(other)
+
+      case "scala-collection-compat.properties" =>
+        MergeStrategy.discard
+      case p
+          if Set("scala/util/control/compat", "scala/collection/compat")
+            .exists(p.replace('\\', '/').contains) =>
+        MergeStrategy.last
+
+      case other => (assembly / assemblyMergeStrategy).value(other)
     }
   )
 )
@@ -93,11 +96,11 @@ inConfig(Universal)(
 
 inConfig(Linux)(
   Seq(
-    packageSummary := "Waves node",
+    packageSummary     := "Waves node",
     packageDescription := "Waves node",
-    name := s"${name.value}${network.value.packageSuffix}",
-    normalizedName := name.value,
-    packageName := normalizedName.value
+    name               := s"${name.value}${network.value.packageSuffix}",
+    normalizedName     := name.value,
+    packageName        := normalizedName.value
   )
 )
 
@@ -113,7 +116,7 @@ linuxPackageMappings := linuxPackageMappings.value.map { lpm =>
         dest,
         s"""-J-Dwaves.defaults.blockchain.type=${network.value}
            |-J-Dwaves.defaults.directory=/var/lib/${(Linux / packageName).value}
-           |-J-Dwaves.defaults.config.directory=/var/lib/${(Linux / packageName).value}
+           |-J-Dwaves.defaults.config.directory=/etc/${(Linux / packageName).value}
            |""".stripMargin
       )
       IO.append(dest, IO.readBytes(file))
@@ -133,7 +136,7 @@ linuxPackageSymlinks := linuxPackageSymlinks.value.map { lsl =>
 
 inConfig(Debian)(
   Seq(
-    packageSource := sourceDirectory.value / "package",
+    packageSource            := sourceDirectory.value / "package",
     linuxStartScriptTemplate := (packageSource.value / "systemd.service").toURI.toURL,
     debianPackageDependencies += "java8-runtime-headless",
     maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("postinst", "postrm", "prerm"))

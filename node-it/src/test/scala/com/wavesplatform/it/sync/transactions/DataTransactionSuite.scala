@@ -46,7 +46,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
 
   test("should not put 65-sized proof") {
     val keyPair = sender.createKeyPair()
-    sender.transfer(sender.keyPair, keyPair.toAddress.stringRepr, 1.waves, waitForTx = true)
+    sender.transfer(sender.keyPair, keyPair.toAddress.toString, 1.waves, waitForTx = true)
     sender.setScript(
       keyPair,
       Some(
@@ -312,9 +312,9 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     val keys      = Seq("int", "bool", "int", "blob", "?&$#^123\\/.a:;'\"\r\n\t\u0000|%è&", "str", "inexisted_key", tooBigKey)
     val values    = Seq[Any](-127, false, -127, ByteStr(Array[Byte](127.toByte, 0, 1, 1)), "specïal", "BBBB")
 
-    val list     = sender.getDataList(secondAddress, keys: _*).map(_.value)
-    val jsonList = sender.getDataListJson(secondAddress, keys: _*).map(_.value)
-    val postList = sender.getDataListPost(secondAddress, keys: _*).map(_.value)
+    val list     = sender.getDataList(secondAddress, keys *).map(_.value)
+    val jsonList = sender.getDataListJson(secondAddress, keys *).map(_.value)
+    val postList = sender.getDataListPost(secondAddress, keys *).map(_.value)
 
     list shouldBe values
     jsonList shouldBe list
@@ -434,14 +434,14 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
         "fee"             -> fee,
         "version"         -> version,
         "data"            -> data,
-        "proofs"          -> JsArray(),
+        "proofs"          -> Json.arr(JsString("")),
         "timestamp"       -> System.currentTimeMillis()
       )
     )
 
   test("try to send tx above limits of key, value and entries count") {
     for (v <- dataTxSupportedVersions) {
-      val maxKeySize    = if (v < 2) 100 else 400
+      val maxKeySize    = 400
       val maxValueSize  = Short.MaxValue
       val maxEntryCount = 100
       val TooBig        = "Too big sequence requested"
@@ -458,13 +458,13 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       val extraValueData = List(BinaryDataEntry("key", ByteStr(Array.fill(maxValueSize + 1)(1.toByte))))
       assertBadRequestAndResponse(postDataTxJson(firstKeyPair, extraValueData, 1.waves, version = v), TooBig)
 
-      val largeBinData = List.tabulate(5)(n => BinaryDataEntry(extraKey, ByteStr(Array.fill(maxValueSize)(n.toByte))))
+      val largeBinData = List.tabulate(5)(n => BinaryDataEntry(extraKey + n.toString, ByteStr(Array.fill(maxValueSize)(n.toByte))))
       assertBadRequestAndResponse(postDataTxJson(firstKeyPair, largeBinData, 1.waves, version = v), TooBig)
 
-      val largeStrData = List.tabulate(5)(n => StringDataEntry(extraKey, "A" * maxValueSize))
+      val largeStrData = List.tabulate(5)(n => StringDataEntry(extraKey + n.toString, "A" * maxValueSize))
       assertBadRequestAndResponse(postDataTxJson(firstKeyPair, largeStrData, 1.waves, version = v), TooBig)
 
-      val tooManyEntriesData = List.fill(maxEntryCount + 1)(IntegerDataEntry("key", 88))
+      val tooManyEntriesData = List.tabulate(maxEntryCount + 1)(n => IntegerDataEntry("key" + n.toString, 88))
       assertBadRequestAndResponse(postDataTxJson(firstKeyPair, tooManyEntriesData, 1.waves, version = v), TooBig)
     }
   }

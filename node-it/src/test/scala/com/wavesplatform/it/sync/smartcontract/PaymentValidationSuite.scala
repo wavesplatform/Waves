@@ -14,8 +14,8 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 class PaymentValidationSuite extends BaseTransactionSuite {
 
   test("payment's validation order check") {
-    val dApp = firstKeyPair
-    val caller = secondKeyPair
+    val dApp             = firstKeyPair
+    val caller           = secondKeyPair
     val (wrKey, wrValue) = ("key", "value")
 
     val sourceV4 =
@@ -28,7 +28,7 @@ class PaymentValidationSuite extends BaseTransactionSuite {
          |  [StringEntry("$wrKey", "$wrValue")]
          |}
       """.stripMargin
-    val scriptV4 = ScriptCompiler.compile(sourceV4, ScriptEstimatorV3).explicitGet()._1.bytes().base64
+    val scriptV4 = ScriptCompiler.compile(sourceV4, ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64
     sender.setScript(dApp, Some(scriptV4), setScriptFee, waitForTx = true)
 
     val scr = ScriptCompiler(
@@ -40,16 +40,21 @@ class PaymentValidationSuite extends BaseTransactionSuite {
          |getStringValue(addressFromString("${dApp.toAddress.toString}").value(), "$wrKey") == "$wrValue"
          """.stripMargin,
       isAssetScript = true,
-      ScriptEstimatorV3
+      ScriptEstimatorV3(fixOverflow = true, overhead = false)
     ).explicitGet()._1.bytes().base64
     val smartAssetId = sender.issue(caller, script = Some(scr), fee = issueFee + smartFee, waitForTx = true).id
 
     assertApiError(
-      sender.invokeScript(caller, dApp.toAddress.toString, func = Some("write"),
-        payment = Seq(Payment(1000L, IssuedAsset(ByteStr(Base58.decode(smartAssetId))))), fee = issueFee)) {
-      err =>
-        err.message should include regex "called on unit"
-        err.id shouldBe ScriptExecutionError.Id
+      sender.invokeScript(
+        caller,
+        dApp.toAddress.toString,
+        func = Some("write"),
+        payment = Seq(Payment(1000L, IssuedAsset(ByteStr(Base58.decode(smartAssetId))))),
+        fee = issueFee
+      )
+    ) { err =>
+      err.message should include regex "called on unit"
+      err.id shouldBe ScriptExecutionError.Id
     }
 
   }

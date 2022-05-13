@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit
 
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.database.openDB
 import com.wavesplatform.events.api.grpc.protobuf.BlockchainUpdatesApiGrpc
 import com.wavesplatform.events.settings.BlockchainUpdatesSettings
 import com.wavesplatform.extensions.{Context, Extension}
@@ -16,6 +17,7 @@ import io.grpc.{Metadata, Server, ServerStreamTracer, Status}
 import monix.execution.schedulers.SchedulerService
 import monix.execution.{ExecutionModel, Scheduler, UncaughtExceptionReporter}
 import net.ceedubs.ficus.Ficus._
+
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Try
@@ -30,7 +32,8 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
   )
 
   private[this] val settings = context.settings.config.as[BlockchainUpdatesSettings]("waves.blockchain-updates")
-  private[this] val repo     = new Repo(context.settings.directory + "/blockchain-updates", context.blocksApi)
+  private[this] val db       = openDB(context.settings.directory + "/blockchain-updates")
+  private[this] val repo     = new Repo(db, context.blocksApi)
 
   private[this] val grpcServer: Server = NettyServerBuilder
     .forAddress(new InetSocketAddress("0.0.0.0", settings.grpcPort))
@@ -48,7 +51,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
 
           override def streamClosed(status: Status): Unit =
             log.trace(s"[$callId] gRPC call closed with status: $status")
-        }
+      }
     )
     .addService(BlockchainUpdatesApiGrpc.bindService(repo, scheduler))
     .build()
@@ -73,7 +76,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
     if (lastUpdateId != lastBlockId)
       throw new IllegalStateException(s"Last update ID $lastUpdateId does not match last block ID $lastBlockId at height $nodeHeight")
 
-    log.info(s"BlockchainUpdates startup check successful at height $extensionHeight")
+    log.info(s"BlockchainUpdates startup check successful at height $nodeHeight")
 
     grpcServer.start()
     log.info(s"BlockchainUpdates extension started gRPC API on port ${settings.grpcPort}")

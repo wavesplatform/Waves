@@ -3,8 +3,8 @@ package com.wavesplatform.api.http.requests
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Proofs}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import play.api.libs.json._
 
 case class TransferRequest(
@@ -17,7 +17,7 @@ case class TransferRequest(
     feeAssetId: Option[Asset],
     fee: Long,
     attachment: Option[ByteStr] = None,
-    timestamp: Option[Long]= None,
+    timestamp: Option[Long] = None,
     signature: Option[ByteStr] = None,
     proofs: Option[Proofs] = None
 ) extends TxBroadcastRequest {

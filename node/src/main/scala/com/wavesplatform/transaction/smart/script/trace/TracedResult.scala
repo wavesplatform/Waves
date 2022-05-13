@@ -1,12 +1,11 @@
 package com.wavesplatform.transaction.smart.script.trace
 
-import cats.instances.either._
-import cats.instances.list._
+import cats.instances.either.*
+import cats.instances.list.*
 import cats.kernel.Semigroup
-import cats.syntax.either._
-import cats.syntax.semigroup._
-import cats.syntax.semigroupal._
-import cats.{Applicative, Apply, Functor}
+import cats.syntax.either.*
+import cats.syntax.semigroup.*
+import cats.{Monad, StackSafeMonad}
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.transaction.Transaction
 import play.api.libs.json.{JsObject, Json}
@@ -79,17 +78,9 @@ object TracedResult {
         a.trace |+| b.trace
       )
 
-  implicit def applicativeTracedResult[L]: Applicative[TracedResult[L, *]] with Apply[TracedResult[L, *]] with Functor[TracedResult[L, *]] =
-    new Applicative[TracedResult[L, *]] {
-      def pure[A](v: A) = wrapValue[A, L](v)
-      def ap[A, B](fb: TracedResult[L, A => B])(fa: TracedResult[L, A]): TracedResult[L, B] = {
-        TracedResult(fa.resultE ap fb.resultE, fa.trace ++ fb.trace)
-      }
-      override def product[A, B](fa: TracedResult[L, A], fb: TracedResult[L, B]): TracedResult[L, (A, B)] = {
-        TracedResult(fa.resultE product fb.resultE, fa.trace ++ fb.trace)
-      }
-      override def map[A, B](x: TracedResult[L, A])(f: A => B): TracedResult[L, B] = {
-        TracedResult[L, B](x.resultE map f, x.trace)
-      }
+  implicit def monadTracedResult[L]: Monad[TracedResult[L, *]] =
+    new StackSafeMonad[TracedResult[L, *]] {
+      override def flatMap[A, B](fa: TracedResult[L, A])(f: A => TracedResult[L, B]): TracedResult[L, B] = fa.flatMap(f)
+      override def pure[A](x: A): TracedResult[L, A]                                                     = TracedResult.wrapValue(x)
     }
 }

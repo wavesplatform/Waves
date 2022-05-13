@@ -1,12 +1,13 @@
 package com.wavesplatform.lang.utils
 
+import com.google.protobuf.{CodedInputStream, CodedOutputStream}
+
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
-
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
-import com.wavesplatform.lang.v1.Serde.{FH_NATIVE, FH_USER}
+import com.wavesplatform.lang.v1.serialization.Serde.{FH_NATIVE, FH_USER}
 
 object Serialize {
   implicit class ByteBufferOps(val self: ByteBuffer) extends AnyVal {
@@ -26,6 +27,25 @@ object Serialize {
       case FH_NATIVE => Native(self.getShort)
       case FH_USER   => User(getString)
       case x         => throw new RuntimeException(s"Unknown function header type: $x")
+    }
+  }
+
+  implicit class CodedInputStreamOps(val self: CodedInputStream) extends AnyVal {
+    def getFunctionHeader: FunctionHeader = self.readRawByte() match {
+      case FH_NATIVE => Native(self.readUInt32().toShort)
+      case FH_USER   => User(self.readString())
+      case x         => throw new RuntimeException(s"Unknown function header type: $x")
+    }
+  }
+
+  implicit class CodedOutputStreamOps(val self: CodedOutputStream) extends AnyVal {
+    def writeFunctionHeader(h: FunctionHeader): Unit = h match {
+      case FunctionHeader.Native(id) =>
+        self.writeRawByte(FH_NATIVE)
+        self.writeUInt32NoTag(id)
+      case FunctionHeader.User(internalName, _) =>
+        self.writeRawByte(FH_USER)
+        self.writeStringNoTag(internalName)
     }
   }
 

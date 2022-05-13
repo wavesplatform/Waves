@@ -7,6 +7,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.serialization.impl.MassTransferTxSerializer
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, ParsedTransfer, Transfer}
 import com.wavesplatform.transaction.transfer._
 import play.api.libs.json.Json
@@ -67,7 +68,7 @@ class MassTransferTransactionSpecification extends PropSpec {
                        }
   """)
 
-    val tx = MassTransferTransaction.serializer.parseBytes(bytes).get
+    val tx = MassTransferTxSerializer.parseBytes(bytes).get
     tx.json() shouldBe json
     assert(crypto.verify(tx.signature, tx.bodyBytes(), tx.sender), "signature should be valid")
   }
@@ -84,38 +85,40 @@ class MassTransferTransactionSpecification extends PropSpec {
 
     forAll(massTransferGen) {
       case MassTransferTransaction(_, sender, assetId, transfers, fee, timestamp, attachment, proofs, _) =>
-        val tooManyTransfers   = List.fill(MaxTransferCount + 1)(ParsedTransfer(sender.toAddress, 1L))
-        val tooManyTransfersEi = create(1.toByte, sender, assetId, tooManyTransfers, fee, timestamp, attachment, proofs)
+        val tooManyTransfers   = List.fill(MaxTransferCount + 1)(ParsedTransfer(sender.toAddress, TxNonNegativeAmount.unsafeFrom(1L)))
+        val tooManyTransfersEi = create(1.toByte, sender, assetId, tooManyTransfers, fee.value, timestamp, attachment, proofs)
         tooManyTransfersEi shouldBe Left(GenericError(s"Number of transfers ${tooManyTransfers.length} is greater than $MaxTransferCount"))
 
-        val negativeTransfer   = List(ParsedTransfer(sender.toAddress, -1L))
-        val negativeTransferEi = create(1.toByte, sender, assetId, negativeTransfer, fee, timestamp, attachment, proofs)
-        negativeTransferEi shouldBe Left(GenericError("One of the transfers has negative amount"))
-
         val oneHalf    = Long.MaxValue / 2 + 1
-        val overflow   = List.fill(2)(ParsedTransfer(sender.toAddress, oneHalf))
-        val overflowEi = create(1.toByte, sender, assetId, overflow, fee, timestamp, attachment, proofs)
+        val overflow   = List.fill(2)(ParsedTransfer(sender.toAddress, TxNonNegativeAmount.unsafeFrom(oneHalf)))
+        val overflowEi = create(1.toByte, sender, assetId, overflow, fee.value, timestamp, attachment, proofs)
         overflowEi shouldBe Left(TxValidationError.OverflowError)
 
-        val feeOverflow   = List(ParsedTransfer(sender.toAddress, oneHalf))
+        val feeOverflow   = List(ParsedTransfer(sender.toAddress, TxNonNegativeAmount.unsafeFrom(oneHalf)))
         val feeOverflowEi = create(1.toByte, sender, assetId, feeOverflow, oneHalf, timestamp, attachment, proofs)
         feeOverflowEi shouldBe Left(TxValidationError.OverflowError)
 
         val longAttachment   = ByteStr(Array.fill(TransferTransaction.MaxAttachmentSize + 1)(1: Byte))
-        val longAttachmentEi = create(1.toByte, sender, assetId, transfers, fee, timestamp, longAttachment, proofs)
+        val longAttachmentEi = create(1.toByte, sender, assetId, transfers, fee.value, timestamp, longAttachment, proofs)
         longAttachmentEi shouldBe Left(TxValidationError.TooBigArray)
 
         val noFeeEi = create(1.toByte, sender, assetId, feeOverflow, 0, timestamp, attachment, proofs)
-        noFeeEi shouldBe Left(TxValidationError.InsufficientFee())
+        noFeeEi shouldBe Left(TxValidationError.InsufficientFee)
 
         val negativeFeeEi = create(1.toByte, sender, assetId, feeOverflow, -100, timestamp, attachment, proofs)
-        negativeFeeEi shouldBe Left(TxValidationError.InsufficientFee())
+        negativeFeeEi shouldBe Left(TxValidationError.InsufficientFee)
 
-        val differentChainIds = Seq(ParsedTransfer(sender.toAddress, 100), ParsedTransfer(sender.toAddress('?'.toByte), 100))
-        val invalidChainIdEi  = create(1.toByte, sender, assetId, differentChainIds, 100, timestamp, attachment, proofs)
+        val differentChainIds = Seq(
+          ParsedTransfer(sender.toAddress, TxNonNegativeAmount.unsafeFrom(100)),
+          ParsedTransfer(sender.toAddress('?'.toByte), TxNonNegativeAmount.unsafeFrom(100))
+        )
+        val invalidChainIdEi = create(1.toByte, sender, assetId, differentChainIds, 100, timestamp, attachment, proofs)
         invalidChainIdEi should produce("One of chain ids not match")
 
-        val otherChainIds         = Seq(ParsedTransfer(sender.toAddress('?'.toByte), 100), ParsedTransfer(sender.toAddress('?'.toByte), 100))
+        val otherChainIds = Seq(
+          ParsedTransfer(sender.toAddress('?'.toByte), TxNonNegativeAmount.unsafeFrom(100)),
+          ParsedTransfer(sender.toAddress('?'.toByte), TxNonNegativeAmount.unsafeFrom(100))
+        )
         val invalidOtherChainIdEi = create(1.toByte, sender, assetId, otherChainIds, 100, timestamp, attachment, proofs)
         invalidOtherChainIdEi should produce("One of chain ids not match")
     }

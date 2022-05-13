@@ -3,9 +3,9 @@ package com.wavesplatform.transaction
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.state.diffs._
-import com.wavesplatform.test.PropSpec
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.serialization.impl.TransferTxSerializer
 import com.wavesplatform.transaction.transfer._
 import play.api.libs.json.Json
 
@@ -21,7 +21,7 @@ class TransferTransactionV1Specification extends PropSpec {
       recovered.timestamp shouldEqual transfer.timestamp
       recovered.amount shouldEqual transfer.amount
       recovered.fee shouldEqual transfer.fee
-      recovered.recipient.stringRepr shouldEqual transfer.recipient.stringRepr
+      recovered.recipient shouldEqual transfer.recipient
 
       recovered.bytes() shouldEqual transfer.bytes()
     }
@@ -52,7 +52,7 @@ class TransferTransactionV1Specification extends PropSpec {
         |""".stripMargin
     )
 
-    val tx = TransferTransaction.serializer.parseBytes(bytes)
+    val tx = TransferTxSerializer.parseBytes(bytes)
     tx.get.json() shouldBe json
   }
 
@@ -89,9 +89,9 @@ class TransferTransactionV1Specification extends PropSpec {
       PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
       recipient,
       Waves,
-      1900000,
+      TxPositiveAmount.unsafeFrom(1900000),
       Waves,
-      100000,
+      TxPositiveAmount.unsafeFrom(100000),
       ByteStr.decodeBase58("4t2Xazb2SX").get,
       1526552510868L,
       Proofs(Seq(ByteStr.decodeBase58("eaV1i3hEiXyYQd6DQY7EnPg9XzpAvB9VA3bnpin2qJe4G36GZXaGnYKCgSf9xiQ61DcAwcBFzjSXh6FwCgazzFz").get)),

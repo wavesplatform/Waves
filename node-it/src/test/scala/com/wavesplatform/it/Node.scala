@@ -2,20 +2,21 @@ package com.wavesplatform.it
 
 import java.net.{InetSocketAddress, URL}
 
+import scala.concurrent.duration.FiniteDuration
+
 import com.typesafe.config.Config
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.util.GlobalTimer
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.transaction.TransactionType
 import com.wavesplatform.utils.LoggerFacade
 import com.wavesplatform.wallet.Wallet
 import io.grpc.{ManagedChannel, ManagedChannelBuilder}
-import org.asynchttpclient.Dsl.{config => clientConfig, _}
 import org.asynchttpclient._
+import org.asynchttpclient.Dsl.{config => clientConfig, _}
 import org.slf4j.LoggerFactory
-
-import scala.concurrent.duration.FiniteDuration
 
 abstract class Node(val config: Config) extends AutoCloseable {
   lazy val log: LoggerFacade =
@@ -25,9 +26,11 @@ abstract class Node(val config: Config) extends AutoCloseable {
   val client: AsyncHttpClient = asyncHttpClient(
     clientConfig()
       .setKeepAlive(false)
-      .setNettyTimer(GlobalTimer.instance))
+      .setNettyTimer(GlobalTimer.instance)
+  )
 
-  lazy val grpcChannel: ManagedChannel = ManagedChannelBuilder.forAddress(networkAddress.getHostString, nodeExternalPort(6870))
+  lazy val grpcChannel: ManagedChannel = ManagedChannelBuilder
+    .forAddress(networkAddress.getHostString, nodeExternalPort(6870))
     .usePlaintext()
     .build()
 
@@ -38,7 +41,7 @@ abstract class Node(val config: Config) extends AutoCloseable {
     wallet.generateNewAccount().get
   }
 
-  val keyPair: KeyPair  = KeyPair.fromSeed(config.getString("account-seed")).explicitGet()
+  val keyPair: KeyPair     = KeyPair.fromSeed(config.getString("account-seed")).explicitGet()
   val publicKey: PublicKey = PublicKey.fromBase58String(config.getString("public-key")).explicitGet()
   val address: String      = config.getString("address")
 
@@ -56,7 +59,7 @@ object Node {
   implicit class NodeExt(val n: Node) extends AnyVal {
     def name: String               = n.settings.networkSettings.nodeName
     def publicKeyStr: String       = n.publicKey.toString
-    def fee(txTypeId: Byte): Long  = FeeValidation.FeeConstants(txTypeId) * FeeValidation.FeeUnit
+    def fee(txTypeId: Byte): Long  = FeeValidation.FeeConstants(TransactionType(txTypeId)) * FeeValidation.FeeUnit
     def blockDelay: FiniteDuration = n.settings.blockchainSettings.genesisSettings.averageBlockDelay
   }
 }

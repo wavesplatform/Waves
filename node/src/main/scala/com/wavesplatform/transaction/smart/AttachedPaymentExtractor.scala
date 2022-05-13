@@ -3,7 +3,6 @@ package com.wavesplatform.transaction.smart
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.diffs.invoke.InvokeScriptLike
 import com.wavesplatform.features.MultiPaymentPolicyProvider._
-import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.traits.domain.AttachedPayments
 import com.wavesplatform.lang.v1.traits.domain.AttachedPayments._
@@ -11,25 +10,24 @@ import com.wavesplatform.state.Blockchain
 
 object AttachedPaymentExtractor {
   def extractPayments(
-    tx:           InvokeScriptLike,
-    version:      StdLibVersion,
-    blockchain:   Blockchain,
-    targetScript: AttachedPaymentTarget
-  ): Either[ExecutionError, AttachedPayments] =
+      tx: InvokeScriptLike,
+      version: StdLibVersion,
+      blockchain: Blockchain,
+      targetScript: AttachedPaymentTarget
+  ): Either[String, AttachedPayments] =
     if (tx.payments.size <= 1)
       if (version.supportsMultiPayment)
         multiple(tx)
       else
         single(tx)
+    else if (!blockchain.allowsMultiPayment)
+      Left("Multiple payments isn't allowed now")
+    else if (!version.supportsMultiPayment)
+      Left(scriptErrorMessage(targetScript, version))
+    else if (tx.payments.size > version.maxPayments)
+      Left(s"Script payment amount=${tx.payments.size} should not exceed ${version.maxPayments}")
     else
-      if (!blockchain.allowsMultiPayment)
-        Left("Multiple payments isn't allowed now")
-      else if (!version.supportsMultiPayment)
-        Left(scriptErrorMessage(targetScript, version))
-      else if (tx.payments.size > version.maxPayments)
-        Left(s"Script payment amount=${tx.payments.size} should not exceed ${version.maxPayments}")
-      else
-        multiple(tx)
+      multiple(tx)
 
   private def single(tx: InvokeScriptLike) =
     Right(AttachedPayments.Single(tx.payments.headOption.map(p => (p.amount, p.assetId.compatId))))
@@ -48,6 +46,6 @@ object AttachedPaymentExtractor {
 }
 
 trait AttachedPaymentTarget
-case object DApp                     extends AttachedPaymentTarget
-case object InvokerScript            extends AttachedPaymentTarget
-case class  AssetScript(id: ByteStr) extends AttachedPaymentTarget
+case object DApp                    extends AttachedPaymentTarget
+case object InvokerScript           extends AttachedPaymentTarget
+case class AssetScript(id: ByteStr) extends AttachedPaymentTarget

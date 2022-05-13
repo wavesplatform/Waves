@@ -1,45 +1,49 @@
 package com.wavesplatform.http
 
+import akka.http.scaladsl.model.HttpEntity.{Chunk, LastChunk}
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpHeader, MediaTypes, TransferEncodings}
+import akka.http.scaladsl.model.headers.{Accept, `Content-Type`, `Transfer-Encoding`}
 import akka.http.scaladsl.testkit.RouteTestTimeout
+import akka.stream.scaladsl.Source
+import com.google.common.primitives.Longs
 import com.google.protobuf.ByteString
-import com.wavesplatform.{crypto, TestTime, TestWallet}
-import com.wavesplatform.account.{Address, AddressOrAlias}
+import com.wavesplatform.crypto
+import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.AddressApiRoute
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
-import com.wavesplatform.api.http.ApiMarshallers._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
+import com.wavesplatform.settings.WalletSettings
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utils.Schedulers
+import com.wavesplatform.wallet.Wallet
 import io.netty.util.HashedWheelTimer
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
-import play.api.libs.json._
+import play.api.libs.json.*
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
-class AddressRouteSpec
-    extends RouteSpec("/addresses")
-    with PathMockFactory
-    with RestAPISettingsHelper
-    with TestWallet
-    with WithDomain {
+class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with RestAPISettingsHelper with WithDomain {
 
-  testWallet.generateNewAccounts(10)
-  private val allAccounts  = testWallet.privateKeyAccounts
+  private val wallet = Wallet(WalletSettings(None, Some("123"), Some(ByteStr(Longs.toByteArray(System.nanoTime())))))
+  wallet.generateNewAccounts(10)
+  private val allAccounts  = wallet.privateKeyAccounts
   private val allAddresses = allAccounts.map(_.toAddress)
   private val blockchain   = stub[Blockchain]("globalBlockchain")
   (() => blockchain.activatedFeatures).when().returning(Map())
@@ -50,7 +54,7 @@ class AddressRouteSpec
 
   private val addressApiRoute: AddressApiRoute = AddressApiRoute(
     restAPISettings,
-    testWallet,
+    wallet,
     blockchain,
     utxPoolSynchronizer,
     new TestTime,
@@ -71,12 +75,13 @@ class AddressRouteSpec
     message <- Gen.listOfN(length, Gen.alphaNumChar).map(_.mkString).label("message")
   } yield (account, message)
 
-  routePath("/balance/{address}/{confirmations}") in withDomain() { d =>
+  routePath("/balance/{address}/{confirmations}") in withDomain(balances = Seq(AddrWithBalance(TxHelpers.defaultAddress))) { d =>
     val route =
-      addressApiRoute.copy(blockchain = d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(() => d.liquidDiff, d.db, d.blockchainUpdater)).route
+      addressApiRoute
+        .copy(blockchain = d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(() => d.liquidDiff, d.db, d.blockchainUpdater))
+        .route
     val address = TxHelpers.signer(1).toAddress
 
-    d.appendBlock(TxHelpers.genesis(TxHelpers.defaultSigner.toAddress))
     for (_ <- 1 until 10) d.appendBlock(TxHelpers.transfer(TxHelpers.defaultSigner, address))
 
     Get(routePath(s"/balance/$address/10")) ~> route ~> check {
@@ -115,7 +120,7 @@ class AddressRouteSpec
   }
 
   routePath("/validate/{address}") in {
-    val t = Table(("address", "valid"), allAddresses.map(_ -> true) :+ "3P2HNUd5VUPLMQkJmctTPEeeHumiPN2GkTb" -> false: _*)
+    val t = Table(("address", "valid"), (allAddresses.map(_ -> true) :+ "3P2HNUd5VUPLMQkJmctTPEeeHumiPN2GkTb" -> false)*)
 
     forAll(t) { (a, v) =>
       Get(routePath(s"/validate/$a")) ~> route ~> check {
@@ -297,7 +302,7 @@ class AddressRouteSpec
     val contractWithoutMeta = contractWithMeta.copy(meta = DAppMeta())
     (blockchain.accountScript _)
       .when(allAccounts(4).toAddress)
-      .onCall((_: AddressOrAlias) => Some(AccountScriptInfo(allAccounts(4).publicKey, ContractScript(V3, contractWithoutMeta).explicitGet(), 11L)))
+      .onCall((_: Address) => Some(AccountScriptInfo(allAccounts(4).publicKey, ContractScript(V3, contractWithoutMeta).explicitGet(), 11L)))
 
     Get(routePath(s"/scriptInfo/${allAddresses(4)}/meta")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -321,7 +326,7 @@ class AddressRouteSpec
     (blockchain.accountScript _)
       .when(allAccounts(6).toAddress)
       .onCall(
-        (_: AddressOrAlias) =>
+        (_: Address) =>
           Some(
             AccountScriptInfo(
               allAccounts(6).publicKey,
@@ -391,4 +396,30 @@ class AddressRouteSpec
       }
     }
   }
+
+  routePath(s"/data/{address} with Transfer-Encoding: chunked") in {
+    val account = TxHelpers.signer(1)
+
+    withDomain(DomainPresets.RideV5, balances = AddrWithBalance.enoughBalances(account)) { d =>
+      d.appendBlock(TxHelpers.dataSingle(account))
+
+      val route =
+        addressApiRoute
+          .copy(blockchain = d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(() => d.liquidDiff, d.db, d.blockchainUpdater))
+          .route
+
+      val requestBody = Json.obj("keys" -> Seq("test"))
+
+      val headers: Seq[HttpHeader] =
+        Seq(`Transfer-Encoding`(TransferEncodings.chunked), `Content-Type`(ContentTypes.`application/json`), Accept(MediaTypes.`application/json`))
+
+      Post(
+        routePath(s"/data/${account.toAddress}"),
+        HttpEntity.Chunked(ContentTypes.`application/json`, Source(Seq(Chunk(akka.util.ByteString.fromString(requestBody.toString)), LastChunk)))
+      ).withHeaders(headers) ~> route ~> check {
+        responseAs[JsValue] should matchJson("""[{"key":"test","type":"string","value":"test"}]""")
+      }
+    }
+  }
+
 }

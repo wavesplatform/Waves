@@ -27,10 +27,21 @@ class SimpleTransactionsSuite extends BaseTransactionSuite {
   private def node = nodes.head
 
   test("valid tx send by network to node should be in blockchain") {
-    val tx = TransferTransaction.selfSigned(1.toByte, node.keyPair, Address.fromString(node.address).explicitGet(), Waves, 1L, Waves, minFee, ByteStr.empty,  System.currentTimeMillis())
+    val tx = TransferTransaction
+      .selfSigned(
+        1.toByte,
+        node.keyPair,
+        Address.fromString(node.address).explicitGet(),
+        Waves,
+        1L,
+        Waves,
+        minFee,
+        ByteStr.empty,
+        System.currentTimeMillis()
+      )
       .explicitGet()
 
-    node.sendByNetwork(RawBytes.fromTransaction(tx))
+    node.sendByNetwork(RawBytes.fromTransaction(tx, forceProtobuf = false))
     node.waitForTransaction(tx.id().toString)
 
   }
@@ -50,7 +61,7 @@ class SimpleTransactionsSuite extends BaseTransactionSuite {
       )
       .explicitGet()
 
-    node.sendByNetwork(RawBytes.fromTransaction(tx))
+    node.sendByNetwork(RawBytes.fromTransaction(tx, forceProtobuf = false))
     val maxHeight = nodes.map(_.height).max
     nodes.waitForHeight(maxHeight + 1)
     node.ensureTxDoesntExist(tx.id().toString)

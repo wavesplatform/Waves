@@ -16,7 +16,7 @@ import com.wavesplatform.test.PropSpec
 class EvaluatorV1CaseObjField extends PropSpec {
 
   def context(p: CaseObj): EvaluationContext[NoContext, Id] =
-    Monoid.combine(PureContext.build(V1, fixUnicodeFunctions = true).evaluationContext, sampleUnionContext(p))
+    Monoid.combine(PureContext.build(V1, useNewPowPrecision = true).evaluationContext, sampleUnionContext(p))
 
   property("case custom type field access") {
     ev[CONST_LONG](

@@ -12,7 +12,7 @@ class LeaseCancelTransactionSpecification extends PropSpec {
 
   property("Lease cancel serialization roundtrip") {
     forAll(leaseCancelGen) { tx: LeaseCancelTransaction =>
-      val recovered = tx.builder.parseBytes(tx.bytes()).get.asInstanceOf[LeaseCancelTransaction]
+      val recovered = LeaseCancelTxSerializer.parseBytes(tx.bytes()).get
       assertTxs(recovered, tx)
     }
   }

@@ -1,10 +1,10 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.transaction.assets._
+import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.transfer.*
 
 import scala.util.{Failure, Try}
 
@@ -39,25 +39,24 @@ object TransactionParsers {
     SetAssetScriptTransaction,
     InvokeScriptTransaction,
     TransferTransaction,
-    UpdateAssetInfoTransaction,
+    InvokeExpressionTransaction
   ).flatMap { x =>
     x.supportedVersions.map { version =>
       ((x.typeId, version), x)
     }
   }.toMap
 
-  val all: Map[(Byte, Byte), TransactionParser] = old.flatMap {
-    case (typeId, builder) =>
-      builder.supportedVersions.map { version =>
-        ((typeId, version), builder)
-      }
+  val all: Map[(Byte, Byte), TransactionParser] = old.flatMap { case (typeId, builder) =>
+    builder.supportedVersions.map { version =>
+      ((typeId, version), builder)
+    }
   } ++ modern
 
   def by(typeId: Byte, version: TxVersion): Option[TransactionParser] = all.get((typeId, version))
 
   def parseBytes(bytes: Array[Byte]): Try[Transaction] = {
     def validate(parser: TransactionParser)(tx: parser.TransactionT): Try[Transaction] = {
-      import parser._
+      import parser.*
       tx.validatedEither.left.map(ve => new RuntimeException(ve.toString)).toTry
     }
     def modernParseBytes: Try[Transaction] = {

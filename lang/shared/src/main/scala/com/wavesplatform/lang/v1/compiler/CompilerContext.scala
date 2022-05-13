@@ -1,28 +1,29 @@
 package com.wavesplatform.lang.v1.compiler
 
-import cats.Monoid
+import cats.Semigroup
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.CompilerContext._
-import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
-import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, FunctionTypeSignature}
+import com.wavesplatform.lang.v1.compiler.CompilerContext.*
+import com.wavesplatform.lang.v1.compiler.Types.*
+import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
 import com.wavesplatform.lang.v1.parser.Expressions.Pos
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
-import shapeless._
+import shapeless.*
 
 case class CompilerContext(
     predefTypes: Map[String, FINAL],
     varDefs: VariableTypes,
     functionDefs: FunctionTypes,
+    provideRuntimeTypeOnCastError: Boolean,
+    arbitraryDeclarations: Boolean = false,
     tmpArgsIdx: Int = 0,
-    arbitraryDeclarations: Boolean = false
+    foldIdx: Int = 0
 ) {
   private lazy val allFuncDefs: FunctionTypes =
-    predefTypes.collect {
-      case (_, CASETYPEREF(typeName, fields, false)) =>
+    predefTypes
+      .collect { case (_, CASETYPEREF(typeName, fields, false)) =>
         typeName ->
           FunctionInfo(AnyPos, List(FunctionTypeSignature(CASETYPEREF(typeName, fields), fields, FunctionHeader.User(typeName))))
-    } ++ functionDefs
+      } ++ functionDefs
 
   private def resolveFunction(name: String): FunctionInfo =
     if (arbitraryDeclarations) {
@@ -59,27 +60,19 @@ case class CompilerContext(
 }
 
 object CompilerContext {
-
-  def build(predefTypes: Seq[FINAL], varDefs: VariableTypes, functions: Seq[BaseFunction[NoContext]]) = new CompilerContext(
-    predefTypes = predefTypes.map(t => t.name -> t).toMap,
-    varDefs = varDefs,
-    functionDefs = functions.groupBy(_.name).map { case (k, v) => k -> FunctionInfo(AnyPos, v.map(_.signature).toList) }
-  )
-
   case class VariableInfo(pos: Pos, vType: FINAL)
   case class FunctionInfo(pos: Pos, fSigList: List[FunctionTypeSignature])
 
   type VariableTypes = Map[String, VariableInfo]
   type FunctionTypes = Map[String, FunctionInfo]
 
-  val empty = CompilerContext(Map.empty, Map.empty, Map.empty, 0)
-
-  implicit val monoid: Monoid[CompilerContext] = new Monoid[CompilerContext] {
-    override val empty: CompilerContext = CompilerContext.empty
-
-    override def combine(x: CompilerContext, y: CompilerContext): CompilerContext =
-      CompilerContext(predefTypes = x.predefTypes ++ y.predefTypes, varDefs = x.varDefs ++ y.varDefs, functionDefs = x.functionDefs ++ y.functionDefs)
-  }
+  implicit val semigroup: Semigroup[CompilerContext] = (x: CompilerContext, y: CompilerContext) =>
+    CompilerContext(
+      predefTypes = x.predefTypes ++ y.predefTypes,
+      varDefs = x.varDefs ++ y.varDefs,
+      functionDefs = x.functionDefs ++ y.functionDefs,
+      y.provideRuntimeTypeOnCastError
+    )
 
   val types: Lens[CompilerContext, Map[String, FINAL]] = lens[CompilerContext] >> Symbol("predefTypes")
   val vars: Lens[CompilerContext, VariableTypes]       = lens[CompilerContext] >> Symbol("varDefs")

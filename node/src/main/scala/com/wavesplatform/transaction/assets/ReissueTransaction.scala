@@ -17,27 +17,23 @@ case class ReissueTransaction(
     version: TxVersion,
     sender: PublicKey,
     asset: IssuedAsset,
-    quantity: TxAmount,
+    quantity: TxPositiveAmount,
     reissuable: Boolean,
-    fee: TxAmount,
+    fee: TxPositiveAmount,
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
-) extends VersionedTransaction
+) extends Transaction(TransactionType.Reissue, Seq(asset))
+    with VersionedTransaction
     with ProvenTransaction
     with SigProofsSwitch
     with TxWithFee.InWaves
     with FastHashId
-    with LegacyPBSwitch.V3 {
+    with PBSince.V3 {
 
-  //noinspection TypeAnnotation
-  override val builder = ReissueTransaction
-
-  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(builder.serializer.bodyBytes(this))
-  override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(builder.serializer.toBytes(this))
-  override val json: Coeval[JsObject]         = Coeval.evalOnce(builder.serializer.toJson(this))
-
-  override def checkedAssets: Seq[IssuedAsset] = Seq(asset)
+  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(ReissueTxSerializer.bodyBytes(this))
+  override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(ReissueTxSerializer.toBytes(this))
+  override val json: Coeval[JsObject]         = Coeval.evalOnce(ReissueTxSerializer.toJson(this))
 }
 
 object ReissueTransaction extends TransactionParser {
@@ -50,10 +46,8 @@ object ReissueTransaction extends TransactionParser {
   implicit def sign(tx: ReissueTransaction, privateKey: PrivateKey): ReissueTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
-  val serializer = ReissueTxSerializer
-
   override def parseBytes(bytes: Array[TxVersion]): Try[ReissueTransaction] =
-    serializer.parseBytes(bytes)
+    ReissueTxSerializer.parseBytes(bytes)
 
   def create(
       version: TxVersion,
@@ -66,7 +60,11 @@ object ReissueTransaction extends TransactionParser {
       proofs: Proofs,
       chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, ReissueTransaction] =
-    ReissueTransaction(version, sender, asset, quantity, reissuable, fee, timestamp, proofs, chainId).validatedEither
+    for {
+      fee      <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
+      quantity <- TxPositiveAmount(quantity)(TxValidationError.NonPositiveAmount(quantity, "assets"))
+      tx       <- ReissueTransaction(version, sender, asset, quantity, reissuable, fee, timestamp, proofs, chainId).validatedEither
+    } yield tx
 
   def signed(
       version: TxVersion,
@@ -76,9 +74,10 @@ object ReissueTransaction extends TransactionParser {
       reissuable: Boolean,
       fee: Long,
       timestamp: Long,
-      signer: PrivateKey
+      signer: PrivateKey,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, ReissueTransaction] =
-    create(version, sender, asset, quantity, reissuable, fee, timestamp, Nil).map(_.signWith(signer))
+    create(version, sender, asset, quantity, reissuable, fee, timestamp, Nil, chainId).map(_.signWith(signer))
 
   def selfSigned(
       version: TxVersion,
@@ -87,7 +86,8 @@ object ReissueTransaction extends TransactionParser {
       quantity: Long,
       reissuable: Boolean,
       fee: Long,
-      timestamp: Long
+      timestamp: Long,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, ReissueTransaction] =
-    signed(version, sender.publicKey, asset, quantity, reissuable, fee, timestamp, sender.privateKey)
+    signed(version, sender.publicKey, asset, quantity, reissuable, fee, timestamp, sender.privateKey, chainId)
 }

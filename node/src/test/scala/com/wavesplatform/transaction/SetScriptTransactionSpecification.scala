@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import org.scalacheck.Gen
-import play.api.libs.json._
+import play.api.libs.json.*
 
 class SetScriptTransactionSpecification extends GenericTransactionSpecification[SetScriptTransaction] {
 
@@ -25,7 +25,7 @@ class SetScriptTransactionSpecification extends GenericTransactionSpecification[
     first.script shouldEqual second.script
   }
 
-  def generator: Gen[((Seq[com.wavesplatform.transaction.Transaction], SetScriptTransaction))] = setScriptTransactionGen.map(t => (Seq(), t))
+  def generator: Gen[(Seq[com.wavesplatform.transaction.Transaction], SetScriptTransaction)] = setScriptTransactionGen.map(t => (Seq(), t))
 
   def jsonRepr: Seq[(JsValue, SetScriptTransaction)] =
     Seq(

@@ -44,6 +44,18 @@ object Tx {
       timestamp: Long
   ) extends PseudoTx
 
+  case class InvokePseudoTx(
+      id: ByteStr,
+      timestamp: Long,
+      sender: Recipient.Address,
+      senderPk: ByteStr,
+      dApp: Recipient,
+      feeAssetId: Option[ByteStr],
+      funcName: Option[String],
+      funcArgs: List[EVALUATED],
+      payments: AttachedPayments
+  ) extends PseudoTx
+
   case class Header(id: ByteStr, fee: Long, timestamp: Long, version: Long)
   case class Proven(h: Header, sender: Recipient.Address, bodyBytes: ByteStr, senderPk: ByteStr, proofs: IndexedSeq[ByteStr])
   case class TransferItem(recipient: Recipient, amount: Long)
@@ -69,6 +81,8 @@ object Tx {
       funcName: Option[String],
       funcArgs: List[EVALUATED]
   ) extends Tx
+
+  case class InvokeExpression(p: Proven, expression: ByteStr, feeAssetId: Option[ByteStr]) extends Tx
 
   case class Lease(p: Proven, amount: Long, recipient: Recipient) extends Tx
 

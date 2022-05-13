@@ -10,7 +10,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.state.diffs.produce
+import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -18,10 +18,7 @@ import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
-class VerifierSpecification
-    extends PropSpec
-    with NTPTime
-    with WithDomain {
+class VerifierSpecification extends PropSpec with NTPTime with WithDomain {
   private def mkIssue(issuer: KeyPair, name: String, script: Option[Script] = None) =
     IssueTransaction
       .selfSigned(
@@ -45,19 +42,22 @@ class VerifierSpecification
       assetPair: AssetPair,
       fee: Long = 0.003.waves,
       feeAsset: Asset = Waves
-  ) = Order.selfSigned(
-    3.toByte,
-    sender,
-    matcher,
-    assetPair,
-    orderType,
-    100,
-    5.waves,
-    ntpTime.getTimestamp(),
-    ntpTime.getTimestamp() + 200000,
-    fee,
-    feeAsset
-  )
+  ) =
+    Order
+      .selfSigned(
+        3.toByte,
+        sender,
+        matcher,
+        assetPair,
+        orderType,
+        100,
+        5.waves,
+        ntpTime.getTimestamp(),
+        ntpTime.getTimestamp() + 200000,
+        fee,
+        feeAsset
+      )
+      .explicitGet()
 
   private val sharedParamGen = for {
     sender  <- accountGen
@@ -83,7 +83,7 @@ class VerifierSpecification
             BlockchainFeatures.Ride4DApps
           )
         ) { d =>
-          d.appendBlock(genesisTxs: _*)
+          d.appendBlock(genesisTxs*)
           d.appendBlock(
             SetScriptTransaction
               .selfSigned(
@@ -166,7 +166,7 @@ class VerifierSpecification
             BlockchainFeatures.Ride4DApps
           )
         ) { d =>
-          d.appendBlock(genesisTxs: _*)
+          d.appendBlock(genesisTxs*)
 
           d.blockchainUpdater.processBlock(
             d.createBlock(2.toByte, Seq(setAssetScript(buyFeeAsset, Some(ExprScript(Terms.FALSE).explicitGet())), exchangeTx))

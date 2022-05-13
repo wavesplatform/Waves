@@ -1,12 +1,13 @@
 package com.wavesplatform.state.patch
 
+import scala.io.Source
+
 import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.features.BlockchainFeature
 import com.wavesplatform.state.{Blockchain, Diff}
 import play.api.libs.json.{Json, Reads}
 
-import scala.io.Source
-
-trait PatchDataLoader extends {
+trait PatchDataLoader {
   protected def readPatchData[T: Reads](): T =
     Json
       .parse(
@@ -20,9 +21,16 @@ trait PatchDataLoader extends {
 trait DiffPatchFactory extends PartialFunction[Blockchain, Diff]
 
 abstract class PatchAtHeight(chainIdToHeight: (Char, Int)*) extends PatchDataLoader with DiffPatchFactory {
-  protected lazy val patchHeight: Option[Int] = chainIdToHeight.collectFirst {
-    case (chainId, height) if AddressScheme.current.chainId == chainId.toByte => height
-  }
+  private[this] val chainIdToHeightMap   = chainIdToHeight.toMap
+  protected def patchHeight: Option[Int] = chainIdToHeightMap.get(AddressScheme.current.chainId.toChar)
 
-  override def isDefinedAt(blockchain: Blockchain): Boolean = patchHeight.contains(blockchain.height)
+  override def isDefinedAt(blockchain: Blockchain): Boolean =
+    chainIdToHeightMap.get(blockchain.settings.addressSchemeCharacter).contains(blockchain.height)
+}
+
+abstract class PatchOnFeature(feature: BlockchainFeature, networks: Set[Char] = Set.empty) extends PatchDataLoader with DiffPatchFactory {
+  override def isDefinedAt(blockchain: Blockchain): Boolean = {
+    (networks.isEmpty || networks.contains(blockchain.settings.addressSchemeCharacter)) &&
+    blockchain.featureActivationHeight(feature.id).contains(blockchain.height)
+  }
 }

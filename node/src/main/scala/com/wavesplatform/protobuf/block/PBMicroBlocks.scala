@@ -1,13 +1,13 @@
 package com.wavesplatform.protobuf.block
 
+import scala.util.Try
+
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.network.MicroBlockResponse
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction.PBTransactions
-
-import scala.util.Try
 
 object PBMicroBlocks {
 

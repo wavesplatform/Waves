@@ -3,21 +3,22 @@ package com.wavesplatform.network
 import java.net.{InetAddress, InetSocketAddress}
 import java.util
 
+import scala.util.Try
+
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.block.serialization.MicroBlockSerializer
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.mining.Miner.MaxTransactionsPerMicroblock
 import com.wavesplatform.mining.MiningConstraints
-import com.wavesplatform.network.message.Message._
 import com.wavesplatform.network.message._
+import com.wavesplatform.network.message.Message._
 import com.wavesplatform.protobuf.block.{PBBlock, PBBlocks, PBMicroBlocks, SignedMicroBlock}
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
-import com.wavesplatform.transaction.{DataTransaction, Transaction, TransactionParsers}
-
-import scala.util.Try
+import com.wavesplatform.transaction.{DataTransaction, EthereumTransaction, Transaction, TransactionParsers}
 
 object GetPeersSpec extends MessageSpec[GetPeers.type] {
   override val messageCode: Message.MessageCode = 1: Byte
@@ -96,7 +97,7 @@ trait SignaturesSeqSpec[A <: AnyRef] extends MessageSpec[A] {
   }
 
   override def serializeData(v: A): Array[Byte] = {
-    Bytes.concat(Ints.toByteArray(unwrap(v).length) +: unwrap(v): _*)
+    Bytes.concat((Ints.toByteArray(unwrap(v).length) +: unwrap(v))*)
   }
 }
 
@@ -204,12 +205,13 @@ object TransactionSpec extends MessageSpec[Transaction] {
   override val messageCode: MessageCode = 25: Byte
 
   // Modeled after Data Transaction https://wavesplatform.atlassian.net/wiki/spaces/MAIN/pages/119734321/Data+Transaction
-  override val maxLength: Int = 150 * 1024
+  override val maxLength: Int = (DataTransaction.MaxBytes * 1.2).toInt // 150 * 1024
 
   override def deserializeData(bytes: Array[Byte]): Try[Transaction] =
     TransactionParsers.parseBytes(bytes)
 
-  override def serializeData(tx: Transaction): Array[Byte] = tx.bytes()
+  override def serializeData(tx: Transaction): Array[Byte] =
+    tx.bytes().ensuring(!tx.isInstanceOf[EthereumTransaction])
 }
 
 object MicroBlockInvSpec extends MessageSpec[MicroBlockInv] {
@@ -259,8 +261,10 @@ object LegacyMicroBlockResponseSpec extends MessageSpec[MicroBlockResponse] {
   override def deserializeData(bytes: Array[Byte]): Try[MicroBlockResponse] =
     MicroBlock.parseBytes(bytes).map(MicroBlockResponse(_))
 
-  override def serializeData(resp: MicroBlockResponse): Array[Byte] =
-    resp.microblock.bytes()
+  override def serializeData(resp: MicroBlockResponse): Array[Byte] = {
+    require(resp.microblock.version < Block.ProtoBlockVersion)
+    MicroBlockSerializer.toBytes(resp.microblock)
+  }
 
   override val maxLength: Int = 271 + TransactionSpec.maxLength * MaxTransactionsPerMicroblock
 }
@@ -291,14 +295,14 @@ object PBMicroBlockSpec extends MessageSpec[MicroBlockResponse] {
 object PBTransactionSpec extends MessageSpec[Transaction] {
   override val messageCode: MessageCode = 31: Byte
 
-  // Signed (8 proofs) PBTransaction + max DataTransaction.DataEntry + max proto serialization meta + gap
-  override val maxLength: Int = 624 + DataTransaction.MaxProtoBytes + 5 + 100
+  //624 + DataTransaction.MaxProtoBytes + 5 + 100 // Signed (8 proofs) PBTransaction + max DataTransaction.DataEntry + max proto serialization meta + gap
+  override val maxLength: Int = (DataTransaction.MaxBytes * 1.2).toInt
 
   override def deserializeData(bytes: Array[MessageCode]): Try[Transaction] =
-    PBTransactions.vanilla(PBSignedTransaction.parseFrom(bytes)).left.map(ve => new IllegalArgumentException(ve.toString)).toTry
+    PBTransactions.tryToVanilla(PBSignedTransaction.parseFrom(bytes))
 
   override def serializeData(data: Transaction): Array[MessageCode] =
-    PBTransactions.protobuf(data).toByteArray
+    PBTransactions.toByteArray(data)
 }
 
 // Virtual, only for logs

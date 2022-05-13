@@ -10,13 +10,17 @@ import com.wavesplatform.{BlockGen, RxScheduler}
 import io.netty.channel.Channel
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.channel.local.LocalChannel
+import io.netty.util
 import monix.eval.{Coeval, Task}
 import monix.reactive.Observable
 import monix.reactive.subjects.{PublishSubject => PS}
 
 import scala.concurrent.duration._
+import scala.concurrent.{Future, Promise}
+import scala.util.Try
 
 class RxExtensionLoaderSpec extends FreeSpec with RxScheduler with BlockGen {
+  import RxExtensionLoaderSpec._
 
   val MaxRollback = 10
   type Applier = (Channel, ExtensionBlocks) => Task[Either[ValidationError, Option[BigInt]]]
@@ -25,11 +29,14 @@ class RxExtensionLoaderSpec extends FreeSpec with RxScheduler with BlockGen {
   override def testSchedulerName: String = "test-rx-extension-loader"
 
   private def withExtensionLoader(lastBlockIds: Seq[ByteStr] = Seq.empty, timeOut: FiniteDuration = 1.day, applier: Applier = simpleApplier)(
-      f: (InMemoryInvalidBlockStorage,
+      f: (
+          InMemoryInvalidBlockStorage,
           PS[(Channel, Block)],
           PS[(Channel, Signatures)],
           PS[ChannelClosedAndSyncWith],
-          Observable[(Channel, Block)]) => Any) = {
+          Observable[(Channel, Block)]
+      ) => Any
+  ) = {
     val blocks          = PS[(Channel, Block)]()
     val sigs            = PS[(Channel, Signatures)]()
     val ccsw            = PS[ChannelClosedAndSyncWith]()
@@ -38,7 +45,8 @@ class RxExtensionLoaderSpec extends FreeSpec with RxScheduler with BlockGen {
     val invBlockStorage = new InMemoryInvalidBlockStorage
     val (singleBlocks, _, _) =
       RxExtensionLoader(timeOut, Coeval(lastBlockIds.reverse.take(MaxRollback)), op, invBlockStorage, blocks, sigs, ccsw, testScheduler, timeout)(
-        applier)
+        applier
+      )
 
     try {
       f(invBlockStorage, blocks, sigs, ccsw, singleBlocks)
@@ -101,31 +109,15 @@ class RxExtensionLoaderSpec extends FreeSpec with RxScheduler with BlockGen {
     (_, blocks, sigs, ccsw, _) =>
       val ch = new EmbeddedChannel()
 
-      val preconditionTask = Task.defer {
-        Task.fromFuture {
-          for {
-            _ <- send(ccsw)(ChannelClosedAndSyncWith(None, Some(BestChannel(ch, 1: BigInt))))
-            _ = ch.readOutbound[GetSignatures].signatures.size shouldBe MaxRollback
-            _ <- send(sigs)((ch, Signatures(Range(97, 102).map(byteStr))))
-            _ = ch.readOutbound[GetBlock].signature shouldBe byteStr(100)
-            _ = ch.readOutbound[GetBlock].signature shouldBe byteStr(101)
-            _ <- send(blocks)((ch, block(100)))
-          } yield ()
-        }
-      }
-
-      val testTask =
-        for {
-          _ <- Task
-            .race(Task.sleep(8.seconds), preconditionTask)
-            .flatMap {
-              case Left(_) => Task.raiseError(new Exception("Preparation for the test takes too much time"))
-              case _       => Task.pure(())
-            }
-          _ <- Task.sleep(1.second)
-        } yield ch.isOpen shouldBe false
-
-      test(testTask.runToFuture(monix.execution.Scheduler.global))
+      test(for {
+        _ <- send(ccsw)(ChannelClosedAndSyncWith(None, Some(BestChannel(ch, 1: BigInt))))
+        _ = ch.readOutbound[GetSignatures].signatures.size shouldBe MaxRollback
+        _ <- send(sigs)((ch, Signatures(Range(97, 102).map(byteStr))))
+        _ = ch.readOutbound[GetBlock].signature shouldBe byteStr(100)
+        _ = ch.readOutbound[GetBlock].signature shouldBe byteStr(101)
+        _ <- send(blocks)((ch, block(100)))
+        _ <- ch.closeF()
+      } yield ())
   }
 
   "should process received extension" in {
@@ -134,7 +126,7 @@ class RxExtensionLoaderSpec extends FreeSpec with RxScheduler with BlockGen {
       Task {
         applied = true
         Right(None)
-    }
+      }
     withExtensionLoader(Seq.tabulate(100)(byteStr), applier = successfulApplier) { (_, blocks, sigs, ccsw, _) =>
       val ch = new EmbeddedChannel()
       test(for {
@@ -148,6 +140,29 @@ class RxExtensionLoaderSpec extends FreeSpec with RxScheduler with BlockGen {
       } yield {
         applied shouldBe true
       })
+    }
+  }
+
+  "should blacklist peer after receiving empty signature list" in {
+    withExtensionLoader(Seq.tabulate(100)(byteStr)) { (_, _, sigs, ccsw, _) =>
+      val ch = new EmbeddedChannel()
+
+      test(for {
+        _ <- send(ccsw)(ChannelClosedAndSyncWith(None, Some(BestChannel(ch, 1: BigInt))))
+        _ = ch.readOutbound[GetSignatures].signatures.size shouldBe MaxRollback
+        _ <- send(sigs)((ch, Signatures(Seq.empty)))
+        _ <- ch.closeF()
+      } yield ())
+    }
+  }
+}
+
+object RxExtensionLoaderSpec {
+  implicit class ChannelExt(val channel: Channel) extends AnyVal {
+    def closeF(): Future[Unit] = {
+      val closePromise = Promise[Unit]()
+      channel.closeFuture().addListener((future: util.concurrent.Future[_ >: Void]) => closePromise.complete(Try(future.get())))
+      closePromise.future
     }
   }
 }

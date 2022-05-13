@@ -4,10 +4,10 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.lang.ValidationError.ScriptParseError
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
+import com.wavesplatform.lang.directives.values.{DApp as DAppType, *}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.utils._
+import com.wavesplatform.lang.utils.*
 import com.wavesplatform.lang.v1.compiler.Decompiler
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import monix.eval.Coeval
@@ -24,6 +24,8 @@ trait Script {
   val containsBlockV2: Coeval[Boolean]
 
   val containsArray: Boolean
+
+  val isFreeCall: Boolean
 
   override def equals(obj: scala.Any): Boolean = obj match {
     case that: Script => stdLibVersion == that.stdLibVersion && expr == that.expr
@@ -55,7 +57,7 @@ object Script {
     val ctx = getDecompilerContext(s.stdLibVersion, cType)
     val (scriptText, directives) = (s: @unchecked) match {
       case e: ExprScript                   => (Decompiler(e.expr, ctx), List(s.stdLibVersion, Expression))
-      case ContractScriptImpl(_, contract) => (Decompiler(contract, ctx), List(s.stdLibVersion, Account, DAppType))
+      case ContractScriptImpl(_, contract) => (Decompiler(contract, ctx, s.stdLibVersion), List(s.stdLibVersion, Account, DAppType))
     }
     val directivesText = directives
       .map(_.unparsed)
@@ -68,19 +70,25 @@ object Script {
   def complexityInfo(
       script: Script,
       estimator: ScriptEstimator,
-      useContractVerifierLimit: Boolean
+      fixEstimateOfVerifier: Boolean,
+      useContractVerifierLimit: Boolean,
+      withCombinedContext: Boolean = false
   ): Either[String, ComplexityInfo] =
     (script: @unchecked) match {
       case script: ExprScript =>
         ExprScript
-          .estimate(script.expr, script.stdLibVersion, estimator, useContractVerifierLimit)
-          .map(complexity => ComplexityInfo(complexity, Map(), complexity))
+          .estimate(script.expr, script.stdLibVersion, script.isFreeCall, estimator, useContractVerifierLimit, withCombinedContext)
+          .map { complexity =>
+            val verifierComplexity = if (script.isFreeCall) 0 else complexity
+            ComplexityInfo(verifierComplexity, Map(), complexity)
+          }
       case ContractScriptImpl(version, contract @ DApp(_, _, _, verifierFuncOpt)) =>
         for {
           (maxComplexity, callableComplexities) <- ContractScript.estimateComplexity(
             version,
             contract,
             estimator,
+            fixEstimateOfVerifier,
             useContractVerifierLimit
           )
           complexityInfo = verifierFuncOpt.fold(
@@ -91,15 +99,16 @@ object Script {
         } yield complexityInfo
     }
 
-  def estimate(script: Script, estimator: ScriptEstimator, useContractVerifierLimit: Boolean): Either[String, Long] =
-    complexityInfo(script, estimator, useContractVerifierLimit)
+  def estimate(script: Script, estimator: ScriptEstimator, fixEstimateOfVerifier: Boolean, useContractVerifierLimit: Boolean): Either[String, Long] =
+    complexityInfo(script, estimator, fixEstimateOfVerifier, useContractVerifierLimit)
       .map(_.maxComplexity)
 
   def verifierComplexity(
       script: Script,
       estimator: ScriptEstimator,
+      fixEstimateOfVerifier: Boolean,
       useContractVerifierLimit: Boolean
   ): Either[String, Long] =
-    complexityInfo(script, estimator, useContractVerifierLimit)
+    complexityInfo(script, estimator, fixEstimateOfVerifier, useContractVerifierLimit)
       .map(_.verifierComplexity)
 }

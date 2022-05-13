@@ -23,7 +23,7 @@ private[node] class ChainDependentMapper(chainId: Byte) {
     )
 
   def toRideModelO(tx: TransferTransaction): Option[Transfer] =
-    if(tx.succeed) {
+    if (tx.succeed) {
       Some(toRideModel(tx))
     } else {
       None
@@ -78,7 +78,7 @@ private[node] class ChainDependentMapper(chainId: Byte) {
       vrf = b.VRF.map(_.byteStr)
     )
 
-  private def pkToAddress(publicKey: ByteString): ByteStr = {
+  def pkToAddress(publicKey: ByteString): ByteStr = {
     val withoutChecksum =
       ByteBuffer.allocate(1 + 1 + HashLength)
         .put(AddressVersion.toByte)
@@ -112,8 +112,8 @@ private[node] class ChainDependentMapper(chainId: Byte) {
   }
 
   private def addressFromBytes(addressBytes: Array[Byte]): Either[String, Address] = {
-    val version = addressBytes(0)
-    val network = addressBytes(1)
+    val version      = addressBytes(0)
+    val bytesChainId = addressBytes(1)
     for {
       _ <- Either.cond(
         addressBytes.length == AddressLength,
@@ -126,9 +126,9 @@ private[node] class ChainDependentMapper(chainId: Byte) {
         s"Unknown address version: $version"
       )
       _ <- Either.cond(
-        network == chainId,
+        bytesChainId == chainId,
         (),
-        s"Data from other network: expected: $chainId(${chainId.toChar}), actual: $network(${network.toChar})"
+        s"Address belongs to another: expected: $chainId(${chainId.toChar}), actual: $bytesChainId(${bytesChainId.toChar})"
       )
       checkSum          = addressBytes.takeRight(ChecksumLength)
       checkSumGenerated = global.secureHash(addressBytes.dropRight(ChecksumLength)).take(ChecksumLength)

@@ -1,7 +1,9 @@
 package com.wavesplatform.state.diffs.smart
 
+import cats.syntax.either._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.crypto
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.utils._
@@ -14,7 +16,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.{BlockchainContext, buildThisValue}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{DataTransaction, Transaction}
+import com.wavesplatform.transaction.{Authorized, DataTransaction, EthereumTransaction, Proofs, ProvenTransaction, Transaction, VersionedTransaction}
 import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
 import shapeless.Coproduct
@@ -27,17 +29,21 @@ package object predef {
     for {
       compileResult <- ExpressionCompiler(compilerContext(version, Expression, isAssetScript = false), expr)
       (typedExpr, _) = compileResult
-      directives = DirectiveSet(version, Account, Expression).explicitGet()
-      evalContext <- BlockchainContext.build(version,
-                                             chainId,
-                                             Coeval.evalOnce(buildThisValue(t, blockchain, directives, Coproduct[Environment.Tthis](Environment.AssetId(Array())))).map(_.explicitGet()),
-                                             Coeval.evalOnce(blockchain.height),
-                                             blockchain,
-                                             isTokenContext = false,
-                                             isContract = false,
-                                             Coproduct[Environment.Tthis](Environment.AssetId(Array())),
-                                             ByteStr.empty)
-      r <- EvaluatorV1().apply[T](evalContext, typedExpr)
+      directives     = DirectiveSet(version, Account, Expression).explicitGet()
+      evalContext <- BlockchainContext.build(
+        version,
+        chainId,
+        Coeval.evalOnce(buildThisValue(t, blockchain, directives, Coproduct[Environment.Tthis](Environment.AssetId(Array())))).map(_.explicitGet()),
+        Coeval.evalOnce(blockchain.height),
+        blockchain,
+        isTokenContext = false,
+        isContract = false,
+        Coproduct[Environment.Tthis](Environment.AssetId(Array())),
+        ByteStr.empty,
+        fixUnicodeFunctions = true,
+        useNewPowPrecision = true
+      )
+      r <- EvaluatorV1().apply[T](evalContext, typedExpr).leftMap(_.message)
     } yield r
   }
 
@@ -51,13 +57,12 @@ package object predef {
     runScript[T](script, V1, Coproduct(tx), blockchain, chainId)
 
   def runScriptWithCustomContext[T <: EVALUATED](
-    script: String,
-    t: In,
-    chainId: Byte,
-    ctxV: StdLibVersion = V1,
-    blockchain: Blockchain = EmptyBlockchain
+      script: String,
+      tx: Transaction,
+      v: StdLibVersion = V1,
+      blockchain: Blockchain = EmptyBlockchain
   ): Either[String, T] =
-    runScript[T](script, ctxV, t, blockchain, chainId)
+    runScript[T](script, v, Coproduct(tx), blockchain, 'T'.toByte)
 
   private def dropLastLine(str: String): String = str.replace("\r", "").split('\n').init.mkString("\n")
 
@@ -197,4 +202,42 @@ package object predef {
        | let crypto = bks && sig && str58 && str64
        | crypto""".stripMargin
 
+  def letProof(p: Proofs, prefix: String)(i: Int): String =
+    s"let ${prefix.replace(".", "")}proof$i = $prefix.proofs[$i] == base58'${p.proofs.applyOrElse(i, (_: Int) => ByteStr.empty).toString}'"
+
+  def provenPart(t: Transaction with Authorized, emptyBodyBytes: Boolean = false, checkProofs: Boolean = true): String = {
+    val version = t match {
+      case _: EthereumTransaction  => 0
+      case v: VersionedTransaction => v.version
+      case _                       => 1
+    }
+    val proofs = t match {
+      case p: ProvenTransaction => p.proofs
+      case _                    => Proofs(Seq())
+    }
+    val bodyBytesCheck =
+      if (emptyBodyBytes)
+        "t.bodyBytes.size() == 0"
+      else
+        s""" blake2b256(t.bodyBytes) == base64'${ByteStr(crypto.fastHash(t.bodyBytes.apply().array)).base64}' """
+
+    s"""
+       | let id = t.id == base58'${t.id().toString}'
+       | let fee = t.fee == ${t.fee}
+       | let timestamp = t.timestamp == ${t.timestamp}
+       | let bodyBytes = $bodyBytesCheck
+       | let sender = t.sender == Address(base58'${t.sender.toAddress}')
+       | let senderPublicKey = t.senderPublicKey == base58'${t.sender}'
+       | let version = t.version == $version
+       | ${ if (checkProofs) Range(0, 8).map(letProof(proofs, "t")).mkString("\n") else ""}
+     """.stripMargin
+  }
+
+  def assertProofs(p: String): String = {
+    val prefix = p.replace(".", "")
+    s"${prefix}proof0 && ${prefix}proof1 && ${prefix}proof2 && ${prefix}proof3 && ${prefix}proof4 && ${prefix}proof5 && ${prefix}proof6 && ${prefix}proof7"
+  }
+
+  def assertProvenPart(prefix: String, proofs: Boolean = true): String =
+    s"id && fee && timestamp && sender && senderPublicKey && ${if (proofs) assertProofs(prefix) + " &&" else ""} bodyBytes && version"
 }

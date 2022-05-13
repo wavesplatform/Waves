@@ -72,7 +72,7 @@ private class ResponsivenessLogs(csvPrefix: String, metricName: String) extends 
           .measurement(metricName)
           .tag("id", tx.id().toString)
           .tag("event", eventType.toString.toLowerCase)
-          .addField("type", tx.builder.typeId)
+          .addField("type", tx.tpe.id)
           .addField("height", height)
 
         if (eventType == TxEvent.Mined) {
@@ -159,7 +159,7 @@ private class ResponsivenessLogs(csvPrefix: String, metricName: String) extends 
           case Some(err)                                                => escape(err.toString)
           case None                                                     => ""
         }
-        val txType    = tx.builder.typeId
+        val txType    = tx.tpe.id
         val timestamp = System.currentTimeMillis()
         val txJson    = if (eventType == TxEvent.Expired || eventType == TxEvent.Invalidated) tx.json().toString() else ""
         val logLine   = s"${tx.id()};$eventType;$height;$txType;$timestamp;$reasonClass;$reasonEscaped;$txJson"
@@ -189,7 +189,7 @@ object ResponsivenessLogs {
   def isNeutrino(tx: Transaction): Boolean = {
     val txAddrs = tx match {
       case is: InvokeScriptTransaction =>
-        Seq(is.sender.toAddress) ++ (is.dAppAddressOrAlias match {
+        Seq(is.senderAddress) ++ (is.dApp match {
           case a: Address => Seq(a)
           case _          => Nil
         })
@@ -205,7 +205,7 @@ object ResponsivenessLogs {
       "3PNikM6yp4NqcSU8guxQtmR5onr2D4e8yTJ"
     )
 
-    txAddrs.map(_.stringRepr).exists(neutrinoAddrs)
+    txAddrs.map(_.toString).exists(neutrinoAddrs)
   }
 
   def writeEvent(height: Int, tx: Transaction, eventType: TxEvent, reason: Option[ValidationError] = None): Unit =

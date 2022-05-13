@@ -10,8 +10,8 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.transfer.TransferTransactionLike
+import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 
 trait EmptyBlockchain extends Blockchain {
   override lazy val settings: BlockchainSettings = BlockchainSettings.fromRootConfig(ConfigFactory.load())
@@ -42,11 +42,11 @@ trait EmptyBlockchain extends Blockchain {
 
   override def wavesAmount(height: Int): BigInt = 0
 
-  override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = None
+  override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] = None
 
-  override def transactionInfo(id: ByteStr): Option[(Int, Transaction, Boolean)] = None
+  override def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)] = None
 
-  override def transactionMeta(id: ByteStr): Option[(Int, Boolean)] = None
+  override def transactionMeta(id: ByteStr): Option[TxMeta] = None
 
   override def containsTransaction(tx: Transaction): Boolean = false
 
@@ -60,7 +60,7 @@ trait EmptyBlockchain extends Blockchain {
 
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceAtHeight(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)] = Option.empty
-  override def balanceSnapshots(address: Address, from: Int, to: Option[ByteStr]): Seq[BalanceSnapshot]         = Seq.empty
+  override def balanceSnapshots(address: Address, from: Int, to: Option[ByteStr]): Seq[BalanceSnapshot]    = Seq.empty
 
   override def accountScript(address: Address): Option[AccountScriptInfo] = None
 
@@ -75,6 +75,8 @@ trait EmptyBlockchain extends Blockchain {
   override def balance(address: Address, mayBeAssetId: Asset): Long = 0
 
   override def leaseBalance(address: Address): LeaseBalance = LeaseBalance.empty
+
+  override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] = None
 }
 
 object EmptyBlockchain extends EmptyBlockchain

@@ -7,13 +7,13 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CONST_STRING, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.ScriptResultV3
-import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, Recipient}
 import com.wavesplatform.lang.v1.traits.domain.DataItem.Lng
+import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, Recipient}
 import com.wavesplatform.test.PropSpec
-import com.wavesplatform.transaction.{Proofs, TxValidationError}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
+import com.wavesplatform.transaction.{Proofs, TxValidationError}
 import com.wavesplatform.utils.JsonMatchers
 
 class TraceResultJsonTest extends PropSpec with JsonMatchers {
@@ -31,7 +31,8 @@ class TraceResultJsonTest extends PropSpec with JsonMatchers {
         fee = 10000000L,
         feeAssetId = Waves,
         timestamp = 1111L,
-        proofs = Proofs(List(proof))
+        proofs = Proofs(List(proof)),
+        address.chainId
       )
     } yield tx
   ).explicitGet()
@@ -41,11 +42,11 @@ class TraceResultJsonTest extends PropSpec with JsonMatchers {
       "amount"     -> Right(CONST_LONG(12345)),
       "invocation" -> CONST_STRING("str")
     )
-    val recipient = Recipient.Address(ByteStr(tx.dAppAddressOrAlias.bytes))
+    val recipient = Recipient.Address(ByteStr(tx.dApp.bytes))
     val trace = List(
       InvokeScriptTrace(
         tx.id(),
-        tx.dAppAddressOrAlias,
+        tx.dApp,
         tx.funcCall,
         Right(
           ScriptResultV3(
@@ -225,7 +226,7 @@ class TraceResultJsonTest extends PropSpec with JsonMatchers {
     val trace = List(
       InvokeScriptTrace(
         tx.id(),
-        tx.dAppAddressOrAlias,
+        tx.dApp,
         tx.funcCall,
         Left(TxValidationError.ScriptExecutionError(reason, vars, None)),
         vars,

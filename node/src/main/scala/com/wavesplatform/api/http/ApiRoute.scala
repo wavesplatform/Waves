@@ -1,11 +1,11 @@
 package com.wavesplatform.api.http
 
-import akka.http.scaladsl.server._
+import akka.http.scaladsl.server.*
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.utils._
+import com.wavesplatform.utils.*
 
 trait ApiRoute extends Directives with CustomDirectives with ApiMarshallers with ScorexLogging {
   def route: Route

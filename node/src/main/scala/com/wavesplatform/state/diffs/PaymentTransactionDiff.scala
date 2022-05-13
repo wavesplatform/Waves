@@ -1,14 +1,10 @@
 package com.wavesplatform.state.diffs
 
-import cats.instances.map._
-import cats.syntax.semigroup._
-import com.wavesplatform.account.Address
+import cats.implicits.toBifunctorOps
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
+import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.PaymentTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
-
-import scala.util.{Left, Right}
 
 object PaymentTransactionDiff {
 
@@ -17,16 +13,11 @@ object PaymentTransactionDiff {
     if (blockchain.height > blockVersion3AfterHeight)
       Left(GenericError(s"Payment transaction is deprecated after h=$blockVersion3AfterHeight"))
     else
-      Right(
-        Diff(
-          portfolios = Map(tx.recipient -> Portfolio(balance = tx.amount, LeaseBalance.empty, assets = Map.empty)) combine Map(
-            Address.fromPublicKey(tx.sender) -> Portfolio(
-              balance = -tx.amount - tx.fee,
-              LeaseBalance.empty,
-              assets = Map.empty
-            )
-          )
+      Diff
+        .combine(
+          Map(tx.recipient        -> Portfolio(tx.amount.value)),
+          Map(tx.sender.toAddress -> Portfolio(-tx.amount.value - tx.fee.value))
         )
-      )
+        .bimap(GenericError(_), p => Diff(portfolios = p))
   }
 }

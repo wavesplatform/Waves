@@ -1,36 +1,37 @@
 package com.wavesplatform.lang
 
+import java.nio.charset.StandardCharsets
+
 import cats.Id
 import cats.kernel.Monoid
-import cats.syntax.either._
+import cats.syntax.either.*
 import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.Keccak256
-import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.Testing._
+import com.wavesplatform.lang.Common.*
+import com.wavesplatform.lang.Testing.*
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values._
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.directives.values.*
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, FINAL, LONG}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
-import com.wavesplatform.lang.v1.evaluator.ctx._
+import com.wavesplatform.lang.v1.evaluator.ctx.*
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, _}
 import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV2}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease}
 import com.wavesplatform.lang.v1.{CTX, ContractLimits}
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import org.scalatest.Inside
 import org.web3j.crypto.Keys
 
-import java.nio.charset.StandardCharsets
-import scala.util.{Random, Try}
+import scala.util.Random
 
 class IntegrationTest extends PropSpec with Inside {
   private def eval[T <: EVALUATED](
@@ -82,7 +83,7 @@ class IntegrationTest extends PropSpec with Inside {
     val ctx: CTX[C] =
       Monoid.combineAll(
         Seq(
-          PureContext.build(version, fixUnicodeFunctions = true).withEnvironment[C],
+          PureContext.build(version, useNewPowPrecision = true).withEnvironment[C],
           CryptoContext.build(Global, version).withEnvironment[C],
           addCtx.withEnvironment[C],
           CTX[C](sampleTypes, stringToTuple, Array(f, f2)),
@@ -90,13 +91,10 @@ class IntegrationTest extends PropSpec with Inside {
         )
       )
 
-    val typed = ExpressionCompiler(ctx.compilerContext, untyped)
-    val loggedCtx = LoggedEvaluationContext[C, Id](_ => _ => (), ctx.evaluationContext(env))
-      .asInstanceOf[LoggedEvaluationContext[Environment, Id]]
-    typed.flatMap(
-      v =>
-        Try(new EvaluatorV2(loggedCtx, version).apply(v._1, Int.MaxValue)._1.asInstanceOf[T]).toEither
-          .leftMap(_.getMessage)
+    val compiled = ExpressionCompiler(ctx.compilerContext, untyped)
+    val evalCtx = ctx.evaluationContext(env).asInstanceOf[EvaluationContext[Environment, Id]]
+    compiled.flatMap(
+      v => EvaluatorV2.applyCompleted(evalCtx, v._1, version, correctFunctionCallScope = true, newMode = true)._3.bimap(_.message, _.asInstanceOf[T])
     )
   }
 
@@ -429,7 +427,7 @@ class IntegrationTest extends PropSpec with Inside {
     }
 
     val context = Monoid.combine(
-      PureContext.build(V1, fixUnicodeFunctions = true).evaluationContext[Id],
+      PureContext.build(V1, useNewPowPrecision = true).evaluationContext[Id],
       EvaluationContext.build(
         typeDefs = Map.empty,
         letDefs = Map("x" -> LazyVal.fromEvaluated[Id](CONST_LONG(3L))),
@@ -443,7 +441,7 @@ class IntegrationTest extends PropSpec with Inside {
 
   property("context won't change after execution of an inner block") {
     val context = Monoid.combine(
-      PureContext.build(V1, fixUnicodeFunctions = true).evaluationContext[Id],
+      PureContext.build(V1, useNewPowPrecision = true).evaluationContext[Id],
       EvaluationContext.build(
         typeDefs = Map.empty,
         letDefs = Map("x" -> LazyVal.fromEvaluated[Id](CONST_LONG(3L))),
@@ -906,35 +904,6 @@ class IntegrationTest extends PropSpec with Inside {
 
     eval[EVALUATED]("MD5 == if true then MD5 else SHA1", None) shouldBe Right(CONST_BOOLEAN(true))
     eval[EVALUATED]("MD5 == if true then SHA1 else MD5", None) shouldBe Right(CONST_BOOLEAN(false))
-  }
-
-  property("math functions") {
-    eval[EVALUATED]("pow(12, 1, 3456, 3, 2, DOWN)", None) shouldBe Right(CONST_LONG(187))
-    eval[EVALUATED]("pow(12, 1, 3456, 3, 2, UP)", None) shouldBe Right(CONST_LONG(188))
-    eval[EVALUATED]("pow(0, 1, 3456, 3, 2, UP)", None) shouldBe Right(CONST_LONG(0))
-    eval[EVALUATED]("pow(20, 1, -1, 0, 4, DOWN)", None) shouldBe Right(CONST_LONG(5000))
-    eval[EVALUATED]("pow(-20, 1, -1, 0, 4, DOWN)", None) shouldBe Right(CONST_LONG(-5000))
-    eval[EVALUATED]("pow(0, 1, -1, 0, 4, DOWN)", None) shouldBe Symbol("left")
-    eval[EVALUATED]("log(16, 0, 2, 0, 0, CEILING)", None) shouldBe Right(CONST_LONG(4))
-    eval[EVALUATED]("log(16, 0, -2, 0, 0, CEILING)", None) shouldBe Symbol("left")
-    eval[EVALUATED]("log(-16, 0, 2, 0, 0, CEILING)", None) shouldBe Symbol("left")
-  }
-
-  property("math functions scale limits") {
-    eval("pow(2,  0, 2, 9, 0, UP)") should produce("out of range 0-8")
-    eval("log(2,  0, 2, 9, 0, UP)") should produce("out of range 0-8")
-    eval("pow(2, -2, 2, 0, 5, UP)") should produce("out of range 0-8")
-    eval("log(2, -2, 2, 0, 5, UP)") should produce("out of range 0-8")
-  }
-
-  property("pow result size max") {
-    eval("pow(2, 0, 62, 0, 0, UP)") shouldBe Right(CONST_LONG(Math.pow(2, 62).toLong))
-    eval("pow(2, 0, 63, 0, 0, UP)") should produce("out of long range")
-  }
-
-  property("pow result size abs min") {
-    eval("pow(10, 0, -8, 0, 8, HALFUP)") shouldBe Right(CONST_LONG(1))
-    eval("pow(10, 0, -9, 0, 8, HALFUP)") shouldBe Right(CONST_LONG(0))
   }
 
   property("HalfUp is type") {
@@ -1440,8 +1409,8 @@ class IntegrationTest extends PropSpec with Inside {
     eval(constructingMaxStringAndBytes, version = V3) shouldBe CONST_BYTESTR(ByteStr(maxBytes))
     eval(constructingMaxStringAndBytes, version = V4) shouldBe CONST_BYTESTR(ByteStr(maxBytes))
 
-    eval(constructingTooBigString, version = V3) should produce("String length = 32768 exceeds 32767")
-    eval(constructingTooBigString, version = V4) should produce("String length = 32768 exceeds 32767")
+    eval(constructingTooBigString, version = V3) should produce("String size = 32768 exceeds 32767 bytes")
+    eval(constructingTooBigString, version = V4) should produce("String size = 32768 exceeds 32767 bytes")
   }
 
   property("bytes limit") {
@@ -1636,7 +1605,7 @@ class IntegrationTest extends PropSpec with Inside {
            | f(a) == a
          """.stripMargin
 
-      eval(script, version = V3) should produce(s"Can't find a function '_Tuple$size'")
+      eval(script, version = V3) should produce(s"Can't find a function '$$Tuple$size'")
       eval(script, version = V4) shouldBe Right(CONST_BOOLEAN(true))
     }
 
@@ -2047,7 +2016,7 @@ class IntegrationTest extends PropSpec with Inside {
          |}
          |
       """.stripMargin
-    eval[EVALUATED](sampleScript, version = V4) shouldBe evaluated(5)
+    eval[EVALUATED](sampleScript, version = V6) shouldBe evaluated(5)
   }
 
   property("typed tuple destruct") {

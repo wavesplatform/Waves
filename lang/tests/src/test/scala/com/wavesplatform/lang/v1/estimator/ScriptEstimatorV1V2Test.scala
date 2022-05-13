@@ -19,11 +19,11 @@ class ScriptEstimatorV1V2Test extends ScriptEstimatorTestBase(ScriptEstimatorV1,
   }
 
   property("handles const expression correctly") {
-    estimate(Map.empty, compile("false")).explicitGet() shouldBe 1
+    estimate(customFunctionCosts, compile("false")).explicitGet() shouldBe 1
   }
 
   property("handles getter expression correctly") {
-    estimate(Map.empty, compile("tx.amount")).explicitGet() shouldBe 2 + 2
+    estimate(customFunctionCosts, compile("tx.amount")).explicitGet() shouldBe 2 + 2
   }
 
   property("evaluates let statement lazily") {
@@ -45,7 +45,7 @@ class ScriptEstimatorV1V2Test extends ScriptEstimatorTestBase(ScriptEstimatorV1,
   property("recursive let statement") {
     // let v = v; v
     val expr = BLOCK(LET("v", REF("v")), REF("v"))
-    estimate(Map.empty, expr).explicitGet() shouldBe 5 + 2 + 2
+    estimate(customFunctionCosts, expr).explicitGet() shouldBe 5 + 2 + 2
   }
 
   property("evaluates if statement lazily") {

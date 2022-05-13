@@ -1,10 +1,11 @@
 package com.wavesplatform.lang.v1.estimator.v2
 
-import com.wavesplatform.lang.ExecutionError
+
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.FUNC
-import com.wavesplatform.lang.v1.task.TaskM
+import com.wavesplatform.lang.v1.estimator.EstimationError
 import com.wavesplatform.lang.v1.estimator.v2.EstimatorContext.EvalM
+import com.wavesplatform.lang.v1.task.TaskM
 import shapeless.{Lens, lens}
 
 private[v2] case class EstimatorContext(
@@ -15,7 +16,7 @@ private[v2] case class EstimatorContext(
 )
 
 private[v2] object EstimatorContext {
-  type EvalM[A] = TaskM[EstimatorContext, ExecutionError, A]
+  type EvalM[A] = TaskM[EstimatorContext, EstimationError, A]
 
   object Lenses {
     val lets: Lens[EstimatorContext, Map[String, (Boolean, EvalM[Long])]] = lens[EstimatorContext] >> Symbol("letDefs")

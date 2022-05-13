@@ -2,11 +2,11 @@ package com.wavesplatform.settings
 
 import com.typesafe.config.Config
 import com.wavesplatform.common.state.ByteStr
-import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import net.ceedubs.ficus.Ficus.*
+import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import net.ceedubs.ficus.readers.ValueReader
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 case class RewardsSettings(
     term: Int,
@@ -45,12 +45,12 @@ object RewardsSettings {
 }
 
 case class FunctionalitySettings(
-    featureCheckBlocksPeriod: Int,
-    blocksForFeatureActivation: Int,
+    featureCheckBlocksPeriod: Int = 1000,
+    blocksForFeatureActivation: Int = 800,
     generationBalanceDepthFrom50To1000AfterHeight: Int = 0,
     blockVersion3AfterHeight: Int = 0,
     preActivatedFeatures: Map[Short, Int] = Map.empty,
-    doubleFeaturesPeriodsAfterHeight: Int,
+    doubleFeaturesPeriodsAfterHeight: Int = Int.MaxValue,
     maxTransactionTimeBackOffset: FiniteDuration = 120.minutes,
     maxTransactionTimeForwardOffset: FiniteDuration = 90.minutes,
     lastTimeBasedForkParameter: Long = 0L,
@@ -58,15 +58,18 @@ case class FunctionalitySettings(
     estimatorPreCheckHeight: Int = 0,
     minAssetInfoUpdateInterval: Int = 100000,
     minBlockTime: FiniteDuration = 15.seconds,
-    delayDelta: Int = 8
+    delayDelta: Int = 8,
+    estimationOverflowFixHeight: Int = 0,
+    estimatorSumOverflowFixHeight: Int = 0,
+    enforceTransferValidationAfter: Int = 0
 ) {
-  val allowLeasedBalanceTransferUntilHeight: Int        = blockVersion3AfterHeight
-  val allowTemporaryNegativeUntil                       = lastTimeBasedForkParameter
-  val minimalGeneratingBalanceAfter                     = lastTimeBasedForkParameter
-  val allowTransactionsFromFutureUntil                  = lastTimeBasedForkParameter
-  val allowUnissuedAssetsUntil                          = lastTimeBasedForkParameter
-  val allowInvalidReissueInSameBlockUntilTimestamp      = lastTimeBasedForkParameter
-  val allowMultipleLeaseCancelTransactionUntilTimestamp = lastTimeBasedForkParameter
+  val allowLeasedBalanceTransferUntilHeight: Int              = blockVersion3AfterHeight
+  val allowTemporaryNegativeUntil: Long                       = lastTimeBasedForkParameter
+  val minimalGeneratingBalanceAfter: Long                     = lastTimeBasedForkParameter
+  val allowTransactionsFromFutureUntil: Long                  = lastTimeBasedForkParameter
+  val allowUnissuedAssetsUntil: Long                          = lastTimeBasedForkParameter
+  val allowInvalidReissueInSameBlockUntilTimestamp: Long      = lastTimeBasedForkParameter
+  val allowMultipleLeaseCancelTransactionUntilTimestamp: Long = lastTimeBasedForkParameter
 
   require(featureCheckBlocksPeriod > 0, "featureCheckBlocksPeriod must be greater than 0")
   require(
@@ -93,31 +96,39 @@ case class FunctionalitySettings(
 }
 
 object FunctionalitySettings {
-  val MAINNET = apply(
+  val MAINNET: FunctionalitySettings = apply(
     featureCheckBlocksPeriod = 5000,
     blocksForFeatureActivation = 4000,
     generationBalanceDepthFrom50To1000AfterHeight = 232000,
-    lastTimeBasedForkParameter = 1530161445559L,
     blockVersion3AfterHeight = 795000,
     doubleFeaturesPeriodsAfterHeight = 810000,
-    estimatorPreCheckHeight = 1847610
+    lastTimeBasedForkParameter = 1530161445559L,
+    estimatorPreCheckHeight = 1847610,
+    estimationOverflowFixHeight = 2858710,
+    estimatorSumOverflowFixHeight = 2897510,
+    enforceTransferValidationAfter = 2959447
   )
 
-  val TESTNET = apply(
+  val TESTNET: FunctionalitySettings = apply(
     featureCheckBlocksPeriod = 3000,
     blocksForFeatureActivation = 2700,
     blockVersion3AfterHeight = 161700,
     doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
     lastTimeBasedForkParameter = 1492560000000L,
-    estimatorPreCheckHeight = 817380
+    estimatorPreCheckHeight = 817380,
+    estimationOverflowFixHeight = 1793770,
+    estimatorSumOverflowFixHeight = 1832520,
+    enforceTransferValidationAfter = 1698800
   )
 
-  val STAGENET = apply(
+  val STAGENET: FunctionalitySettings = apply(
     featureCheckBlocksPeriod = 100,
     blocksForFeatureActivation = 40,
-    doubleFeaturesPeriodsAfterHeight = 1000000000,
     preActivatedFeatures = (1 to 13).map(_.toShort -> 0).toMap,
-    minAssetInfoUpdateInterval = 10
+    doubleFeaturesPeriodsAfterHeight = 1000000000,
+    minAssetInfoUpdateInterval = 10,
+    estimationOverflowFixHeight = 1078680,
+    estimatorSumOverflowFixHeight = 1097419
   )
 
   val configPath = "waves.blockchain.custom.functionality"
@@ -136,7 +147,7 @@ case class GenesisSettings(
 )
 
 object GenesisSettings { // TODO: Move to network-defaults.conf
-  val MAINNET = GenesisSettings(
+  val MAINNET: GenesisSettings = GenesisSettings(
     1460678400000L,
     1465742577614L,
     Constants.UnitsInWave * Constants.TotalWaves,
@@ -153,7 +164,7 @@ object GenesisSettings { // TODO: Move to network-defaults.conf
     60.seconds
   )
 
-  val TESTNET = GenesisSettings(
+  val TESTNET: GenesisSettings = GenesisSettings(
     1460678400000L,
     1478000000000L,
     Constants.UnitsInWave * Constants.TotalWaves,
@@ -172,7 +183,7 @@ object GenesisSettings { // TODO: Move to network-defaults.conf
     60.seconds
   )
 
-  val STAGENET = GenesisSettings(
+  val STAGENET: GenesisSettings = GenesisSettings(
     1561705836768L,
     1561705836768L,
     Constants.UnitsInWave * Constants.TotalWaves,

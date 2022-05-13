@@ -1,9 +1,9 @@
 package com.wavesplatform.common.state
 
-import com.wavesplatform.common.utils.{Base58, Base64}
-import com.wavesplatform.common._
-
 import scala.util.Try
+
+import com.wavesplatform.common._
+import com.wavesplatform.common.utils.{Base58, Base64}
 
 case class ByteStr(arr: Array[Byte]) {
   private[this] lazy val base58: String = Base58.encode(arr)
@@ -30,25 +30,25 @@ case class ByteStr(arr: Array[Byte]) {
   def ++(other: ByteStr): ByteStr =
     if (this.isEmpty) other else ByteStr(this.arr ++ other.arr)
 
-  def take(n: Long): ByteStr = {
+  def take(n: Int): ByteStr = {
     val n1 = n min arr.length max 0
 
     if (n1 == arr.length) this
     else if (n1 == 0) ByteStr.empty
-    else ByteStr(arr.take(n1.toInt))
+    else ByteStr(arr.take(n1))
   }
 
-  def drop(n: Long): ByteStr = {
+  def drop(n: Int): ByteStr = {
     val n1 = n min arr.length max 0
 
     if (n1 == arr.length) ByteStr.empty
     else if (n1 == 0) this
-    else ByteStr(arr.drop(n1.toInt))
+    else ByteStr(arr.drop(n1))
   }
 
-  def takeRight(n: Long): ByteStr = drop(arr.length.toLong - n)
+  def takeRight(n: Int): ByteStr = drop(arr.length - n)
 
-  def dropRight(n: Long): ByteStr = take(arr.length.toLong - n.max(0))
+  def dropRight(n: Int): ByteStr = take(arr.length - n.max(0))
 
   override def equals(a: Any): Boolean = a match {
     case other: ByteStr => java.util.Arrays.equals(arr, other.arr)
@@ -57,7 +57,7 @@ case class ByteStr(arr: Array[Byte]) {
 
   private lazy val hc = java.util.Arrays.hashCode(arr)
 
-  override def hashCode(): Int = hc
+  override final def hashCode(): Int = hc
 }
 
 object ByteStr {

@@ -1,32 +1,36 @@
 package com.wavesplatform.state
 
+import cats.Monad
 import cats.data.Ior
-import cats.instances.map._
+import cats.implicits.{catsSyntaxSemigroup, toFlatMapOps, toFunctorOps}
 import cats.kernel.{Monoid, Semigroup}
-import cats.syntax.semigroup._
+import cats.syntax.either.*
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.smart.InvokeTransaction
+import com.wavesplatform.transaction.{Asset, EthereumTransaction, Transaction}
 
 import scala.collection.immutable.VectorMap
 
-case class LeaseBalance(in: Long, out: Long)
+case class LeaseBalance(in: Long, out: Long) {
+  def combineF[F[_]: Monad](that: LeaseBalance)(implicit s: Summarizer[F]): F[LeaseBalance] =
+    for {
+      in  <- s.sum(in, that.in, "Lease in")
+      out <- s.sum(out, that.out, "Lease out")
+    } yield LeaseBalance(in, out)
+}
 
 object LeaseBalance {
   val empty: LeaseBalance = LeaseBalance(0, 0)
-
-  implicit val m: Monoid[LeaseBalance] = new Monoid[LeaseBalance] {
-    override def empty: LeaseBalance = LeaseBalance.empty
-
-    override def combine(x: LeaseBalance, y: LeaseBalance): LeaseBalance =
-      LeaseBalance(safeSum(x.in, y.in), safeSum(x.out, y.out))
-  }
 }
 
 case class VolumeAndFee(volume: Long, fee: Long)
@@ -78,7 +82,7 @@ case class AssetDescription(
     nft: Boolean
 )
 
-case class AccountDataInfo(data: Map[String, DataEntry[_]])
+case class AccountDataInfo(data: Map[String, DataEntry[?]])
 
 object AccountDataInfo {
   implicit val accountDataInfoMonoid: Monoid[AccountDataInfo] = new Monoid[AccountDataInfo] {
@@ -137,7 +141,7 @@ object Sponsorship {
     }
 }
 
-case class NewTransactionInfo(transaction: Transaction, affected: Set[Address], applied: Boolean)
+case class NewTransactionInfo(transaction: Transaction, affected: Set[Address], applied: Boolean, spentComplexity: Long)
 
 case class NewAssetInfo(static: AssetStaticInfo, dynamic: AssetInfo, volume: AssetVolumeInfo)
 
@@ -157,33 +161,55 @@ case class Diff(
     sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
     scriptsRun: Int = 0,
     scriptsComplexity: Long = 0,
-    scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty
-)
+    scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty,
+    ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map.empty
+) {
+  @inline
+  final def combineE(newer: Diff): Either[ValidationError, Diff] = combineF(newer).leftMap(GenericError(_))
+
+  def combineF(newer: Diff): Either[String, Diff] =
+    Diff
+      .combine(portfolios, newer.portfolios)
+      .map(portfolios =>
+        Diff(
+          transactions = transactions ++ newer.transactions,
+          portfolios = portfolios,
+          issuedAssets = issuedAssets ++ newer.issuedAssets,
+          updatedAssets = updatedAssets |+| newer.updatedAssets,
+          aliases = aliases ++ newer.aliases,
+          orderFills = orderFills.combine(newer.orderFills),
+          leaseState = leaseState ++ newer.leaseState,
+          scripts = scripts ++ newer.scripts,
+          assetScripts = assetScripts ++ newer.assetScripts,
+          accountData = accountData.combine(newer.accountData),
+          sponsorship = sponsorship.combine(newer.sponsorship),
+          scriptsRun = scriptsRun + newer.scriptsRun,
+          scriptResults = scriptResults.combine(newer.scriptResults),
+          scriptsComplexity = scriptsComplexity + newer.scriptsComplexity,
+          ethereumTransactionMeta = ethereumTransactionMeta ++ newer.ethereumTransactionMeta
+        )
+      )
+}
 
 object Diff {
   val empty: Diff = Diff()
 
-  implicit val diffMonoid: Monoid[Diff] = new Monoid[Diff] {
-    override def empty: Diff = Diff.empty
-
-    override def combine(older: Diff, newer: Diff): Diff =
-      Diff(
-        transactions = older.transactions ++ newer.transactions,
-        portfolios = older.portfolios.combine(newer.portfolios),
-        issuedAssets = older.issuedAssets ++ newer.issuedAssets,
-        updatedAssets = older.updatedAssets |+| newer.updatedAssets,
-        aliases = older.aliases ++ newer.aliases,
-        orderFills = older.orderFills.combine(newer.orderFills),
-        leaseState = older.leaseState ++ newer.leaseState,
-        scripts = older.scripts ++ newer.scripts,
-        assetScripts = older.assetScripts ++ newer.assetScripts,
-        accountData = older.accountData.combine(newer.accountData),
-        sponsorship = older.sponsorship.combine(newer.sponsorship),
-        scriptsRun = older.scriptsRun + newer.scriptsRun,
-        scriptResults = older.scriptResults.combine(newer.scriptResults),
-        scriptsComplexity = older.scriptsComplexity + newer.scriptsComplexity
-      )
-  }
+  def combine(portfolios1: Map[Address, Portfolio], portfolios2: Map[Address, Portfolio]): Either[String, Map[Address, Portfolio]] =
+    if (portfolios1.isEmpty) Right(portfolios2)
+    else if (portfolios2.isEmpty) Right(portfolios1)
+    else
+      portfolios2.foldLeft[Either[String, Map[Address, Portfolio]]](Right(portfolios1)) {
+        case (Right(seed), kv @ (address, pf)) =>
+          seed.get(address).fold[Either[String, Map[Address, Portfolio]]](Right(seed + kv)) { oldPf =>
+            oldPf
+              .combine(pf)
+              .bimap(
+                err => s"$address: " + err,
+                newPf => seed + (address -> newPf)
+              )
+          }
+        case (r, _) => r
+      }
 
   implicit class DiffExt(private val d: Diff) extends AnyVal {
     def errorMessage(txId: ByteStr): Option[InvokeScriptResult.ErrorMessage] =
@@ -192,12 +218,24 @@ object Diff {
     def hashString: String =
       Integer.toHexString(d.hashCode())
 
-    def bindTransaction(tx: Transaction): Diff = {
-      val calledScripts = d.scriptResults.values
-        .flatMap(inv => InvokeScriptResult.Invocation.calledAddresses(inv.invokes))
-
-      val affectedAddresses = d.portfolios.keySet ++ d.accountData.keySet ++ calledScripts
-      d.copy(transactions = VectorMap(tx.id() -> NewTransactionInfo(tx, affectedAddresses, applied = true)))
+    def bindTransaction(blockchain: Blockchain, tx: Transaction, applied: Boolean): Diff = {
+      val calledScripts = d.scriptResults.values.flatMap(inv => InvokeScriptResult.Invocation.calledAddresses(inv.invokes))
+      val maybeDApp = tx match {
+        case i: InvokeTransaction =>
+          i.dApp match {
+            case alias: Alias     => d.aliases.get(alias).orElse(blockchain.resolveAlias(alias).toOption)
+            case address: Address => Some(address)
+          }
+        case et: EthereumTransaction =>
+          et.payload match {
+            case EthereumTransaction.Invocation(dApp, _) => Some(dApp)
+            case _ => None
+          }
+        case _ =>
+          None
+      }
+      val affectedAddresses = d.portfolios.keySet ++ d.accountData.keySet ++ calledScripts ++ maybeDApp
+      d.copy(transactions = VectorMap(tx.id() -> NewTransactionInfo(tx, affectedAddresses, applied, d.scriptsComplexity)))
     }
   }
 }

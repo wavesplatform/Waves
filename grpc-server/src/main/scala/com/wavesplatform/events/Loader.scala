@@ -60,7 +60,7 @@ object Loader {
           _.body.modify {
             case Body.Block(value) =>
               Body.Block(value.copy(block = blocksApi.blockAtHeight(height).map {
-                case (meta, txs) => PBBlock(Some(meta.header.toPBHeader), meta.signature.toByteString, txs.map(_._1.toPB))
+                case (meta, txs) => PBBlock(Some(meta.header.toPBHeader), meta.signature.toByteString, txs.map(_._2.toPB))
               }))
             case other => other
           }

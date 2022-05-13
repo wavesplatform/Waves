@@ -1,51 +1,52 @@
 package com.wavesplatform.lang.v1
 
+import java.util.concurrent.TimeUnit
+
 import cats.Id
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common
-import com.wavesplatform.lang.directives.values.V1
+import com.wavesplatform.lang.directives.values.{V1, V3}
 import com.wavesplatform.lang.v1.EvaluatorV2Benchmark._
-import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
+import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, IF, TRUE}
+import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext}
-import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
-import java.util.concurrent.TimeUnit
+import scala.annotation.tailrec
 
 object EvaluatorV2Benchmark {
-  val pureContext: CTX[Environment]                       = PureContext.build(V1, fixUnicodeFunctions = true).withEnvironment[Environment]
+  val pureContext: CTX[Environment]                       = PureContext.build(V1, useNewPowPrecision = true, useNewPowPrecision = true).withEnvironment[Environment]
   val pureEvalContext: EvaluationContext[Environment, Id] = pureContext.evaluationContext(Common.emptyBlockchainEnvironment())
-  val evaluatorV2: EvaluatorV2                            = new EvaluatorV2(LoggedEvaluationContext(_ => _ => (), pureEvalContext), V1)
+  val evaluatorV2: EvaluatorV2                            = new EvaluatorV2(LoggedEvaluationContext(_ => _ => (), pureEvalContext), V1, true)
 }
 
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
 @Threads(1)
 @Fork(1)
-@Warmup(iterations = 20)
-@Measurement(iterations = 10)
+@Warmup(iterations = 10, time = 1)
+@Measurement(iterations = 10, time = 1)
 class EvaluatorV2Benchmark {
   @Benchmark
-  def funcs(st: Funcs, bh: Blackhole): Unit = bh.consume(evaluatorV2(st.expr, 1000000))
+  def funcs(st: Funcs, bh: Blackhole): Unit = bh.consume(eval(pureEvalContext, st.expr, V1))
 
   @Benchmark
-  def lets(st: Lets, bh: Blackhole): Unit = bh.consume(evaluatorV2(st.expr, 1000000))
+  def lets(st: Lets, bh: Blackhole): Unit = bh.consume(eval(pureEvalContext, st.expr, V1))
 
   @Benchmark
-  def custom(st: CustomFunc, bh: Blackhole): Unit = bh.consume(evaluatorV2(st.expr, 1000000))
+  def custom(st: CustomFunc, bh: Blackhole): Unit = bh.consume(eval(pureEvalContext, st.expr, V1))
 
   @Benchmark
-  def littleCustom(st: LittleCustomFunc, bh: Blackhole): Unit = bh.consume(evaluatorV2(st.expr, 1000000))
+  def littleCustom(st: LittleCustomFunc, bh: Blackhole): Unit = bh.consume(eval(pureEvalContext, st.expr, V1))
+
+  @Benchmark
+  def conditions(st: Conditions, bh: Blackhole): Unit = bh.consume(eval(pureEvalContext, st.expr, V1))
 }
 
 @State(Scope.Benchmark)
 class Funcs {
-  val context = pureEvalContext
-
   val count = 2000
   val script =
     s"""
@@ -56,14 +57,11 @@ class Funcs {
        | a$count() == a$count()
       """.stripMargin
 
-  val parsed = Parser.parseExpr(script).get.value
-  val expr   = ExpressionCompiler(pureContext.compilerContext, parsed).explicitGet()._1
+  val expr = TestCompiler(V3).compileExpression(script).expr.asInstanceOf[EXPR]
 }
 
 @State(Scope.Benchmark)
 class Lets {
-  val context = pureEvalContext
-
   val count = 5000
   val script =
     s"""
@@ -72,14 +70,11 @@ class Lets {
        | a$count == a$count
       """.stripMargin
 
-  val parsed = Parser.parseExpr(script).get.value
-  val expr   = ExpressionCompiler(pureContext.compilerContext, parsed).explicitGet()._1
+  val expr = TestCompiler(V3).compileExpression(script).expr.asInstanceOf[EXPR]
 }
 
 @State(Scope.Benchmark)
 class CustomFunc {
-  val context = pureEvalContext
-
   val script =
     s"""
        | func f() = {
@@ -119,14 +114,11 @@ class CustomFunc {
        | f() && f() && f() && f() && f() && f() && f()
       """.stripMargin
 
-  val parsed = Parser.parseExpr(script).get.value
-  val expr   = ExpressionCompiler(pureContext.compilerContext, parsed).explicitGet()._1
+  val expr = TestCompiler(V3).compileExpression(script).expr.asInstanceOf[EXPR]
 }
 
 @State(Scope.Benchmark)
 class LittleCustomFunc {
-  val context = pureEvalContext
-
   val script =
     s"""
        | func f() = {
@@ -166,6 +158,14 @@ class LittleCustomFunc {
        | f()
       """.stripMargin
 
-  val parsed = Parser.parseExpr(script).get.value
-  val expr   = ExpressionCompiler(pureContext.compilerContext, parsed).explicitGet()._1
+  val expr = TestCompiler(V3).compileExpression(script).expr.asInstanceOf[EXPR]
+}
+
+@State(Scope.Benchmark)
+class Conditions {
+  @tailrec private def build(r: EXPR, count: Int): EXPR =
+    if (count > 0) build(IF(TRUE, TRUE, r), count - 1)
+    else r
+
+  val expr = build(TRUE, 11000) // ~ 32 KB
 }
