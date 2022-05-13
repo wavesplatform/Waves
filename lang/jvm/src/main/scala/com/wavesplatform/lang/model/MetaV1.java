@@ -1,15 +1,16 @@
 package com.wavesplatform.lang.model;
 
-import com.wavesplatform.lang.contract.meta.FunctionSignatures;
+import java.util.List;
+import java.util.Map;
 
 public class MetaV1 implements Meta {
-    private final FunctionSignatures functionSignatures;
+    private final Map<String, List<ArgNameWithType>> functionSignatures;
 
-    public MetaV1(FunctionSignatures functionSignatures) {
+    public MetaV1(Map<String, List<ArgNameWithType>> functionSignatures) {
         this.functionSignatures = functionSignatures;
     }
 
-    public FunctionSignatures getFunctionSignatures() {
+    public Map<String, List<ArgNameWithType>> getFunctionSignatures() {
         return functionSignatures;
     }
 }
