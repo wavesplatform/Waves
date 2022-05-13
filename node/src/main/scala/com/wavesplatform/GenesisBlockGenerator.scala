@@ -4,7 +4,7 @@ import java.io.{File, FileNotFoundException}
 import java.nio.file.Files
 
 import scala.annotation.tailrec
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
@@ -13,14 +13,14 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.{FairPoSCalculator, NxtPoSCalculator, PoSCalculator}
 import com.wavesplatform.consensus.PoSCalculator.{generationSignature, hit}
-import com.wavesplatform.crypto._
+import com.wavesplatform.crypto.*
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.settings.{FunctionalitySettings, GenesisSettings, GenesisTransactionSettings}
 import com.wavesplatform.transaction.{GenesisTransaction, TxNonNegativeAmount}
-import com.wavesplatform.utils._
+import com.wavesplatform.utils.*
 import com.wavesplatform.wallet.Wallet
-import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import net.ceedubs.ficus.Ficus.*
+import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 
 object GenesisBlockGenerator {
 
@@ -47,7 +47,14 @@ object GenesisBlockGenerator {
     private val features: Map[Short, Int] =
       preActivatedFeatures.getOrElse(List(BlockchainFeatures.FairPoS.id.toInt, BlockchainFeatures.BlockV5.id.toInt)).map(f => f.toShort -> 0).toMap
 
-    val functionalitySettings: FunctionalitySettings = FunctionalitySettings(Int.MaxValue, Int.MaxValue, preActivatedFeatures = features, doubleFeaturesPeriodsAfterHeight = Int.MaxValue, minBlockTime = minBlockTime.getOrElse(15.seconds), delayDelta = delayDelta.getOrElse(8))
+    val functionalitySettings: FunctionalitySettings = FunctionalitySettings(
+      Int.MaxValue,
+      Int.MaxValue,
+      preActivatedFeatures = features,
+      doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
+      minBlockTime = minBlockTime.getOrElse(15.seconds),
+      delayDelta = delayDelta.getOrElse(8)
+    )
 
     def preActivated(feature: BlockchainFeature): Boolean = features.contains(feature.id)
   }
@@ -143,9 +150,11 @@ object GenesisBlockGenerator {
 
     val timestamp = settings.timestamp.getOrElse(System.currentTimeMillis())
 
-    val genesisTxs: Seq[GenesisTransaction] = shares.map {
-      case (addrInfo, part) =>
-        GenesisTransaction(addrInfo.accountAddress, part, timestamp, ByteStr.empty, settings.chainId)
+    val genesisTxs: Seq[GenesisTransaction] = shares.flatMap { case (addrInfo, part) =>
+      TxNonNegativeAmount
+        .from(part)
+        .toOption
+        .map(amount => GenesisTransaction(addrInfo.accountAddress, amount, timestamp, ByteStr.empty, settings.chainId))
     }
 
     def genesisSettings(predefined: Option[Long]): GenesisSettings =
@@ -177,7 +186,7 @@ object GenesisBlockGenerator {
         settings.initialBalance,
         Some(genesis.signature),
         genesisTxs.map { tx =>
-          GenesisTransactionSettings(tx.recipient.stringRepr, tx.amount)
+          GenesisTransactionSettings(tx.recipient.toString, tx.amount.value)
         },
         genesis.header.baseTarget,
         settings.averageBlockDelay

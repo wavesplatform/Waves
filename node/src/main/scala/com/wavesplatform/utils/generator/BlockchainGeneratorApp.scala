@@ -2,23 +2,21 @@ package com.wavesplatform.utils.generator
 
 import java.io.{File, FileOutputStream, PrintWriter}
 import java.util.concurrent.TimeUnit
-
 import scala.collection.mutable.ArrayBuffer
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.language.reflectiveCalls
-
-import cats.implicits._
+import cats.implicits.*
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions}
 import com.wavesplatform.{GenesisBlockGenerator, Version}
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.openDB
-import com.wavesplatform.events.BlockchainUpdateTriggers
+import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerImpl}
-import com.wavesplatform.settings._
+import com.wavesplatform.settings.*
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -27,8 +25,8 @@ import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.DefaultChannelGroup
 import monix.reactive.subjects.ConcurrentSubject
-import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import net.ceedubs.ficus.Ficus.*
+import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import play.api.libs.json.Json
 import scopt.OParser
 
@@ -145,9 +143,23 @@ object BlockchainGeneratorApp extends ScorexLogging {
         map.get(account).toRight(GenericError(s"No key for $account"))
     }
 
-    val utx           = new UtxPoolImpl(fakeTime, blockchain, spendableBalance, wavesSettings.utxSettings)
-    val posSelector   = PoSSelector(blockchain, None)
-    val miner         = new MinerImpl(new DefaultChannelGroup("", null), blockchain, wavesSettings, fakeTime, utx, wallet, posSelector, scheduler, scheduler)
+    val utx         = new UtxPoolImpl(fakeTime, blockchain, wavesSettings.utxSettings, wavesSettings.minerSettings.enable)
+    val posSelector = PoSSelector(blockchain, None)
+    val utxEvents   = ConcurrentSubject.publish[UtxEvent](scheduler)
+    val miner = new MinerImpl(
+      new DefaultChannelGroup("", null),
+      blockchain,
+      wavesSettings,
+      fakeTime,
+      utx,
+      wallet,
+      posSelector,
+      scheduler,
+      scheduler,
+      utxEvents.collect { case _: UtxEvent.TxAdded =>
+        ()
+      }
+    )
     val blockAppender = BlockAppender(blockchain, fakeTime, utx, posSelector, scheduler, verify = false) _
 
     object Output {
@@ -181,10 +193,9 @@ object BlockchainGeneratorApp extends ScorexLogging {
     val blocks = ArrayBuffer.empty[Block]
 
     def averageTime(): FiniteDuration = {
-      val (_, delaySum) = blocks.foldLeft(fakeTime.startTime -> 0L) {
-        case ((prevTs, delays), block) =>
-          val ts = block.header.timestamp
-          (ts, ts - prevTs + delays)
+      val (_, delaySum) = blocks.foldLeft(fakeTime.startTime -> 0L) { case ((prevTs, delays), block) =>
+        val ts = block.header.timestamp
+        (ts, ts - prevTs + delays)
       }
       delaySum.millis / blocks.length.max(1)
     }
