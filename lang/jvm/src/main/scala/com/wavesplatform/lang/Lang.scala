@@ -1,7 +1,10 @@
 package com.wavesplatform.lang
 
+import cats.implicits.toBifunctorOps
+import com.wavesplatform.lang.model.{DAppWithMeta, MetaV1}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.serialization.SerdeV1
 
 object Lang {
@@ -21,6 +24,15 @@ object Lang {
         }
       )
 
+  def compileDApp(input: String): DAppWithMeta =
+    API
+      .compile(input, ScriptEstimatorV3(fixOverflow = true, overhead = false))
+      .flatMap {
+        case r: CompileResult.DApp => Global.dAppFuncTypes(r.dAppInfo.dApp).bimap(_.m, m => new DAppWithMeta(r.dAppInfo.dApp, new MetaV1(m)))
+        case _                     => Left("not a dApp")
+      }
+      .fold(e => throw new IllegalArgumentException(e), identity)
+
   def parseAndCompile(input: String, needCompaction: Boolean, removeUnusedCode: Boolean): CompileAndParseResult =
     parseAndCompile(input, API.latestEstimatorVersion, needCompaction, removeUnusedCode)
 
@@ -32,6 +44,5 @@ object Lang {
         res => res
       )
 
-  def serializable(expr: Terms.EXPR): Array[Byte] = SerdeV1.serialize(expr)
-
+  def serialize(expr: Terms.EXPR): Array[Byte] = SerdeV1.serialize(expr)
 }

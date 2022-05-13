@@ -1,4 +1,5 @@
 import JsApiUtils.*
+import cats.implicits.toBifunctorOps
 import com.wavesplatform.DocSource
 import com.wavesplatform.lang.*
 import com.wavesplatform.lang.directives.Directive.extractDirectives
@@ -160,12 +161,22 @@ object JsAPI {
               "complexity" -> complexity.toDouble
             )
           case CompileResult.DApp(_, di, error) =>
+            val metaE = Global.dAppFuncTypes(di.dApp).leftMap(_.m)
+            val meta = metaE
+              .map(_.argsWithFuncName)
+              .getOrElse(Nil)
+              .map { case (func, argsWithName) =>
+                func -> argsWithName.map { case (arg, argType) => arg -> argType.name }.toJSArray
+              }
+              .toJSArray
+
             val compactNameToOriginalName: Map[String, String] =
               di.dApp.meta.compactNameAndOriginalNamePairList.map(pair => pair.compactName -> pair.originalName).toMap
 
             val resultFields: Seq[(String, Any)] = Seq(
               "result"               -> Global.toBuffer(di.bytes),
               "ast"                  -> toJs(di.dApp),
+              "meta"                 -> meta,
               "complexity"           -> di.maxComplexity._2.toDouble,
               "verifierComplexity"   -> di.verifierComplexity.toDouble,
               "callableComplexities" -> di.callableComplexities.view.mapValues(_.toDouble).toMap.toJSDictionary,
@@ -176,13 +187,13 @@ object JsAPI {
                 compactNameToOriginalName.getOrElse(name, name) -> complexity.toDouble
               }.toJSDictionary
             )
-            val errorFieldOpt: Seq[(String, Any)] = {
+            val errorFieldOpt: Seq[(String, Any)] =
               error
+                .flatMap(_ => metaE)
                 .fold(
                   error => Seq("error" -> error),
                   _ => Seq()
                 )
-            }
             js.Dynamic.literal.applyDynamic("apply")((resultFields ++ errorFieldOpt)*)
         }
       )
