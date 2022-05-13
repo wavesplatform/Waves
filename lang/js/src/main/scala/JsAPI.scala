@@ -168,7 +168,8 @@ object JsAPI {
               .map { case (func, argsWithName) =>
                 func -> argsWithName.map { case (arg, argType) => arg -> argType.name }.toJSArray
               }
-              .toJSArray
+              .toMap
+              .toJSDictionary
 
             val compactNameToOriginalName: Map[String, String] =
               di.dApp.meta.compactNameAndOriginalNamePairList.map(pair => pair.compactName -> pair.originalName).toMap

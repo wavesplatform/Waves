@@ -31,7 +31,7 @@ trait JsonFormats {
                     )
                 }
               functionName -> functionArgs
-          }*
+          }.toSeq*
         )
       )
 

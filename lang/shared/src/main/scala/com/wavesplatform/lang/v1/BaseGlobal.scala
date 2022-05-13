@@ -264,7 +264,7 @@ trait BaseGlobal {
             func.u.name -> (func.u.args zip argTypes)
           }
       )
-    FunctionSignatures(meta.version, argTypesWithFuncName)
+    FunctionSignatures(meta.version, argTypesWithFuncName.toMap)
   }
 
   def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean
