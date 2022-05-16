@@ -1,7 +1,6 @@
 package com.wavesplatform.lang
 
 import cats.implicits.toBifunctorOps
-import com.wavesplatform.lang.model.{ArgNameWithType, DAppWithMeta, MetaV1}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
@@ -36,13 +35,13 @@ object Lang {
             .bimap(
               _.m,
               meta => {
-                val javaMeta = new MetaV1(
+                val javaMeta = Meta(
                   meta.argsWithFuncName.view
-                    .mapValues(_.map { case (argName, argType) => new ArgNameWithType(argName, argType.name) }.asJava)
+                    .mapValues(_.map { case (argName, argType) => ArgNameWithType(argName, argType.name) }.asJava)
                     .toMap
                     .asJava
                 )
-                new DAppWithMeta(r.dAppInfo.dApp, javaMeta)
+                DAppWithMeta(r.dAppInfo.dApp, javaMeta)
               }
             )
         case _ => Left("not a dApp")
