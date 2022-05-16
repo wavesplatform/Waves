@@ -18,7 +18,6 @@ trait JsonFormats {
     (o: FunctionSignatures) =>
       Json.obj(
         "version"          -> o.version.toString,
-        "isArrayArguments" -> true,
         "callableFuncTypes" -> Json.obj(
           o.argsWithFuncName.map {
             case (functionName, args) =>
