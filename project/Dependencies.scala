@@ -77,7 +77,9 @@ object Dependencies {
       catsModule("kernel").value,
       catsModule("macros", "2.1.1").value,
       shapeless.value,
-      "com.google.protobuf" % "protobuf-java" % "3.19.2" // TODO: remove in NODE-2414
+      "com.google.protobuf" % "protobuf-java" % "3.19.2", // TODO: remove in NODE-2414
+      "net.java.dev.jna" % "jna" % "5.12.0-SNAPSHOT",
+      "net.java.dev.jna" % "jna-platform" % "5.12.0-SNAPSHOT"
     )
   )
 
