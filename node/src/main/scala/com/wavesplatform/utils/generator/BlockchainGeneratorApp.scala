@@ -36,7 +36,8 @@ object BlockchainGeneratorApp extends ScorexLogging {
       configFile: Option[File] = None,
       outputFile: Option[File] = None,
       blocks: Int = 1000,
-      targetAverageTime: Option[Int] = None
+      targetAverageTime: Option[Int] = None,
+      miningConflictInterval: Option[Int] = None
   )
 
   def parseOptions(args: Array[String]): BlockchainGeneratorAppSettings = {
@@ -44,7 +45,7 @@ object BlockchainGeneratorApp extends ScorexLogging {
       import scopt.OParser
 
       val builder = OParser.builder[BlockchainGeneratorAppSettings]
-      import builder._
+      import builder.*
 
       OParser.sequence(
         programName("waves blockchain generator"),
@@ -67,6 +68,10 @@ object BlockchainGeneratorApp extends ScorexLogging {
           .text("Blocks count")
           .action((h, c) => c.copy(blocks = h))
           .validate(h => if (h > 0) success else failure("Blocks must be > 0")),
+        opt[Int]("mining-conflict")
+          .abbr("mc")
+          .text("Mining conflict interval (in milliseconds)")
+          .action((mc, c) => c.copy(miningConflictInterval = Some(mc))),
         help("help").hidden()
       )
     }
@@ -210,8 +215,11 @@ object BlockchainGeneratorApp extends ScorexLogging {
       }
     }
 
+    var conflictCounter = 0
+
     var quit = false
     sys.addShutdownHook {
+      log.info(s"Found $conflictCounter miner conflicts")
       log.info(f"Average block time is ${averageTime().toUnit(TimeUnit.SECONDS)}%.2f seconds")
       quit = true
     }
@@ -220,6 +228,18 @@ object BlockchainGeneratorApp extends ScorexLogging {
       val times = miners.flatMap { kp =>
         val time = miner.nextBlockGenerationTime(blockchain, blockchain.height, blockchain.lastBlockHeader.get, kp)
         time.toOption.map(kp -> _)
+      }
+
+      for {
+        mcInterval <- options.miningConflictInterval
+        sorted = times.map(_._2).sorted
+        firstMiningTime  <- sorted.headOption
+        secondMiningTime <- sorted.drop(1).headOption
+      } yield {
+        if (secondMiningTime - firstMiningTime < mcInterval) {
+          conflictCounter += 1
+          log.warn(s"Mining conflict: $firstMiningTime and $secondMiningTime")
+        }
       }
 
       val (bestMiner, nextTime) = times.minBy(_._2)
