@@ -1,6 +1,5 @@
 package com.wavesplatform.lang
 
-import cats.implicits.toBifunctorOps
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
@@ -30,20 +29,13 @@ object Lang {
       .compile(input, ScriptEstimatorV3(fixOverflow = true, overhead = false))
       .flatMap {
         case r: CompileResult.DApp =>
-          Global
-            .dAppFuncTypes(r.dAppInfo.dApp)
-            .bimap(
-              _.m,
-              meta => {
-                val javaMeta = Meta(
-                  meta.argsWithFuncName.view
-                    .mapValues(_.map { case (argName, argType) => ArgNameWithType(argName, argType.name) }.asJava)
-                    .toMap
-                    .asJava
-                )
-                DAppWithMeta(r.dAppInfo.dApp, javaMeta)
-              }
-            )
+          val javaMeta = Meta(
+            r.meta.argsWithFuncName.view
+              .mapValues(_.map { case (argName, argType) => ArgNameWithType(argName, argType.name) }.asJava)
+              .toMap
+              .asJava
+          )
+          Right(DAppWithMeta(r.dAppInfo.dApp, javaMeta))
         case _ => Left("not a dApp")
       }
       .fold(e => throw new IllegalArgumentException(e), identity)

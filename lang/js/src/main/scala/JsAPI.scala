@@ -1,5 +1,4 @@
 import JsApiUtils.*
-import cats.implicits.toBifunctorOps
 import com.wavesplatform.DocSource
 import com.wavesplatform.lang.*
 import com.wavesplatform.lang.directives.Directive.extractDirectives
@@ -160,16 +159,11 @@ object JsAPI {
               "ast"        -> toJs(expr),
               "complexity" -> complexity.toDouble
             )
-          case CompileResult.DApp(_, di, error) =>
-            val metaE = Global.dAppFuncTypes(di.dApp).leftMap(_.m)
-            val meta = metaE
-              .map(_.argsWithFuncName)
-              .getOrElse(Nil)
-              .map { case (func, argsWithName) =>
+          case CompileResult.DApp(_, di, meta, error) =>
+            val mappedMeta =
+              meta.argsWithFuncName.map { case (func, argsWithName) =>
                 func -> argsWithName.map { case (arg, argType) => arg -> argType.name }.toJSArray
-              }
-              .toMap
-              .toJSDictionary
+              }.toJSDictionary
 
             val compactNameToOriginalName: Map[String, String] =
               di.dApp.meta.compactNameAndOriginalNamePairList.map(pair => pair.compactName -> pair.originalName).toMap
@@ -177,7 +171,7 @@ object JsAPI {
             val resultFields: Seq[(String, Any)] = Seq(
               "result"               -> Global.toBuffer(di.bytes),
               "ast"                  -> toJs(di.dApp),
-              "meta"                 -> meta,
+              "meta"                 -> mappedMeta,
               "complexity"           -> di.maxComplexity._2.toDouble,
               "verifierComplexity"   -> di.verifierComplexity.toDouble,
               "callableComplexities" -> di.callableComplexities.view.mapValues(_.toDouble).toMap.toJSDictionary,
@@ -190,7 +184,6 @@ object JsAPI {
             )
             val errorFieldOpt: Seq[(String, Any)] =
               error
-                .flatMap(_ => metaE)
                 .fold(
                   error => Seq("error" -> error),
                   _ => Seq()

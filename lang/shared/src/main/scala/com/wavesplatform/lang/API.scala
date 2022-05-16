@@ -1,5 +1,7 @@
 package com.wavesplatform.lang
 
+import cats.implicits.toBifunctorOps
+import com.wavesplatform.lang.contract.meta.FunctionSignatures
 import com.wavesplatform.lang.directives.Directive.extractDirectives
 import com.wavesplatform.lang.directives.values.{Call, Expression, Library, StdLibVersion, DApp as DAppType}
 import com.wavesplatform.lang.directives.{DirectiveParser, DirectiveSet}
@@ -49,7 +51,7 @@ object CompileResult {
     override val maxComplexity: Long                     = complexity
   }
 
-  case class DApp(version: StdLibVersion, dAppInfo: DAppInfo, error: Either[String, Unit]) extends CompileResult {
+  case class DApp(version: StdLibVersion, dAppInfo: DAppInfo, meta: FunctionSignatures, error: Either[String, Unit]) extends CompileResult {
     override def bytes: Array[Byte]                      = dAppInfo.bytes
     override def verifierComplexity: Long                = dAppInfo.verifierComplexity
     override def callableComplexities: Map[String, Long] = dAppInfo.callableComplexities
@@ -206,8 +208,9 @@ object API {
       case (DAppType, _) =>
         // Just ignore stdlib version here
         G.compileContract(input, ctx, version, estimator, needCompaction, removeUnusedCode)
-          .map { di =>
-            CompileResult.DApp(version, di, G.checkContract(version, di.dApp, di.maxComplexity, di.annotatedComplexities, estimator))
+          .flatMap { di =>
+            val check = G.checkContract(version, di.dApp, di.maxComplexity, di.annotatedComplexities, estimator)
+            G.dAppFuncTypes(di.dApp).bimap(_.m, CompileResult.DApp(version, di, _, check))
           }
     }
   }
