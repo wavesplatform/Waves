@@ -362,7 +362,7 @@ object Importer extends ScorexLogging {
       if (inputStream != null) inputStream.close()
     }
 
-    startImport(establishInputStream, blockchainUpdater, extAppender, importOptions, importFileOffset() == 0)
+    startImport(() => establishInputStream(), blockchainUpdater, extAppender, importOptions, importFileOffset() == 0)
     Await.result(Kamon.stopModules(), 10.seconds)
   }
 }
