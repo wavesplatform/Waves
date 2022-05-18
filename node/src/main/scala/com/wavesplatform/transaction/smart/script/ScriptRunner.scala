@@ -49,7 +49,8 @@ object ScriptRunner {
       blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls) &&
         blockchain.height > blockchain.settings.functionalitySettings.enforceTransferValidationAfter,
       blockchain.checkEstimatorSumOverflow,
-      blockchain.newEvaluatorMode
+      blockchain.newEvaluatorMode,
+      blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
     )
 
   def applyGeneric(
@@ -64,7 +65,8 @@ object ScriptRunner {
       fixUnicodeFunctions: Boolean,
       useNewPowPrecision: Boolean,
       checkEstimatorSumOverflow: Boolean,
-      newEvaluatorMode: Boolean
+      newEvaluatorMode: Boolean,
+      checkWeakPk: Boolean
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
 
     def evalVerifier(
@@ -112,7 +114,15 @@ object ScriptRunner {
           (defaultLimit, (_: EXPR) => Right(default))
 
       val (log, unusedComplexity, result) =
-        EvaluatorV2.applyOrDefault(ctx, expr, script.stdLibVersion, limit, correctFunctionCallScope = checkEstimatorSumOverflow, newMode = newEvaluatorMode, onExceed)
+        EvaluatorV2.applyOrDefault(
+          ctx,
+          expr,
+          script.stdLibVersion,
+          limit,
+          correctFunctionCallScope = checkEstimatorSumOverflow,
+          newMode = newEvaluatorMode,
+          onExceed
+        )
 
       (log, limit - unusedComplexity, result)
     }
@@ -151,7 +161,7 @@ object ScriptRunner {
               _ => ???
             )
           )
-        (Nil, 0, Verifier.verifyAsEllipticCurveSignature(proven, blockchain.isFeatureActivated(BlockchainFeatures.RideV6)).bimap(_.err, _ => TRUE))
+        (Nil, 0, Verifier.verifyAsEllipticCurveSignature(proven, checkWeakPk).bimap(_.err, _ => TRUE))
 
       case other =>
         (Nil, 0, Left(s"$other: Unsupported script version"))
