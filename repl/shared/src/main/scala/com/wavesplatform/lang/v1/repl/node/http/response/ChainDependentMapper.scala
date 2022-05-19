@@ -6,9 +6,8 @@ import java.nio.ByteBuffer
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.EnvironmentFunctions.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.crypto.Curve25519.KeyLength
 import com.wavesplatform.lang.v1.repl.global
-import com.wavesplatform.lang.v1.repl.node.http.response.ChainDependentMapper.EthereumKeyLength
+import com.wavesplatform.lang.v1.repl.node.http.response.ChainDependentMapper.*
 import com.wavesplatform.lang.v1.repl.node.http.response.model.*
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven, Transfer}
@@ -157,5 +156,6 @@ private[node] class ChainDependentMapper(chainId: Byte) {
 }
 
 object ChainDependentMapper {
+  val KeyLength         = 32
   val EthereumKeyLength = 64
 }
