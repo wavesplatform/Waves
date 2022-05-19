@@ -1,7 +1,5 @@
 package com.wavesplatform.lang.v1.repl.node.http.response
 
-import com.google.common.primitives.Bytes
-
 import java.nio.ByteBuffer
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.EnvironmentFunctions.*
 import com.wavesplatform.common.state.ByteStr
@@ -12,7 +10,8 @@ import com.wavesplatform.lang.v1.repl.node.http.response.model.*
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven, Transfer}
 import com.wavesplatform.lang.v1.traits.domain.*
-import org.web3j.crypto.Keys
+
+import java.util
 
 private[node] class ChainDependentMapper(chainId: Byte) {
   def toRideModel(tx: TransferTransaction): Transfer =
@@ -104,9 +103,11 @@ private[node] class ChainDependentMapper(chainId: Byte) {
 
         ByteStr(bytes)
       case EthereumKeyLength =>
-        val checksumPayload = Bytes.concat(Array(1.toByte, chainId), Keys.getAddress(publicKey.bytes))
+        val hash = global.keccak256(publicKey.bytes)
+
+        val checksumPayload = Array(1.toByte, chainId) ++ util.Arrays.copyOfRange(hash, hash.length - 20, hash.length)
         val checksum        = global.checksum(checksumPayload)
-        ByteStr(Bytes.concat(checksumPayload, checksum))
+        ByteStr(checksumPayload ++ checksum)
 
       case other => throw new IllegalArgumentException(s"Unexpected public key length: $other")
     }
