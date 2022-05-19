@@ -26,13 +26,12 @@ import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.{EitherMatchers, NTPTime}
-import monix.execution.Ack
-import monix.execution.Ack.Continue
-import monix.reactive.Observer
+import monix.execution.Scheduler.Implicits.global
+import monix.reactive.subjects.PublishToOneSubject
 import org.scalamock.scalatest.MockFactory
 
-import scala.collection.mutable.ArrayBuffer
-import scala.concurrent.Future
+import scala.concurrent.Await
+import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
 class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDomain with NTPTime with DBCacheSettings with MockFactory {
@@ -302,15 +301,12 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
 
     "spendableBalanceChanged" in {
       withLevelDBWriter(RideV6) { levelDb =>
-        val spendableBalanceChanged = ArrayBuffer.empty[(Address, Asset)]
-        val observer = new Observer[(Address, Asset)] {
-          override def onNext(elem: (Address, Asset)): Future[Ack] = Future.successful { spendableBalanceChanged += elem; Continue }
-          override def onError(ex: Throwable): Unit                = throw ex
-          override def onComplete(): Unit                          = ()
-        }
+        val ps    = PublishToOneSubject[(Address, Asset)]
+        val items = ps.toListL.runToFuture
+
         val blockchain = new BlockchainUpdaterImpl(
           levelDb,
-          observer,
+          ps,
           RideV6,
           ntpTime,
           BlockchainUpdateTriggers.noop,
@@ -319,11 +315,16 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
 
         val block = TestBlock.create(Seq(genesis(defaultAddress)))
         blockchain.processBlock(block)
-        spendableBalanceChanged shouldBe Seq((TestBlock.defaultSigner.toAddress, Waves), (defaultAddress, Waves))
-
-        spendableBalanceChanged.clear()
         blockchain.processBlock(TestBlock.create(block.header.timestamp, block.id(), Seq(transfer())))
-        spendableBalanceChanged shouldBe Seq((TestBlock.defaultSigner.toAddress, Waves), (defaultAddress, Waves), (secondAddress, Waves))
+
+        ps.onComplete()
+        Await.result(items, 2.seconds) shouldBe Seq(
+          (TestBlock.defaultSigner.toAddress, Waves),
+          (defaultAddress, Waves),
+          (TestBlock.defaultSigner.toAddress, Waves),
+          (defaultAddress, Waves),
+          (secondAddress, Waves)
+        )
       }
     }
   }
