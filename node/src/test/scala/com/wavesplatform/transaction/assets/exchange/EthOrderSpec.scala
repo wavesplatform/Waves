@@ -26,8 +26,10 @@ class EthOrderSpec
   "ETH signed order" should "recover signer public key correctly" in {
     val testOrder = Order(
       Order.V4,
-      OrderAuthentication(TestEthOrdersPublicKey),
-      TestEthOrdersPublicKey,
+      EthSignature(
+        "0xfe56e1cbd6945f1e17ce9f9eb21172dd7810bcc74651dd7d3eaeca5d9ae0409113e5236075841af8195cb4dba3947ae9b99dbd560fd0c43afe89cc0b648690321c"
+      ),
+      PublicKey(EthStubBytes32),
       AssetPair(IssuedAsset(ByteStr(EthStubBytes32)), IssuedAsset(ByteStr(EthStubBytes32))),
       OrderType.BUY,
       TxExchangeAmount.unsafeFrom(1),
@@ -38,12 +40,7 @@ class EthOrderSpec
       IssuedAsset(ByteStr(EthStubBytes32))
     )
 
-    val signature =
-      EthEncoding.toBytes(
-        "0x2db69e1923c0b4d864368d9fb6c355bcd457ad4636ba9a4e66112e27a762d2900718ba91ac29346e6fed16050ae9cf76a7b9e216d8972aa8b5d159ffdbaa70801c"
-      )
-
-    val result = EthOrders.recoverEthSignerKey(testOrder, signature)
+    val result = EthOrders.recoverEthSignerKey(testOrder, testOrder.eip712Signature.get.arr)
     result shouldBe TestEthOrdersPublicKey
     result.toAddress shouldBe TestEthOrdersPublicKey.toAddress
   }
