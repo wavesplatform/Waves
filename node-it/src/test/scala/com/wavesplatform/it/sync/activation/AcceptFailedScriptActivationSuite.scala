@@ -462,7 +462,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
 }
 
 object AcceptFailedScriptActivationSuite {
-  private val ActivationHeight   = 9
+  private val ActivationHeight   = 11
   private val UpdateInterval     = 3
   private val MaxTxsInMicroBlock = 2
 
