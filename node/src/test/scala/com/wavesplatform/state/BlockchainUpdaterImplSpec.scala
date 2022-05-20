@@ -6,6 +6,7 @@ import com.wavesplatform.TestHelpers.enableNG
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.database.loadActiveLeases
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{DBCacheSettings, WithDomain}
 import com.wavesplatform.events.BlockchainUpdateTriggers
@@ -17,18 +18,24 @@ import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{Transaction, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.{EitherMatchers, NTPTime}
+import monix.execution.Scheduler.Implicits.global
+import monix.reactive.subjects.PublishToOneSubject
 import org.scalamock.scalatest.MockFactory
 
+import scala.concurrent.Await
+import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
 class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDomain with NTPTime with DBCacheSettings with MockFactory {
+  import DomainPresets.*
 
   private val FEE_AMT = 1000000L
 
@@ -258,24 +265,24 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
       val sender = KeyPair(Longs.toByteArray(Random.nextLong()))
 
       withDomain(
-        DomainPresets.RideV4,
+        RideV4,
         balances = Seq(AddrWithBalance(dapp.toAddress, 10_00000000), AddrWithBalance(sender.toAddress, 10_00000000))
       ) { d =>
         val script = ScriptCompiler
           .compile(
             """
-                |
-                |{-# STDLIB_VERSION 4 #-}
-                |{-# SCRIPT_TYPE ACCOUNT #-}
-                |{-# CONTENT_TYPE DAPP #-}
-                |
-                |@Callable(i)
-                |func default() = {
-                |  [
-                |    BinaryEntry("vrf", value(value(blockInfoByHeight(height)).vrf))
-                |  ]
-                |}
-                |""".stripMargin,
+              |
+              |{-# STDLIB_VERSION 4 #-}
+              |{-# SCRIPT_TYPE ACCOUNT #-}
+              |{-# CONTENT_TYPE DAPP #-}
+              |
+              |@Callable(i)
+              |func default() = {
+              |  [
+              |    BinaryEntry("vrf", value(value(blockInfoByHeight(height)).vrf))
+              |  ]
+              |}
+              |""".stripMargin,
             ScriptEstimatorV2
           )
           .explicitGet()
@@ -289,6 +296,35 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
           Signed.invokeScript(3.toByte, sender, dapp.toAddress, None, Seq.empty, 50_0000L, Waves, ntpTime.getTimestamp())
 
         d.appendBlock(d.createBlock(5.toByte, Seq(invoke)))
+      }
+    }
+
+    "spendableBalanceChanged" in {
+      withLevelDBWriter(RideV6) { levelDb =>
+        val ps    = PublishToOneSubject[(Address, Asset)]()
+        val items = ps.toListL.runToFuture
+
+        val blockchain = new BlockchainUpdaterImpl(
+          levelDb,
+          ps,
+          RideV6,
+          ntpTime,
+          BlockchainUpdateTriggers.noop,
+          loadActiveLeases(db, _, _)
+        )
+
+        val block = TestBlock.create(Seq(genesis(defaultAddress)))
+        blockchain.processBlock(block)
+        blockchain.processBlock(TestBlock.create(block.header.timestamp, block.id(), Seq(transfer())))
+
+        ps.onComplete()
+        Await.result(items, 2.seconds) shouldBe Seq(
+          (TestBlock.defaultSigner.toAddress, Waves),
+          (defaultAddress, Waves),
+          (TestBlock.defaultSigner.toAddress, Waves),
+          (defaultAddress, Waves),
+          (secondAddress, Waves)
+        )
       }
     }
   }
