@@ -123,7 +123,6 @@ class OrderJsonSpecification extends PropSpec with JsonMatchers with EthHelpers 
         o.matcherFeeAssetId shouldBe IssuedAsset(ByteStr.decodeBase58("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get)
     }
 
-
     val jsonOV4WithEthSig = Json.parse(s"""
         {
           "version": 4,
@@ -149,7 +148,9 @@ class OrderJsonSpecification extends PropSpec with JsonMatchers with EthHelpers 
       case JsSuccess(o, _) =>
         o.id().toString shouldBe "FU8kLN9rRXCYjUDVUg914L3rdKNbgqpcfPmzXV7kLSJZ"
         o.withProofs(Proofs.empty).id() shouldNot be(o.id())
-        o.senderPublicKey shouldBe PublicKey(ByteStr.decodeBase58("4aEWkjMryfRtekGnQwwCYQg5gaoC41cgWxYXTaLfYCrt41T4A3kXnQnt6hR5d2DHaWsHfFYXvswbbumZ3s8irEWN").get)
+        o.senderPublicKey shouldBe PublicKey(
+          ByteStr.decodeBase58("4LySXRvAsKTfhvabypvFUwYT3cvUFyZBhzFhq9UUDfzDmM4wDEmu3m5xPSD7iZrm7Zg4mmUXAkEQmodGgrdCAic7").get
+        )
         o.matcherPublicKey shouldBe PublicKey(Base58.tryDecodeWithLimit("DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ").get)
         o.assetPair.amountAsset shouldBe IssuedAsset(ByteStr.decodeBase58("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get)
         o.assetPair.priceAsset shouldBe IssuedAsset(ByteStr.decodeBase58("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get)
@@ -160,7 +161,13 @@ class OrderJsonSpecification extends PropSpec with JsonMatchers with EthHelpers 
         o.expiration shouldBe 5
         o.signature shouldBe ByteStr.empty
         o.matcherFeeAssetId shouldBe IssuedAsset(ByteStr.decodeBase58("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get)
-        o.eip712Signature shouldBe Some(ByteStr(EthEncoding.toBytes("0x40dd06c9f80215612a0397948a10dd82d6a58dda8a256544971e236a95a395ad6b87e75fb58789ece4f2ff7ed380849d120faefce135b6f7ddec9e11df169f971b")))
+        o.eip712Signature shouldBe Some(
+          ByteStr(
+            EthEncoding.toBytes(
+              "0x40dd06c9f80215612a0397948a10dd82d6a58dda8a256544971e236a95a395ad6b87e75fb58789ece4f2ff7ed380849d120faefce135b6f7ddec9e11df169f971b"
+            )
+          )
+        )
     }
   }
 
@@ -187,7 +194,7 @@ class OrderJsonSpecification extends PropSpec with JsonMatchers with EthHelpers 
     }
   }
 
-  val base58Str     = "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ"
+  val base58Str = "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ"
   val json: JsValue = Json.parse(s"""
     {
       "sender": "$base58Str",
@@ -253,18 +260,17 @@ class OrderJsonSpecification extends PropSpec with JsonMatchers with EthHelpers 
       x -> mkJson(x)
     }
 
-    jsons.foreach {
-      case (priceAssetStr, rawJson) =>
-        withClue(priceAssetStr) {
-          Json.parse(rawJson).validate[Order] match {
-            case e: JsError =>
-              fail("Error: " + JsError.toJson(e).toString())
-            case s: JsSuccess[Order] =>
-              val o = s.get
-              o.assetPair.amountAsset shouldBe Waves
-              o.assetPair.priceAsset shouldBe Waves
-          }
+    jsons.foreach { case (priceAssetStr, rawJson) =>
+      withClue(priceAssetStr) {
+        Json.parse(rawJson).validate[Order] match {
+          case e: JsError =>
+            fail("Error: " + JsError.toJson(e).toString())
+          case s: JsSuccess[Order] =>
+            val o = s.get
+            o.assetPair.amountAsset shouldBe Waves
+            o.assetPair.priceAsset shouldBe Waves
         }
+      }
     }
   }
 }

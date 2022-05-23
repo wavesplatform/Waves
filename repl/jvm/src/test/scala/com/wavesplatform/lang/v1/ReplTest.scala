@@ -255,6 +255,20 @@ class ReplTest extends AnyPropSpec with Matchers {
       "Blockchain interaction using lets from libraries is prohibited, use functions instead"
   }
 
+  property("addressFromPublicKey function") {
+    val address  = "3MpLKVSnWSY53bSNTECuGvESExzhV9ppcun"
+    val settings = NodeConnectionSettings("testnodes.wavesnodes.com", 'T'.toByte, address)
+    val repl     = Repl(Some(settings))
+    await(repl.execute("addressFromPublicKey(base58'HnU9jfhpMcQNaG5yQ46eR43RnkWKGxerw2zVrbpnbGof')")) shouldBe Right(
+      "res1: Address = Address(\n\tbytes = base58'3N7rGHurxjXCPDhJLvLxWQ1YKq1tiUDRKUL'\n)"
+    )
+    await(
+      repl.execute("addressFromPublicKey(base58'1ejb7sZqEyRLXjqukkZLmwP7KCJqbdw74oQQJRnAeir66zFQ56ZC3qP76yBLaW4hZY9NXtZ6LqnUDztZdAmCNqU')")
+    ) shouldBe Right(
+      "res2: Address = Address(\n\tbytes = base58'3N8tAA42HCeoea6jqF5k3twBYCms5irDqmN'\n)"
+    )
+  }
+
   property("transactionHeightById for failed transaction") {
     val settings = NodeConnectionSettings("testnodes.wavesnodes.com", 'T'.toByte, "")
     val client = new NodeClient {
