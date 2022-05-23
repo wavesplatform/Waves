@@ -121,15 +121,6 @@ class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[Stri
     val putDataFee   = calcDataFee(priorityData, 1)
     val priorityFee  = putDataFee + invokeFee
 
-    overflowBlock()
-    val failedTxs = sendTxsAndThenPriorityTx(
-      _ => sender.invokeScript(issuer, issuer.toAddress.toString, None, fee = invokeFee)._1.id,
-      () => sender.putData(issuer, priorityData, priorityFee).id
-    ) { (failed, _) =>
-      assertFailedTxs(failed)
-    }
-    val idFailed = failedTxs.head.id
-
     val settings = NodeConnectionSettings(miner.nodeApiEndpoint.toString, 'I'.toByte, issuer.toAddress.toString)
     val repl     = Repl(Some(settings))
 
@@ -223,9 +214,6 @@ class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[Stri
     await(repl.execute(s""" wavesBalance(Address(base58'${sample.toAddress}')).regular """)) shouldBe Right(s"res12: Int = ${100.waves}")
     await(repl.execute(""" this.wavesBalance() """))
       .explicitGet() should fullyMatch regex "res13: BalanceDetails = BalanceDetails\\(\\s+available = \\d+\\s+regular = \\d+\\s+generating = \\d+\\s+effective = \\d+\\s+\\)".r
-
-    await(repl.execute(s""" transactionHeightById(base58'$idFailed') """)) shouldBe
-      Right("res14: Int|Unit = Unit")
 
     /* It function removed from node API. Wait native protobufs implementation. */
 //    await(repl.execute(s""" transferTransactionFromProto(base58'3nec5yth17jNrNgA7dfbbmzJTKysfVyrbkAH5A8w8ncBtWYGgfxEn5hGMnNKQyacgGxuoT9DQdbufGBybzPEpR4SFSbM2o1rxgLUtocDdzLWdbSAUKKHM7f2fsCDqEExkGF2f7Se6Tfi44y3yuNMTYAKrfShEBrKGzCgbEaJtLoZo4bPdnX5V6K2eWCBFnmFjUjA947TckxnNGboh7CL6') """)) shouldBe Right(
