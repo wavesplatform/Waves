@@ -5,7 +5,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.transactions.{FailedTransactionSuiteLike, OverflowBlock}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.test._
@@ -20,8 +19,6 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[String] with OverflowBlock {
-  import restApi._
-
   override protected def waitForHeightArise(): Unit =
     nodes.waitForHeightArise()
 
@@ -115,11 +112,6 @@ class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[Stri
     )
 
     miner.setScript(issuer, Some(failDApp), 1.waves, waitForTx = true)
-
-    // used to fail invoke
-    val priorityData = List(StringDataEntry("crash", "yes"))
-    val putDataFee   = calcDataFee(priorityData, 1)
-    val priorityFee  = putDataFee + invokeFee
 
     val settings = NodeConnectionSettings(miner.nodeApiEndpoint.toString, 'I'.toByte, issuer.toAddress.toString)
     val repl     = Repl(Some(settings))
