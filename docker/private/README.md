@@ -1,6 +1,6 @@
 # Waves private node
 
-The image is useful for developing dApps and other smart contracts on Waves blockchain. Uses actual Mainnet version by default.
+The image is useful for developing dApps and other smart contracts on Waves blockchain.
 
 ## Getting started
 
@@ -8,11 +8,6 @@ To run the node,\
 `docker run -d --name waves-private-node -p 6869:6869 wavesplatform/waves-private-node`
 
 To view node API documentation, open http://localhost:6869/
-
-### Use Stagenet version
-
-If you would like to try Stagenet version of Waves Node, then use docker tag `stagenet`:\
-`docker run -d --name waves-private-node -p 6869:6869 wavesplatform/waves-private-node:stagenet`
 
 ## Preserve blockchain state
 
@@ -45,6 +40,5 @@ Full node configuration is available on Github in `waves.custom.conf`: https://g
 
 You can use the following tags:
 
-- `latest` - current version of Mainnet and Testnet
-- `stagenet` - current version of Stagenet
+- `latest` - latest version
 - `vX.X.X` - specific version of Waves Node
