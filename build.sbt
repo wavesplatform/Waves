@@ -182,8 +182,8 @@ packageAll := {
   (node / assembly).value
   (`grpc-server` / Universal / packageZipTarball).value
 
-  IO.copyFile((node / Debian / packageBin).value, new File(baseDirectory.value, "docker/target/waves.deb"))
-  IO.copyFile((`grpc-server` / Debian / packageBin).value, new File(baseDirectory.value, "docker/target/waves-grpc-server.deb"))
+  IO.copyFile((node / Debian / packageBin).value, new File(baseDirectory.value, "docker/main/target/waves.deb"))
+  IO.copyFile((`grpc-server` / Debian / packageBin).value, new File(baseDirectory.value, "docker/main/target/waves-grpc-server.deb"))
 }
 
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
