@@ -475,44 +475,6 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     (result \ "error").as[String] should include("not allowed by script of the asset")
   }
 
-  test("ExchangeTransaction: failed exchange tx when asset script fails") {
-    val init = Seq(
-      sender.setScript(firstKeyPair, None, setScriptFee + smartFee).id,
-      sender.setScript(secondKeyPair, None, setScriptFee + smartFee).id,
-      sender.setScript(thirdKeyPair, None, setScriptFee + smartFee).id
-    )
-    waitForTxs(init)
-
-    val Precondition(amountAsset, priceAsset, buyFeeAsset, sellFeeAsset) =
-      exchangePreconditions(
-        Some(ScriptCompiler.compile("true", ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64)
-      )
-
-    val assetPair      = AssetPair.createAssetPair(amountAsset, priceAsset).get
-    val fee            = 0.003.waves + 4 * smartFee
-    val sellMatcherFee = fee / 100000L
-    val buyMatcherFee  = fee / 100000L
-    val priorityFee    = setAssetScriptFee + smartFee + fee * 10
-
-    val allCases =
-      Seq((amountAsset, sellerAddress), (priceAsset, buyerAddress), (sellFeeAsset, matcherAddress), (buyFeeAsset, matcherAddress))
-
-    for ((invalidScriptAsset, owner) <- allCases) {
-      overflowBlock()
-      sendTxsAndThenPriorityTx(
-        _ =>
-          sender
-            .signedBroadcast(mkExchange(buyer, seller, matcher, assetPair, fee, buyFeeAsset, sellFeeAsset, buyMatcherFee, sellMatcherFee).json())
-            .id,
-        () => updateAssetScript(result = false, invalidScriptAsset, owner, priorityFee, waitForTx = false)
-      ) { (txs, priorityTx) =>
-        logPriorityTx(priorityTx)
-        assertFailedTxs(txs)
-      }
-      updateAssetScript(result = true, invalidScriptAsset, owner, setAssetScriptFee + smartFee)
-    }
-  }
-
   test("ExchangeTransaction: invalid exchange tx when asset script fails on broadcast") {
     val init = Seq(
       sender.setScript(firstKeyPair, None, setScriptFee + smartFee).id,
