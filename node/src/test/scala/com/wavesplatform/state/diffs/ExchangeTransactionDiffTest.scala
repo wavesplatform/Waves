@@ -13,11 +13,13 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.THROW
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.ExchangeTransactionDiff.getOrderFeePortfolio
+import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.*
@@ -1556,7 +1558,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     }
   }
 
-  property("Counts complexity correctly for failed transactions") {
+  property("Counts complexity correctly for exchanges failed by assets") {
     def test(
         priceAssetIssue: IssueTransaction,
         amountAssetIssue: IssueTransaction,
@@ -1576,24 +1578,13 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         IssuedAsset(priceAssetIssue.assetId),
         IssuedAsset(order2FeeAssetIssue.assetId)
       )
-      val exchange = TxHelpers.exchangeFromOrders(order1, order2)
+      val fee      = FeeConstants(TransactionType.Exchange) * FeeUnit + 2 * ScriptExtraFee
+      val exchange = TxHelpers.exchangeFromOrders(order1, order2, fee = fee)
 
-      withDomain(
-        domainSettingsWithFS(
-          TestFunctionalitySettings.withFeatures(
-            BlockchainFeatures.SmartAssets,
-            BlockchainFeatures.SmartAccountTrading,
-            BlockchainFeatures.OrderV3,
-            BlockchainFeatures.BlockV5
-          )
-        )
-      ) { d =>
+      withDomain(RideV4) { d =>
         d.appendBlock(Seq(amountAssetIssue, priceAssetIssue, order1FeeAssetIssue, order2FeeAssetIssue).distinct*)
-        val newBlock = d.createBlock(2.toByte, Seq(exchange))
-        val diff = BlockDiffer
-          .fromBlock(d.blockchainUpdater, Some(d.lastBlock), newBlock, MiningConstraint.Unlimited, newBlock.header.generationSignature)
-          .explicitGet()
-        diff.diff.scriptsComplexity shouldBe complexity
+        d.appendAndAssertFailed(exchange)
+        d.liquidDiff.scriptsComplexity shouldBe complexity
       }
     }
 
