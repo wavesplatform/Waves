@@ -14,7 +14,7 @@ GitHub repository: https://github.com/wavesplatform/Waves/tree/master/docker
 It is highly recommended to read more about [Waves Node configuration](https://docs.waves.tech/en/waves-node/node-configuration) before running the container.
 
 ## Building Docker image
-`./build-with-docker.sh && docker build -t wavesplatform/wavesnode docker` (from the repository root) - builds an image with the current local repository
+`./build-with-docker.sh && docker build -t wavesplatform/wavesnode docker/main` (from the repository root) - builds an image with the current local repository
 
 **You can specify following arguments when building the image:**
 
