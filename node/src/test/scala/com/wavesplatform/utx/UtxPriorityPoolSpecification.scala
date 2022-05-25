@@ -127,6 +127,7 @@ class UtxPriorityPoolSpecification extends FreeSpec with SharedDomain {
     }
 
     "tx from last microblock is placed on next height ahead of new txs after appending key block" in {
+      domain.utxPool.removeAll(domain.utxPool.nonPriorityTransactions)
       val blockId = domain.appendKeyBlock().id()
 
       val issue    = TxHelpers.issue(alice)
