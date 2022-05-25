@@ -15,10 +15,15 @@ if [ "$user" = '0' ]; then
   find $WVLOG \! -user waves -exec chown waves '{}' +
 fi
 
+if [[ $PRIVATE_NODE == "true" ]]; then
+  WAVES_NETWORK="custom"
+fi
+
 [ -z "${WAVES_CONFIG}" ] && WAVES_CONFIG="/etc/waves/waves.conf"
 if [[ ! -f "$WAVES_CONFIG" ]]; then
   logEcho "Custom '$WAVES_CONFIG' not found. Using a default one for '${WAVES_NETWORK,,}' network."
   if [[ $NETWORKS == *"${WAVES_NETWORK,,}"* ]]; then
+    mkdir -p /etc/waves
     touch "$WAVES_CONFIG"
     echo "waves.blockchain.type=${WAVES_NETWORK}" >>$WAVES_CONFIG
 
@@ -55,4 +60,4 @@ JAVA_OPTS="-Dlogback.stdout.level=${WAVES_LOG_LEVEL}
   -Dlogback.file.directory=$WVLOG
   -Dconfig.override_with_env_vars=true
   ${JAVA_OPTS}
-  -cp '/usr/share/waves/lib/plugins/*:/usr/share/waves/lib/*'" exec gosu waves waves "$WAVES_CONFIG"
+  -cp '$WAVES_INSTALL_PATH/lib/plugins/*:$WAVES_INSTALL_PATH/lib/*:$WAVES_INSTALL_PATH/grpc-server/lib/*'" exec gosu waves waves "$WAVES_CONFIG"

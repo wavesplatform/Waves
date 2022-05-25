@@ -22,22 +22,49 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USER }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-      # Extract metadata (tags, labels) for Docker
+      # Extract metadata (tags, labels) for Docker public node
       # https://github.com/docker/metadata-action
-      - name: Extract Docker metadata
-        id: meta
+      - name: Extract Docker public node metadata
+        id: meta-public
+        uses: docker/metadata-action@v4
+        with:
+          images: wavesplatform/wavesnode
+          flavor: |
+            latest=false
+          tags: |
+            type=ref,event=tag
+            type=raw,value=latest,enable=${{ github.event.release.prerelease == false }}
+
+      # Extract metadata (tags, labels) for Docker private node
+      # https://github.com/docker/metadata-action
+      - name: Extract Docker private node metadata
+        id: meta-private
         uses: docker/metadata-action@v4
         with:
           images: wavesplatform/waves-private-node
 
-      # Build and push Docker image with Buildx
+      # Build and push Docker public image with Buildx
       # https://github.com/docker/build-push-action
-      - name: Build and push Docker image
+      - name: Build and push Docker public image
         id: build-and-push
         uses: docker/build-push-action@v3
         with:
-          context: ./docker/private
+          context: ./docker
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ steps.meta-public.outputs.tags }}
           build-args: |
             NODE_TAG=${{ github.event.release.tag_name }}
+
+      # Build and push Docker private image with Buildx
+      # https://github.com/docker/build-push-action
+      - name: Build and push Docker private image
+        id: build-and-push
+        uses: docker/build-push-action@v3
+        with:
+          context: ./docker
+          push: true
+          tags: ${{ steps.meta-private.outputs.tags }}
+          build-args: |
+            NODE_TAG=${{ github.event.release.tag_name }}
+            PRIVATE_NODE="true"
+            WAVES_NETWORK="custom"

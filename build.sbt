@@ -180,10 +180,9 @@ git.uncommittedSignifier := Some("DIRTY")
 lazy val packageAll = taskKey[Unit]("Package all artifacts")
 packageAll := {
   (node / assembly).value
-  (`grpc-server` / Universal / packageZipTarball).value
 
-  IO.copyFile((node / Debian / packageBin).value, new File(baseDirectory.value, "docker/main/target/waves.deb"))
-  IO.copyFile((`grpc-server` / Debian / packageBin).value, new File(baseDirectory.value, "docker/main/target/waves-grpc-server.deb"))
+  IO.copyFile((node / Universal / packageZipTarball).value, new File(baseDirectory.value, "docker/target/waves.tgz"))
+  IO.copyFile((`grpc-server` / Universal / packageZipTarball).value, new File(baseDirectory.value, "docker/target/waves-grpc-server.tgz"))
 }
 
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
