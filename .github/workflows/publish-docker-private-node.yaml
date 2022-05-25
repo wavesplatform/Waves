@@ -1,4 +1,4 @@
-name: Build node docker images
+name: Build docker images for node
 
 on:
   release:
@@ -8,43 +8,57 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Setup Java
+      - uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '11'
+
       - name: Checkout repository
         uses: actions/checkout@v3
+
+      - name: Cache SBT
+        uses: actions/cache@v3
+        with:
+          path: ~/.sbt
+          key: sbt-cache-${{ hashFiles('project/build.properties') }}
+
+      - name: Cache Coursier
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/coursier
+          key: coursier-cache
+
+      - name: Build sources
+        run: |
+          sbt --mem 2048 -J-XX:+UseG1GC -Dcoursier.cache=~/.cache/coursier -Dsbt.boot.directory=~/.sbt packageAll
 
       - name: Setup Docker buildx
         uses: docker/setup-buildx-action@v2
 
-      # Login against a Docker registry
-      # https://github.com/docker/login-action
       - name: Log into Docker Hub registry
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USER }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-      # Extract metadata (tags, labels) for Docker public node
-      # https://github.com/docker/metadata-action
       - name: Extract Docker public node metadata
         id: meta-public
         uses: docker/metadata-action@v4
         with:
-          images: wavesplatform/wavesnode
+          images: imashonskiy/wavesnode-test
           flavor: |
             latest=false
           tags: |
             type=ref,event=tag
             type=raw,value=latest,enable=${{ github.event.release.prerelease == false }}
 
-      # Extract metadata (tags, labels) for Docker private node
-      # https://github.com/docker/metadata-action
       - name: Extract Docker private node metadata
         id: meta-private
         uses: docker/metadata-action@v4
         with:
-          images: wavesplatform/waves-private-node
+          images: imashonskiy/waves-private-node-test
 
-      # Build and push Docker public image with Buildx
-      # https://github.com/docker/build-push-action
       - name: Build and push Docker public image
         id: build-and-push-public
         uses: docker/build-push-action@v3
@@ -55,8 +69,6 @@ jobs:
           build-args: |
             NODE_TAG=${{ github.event.release.tag_name }}
 
-      # Build and push Docker private image with Buildx
-      # https://github.com/docker/build-push-action
       - name: Build and push Docker private image
         id: build-and-push-private
         uses: docker/build-push-action@v3
