@@ -134,6 +134,8 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     fee.feeAssetId shouldBe None
   }
 
+  var updateAssetInfoTxHeight: Int = -1
+
   test("able to update name/description of issued asset") {
     val nextTerm = sender.transactionInfo[TransactionInfo](assetId).height + updateInterval + 1
     nodes.waitForHeight(nextTerm)
@@ -141,7 +143,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     val updateAssetInfoTxId = notMiner.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)._1.id
     checkUpdateAssetInfoTx(notMiner.utx().head, "updatedName", "updatedDescription")
     miner.waitForTransaction(updateAssetInfoTxId)
-    val updateAssetInfoTxHeight = sender.transactionInfo[TransactionInfo](updateAssetInfoTxId).height
+    updateAssetInfoTxHeight = sender.transactionInfo[TransactionInfo](updateAssetInfoTxId).height
     checkUpdateAssetInfoTx(sender.blockAt(updateAssetInfoTxHeight).transactions.head, "updatedName", "updatedDescription")
     checkUpdateAssetInfoTx(sender.lastBlock().transactions.head, "updatedName", "updatedDescription")
     checkUpdateAssetInfoTx(
@@ -189,19 +191,19 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
   }
 
   test("not able to update name/description more than once within interval") {
-    val nextTermEnd = sender.transactionInfo[TransactionInfo](assetId).height + 2 * updateInterval
+    val nextTermEnd = updateAssetInfoTxHeight + updateInterval
     assertApiError(sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)) { error =>
       error.id shouldBe StateCheckFailed.Id
       error.message should include(
-        s"Can't update info of asset with id=$assetId before ${nextTermEnd + 1} block, current height=${sender.height}, minUpdateInfoInterval=$updateInterval"
+        s"Can't update info of asset with id=$assetId before $nextTermEnd block, current height=${sender.height}, minUpdateInfoInterval=$updateInterval"
       )
     }
-    sender.waitForHeight(nextTermEnd)
+    sender.waitForHeight(nextTermEnd - 1)
 
     assertApiError(sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)) { error =>
       error.id shouldBe StateCheckFailed.Id
       error.message should include(
-        s"Can't update info of asset with id=$assetId before ${nextTermEnd + 1} block, current height=${sender.height}, minUpdateInfoInterval=$updateInterval"
+        s"Can't update info of asset with id=$assetId before $nextTermEnd block, current height=${sender.height}, minUpdateInfoInterval=$updateInterval"
       )
     }
   }
