@@ -1,4 +1,4 @@
-name: Build docker private node
+name: Build node docker images
 
 on:
   release:
