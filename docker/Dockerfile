@@ -21,7 +21,7 @@ RUN /bin/bash /tmp/setup-deps.sh
 ENV WVDATA=/var/lib/waves
 ENV WVLOG=/var/log/waves
 ENV WAVES_INSTALL_PATH=/usr/share/waves
-COPY main/target /tmp/
+COPY target /tmp/
 COPY waves.custom.conf /tmp/waves.conf
 RUN /bin/bash /tmp/setup-node.sh
 
