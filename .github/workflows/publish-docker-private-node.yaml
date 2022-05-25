@@ -46,7 +46,7 @@ jobs:
       # Build and push Docker public image with Buildx
       # https://github.com/docker/build-push-action
       - name: Build and push Docker public image
-        id: build-and-push
+        id: build-and-push-public
         uses: docker/build-push-action@v3
         with:
           context: ./docker
@@ -58,7 +58,7 @@ jobs:
       # Build and push Docker private image with Buildx
       # https://github.com/docker/build-push-action
       - name: Build and push Docker private image
-        id: build-and-push
+        id: build-and-push-private
         uses: docker/build-push-action@v3
         with:
           context: ./docker
