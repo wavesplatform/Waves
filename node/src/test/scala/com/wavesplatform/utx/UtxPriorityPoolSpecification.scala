@@ -7,6 +7,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.test.*
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.utx.UtxPool.PackStrategy
 
@@ -123,6 +124,24 @@ class UtxPriorityPoolSpecification extends FreeSpec with SharedDomain {
       domain.utxPool.all shouldEqual Seq(transfer1, createAlias)
 
       pack() shouldEqual Some(Seq(createAlias))
+    }
+
+    "tx from last microblock is placed on next height ahead of new txs after appending key block" in {
+      val blockId = domain.appendKeyBlock().id()
+
+      val issue    = TxHelpers.issue(alice)
+      val transfer = TxHelpers.transfer(alice, asset = IssuedAsset(issue.id()))
+
+      domain.appendMicroBlock(issue)
+      domain.blockchain.transactionInfo(issue.id()) shouldBe defined
+      domain.utxPool.priorityPool.priorityTransactions shouldBe Nil
+
+      domain.appendKeyBlock(Some(blockId))
+      domain.blockchain.transactionInfo(issue.id()) shouldBe None
+      domain.utxPool.priorityPool.priorityTransactions shouldBe Seq(issue)
+
+      domain.utxPool.putIfNew(transfer)
+      pack() shouldBe Some(List(issue, transfer))
     }
   }
 }
