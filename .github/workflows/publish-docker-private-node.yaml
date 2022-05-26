@@ -46,7 +46,7 @@ jobs:
         id: meta-public
         uses: docker/metadata-action@v4
         with:
-          images: imashonskiy/wavesnode-test
+          images: wavesplatform/wavesnode
           flavor: |
             latest=false
           tags: |
@@ -57,7 +57,7 @@ jobs:
         id: meta-private
         uses: docker/metadata-action@v4
         with:
-          images: imashonskiy/waves-private-node-test
+          images: wavesplatform/waves-private-node
 
       - name: Build and push Docker public image
         id: build-and-push-public
@@ -78,5 +78,5 @@ jobs:
           tags: ${{ steps.meta-private.outputs.tags }}
           build-args: |
             NODE_TAG=${{ github.event.release.tag_name }}
-            PRIVATE_NODE="true"
-            WAVES_NETWORK="custom"
+            PRIVATE_NODE=true
+            WAVES_NETWORK=custom
