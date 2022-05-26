@@ -58,6 +58,11 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: wavesplatform/waves-private-node
+          flavor: |
+            latest=false
+          tags: |
+            type=ref,event=tag
+            type=raw,value=latest,enable=${{ github.event.release.prerelease == false }}
 
       - name: Build and push Docker public image
         id: build-and-push-public

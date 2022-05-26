@@ -6,6 +6,8 @@ logEcho() {
   echo $1 | gosu waves tee -a /var/log/waves/waves.log
 }
 
+cp $WAVES_INSTALL_PATH/lib/plugins/* $WAVES_INSTALL_PATH/lib/
+
 mkdir -p $WVDATA $WVLOG
 chmod 700 $WVDATA $WVLOG || :
 
