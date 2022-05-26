@@ -2,25 +2,26 @@ package com.wavesplatform.lang.v1.repl
 
 import cats.arrow.FunctionK
 import cats.implicits.*
-import scala.concurrent.Future
 
+import scala.concurrent.Future
 import cats.{Functor, Id, Monoid}
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.repl.node.ErrorMessageEnvironment
-import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
+import com.wavesplatform.lang.v1.repl.node.http.{NodeClient, NodeConnectionSettings}
 import com.wavesplatform.lang.v1.repl.node.http.WebEnvironment.executionContext
 import com.wavesplatform.lang.v1.traits.Environment
 import monix.execution.atomic.Atomic
 
 case class Repl(
     settings: Option[NodeConnectionSettings] = None,
+    customHttpClient: Option[NodeClient] = None,
     libraries: List[String] = Nil,
     lastContext: (CompilerContext, EvaluationContext[Environment, Future]) =
       (CTX.empty.compilerContext, Monoid[EvaluationContext[Environment, Future]].empty)
 ) {
-  private val environment = buildEnvironment(settings)
+  private val environment = buildEnvironment(settings, customHttpClient)
   private val initialState = state(
     (
       lastContext._1 |+| initialCtx.compilerContext,
@@ -39,7 +40,7 @@ case class Repl(
   def clear(): Unit = currentState.set(initialState)
 
   def reconfigure(settings: NodeConnectionSettings): Repl =
-    Repl(Some(settings), libraries, currentState.get()._1)
+    Repl(Some(settings), customHttpClient, libraries, currentState.get()._1)
 
   def info(str: String): String = currentState.get()._2.declMap(str)
 

@@ -1,13 +1,17 @@
 package com.wavesplatform.lang.v1
 
+import cats.Functor
 import com.wavesplatform.lang.v1.repl.Repl
 import com.wavesplatform.lang.v1.repl.node.BlockchainUnavailableException
-import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
+import com.wavesplatform.lang.v1.repl.node.http.NodeClient.ResponseWrapper
+import com.wavesplatform.lang.v1.repl.node.http.response.model.HeightResponse
+import com.wavesplatform.lang.v1.repl.node.http.{NodeClient, NodeConnectionSettings}
 import com.wavesplatform.test.produce
+import io.circe.Decoder
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.propspec.AnyPropSpec
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
 
 class ReplTest extends AnyPropSpec with Matchers {
@@ -263,5 +267,19 @@ class ReplTest extends AnyPropSpec with Matchers {
     ) shouldBe Right(
       "res2: Address = Address(\n\tbytes = base58'3N8tAA42HCeoea6jqF5k3twBYCms5irDqmN'\n)"
     )
+  }
+
+  property("transactionHeightById for failed transaction") {
+    val settings = NodeConnectionSettings("testnodes.wavesnodes.com", 'T'.toByte, "")
+    val client = new NodeClient {
+      override def get[F[_]: Functor: ResponseWrapper, R: Decoder](path: String): Future[F[R]] = {
+        if (path == "/transactions/info/abcd")
+          Future.successful(Some(HeightResponse(1, succeed = false)).asInstanceOf[F[R]])
+        else
+          ???
+      }
+    }
+    val repl = Repl(Some(settings), Some(client))
+    await(repl.execute("transactionHeightById(base58'abcd')")) shouldBe Right("res1: Int|Unit = Unit")
   }
 }
