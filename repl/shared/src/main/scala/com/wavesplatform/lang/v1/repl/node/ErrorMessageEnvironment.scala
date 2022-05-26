@@ -11,7 +11,7 @@ import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import monix.eval.Coeval
 
 case class ErrorMessageEnvironment[F[_]](message: String) extends Environment[F] {
-  lazy val unavailable                                                                                            = throw new BlockchainUnavailableException(message)
+  lazy val unavailable                                                                                            = throw BlockchainUnavailableException(message)
   override def chainId: Byte                                                                                      = 0
   override def height: F[Long]                                                                                    = unavailable
   override def inputEntity: InputEntity                                                                           = unavailable
