@@ -35,9 +35,10 @@ class InvokeExpressionGrpcSuite extends GrpcBaseTransactionSuite with CancelAfte
     )
 
   test("successful applying to the state") {
-    val id = sender.broadcastInvokeExpression(firstAcc, expr, waitForTx = true).id
+    val id     = sender.broadcastInvokeExpression(firstAcc, expr, waitForTx = true).id
+    val height = sender.getTransactionInfo(id).height.toInt
 
-    val lastBlock          = sender.blockAt(sender.height - 1)
+    val lastBlock          = sender.blockAt(height)
     val blockById          = sender.blockById(ByteString.copyFrom(lastBlock.id.value().arr))
     val blocksSeq          = sender.blockSeq(1, 100)
     val blocksSeqByAddress = sender.blockSeqByAddress(lastBlock.header.generator.toAddress.toString, 1, 100)
