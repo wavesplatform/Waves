@@ -6,26 +6,27 @@ import com.wavesplatform.api.http.ApiError.{ScriptExecutionError, TransactionNot
 import com.wavesplatform.api.http.DebugMessage
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.{DebugStateChanges, TransactionStatus}
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
-import scala.concurrent.duration._
+import scala.collection.mutable
+import scala.concurrent.duration.*
 
 class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailure with FailedTransactionSuiteLike[String] with OverflowBlock {
-  import FailedTransactionSuite._
-  import FailedTransactionSuiteLike._
-  import restApi._
+  import FailedTransactionSuite.*
+  import FailedTransactionSuiteLike.*
+  import restApi.*
 
   private lazy val contract = sender.createKeyPair()
   private def caller        = thirdKeyPair
@@ -367,9 +368,8 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
             case i if i % 4 == 3 => "s"  -> StringDataEntry("s", i.toString)
           }
           .toMap
-      initialEntries.map(entry => entry.key -> entry).toMap.foreach {
-        case (key, initial) =>
-          sender.getDataByKey(contractAddress, key) shouldBe lastSuccessWrites.getOrElse(key, initial)
+      initialEntries.map(entry => entry.key -> entry).toMap.foreach { case (key, initial) =>
+        sender.getDataByKey(contractAddress, key) shouldBe lastSuccessWrites.getOrElse(key, initial)
       }
 
       failed.foreach(s => checkStateChange(sender.debugStateChanges(s.id), 3, "Transaction is not allowed by script of the asset"))
@@ -455,57 +455,24 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
 
   test("ExchangeTransaction: transaction validates as failed when asset script fails") {
     val Precondition(amountAsset, priceAsset, buyFeeAsset, sellFeeAsset) =
-      exchangePreconditions(Some(ScriptCompiler.compile("true", ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64))
+      exchangePreconditions(
+        Some(ScriptCompiler.compile("true", ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64)
+      )
 
     val assetPair      = AssetPair.createAssetPair(amountAsset, priceAsset).get
     val fee            = 0.003.waves + 4 * smartFee
     val sellMatcherFee = fee / 100000L
     val buyMatcherFee  = fee / 100000L
 
-    val (assetScript, _) = ScriptCompiler.compile("if true then throw(\"error\") else false", ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()
-    val scriptTx         = sender.setAssetScript(priceAsset, buyerAddress, script = Some(assetScript.bytes().base64))
+    val (assetScript, _) =
+      ScriptCompiler.compile("if true then throw(\"error\") else false", ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()
+    val scriptTx = sender.setAssetScript(priceAsset, buyerAddress, script = Some(assetScript.bytes().base64))
     nodes.waitForHeightAriseAndTxPresent(scriptTx.id)
 
     val tx     = mkExchange(buyer, seller, matcher, assetPair, fee, buyFeeAsset, sellFeeAsset, buyMatcherFee, sellMatcherFee)
     val result = sender.signedValidate(tx.json())
     (result \ "valid").as[Boolean] shouldBe false
     (result \ "error").as[String] should include("not allowed by script of the asset")
-  }
-
-  test("ExchangeTransaction: failed exchange tx when asset script fails") {
-    val init = Seq(
-      sender.setScript(firstKeyPair, None, setScriptFee + smartFee).id,
-      sender.setScript(secondKeyPair, None, setScriptFee + smartFee).id,
-      sender.setScript(thirdKeyPair, None, setScriptFee + smartFee).id
-    )
-    waitForTxs(init)
-
-    val Precondition(amountAsset, priceAsset, buyFeeAsset, sellFeeAsset) =
-      exchangePreconditions(Some(ScriptCompiler.compile("true", ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64))
-
-    val assetPair      = AssetPair.createAssetPair(amountAsset, priceAsset).get
-    val fee            = 0.003.waves + 4 * smartFee
-    val sellMatcherFee = fee / 100000L
-    val buyMatcherFee  = fee / 100000L
-    val priorityFee    = setAssetScriptFee + smartFee + fee * 10
-
-    val allCases =
-      Seq((amountAsset, sellerAddress), (priceAsset, buyerAddress), (sellFeeAsset, matcherAddress), (buyFeeAsset, matcherAddress))
-
-    for ((invalidScriptAsset, owner) <- allCases) {
-      overflowBlock()
-      sendTxsAndThenPriorityTx(
-        _ =>
-          sender
-            .signedBroadcast(mkExchange(buyer, seller, matcher, assetPair, fee, buyFeeAsset, sellFeeAsset, buyMatcherFee, sellMatcherFee).json())
-            .id,
-        () => updateAssetScript(result = false, invalidScriptAsset, owner, priorityFee, waitForTx = false)
-      ) { (txs, priorityTx) =>
-        logPriorityTx(priorityTx)
-        assertFailedTxs(txs)
-      }
-      updateAssetScript(result = true, invalidScriptAsset, owner, setAssetScriptFee + smartFee)
-    }
   }
 
   test("ExchangeTransaction: invalid exchange tx when asset script fails on broadcast") {
@@ -517,7 +484,9 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     waitForTxs(init)
 
     val Precondition(amountAsset, priceAsset, buyFeeAsset, sellFeeAsset) =
-      exchangePreconditions(Some(ScriptCompiler.compile("true", ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64))
+      exchangePreconditions(
+        Some(ScriptCompiler.compile("true", ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64)
+      )
 
     val assetPair      = AssetPair.createAssetPair(amountAsset, priceAsset).get
     val fee            = 0.003.waves + 4 * smartFee
@@ -572,7 +541,9 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
 
   test("ExchangeTransaction: transactionHeightById and transactionById returns only succeed transactions") {
     val Precondition(amountAsset, priceAsset, buyFeeAsset, sellFeeAsset) =
-      exchangePreconditions(Some(ScriptCompiler.compile("true", ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64))
+      exchangePreconditions(
+        Some(ScriptCompiler.compile("true", ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64)
+      )
 
     val assetPair      = AssetPair.createAssetPair(amountAsset, priceAsset).get
     val fee            = 0.003.waves + 4 * smartFee
@@ -633,27 +604,27 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     val caller = sender.createKeyPair()
     sender.transfer(sender.keyPair, caller.toAddress.toString, 100.waves, minFee, waitForTx = true)
 
-    sender.waitFor("even height")(n => n.height, (h: Int) => h % 2 == 0, 500.millis)
+    val startHeight = sender.height
+    sender.waitFor("even height")(_.height, (h: Int) => h % 2 == 0 && h != startHeight, 500.millis)
 
-    var ids = Set.empty[String]
-    while (miner.height % 2 == 0) {
-      val tx = sender.invokeScript(caller, contractAddress, Some("blockIsEven"), fee = invokeFee, waitForTx = true)._1
+    val ids = mutable.Buffer.empty[String]
+    (1 to 5).foreach { _ =>
+      val tx = sender.invokeScript(caller, contractAddress, Some("blockIsEven"), fee = invokeFee)._1
       ids += tx.id
     }
 
-    val height = sender.waitFor("odd height")(n => n.height, (h: Int) => h % 2 != 0, 500.millis)
-    nodes.waitForHeightArise()
-    val blockTxs = sender.blockAt(height).transactions.map(_.id).filter(ids)
-    assertFailedTxs(blockTxs)
+    val resultHeight = sender.height
+    sender.waitFor("accept txs as failed")(_.height, (_: Int) == resultHeight + 2, 500.millis)
+
+    val oddBlockTxs = sender.blockAt(resultHeight + 1).transactions.map(_.id)
+    assertFailedTxs(oddBlockTxs)
   }
 
   def updateTikTok(result: String, fee: Long, waitForTx: Boolean = true): String =
     sender.broadcastData(contract, List(StringDataEntry("tikTok", result)), fee = fee, waitForTx = waitForTx).id
 
   private def waitForTxs(txs: Seq[String]): Unit =
-    nodes.waitFor("preconditions", 500.millis)(_.transactionStatus(txs).forall(_.status == "confirmed"))(
-      statuses => statuses.forall(identity)
-    )
+    nodes.waitFor("preconditions", 500.millis)(_.transactionStatus(txs).forall(_.status == "confirmed"))(_.forall(identity))
 
   private def checkStateChange(info: DebugStateChanges, code: Int, text: String, strict: Boolean = false): Unit = {
     info.stateChanges shouldBe defined
