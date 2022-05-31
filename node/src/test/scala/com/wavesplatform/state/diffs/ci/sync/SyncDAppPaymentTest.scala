@@ -20,35 +20,12 @@ import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers}
 class SyncDAppPaymentTest extends PropSpec with WithDomain {
 
   property("negative sync dApp payments amount rejects tx after enforceTransferValidationAfter") {
-    def scenario(
-        bigComplexityDApp1: Boolean,
-        bigComplexityDApp2: Boolean,
-        customAsset: Boolean
-    ): (Seq[AddrWithBalance], Seq[Transaction], () => InvokeScriptTransaction, Address, Address, Asset) = {
-      val invoker = TxHelpers.signer(0)
-      val dApp1   = TxHelpers.signer(1)
-      val dApp2   = TxHelpers.signer(2)
-
-      val balances = AddrWithBalance.enoughBalances(invoker, dApp1, dApp2)
-
-      val issue = TxHelpers.issue(dApp2, 100)
-      val asset = if (customAsset) IssuedAsset(issue.id()) else Waves
-      val setScript = Seq(
-        TxHelpers.setScript(dApp1, invokerDAppScript(dApp2.toAddress, bigComplexityDApp1, asset, -1)),
-        TxHelpers.setScript(dApp2, simpleDAppScript(bigComplexityDApp2))
-      )
-
-      val invoke = () => TxHelpers.invoke(dApp1.toAddress, invoker = invoker)
-
-      (balances, issue +: setScript, invoke, dApp1.toAddress, dApp2.toAddress, asset)
-    }
-
     for {
       bigComplexityDApp1 <- Seq(false, true)
       bigComplexityDApp2 <- Seq(false, true)
       customAsset        <- Seq(false, true)
     } {
-      val (balances, preparingTxs, invoke, dApp1, dApp2, asset) = scenario(bigComplexityDApp1, bigComplexityDApp2, customAsset)
+      val (balances, preparingTxs, invoke, dApp1, dApp2, asset) = negativePaymentScenario(bigComplexityDApp1, bigComplexityDApp2, customAsset)
       withDomain(RideV5.configure(_.copy(enforceTransferValidationAfter = 4)), balances) { d =>
         d.appendBlock(preparingTxs*)
 
@@ -65,6 +42,40 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
             s"DApp $dApp1 invoked DApp $dApp2 with attached token $asset amount = -1"
           else
             s"DApp $dApp1 invoked DApp $dApp2 with attached WAVES amount = -1"
+        }
+      }
+    }
+  }
+
+  property("negative sync dApp payments are forbidden before and after RideV6 activation") {
+    for {
+      bigComplexityDApp1 <- Seq(false, true)
+      customAsset        <- Seq(false, true)
+    } {
+      val (balances, preparingTxs, invoke, dApp1, dApp2, asset) =
+        negativePaymentScenario(bigComplexityDApp1, bigComplexityDApp2 = false, customAsset)
+      withDomain(
+        DomainPresets.RideV5.configure(_.copy(enforceTransferValidationAfter = 0)).setFeaturesHeight(BlockchainFeatures.RideV6 -> 4),
+        balances
+      ) { d =>
+        val errMsg =
+          if (customAsset)
+            s"DApp $dApp1 invoked DApp $dApp2 with attached token $asset amount = -1"
+          else
+            s"DApp $dApp1 invoked DApp $dApp2 with attached WAVES amount = -1"
+
+        d.appendBlock(preparingTxs*)
+
+        val invoke1 = invoke()
+        d.appendAndCatchError(invoke1).toString should include(errMsg)
+
+        d.appendBlock()
+
+        val invoke2 = invoke()
+        if (bigComplexityDApp1) {
+          d.appendAndAssertFailed(invoke2, errMsg)
+        } else {
+          d.appendAndCatchError(invoke2).toString should include(errMsg)
         }
       }
     }
@@ -401,4 +412,27 @@ class SyncDAppPaymentTest extends PropSpec with WithDomain {
          |
        """.stripMargin
     )
+
+  def negativePaymentScenario(
+      bigComplexityDApp1: Boolean,
+      bigComplexityDApp2: Boolean,
+      customAsset: Boolean
+  ): (Seq[AddrWithBalance], Seq[Transaction], () => InvokeScriptTransaction, Address, Address, Asset) = {
+    val invoker = TxHelpers.signer(0)
+    val dApp1   = TxHelpers.signer(1)
+    val dApp2   = TxHelpers.signer(2)
+
+    val balances = AddrWithBalance.enoughBalances(invoker, dApp1, dApp2)
+
+    val issue = TxHelpers.issue(dApp2, 100)
+    val asset = if (customAsset) IssuedAsset(issue.id()) else Waves
+    val setScript = Seq(
+      TxHelpers.setScript(dApp1, invokerDAppScript(dApp2.toAddress, bigComplexityDApp1, asset, -1)),
+      TxHelpers.setScript(dApp2, simpleDAppScript(bigComplexityDApp2))
+    )
+
+    val invoke = () => TxHelpers.invoke(dApp1.toAddress, invoker = invoker)
+
+    (balances, issue +: setScript, invoke, dApp1.toAddress, dApp2.toAddress, asset)
+  }
 }
