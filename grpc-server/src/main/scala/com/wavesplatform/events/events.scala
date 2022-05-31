@@ -18,7 +18,7 @@ import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.{AccountDataInfo, AssetDescription, AssetScriptInfo, Blockchain, DataEntry, Diff, DiffToStateApplier, EmptyDataEntry, Height, InvokeScriptResult, LeaseBalance}
+import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -447,17 +447,19 @@ object StateUpdate {
             TransactionMetadata.Metadata.InvokeScript(invokeScriptLikeToMetadata(ist))
 
           case et: EthereumTransaction =>
-            val metadataOpt: Option[EthereumMetadata] = et.payload match {
+            val metadataOpt: Option[EthereumMetadata.Action] = et.payload match {
               case EthereumTransaction.Transfer(_, _, recipient) =>
-                Some(EthereumMetadata(et.senderAddress().toByteString, EthereumMetadata.Action.Transfer(TransferMetadata(recipient.toByteString))))
+                Some(EthereumMetadata.Action.Transfer(TransferMetadata(recipient.toByteString)))
 
               case inv @ EthereumTransaction.Invocation(_, _) =>
                 for {
                   invoke <- inv.toInvokeScriptLike(et, blockchain).toOption
-                } yield EthereumMetadata(et.senderAddress().toByteString, EthereumMetadata.Action.Invoke(invokeScriptLikeToMetadata(invoke)))
+                } yield EthereumMetadata.Action.Invoke(invokeScriptLikeToMetadata(invoke))
             }
             metadataOpt
-              .map(TransactionMetadata.Metadata.Ethereum)
+              .map { a =>
+                TransactionMetadata.Metadata.Ethereum(EthereumMetadata(et.senderAddress().toByteString, et.timestamp, a))
+              }
               .getOrElse(TransactionMetadata.Metadata.Empty)
 
           case _ =>
