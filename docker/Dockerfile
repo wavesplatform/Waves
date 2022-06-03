@@ -31,5 +31,7 @@ VOLUME $WVLOG
 VOLUME $WAVES_INSTALL_PATH/lib/plugins
 WORKDIR $WVDATA
 
+RUN /bin/bash /tmp/setup-private-node.sh
+
 STOPSIGNAL SIGINT
 ENTRYPOINT ["/usr/share/waves/bin/entrypoint.sh"]
