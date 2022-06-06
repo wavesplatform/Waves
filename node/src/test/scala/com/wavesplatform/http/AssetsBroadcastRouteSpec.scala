@@ -36,10 +36,10 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
   private[this] val fixedIssueGen = for {
     (sender, _, _, quantity, decimals, reissuable, fee, timestamp) <- issueParamGen
-    nameLength                                                     <- G.choose(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
-    name                                                           <- G.listOfN(nameLength, G.alphaNumChar)
-    description                                                    <- G.listOfN(IssueTransaction.MaxAssetDescriptionLength, G.alphaNumChar)
-    tx                                                             <- createLegacyIssue(sender, name.mkString.utf8Bytes, description.mkString.utf8Bytes, quantity, decimals, reissuable, fee, timestamp)
+    nameLength  <- G.choose(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
+    name        <- G.listOfN(nameLength, G.alphaNumChar)
+    description <- G.listOfN(IssueTransaction.MaxAssetDescriptionLength, G.alphaNumChar)
+    tx          <- createLegacyIssue(sender, name.mkString.utf8Bytes, description.mkString.utf8Bytes, quantity, decimals, reissuable, fee, timestamp)
   } yield tx
 
   "returns StateCheckFailed" - {
@@ -47,15 +47,23 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
       ("url", "generator", "transform"),
       ("issue", fixedIssueGen, identity),
       ("reissue", reissueGen.retryUntil(_.version == 1), identity),
-      ("burn", burnGen.retryUntil(_.version == 1), {
-        case o: JsObject => o ++ Json.obj("quantity" -> o.value("amount"))
-        case other       => other
-      }),
-      ("transfer", transferV1Gen, {
-        case o: JsObject if o.value.contains("feeAsset") =>
-          o ++ Json.obj("feeAssetId" -> o.value("feeAsset"), "quantity" -> o.value("amount"))
-        case other => other
-      })
+      (
+        "burn",
+        burnGen.retryUntil(_.version == 1),
+        {
+          case o: JsObject => o ++ Json.obj("quantity" -> o.value("amount"))
+          case other       => other
+        }
+      ),
+      (
+        "transfer",
+        transferV1Gen,
+        {
+          case o: JsObject if o.value.contains("feeAsset") =>
+            o ++ Json.obj("feeAssetId" -> o.value("feeAsset"), "quantity" -> o.value("amount"))
+          case other => other
+        }
+      )
     )
 
     def posting(url: String, v: JsValue): RouteTestResult = Post(routePath(url), v) ~> route
@@ -143,12 +151,12 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
         }
         forAll(invalidBase58) { a =>
           posting(tr.copy(assetId = Some(a))) should produce(
-            WrongJson(errors = Seq(JsPath \ "assetId" -> Seq(JsonValidationError(s"Too long assetId: length of $a exceeds 44"))))
+            WrongJson(errors = Seq(JsPath \ "assetId" -> Seq(JsonValidationError(s"Expected base58-encoded assetId"))))
           )
         }
         forAll(invalidBase58) { a =>
           posting(tr.copy(feeAssetId = Some(a))) should produce(
-            WrongJson(errors = Seq(JsPath \ "feeAssetId" -> Seq(JsonValidationError(s"Too long assetId: length of $a exceeds 44"))))
+            WrongJson(errors = Seq(JsPath \ "feeAssetId" -> Seq(JsonValidationError(s"Expected base58-encoded assetId"))))
           )
         }
         forAll(longAttachment) { a =>

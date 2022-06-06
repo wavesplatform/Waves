@@ -4,7 +4,7 @@ import com.google.common.primitives.Bytes
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.*
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves, WavesName}
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import net.ceedubs.ficus.readers.ValueReader
 import play.api.libs.json.{JsObject, Json}
@@ -32,7 +32,6 @@ case class AssetPair(
 }
 
 object AssetPair {
-  val WavesName = "WAVES"
 
   implicit class AssetPairExt(val p: AssetPair) extends AnyVal {
     def checkedAssets: Seq[IssuedAsset] = Seq(p.priceAsset, p.amountAsset).collect { case ia: Asset.IssuedAsset => ia }

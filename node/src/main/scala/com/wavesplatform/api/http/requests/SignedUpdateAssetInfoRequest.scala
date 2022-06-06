@@ -13,7 +13,7 @@ case class SignedUpdateAssetInfoRequest(
     version: TxVersion,
     chainId: Byte,
     senderPublicKey: String,
-    assetId: String,
+    assetId: IssuedAsset,
     name: String,
     description: String,
     timestamp: TxTimestamp,
@@ -24,13 +24,12 @@ case class SignedUpdateAssetInfoRequest(
 
   def toTx: Either[ValidationError, UpdateAssetInfoTransaction] =
     for {
-      _sender  <- PublicKey.fromBase58String(senderPublicKey)
-      _assetId <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength)
+      _sender <- PublicKey.fromBase58String(senderPublicKey)
       _feeAssetId <- feeAssetId
         .traverse(parseBase58(_, "invalid.assetId", AssetIdStringLength).map(IssuedAsset(_)))
         .map(_ getOrElse Waves)
       tx <- UpdateAssetInfoTransaction
-        .create(version, _sender, _assetId, name, description, timestamp, fee, _feeAssetId, proofs, chainId)
+        .create(version, _sender, assetId.id, name, description, timestamp, fee, _feeAssetId, proofs, chainId)
     } yield tx
 
 }

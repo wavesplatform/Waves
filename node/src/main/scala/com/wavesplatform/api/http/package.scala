@@ -35,8 +35,8 @@ package object http {
     val intToByteReads   = implicitly[Reads[Int]].map(_.toByte)
     val stringToByteReads = implicitly[Reads[String]]
       .map(s => Try(s.toByte))
-      .collect(JsonValidationError("Can't parse version")) {
-        case Success(v) => v
+      .collect(JsonValidationError("Can't parse version")) { case Success(v) =>
+        v
       }
 
     defaultByteReads orElse
@@ -161,15 +161,15 @@ package object http {
     * This directive can't handle __fatal__ errors from:
     *
     *   - Monix [[monix.eval.Task tasks]] with async boundaries:
-    *     {{{
+    * {{{
     *       get(complete(Task(throw new StackOverflowError()).executeAsync.runToFuture))
     *       get(complete(Task.evalAsync(throw new StackOverflowError()).runToFuture))
     *       get(complete(Task.deferFuture(Future(throw new StackOverflowError())).runToFuture))
-    *     }}}
+    * }}}
     *   - Async futures (i.e. which are not available at the time of handling):
-    *     {{{
+    * {{{
     *       get(complete(Future(throw new StackOverflowException())))
-    *     }}}
+    * }}}
     */
   def handleAllExceptions: Directive0 =
     Directive { inner => ctx =>
