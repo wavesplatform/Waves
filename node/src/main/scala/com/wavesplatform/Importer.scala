@@ -37,6 +37,7 @@ import java.io.*
 import java.net.{MalformedURLException, URL}
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
+import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 object Importer extends ScorexLogging {
@@ -199,52 +200,58 @@ object Importer extends ScorexLogging {
     inputStream = getInputStream()
 
     while (!quit && counter < blocksToApply) lock.synchronized {
-      val s1 = ByteStreams.read(inputStream, lenBytes, 0, Ints.BYTES)
-      if (s1 == Ints.BYTES) {
-        val blockSize = Ints.fromByteArray(lenBytes)
+      try {
+        val s1 = ByteStreams.read(inputStream, lenBytes, 0, Ints.BYTES)
+        if (s1 == Ints.BYTES) {
+          val blockSize = Ints.fromByteArray(lenBytes)
 
-        lazy val blockBytes = new Array[Byte](blockSize)
-        val factReadSize =
-          if (blocksToSkip > 0) {
-            // File IO optimization
-            ByteStreams.skipFully(inputStream, blockSize)
-            blockSize
-          } else {
-            ByteStreams.read(inputStream, blockBytes, 0, blockSize)
-          }
-
-        if (factReadSize == blockSize) {
-          if (blocksToSkip > 0) {
-            blocksToSkip -= 1
-          } else {
-            val blockV5 = blockchain.isFeatureActivated(
-              BlockchainFeatures.BlockV5,
-              blockchain.height + 1
-            )
-            val block =
-              (if (importOptions.format == Formats.Binary && !blockV5) Block.parseBytes(blockBytes)
-               else PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(blockBytes)), unsafe = true)).get
-            if (blockchain.lastBlockId.contains(block.header.reference)) {
-              Await.result(appendBlock(block).runAsyncLogErr, Duration.Inf) match {
-                case Left(ve) =>
-                  log.error(s"Error appending block: $ve")
-                  quit = true
-                case _ =>
-                  counter = counter + 1
-              }
+          lazy val blockBytes = new Array[Byte](blockSize)
+          val factReadSize =
+            if (blocksToSkip > 0) {
+              // File IO optimization
+              ByteStreams.skipFully(inputStream, blockSize)
+              blockSize
             } else {
-              log.warn(s"Block $block is not a child of the last block ${blockchain.lastBlockId.get}")
+              ByteStreams.read(inputStream, blockBytes, 0, blockSize)
             }
+
+          if (factReadSize == blockSize) {
+            if (blocksToSkip > 0) {
+              blocksToSkip -= 1
+            } else {
+              val blockV5 = blockchain.isFeatureActivated(
+                BlockchainFeatures.BlockV5,
+                blockchain.height + 1
+              )
+              val block =
+                (if (importOptions.format == Formats.Binary && !blockV5) Block.parseBytes(blockBytes)
+                 else PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(blockBytes)), unsafe = true)).get
+              if (blockchain.lastBlockId.contains(block.header.reference)) {
+                Await.result(appendBlock(block).runAsyncLogErr, Duration.Inf) match {
+                  case Left(ve) =>
+                    log.error(s"Error appending block: $ve")
+                    quit = true
+                  case _ =>
+                    counter = counter + 1
+                }
+              } else {
+                log.warn(s"Block $block is not a child of the last block ${blockchain.lastBlockId.get}")
+              }
+            }
+          } else {
+            log.info(s"$factReadSize != expected $blockSize")
+            log.info(s"reestablishing input stream")
+            inputStream.close()
+            inputStream = getInputStream()
           }
         } else {
-          log.info(s"$factReadSize != expected $blockSize")
-          log.info(s"reestablishing input stream")
-          inputStream.close()
-          inputStream = getInputStream()
+          if (inputStream.available() > 0) log.info(s"Expecting to read ${Ints.BYTES} but got $s1 (${inputStream.available()})")
+          quit = true
         }
-      } else {
-        if (inputStream.available() > 0) log.info(s"Expecting to read ${Ints.BYTES} but got $s1 (${inputStream.available()})")
-        quit = true
+      } catch  {
+        case NonFatal(e) =>
+          log.error(s"Error reading bytes: $e")
+          quit = true
       }
     }
   }
