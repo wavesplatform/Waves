@@ -9,16 +9,16 @@ import com.wavesplatform.common.utils.*
 import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
 import com.wavesplatform.events.StateUpdate.{AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate}
 import com.wavesplatform.events.protobuf.TransactionMetadata
-import com.wavesplatform.events.protobuf.TransactionMetadata.{EthereumMetadata, TransferMetadata}
+import com.wavesplatform.events.protobuf.TransactionMetadata.EthereumMetadata
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.transaction.InvokeScriptResult.Call.Argument
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions, InvokeScriptResult as PBInvokeScriptResult}
+import com.wavesplatform.state.*
 import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -451,8 +451,15 @@ object StateUpdate {
 
           case et: EthereumTransaction =>
             val metadataOpt: Option[EthereumMetadata.Action] = et.payload match {
-              case EthereumTransaction.Transfer(_, _, recipient) =>
-                Some(EthereumMetadata.Action.Transfer(TransferMetadata(recipient.toByteString)))
+              case ett: EthereumTransaction.Transfer =>
+                ett.toTransferLike(et, blockchain).toOption.map { transferLike =>
+                  EthereumMetadata.Action.Transfer(
+                    TransactionMetadata.EthereumTransferMetadata(
+                      ett.recipient.toByteString,
+                      Some(Amount(transferLike.assetId.fold(ByteString.EMPTY)(_.id.toByteString), ett.amount))
+                    )
+                  )
+                }
 
               case inv @ EthereumTransaction.Invocation(_, _) =>
                 for {

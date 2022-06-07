@@ -10,13 +10,12 @@ import com.wavesplatform.test.DomainPresets.RideV6
 import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.utils.EthConverters.*
+import com.wavesplatform.transaction.utils.EthTxGenerator
 import com.wavesplatform.transaction.{Asset, TxExchangeAmount, TxHelpers, TxMatcherFee, TxNonNegativeAmount, TxOrderPrice}
 
 class MetadataSpec extends FreeSpec with WithBUDomain {
   "BlockchainUpdates returns correct metadata for supported transaction types" in withDomainAndRepo(RideV6){ (d, r) =>
     val genesisAddress = TxHelpers.signer(100)
-
-
 
     d.appendBlock(TxHelpers.genesis(genesisAddress.toAddress, 100000.waves))
 
@@ -73,12 +72,19 @@ class MetadataSpec extends FreeSpec with WithBUDomain {
       fee = 0.003.waves
     )
 
-
+    val ethTransfer = EthTxGenerator.generateEthTransfer(
+      ethOrderSender,
+      matcher.toAddress,
+      10,
+      issue.asset,
+      0.005.waves
+    )
 
     d.appendBlock(
       massTransfer,
       issue,
-      exchange
+      exchange,
+      ethTransfer
     )
 
     val txMetadata = r.createFakeObserver(SubscribeRequest.of(1, 2))
@@ -105,6 +111,18 @@ class MetadataSpec extends FreeSpec with WithBUDomain {
             Seq(exchange.order1.id().toByteString, exchange.order2.id().toByteString),
             Seq(exchange.order1.senderAddress.toByteString, exchange.order2.senderAddress.toByteString),
             Seq(exchange.order1.senderPublicKey.toByteString, exchange.order2.senderPublicKey.toByteString)
+          ))
+        ),
+        TransactionMetadata(
+          ethOrderSender.toWavesAddress.toByteString,
+          TransactionMetadata.Metadata.Ethereum(TransactionMetadata.EthereumMetadata(
+            ethTransfer.timestamp,
+            ethTransfer.fee,
+            ethTransfer.sender.toByteString,
+            TransactionMetadata.EthereumMetadata.Action.Transfer(TransactionMetadata.EthereumTransferMetadata(
+              matcher.toAddress.toByteString,
+              Some(Amount(issue.assetId.toByteString, 10))
+            ))
           ))
         )
       )
