@@ -90,7 +90,7 @@ object ApiError {
   case object WrongJson {
     val Id                   = 1
     val WrongJsonMessage     = "failed to parse json message"
-    val WrongJsonDataMessage = "json data validation error, see \"validationErrors\" for details"
+    val WrongJsonDataMessage = "json data validation error, see validationErrors for details"
   }
 
   // API Auth
