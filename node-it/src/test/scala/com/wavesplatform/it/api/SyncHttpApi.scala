@@ -56,12 +56,15 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     )((id, message, json) => GenericApiError(id, message, StatusCodes.BadRequest.intValue, json))
   }
 
-  /**
-    *
-    * @param id Expected API error code
-    * @param message Expected API error full message or regex template
-    * @param code Expected HTTP status code, 400/Bad Request by default
-    * @param matchMessage When true, uses `message` as regular expression to find it in response. When false, fully tests `message` equality with received error message.
+  /** @param id
+    *   Expected API error code
+    * @param message
+    *   Expected API error full message or regex template
+    * @param code
+    *   Expected HTTP status code, 400/Bad Request by default
+    * @param matchMessage
+    *   When true, uses `message` as regular expression to find it in response. When false, fully tests `message` equality with received error
+    *   message.
     */
   case class AssertiveApiError(id: Int, message: String, code: StatusCode = StatusCodes.BadRequest, matchMessage: Boolean = false)
 
@@ -73,7 +76,8 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
   def assertBadRequestAndResponse[R](f: => R, errorRegex: String): Assertion = Try(f) match {
     case Failure(ApiCallException(UnexpectedStatusCodeException(_, _, statusCode, responseBody))) =>
       Assertions.assert(
-        statusCode == BadRequest.intValue && responseBody.replace("\n", "").matches(s".*$errorRegex.*"), s"\nexpected '$errorRegex'\nactual '$responseBody'"
+        statusCode == BadRequest.intValue && responseBody.replace("\n", "").matches(s".*$errorRegex.*"),
+        s"\nexpected '$errorRegex'\nactual '$responseBody'"
       )
     case Failure(e) => Assertions.fail(e)
     case _          => Assertions.fail("Expecting bad request")
@@ -147,7 +151,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
       case NonFatal(cause) => throw ApiCallException(cause)
     }
 
-  //noinspection ScalaStyle
+  // noinspection ScalaStyle
   implicit class NodeExtSync(n: Node) extends Assertions with matchers.should.Matchers {
     import com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi as async
 
@@ -299,11 +303,11 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     ): Transaction =
       maybeWaitForTransaction(sync(async(n).reissue(sender, assetId, quantity, reissuable, fee, version)), waitForTx)
 
-    def debugStateChanges(transactionId: String, amountsAsStrings: Boolean = false): DebugStateChanges = {
-      sync(async(n).debugStateChanges(transactionId, amountsAsStrings))
+    def stateChanges(transactionId: String, amountsAsStrings: Boolean = false): StateChanges = {
+      sync(async(n).stateChanges(transactionId, amountsAsStrings))
     }
 
-    def debugStateChangesByAddress(address: String, limit: Int, after: Option[String] = None): Seq[DebugStateChanges] = {
+    def debugStateChangesByAddress(address: String, limit: Int, after: Option[String] = None): Seq[StateChanges] = {
       sync(async(n).debugStateChangesByAddress(address, limit, after))
     }
 
