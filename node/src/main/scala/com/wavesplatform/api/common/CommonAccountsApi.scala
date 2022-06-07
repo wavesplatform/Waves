@@ -149,17 +149,22 @@ object CommonAccountsApi {
             )
           )
         case inv @ TransactionMeta.Invoke(invokeHeight, originTransaction, true, _, Some(scriptResult)) =>
-          extractLeases(address, blockchain.resolveAlias(inv.transaction.dApp).explicitGet(), scriptResult, originTransaction.id(), invokeHeight)
+          extractLeases(address, scriptResult, originTransaction.id(), invokeHeight)
         case Ethereum(height, tx @ EthereumTransaction(inv: Invocation, _, _, _), true, _, _, Some(scriptResult)) =>
-          extractLeases(address, inv.dApp, scriptResult, tx.id(), height)
+          extractLeases(address, scriptResult, tx.id(), height)
         case _ => Seq()
       }
 
-    private def extractLeases(subject: Address, sender: Address, result: InvokeScriptResult, txId: ByteStr, height: Height): Seq[LeaseInfo] = {
+    private def extractLeases(subject: Address, result: InvokeScriptResult, txId: ByteStr, height: Height): Seq[LeaseInfo] = {
       result.leases.flatMap { lease =>
         val leaseRecipient = blockchain.resolveAlias(lease.recipient).toOption
-        if (leaseIsActive(lease.id) && (subject == sender || leaseRecipient.contains(subject))) {
-          leaseRecipient.map { recipient =>
+        val leaseDetails   = blockchain.leaseDetails(lease.id)
+        val leaseSender    = leaseDetails.map(_.sender.toAddress)
+        if (leaseDetails.exists(_.isActive) && (leaseSender.contains(subject) || leaseRecipient.contains(subject))) {
+          for {
+            sender    <- leaseSender
+            recipient <- leaseRecipient
+          } yield {
             LeaseInfo(
               lease.id,
               txId,
@@ -174,7 +179,7 @@ object CommonAccountsApi {
           None
         }
       } ++ {
-        result.invokes.flatMap(i => extractLeases(subject, i.dApp, i.stateChanges, txId, height))
+        result.invokes.flatMap(i => extractLeases(subject, i.stateChanges, txId, height))
       }
     }
 
