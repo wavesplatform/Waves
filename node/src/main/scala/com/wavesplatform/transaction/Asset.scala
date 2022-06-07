@@ -38,11 +38,7 @@ object Asset {
     JsString(asset.id.toString)
   }
 
-  implicit val assetIdReads: Reads[Asset] = Reads {
-    case json: JsString => if (json.value.isEmpty || json.value == WavesName) JsSuccess(Waves) else assetReads.reads(json)
-    case JsNull         => JsSuccess(Waves)
-    case _              => JsError("Expected base58-encoded assetId or null")
-  }
+  implicit val assetIdReads: Reads[Asset] = assetReads(false)
   implicit val assetIdWrites: Writes[Asset] = Writes {
     case Waves           => JsNull
     case IssuedAsset(id) => JsString(id.toString)
@@ -85,5 +81,12 @@ object Asset {
       case Waves                  => onWaves
       case asset @ IssuedAsset(_) => onAsset(asset)
     }
+  }
+
+  def assetReads(allowWavesStr: Boolean): Reads[Asset] = Reads {
+    case json: JsString =>
+      if (json.value.isEmpty || (allowWavesStr && json.value == WavesName)) JsSuccess(Waves) else assetReads.reads(json)
+    case JsNull => JsSuccess(Waves)
+    case _      => JsError("Expected base58-encoded assetId or null")
   }
 }

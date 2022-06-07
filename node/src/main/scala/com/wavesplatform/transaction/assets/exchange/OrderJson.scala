@@ -117,9 +117,11 @@ object OrderJson {
     Order(version, senderCredentials, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, priceMode)
   }
 
+  val assetReads: Reads[Asset] = Asset.assetReads(true)
+
   implicit val assetPairReads: Reads[AssetPair] = {
-    val r = (JsPath \ "amountAsset").readWithDefault[Asset](Waves) and
-      (JsPath \ "priceAsset").readWithDefault[Asset](Waves)
+    val r = (JsPath \ "amountAsset").readWithDefault[Asset](Waves)(assetReads) and
+      (JsPath \ "priceAsset").readWithDefault[Asset](Waves)(assetReads)
     r(AssetPair(_, _))
   }
 
