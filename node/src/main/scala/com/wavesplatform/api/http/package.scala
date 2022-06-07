@@ -131,7 +131,7 @@ package object http {
     .result()
 
   val jsonExceptionHandler: ExceptionHandler = ExceptionHandler {
-    case JsResultException(err)                                         => complete(WrongJson(errors = err))
+    case JsResultException(err) => complete(WrongJson(errors = err, msg = Some("json data validation error, see \"validationErrors\" for details")))
     case PlayJsonException(cause, errors)                               => complete(WrongJson(cause, errors))
     case e: NoSuchElementException                                      => complete(WrongJson(Some(e)))
     case e: IllegalArgumentException                                    => complete(ApiError.fromValidationError(GenericError(e)))
