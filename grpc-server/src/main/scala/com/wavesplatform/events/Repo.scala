@@ -34,9 +34,13 @@ class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler) extends Bl
   private[this] var liquidState = Option.empty[LiquidState]
   private[this] val handlers    = ConcurrentHashMap.newKeySet[Handler]()
 
-  def shutdown(): Unit = monitor.synchronized {
-    db.close()
+  def shutdownHandlers(): Unit = monitor.synchronized {
     handlers.forEach(_.shutdown())
+  }
+
+  def shutdown(): Unit = {
+    shutdownHandlers()
+    db.close()
   }
 
   def height: Int =
@@ -62,8 +66,8 @@ class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler) extends Bl
       s"Block reference ${block.header.reference} does not match last block id ${liquidState.get.totalBlockId}"
     )
 
-    liquidState.foreach(
-      ls => db.put(keyForHeight(ls.keyBlock.height), ls.solidify().protobuf.update(_.append.block.optionalBlock := None).toByteArray)
+    liquidState.foreach(ls =>
+      db.put(keyForHeight(ls.keyBlock.height), ls.solidify().protobuf.update(_.append.block.optionalBlock := None).toByteArray)
     )
 
     val ba = BlockAppended.from(block, diff, blockchainBeforeWithMinerReward)
