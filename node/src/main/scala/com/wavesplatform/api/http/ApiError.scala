@@ -79,7 +79,7 @@ object ApiError {
   ) extends ApiError {
     override val id              = WrongJson.Id
     override val code            = StatusCodes.BadRequest
-    override val message: String = msg.getOrElse(WrongJson.Message)
+    override val message: String = msg.getOrElse(WrongJson.WrongJsonMessage)
     override lazy val json: JsObject = Json.obj(
       "error"            -> id,
       "message"          -> message,
@@ -88,8 +88,9 @@ object ApiError {
     )
   }
   case object WrongJson {
-    val Id      = 1
-    val Message = "failed to parse json message"
+    val Id                   = 1
+    val WrongJsonMessage     = "failed to parse json message"
+    val WrongJsonDataMessage = "json data validation error, see \"validationErrors\" for details"
   }
 
   // API Auth
