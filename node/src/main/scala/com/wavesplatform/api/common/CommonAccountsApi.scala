@@ -157,14 +157,11 @@ object CommonAccountsApi {
 
     private def extractLeases(subject: Address, result: InvokeScriptResult, txId: ByteStr, height: Height): Seq[LeaseInfo] = {
       result.leases.flatMap { lease =>
-        val leaseRecipient = blockchain.resolveAlias(lease.recipient).toOption
-        val leaseDetails   = blockchain.leaseDetails(lease.id)
-        val leaseSender    = leaseDetails.map(_.sender.toAddress)
-        if (leaseDetails.exists(_.isActive) && (leaseSender.contains(subject) || leaseRecipient.contains(subject))) {
-          for {
-            sender    <- leaseSender
-            recipient <- leaseRecipient
-          } yield {
+        for {
+          recipient <- blockchain.resolveAlias(lease.recipient).toOption
+          details   <- blockchain.leaseDetails(lease.id)
+          sender = details.sender.toAddress
+          info <- Option.when(details.isActive && (subject == sender || subject == recipient)) {
             LeaseInfo(
               lease.id,
               txId,
@@ -175,9 +172,7 @@ object CommonAccountsApi {
               LeaseInfo.Status.Active
             )
           }
-        } else {
-          None
-        }
+        } yield info
       } ++ {
         result.invokes.flatMap(i => extractLeases(subject, i.stateChanges, txId, height))
       }
