@@ -172,7 +172,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
     dAppStateChanges.head.stateChanges.get shouldBe expected
   }
 
-  test("Error on wrong tx type") {
+  test("None on wrong tx type") {
     val tx = nodes.head.transfer(
       caller,
       recipientAddress,
@@ -180,11 +180,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       waitForTx = true
     )
 
-    assertBadRequestAndMessage(
-      nodes.head.stateChanges(tx.id),
-      "transaction type not supported",
-      expectedStatusCode = 501
-    )
+    nodes.head.stateChanges(tx.id).stateChanges shouldBe None
   }
 
   test("state changes order") {
