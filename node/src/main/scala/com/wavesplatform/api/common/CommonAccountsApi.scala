@@ -148,28 +148,31 @@ object CommonAccountsApi {
               LeaseInfo.Status.Active
             )
           )
-        case inv @ TransactionMeta.Invoke(invokeHeight, originTransaction, true, _, Some(scriptResult)) =>
-          extractLeases(blockchain.resolveAlias(inv.transaction.dApp).explicitGet(), scriptResult, originTransaction.id(), invokeHeight)
+        case TransactionMeta.Invoke(invokeHeight, originTransaction, true, _, Some(scriptResult)) =>
+          extractLeases(address, scriptResult, originTransaction.id(), invokeHeight)
         case Ethereum(height, tx @ EthereumTransaction(inv: Invocation, _, _, _), true, _, _, Some(scriptResult)) =>
-          extractLeases(inv.dApp, scriptResult, tx.id(), height)
+          extractLeases(address, scriptResult, tx.id(), height)
         case _ => Seq()
       }
 
-    private def extractLeases(sender: Address, result: InvokeScriptResult, txId: ByteStr, height: Height): Seq[LeaseInfo] =
-      result.leases.collect {
-        case lease if leaseIsActive(lease.id) =>
-          LeaseInfo(
-            lease.id,
-            txId,
-            sender,
-            blockchain.resolveAlias(lease.recipient).explicitGet(),
-            lease.amount,
-            height,
-            LeaseInfo.Status.Active
-          )
-      } ++ {
-        result.invokes.flatMap(i => extractLeases(i.dApp, i.stateChanges, txId, height))
+    private def extractLeases(subject: Address, result: InvokeScriptResult, txId: ByteStr, height: Height): Seq[LeaseInfo] = {
+      (for {
+        lease   <- result.leases
+        details <- blockchain.leaseDetails(lease.id) if details.isActive
+        sender = details.sender.toAddress
+        recipient <- blockchain.resolveAlias(lease.recipient).toOption if subject == sender || subject == recipient
+      } yield LeaseInfo(
+        lease.id,
+        txId,
+        sender,
+        recipient,
+        lease.amount,
+        height,
+        LeaseInfo.Status.Active
+      )) ++ {
+        result.invokes.flatMap(i => extractLeases(subject, i.stateChanges, txId, height))
       }
+    }
 
     private def resolveDisabledAlias(leaseId: ByteStr): Either[ValidationError, Address] =
       CancelLeasesToDisabledAliases.patchData
