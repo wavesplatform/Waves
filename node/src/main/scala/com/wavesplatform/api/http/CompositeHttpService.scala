@@ -63,10 +63,14 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
       `Access-Control-Allow-Methods`(settings.corsHeaders.accessControlAllowMethods.flatMap(getForKeyCaseInsensitive))
     )
 
-  private def corsAllowAll =
-    respondWithHeaders(
-      commonCorsHeaders :+ `Access-Control-Allow-Origin`(settings.corsHeaders.accessControlAllowOrigin)
-    )
+  private def corsAllowAll = {
+    val allowOrigin =
+      if (settings.corsHeaders.accessControlAllowOrigin == "*")
+        `Access-Control-Allow-Origin`.*
+      else
+        `Access-Control-Allow-Origin`(settings.corsHeaders.accessControlAllowOrigin)
+    respondWithHeaders(commonCorsHeaders :+ allowOrigin)
+  }
 
   private def extendRoute(base: Route): Route = handleAllExceptions { ctx =>
     val extendedRoute =
