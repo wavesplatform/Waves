@@ -57,27 +57,30 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
     case _ =>
   }
 
-  private val commonCorsHeaders =
+  private val preflightCorsHeaders =
     Seq(
       `Access-Control-Allow-Headers`(settings.corsHeaders.accessControlAllowHeaders),
-      `Access-Control-Allow-Methods`(settings.corsHeaders.accessControlAllowMethods.flatMap(getForKeyCaseInsensitive))
+      `Access-Control-Allow-Methods`(settings.corsHeaders.accessControlAllowMethods.flatMap(getForKeyCaseInsensitive)),
+      `Access-Control-Allow-Credentials`(settings.corsHeaders.accessControlAllowCredentials)
     )
 
-  private def corsAllowAll = {
+  private val corsHeaders = {
     val allowOrigin =
       if (settings.corsHeaders.accessControlAllowOrigin == "*")
         `Access-Control-Allow-Origin`.*
       else
         `Access-Control-Allow-Origin`(settings.corsHeaders.accessControlAllowOrigin)
-    respondWithHeaders(commonCorsHeaders :+ allowOrigin)
+    Seq(
+      allowOrigin,
+      `Access-Control-Allow-Credentials`(settings.corsHeaders.accessControlAllowCredentials)
+    )
   }
 
   private def extendRoute(base: Route): Route = handleAllExceptions { ctx =>
     val extendedRoute =
       options {
-        val headers = commonCorsHeaders :+ `Access-Control-Allow-Credentials`(settings.corsHeaders.accessControlAllowCredentials)
-        respondWithDefaultHeaders(headers)(corsAllowAll(complete(StatusCodes.OK)))
-      } ~ corsAllowAll(base)
+        respondWithDefaultHeaders(preflightCorsHeaders)(complete(StatusCodes.OK))
+      } ~ respondWithDefaultHeaders(corsHeaders)(base)
 
     extendedRoute(ctx)
   }
