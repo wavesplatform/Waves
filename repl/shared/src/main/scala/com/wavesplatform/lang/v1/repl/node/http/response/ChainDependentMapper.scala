@@ -1,15 +1,17 @@
 package com.wavesplatform.lang.v1.repl.node.http.response
 
 import java.nio.ByteBuffer
-
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.EnvironmentFunctions._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.EnvironmentFunctions.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.v1.repl.global
-import com.wavesplatform.lang.v1.repl.node.http.response.model._
+import com.wavesplatform.lang.v1.repl.node.http.response.ChainDependentMapper.*
+import com.wavesplatform.lang.v1.repl.node.http.response.model.*
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven, Transfer}
-import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.lang.v1.traits.domain.*
+
+import java.util
 
 private[node] class ChainDependentMapper(chainId: Byte) {
   def toRideModel(tx: TransferTransaction): Transfer =
@@ -79,23 +81,36 @@ private[node] class ChainDependentMapper(chainId: Byte) {
     )
 
   def pkToAddress(publicKey: ByteString): ByteStr = {
-    val withoutChecksum =
-      ByteBuffer.allocate(1 + 1 + HashLength)
-        .put(AddressVersion.toByte)
-        .put(chainId)
-        .put(global.secureHash(publicKey.bytes), 0, HashLength)
-        .array()
+    publicKey.bytes.length match {
+      case KeyLength =>
+        val withoutChecksum =
+          ByteBuffer
+            .allocate(1 + 1 + HashLength)
+            .put(AddressVersion)
+            .put(chainId)
+            .put(global.secureHash(publicKey.bytes), 0, HashLength)
+            .array()
 
-    val checksum =
-      global.secureHash(withoutChecksum).take(ChecksumLength)
+        val checksum =
+          global.secureHash(withoutChecksum).take(ChecksumLength)
 
-    val bytes =
-      ByteBuffer.allocate(AddressLength)
-        .put(withoutChecksum)
-        .put(checksum, 0, ChecksumLength)
-        .array()
+        val bytes =
+          ByteBuffer
+            .allocate(AddressLength)
+            .put(withoutChecksum)
+            .put(checksum, 0, ChecksumLength)
+            .array()
 
-    ByteStr(bytes)
+        ByteStr(bytes)
+      case EthereumKeyLength =>
+        val hash = global.keccak256(publicKey.bytes)
+
+        val checksumPayload = Array(1.toByte, chainId) ++ util.Arrays.copyOfRange(hash, hash.length - 20, hash.length)
+        val checksum        = global.checksum(checksumPayload)
+        ByteStr(checksumPayload ++ checksum)
+
+      case other => throw new IllegalArgumentException(s"Unexpected public key length: $other")
+    }
   }
 
   def addressFromString(addressStr: String): Either[String, Address] = {
@@ -139,4 +154,9 @@ private[node] class ChainDependentMapper(chainId: Byte) {
       )
     } yield Address(ByteStr(addressBytes))
   }
+}
+
+object ChainDependentMapper {
+  val KeyLength         = 32
+  val EthereumKeyLength = 64
 }

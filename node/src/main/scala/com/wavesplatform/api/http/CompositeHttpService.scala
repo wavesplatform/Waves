@@ -1,18 +1,17 @@
 package com.wavesplatform.api.http
 
-import java.util.concurrent.{LinkedBlockingQueue, RejectedExecutionException, ThreadPoolExecutor, TimeUnit}
-
-import akka.http.scaladsl.model.HttpMethods._
-import akka.http.scaladsl.model._
-import akka.http.scaladsl.model.headers._
-import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.model.*
+import akka.http.scaladsl.model.HttpMethods.*
+import akka.http.scaladsl.model.headers.*
+import akka.http.scaladsl.server.*
+import akka.http.scaladsl.server.Directives.*
 import akka.http.scaladsl.server.RouteResult.Complete
-import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.util.concurrent.DefaultThreadFactory
 
+import java.util.concurrent.{LinkedBlockingQueue, RejectedExecutionException, ThreadPoolExecutor, TimeUnit}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService}
 import scala.io.Source
 
@@ -27,7 +26,8 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
       60,
       TimeUnit.SECONDS,
       new LinkedBlockingQueue[Runnable],
-      new DefaultThreadFactory("rest-heavy-request-processor", true), { (r: Runnable, executor: ThreadPoolExecutor) =>
+      new DefaultThreadFactory("rest-heavy-request-processor", true),
+      { (r: Runnable, executor: ThreadPoolExecutor) =>
         log.error(s"$r has been rejected from $executor")
         throw new RejectedExecutionException
       }
@@ -57,27 +57,25 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
     case _ =>
   }
 
-  private val corsAllowedHeaders = (if (settings.apiKeyDifferentHost) List("api_key", "X-API-Key") else List.empty[String]) ++
-    Seq("Authorization", "Content-Type", "X-Requested-With", "Timestamp", "Signature")
+  private val commonCorsHeaders =
+    Seq(
+      `Access-Control-Allow-Headers`(settings.corsHeaders.accessControlAllowHeaders),
+      `Access-Control-Allow-Methods`(settings.corsHeaders.accessControlAllowMethods.flatMap(getForKeyCaseInsensitive))
+    )
 
   private def corsAllowAll =
-    if (settings.cors) respondWithHeaders(`Access-Control-Allow-Credentials`(true),
-      `Access-Control-Allow-Headers`(corsAllowedHeaders),
-      `Access-Control-Allow-Methods`(OPTIONS, POST, PUT, GET, DELETE),
-      `Access-Control-Allow-Origin`(HttpOrigin("http://localhost:8080"))) else pass
+    respondWithHeaders(
+      commonCorsHeaders :+ `Access-Control-Allow-Origin`(settings.corsHeaders.accessControlAllowOrigin)
+    )
 
-  private def extendRoute(base: Route): Route = handleAllExceptions {
-    if (settings.cors) { ctx =>
-      val extendedRoute = options {
-        respondWithDefaultHeaders(
-          `Access-Control-Allow-Credentials`(true),
-          `Access-Control-Allow-Headers`(corsAllowedHeaders),
-          `Access-Control-Allow-Methods`(OPTIONS, POST, PUT, GET, DELETE)
-        )(corsAllowAll(complete(StatusCodes.OK)))
+  private def extendRoute(base: Route): Route = handleAllExceptions { ctx =>
+    val extendedRoute =
+      options {
+        val headers = commonCorsHeaders :+ `Access-Control-Allow-Credentials`(settings.corsHeaders.accessControlAllowCredentials)
+        respondWithDefaultHeaders(headers)(corsAllowAll(complete(StatusCodes.OK)))
       } ~ corsAllowAll(base)
 
-      extendedRoute(ctx)
-    } else base
+    extendedRoute(ctx)
   }
 
   private[this] lazy val patchedSwaggerJson = {

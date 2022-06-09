@@ -6,7 +6,7 @@ import sbt.{Def, _}
 object Dependencies {
   // Node protobuf schemas
   private[this] val protoSchemasLib =
-    "com.wavesplatform" % "protobuf-schemas" % "1.4.2" classifier "protobuf-src" intransitive ()
+    "com.wavesplatform" % "protobuf-schemas" % "1.4.3" classifier "protobuf-src" intransitive ()
 
   def akkaModule(module: String): ModuleID = "com.typesafe.akka" %% s"akka-$module" % "2.6.19"
 
@@ -78,8 +78,7 @@ object Dependencies {
       catsCore.value,
       catsModule("kernel").value,
       catsModule("macros", "2.1.1").value,
-      shapeless.value,
-      "com.google.protobuf" % "protobuf-java" % "3.19.2" // TODO: remove in NODE-2414
+      shapeless.value
     )
   )
 
