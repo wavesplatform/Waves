@@ -24,9 +24,10 @@ import com.wavesplatform.test.*
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.transaction.utils.EthTxGenerator.Arg
-import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{Asset, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
+import com.wavesplatform.transaction.{Asset, Authorized, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.SystemTime
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{NTPTime, TestWallet, TransactionGen}
@@ -426,6 +427,92 @@ class LeaseRouteSpec
         }
       }
     }
+  }
+
+  "returns leases created by invoke only for lease sender or recipient" in {
+    val invoker         = TxHelpers.signer(1)
+    val dApp1           = TxHelpers.signer(2)
+    val dApp2           = TxHelpers.signer(3)
+    val leaseRecipient1 = TxHelpers.signer(4)
+    val leaseRecipient2 = TxHelpers.signer(5)
+
+    val leaseAmount1 = 1
+    val leaseAmount2 = 2
+
+    val dAppScript1 = TestCompiler(V5)
+      .compileContract(s"""
+                          |{-# STDLIB_VERSION 5 #-}
+                          |{-# CONTENT_TYPE DAPP #-}
+                          |{-# SCRIPT_TYPE ACCOUNT #-}
+                          |
+                          |@Callable(i)
+                          |func foo() = {
+                          |  strict inv = invoke(Address(base58'${dApp2.toAddress}'), "bar", [], [])
+                          |  let lease = Lease(Address(base58'${leaseRecipient1.toAddress}'), 1)
+                          |  [lease, BinaryEntry("leaseId", lease.calculateLeaseId())]
+                          |}
+                          |""".stripMargin)
+
+    val dAppScript2 = TestCompiler(V5)
+      .compileContract(s"""
+                          |{-# STDLIB_VERSION 5 #-}
+                          |{-# CONTENT_TYPE DAPP #-}
+                          |{-# SCRIPT_TYPE ACCOUNT #-}
+                          |
+                          |@Callable(i)
+                          |func bar() = {
+                          |  let lease = Lease(Address(base58'${leaseRecipient2.toAddress}'), 2)
+                          |  [lease, BinaryEntry("leaseId", lease.calculateLeaseId())]
+                          |}
+                          |""".stripMargin)
+
+    def checkForInvoke(invokeTx: Transaction & Authorized): Unit =
+      withRoute(AddrWithBalance.enoughBalances(dApp1, dApp2) :+ AddrWithBalance(invokeTx.sender.toAddress)) { case (d, r) =>
+        def getLeaseId(address: Address) =
+          d.blockchain
+            .accountData(address, "leaseId")
+            .collect { case i: BinaryDataEntry =>
+              i.value
+            }
+            .get
+
+        d.appendBlock(
+          TxHelpers.setScript(dApp1, dAppScript1),
+          TxHelpers.setScript(dApp2, dAppScript2)
+        )
+
+        d.appendBlock(invokeTx)
+
+        val leaseDetails1 = Seq(
+          getLeaseId(dApp1.toAddress) -> LeaseDetails(
+            dApp1.publicKey,
+            leaseRecipient1.toAddress,
+            leaseAmount1,
+            LeaseDetails.Status.Active,
+            invokeTx.id(),
+            3
+          )
+        )
+        val leaseDetails2 = Seq(
+          getLeaseId(dApp2.toAddress) -> LeaseDetails(
+            dApp2.publicKey,
+            leaseRecipient2.toAddress,
+            leaseAmount2,
+            LeaseDetails.Status.Active,
+            invokeTx.id(),
+            3
+          )
+        )
+
+        checkActiveLeasesFor(invokeTx.sender.toAddress, r, Seq.empty)
+        checkActiveLeasesFor(dApp1.toAddress, r, leaseDetails1)
+        checkActiveLeasesFor(dApp2.toAddress, r, leaseDetails2)
+        checkActiveLeasesFor(leaseRecipient1.toAddress, r, leaseDetails1)
+        checkActiveLeasesFor(leaseRecipient2.toAddress, r, leaseDetails2)
+      }
+
+    checkForInvoke(TxHelpers.invoke(dApp1.toAddress, Some("foo"), invoker = invoker))
+    checkForInvoke(EthTxGenerator.generateEthInvoke(invoker.toEthKeyPair, dApp1.toAddress, "foo", Seq.empty, Seq.empty))
   }
 
   routePath("/info") in {

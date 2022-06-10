@@ -155,7 +155,7 @@ class MinerImpl(
     }
   }
 
-  private[mining] def forgeBlock(account: KeyPair): Either[String, (Block, MiningConstraint)] = {
+  def forgeBlock(account: KeyPair): Either[String, (Block, MiningConstraint)] = {
     // should take last block right at the time of mining since microblocks might have been added
     val height          = blockchainUpdater.height
     val version         = blockchainUpdater.nextBlockVersion
@@ -217,7 +217,7 @@ class MinerImpl(
     if (version < RewardBlockVersion) -1L
     else settings.rewardsSettings.desired.getOrElse(-1L)
 
-  private def nextBlockGenerationTime(blockchain: Blockchain, height: Int, block: SignedBlockHeader, account: KeyPair): Either[String, Long] = {
+  def nextBlockGenerationTime(blockchain: Blockchain, height: Int, block: SignedBlockHeader, account: KeyPair): Either[String, Long] = {
     val balance = blockchain.generatingBalance(account.toAddress, Some(block.id()))
 
     if (blockchain.isMiningAllowed(height, balance)) {
