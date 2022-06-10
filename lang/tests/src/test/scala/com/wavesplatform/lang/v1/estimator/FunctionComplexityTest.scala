@@ -2,8 +2,9 @@ package com.wavesplatform.lang.v1.estimator
 
 import com.wavesplatform.DocSource
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
+import com.wavesplatform.lang.API
 import com.wavesplatform.lang.directives.values.*
+import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.utils.*
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_STRING, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
@@ -96,5 +97,29 @@ class FunctionComplexityTest extends PropSpec {
     directives
       .flatMap(ds => contexts(ds).map(ds -> _))
       .foreach { case (ds, context) => check(context.value().functions, ds) }
+  }
+
+  property("JS API functions") {
+    lazyContexts
+      .flatMap { case ((ds, _), _) =>
+        API
+          .allFunctions(ds.stdLibVersion.id, ds.scriptType == Asset, ds.contentType == DApp)
+          .map((_, ds.stdLibVersion))
+      }
+      .foreach { case ((name, _, signature), version) =>
+        DocSource.funcData((name, signature.args.map(_._2.toString).toList, version.id))
+      }
+  }
+
+  property("JS API vars") {
+    lazyContexts
+      .flatMap { case ((ds, _), _) =>
+        API
+          .allVars(ds.stdLibVersion.id, ds.scriptType == Asset, ds.contentType == DApp)
+          .map((_, ds.stdLibVersion))
+      }
+      .foreach { case ((name, _), version) =>
+        DocSource.varData((name, version.id))
+      }
   }
 }

@@ -70,9 +70,7 @@ object API {
     utils
       .ctx(ver, isTokenContext, isContract)
       .vars
-      .collect {
-        case (name, (t, _)) if !name.startsWith("_") => (name, t)
-      }
+      .map { case (name, (t, _)) => (name, t) }
       .toSeq
 
   def allFunctions(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): Seq[(String, Seq[String], FunctionTypeSignature)] =
@@ -80,7 +78,7 @@ object API {
       .ctx(ver, isTokenContext, isContract)
       .functions
       .collect {
-        case f if !f.name.startsWith("_") => (f.name, f.args, f.signature)
+        case f if !f.name.startsWith("$") => (f.name, f.args, f.signature)
       }
       .toSeq
 
