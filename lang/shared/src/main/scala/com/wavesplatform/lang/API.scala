@@ -7,7 +7,7 @@ import com.wavesplatform.lang.script.ScriptPreprocessor
 import com.wavesplatform.lang.v1.BaseGlobal
 import com.wavesplatform.lang.v1.BaseGlobal.DAppInfo
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
-import com.wavesplatform.lang.v1.compiler.{CompilationError, Types}
+import com.wavesplatform.lang.v1.compiler.{CompilationError, Types, UtilityFunctionPrefix}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
 import com.wavesplatform.lang.v1.parser.Expressions
@@ -78,7 +78,7 @@ object API {
       .ctx(ver, isTokenContext, isContract)
       .functions
       .collect {
-        case f if !f.name.startsWith("$") => (f.name, f.args, f.signature)
+        case f if !f.name.startsWith(UtilityFunctionPrefix) => (f.name, f.args, f.signature)
       }
       .toSeq
 
