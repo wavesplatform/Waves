@@ -30,6 +30,7 @@ import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.{EthEncoding, EthHelpers}
@@ -146,31 +147,33 @@ class TransactionsRouteSpec
       d.appendBlock(lease)
 
       def expectedJson(status: String, cancelHeight: Option[Int] = None, cancelTransactionId: Option[ByteStr] = None): JsObject =
-        Json.parse(s"""{
-                      |  "type" : 9,
-                      |  "id" : "${leaseCancel.id()}",
-                      |  "sender" : "${sender.toAddress}",
-                      |  "senderPublicKey" : "${sender.publicKey}",
-                      |  "fee" : ${0.001.waves},
-                      |  "feeAssetId" : null,
-                      |  "timestamp" : ${leaseCancel.timestamp},
-                      |  "proofs" : [ "${leaseCancel.signature}" ],
-                      |  "version" : 2,
-                      |  "leaseId" : "${lease.id()}",
-                      |  "chainId" : 84,
-                      |  "spentComplexity" : 0,
-                      |  "lease" : {
-                      |    "id" : "${lease.id()}",
-                      |    "originTransactionId" : "${lease.id()}",
-                      |    "sender" : "${sender.toAddress}",
-                      |    "recipient" : "${recipient.toAddress}",
-                      |    "amount" : ${5.waves},
-                      |    "height" : 2,
-                      |    "status" : "$status",
-                      |    "cancelHeight" : ${cancelHeight.getOrElse("null")},
-                      |    "cancelTransactionId" : ${cancelTransactionId.fold("null")("\"" + _ + "\"")}
-                      |  }
-                      |}""".stripMargin).as[JsObject]
+        Json
+          .parse(s"""{
+                    |  "type" : 9,
+                    |  "id" : "${leaseCancel.id()}",
+                    |  "sender" : "${sender.toAddress}",
+                    |  "senderPublicKey" : "${sender.publicKey}",
+                    |  "fee" : ${0.001.waves},
+                    |  "feeAssetId" : null,
+                    |  "timestamp" : ${leaseCancel.timestamp},
+                    |  "proofs" : [ "${leaseCancel.signature}" ],
+                    |  "version" : 2,
+                    |  "leaseId" : "${lease.id()}",
+                    |  "chainId" : 84,
+                    |  "spentComplexity" : 0,
+                    |  "lease" : {
+                    |    "id" : "${lease.id()}",
+                    |    "originTransactionId" : "${lease.id()}",
+                    |    "sender" : "${sender.toAddress}",
+                    |    "recipient" : "${recipient.toAddress}",
+                    |    "amount" : ${5.waves},
+                    |    "height" : 2,
+                    |    "status" : "$status",
+                    |    "cancelHeight" : ${cancelHeight.getOrElse("null")},
+                    |    "cancelTransactionId" : ${cancelTransactionId.fold("null")("\"" + _ + "\"")}
+                    |  }
+                    |}""".stripMargin)
+          .as[JsObject]
 
       d.utxPool.putIfNew(leaseCancel)
 
@@ -212,44 +215,40 @@ class TransactionsRouteSpec
 
       "invalid limit" - {
         "limit is too big" in {
-          forAll(addressGen, choose(MaxTransactionsPerRequest + 1, Int.MaxValue).label("limitExceeded")) {
-            case (address, limit) =>
-              Get(routePath(s"/address/$address/limit/$limit")) ~> route should produce(TooBigArrayAllocation)
+          forAll(addressGen, choose(MaxTransactionsPerRequest + 1, Int.MaxValue).label("limitExceeded")) { case (address, limit) =>
+            Get(routePath(s"/address/$address/limit/$limit")) ~> route should produce(TooBigArrayAllocation)
           }
         }
       }
 
       "invalid after" in {
-        forAll(addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect"), invalidBase58Gen) {
-          case (address, limit, invalidBase58) =>
-            Get(routePath(s"/address/$address/limit/$limit?after=$invalidBase58")) ~> route ~> check {
-              status shouldEqual StatusCodes.BadRequest
-              (responseAs[JsObject] \ "message").as[String] shouldEqual s"Unable to decode transaction id $invalidBase58"
-            }
+        forAll(addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect"), invalidBase58Gen) { case (address, limit, invalidBase58) =>
+          Get(routePath(s"/address/$address/limit/$limit?after=$invalidBase58")) ~> route ~> check {
+            status shouldEqual StatusCodes.BadRequest
+            (responseAs[JsObject] \ "message").as[String] shouldEqual s"Unable to decode transaction id $invalidBase58"
+          }
         }
       }
     }
 
     "returns 200 if correct params provided" - {
       "address and limit" in {
-        forAll(addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect")) {
-          case (address, limit) =>
-            (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
-            (addressTransactions.transactionsByAddress _).expects(*, *, *, None).returning(Observable.empty).once()
-            Get(routePath(s"/address/$address/limit/$limit")) ~> route ~> check {
-              status shouldEqual StatusCodes.OK
-            }
+        forAll(addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect")) { case (address, limit) =>
+          (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
+          (addressTransactions.transactionsByAddress _).expects(*, *, *, None).returning(Observable.empty).once()
+          Get(routePath(s"/address/$address/limit/$limit")) ~> route ~> check {
+            status shouldEqual StatusCodes.OK
+          }
         }
       }
 
       "address, limit and after" in {
-        forAll(addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect"), bytes32StrGen) {
-          case (address, limit, txId) =>
-            (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
-            (addressTransactions.transactionsByAddress _).expects(*, *, *, *).returning(Observable.empty).once()
-            Get(routePath(s"/address/$address/limit/$limit?after=$txId")) ~> route ~> check {
-              status shouldEqual StatusCodes.OK
-            }
+        forAll(addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect"), bytes32StrGen) { case (address, limit, txId) =>
+          (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
+          (addressTransactions.transactionsByAddress _).expects(*, *, *, *).returning(Observable.empty).once()
+          Get(routePath(s"/address/$address/limit/$limit?after=$txId")) ~> route ~> check {
+            status shouldEqual StatusCodes.OK
+          }
         }
       }
     }
@@ -425,9 +424,12 @@ class TransactionsRouteSpec
     "returns meta and state changes for eth invoke" in {
       val blockchain = createBlockchainStub { blockchain =>
         blockchain.stub.creditBalance(TxHelpers.defaultEthAddress, Waves)
-        blockchain.stub.setScript(TxHelpers.secondAddress, TxHelpers.scriptV5("""@Callable(i)
-            |func test() = []
-            |""".stripMargin))
+        blockchain.stub.setScript(
+          TxHelpers.secondAddress,
+          TxHelpers.scriptV5("""@Callable(i)
+                               |func test() = []
+                               |""".stripMargin)
+        )
         blockchain.stub.activateAllFeatures()
       }
 
@@ -495,7 +497,7 @@ class TransactionsRouteSpec
       val leaseCancel = TxHelpers.leaseCancel(lease.id())
 
       val blockchain = createBlockchainStub { blockchain =>
-        (blockchain.transactionInfo _).when(lease.id()).returns(Some(TxMeta(Height(1), true, 0L)        -> lease))
+        (blockchain.transactionInfo _).when(lease.id()).returns(Some(TxMeta(Height(1), true, 0L) -> lease))
         (blockchain.transactionInfo _).when(leaseCancel.id()).returns(Some((TxMeta(Height(1), true, 0L) -> leaseCancel)))
       }
 
@@ -506,7 +508,9 @@ class TransactionsRouteSpec
       (blockchain.leaseDetails _)
         .when(lease.id())
         .returns(
-          Some(LeaseDetails(lease.sender, lease.recipient, lease.amount.value, LeaseDetails.Status.Cancelled(2, Some(leaseCancel.id())), lease.id(), 1))
+          Some(
+            LeaseDetails(lease.sender, lease.recipient, lease.amount.value, LeaseDetails.Status.Cancelled(2, Some(leaseCancel.id())), lease.id(), 1)
+          )
         )
 
       val route = transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route
@@ -527,7 +531,7 @@ class TransactionsRouteSpec
                                     |  "height" : 1,
                                     |  "applicationStatus" : "succeeded",
                                     |  "spentComplexity": 0,
-                                   |  "lease" : {
+                                    |  "lease" : {
                                     |    "id" : "${lease.id()}",
                                     |    "originTransactionId" : "${lease.id()}",
                                     |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
@@ -559,28 +563,27 @@ class TransactionsRouteSpec
         succeed                      <- if (height >= acceptFailedActivationHeight) Arbitrary.arbBool.arbitrary else Gen.const(true)
       } yield (tx, succeed, height, acceptFailedActivationHeight)
 
-      forAll(txAvailability) {
-        case (tx, succeed, height, acceptFailedActivationHeight) =>
-          (addressTransactions.transactionById _).expects(tx.id()).returning(Some(TransactionMeta.Default(Height(height), tx, succeed, 0L))).once()
-          (() => blockchain.activatedFeatures)
-            .expects()
-            .returning(Map(BF.BlockV5.id -> acceptFailedActivationHeight))
-            .anyNumberOfTimes()
+      forAll(txAvailability) { case (tx, succeed, height, acceptFailedActivationHeight) =>
+        (addressTransactions.transactionById _).expects(tx.id()).returning(Some(TransactionMeta.Default(Height(height), tx, succeed, 0L))).once()
+        (() => blockchain.activatedFeatures)
+          .expects()
+          .returning(Map(BF.BlockV5.id -> acceptFailedActivationHeight))
+          .anyNumberOfTimes()
 
-          def validateResponse(): Unit = {
-            status shouldEqual StatusCodes.OK
+        def validateResponse(): Unit = {
+          status shouldEqual StatusCodes.OK
 
-            val extraFields = Seq(
-              (if (blockchain.isFeatureActivated(BF.BlockV5, height))
-                 Json.obj("applicationStatus" -> JsString(if (succeed) "succeeded" else "script_execution_failed"))
-               else Json.obj()),
-              Json.obj("height" -> height, "spentComplexity" -> 0)
-            ).reduce(_ ++ _)
+          val extraFields = Seq(
+            (if (blockchain.isFeatureActivated(BF.BlockV5, height))
+               Json.obj("applicationStatus" -> JsString(if (succeed) "succeeded" else "script_execution_failed"))
+             else Json.obj()),
+            Json.obj("height" -> height, "spentComplexity" -> 0)
+          ).reduce(_ ++ _)
 
-            responseAs[JsValue] should matchJson(tx.json() ++ extraFields)
-          }
+          responseAs[JsValue] should matchJson(tx.json() ++ extraFields)
+        }
 
-          Get(routePath(s"/info/${tx.id().toString}")) ~> route ~> check(validateResponse())
+        Get(routePath(s"/info/${tx.id().toString}")) ~> route ~> check(validateResponse())
       }
     }
 
@@ -773,31 +776,53 @@ class TransactionsRouteSpec
     "handles multiple ids" in {
       val txCount = 5
       val txs     = (1 to txCount).map(_ => TxHelpers.invoke(TxHelpers.defaultSigner.toAddress))
-      txs.foreach(
-        tx =>
-          (addressTransactions.transactionById _)
-            .expects(tx.id())
-            .returns(Some(TransactionMeta.Invoke(Height(1), tx, succeeded = true, 85L, Some(InvokeScriptResult()))))
-            .repeat(3)
+      txs.foreach(tx =>
+        (addressTransactions.transactionById _)
+          .expects(tx.id())
+          .returns(Some(TransactionMeta.Invoke(Height(1), tx, succeeded = true, 85L, Some(InvokeScriptResult()))))
+          .anyNumberOfTimes()
       )
 
       (() => blockchain.activatedFeatures).expects().returns(Map(BF.BlockV5.id -> 1)).anyNumberOfTimes()
 
-      def checkResponse(): Unit = txs.zip(responseAs[JsArray].value) foreach {
-        case (tx, json) =>
-          val extraFields =
-            Json.obj("height" -> 1, "spentComplexity" -> 85, "applicationStatus" -> "succeeded", "stateChanges" -> InvokeScriptResult())
-          json shouldBe (tx.json() ++ extraFields)
+      def checkResponse(txs: Seq[InvokeScriptTransaction]): Unit = txs.zip(responseAs[JsArray].value) foreach { case (tx, json) =>
+        val extraFields =
+          Json.obj("height" -> 1, "spentComplexity" -> 85, "applicationStatus" -> "succeeded", "stateChanges" -> InvokeScriptResult())
+        json shouldBe (tx.json() ++ extraFields)
       }
 
-      Get(routePath(s"/info?${txs.map("id=" + _.id()).mkString("&")}")) ~> route ~> check(checkResponse())
-      Post(routePath("/info"), FormData(txs.map("id" -> _.id().toString)*)) ~> route ~> check(checkResponse())
+      def checkErrorResponse(): Unit = {
+        response.status shouldBe StatusCodes.BadRequest
+        (responseAs[JsObject] \ "message").as[String] shouldBe TooBigArrayAllocation(transactionsApiRoute.settings.transactionsByAddressLimit).message
+      }
+
+      val maxLimitTxs      = Seq.fill(transactionsApiRoute.settings.transactionsByAddressLimit)(txs.head)
+      val moreThanLimitTxs = txs.head +: maxLimitTxs
+
+      Get(routePath(s"/info?${txs.map("id=" + _.id()).mkString("&")}")) ~> route ~> check(checkResponse(txs))
+      Get(routePath(s"/info?${maxLimitTxs.map("id=" + _.id()).mkString("&")}")) ~> route ~> check(checkResponse(maxLimitTxs))
+      Get(routePath(s"/info?${moreThanLimitTxs.map("id=" + _.id()).mkString("&")}")) ~> route ~> check(checkErrorResponse())
+
+      Post(routePath("/info"), FormData(txs.map("id" -> _.id().toString)*)) ~> route ~> check(checkResponse(txs))
+      Post(routePath("/info"), FormData(maxLimitTxs.map("id" -> _.id().toString)*)) ~> route ~> check(checkResponse(maxLimitTxs))
+      Post(routePath("/info"), FormData(moreThanLimitTxs.map("id" -> _.id().toString)*)) ~> route ~> check(checkErrorResponse())
+
       Post(
         routePath("/info"),
         HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Json.arr(txs.map(_.id().toString: JsValueWrapper)*)).toString())
       ) ~> route ~> check(
-        checkResponse()
+        checkResponse(txs)
       )
+      Post(
+        routePath("/info"),
+        HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Json.arr(maxLimitTxs.map(_.id().toString: JsValueWrapper)*)).toString())
+      ) ~> route ~> check(
+        checkResponse(maxLimitTxs)
+      )
+      Post(
+        routePath("/info"),
+        HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Json.arr(moreThanLimitTxs.map(_.id().toString: JsValueWrapper)*)).toString())
+      ) ~> route ~> check(checkErrorResponse())
     }
   }
 
@@ -820,36 +845,35 @@ class TransactionsRouteSpec
         succeed                      <- if (height >= acceptFailedActivationHeight) Arbitrary.arbBool.arbitrary else Gen.const(true)
       } yield (tx, height, acceptFailedActivationHeight, succeed)
 
-      forAll(txAvailability) {
-        case (tx, height, acceptFailedActivationHeight, succeed) =>
-          (blockchain.transactionInfo _).expects(tx.id()).returning(Some(TxMeta(Height(height), succeed, 93L) -> tx)).anyNumberOfTimes()
-          (() => blockchain.height).expects().returning(1000).anyNumberOfTimes()
-          (() => blockchain.activatedFeatures)
-            .expects()
-            .returning(Map(BF.BlockV5.id -> acceptFailedActivationHeight))
-            .anyNumberOfTimes()
+      forAll(txAvailability) { case (tx, height, acceptFailedActivationHeight, succeed) =>
+        (blockchain.transactionInfo _).expects(tx.id()).returning(Some(TxMeta(Height(height), succeed, 93L) -> tx)).anyNumberOfTimes()
+        (() => blockchain.height).expects().returning(1000).anyNumberOfTimes()
+        (() => blockchain.activatedFeatures)
+          .expects()
+          .returning(Map(BF.BlockV5.id -> acceptFailedActivationHeight))
+          .anyNumberOfTimes()
 
-          Get(routePath(s"/status?id=${tx.id().toString}&id=${tx.id().toString}")) ~> route ~> check {
-            status shouldEqual StatusCodes.OK
-            val obj = {
-              val common = Json.obj(
-                "id"              -> tx.id().toString,
-                "status"          -> "confirmed",
-                "height"          -> JsNumber(height),
-                "confirmations"   -> JsNumber(1000 - height),
-                "spentComplexity" -> 93
-              )
-              val applicationStatus =
-                if (blockchain.isFeatureActivated(BF.BlockV5, height))
-                  Json.obj("applicationStatus" -> JsString(if (succeed) "succeeded" else "script_execution_failed"))
-                else Json.obj()
-              common ++ applicationStatus
-            }
-            responseAs[JsValue] shouldEqual Json.arr(obj, obj)
+        Get(routePath(s"/status?id=${tx.id().toString}&id=${tx.id().toString}")) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          val obj = {
+            val common = Json.obj(
+              "id"              -> tx.id().toString,
+              "status"          -> "confirmed",
+              "height"          -> JsNumber(height),
+              "confirmations"   -> JsNumber(1000 - height),
+              "spentComplexity" -> 93
+            )
+            val applicationStatus =
+              if (blockchain.isFeatureActivated(BF.BlockV5, height))
+                Json.obj("applicationStatus" -> JsString(if (succeed) "succeeded" else "script_execution_failed"))
+              else Json.obj()
+            common ++ applicationStatus
           }
-          Post(routePath("/status"), Json.obj("ids" -> Seq(tx.id().toString, tx.id().toString))) ~> route ~> check {
-            status shouldEqual StatusCodes.OK
-          }
+          responseAs[JsValue] shouldEqual Json.arr(obj, obj)
+        }
+        Post(routePath("/status"), Json.obj("ids" -> Seq(tx.id().toString, tx.id().toString))) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+        }
       }
     }
   }
@@ -962,15 +986,15 @@ class TransactionsRouteSpec
       Random.nextBytes(seed)
       val sender: KeyPair = KeyPair(seed)
       val ist = Signed.invokeScript(
-          TxVersion.V1,
-          sender,
-          sender.toAddress,
-          None,
-          Seq.empty,
-          500000L,
-          Asset.Waves,
-          testTime.getTimestamp()
-        )
+        TxVersion.V1,
+        sender,
+        sender.toAddress,
+        None,
+        Seq.empty,
+        500000L,
+        Asset.Waves,
+        testTime.getTimestamp()
+      )
       f(sender, ist)
     }
 
@@ -1093,15 +1117,14 @@ class TransactionsRouteSpec
 
       proofs.size shouldBe expectedProofs.size
 
-      proofs.zip(expectedProofs).foreach {
-        case (p, e) =>
-          val transactionId    = (p \ "id").as[String]
-          val transactionIndex = (p \ "transactionIndex").as[Int]
-          val digests          = (p \ "merkleProof").as[List[String]].map(s => ByteStr.decodeBase58(s).get)
+      proofs.zip(expectedProofs).foreach { case (p, e) =>
+        val transactionId    = (p \ "id").as[String]
+        val transactionIndex = (p \ "transactionIndex").as[Int]
+        val digests          = (p \ "merkleProof").as[List[String]].map(s => ByteStr.decodeBase58(s).get)
 
-          transactionId shouldEqual e.id.toString
-          transactionIndex shouldEqual e.transactionIndex
-          digests shouldEqual e.digests.map(ByteStr(_))
+        transactionId shouldEqual e.id.toString
+        transactionIndex shouldEqual e.transactionIndex
+        digests shouldEqual e.digests.map(ByteStr(_))
       }
     }
 
@@ -1160,6 +1183,48 @@ class TransactionsRouteSpec
         Get(routePath(s"/merkleProof$queryParams")) ~> route should produce(InvalidSignature)
 
         Post(routePath("/merkleProof"), requestBody) ~> route should produce(InvalidSignature)
+      }
+    }
+
+    "handles transactions ids limit" in {
+      def checkErrorResponse(): Unit = {
+        response.status shouldBe StatusCodes.BadRequest
+        (responseAs[JsObject] \ "message").as[String] shouldBe TooBigArrayAllocation(transactionsApiRoute.settings.transactionsByAddressLimit).message
+      }
+
+      def checkResponse(tx: TransferTransaction, idsCount: Int): Unit = {
+        response.status shouldBe StatusCodes.OK
+
+        val result = responseAs[JsArray].value
+        result.size shouldBe idsCount
+        (1 to idsCount).zip(responseAs[JsArray].value) foreach { case (_, json) =>
+          (json \ "id").as[String] shouldBe tx.id().toString
+          (json \ "transactionIndex").as[Int] shouldBe 0
+        }
+      }
+
+      val sender = TxHelpers.signer(1)
+
+      withDomain(DomainPresets.RideV5, balances = AddrWithBalance.enoughBalances(sender)) { d =>
+        val transferTx = TxHelpers.transfer(from = sender)
+        d.appendBlock(transferTx)
+
+        val route = mkRoute(d)
+
+        val maxLimitIds      = Seq.fill(transactionsApiRoute.settings.transactionsByAddressLimit)(transferTx.id().toString)
+        val moreThanLimitIds = transferTx.id().toString +: maxLimitIds
+
+        Get(routePath(s"/merkleProof?${maxLimitIds.map("id=" + _).mkString("&")}")) ~> route ~> check(checkResponse(transferTx, maxLimitIds.size))
+        Get(routePath(s"/merkleProof?${moreThanLimitIds.map("id=" + _).mkString("&")}")) ~> route ~> check(checkErrorResponse())
+
+        Post(
+          routePath(s"/merkleProof"),
+          HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Json.arr(maxLimitIds.map(id => id: JsValueWrapper)*)).toString())
+        ) ~> route ~> check(checkResponse(transferTx, maxLimitIds.size))
+        Post(
+          routePath(s"/merkleProof"),
+          HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Json.arr(moreThanLimitIds.map(id => id: JsValueWrapper)*)).toString())
+        ) ~> route ~> check(checkErrorResponse())
       }
     }
   }

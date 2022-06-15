@@ -1,10 +1,11 @@
 package com.wavesplatform.http
 
-import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.{ContentTypes, FormData, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.Route
 import com.google.protobuf.ByteString
 import com.wavesplatform.TestWallet
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.api.http.requests.{TransferV1Request, TransferV2Request}
 import com.wavesplatform.common.state.ByteStr
@@ -30,7 +31,7 @@ import com.wavesplatform.transaction.utils.EthTxGenerator.Arg
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxHelpers, TxNonNegativeAmount, TxVersion}
 import org.scalatest.concurrent.Eventually
 import play.api.libs.json.Json.JsValueWrapper
-import play.api.libs.json.{JsObject, JsValue, Json, Writes}
+import play.api.libs.json.{JsArray, JsObject, JsValue, Json, Writes}
 
 class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPISettingsHelper with WithDomain with TestWallet {
 
@@ -403,6 +404,64 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
         )
       }
     }
+  }
+
+  routePath(s"/details - handles assets ids limit") in routeTest() { (d, route) =>
+    def checkErrorResponse(): Unit = {
+      response.status shouldBe StatusCodes.BadRequest
+      (responseAs[JsObject] \ "message").as[String] shouldBe TooBigArrayAllocation(AssetsApiRoute.AssetsLimit).message
+    }
+
+    def checkResponse(issueTx: IssueTransaction, idsCount: Int): Unit = {
+      response.status shouldBe StatusCodes.OK
+
+      val result = responseAs[JsArray].value
+      result.size shouldBe idsCount
+      (1 to idsCount).zip(responseAs[JsArray].value) foreach { case (_, json) =>
+        json should matchJson(s"""
+                                 |{
+                                 |  "assetId" : "${issueTx.id()}",
+                                 |  "issueHeight" : 2,
+                                 |  "issueTimestamp" : ${issueTx.timestamp},
+                                 |  "issuer" : "${issueTx.sender.toAddress}",
+                                 |  "issuerPublicKey" : "${issueTx.sender.toString}",
+                                 |  "name" : "${issueTx.name.toStringUtf8}",
+                                 |  "description" : "${issueTx.description.toStringUtf8}",
+                                 |  "decimals" : ${issueTx.decimals.value},
+                                 |  "reissuable" : ${issueTx.reissuable},
+                                 |  "quantity" : ${issueTx.quantity.value},
+                                 |  "scripted" : false,
+                                 |  "minSponsoredAssetFee" : null,
+                                 |  "originTransactionId" : "${issueTx.id()}"
+                                 |}
+                                 |""".stripMargin)
+      }
+    }
+
+    val issuer = TxHelpers.signer(1)
+
+    val issue = TxHelpers.issue(issuer = issuer)
+
+    d.appendBlock(TxHelpers.genesis(issuer.toAddress))
+    d.appendBlock(issue)
+
+    val maxLimitIds      = Seq.fill(AssetsApiRoute.AssetsLimit)(issue.id().toString)
+    val moreThanLimitIds = issue.id().toString +: maxLimitIds
+
+    Get(routePath(s"/details?${maxLimitIds.map("id=" + _).mkString("&")}")) ~> route ~> check(checkResponse(issue, maxLimitIds.size))
+    Get(routePath(s"/details?${moreThanLimitIds.map("id=" + _).mkString("&")}")) ~> route ~> check(checkErrorResponse())
+
+    Post(routePath("/details"), FormData(maxLimitIds.map("id" -> _)*)) ~> route ~> check(checkResponse(issue, maxLimitIds.size))
+    Post(routePath("/details"), FormData(moreThanLimitIds.map("id" -> _)*)) ~> route ~> check(checkErrorResponse())
+
+    Post(
+      routePath("/details"),
+      HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Json.arr(maxLimitIds.map(id => id: JsValueWrapper)*)).toString())
+    ) ~> route ~> check(checkResponse(issue, maxLimitIds.size))
+    Post(
+      routePath("/details"),
+      HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Json.arr(moreThanLimitIds.map(id => id: JsValueWrapper)*)).toString())
+    ) ~> route ~> check(checkErrorResponse())
   }
 
   routePath("/nft/list") in routeTest() { (d, route) =>
