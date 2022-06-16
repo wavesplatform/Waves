@@ -1,7 +1,7 @@
 package com.wavesplatform.settings
 
 import akka.http.scaladsl.model.HttpMethods.*
-import com.typesafe.config.{ConfigFactory, ConfigParseOptions}
+import com.typesafe.config.ConfigFactory
 import com.wavesplatform.test.FlatSpec
 import net.ceedubs.ficus.Ficus.*
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
