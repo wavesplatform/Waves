@@ -1,7 +1,7 @@
 package com.wavesplatform.settings
 
 import akka.http.scaladsl.model.HttpMethods.*
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{ConfigFactory, ConfigParseOptions}
 import com.wavesplatform.test.FlatSpec
 import net.ceedubs.ficus.Ficus.*
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
@@ -45,9 +45,46 @@ class RestAPISettingsSpecification extends FlatSpec {
     settings.heavyRequestProcessorPoolThreads shouldBe Some(7)
     settings.minimumPeers shouldBe 2
 
-    settings.corsHeaders.accessControlAllowOrigin shouldBe "http://localhost:8080"
+    settings.corsHeaders.accessControlAllowOrigin shouldBe Some("http://localhost:8080")
     settings.corsHeaders.accessControlAllowHeaders shouldBe Seq("Authorization", "Content-Type", "X-Requested-With", "Timestamp", "Signature")
     settings.corsHeaders.accessControlAllowMethods.flatMap(getForKeyCaseInsensitive) shouldBe Seq(OPTIONS, POST, PUT, GET, DELETE)
     settings.corsHeaders.accessControlAllowCredentials shouldBe true
+  }
+
+  "CORS headers" should "be read without access-control-allow-origin" in {
+    val config = ConfigFactory.parseString(
+      """
+        |waves {
+        |  rest-api {
+        |    cors-headers {
+        |      access-control-allow-headers = [ "Authorization", "Content-Type", "X-Requested-With", "Timestamp", "Signature" ]
+        |      access-control-allow-methods = ["OPTIONS", "POST", "PUT", "GET", "DELETE"]
+        |      access-control-allow-credentials = yes
+        |    }
+        |  }
+        |}
+      """.stripMargin
+    )
+    val corsHeaders = config.as[CorsHeaders]("waves.rest-api.cors-headers")
+    corsHeaders.accessControlAllowOrigin shouldBe None
+  }
+
+  "CORS headers" should "be read with access-control-allow-origin = null" in {
+    val config = ConfigFactory.parseString(
+      """
+        |waves {
+        |  rest-api {
+        |    cors-headers {
+        |      access-control-allow-headers = [ "Authorization", "Content-Type", "X-Requested-With", "Timestamp", "Signature" ]
+        |      access-control-allow-origin  = null
+        |      access-control-allow-methods = ["OPTIONS", "POST", "PUT", "GET", "DELETE"]
+        |      access-control-allow-credentials = yes
+        |    }
+        |  }
+        |}
+      """.stripMargin
+    )
+    val corsHeaders = config.as[CorsHeaders]("waves.rest-api.cors-headers")
+    corsHeaders.accessControlAllowOrigin shouldBe None
   }
 }
