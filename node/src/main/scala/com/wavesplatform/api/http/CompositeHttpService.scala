@@ -57,27 +57,31 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
     case _ =>
   }
 
-  private val preflightCorsHeaders =
+  private def preflightCorsHeaders(requestHeaders: Seq[HttpHeader]) =
     Seq(
       `Access-Control-Allow-Headers`(settings.corsHeaders.accessControlAllowHeaders),
-      `Access-Control-Allow-Methods`(settings.corsHeaders.accessControlAllowMethods.flatMap(getForKeyCaseInsensitive)),
-      `Access-Control-Allow-Credentials`(settings.corsHeaders.accessControlAllowCredentials)
-    )
+      `Access-Control-Allow-Methods`(settings.corsHeaders.accessControlAllowMethods.flatMap(getForKeyCaseInsensitive))
+    ) ++ corsHeaders(requestHeaders)
 
   private def corsHeaders(requestHeaders: Seq[HttpHeader]) = {
     val allowOrigin =
       settings.corsHeaders.accessControlAllowOrigin match {
-        case Some("*")    => Some(`Access-Control-Allow-Origin`.*)
-        case Some(origin) => Some(`Access-Control-Allow-Origin`(origin))
-        case None         => requestHeaders.collectFirst { case o: Origin => o.origins.headOption }.flatten.map(`Access-Control-Allow-Origin`(_))
+        case Some("*")    => `Access-Control-Allow-Origin`.*
+        case Some(origin) => `Access-Control-Allow-Origin`(origin)
+        case None         =>
+          requestHeaders
+            .collectFirst { case o: Origin => o.origins.headOption }
+            .flatten
+            .map(`Access-Control-Allow-Origin`(_))
+            .getOrElse(`Access-Control-Allow-Origin`.`null`)
       }
-    Seq(`Access-Control-Allow-Credentials`(settings.corsHeaders.accessControlAllowCredentials)) ++ allowOrigin
+    Seq(allowOrigin, `Access-Control-Allow-Credentials`(settings.corsHeaders.accessControlAllowCredentials))
   }
 
   private def extendRoute(base: Route): Route = handleAllExceptions { ctx =>
     val extendedRoute =
       options {
-        respondWithDefaultHeaders(preflightCorsHeaders)(complete(StatusCodes.OK))
+        respondWithDefaultHeaders(preflightCorsHeaders(ctx.request.headers))(complete(StatusCodes.OK))
       } ~ respondWithDefaultHeaders(corsHeaders(ctx.request.headers))(base)
 
     extendedRoute(ctx)
