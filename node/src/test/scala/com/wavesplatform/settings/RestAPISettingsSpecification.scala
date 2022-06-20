@@ -45,7 +45,7 @@ class RestAPISettingsSpecification extends FlatSpec {
     settings.heavyRequestProcessorPoolThreads shouldBe Some(7)
     settings.minimumPeers shouldBe 2
 
-    settings.corsHeaders.accessControlAllowOrigin shouldBe Some("http://localhost:8080")
+    settings.corsHeaders.accessControlAllowOrigin shouldBe "http://localhost:8080"
     settings.corsHeaders.accessControlAllowHeaders shouldBe Seq("Authorization", "Content-Type", "X-Requested-With", "Timestamp", "Signature")
     settings.corsHeaders.accessControlAllowMethods.flatMap(getForKeyCaseInsensitive) shouldBe Seq(OPTIONS, POST, PUT, GET, DELETE)
     settings.corsHeaders.accessControlAllowCredentials shouldBe true
