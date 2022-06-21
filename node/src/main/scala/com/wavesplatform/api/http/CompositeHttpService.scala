@@ -59,10 +59,10 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
     case _ =>
   }
 
-  private def preflightCorsHeaders(requestOrigin: Option[Origin]) =
+  private def preflightCorsHeaders(requestOrigin: Option[Origin]): Seq[HttpHeader] =
     requestOrigin
       .flatMap(_.origins.headOption)
-      .fold(Seq()) { _ =>
+      .fold(Seq[HttpHeader]()) { _ =>
         Seq(
           `Access-Control-Allow-Headers`(settings.corsHeaders.accessControlAllowHeaders),
           `Access-Control-Allow-Methods`(settings.corsHeaders.accessControlAllowMethods.flatMap(getForKeyCaseInsensitive))
@@ -72,7 +72,7 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
   private def corsHeaders(requestOrigin: Option[Origin]): Seq[HttpHeader] =
     requestOrigin
       .flatMap(_.origins.headOption)
-      .fold(Seq()) { requestOriginValue =>
+      .fold(Seq[HttpHeader]()) { requestOriginValue =>
         val responseOrigin =
           settings.corsHeaders.accessControlAllowOrigin match {
             case "*"                => `Access-Control-Allow-Origin`.*
