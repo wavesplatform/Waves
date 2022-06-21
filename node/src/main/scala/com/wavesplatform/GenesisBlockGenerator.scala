@@ -1,18 +1,12 @@
 package com.wavesplatform
 
-import java.io.{File, FileNotFoundException}
-import java.nio.file.Files
-
-import scala.annotation.tailrec
-import scala.concurrent.duration.*
-
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.{FairPoSCalculator, NxtPoSCalculator, PoSCalculator}
 import com.wavesplatform.consensus.PoSCalculator.{generationSignature, hit}
+import com.wavesplatform.consensus.{FairPoSCalculator, NxtPoSCalculator}
 import com.wavesplatform.crypto.*
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.settings.{FunctionalitySettings, GenesisSettings, GenesisTransactionSettings}
@@ -21,6 +15,13 @@ import com.wavesplatform.utils.*
 import com.wavesplatform.wallet.Wallet
 import net.ceedubs.ficus.Ficus.*
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
+
+import java.io.{File, FileNotFoundException}
+import java.nio.file.Files
+import scala.collection.concurrent.TrieMap
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.*
+import scala.concurrent.{Await, Future}
 
 object GenesisBlockGenerator {
 
@@ -194,41 +195,88 @@ object GenesisBlockGenerator {
     }
 
     def calcInitialBaseTarget(): Long = {
-      val posCalculator: PoSCalculator =
+      val posCalculator =
         if (settings.preActivated(BlockchainFeatures.FairPoS))
           if (settings.preActivated(BlockchainFeatures.BlockV5)) FairPoSCalculator.fromSettings(settings.functionalitySettings)
           else FairPoSCalculator.V1
         else NxtPoSCalculator
 
-      val hitSource = ByteStr(new Array[Byte](crypto.DigestLength))
+      val hitSourceCache = TrieMap[(KeyPair, ByteStr), (BigInt, ByteStr)]()
 
-      def getHit(account: KeyPair): BigInt = {
-        val gs = if (settings.preActivated(BlockchainFeatures.BlockV5)) {
-          val vrfProof = crypto.signVRF(account.privateKey, hitSource.arr)
-          crypto.verifyVRF(vrfProof, hitSource.arr, account.publicKey, settings.preActivated(BlockchainFeatures.RideV6)).map(_.arr).explicitGet()
-        } else generationSignature(hitSource, account.publicKey)
+      def getHitWithSource(account: KeyPair, hitSource: ByteStr): (BigInt, ByteStr) =
+        hitSourceCache.getOrElseUpdate(
+          (account, hitSource), {
+            val gs =
+              if (settings.preActivated(BlockchainFeatures.BlockV5)) {
+                val vrfProof = crypto.signVRF(account.privateKey, hitSource.arr)
+                crypto
+                  .verifyVRF(vrfProof, hitSource.arr, account.publicKey, settings.preActivated(BlockchainFeatures.RideV6))
+                  .map(_.arr)
+                  .explicitGet()
+              } else generationSignature(hitSource, account.publicKey)
 
-        hit(gs)
+            (hit(gs), ByteStr(gs))
+          }
+        )
+
+      def inverseCalculateDelay(balance: Long, hitRate: Double): Int =
+        posCalculator match {
+          case FairPoSCalculator(minBlockTime, _) =>
+            val z = (1 - Math.exp((settings.averageBlockDelay.toMillis - minBlockTime) / 70000.0)) * balance
+            (5e17 * (Math.log(hitRate) / z)).toInt
+          case NxtPoSCalculator =>
+            (FairPoSCalculator.MaxHit * hitRate / settings.averageBlockDelay.toSeconds / balance).toInt
+        }
+
+      def nextBaseTarget(baseTarget: Long, height: Int, maybeGreatGrandParentTimestamp: Option[Long], parentTimestamp: Long, timestamp: Long): Share =
+        posCalculator.calculateBaseTarget(
+          settings.averageBlockDelay.toSeconds,
+          height,
+          baseTarget,
+          parentTimestamp,
+          maybeGreatGrandParentTimestamp,
+          timestamp
+        )
+
+      def parallelMapMin[A, B, C](seq: Seq[A], f: A => B, fMin: B => C)(implicit c: Ordering[C]): B = {
+        val partSize        = (seq.size / Runtime.getRuntime.availableProcessors()).max(1)
+        val parallelResults = seq.grouped(partSize).map(part => Future(part.map(f).minBy(fMin)))
+        Await.result(Future.sequence(parallelResults), Duration.Inf).minBy(fMin)
       }
 
-      shares.collect {
-        case (accountInfo, amount) if accountInfo.miner =>
-          val hit = getHit(accountInfo.account)
+      def calc(hitSources: Seq[ByteStr], timestamps: Seq[Long], baseTargets: Seq[Long], height: Int, n: Int): Seq[Long] =
+        if (n == 0)
+          baseTargets
+        else {
+          val currentHitSource = if (height > 100) hitSources(100) else hitSources.head
+          val (delay, newHitSource) = parallelMapMin[(FullAddressInfo, Share), (Long, ByteStr), Long](
+            shares,
+            { case (miner, balance) =>
+              val (hit, newHitSource) = getHitWithSource(miner.account, currentHitSource)
+              val delay               = posCalculator.calculateDelay(hit, baseTargets.head, balance)
+              (delay, newHitSource)
+            },
+            _._1
+          )
+          val newTimestamp  = timestamps.head + delay
+          val newBaseTarget = nextBaseTarget(baseTargets.head, height, timestamps.lift(2), timestamps.head, newTimestamp)
+          calc(
+            newHitSource +: hitSources,
+            newTimestamp +: timestamps,
+            newBaseTarget +: baseTargets,
+            height + 1,
+            n - 1
+          )
+        }
 
-          @tailrec def calculateBaseTarget(keyPair: KeyPair, minBT: Long, maxBT: Long, balance: Long): Long =
-            if (maxBT - minBT <= 1) maxBT
-            else {
-              val newBT = (maxBT + minBT) / 2
-              val delay = posCalculator.calculateDelay(hit, newBT, balance)
-              if (math.abs(delay - settings.averageBlockDelay.toMillis) < 100) newBT
-              else {
-                val (min, max) = if (delay > settings.averageBlockDelay.toMillis) (newBT, maxBT) else (minBT, newBT)
-                calculateBaseTarget(keyPair, min, max, balance)
-              }
-            }
+      val startHitSource  = ByteStr(Array.fill(crypto.DigestLength)(0: Byte))
+      val startBaseTarget = inverseCalculateDelay(shares.map(_._2).max, 0.5)
 
-          calculateBaseTarget(accountInfo.account, PoSCalculator.MinBaseTarget, 1000000, amount)
-      }.max
+      val totalCount       = 1000
+      val significantCount = 100
+
+      val baseTargets = calc(Seq(startHitSource), Seq(0), Seq(startBaseTarget), 1, totalCount)
+      baseTargets.take(significantCount).sum / significantCount
     }
 
     generateAndReport(
