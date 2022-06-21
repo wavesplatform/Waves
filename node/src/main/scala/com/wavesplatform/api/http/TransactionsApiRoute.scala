@@ -179,23 +179,9 @@ case class TransactionsApiRoute(
   def signedBroadcast: Route = path("broadcast")(broadcast[JsValue](TransactionFactory.fromSignedRequest))
 
   def merkleProof: Route = path("merkleProof") {
-    (get & parameters("id".as[String].*)) { ids =>
-      if (ids.size > settings.transactionsByAddressLimit) {
-        complete(TooBigArrayAllocation(settings.transactionsByAddressLimit))
-      } else {
-        complete(merkleProof(ids.toList.reverse))
-      }
-    } ~
-      jsonPost[JsObject](jsv =>
-        (jsv \ "ids").validate[List[String]] match {
-          case JsSuccess(ids, _) if ids.size <= settings.transactionsByAddressLimit =>
-            merkleProof(ids)
-          case JsSuccess(_, _) =>
-            TooBigArrayAllocation(settings.transactionsByAddressLimit)
-          case JsError(err) =>
-            WrongJson(errors = err.toSeq)
-        }
-      )
+    anyParam("id", limit = settings.transactionsByAddressLimit) { ids =>
+      complete(merkleProof(ids.toList))
+    }
   }
 
   private def merkleProof(encodedIds: List[String]): ToResponseMarshallable =
