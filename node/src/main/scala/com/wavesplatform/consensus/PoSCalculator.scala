@@ -6,7 +6,7 @@ import com.wavesplatform.consensus.PoSCalculator.HitSize
 import com.wavesplatform.crypto
 import com.wavesplatform.settings.FunctionalitySettings
 
-trait PoSCalculator {
+sealed trait PoSCalculator {
   def calculateBaseTarget(
       targetBlockDelaySeconds: Long,
       prevHeight: Int,
