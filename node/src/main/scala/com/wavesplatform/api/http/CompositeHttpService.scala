@@ -45,10 +45,9 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
           getFromResourceDirectory("swagger-ui")
       }
 
-  val compositeRoute: Route = extractRequest { req =>
+  val compositeRoute: Route = {
     Kamon
       .currentSpan()
-//      .tagMetrics("http.request_uri", req.uri.toRelative.toString)
       .mark("processing.start")
 
     withExecutionContext(scheduler)(extendRoute(routes.map(_.route).reduce(_ ~ _))) ~ swaggerRoute ~ complete(

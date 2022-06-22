@@ -2,7 +2,6 @@ package com.wavesplatform.state
 
 import com.wavesplatform.account.*
 import com.wavesplatform.block.Block.*
-import com.typesafe.scalalogging.LazyLogging
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
@@ -77,7 +76,7 @@ trait Blockchain {
   def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]
 }
 
-object Blockchain extends LazyLogging {
+object Blockchain {
   implicit class BlockchainExt(private val blockchain: Blockchain) extends AnyVal {
     def isEmpty: Boolean = blockchain.height == 0
 

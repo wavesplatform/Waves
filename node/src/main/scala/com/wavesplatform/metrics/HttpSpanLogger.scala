@@ -20,23 +20,19 @@ class HttpSpanLogger extends SpanReporter with LazyLogging {
     for (span <- spans if span.isAkkaHttpServer) {
       val code = StatusCodes.getForKey(span.statusCode).fold("<unknown>")(c => c.toString())
 
-      val processingStart   = span.marks.find(_.key == "processing.start").map(_.instant)
+      val processingStart   = span.marks.find(_.key == ProcessingStartMark).map(_.instant)
       val akkaQueueDuration = processingStart.map(millisBetween(span.from, _))
       val processDuration =
         for {
           from <- processingStart
-          to   <- span.marks.find(_.key == "http.response.ready").map(_.instant)
+          to   <- span.marks.find(_.key == ResponseEndMark).map(_.instant)
         } yield millisBetween(from, to)
       val executorQueueDuration =
         for {
-          from <- span.marks.find(_.key == "executor.enqueue").map(_.instant)
-          to   <- span.marks.find(_.key == "executor.start").map(_.instant)
+          from <- span.marks.find(_.key == ExecutorEnqueueMark).map(_.instant)
+          to   <- span.marks.find(_.key == ExecutorStartMark).map(_.instant)
         } yield millisBetween(from, to)
-//      val timeline = span.marks.reverse
-//        .foldLeft((span.from, List.empty[Mark])) { case ((prevInstant, acc), m) =>
-//          m.instant -> (Mark(m.key, millisBetween(prevInstant, m.instant)) +: acc)
-//        }
-//        ._2
+
       val extraFields = akkaQueueDuration.toSeq.map("akka_queue_duration" -> Json.toJson(_)) ++
         processDuration.toSeq.map("process_duration" -> Json.toJson(_)) ++
         executorQueueDuration.toSeq.map("executor_queue_duration" -> Json.toJson(_))
@@ -50,9 +46,6 @@ class HttpSpanLogger extends SpanReporter with LazyLogging {
       ) ++ JsObject(extraFields)
 
       logger.info(json.toString)
-//      logger.info(
-//        f"${span.trace.id.string} ${span.method} ${span.operation}: $code in ${millisBetween(span.from, span.to)}%.3f ms $timeline"
-//      )
     }
   }
 
@@ -62,6 +55,11 @@ class HttpSpanLogger extends SpanReporter with LazyLogging {
 }
 
 object HttpSpanLogger {
+  val ProcessingStartMark = "processing.start"
+  val ResponseEndMark     = "http.response.ready"
+  val ExecutorEnqueueMark = "executor.enqueue"
+  val ExecutorStartMark   = "executor.start"
+
   case class Mark(key: String, duration: Double)
 
   def millisBetween(from: Instant, to: Instant): Double = Duration.between(from, to).toNanos * 1e-6
@@ -69,6 +67,6 @@ object HttpSpanLogger {
     def isAkkaHttpServer: Boolean = span.metricTags.get(Lookups.option("component")).contains("akka.http.server")
     def method: String            = span.metricTags.get(Lookups.plain(TagKeys.HttpMethod))
     def statusCode: Int           = span.metricTags.get(Lookups.plainLong(TagKeys.HttpStatusCode)).toInt
-    def operation: String         = span.metricTags.get(Lookups.plain("operation")) // span.metricTags.get(Lookups.plain("http.request_uri"))
+    def operation: String         = span.metricTags.get(Lookups.plain("operation"))
   }
 }

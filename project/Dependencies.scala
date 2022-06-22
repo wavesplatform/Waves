@@ -154,7 +154,7 @@ object Dependencies {
       "net.logstash.logback" % "logstash-logback-encoder" % "7.1.1" % Runtime,
       kamonCore,
       kamonModule("system-metrics"),
-//      kamonModule("influxdb"),
+      kamonModule("influxdb"),
       kamonModule("akka-http"),
       "org.influxdb" % "influxdb-java" % "2.22",
       googleGuava,

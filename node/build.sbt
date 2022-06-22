@@ -13,7 +13,14 @@ enablePlugins(
 )
 
 libraryDependencies ++= Dependencies.node.value
-javaAgents += "io.kamon" % "kanela-agent" % "1.0.14"
+
+javaAgents ++= {
+  if (instrumentation.value) {
+    Seq("io.kamon" % "kanela-agent" % "1.0.14")
+  } else {
+    Seq.empty
+  }
+}
 
 inConfig(Compile)(
   Seq(
