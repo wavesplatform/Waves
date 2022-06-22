@@ -549,7 +549,7 @@ object Functions {
     }
 
   def blockInfoByHeightF(version: StdLibVersion, typeDefs: Map[String, FINAL]): BaseFunction[Environment] = {
-    val optionBlockInfoType = typeDefs("BlockInfo")
+    val optionBlockInfoType = UNION(typeDefs("BlockInfo"), UNIT)
     NativeFunction.withEnvironment[Environment](
       "blockInfoByHeight",
       Map[StdLibVersion, Long](V1 -> 100L, V2 -> 100L, V3 -> 100L, V4 -> 5L),
@@ -691,7 +691,7 @@ object Functions {
       "transactionById",
       100,
       GETTRANSACTIONBYID,
-      txByIdReturnType(proofsEnabled, version), // !!!
+      txByIdReturnType(proofsEnabled, version),
       ("id", BYTESTR)
     ) {
       new ContextfulNativeFunction.Simple[Environment]("transactionById", txByIdReturnType(proofsEnabled, version), Seq(("id", BYTESTR))) {

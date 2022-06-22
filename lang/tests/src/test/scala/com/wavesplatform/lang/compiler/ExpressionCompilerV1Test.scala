@@ -635,7 +635,7 @@ class ExpressionCompilerV1Test extends PropSpec {
             s"""
                |match $function {
                |  case r: $resultType => r
-               |  case _              => throw()
+               |  case _: Unit        => throw()
                |}
           """.stripMargin
           ) shouldBe an[ExprScript]
