@@ -82,8 +82,8 @@ object Types {
     override def typeList: List[REAL] = List(this)
     override def equals(obj: Any): Boolean =
       obj match {
-        case CASETYPEREF(`name`, `fields`, _) => true
-        case _                                => false
+        case CASETYPEREF(`name`, _, _) => true
+        case _                         => false
       }
   }
 
