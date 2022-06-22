@@ -48,7 +48,7 @@ object MinerDebugInfo {
 
 class MinerImpl(
     allChannels: ChannelGroup,
-    blockchainUpdater: Blockchain with BlockchainUpdater with NG,
+    blockchainUpdater: Blockchain & BlockchainUpdater & NG,
     settings: WavesSettings,
     timeService: Time,
     utx: UtxPoolImpl,
@@ -89,7 +89,8 @@ class MinerImpl(
   def scheduleMining(tempBlockchain: Option[Blockchain]): Unit = {
     Miner.blockMiningStarted.increment()
 
-    val hasAllowedForMiningScriptsAccounts = wallet.privateKeyAccounts.filter(kp => hasAllowedForMiningScript(kp, tempBlockchain.getOrElse(blockchainUpdater)))
+    val hasAllowedForMiningScriptsAccounts =
+      wallet.privateKeyAccounts.filter(kp => hasAllowedForMiningScript(kp, tempBlockchain.getOrElse(blockchainUpdater)))
     scheduledAttempts := CompositeCancelable.fromSet(hasAllowedForMiningScriptsAccounts.map { account =>
       generateBlockTask(account, tempBlockchain)
         .onErrorHandle(err => log.warn(s"Error mining Block", err))
@@ -106,13 +107,12 @@ class MinerImpl(
     Either
       .cond(parentHeight == 1, (), (timeService.correctedTime() - parentTimestamp).millis)
       .left
-      .flatMap(
-        blockAge =>
-          Either.cond(
-            blockAge <= minerSettings.intervalAfterLastBlockThenGenerationIsAllowed,
-            (),
-            s"BlockChain is too old (last block timestamp is $parentTimestamp generated $blockAge ago)"
-          )
+      .flatMap(blockAge =>
+        Either.cond(
+          blockAge <= minerSettings.intervalAfterLastBlockThenGenerationIsAllowed,
+          (),
+          s"BlockChain is too old (last block timestamp is $parentTimestamp generated $blockAge ago)"
+        )
       )
 
   private def hasAllowedForMiningScript(account: KeyPair, blockchain: Blockchain): Boolean =
@@ -326,7 +326,7 @@ class MinerImpl(
     log.trace(s"MicroBlock mining scheduled for acc=${account.toAddress}")
   }
 
-  //noinspection TypeAnnotation,ScalaStyle
+  // noinspection TypeAnnotation,ScalaStyle
   private[this] object metrics {
     val blockBuildTimeStats = Kamon.timer("miner.pack-and-forge-block-time").withoutTags()
   }
