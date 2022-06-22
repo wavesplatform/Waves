@@ -621,19 +621,26 @@ class ExpressionCompilerV1Test extends PropSpec {
     )
   }
 
-  property("match transaction type") {
-    DirectiveDictionary[StdLibVersion].all
-      .filter(_ >= V4)
-      .foreach(
-        TestCompiler(_).compileExpression(
-          """
-            |match transferTransactionFromProto(base58'') {
-            |  case tt: TransferTransaction => tt
-            |  case _                       => throw()
-            |}
+  property("match result of function with composite types instantiated in signature") {
+    Seq(
+      ("transferTransactionFromProto(base58'')", "TransferTransaction"),
+      ("transferTransactionById(base58'')", "TransferTransaction"),
+      ("assetInfo(base58'')", "Asset"),
+      ("blockInfoByHeight(1)", "BlockInfo")
+    ).foreach { case (function, resultType) =>
+      DirectiveDictionary[StdLibVersion].all
+        .filter(_ >= V4)
+        .foreach(
+          TestCompiler(_).compileExpression(
+            s"""
+               |match $function {
+               |  case r: $resultType => r
+               |  case _              => throw()
+               |}
           """.stripMargin
-        ) shouldBe an[ExprScript]
-      )
+          ) shouldBe an[ExprScript]
+        )
+    }
   }
 
   treeTypeTest("GETTER")(
