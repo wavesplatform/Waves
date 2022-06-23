@@ -25,6 +25,7 @@ import monix.reactive.Observable
 import DomainPresets.*
 import com.wavesplatform.block.Block
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.v1.compiler.Terms.CONST_STRING
 import com.wavesplatform.state.appender.BlockAppender
 import monix.eval.Task
 
@@ -34,23 +35,43 @@ class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
 
   type Appender = Block => Task[Either[ValidationError, Option[BigInt]]]
 
-  val time: TestTime    = TestTime()
-  val minerAcc: KeyPair = TxHelpers.signer(1)
+  val time: TestTime            = TestTime()
+  val minerAcc: KeyPair         = TxHelpers.signer(1)
+  val invoker: KeyPair          = TxHelpers.signer(2)
+  val allowedRecipient: KeyPair = TxHelpers.signer(3)
+
+  val dataKey = "testKey"
 
   property("miner account can have any script after RideV6 feature activation") {
     Seq(
-      dAppScriptWithVerifier(true),
-      dAppScriptWithVerifier(false),
-      dAppScriptWithoutVerifier,
-      accountScript(true),
-      accountScript(false)
-    ).foreach { script =>
+      (dAppScriptWithVerifier, true, true),
+      (dAppScriptWithoutVerifier, true, false),
+      (accountScript, false, true)
+    ).foreach { case (script, hasCallable, hasVerifier) =>
+      val checkCallableTxCount = if (hasCallable) 2 else 0
+      val checkVerifierTxCount = if (hasVerifier) 1 else 0
+      val activationHeight     = 3 + checkCallableTxCount + checkVerifierTxCount
+
       withDomain(
-        DomainPresets.RideV5.setFeaturesHeight((BlockchainFeatures.RideV6, 3)),
-        AddrWithBalance.enoughBalances(minerAcc)
+        DomainPresets.RideV5.setFeaturesHeight((BlockchainFeatures.RideV6, activationHeight)),
+        AddrWithBalance.enoughBalances(minerAcc, invoker)
       ) { d =>
         withMiner(d) { (miner, appender, scheduler) =>
           d.appendBlock(setScript(script))
+          if (hasCallable) {
+            d.appendAndAssertSucceed(
+              TxHelpers.invoke(minerAcc.toAddress, Some("c"), Seq(CONST_STRING("invoker").explicitGet()), invoker = invoker)
+            )
+            d.accountsApi.data(minerAcc.toAddress, dataKey).get.value shouldBe "invoker"
+            d.appendAndAssertSucceed(
+              TxHelpers.invoke(minerAcc.toAddress, Some("c"), Seq(CONST_STRING("miner").explicitGet()), invoker = minerAcc)
+            )
+            d.accountsApi.data(minerAcc.toAddress, dataKey).get.value shouldBe "miner"
+          }
+          if (hasVerifier) {
+            d.appendAndAssertSucceed(TxHelpers.transfer(minerAcc, allowedRecipient.toAddress))
+            d.appendAndCatchError(TxHelpers.transfer(minerAcc, invoker.toAddress)).toString should include("TransactionNotAllowedByScript")
+          }
           miner.getNextBlockGenerationOffset(minerAcc) should produce(errMsgBeforeRideV6)
           forgeAndAppendBlock(d, miner, appender)(scheduler) should produce(errMsgBeforeRideV6)
 
@@ -106,27 +127,37 @@ class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
   private def setScript(script: Script): SetScriptTransaction =
     SetScriptTransaction.selfSigned(TxVersion.V2, minerAcc, Some(script), 0.01.waves, ts).explicitGet()
 
-  private def accountScript(result: Boolean): ExprScript =
-    TestCompiler(V5).compileExpression(result.toString)
+  private def verifierScriptStr: String =
+    s"""
+       |match tx {
+       |    case t: TransferTransaction => t.recipient == Address(base58'${allowedRecipient.toAddress}')
+       |    case _ => true
+       |}
+       |""".stripMargin
 
-  private def dAppScriptWithVerifier(result: Boolean): ContractScriptImpl = {
+  private def callableFuncStr: String =
+    s"""
+       |@Callable(i)
+       |func c(value: String) = {
+       |  [StringEntry("$dataKey", value)]
+       |}""".stripMargin
+
+  private def accountScript: ExprScript =
+    TestCompiler(V5).compileExpression(verifierScriptStr)
+
+  private def dAppScriptWithVerifier: ContractScriptImpl = {
     val expr =
       s"""
-         |@Callable(i)
-         |func c() = []
+         |$callableFuncStr
          |
          |@Verifier(tx)
-         |func v() = $result
+         |func v() = {
+         |  $verifierScriptStr
+         |}
          |""".stripMargin
     TestCompiler(V5).compileContract(expr)
   }
 
-  private def dAppScriptWithoutVerifier: ContractScriptImpl = {
-    val expr =
-      """
-        |@Callable(i)
-        |func c() = []
-        |""".stripMargin
-    TestCompiler(V5).compileContract(expr)
-  }
+  private def dAppScriptWithoutVerifier: ContractScriptImpl =
+    TestCompiler(V5).compileContract(callableFuncStr)
 }
