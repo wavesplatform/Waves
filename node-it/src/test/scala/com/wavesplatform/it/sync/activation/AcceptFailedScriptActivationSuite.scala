@@ -102,8 +102,8 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
   }
 
   test("accept failed transaction after activation height") {
-    val startHeight = sender.height
     docker.restartNode(dockerNodes().head, configs(activate = true).head)
+    val startHeight = sender.height
 
     sender.setAssetScript(asset, dAppKP, setAssetScriptFee + smartFee, assetScript(true), waitForTx = true)
     overflowBlock()
