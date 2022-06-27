@@ -20,7 +20,6 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
-import scala.collection.mutable
 import scala.concurrent.duration.*
 
 class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailure with FailedTransactionSuiteLike[String] with OverflowBlock {
@@ -120,10 +119,14 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
          |func defineTxHeight(id: ByteVector) = [BooleanEntry(toBase58String(id), transactionHeightById(id).isDefined())]
          |
          |@Callable(inv)
-         |func blockIsEven() =
-         |  if (${"sigVerify(base58'', base58'', base58'') ||" * 16} height % 2 == 0)
-         |  then []
-         |  else throw("block height is odd")
+         |func failAfterFirstCallHeight() = {
+         |  strict c = ${"sigVerify(base58'', base58'', base58'') ||" * 16} true
+         |  let heightEntry = match this.getInteger("heightEntry") {
+         |    case _: Unit => height
+         |    case h       => if (h == height) then h else throw("height differs")
+         |  }
+         |  [IntegerEntry("heightEntry", heightEntry)]
+         |}
          |
         """.stripMargin
 
@@ -604,20 +607,12 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     val caller = sender.createKeyPair()
     sender.transfer(sender.keyPair, caller.toAddress.toString, 100.waves, minFee, waitForTx = true)
 
-    val startHeight = sender.height
-    sender.waitFor("even height")(_.height, (h: Int) => h % 2 == 0 && h != startHeight, 500.millis)
+    val txs = (1 to 9).map { _ => sender.invokeScript(caller, contractAddress, Some("failAfterFirstCallHeight"), fee = invokeFee) }
 
-    val ids = mutable.Buffer.empty[String]
-    (1 to 5).foreach { _ =>
-      val tx = sender.invokeScript(caller, contractAddress, Some("blockIsEven"), fee = invokeFee)._1
-      ids += tx.id
-    }
+    val failHeight = txs.map(tx => sender.waitForTransaction(tx._1.id)).map(_.height).max
+    val failedTxs  = sender.blockAt(failHeight).transactions.map(_.id)
 
-    val resultHeight = sender.height
-    sender.waitFor("accept txs as failed")(_.height, (_: Int) == resultHeight + 2, 500.millis)
-
-    val oddBlockTxs = sender.blockAt(resultHeight + 1).transactions.map(_.id)
-    assertFailedTxs(oddBlockTxs)
+    assertFailedTxs(failedTxs)
   }
 
   def updateTikTok(result: String, fee: Long, waitForTx: Boolean = true): String =
