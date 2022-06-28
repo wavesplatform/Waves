@@ -43,11 +43,12 @@ case class TransactionsApiRoute(
     blockchain: Blockchain,
     utxPoolSize: () => Int,
     transactionPublisher: TransactionPublisher,
-    time: Time
+    time: Time,
+    heavyRequestScheduler: Scheduler
 ) extends ApiRoute
     with BroadcastRoute
     with AuthRoute {
-  import TransactionsApiRoute._
+  import TransactionsApiRoute.*
 
   private[this] val serializer                     = TransactionJsonSerializer(blockchain, commonApi)
   private[this] implicit val transactionMetaWrites = OWrites[TransactionMeta](serializer.transactionWithMetaJson)
@@ -59,12 +60,12 @@ case class TransactionsApiRoute(
 
   def addressWithLimit: Route = {
     (get & path("address" / AddrSegment / "limit" / IntNumber) & parameter("after".?)) { (address, limit, maybeAfter) =>
+      implicit val sc: Scheduler = heavyRequestScheduler
+
       val after =
         maybeAfter.map(s => ByteStr.decodeBase58(s).getOrElse(throw ApiException(CustomValidationError(s"Unable to decode transaction id $s"))))
       if (limit > settings.transactionsByAddressLimit) throw ApiException(TooBigArrayAllocation)
-      extractScheduler { implicit sc =>
-        complete(transactionsByAddress(address, limit, after).map(txs => List(txs))) // Double list - [ [tx1, tx2, ...] ]
-      }
+      complete(transactionsByAddress(address, limit, after).map(txs => List(txs))) // Double list - [ [tx1, tx2, ...] ]
     }
   }
 
@@ -88,7 +89,7 @@ case class TransactionsApiRoute(
   }
 
   private[this] def loadTransactionStatus(id: ByteStr): JsObject = {
-    import Status._
+    import Status.*
     val statusJson = blockchain.transactionInfo(id) match {
       case Some((tm, tx)) =>
         Json.obj(
@@ -180,12 +181,11 @@ case class TransactionsApiRoute(
 
   def merkleProof: Route = path("merkleProof") {
     (get & parameters("id".as[String].*))(ids => complete(merkleProof(ids.toList.reverse))) ~
-      jsonPost[JsObject](
-        jsv =>
-          (jsv \ "ids").validate[List[String]] match {
-            case JsSuccess(ids, _) => merkleProof(ids)
-            case JsError(err)      => WrongJson(errors = err.toSeq)
-          }
+      jsonPost[JsObject](jsv =>
+        (jsv \ "ids").validate[List[String]] match {
+          case JsSuccess(ids, _) => merkleProof(ids)
+          case JsError(err)      => WrongJson(errors = err.toSeq)
+        }
       )
   }
 
@@ -208,21 +208,20 @@ case class TransactionsApiRoute(
         .map(aliases => aliases.toSet)
         .memoize
 
-    /**
-      * Produces compact representation for large transactions by stripping unnecessary data.
-      * Currently implemented for MassTransfer transaction only.
+    /** Produces compact representation for large transactions by stripping unnecessary data. Currently implemented for MassTransfer transaction only.
       */
     def compactJson(address: Address, meta: TransactionMeta): Task[JsObject] = {
-      import com.wavesplatform.transaction.transfer._
+      import com.wavesplatform.transaction.transfer.*
       meta.transaction match {
         case mtt: MassTransferTransaction if mtt.sender.toAddress != address =>
-          (if (mtt.transfers.exists(
-                 pt =>
-                   pt.address match {
-                     case address: Address => false
-                     case a: Alias         => true
-                   }
-               )) aliasesOfAddress.map(aliases => mtt.compactJson(address, aliases))
+          (if (
+             mtt.transfers.exists(pt =>
+               pt.address match {
+                 case address: Address => false
+                 case a: Alias         => true
+               }
+             )
+           ) aliasesOfAddress.map(aliases => mtt.compactJson(address, aliases))
            else Task.now(mtt.compactJson(address, Set.empty))).map(_ ++ serializer.transactionMetaJson(meta))
 
         case _ => Task.now(serializer.transactionWithMetaJson(meta))
@@ -241,7 +240,7 @@ case class TransactionsApiRoute(
 object TransactionsApiRoute {
   type LeaseStatus = LeaseStatus.Value
 
-  //noinspection TypeAnnotation
+  // noinspection TypeAnnotation
   object LeaseStatus extends Enumeration {
     val active   = Value(1)
     val canceled = Value(0)

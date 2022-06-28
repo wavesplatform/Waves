@@ -149,7 +149,7 @@ object CommonAccountsApi {
           )
         case TransactionMeta.Invoke(invokeHeight, originTransaction, true, _, Some(scriptResult)) =>
           extractLeases(address, scriptResult, originTransaction.id(), invokeHeight)
-        case Ethereum(height, tx @ EthereumTransaction(inv: Invocation, _, _, _), true, _, _, Some(scriptResult)) =>
+        case Ethereum(height, tx @ EthereumTransaction(_: Invocation, _, _, _), true, _, _, Some(scriptResult)) =>
           extractLeases(address, scriptResult, tx.id(), height)
         case _ => Seq()
       }

@@ -156,6 +156,7 @@ object Dependencies {
       kamonModule("system-metrics"),
       kamonModule("influxdb"),
       kamonModule("akka-http"),
+      kamonModule("executors"),
       "org.influxdb" % "influxdb-java" % "2.22",
       googleGuava,
       "com.google.code.findbugs" % "jsr305"    % "3.0.2" % Compile, // javax.annotation stubs

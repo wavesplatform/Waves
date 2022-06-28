@@ -3,7 +3,6 @@ package com.wavesplatform.utils
 import java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy
 import java.util.concurrent.{Future as JavaFuture, *}
 import io.netty.util.{Timeout, Timer}
-import kamon.Kamon
 import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
 import monix.execution.{ExecutionModel, Features, UncaughtExceptionReporter}
 
@@ -139,10 +138,7 @@ object Schedulers {
     // Catches InterruptedException correctly
     def executeCatchingInterruptedException[T](f: => T): Future[T] = {
       val promise = Promise[T]()
-      val span    = Kamon.currentSpan()
-      span.mark("executor.enqueue")
       executor.execute { () =>
-        span.mark("executor.start")
         try promise.success(f)
         catch { case e @ (NonFatal(_) | _: InterruptedException) => promise.failure(e) }
       }

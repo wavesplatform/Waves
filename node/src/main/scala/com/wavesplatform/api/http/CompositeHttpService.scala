@@ -9,32 +9,11 @@ import akka.http.scaladsl.server.RouteResult.Complete
 import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.utils.ScorexLogging
-import io.netty.util.concurrent.DefaultThreadFactory
 import kamon.Kamon
 
-import java.util.concurrent.{LinkedBlockingQueue, RejectedExecutionException, ThreadPoolExecutor, TimeUnit}
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService}
 import scala.io.Source
 
 case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings) extends ScorexLogging {
-  // Only affects extractScheduler { implicit sc => ... } routes
-  private val heavyRequestProcessorPoolThreads =
-    settings.heavyRequestProcessorPoolThreads.getOrElse((Runtime.getRuntime.availableProcessors() * 2).min(4))
-  val scheduler: ExecutionContextExecutorService = ExecutionContext.fromExecutorService(
-    new ThreadPoolExecutor(
-      heavyRequestProcessorPoolThreads,
-      heavyRequestProcessorPoolThreads,
-      60,
-      TimeUnit.SECONDS,
-      new LinkedBlockingQueue[Runnable],
-      new DefaultThreadFactory("rest-heavy-request-processor", true),
-      { (r: Runnable, executor: ThreadPoolExecutor) =>
-        log.error(s"$r has been rejected from $executor")
-        throw new RejectedExecutionException
-      }
-    ),
-    log.error("Error in REST API", _)
-  )
 
   private val redirectToSwagger = redirect("/api-docs/index.html", StatusCodes.PermanentRedirect)
   private val swaggerRoute: Route =
@@ -45,12 +24,12 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
           getFromResourceDirectory("swagger-ui")
       }
 
-  val compositeRoute: Route = {
+  val compositeRoute: Route = extractRequest { _ =>
     Kamon
       .currentSpan()
       .mark("processing.start")
 
-    withExecutionContext(scheduler)(extendRoute(routes.map(_.route).reduce(_ ~ _))) ~ swaggerRoute ~ complete(
+    extendRoute(routes.map(_.route).reduce(_ ~ _)) ~ swaggerRoute ~ complete(
       StatusCodes.NotFound
     )
   }

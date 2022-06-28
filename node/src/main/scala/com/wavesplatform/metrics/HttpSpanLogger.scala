@@ -5,7 +5,8 @@ import akka.http.scaladsl.model.StatusCodes
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
 import kamon.instrumentation.tag.TagKeys
-import kamon.module.{ModuleFactory, SpanReporter}
+import kamon.metric.PeriodSnapshot
+import kamon.module.{CombinedReporter, ModuleFactory}
 import kamon.tag.Lookups
 import kamon.trace.Span
 import play.api.libs.json.{JsObject, Json}
@@ -14,7 +15,7 @@ class HttpSpanLoggerFactory extends ModuleFactory {
   override def create(settings: ModuleFactory.Settings): HttpSpanLogger = new HttpSpanLogger
 }
 
-class HttpSpanLogger extends SpanReporter with LazyLogging {
+class HttpSpanLogger extends CombinedReporter with LazyLogging {
   import HttpSpanLogger.*
   override def reportSpans(spans: Seq[Span.Finished]): Unit = logger.whenInfoEnabled {
     for (span <- spans if span.isAkkaHttpServer) {
@@ -27,15 +28,9 @@ class HttpSpanLogger extends SpanReporter with LazyLogging {
           from <- processingStart
           to   <- span.marks.find(_.key == ResponseEndMark).map(_.instant)
         } yield millisBetween(from, to)
-      val executorQueueDuration =
-        for {
-          from <- span.marks.find(_.key == ExecutorEnqueueMark).map(_.instant)
-          to   <- span.marks.find(_.key == ExecutorStartMark).map(_.instant)
-        } yield millisBetween(from, to)
 
       val extraFields = akkaQueueDuration.toSeq.map("akka_queue_duration" -> Json.toJson(_)) ++
-        processDuration.toSeq.map("process_duration" -> Json.toJson(_)) ++
-        executorQueueDuration.toSeq.map("executor_queue_duration" -> Json.toJson(_))
+        processDuration.toSeq.map("process_duration" -> Json.toJson(_))
       val json = Json.obj(
         "@timestamp" -> LocalDateTime.ofInstant(span.from, ZoneId.systemDefault()),
         "trace_id"   -> span.trace.id.string,
@@ -49,6 +44,30 @@ class HttpSpanLogger extends SpanReporter with LazyLogging {
     }
   }
 
+  override def reportPeriodSnapshot(snapshot: PeriodSnapshot): Unit = {
+    val timeInQueue = snapshot.timers.filter(_.name == TimeInQueueMetricKey)
+    val distributions = timeInQueue
+      .flatMap(_.instruments)
+      .collect {
+        case snap if snap.tags.get(Lookups.plain("name")) == "heavy-request-executor" && snap.value.count > 0 =>
+          snap.value
+      }
+    distributions.foreach { dist =>
+      logger.info(
+        Json
+          .obj(
+            "@timestamp"                    -> LocalDateTime.ofInstant(snapshot.from, ZoneId.systemDefault()),
+            "executor_queue_duration_max"   -> dist.max.toDouble / 10e6,
+            "executor_queue_duration_min"   -> dist.min.toDouble / 10e6,
+            "executor_queue_duration_sum"   -> dist.sum.toDouble / 10e6,
+            "executor_queue_duration_count" -> dist.count,
+            "executor_queue_duration_avg"   -> dist.sum.toDouble / dist.count / 10e6
+          )
+          .toString
+      )
+    }
+  }
+
   override def stop(): Unit = {}
 
   override def reconfigure(newConfig: Config): Unit = {}
@@ -59,6 +78,8 @@ object HttpSpanLogger {
   val ResponseEndMark     = "http.response.ready"
   val ExecutorEnqueueMark = "executor.enqueue"
   val ExecutorStartMark   = "executor.start"
+
+  val TimeInQueueMetricKey = "executor.time-in-queue"
 
   case class Mark(key: String, duration: Double)
 
