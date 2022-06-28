@@ -61,7 +61,8 @@ case class DebugApiRoute(
     configRoot: ConfigObject,
     loadBalanceHistory: Address => Seq[(Int, Long)],
     loadStateHash: Int => Option[StateHash],
-    priorityPoolBlockchain: () => Blockchain
+    priorityPoolBlockchain: () => Blockchain,
+    heavyRequestScheduler: Scheduler
 ) extends ApiRoute
     with AuthRoute
     with ScorexLogging {
@@ -96,20 +97,19 @@ case class DebugApiRoute(
   }
 
   private def distribution(height: Int): Route = optionalHeaderValueByType(Accept) { accept =>
-    extractScheduler { implicit s =>
-      complete(
-        assetsApi
-          .wavesDistribution(height, None)
-          .toListL
-          .runToFuture
-          .map {
-            case l if accept.exists(_.mediaRanges.exists(CustomJson.acceptsNumbersAsStrings)) =>
-              Json.obj(l.map { case (address, balance) => address.toString -> (balance.toString: JsValueWrapper) }*)
-            case l =>
-              Json.obj(l.map { case (address, balance) => address.toString -> (balance: JsValueWrapper) }*)
-          }
-      )
-    }
+    implicit val sc: Scheduler = heavyRequestScheduler
+    complete(
+      assetsApi
+        .wavesDistribution(height, None)
+        .toListL
+        .runToFuture
+        .map {
+          case l if accept.exists(_.mediaRanges.exists(CustomJson.acceptsNumbersAsStrings)) =>
+            Json.obj(l.map { case (address, balance) => address.toString -> (balance.toString: JsValueWrapper) }*)
+          case l =>
+            Json.obj(l.map { case (address, balance) => address.toString -> (balance: JsValueWrapper) }*)
+        }
+    )
   }
 
   def state: Route = (path("state") & get) {
@@ -128,7 +128,8 @@ case class DebugApiRoute(
       .runAsyncLogErr(Scheduler(ec))
   }
 
-  def rollback: Route = (path("rollback") & withRequestTimeout(15.minutes) & extractScheduler) { implicit sc =>
+  def rollback: Route = (path("rollback") & withRequestTimeout(15.minutes)) {
+    implicit val sc: Scheduler = heavyRequestScheduler
     jsonPost[RollbackParams] { params =>
       blockchain.blockHeader(params.rollbackTo) match {
         case Some(sh) =>
@@ -179,7 +180,8 @@ case class DebugApiRoute(
   }
 
   def rollbackTo: Route = path("rollback-to" / Segment) { signature =>
-    (delete & extractScheduler) { implicit sc =>
+    delete {
+      implicit val sc: Scheduler = heavyRequestScheduler
       val signatureEi: Either[ValidationError, ByteStr] =
         ByteStr
           .decodeBase58(signature)
@@ -281,20 +283,19 @@ case class DebugApiRoute(
   def stateChangesByAddress: Route =
     (get & path("stateChanges" / "address" / AddrSegment / "limit" / IntNumber) & parameter("after".as[ByteStr].?)) { (address, limit, afterOpt) =>
       validate(limit <= settings.transactionsByAddressLimit, s"Max limit is ${settings.transactionsByAddressLimit}") {
-        extractScheduler { implicit s =>
-          complete {
-            implicit val ss: JsonEntityStreamingSupport = EntityStreamingSupport.json()
+        complete {
+          implicit val ss: JsonEntityStreamingSupport = EntityStreamingSupport.json()
+          implicit val sc: Scheduler                  = heavyRequestScheduler
 
-            Source
-              .future(
-                transactionsApi
-                  .transactionsByAddress(address, None, Set.empty, afterOpt)
-                  .take(limit)
-                  .toListL
-                  .runToFuture
-              )
-              .mapConcat(_.map(Json.toJsObject(_)))
-          }
+          Source
+            .future(
+              transactionsApi
+                .transactionsByAddress(address, None, Set.empty, afterOpt)
+                .take(limit)
+                .toListL
+                .runToFuture
+            )
+            .mapConcat(_.map(Json.toJsObject(_)))
         }
       }
     }

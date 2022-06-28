@@ -40,6 +40,7 @@ case class AddressApiRoute(
     transactionPublisher: TransactionPublisher,
     time: Time,
     limitedScheduler: Scheduler,
+    heavyRequestScheduler: Scheduler,
     commonAccountsApi: CommonAccountsApi,
     maxBalanceDepth: Int
 ) extends ApiRoute
@@ -137,7 +138,8 @@ case class AddressApiRoute(
     commonAccountsApi
       .balanceDetails(address)
       .fold(
-        e => complete(CustomValidationError(e)), { details =>
+        e => complete(CustomValidationError(e)),
+        { details =>
           import details.*
           complete(
             Json.obj(
@@ -153,11 +155,10 @@ case class AddressApiRoute(
   }
 
   def balanceWithConfirmations: Route = {
-    (path("balance" / AddrSegment / IntNumber) & get) {
-      case (address, confirmations) =>
-        validateBalanceDepth(blockchain.height - confirmations)(
-          complete(balanceJson(address, confirmations))
-        )
+    (path("balance" / AddrSegment / IntNumber) & get) { case (address, confirmations) =>
+      validateBalanceDepth(blockchain.height - confirmations)(
+        complete(balanceJson(address, confirmations))
+      )
     }
   }
 
@@ -199,25 +200,24 @@ case class AddressApiRoute(
 
       (path(Segment) & get) { key =>
         complete(accountDataEntry(address, key))
-      } ~ extractScheduler(
-        implicit sc =>
-          strictEntity {
-            (formField("matches") | parameter("matches")) { matches =>
-              Try(matches.r)
-                .fold(
-                  { e =>
-                    log.trace(s"Error compiling regex $matches: ${e.getMessage}")
-                    complete(ApiError.fromValidationError(GenericError(s"Cannot compile regex")))
-                  },
-                  _ => complete(accountData(address, matches))
-                )
-            } ~ anyParam("key").filter(_.nonEmpty) { keys =>
-              complete(accountDataList(address, keys.toSeq*))
-            } ~ get {
-              complete(accountData(address))
-            }
-          }
-      )
+      } ~ strictEntity {
+        implicit val sc: Scheduler = heavyRequestScheduler
+
+        (formField("matches") | parameter("matches")) { matches =>
+          Try(matches.r)
+            .fold(
+              { e =>
+                log.trace(s"Error compiling regex $matches: ${e.getMessage}")
+                complete(ApiError.fromValidationError(GenericError(s"Cannot compile regex")))
+              },
+              _ => complete(accountData(address, matches))
+            )
+        } ~ anyParam("key").filter(_.nonEmpty) { keys =>
+          complete(accountDataList(address, keys.toSeq*))
+        } ~ get {
+          complete(accountData(address))
+        }
+      }
     }
 
   def root: Route = (path("addresses") & get) {
@@ -225,11 +225,10 @@ case class AddressApiRoute(
   }
 
   def seq: Route = {
-    (path("seq" / IntNumber / IntNumber) & get) {
-      case (start, end) =>
-        if (start < 0 || end < 0 || start > end) complete(GenericError("Invalid sequence"))
-        else if (end - start >= MaxAddressesPerRequest) complete(TooBigArrayAllocation(MaxAddressesPerRequest))
-        else complete(wallet.privateKeyAccounts.map(_.toAddress).slice(start, end))
+    (path("seq" / IntNumber / IntNumber) & get) { case (start, end) =>
+      if (start < 0 || end < 0 || start > end) complete(GenericError("Invalid sequence"))
+      else if (end - start >= MaxAddressesPerRequest) complete(TooBigArrayAllocation(MaxAddressesPerRequest))
+      else complete(wallet.privateKeyAccounts.map(_.toAddress).slice(start, end))
     }
   }
 
