@@ -8,7 +8,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.utils.Time
+import com.wavesplatform.utils.{Schedulers, Time}
 import com.wavesplatform.wallet.Wallet
 import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.*
@@ -17,7 +17,15 @@ import play.api.libs.json.Json.*
 class AliasBroadcastRouteSpec extends RouteSpec("/alias/broadcast/") with RequestGen with PathMockFactory with RestAPISettingsHelper {
   private[this] val utxPoolSynchronizer = DummyTransactionPublisher.rejecting(tx => TransactionValidationError(GenericError("foo"), tx))
 
-  val route = AliasApiRoute(restAPISettings, stub[CommonTransactionsApi], stub[Wallet], utxPoolSynchronizer, stub[Time], stub[Blockchain]).route
+  val route = AliasApiRoute(
+    restAPISettings,
+    stub[CommonTransactionsApi],
+    stub[Wallet],
+    utxPoolSynchronizer,
+    stub[Time],
+    stub[Blockchain],
+    Schedulers.fixedPool(4, "heavy-request-scheduler")
+  ).route
 
   "returns StateCheckFiled" - {
 

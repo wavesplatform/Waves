@@ -21,7 +21,17 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxNonNegativeAmount, TxVersion, VersionedTransaction}
+import com.wavesplatform.transaction.{
+  Asset,
+  CreateAliasTransaction,
+  DataTransaction,
+  Proofs,
+  Transaction,
+  TxNonNegativeAmount,
+  TxVersion,
+  VersionedTransaction
+}
+import com.wavesplatform.utils.Schedulers
 import com.wavesplatform.utx.UtxPool
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -46,7 +56,16 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
 
   private val transactionsApi = mock[CommonTransactionsApi]
   private val route: Route =
-    TransactionsApiRoute(restAPISettings, transactionsApi, testWallet, blockchain, () => utx.size, DummyTransactionPublisher.accepting, ntpTime).route
+    TransactionsApiRoute(
+      restAPISettings,
+      transactionsApi,
+      testWallet,
+      blockchain,
+      () => utx.size,
+      DummyTransactionPublisher.accepting,
+      ntpTime,
+      Schedulers.fixedPool(4, "heavy-request-scheduler")
+    ).route
 
   "Proto transactions should be able to broadcast " - {
     "CreateAliasTransaction" in {
@@ -419,7 +438,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       }
 
       val updateAssetInfoTx = updateAssetInfoTxUnsigned.copy(proofs = proofs)
-      val base64Str = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(updateAssetInfoTx)))
+      val base64Str         = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(updateAssetInfoTx)))
 
       Post(routePath("/broadcast"), updateAssetInfoTx.json()) ~> ApiKeyHeader ~> route ~> check {
         responseAs[JsObject] shouldBe updateAssetInfoTx.json()

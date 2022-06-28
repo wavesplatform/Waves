@@ -9,7 +9,7 @@ import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationErro
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.LeaseCancelTransaction
-import com.wavesplatform.utils.Time
+import com.wavesplatform.utils.{Schedulers, Time}
 import com.wavesplatform.wallet.Wallet
 import org.scalacheck.Gen as G
 import org.scalacheck.Gen.posNum
@@ -19,16 +19,28 @@ import play.api.libs.json.Json.*
 
 class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with RequestGen with PathMockFactory with RestAPISettingsHelper {
   private[this] val publisher = DummyTransactionPublisher.rejecting(t => TransactionValidationError(GenericError("foo"), t))
-  private[this] val route     = LeaseApiRoute(restAPISettings, stub[Wallet], stub[Blockchain], publisher, stub[Time], stub[CommonAccountsApi]).route
+  private[this] val route = LeaseApiRoute(
+    restAPISettings,
+    stub[Wallet],
+    stub[Blockchain],
+    publisher,
+    stub[Time],
+    stub[CommonAccountsApi],
+    Schedulers.fixedPool(4, "heavy-request-scheduler")
+  ).route
   "returns StateCheckFailed" - {
 
     val vt = Table[String, G[_ <: Transaction], JsValue => JsValue](
       ("url", "generator", "transform"),
       ("lease", leaseGen.retryUntil(_.version == 1), identity),
-      ("cancel", leaseCancelGen.retryUntil(_.isInstanceOf[LeaseCancelTransaction]), {
-        case o: JsObject => o ++ Json.obj("txId" -> o.value("leaseId"))
-        case other       => other
-      })
+      (
+        "cancel",
+        leaseCancelGen.retryUntil(_.isInstanceOf[LeaseCancelTransaction]),
+        {
+          case o: JsObject => o ++ Json.obj("txId" -> o.value("leaseId"))
+          case other       => other
+        }
+      )
     )
 
     def posting(url: String, v: JsValue): RouteTestResult = Post(routePath(url), v) ~> route
