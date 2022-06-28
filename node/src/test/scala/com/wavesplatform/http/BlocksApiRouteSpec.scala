@@ -12,7 +12,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.TxHelpers
-import com.wavesplatform.utils.SystemTime
+import com.wavesplatform.utils.{Schedulers, SystemTime}
 import monix.reactive.Observable
 import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.*
@@ -20,9 +20,10 @@ import play.api.libs.json.*
 import scala.util.Random
 
 class BlocksApiRouteSpec extends RouteSpec("/blocks") with PathMockFactory with RestAPISettingsHelper with TestWallet with WithDomain {
-  private val blocksApi                      = mock[CommonBlocksApi]
-  private val blocksApiRoute: BlocksApiRoute = BlocksApiRoute(restAPISettings, blocksApi, SystemTime)
-  private val route                          = blocksApiRoute.route
+  private val blocksApi = mock[CommonBlocksApi]
+  private val blocksApiRoute: BlocksApiRoute =
+    BlocksApiRoute(restAPISettings, blocksApi, SystemTime, Schedulers.fixedPool(4, "heavy-request-scheduler"))
+  private val route = blocksApiRoute.route
 
   private val testBlock1 = TestBlock.create(Nil)
   private val testBlock2 = TestBlock.create(Nil, Block.ProtoBlockVersion)
@@ -315,20 +316,18 @@ class BlocksApiRouteSpec extends RouteSpec("/blocks") with PathMockFactory with 
     }
 
     "random blocks" in {
-      val (_, blocks) = (1 to 10).foldLeft((0L, Vector.empty[Block])) {
-        case ((ts, blocks), _) =>
-          val newBlock = TestBlock.create(ts + 100 + Random.nextInt(10000), Nil)
-          (newBlock.header.timestamp, blocks :+ newBlock)
+      val (_, blocks) = (1 to 10).foldLeft((0L, Vector.empty[Block])) { case ((ts, blocks), _) =>
+        val newBlock = TestBlock.create(ts + 100 + Random.nextInt(10000), Nil)
+        (newBlock.header.timestamp, blocks :+ newBlock)
       }
 
       val route = blocksApiRoute.copy(commonApi = emulateBlocks(blocks)).route
 
-      blocks.zipWithIndex.foreach {
-        case (block, index) =>
-          Get(routePath(s"/heightByTimestamp/${block.header.timestamp}")) ~> route ~> check {
-            val result = (responseAs[JsObject] \ "height").as[Int]
-            result shouldBe (index + 1)
-          }
+      blocks.zipWithIndex.foreach { case (block, index) =>
+        Get(routePath(s"/heightByTimestamp/${block.header.timestamp}")) ~> route ~> check {
+          val result = (responseAs[JsObject] \ "height").as[Int]
+          result shouldBe (index + 1)
+        }
       }
     }
   }

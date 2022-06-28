@@ -16,7 +16,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.{Asset, Proofs, TxHelpers, TxPositiveAmount, TxVersion}
-import com.wavesplatform.utils.{EthEncoding, EthHelpers}
+import com.wavesplatform.utils.{EthEncoding, EthHelpers, Schedulers}
 import com.wavesplatform.wallet.Wallet
 import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.{JsObject, JsValue, Json}
@@ -41,7 +41,8 @@ class TransactionBroadcastSpec
     blockchain,
     mockFunction[Int],
     transactionPublisher,
-    testTime
+    testTime,
+    Schedulers.fixedPool(4, "heavy-request-scheduler")
   )
 
   private val route = seal(transactionsApiRoute.route)

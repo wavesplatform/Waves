@@ -64,6 +64,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
       1,
       "rest-time-limited"
     ),
+    Schedulers.fixedPool(4, "heavy-request-scheduler"),
     commonAccountApi,
     5
   )
@@ -143,19 +144,18 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
   }
 
   private def testSign(path: String, encode: Boolean): Unit =
-    forAll(generatedMessages) {
-      case (account, message) =>
-        val uri = routePath(s"/$path/${account.toAddress}")
-        Post(uri, message) ~> route should produce(ApiKeyNotValid)
-        Post(uri, message) ~> ApiKeyHeader ~> route ~> check {
-          val resp      = responseAs[JsObject]
-          val signature = ByteStr.decodeBase58((resp \ "signature").as[String]).get
+    forAll(generatedMessages) { case (account, message) =>
+      val uri = routePath(s"/$path/${account.toAddress}")
+      Post(uri, message) ~> route should produce(ApiKeyNotValid)
+      Post(uri, message) ~> ApiKeyHeader ~> route ~> check {
+        val resp      = responseAs[JsObject]
+        val signature = ByteStr.decodeBase58((resp \ "signature").as[String]).get
 
-          (resp \ "message").as[String] shouldEqual (if (encode) Base58.encode(message.getBytes("UTF-8")) else message)
-          (resp \ "publicKey").as[String] shouldEqual account.publicKey.toString
+        (resp \ "message").as[String] shouldEqual (if (encode) Base58.encode(message.getBytes("UTF-8")) else message)
+        (resp \ "publicKey").as[String] shouldEqual account.publicKey.toString
 
-          crypto.verify(signature, message.getBytes("UTF-8"), account.publicKey) shouldBe true
-        }
+        crypto.verify(signature, message.getBytes("UTF-8"), account.publicKey) shouldBe true
+      }
     }
 
   routePath("/sign/{address}") in testSign("sign", true)
@@ -163,27 +163,26 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
 
   private def testVerify(path: String, encode: Boolean): Unit = {
 
-    forAll(generatedMessages.flatMap(m => Gen.oneOf(true, false).map(b => (m, b)))) {
-      case ((account, message), b58) =>
-        val uri          = routePath(s"/$path/${account.toAddress}")
-        val messageBytes = message.getBytes("UTF-8")
-        val signature    = crypto.sign(account.privateKey, messageBytes)
-        val validBody = Json.obj(
-          "message"   -> JsString(if (encode) if (b58) Base58.encode(messageBytes) else "base64:" ++ Base64.encode(messageBytes) else message),
-          "publickey" -> JsString(Base58.encode(account.publicKey.arr)),
-          "signature" -> JsString(signature.toString)
-        )
+    forAll(generatedMessages.flatMap(m => Gen.oneOf(true, false).map(b => (m, b)))) { case ((account, message), b58) =>
+      val uri          = routePath(s"/$path/${account.toAddress}")
+      val messageBytes = message.getBytes("UTF-8")
+      val signature    = crypto.sign(account.privateKey, messageBytes)
+      val validBody = Json.obj(
+        "message"   -> JsString(if (encode) if (b58) Base58.encode(messageBytes) else "base64:" ++ Base64.encode(messageBytes) else message),
+        "publickey" -> JsString(Base58.encode(account.publicKey.arr)),
+        "signature" -> JsString(signature.toString)
+      )
 
-        val emptySignature =
-          Json.obj("message" -> JsString(""), "publickey" -> JsString(Base58.encode(account.publicKey.arr)), "signature" -> JsString(""))
+      val emptySignature =
+        Json.obj("message" -> JsString(""), "publickey" -> JsString(Base58.encode(account.publicKey.arr)), "signature" -> JsString(""))
 
-        Post(uri, validBody) ~> route should produce(ApiKeyNotValid)
-        Post(uri, emptySignature) ~> ApiKeyHeader ~> route ~> check {
-          (responseAs[JsObject] \ "valid").as[Boolean] shouldBe false
-        }
-        Post(uri, validBody) ~> ApiKeyHeader ~> route ~> check {
-          (responseAs[JsObject] \ "valid").as[Boolean] shouldBe true
-        }
+      Post(uri, validBody) ~> route should produce(ApiKeyNotValid)
+      Post(uri, emptySignature) ~> ApiKeyHeader ~> route ~> check {
+        (responseAs[JsObject] \ "valid").as[Boolean] shouldBe false
+      }
+      Post(uri, validBody) ~> ApiKeyHeader ~> route ~> check {
+        (responseAs[JsObject] \ "valid").as[Boolean] shouldBe true
+      }
     }
   }
   routePath("/verifyText/{address}") in testVerify("verifyText", false)
@@ -325,16 +324,15 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
     val contractWithoutVerifierComplexities = Map("a" -> 1L, "b" -> 2L, "c" -> 3L)
     (blockchain.accountScript _)
       .when(allAccounts(6).toAddress)
-      .onCall(
-        (_: Address) =>
-          Some(
-            AccountScriptInfo(
-              allAccounts(6).publicKey,
-              ContractScript(V3, contractWithoutVerifier).explicitGet(),
-              0L,
-              complexitiesByEstimator = Map(1 -> contractWithoutVerifierComplexities)
-            )
+      .onCall((_: Address) =>
+        Some(
+          AccountScriptInfo(
+            allAccounts(6).publicKey,
+            ContractScript(V3, contractWithoutVerifier).explicitGet(),
+            0L,
+            complexitiesByEstimator = Map(1 -> contractWithoutVerifierComplexities)
           )
+        )
       )
     (blockchain.hasAccountScript _).when(allAccounts(6).toAddress).returns(true).once()
 

@@ -28,6 +28,7 @@ import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.utils.EthTxGenerator
 import com.wavesplatform.transaction.utils.EthTxGenerator.Arg
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxHelpers, TxNonNegativeAmount, TxVersion}
+import com.wavesplatform.utils.Schedulers
 import org.scalatest.concurrent.Eventually
 import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
@@ -49,7 +50,8 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
             TestTime(),
             d.accountsApi,
             d.assetsApi,
-            MaxDistributionDepth
+            MaxDistributionDepth,
+            Schedulers.fixedPool(4, "heavy-request-scheduler")
           ).route
         )
       )
