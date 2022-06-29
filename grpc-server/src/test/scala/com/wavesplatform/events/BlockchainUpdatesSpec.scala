@@ -1,7 +1,5 @@
 package com.wavesplatform.events
 
-import java.util.concurrent.locks.ReentrantLock
-
 import com.google.common.primitives.Longs
 import com.google.protobuf.ByteString
 import com.wavesplatform.TestValues
@@ -39,6 +37,7 @@ import monix.execution.Scheduler.Implicits.global
 import org.scalactic.source.Position
 import org.scalatest.concurrent.ScalaFutures
 
+import java.util.concurrent.locks.ReentrantLock
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
 import scala.util.Random
@@ -113,15 +112,22 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       val subscription = repo.createFakeObserver(SubscribeRequest.of(1, 0))
       d.appendKeyBlock(Some(keyBlockId))
 
-      subscription.fetchAllEvents(d.blockchain).map(_.getUpdate) should matchPattern {
-        case Seq(
-              E.Block(1, _),
-              E.Micro(1, _),
-              E.Micro(1, _),
-              E.MicroRollback(1, `keyBlockId`),
-              E.Block(2, _)
-            ) =>
-      }
+      subscription.fetchAllEvents(d.blockchain).map(_.getUpdate) should (
+        matchPattern {
+          case Seq(
+                E.Block(1, _),
+                E.Micro(1, _),
+                E.Micro(1, _),
+                E.MicroRollback(1, `keyBlockId`),
+                E.Block(2, _)
+              ) =>
+        } or matchPattern {
+          case Seq(
+                E.Block(1, _),
+                E.Block(2, _)
+              ) =>
+        }
+      )
     }
 
     "should not freeze on block rollback" in withDomainAndRepo(currentSettings) { case (d, repo) =>
@@ -435,23 +441,21 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       val issuer        = KeyPair(Longs.toByteArray(Random.nextLong()))
       val invoker       = KeyPair(Longs.toByteArray(Random.nextLong()))
       val issuerAddress = issuer.toAddress
-      val dAppScript = TestCompiler(V5).compileContract(s"""
-             |{-# STDLIB_VERSION 5 #-}
-             |{-# SCRIPT_TYPE ACCOUNT #-}
-             |{-# CONTENT_TYPE DAPP #-}
-             |
-             |@Callable(i)
-             |func issue() = {
-             |  let issue = Issue("name", "description", 1000, 4, true, unit, 0)
-             |  let lease = Lease(i.caller, 500000000)
-             |  [
-             |    issue,
-             |    BinaryEntry("assetId", calculateAssetId(issue)),
-             |    lease,
-             |    BinaryEntry("leaseId", calculateLeaseId(lease))
-             |  ]
-             |}
-             |""".stripMargin)
+      val dAppScript = TestCompiler(V5).compileContract(
+        s"""
+           |@Callable(i)
+           |func issue() = {
+           |  let issue = Issue("name", "description", 1000, 4, true, unit, 0)
+           |  let lease = Lease(i.caller, 500000000)
+           |  [
+           |    issue,
+           |    BinaryEntry("assetId", calculateAssetId(issue)),
+           |    lease,
+           |    BinaryEntry("leaseId", calculateLeaseId(lease))
+           |  ]
+           |}
+         """.stripMargin
+      )
       val invoke = Signed.invokeScript(
         2.toByte,
         invoker,
