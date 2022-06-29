@@ -34,15 +34,17 @@ class Handler(id: String, maybeLiquidState: Option[LiquidState], subject: Publis
   }
 
   private def revertMicroBlock(rollbackEvent: MicroBlockRollbackCompleted): Unit = {
-    queue.zipWithIndex.reverseIterator.collectFirst {
-      case (bu, idx) if bu.id == rollbackEvent.id => idx
-    } match {
-      case None =>
-        queue.clear()
-        queue.append(rollbackEvent)
-      case Some(idx) =>
+    queue.zipWithIndex.collectFirst {
+      // block is found, remove all microblocks
+      case (ba: BlockAppended, idx) if ba.id == rollbackEvent.id =>
         queue.takeInPlace(idx + 1)
-    }
+      // first microblock is found, remove all microblocks with it
+      case (mba: MicroBlockAppended, idx) if mba.references(rollbackEvent) =>
+        queue.takeInPlace(idx)
+    }.getOrElse(
+      // some microblocks were sent, send rollback
+      queue.append(rollbackEvent)
+    )
   }
 
   def rollbackMicroBlock(rollbackEvent: MicroBlockRollbackCompleted): Unit = {
