@@ -50,7 +50,7 @@ import io.netty.util.concurrent.{DefaultThreadFactory, GlobalEventExecutor}
 import kamon.Kamon
 import kamon.instrumentation.executor.ExecutorInstrumentation
 import monix.eval.{Coeval, Task}
-import monix.execution.{Scheduler, UncaughtExceptionReporter}
+import monix.execution.{ExecutionModel, Scheduler, UncaughtExceptionReporter}
 import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
@@ -101,7 +101,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private var triggers = Seq.empty[BlockchainUpdateTriggers]
 
-  private[this] var miner: Miner with MinerDebugInfo = Miner.Disabled
+  private[this] var miner: Miner & MinerDebugInfo = Miner.Disabled
   private[this] val (blockchainUpdater, levelDB) =
     StorageFactory(settings, db, time, spendableBalanceChanged, BlockchainUpdateTriggers.combined(triggers), bc => miner.scheduleMining(bc))
 
@@ -357,7 +357,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         else heavyRequestExecutor
 
       val heavyRequestScheduler =
-        Scheduler(maybeInstrumentedHeavyRequestExecutor, UncaughtExceptionReporter((t: Throwable) => log.error("Error processing request", t)))
+        Scheduler(
+          maybeInstrumentedHeavyRequestExecutor,
+          UncaughtExceptionReporter((t: Throwable) => log.error("Error processing request", t)),
+          ExecutionModel.AlwaysAsyncExecution
+        )
 
       val apiRoutes = Seq(
         new EthRpcRoute(blockchainUpdater, extensionContext.transactionsApi, time),
@@ -527,7 +531,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
 object Application extends ScorexLogging {
   private[wavesplatform] def loadApplicationConfig(external: Option[File] = None): WavesSettings = {
-    import com.wavesplatform.settings._
+    import com.wavesplatform.settings.*
 
     val maybeExternalConfig = Try(external.map(f => ConfigFactory.parseFile(f.getAbsoluteFile, ConfigParseOptions.defaults().setAllowMissing(false))))
     val config              = loadConfig(maybeExternalConfig.getOrElse(None))
@@ -634,7 +638,7 @@ object Application extends ScorexLogging {
 
     def dumpMinerConfig(): Unit = {
       import settings.synchronizationSettings.microBlockSynchronizer
-      import settings.{minerSettings => miner}
+      import settings.minerSettings as miner
 
       Metrics.write(
         Point
