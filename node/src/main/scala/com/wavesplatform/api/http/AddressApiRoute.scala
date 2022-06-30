@@ -286,20 +286,20 @@ case class AddressApiRoute(
       .dataStream(address, None)
       .toListL
       .runAsyncLogErr
-      .map(data => Source.fromIterator(() => data.sortBy(_.key).iterator.map(Json.toJson[DataEntry[_]])))
+      .map(data => Source.fromIterator(() => data.sortBy(_.key).iterator.map(Json.toJson[DataEntry[?]])))
 
   private def accountData(addr: Address, regex: String)(implicit sc: Scheduler) =
     commonAccountsApi
       .dataStream(addr, Some(regex))
       .toListL
       .runAsyncLogErr
-      .map(data => Source.fromIterator(() => data.sortBy(_.key).iterator.map(Json.toJson[DataEntry[_]])))
+      .map(data => Source.fromIterator(() => data.sortBy(_.key).iterator.map(Json.toJson[DataEntry[?]])))
 
   private def accountDataEntry(address: Address, key: String): ToResponseMarshallable =
     commonAccountsApi.data(address, key).toRight(DataKeyDoesNotExist)
 
   private def accountDataList(address: Address, keys: String*) =
-    Source.fromIterator(() => keys.flatMap(commonAccountsApi.data(address, _)).iterator.map(Json.toJson[DataEntry[_]]))
+    Source.fromIterator(() => keys.flatMap(commonAccountsApi.data(address, _)).iterator.map(Json.toJson[DataEntry[?]]))
 
   private def signPath(address: Address, encode: Boolean): Route = (post & entity(as[String])) { message =>
     withAuth {
