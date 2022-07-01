@@ -228,7 +228,7 @@ class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler) extends Bl
     require(toHeight == 0 || toHeight >= fromHeight, "fromHeight must not exceed toHeight")
     monitor.synchronized {
       val subject = PublishToOneSubject[BlockchainUpdated]()
-      val handler = new Handler(streamId, liquidState, subject, 250)
+      val handler = newHandler(streamId, liquidState, subject, 250)
       handlers.add(handler)
 
       val removeHandler = Task {

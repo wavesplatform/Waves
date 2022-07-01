@@ -34,17 +34,19 @@ class Handler(id: String, maybeLiquidState: Option[LiquidState], subject: Publis
   }
 
   private def revertMicroBlock(rollbackEvent: MicroBlockRollbackCompleted): Unit = {
-    queue.zipWithIndex.collectFirst {
-      case (ba: BlockAppended, idx) if ba.id == rollbackEvent.id =>
-        // block is found, remove all microblocks
-        queue.takeInPlace(idx + 1)
-      case (mba: MicroBlockAppended, idx) if mba.references(rollbackEvent) =>
-        // first microblock is found, remove all microblocks with it
-        queue.takeInPlace(idx)
-    }.getOrElse {
+    queue.zipWithIndex
+      .collectFirst {
+        case (ba: BlockAppended, idx) if ba.id == rollbackEvent.id =>
+          // block is found, remove all microblocks
+          queue.takeInPlace(idx + 1)
+        case (mba: MicroBlockAppended, idx) if mba.references(rollbackEvent) =>
+          // first microblock is found, remove all microblocks with it
+          queue.takeInPlace(idx)
+      }
+      .getOrElse(
         // some microblocks were sent, send rollback
         queue.append(rollbackEvent)
-      }
+      )
   }
 
   def rollbackMicroBlock(rollbackEvent: MicroBlockRollbackCompleted): Unit = {
@@ -87,22 +89,21 @@ class Handler(id: String, maybeLiquidState: Option[LiquidState], subject: Publis
 
   protected def sendUpdate(): Unit =
     if (queue.nonEmpty && subject.subscription.isCompleted && !cancelled)
-      s.execute(
-        () =>
-          queue.synchronized {
-            if (queue.nonEmpty) {
-              val v = queue.remove(0)
-              log.trace(s"[$id] Sending ${v.ref} to subscriber")
-              subject.onNext(v).onComplete {
-                case Success(Ack.Continue) =>
-                  log.trace(s"[$id] Sent ${v.ref} to subscriber, attempting to send one more")
-                  sendUpdate()
-                case Success(Ack.Stop) =>
-                  log.debug(s"[$id] Subscriber stopped")
-                case Failure(exception) =>
-                  log.error(s"[$id] Error sending ${v.ref}", exception)
-              }
+      s.execute(() =>
+        queue.synchronized {
+          if (queue.nonEmpty) {
+            val v = queue.remove(0)
+            log.trace(s"[$id] Sending ${v.ref} to subscriber")
+            subject.onNext(v).onComplete {
+              case Success(Ack.Continue) =>
+                log.trace(s"[$id] Sent ${v.ref} to subscriber, attempting to send one more")
+                sendUpdate()
+              case Success(Ack.Stop) =>
+                log.debug(s"[$id] Subscriber stopped")
+              case Failure(exception) =>
+                log.error(s"[$id] Error sending ${v.ref}", exception)
             }
           }
+        }
       )
 }
