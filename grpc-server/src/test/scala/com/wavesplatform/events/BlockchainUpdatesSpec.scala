@@ -431,6 +431,78 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       subscription.fetchAllEvents(d.blockchain).map(_.getUpdate.height) shouldBe Seq(1, 2, 3)
     }
 
+    "should clear event queue on microblock rollback if block was not sent" in {
+      var sendUpdate: () => Unit = null
+      withManualHandle(currentSettings, sendUpdate = _) { case (d, repo) =>
+        val keyBlockId   = d.appendKeyBlock().id()
+        val subscription = repo.createFakeObserver(SubscribeRequest.of(1, 0))
+
+        d.appendMicroBlock(TxHelpers.transfer())
+        d.appendMicroBlock(TxHelpers.transfer())
+        d.appendKeyBlock(Some(keyBlockId))
+
+        sendUpdate()
+        sendUpdate()
+
+        subscription.fetchAllEvents(d.blockchain).map(_.getUpdate) should matchPattern {
+          case Seq(
+                E.Block(1, _),
+                E.Block(2, _)
+              ) =>
+        }
+      }
+    }
+
+    "should clear event queue on microblock rollback if block was sent but first microblock wasn't" in {
+      var sendUpdate: () => Unit = null
+      withManualHandle(currentSettings, sendUpdate = _) { case (d, repo) =>
+        val keyBlockId   = d.appendKeyBlock().id()
+        val subscription = repo.createFakeObserver(SubscribeRequest.of(1, 0))
+
+        sendUpdate()
+
+        d.appendMicroBlock(TxHelpers.transfer())
+        d.appendMicroBlock(TxHelpers.transfer())
+        d.appendKeyBlock(Some(keyBlockId))
+
+        sendUpdate()
+
+        subscription.fetchAllEvents(d.blockchain).map(_.getUpdate) should matchPattern {
+          case Seq(
+                E.Block(1, _),
+                E.Block(2, _)
+              ) =>
+        }
+      }
+    }
+
+    "should send event on microblock rollback if first microblock was sent" in {
+      var sendUpdate: () => Unit = null
+      withManualHandle(currentSettings, sendUpdate = _) { case (d, repo) =>
+        val keyBlockId   = d.appendKeyBlock().id()
+        val subscription = repo.createFakeObserver(SubscribeRequest.of(1, 0))
+        sendUpdate()
+
+        d.appendMicroBlock(TxHelpers.transfer())
+        sendUpdate()
+
+        d.appendMicroBlock(TxHelpers.transfer())
+        d.appendKeyBlock(Some(keyBlockId))
+
+        (1 to 3).foreach(_ => sendUpdate())
+
+        subscription.fetchAllEvents(d.blockchain).map(_.getUpdate) should matchPattern {
+          case Seq(
+                E.Block(1, _),
+                E.Micro(1, _),
+                E.Micro(1, _),
+                E.MicroRollback(1, `keyBlockId`),
+                E.Block(2, _)
+              ) =>
+        }
+      }
+    }
+
     "should get valid range" in withDomainAndRepo(currentSettings) { (d, repo) =>
       for (_ <- 1 to 10) d.appendBlock()
       val blocks = repo.getBlockUpdatesRange(GetBlockUpdatesRangeRequest(3, 5)).futureValue.updates

@@ -35,16 +35,16 @@ class Handler(id: String, maybeLiquidState: Option[LiquidState], subject: Publis
 
   private def revertMicroBlock(rollbackEvent: MicroBlockRollbackCompleted): Unit = {
     queue.zipWithIndex.collectFirst {
-      // block is found, remove all microblocks
       case (ba: BlockAppended, idx) if ba.id == rollbackEvent.id =>
+        // block is found, remove all microblocks
         queue.takeInPlace(idx + 1)
-      // first microblock is found, remove all microblocks with it
       case (mba: MicroBlockAppended, idx) if mba.references(rollbackEvent) =>
+        // first microblock is found, remove all microblocks with it
         queue.takeInPlace(idx)
-    }.getOrElse(
-      // some microblocks were sent, send rollback
-      queue.append(rollbackEvent)
-    )
+    }.getOrElse {
+        // some microblocks were sent, send rollback
+        queue.append(rollbackEvent)
+      }
   }
 
   def rollbackMicroBlock(rollbackEvent: MicroBlockRollbackCompleted): Unit = {
@@ -85,7 +85,7 @@ class Handler(id: String, maybeLiquidState: Option[LiquidState], subject: Publis
     subject.onComplete()
   }
 
-  private def sendUpdate(): Unit =
+  protected def sendUpdate(): Unit =
     if (queue.nonEmpty && subject.subscription.isCompleted && !cancelled)
       s.execute(
         () =>

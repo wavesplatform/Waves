@@ -34,6 +34,9 @@ class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler) extends Bl
   private[this] var liquidState = Option.empty[LiquidState]
   private[this] val handlers    = ConcurrentHashMap.newKeySet[Handler]()
 
+  def newHandler(id: String, maybeLiquidState: Option[LiquidState], subject: PublishToOneSubject[BlockchainUpdated], maxQueueSize: Int): Handler =
+    new Handler(id, maybeLiquidState, subject, maxQueueSize)
+
   def shutdownHandlers(): Unit = monitor.synchronized {
     handlers.forEach(_.shutdown())
   }

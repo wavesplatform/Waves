@@ -4,10 +4,12 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.events.FakeObserver.*
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeRequest
 import com.wavesplatform.events.protobuf.BlockchainUpdated as PBBlockchainUpdated
+import com.wavesplatform.events.repo.LiquidState
 import com.wavesplatform.history.Domain
 import com.wavesplatform.settings.{Constants, WavesSettings}
 import com.wavesplatform.transaction.TxHelpers
 import monix.execution.Scheduler.Implicits.global
+import monix.reactive.subjects.PublishToOneSubject
 import org.iq80.leveldb.DB
 import org.scalatest.Suite
 
@@ -22,6 +24,27 @@ trait WithBUDomain extends WithDomain { _: Suite =>
       }
     }
   }
+
+  def withManualHandle(settings: WavesSettings, setSendUpdate: (() => Unit) => Unit)(f: (Domain, Repo) => Unit): Unit =
+    withDomain(settings) { d =>
+      tempDb { db =>
+        val repo = new Repo(db, d.blocksApi) {
+          override def newHandler(
+              id: String,
+              maybeLiquidState: Option[LiquidState],
+              subject: PublishToOneSubject[BlockchainUpdated],
+              maxQueueSize: Int
+          ): Handler =
+            new Handler(id, maybeLiquidState, subject, maxQueueSize) {
+              setSendUpdate(() => super.sendUpdate())
+              override def sendUpdate(): Unit = ()
+            }
+        }
+        d.triggers = Seq(repo)
+        try f(d, repo)
+        finally repo.shutdownHandlers()
+      }
+    }
 
   def withGenerateSubscription(request: SubscribeRequest = SubscribeRequest.of(1, Int.MaxValue), settings: WavesSettings)(
       generateBlocks: Domain => Unit
