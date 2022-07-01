@@ -2,9 +2,11 @@ package com.wavesplatform
 
 import java.io.File
 import java.nio.ByteBuffer
-import java.util.Map as JMap
+import java.util
+import java.util.{Collections, Map as JMap}
 
 import com.google.common.base.Charsets.UTF_8
+import com.google.common.collect.Maps
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Bytes, Ints, Longs}
@@ -33,29 +35,39 @@ import com.wavesplatform.transaction.{EthereumTransaction, GenesisTransaction, P
 import com.wavesplatform.utils.*
 import monix.eval.Task
 import monix.reactive.Observable
-import org.iq80.leveldb.*
+import org.rocksdb.{BloomFilter as RBloomFilter, *}
 import org.slf4j.LoggerFactory
 import supertagged.TaggedType
 
 import scala.collection.mutable
+import scala.util.Using
 
 //noinspection UnstableApiUsage
 package object database {
   private lazy val logger: Logger = Logger(LoggerFactory.getLogger(getClass.getName))
 
-  def openDB(path: String, recreate: Boolean = false): DB = {
+  def openDB(path: String, recreate: Boolean = false): RocksDB = {
     logger.debug(s"Open DB at $path")
     val file = new File(path)
-    val options = new Options()
-      .createIfMissing(true)
-      .paranoidChecks(true)
+    val options = new DBOptions()
+      .setCreateIfMissing(true)
+      .setParanoidChecks(true)
+      .setIncreaseParallelism(4)
 
-    if (recreate) {
-      LevelDBFactory.factory.destroy(file, options)
-    }
+    val cfo = new ColumnFamilyOptions()
+      .setTableFormatConfig(
+        new BlockBasedTableConfig()
+          .setFilterPolicy(new RBloomFilter())
+      )
+      .setWriteBufferSize(128 << 20)
 
     file.getAbsoluteFile.getParentFile.mkdirs()
-    LevelDBFactory.factory.open(file, options)
+    RocksDB.open(
+      options,
+      path,
+      Collections.singletonList(new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfo)),
+      new util.ArrayList[ColumnFamilyHandle]()
+    )
   }
 
   final type DBEntry = JMap.Entry[Array[Byte], Array[Byte]]
@@ -148,13 +160,11 @@ package object database {
 
   def writeTxIds(ids: Seq[ByteStr]): Array[Byte] =
     ids
-      .foldLeft(ByteBuffer.allocate(ids.map(_.arr.length + 1).sum)) {
-        case (b, id) =>
-          b.put((id.arr.length: @unchecked) match {
-              case crypto.DigestLength    => crypto.DigestLength.toByte
-              case crypto.SignatureLength => crypto.SignatureLength.toByte
-            })
-            .put(id.arr)
+      .foldLeft(ByteBuffer.allocate(ids.map(_.arr.length + 1).sum)) { case (b, id) =>
+        b.put((id.arr.length: @unchecked) match {
+          case crypto.DigestLength    => crypto.DigestLength.toByte
+          case crypto.SignatureLength => crypto.SignatureLength.toByte
+        }).put(id.arr)
       }
       .array()
 
@@ -163,7 +173,7 @@ package object database {
     val s = Seq.newBuilder[String]
 
     while (i < data.length) {
-      val len = ((data(i) << 8) | (data(i + 1) & 0xFF)).toShort // Optimization
+      val len = ((data(i) << 8) | (data(i + 1) & 0xff)).toShort // Optimization
       s += new String(data, i + 2, len, UTF_8)
       i += (2 + len)
     }
@@ -173,9 +183,8 @@ package object database {
   def writeStrings(strings: Seq[String]): Array[Byte] = {
     val utfBytes = strings.toVector.map(_.utf8Bytes)
     utfBytes
-      .foldLeft(ByteBuffer.allocate(utfBytes.map(_.length + 2).sum)) {
-        case (buf, bytes) =>
-          buf.putShort(bytes.length.toShort).put(bytes)
+      .foldLeft(ByteBuffer.allocate(utfBytes.map(_.length + 2).sum)) { case (buf, bytes) =>
+        buf.putShort(bytes.length.toShort).put(bytes)
       }
       .array()
   }
@@ -197,20 +206,19 @@ package object database {
       _ => throw new IllegalArgumentException("Can not write boolean flag instead of LeaseDetails"),
       ld =>
         pb.LeaseDetails(
-            ByteString.copyFrom(ld.sender.arr),
-            Some(PBRecipients.create(ld.recipient)),
-            ld.amount,
-            ByteString.copyFrom(ld.sourceId.arr),
-            ld.height,
-            ld.status match {
-              case LeaseDetails.Status.Active => pb.LeaseDetails.Status.Active(com.google.protobuf.empty.Empty())
-              case LeaseDetails.Status.Cancelled(height, cancelTxId) =>
-                pb.LeaseDetails.Status
-                  .Cancelled(pb.LeaseDetails.Cancelled(height, cancelTxId.fold(ByteString.EMPTY)(id => ByteString.copyFrom(id.arr))))
-              case LeaseDetails.Status.Expired(height) => pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height))
-            }
-          )
-          .toByteArray
+          ByteString.copyFrom(ld.sender.arr),
+          Some(PBRecipients.create(ld.recipient)),
+          ld.amount,
+          ByteString.copyFrom(ld.sourceId.arr),
+          ld.height,
+          ld.status match {
+            case LeaseDetails.Status.Active => pb.LeaseDetails.Status.Active(com.google.protobuf.empty.Empty())
+            case LeaseDetails.Status.Cancelled(height, cancelTxId) =>
+              pb.LeaseDetails.Status
+                .Cancelled(pb.LeaseDetails.Cancelled(height, cancelTxId.fold(ByteString.EMPTY)(id => ByteString.copyFrom(id.arr))))
+            case LeaseDetails.Status.Expired(height) => pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height))
+          }
+        ).toByteArray
     )
 
   def readLeaseDetails(data: Array[Byte]): Either[Boolean, LeaseDetails] =
@@ -317,23 +325,21 @@ package object database {
     val (info, volumeInfo) = ai
 
     pb.AssetDetails(
-        info.name,
-        info.description,
-        info.lastUpdatedAt,
-        volumeInfo.isReissuable,
-        ByteString.copyFrom(volumeInfo.volume.toByteArray)
-      )
-      .toByteArray
+      info.name,
+      info.description,
+      info.lastUpdatedAt,
+      volumeInfo.isReissuable,
+      ByteString.copyFrom(volumeInfo.volume.toByteArray)
+    ).toByteArray
   }
 
   def writeAssetStaticInfo(sai: AssetStaticInfo): Array[Byte] =
     pb.StaticAssetInfo(
-        ByteString.copyFrom(sai.source.arr),
-        ByteString.copyFrom(sai.issuer.arr),
-        sai.decimals,
-        sai.nft
-      )
-      .toByteArray
+      ByteString.copyFrom(sai.source.arr),
+      ByteString.copyFrom(sai.issuer.arr),
+      sai.decimals,
+      sai.nft
+    ).toByteArray
 
   def readAssetStaticInfo(bb: Array[Byte]): AssetStaticInfo = {
     val sai = pb.StaticAssetInfo.parseFrom(bb)
@@ -347,17 +353,16 @@ package object database {
 
   def writeBlockMeta(data: BlockMeta): Array[Byte] =
     pb.BlockMeta(
-        Some(PBBlocks.protobuf(data.header)),
-        ByteString.copyFrom(data.signature.arr),
-        data.headerHash.fold(ByteString.EMPTY)(hh => ByteString.copyFrom(hh.arr)),
-        data.height,
-        data.size,
-        data.transactionCount,
-        data.totalFeeInWaves,
-        data.reward.getOrElse(-1L),
-        data.vrf.fold(ByteString.EMPTY)(vrf => ByteString.copyFrom(vrf.arr))
-      )
-      .toByteArray
+      Some(PBBlocks.protobuf(data.header)),
+      ByteString.copyFrom(data.signature.arr),
+      data.headerHash.fold(ByteString.EMPTY)(hh => ByteString.copyFrom(hh.arr)),
+      data.height,
+      data.size,
+      data.transactionCount,
+      data.totalFeeInWaves,
+      data.reward.getOrElse(-1L),
+      data.vrf.fold(ByteString.EMPTY)(vrf => ByteString.copyFrom(vrf.arr))
+    ).toByteArray
 
   def readBlockMeta(bs: Array[Byte]): BlockMeta = {
     val pbbm = pb.BlockMeta.parseFrom(bs)
@@ -379,11 +384,14 @@ package object database {
     val height       = Height(ndi.readInt())
     val numSeqLength = ndi.readInt()
 
-    (height, List.fill(numSeqLength) {
-      val tp  = ndi.readByte()
-      val num = TxNum(ndi.readShort())
-      (tp, num)
-    })
+    (
+      height,
+      List.fill(numSeqLength) {
+        val tp  = ndi.readByte()
+        val num = TxNum(ndi.readShort())
+        (tp, num)
+      }
+    )
   }
 
   def writeTransactionHNSeqAndType(v: (Height, Seq[(Byte, TxNum)])): Array[Byte] = {
@@ -395,10 +403,9 @@ package object database {
 
     ndo.writeInt(height)
     ndo.writeInt(numSeqLength)
-    numSeq.foreach {
-      case (tp, num) =>
-        ndo.writeByte(tp)
-        ndo.writeShort(num)
+    numSeq.foreach { case (tp, num) =>
+      ndo.writeByte(tp)
+      ndo.writeShort(num)
     }
 
     ndo.toByteArray
@@ -420,10 +427,9 @@ package object database {
     val sorted = sh.sectionHashes.toSeq.sortBy(_._1)
     val ndo    = newDataOutput(crypto.DigestLength + 1 + sorted.length * (1 + crypto.DigestLength))
     ndo.writeByte(sorted.length)
-    sorted.foreach {
-      case (sectionId, value) =>
-        ndo.writeByte(sectionId.id.toByte)
-        ndo.writeByteStr(value.ensuring(_.arr.length == DigestLength))
+    sorted.foreach { case (sectionId, value) =>
+      ndo.writeByte(sectionId.id.toByte)
+      ndo.writeByteStr(value.ensuring(_.arr.length == DigestLength))
     }
     ndo.writeByteStr(sh.totalHash.ensuring(_.arr.length == DigestLength))
     ndo.toByteArray
@@ -440,13 +446,12 @@ package object database {
 
   def writeDataEntry(e: DataEntry[?]): Array[Byte] =
     pb.DataEntry(e match {
-        case IntegerDataEntry(_, value) => pb.DataEntry.Value.IntValue(value)
-        case BooleanDataEntry(_, value) => pb.DataEntry.Value.BoolValue(value)
-        case BinaryDataEntry(_, value)  => pb.DataEntry.Value.BinaryValue(ByteString.copyFrom(value.arr))
-        case StringDataEntry(_, value)  => pb.DataEntry.Value.StringValue(value)
-        case _: EmptyDataEntry          => pb.DataEntry.Value.Empty
-      })
-      .toByteArray
+      case IntegerDataEntry(_, value) => pb.DataEntry.Value.IntValue(value)
+      case BooleanDataEntry(_, value) => pb.DataEntry.Value.BoolValue(value)
+      case BinaryDataEntry(_, value)  => pb.DataEntry.Value.BinaryValue(ByteString.copyFrom(value.arr))
+      case StringDataEntry(_, value)  => pb.DataEntry.Value.StringValue(value)
+      case _: EmptyDataEntry          => pb.DataEntry.Value.Empty
+    }).toByteArray
 
   implicit class EntryExt(val e: JMap.Entry[Array[Byte], Array[Byte]]) extends AnyVal {
     import com.wavesplatform.crypto.DigestLength
@@ -457,27 +462,29 @@ package object database {
     }
   }
 
-  implicit class DBExt(val db: DB) extends AnyVal {
+  implicit class DBExt(val db: RocksDB) extends AnyVal {
     def readOnly[A](f: ReadOnlyDB => A): A = {
-      val snapshot = db.getSnapshot
-      try f(new ReadOnlyDB(db, new ReadOptions().snapshot(snapshot)))
-      finally snapshot.close()
+      Using.resource(db.getSnapshot) { s =>
+        Using.resource(new ReadOptions().setSnapshot(s)) { ro =>
+          f(new ReadOnlyDB(db, ro))
+        }
+      }
     }
 
-    /**
-      * @note Runs operations in batch, so keep in mind, that previous changes don't appear lately in f
+    /** @note
+      *   Runs operations in batch, so keep in mind, that previous changes don't appear lately in f
       */
     def readWrite[A](f: RW => A): A = {
       val snapshot    = db.getSnapshot
-      val readOptions = new ReadOptions().snapshot(snapshot)
+      val readOptions = new ReadOptions().setSnapshot(snapshot)
       val batch       = new SortedBatch
       val rw          = new RW(db, readOptions, batch)
-      val nativeBatch = db.createWriteBatch()
+      val nativeBatch = new WriteBatch()
       try {
         val r = f(rw)
         batch.addedEntries.foreach { case (k, v) => nativeBatch.put(k.arr, v) }
         batch.deletedEntries.foreach(k => nativeBatch.delete(k.arr))
-        db.write(nativeBatch, new WriteOptions().sync(false).snapshot(false))
+        db.write(new WriteOptions().setSync(false), nativeBatch)
         r
       } finally {
         nativeBatch.close()
@@ -486,16 +493,19 @@ package object database {
     }
 
     def get[A](key: Key[A]): A                           = key.parse(db.get(key.keyBytes))
-    def get[A](key: Key[A], readOptions: ReadOptions): A = key.parse(db.get(key.keyBytes, readOptions))
+    def get[A](key: Key[A], readOptions: ReadOptions): A = key.parse(db.get(readOptions, key.keyBytes))
     def has(key: Key[?]): Boolean                        = db.get(key.keyBytes) != null
 
     def iterateOver(tag: KeyTags.KeyTag)(f: DBEntry => Unit): Unit = iterateOver(tag.prefixBytes)(f)
 
     def iterateOver(prefix: Array[Byte], seekPrefix: Array[Byte] = Array.emptyByteArray)(f: DBEntry => Unit): Unit = {
-      val iterator = db.iterator()
+      val iterator = db.newIterator()
       try {
         iterator.seek(Bytes.concat(prefix, seekPrefix))
-        while (iterator.hasNext && iterator.peekNext().getKey.startsWith(prefix)) f(iterator.next())
+        while (iterator.isValid && iterator.key().startsWith(prefix)) {
+          f(Maps.immutableEntry(iterator.key(), iterator.value()))
+          iterator.next()
+        }
       } finally iterator.close()
     }
 
@@ -523,9 +533,8 @@ package object database {
         ByteString.copyFrom(scriptInfo.publicKey.arr),
         ByteString.copyFrom(scriptInfo.script.bytes().arr),
         scriptInfo.verifierComplexity,
-        scriptInfo.complexitiesByEstimator.map {
-          case (version, complexities) =>
-            pb.AccountScriptInfo.ComplexityByVersion(version, complexities)
+        scriptInfo.complexitiesByEstimator.map { case (version, complexities) =>
+          pb.AccountScriptInfo.ComplexityByVersion(version, complexities)
         }.toSeq
       )
     )
@@ -556,10 +565,10 @@ package object database {
     val (m, tx) = v
     val ptx = tx match {
       case lps: PBSince if !lps.isProtobufVersion => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
-      case _: GenesisTransaction                         => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
-      case _: PaymentTransaction                         => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
-      case et: EthereumTransaction                       => TD.EthereumTransaction(ByteString.copyFrom(et.bytes()))
-      case _                                             => TD.WavesTransaction(PBTransactions.protobuf(tx))
+      case _: GenesisTransaction                  => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
+      case _: PaymentTransaction                  => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
+      case et: EthereumTransaction                => TD.EthereumTransaction(ByteString.copyFrom(et.bytes()))
+      case _                                      => TD.WavesTransaction(PBTransactions.protobuf(tx))
     }
     pb.TransactionData(ptx, !m.succeeded, m.spentComplexity).toByteArray
   }
@@ -603,7 +612,7 @@ package object database {
       staticInfo.nft
     )
 
-  def loadActiveLeases(db: DB, fromHeight: Int, toHeight: Int): Seq[LeaseTransaction] = db.withResource { r =>
+  def loadActiveLeases(db: RocksDB, fromHeight: Int, toHeight: Int): Seq[LeaseTransaction] = db.withResource { r =>
     (for {
       id      <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
       details <- fromHistory(r, Keys.leaseDetailsHistory(id), Keys.leaseDetails(id))
@@ -617,23 +626,23 @@ package object database {
 
   def loadLeaseIds(resource: DBResource, fromHeight: Int, toHeight: Int, includeCancelled: Boolean): Set[ByteStr] = {
     val leaseIds = mutable.Set.empty[ByteStr]
-    val iterator = resource.iterator
-
-    @inline
-    def keyInRange(): Boolean = {
-      val actualKey = iterator.peekNext().getKey
-      actualKey.startsWith(KeyTags.LeaseDetails.prefixBytes) && Ints.fromByteArray(actualKey.slice(2, 6)) <= toHeight
-    }
-
-    iterator.seek(KeyTags.LeaseDetails.prefixBytes ++ Ints.toByteArray(fromHeight))
-    while (iterator.hasNext && keyInRange()) {
-      val e       = iterator.next()
-      val leaseId = ByteStr(e.getKey.drop(6))
-      if (includeCancelled || readLeaseDetails(e.getValue).fold(identity, _.isActive))
-        leaseIds += leaseId
-      else
-        leaseIds -= leaseId
-    }
+//    val iterator = resource.iterator
+//
+//    @inline
+//    def keyInRange(): Boolean = {
+//      val actualKey = iterator.peekNext().getKey
+//      actualKey.startsWith(KeyTags.LeaseDetails.prefixBytes) && Ints.fromByteArray(actualKey.slice(2, 6)) <= toHeight
+//    }
+//
+//    iterator.seek(KeyTags.LeaseDetails.prefixBytes ++ Ints.toByteArray(fromHeight))
+//    while (iterator.hasNext && keyInRange()) {
+//      val e       = iterator.next()
+//      val leaseId = ByteStr(e.getKey.drop(6))
+//      if (includeCancelled || readLeaseDetails(e.getValue).fold(identity, _.isActive))
+//        leaseIds += leaseId
+//      else
+//        leaseIds -= leaseId
+//    }
 
     leaseIds.toSet
   }

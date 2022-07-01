@@ -25,12 +25,13 @@ class NFTIterator(addressId: AddressId, maybeAfter: Option[IssuedAsset], resourc
     def skipEntry(key: Array[Byte]): Boolean =
       key.startsWith(prefixBytes) && !key.endsWith(after.id.arr)
 
-    while (resource.iterator.hasNext && skipEntry(resource.iterator.next().getKey)) {}
+    while (resource.iterator.isValid && skipEntry(resource.iterator.key())) {}
   }
 
   override def computeNext(): (IssuedAsset, Long) =
-    if (resource.iterator.hasNext && resource.iterator.peekNext().getKey.startsWith(prefixBytes)) {
-      val assetId = IssuedAsset(ByteStr(resource.iterator.next().getKey.takeRight(crypto.DigestLength)))
+    if (resource.iterator.isValid && resource.iterator.key().startsWith(prefixBytes)) {
+      val assetId = IssuedAsset(ByteStr(resource.iterator.key().takeRight(crypto.DigestLength)))
+      resource.iterator.next()
       assetId -> (for {
         lastChange <- resource.get(Keys.assetBalanceHistory(addressId, assetId)).headOption
       } yield resource.get(Keys.assetBalance(addressId, assetId)(lastChange))).getOrElse(0L)
@@ -46,11 +47,11 @@ class AssetBalanceIterator(addressId: AddressId, resource: DBResource) extends A
     (k.length == (prefixBytes.length + crypto.DigestLength)) && k.startsWith(prefixBytes)
 
   override def computeNext(): (IssuedAsset, Long) =
-    if (resource.iterator.hasNext && stillSameAddress(resource.iterator.peekNext().getKey)) {
-      val currentEntry = resource.iterator.next()
-      val assetId      = IssuedAsset(ByteStr(currentEntry.getKey.takeRight(crypto.DigestLength)))
-      val history      = readIntSeq(currentEntry.getValue)
+    if (resource.iterator.isValid && stillSameAddress(resource.iterator.key())) {
+      val assetId      = IssuedAsset(ByteStr(resource.iterator.key().takeRight(crypto.DigestLength)))
+      val history      = readIntSeq(resource.iterator.value())
       val balance      = resource.get(Keys.assetBalance(addressId, assetId)(history.headOption.getOrElse(0)))
+      resource.iterator.next()
       assetId -> balance
     } else endOfData()
 }

@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database
 import com.wavesplatform.database.DBExt
 import com.wavesplatform.state.{Blockchain, Height}
-import org.iq80.leveldb.DB
+import org.rocksdb.RocksDB
 
 trait History {
   def loadBlockBytes(id: ByteStr): Option[(Byte, Array[Byte])]
@@ -16,7 +16,7 @@ trait History {
 object History {
   private def versionedBytes(block: Block): (Byte, Array[Byte]) = block.header.version -> block.bytes()
 
-  def apply(blockchain: Blockchain, liquidBlock: ByteStr => Option[Block], microBlock: ByteStr => Option[MicroBlock], db: DB): History = new History {
+  def apply(blockchain: Blockchain, liquidBlock: ByteStr => Option[Block], microBlock: ByteStr => Option[MicroBlock], db: RocksDB): History = new History {
     override def loadBlockBytes(id: ByteStr): Option[(Byte, Array[Byte])] =
       liquidBlock(id)
         .orElse(blockchain.heightOf(id).flatMap { h =>

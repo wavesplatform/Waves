@@ -19,7 +19,7 @@ import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.{EthereumTransaction, TransactionType}
 import monix.eval.Task
 import monix.reactive.Observable
-import org.iq80.leveldb.DB
+import org.rocksdb.RocksDB
 
 trait CommonAccountsApi {
   import CommonAccountsApi.*
@@ -55,7 +55,7 @@ object CommonAccountsApi {
 
   final case class BalanceDetails(regular: Long, generating: Long, available: Long, effective: Long, leaseIn: Long, leaseOut: Long)
 
-  def apply(diff: () => Diff, db: DB, blockchain: Blockchain): CommonAccountsApi = new CommonAccountsApi {
+  def apply(diff: () => Diff, db: RocksDB, blockchain: Blockchain): CommonAccountsApi = new CommonAccountsApi {
 
     override def balance(address: Address, confirmations: Int = 0): Long = {
       blockchain.balance(address, blockchain.height, confirmations)

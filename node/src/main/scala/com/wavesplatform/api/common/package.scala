@@ -8,7 +8,7 @@ import com.wavesplatform.state.{Diff, Height, Portfolio, TxMeta}
 import com.wavesplatform.transaction.{CreateAliasTransaction, Transaction, TransactionType}
 import monix.eval.Task
 import monix.reactive.Observable
-import org.iq80.leveldb.DB
+import org.rocksdb.RocksDB
 
 import scala.jdk.CollectionConverters.*
 
@@ -17,7 +17,7 @@ package object common {
   import BalanceDistribution.*
 
   def addressTransactions(
-      db: DB,
+      db: RocksDB,
       maybeDiff: Option[(Height, Diff)],
       subject: Address,
       sender: Option[Address],
@@ -25,30 +25,29 @@ package object common {
       fromId: Option[ByteStr]
   ): Observable[TransactionMeta] =
     Observable
-      .fromIterator(Task(allAddressTransactions(db, maybeDiff, subject, sender, types, fromId).map {
-        case (m, transaction) =>
-          def loadISR(t: Transaction) =
-            maybeDiff
-              .flatMap { case (_, diff) => diff.scriptResults.get(t.id()) }
-              .orElse(loadInvokeScriptResult(db, t.id()))
+      .fromIterator(Task(allAddressTransactions(db, maybeDiff, subject, sender, types, fromId).map { case (m, transaction) =>
+        def loadISR(t: Transaction) =
+          maybeDiff
+            .flatMap { case (_, diff) => diff.scriptResults.get(t.id()) }
+            .orElse(loadInvokeScriptResult(db, t.id()))
 
-          def loadETM(t: Transaction) =
-            maybeDiff
-              .flatMap { case (_, diff) => diff.ethereumTransactionMeta.get(t.id()) }
-              .orElse(loadEthereumMetadata(db, t.id()))
+        def loadETM(t: Transaction) =
+          maybeDiff
+            .flatMap { case (_, diff) => diff.ethereumTransactionMeta.get(t.id()) }
+            .orElse(loadEthereumMetadata(db, t.id()))
 
-          TransactionMeta.create(
-            m.height,
-            transaction,
-            m.succeeded,
-            m.spentComplexity,
-            loadISR,
-            loadETM
-          )
+        TransactionMeta.create(
+          m.height,
+          transaction,
+          m.succeeded,
+          m.spentComplexity,
+          loadISR,
+          loadETM
+        )
       }))
 
   def balanceDistribution(
-      db: DB,
+      db: RocksDB,
       height: Int,
       after: Option[Address],
       overrides: Map[Address, Portfolio],
@@ -66,7 +65,7 @@ package object common {
         Observable.fromIterator(Task(new BalanceIterator(resource, globalPrefix, addressId, balanceOf, height, overrides).asScala.filter(_._2 > 0)))
       }
 
-  def aliasesOfAddress(db: DB, maybeDiff: => Option[(Height, Diff)], address: Address): Observable[(Height, CreateAliasTransaction)] = {
+  def aliasesOfAddress(db: RocksDB, maybeDiff: => Option[(Height, Diff)], address: Address): Observable[(Height, CreateAliasTransaction)] = {
     val disabledAliases = db.get(Keys.disabledAliases)
     addressTransactions(db, maybeDiff, address, Some(address), Set(TransactionType.CreateAlias), None)
       .collect {
@@ -74,7 +73,7 @@ package object common {
       }
   }
 
-  def loadTransactionMeta(db: DB, maybeDiff: => Option[(Int, Diff)])(tuple: (TxMeta, Transaction)): TransactionMeta = {
+  def loadTransactionMeta(db: RocksDB, maybeDiff: => Option[(Int, Diff)])(tuple: (TxMeta, Transaction)): TransactionMeta = {
     val (meta, transaction) = tuple
     TransactionMeta.create(
       meta.height,

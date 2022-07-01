@@ -9,14 +9,14 @@ import com.wavesplatform.state.BlockchainUpdaterImpl
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import monix.reactive.Observer
-import org.iq80.leveldb.DB
+import org.rocksdb.RocksDB
 
 object StorageFactory extends ScorexLogging {
   private val StorageVersion = 5
 
   def apply(
       settings: WavesSettings,
-      db: DB,
+      db: RocksDB,
       time: Time,
       spendableBalanceChanged: Observer[(Address, Asset)],
       blockchainUpdateTriggers: BlockchainUpdateTriggers,
@@ -36,7 +36,7 @@ object StorageFactory extends ScorexLogging {
     (bui, levelDBWriter)
   }
 
-  private def checkVersion(db: DB): Unit = db.readWrite { rw =>
+  private def checkVersion(db: RocksDB): Unit = db.readWrite { rw =>
     val version = rw.get(Keys.version)
     val height  = rw.get(Keys.height)
     if (version != StorageVersion) {

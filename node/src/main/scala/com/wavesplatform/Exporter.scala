@@ -10,15 +10,15 @@ import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state.Height
-import com.wavesplatform.utils._
+import com.wavesplatform.utils.*
 import kamon.Kamon
 import monix.execution.UncaughtExceptionReporter
 import monix.reactive.Observer
-import org.iq80.leveldb.DB
+import org.rocksdb.RocksDB
 import scopt.OParser
 
 import scala.concurrent.Await
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.{Failure, Success, Try}
 
 object Exporter extends ScorexLogging {
@@ -82,7 +82,7 @@ object Exporter extends ScorexLogging {
     def createOutputStream(filename: String): Try[FileOutputStream] =
       Try(new FileOutputStream(filename))
 
-    def exportBlockToBinary(stream: OutputStream, db: DB, height: Int, legacy: Boolean): Int = {
+    def exportBlockToBinary(stream: OutputStream, db: RocksDB, height: Int, legacy: Boolean): Int = {
       val maybeBlockBytes = db.readOnly(ro => database.loadBlock(Height(height), ro)).map(_.bytes())
       maybeBlockBytes
         .map { oldBytes =>
@@ -97,7 +97,7 @@ object Exporter extends ScorexLogging {
         .getOrElse(0)
     }
 
-    def exportBlockToJson(stream: OutputStream, db: DB, height: Int): Int = {
+    def exportBlockToJson(stream: OutputStream, db: RocksDB, height: Int): Int = {
       val maybeBlock = db.readOnly(ro => database.loadBlock(Height(height), ro))
       maybeBlock
         .map { block =>
@@ -137,7 +137,7 @@ object Exporter extends ScorexLogging {
     import scopt.OParser
 
     val builder = OParser.builder[ExporterOptions]
-    import builder._
+    import builder.*
 
     OParser.sequence(
       programName("waves export"),

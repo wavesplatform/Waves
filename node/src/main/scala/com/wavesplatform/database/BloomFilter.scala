@@ -1,11 +1,11 @@
 package com.wavesplatform.database
 
-import java.io._
+import java.io.*
 
-import com.google.common.hash.{Funnels, HashFunction, Hashing, HashingInputStream, HashingOutputStream, BloomFilter => GBloomFilter}
+import com.google.common.hash.{Funnels, HashFunction, Hashing, HashingInputStream, HashingOutputStream, BloomFilter as GBloomFilter}
 import com.google.common.primitives.Ints
 import com.wavesplatform.utils.ScorexLogging
-import org.iq80.leveldb.DB
+import org.rocksdb.RocksDB
 
 import scala.util.Try
 import scala.util.control.NonFatal
@@ -20,7 +20,7 @@ private[database] class Wrapper(underlying: GBloomFilter[Array[Byte]]) extends B
   override def put(key: Array[Byte]): Unit             = underlying.put(key)
 }
 
-private[database] class BloomFilterImpl(underlying: GBloomFilter[Array[Byte]], directory: String, filterName: String, db: DB)
+private[database] class BloomFilterImpl(underlying: GBloomFilter[Array[Byte]], directory: String, filterName: String, db: RocksDB)
     extends Wrapper(underlying)
     with ScorexLogging {
   import com.wavesplatform.database.BloomFilter._
@@ -55,7 +55,7 @@ object BloomFilter extends ScorexLogging {
   private[database] def filterFile(directory: String, filterName: String): File = new File(directory, filterName + Suffix)
 
   def tryLoad(
-      db: DB,
+      db: RocksDB,
       filterName: String,
       directory: String,
       expectedHeight: Int
@@ -76,7 +76,7 @@ object BloomFilter extends ScorexLogging {
     } finally in.close()
   }
 
-  private def populate(db: DB, keyTag: KeyTags.KeyTag, filterName: String, expectedInsertions: Long) = {
+  private def populate(db: RocksDB, keyTag: KeyTags.KeyTag, filterName: String, expectedInsertions: Long) = {
     log.info(s"Populating bloom filter for $filterName, this can take a while.")
     val filter = GBloomFilter.create(Funnels.byteArrayFunnel(), expectedInsertions)
     db.iterateOver(keyTag)(e => filter.put(e.getKey.drop(2)))
@@ -85,7 +85,7 @@ object BloomFilter extends ScorexLogging {
   }
 
   def loadOrPopulate(
-      db: DB,
+      db: RocksDB,
       directory: String,
       filterName: String,
       expectedHeight: Int,

@@ -2,9 +2,9 @@ package com.wavesplatform.database
 
 import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.metrics.LevelDBStats.DbHistogramExt
-import org.iq80.leveldb.{DB, ReadOptions, WriteBatch}
+import org.rocksdb.{ReadOptions, RocksDB, WriteBatch}
 
-class RW(db: DB, readOptions: ReadOptions, batch: WriteBatch) extends ReadOnlyDB(db, readOptions) {
+class RW(db: RocksDB, readOptions: ReadOptions, batch: WriteBatch) extends ReadOnlyDB(db, readOptions) {
   def put[V](key: Key[V], value: V): Unit = {
     val bytes = key.encode(value)
     LevelDBStats.write.recordTagged(key, bytes)

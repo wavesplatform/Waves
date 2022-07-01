@@ -16,7 +16,7 @@ import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Transaction
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import monix.reactive.Observable
-import org.iq80.leveldb.DB
+import org.rocksdb.RocksDB
 
 import scala.concurrent.Future
 
@@ -47,7 +47,7 @@ trait CommonTransactionsApi {
 object CommonTransactionsApi {
   def apply(
       maybeDiff: => Option[(Height, Diff)],
-      db: DB,
+      db: RocksDB,
       blockchain: Blockchain,
       utx: UtxPool,
       wallet: Wallet,
@@ -75,9 +75,8 @@ object CommonTransactionsApi {
     override def calculateFee(tx: Transaction): Either[ValidationError, (Asset, Long, Long)] =
       FeeValidation
         .getMinFee(blockchain, tx)
-        .map {
-          case FeeDetails(asset, _, feeInAsset, feeInWaves) =>
-            (asset, feeInAsset, feeInWaves)
+        .map { case FeeDetails(asset, _, feeInAsset, feeInWaves) =>
+          (asset, feeInAsset, feeInWaves)
         }
 
     override def broadcastTransaction(tx: Transaction): Future[TracedResult[ValidationError, Boolean]] = publishTransaction(tx)

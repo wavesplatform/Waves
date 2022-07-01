@@ -6,7 +6,7 @@ import java.util
 
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.common.AddressPortfolio
+import com.wavesplatform.api.common.{AddressPortfolio, CommonAccountsApi}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.database.*
@@ -16,18 +16,21 @@ import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.diffs.{DiffsCommon, SetScriptTransactionDiff}
 import com.wavesplatform.state.{Blockchain, Diff, Height, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.utils.ScorexLogging
-import org.iq80.leveldb.DB
+import com.wavesplatform.utils.{Schedulers, ScorexLogging}
+import monix.execution.{ExecutionModel, Scheduler}
+import org.rocksdb.RocksDB
 
 import scala.annotation.tailrec
 import scala.collection.mutable
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Future}
 import scala.jdk.CollectionConverters.*
 
 //noinspection ScalaStyle
 object Explorer extends ScorexLogging {
   case class Stats(entryCount: Long, totalKeySize: Long, totalValueSize: Long)
 
-  def portfolio(db: DB, blockchain: Blockchain, address: Address): Portfolio =
+  def portfolio(db: RocksDB, blockchain: Blockchain, address: Address): Portfolio =
     Portfolio(
       blockchain.balance(address),
       blockchain.leaseBalance(address),
@@ -198,27 +201,27 @@ object Explorer extends ScorexLogging {
 
         case "S" =>
           log.info("Collecting DB stats")
-          val iterator = db.iterator()
-          val result   = new util.HashMap[Short, Stats]
-          iterator.seekToFirst()
-          while (iterator.hasNext) {
-            val entry     = iterator.next()
-            val keyPrefix = ByteBuffer.wrap(entry.getKey).getShort
-            result.compute(
-              keyPrefix,
-              (_, maybePrev) =>
-                maybePrev match {
-                  case null => Stats(1, entry.getKey.length, entry.getValue.length)
-                  case prev => Stats(prev.entryCount + 1, prev.totalKeySize + entry.getKey.length, prev.totalValueSize + entry.getValue.length)
-                }
-            )
-          }
-          iterator.close()
+//          val iterator = db.iterator()
+//          val result   = new util.HashMap[Short, Stats]
+//          iterator.seekToFirst()
+//          while (iterator.hasNext) {
+//            val entry     = iterator.next()
+//            val keyPrefix = ByteBuffer.wrap(entry.getKey).getShort
+//            result.compute(
+//              keyPrefix,
+//              (_, maybePrev) =>
+//                maybePrev match {
+//                  case null => Stats(1, entry.getKey.length, entry.getValue.length)
+//                  case prev => Stats(prev.entryCount + 1, prev.totalKeySize + entry.getKey.length, prev.totalValueSize + entry.getValue.length)
+//                }
+//            )
+//          }
+//          iterator.close()
 
           log.info("key-space,entry-count,total-key-size,total-value-size")
-          for ((prefix, stats) <- result.asScala) {
-            log.info(s"${KeyTags(prefix)},${stats.entryCount},${stats.totalKeySize},${stats.totalValueSize}")
-          }
+//          for ((prefix, stats) <- result.asScala) {
+//            log.info(s"${KeyTags(prefix)},${stats.entryCount},${stats.totalKeySize},${stats.totalValueSize}")
+//          }
 
         case "TXBH" =>
           val h   = Height(argument(1, "height").toInt)
@@ -231,8 +234,8 @@ object Explorer extends ScorexLogging {
           val address = Address.fromString(argument(1, "address")).explicitGet()
           val pf      = portfolio(db, reader, address)
           log.info(s"$address : ${pf.balance} WAVES, ${pf.lease}, ${pf.assets.size} assets")
-          pf.assets.toSeq.sortBy(_._1.toString) foreach {
-            case (assetId, balance) => log.info(s"$assetId : $balance")
+          pf.assets.toSeq.sortBy(_._1.toString) foreach { case (assetId, balance) =>
+            log.info(s"$assetId : $balance")
           }
 
         case "HS" =>
@@ -258,9 +261,8 @@ object Explorer extends ScorexLogging {
             txCounts(Longs.fromByteArray(e.getKey.slice(2, 10)).toInt) += readTransactionHNSeqAndType(e.getValue)._2.size
           }
           log.info("Sorting result")
-          txCounts.zipWithIndex.sorted.takeRight(100).foreach {
-            case (count, id) =>
-              log.info(s"${db.get(Keys.idToAddress(AddressId(id.toLong)))}: $count")
+          txCounts.zipWithIndex.sorted.takeRight(100).foreach { case (count, id) =>
+            log.info(s"${db.get(Keys.idToAddress(AddressId(id.toLong)))}: $count")
           }
         case "ES" =>
           db.iterateOver(KeyTags.AddressScript) { e =>
@@ -294,9 +296,26 @@ object Explorer extends ScorexLogging {
                 log.info(s"${Base58.encode(prevAssetId)} ~ ${Base58.encode(thisAssetId)}")
               }
             }
-            prevAssetId = thisAssetId
-          }
+            prevAssetId = thisAssetId}
           log.info(s"Checked $assetCounter asset(s)")
+
+        case "LDT" =>
+          val s = Scheduler.fixedPool("foo-bar", 8, executionModel = ExecutionModel.AlwaysAsyncExecution)
+
+          def countEntries(): Future[Long] = {
+            CommonAccountsApi(() => Diff.empty, db, reader)
+              .dataStream(Address.fromString("3PC9BfRwJWWiw9AREE2B3eWzCks3CYtg4yo").explicitGet(), None)
+              .countL
+              .runToFuture(s)
+          }
+
+          import scala.concurrent.ExecutionContext.Implicits.global
+
+          println(Await.result(
+            Future.sequence(Seq.fill(16)(countEntries())),
+            Duration.Inf
+          ))
+
       }
     } finally db.close()
   }

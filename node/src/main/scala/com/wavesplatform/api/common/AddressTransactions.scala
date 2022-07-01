@@ -6,10 +6,10 @@ import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.database.{DBExt, DBResource, Keys}
 import com.wavesplatform.state.{Diff, Height, InvokeScriptResult, TransactionId, TxMeta, TxNum}
 import com.wavesplatform.transaction.{Authorized, EthereumTransaction, GenesisTransaction, Transaction, TransactionType}
-import org.iq80.leveldb.DB
+import org.rocksdb.RocksDB
 
 object AddressTransactions {
-  private def loadTransaction(db: DB, height: Height, txNum: TxNum, sender: Option[Address]): Option[(TxMeta, Transaction)] =
+  private def loadTransaction(db: RocksDB, height: Height, txNum: TxNum, sender: Option[Address]): Option[(TxMeta, Transaction)] =
     db.get(Keys.transactionAt(height, txNum)) match {
       case Some((m, tx: Authorized)) if sender.forall(_ == tx.sender.toAddress)         => Some(m -> tx)
       case Some((m, gt: GenesisTransaction)) if sender.isEmpty                          => Some(m -> gt)
@@ -23,10 +23,10 @@ object AddressTransactions {
       scriptResult <- resource.get(Keys.invokeScriptResult(tm.height, TxNum(tm.num.toShort)))
     } yield scriptResult
 
-  def loadInvokeScriptResult(db: DB, txId: ByteStr): Option[InvokeScriptResult] =
+  def loadInvokeScriptResult(db: RocksDB, txId: ByteStr): Option[InvokeScriptResult] =
     db.withResource(r => loadInvokeScriptResult(r, txId))
 
-  def loadEthereumMetadata(db: DB, txId: ByteStr): Option[EthereumTransactionMeta] = db.withResource { resource =>
+  def loadEthereumMetadata(db: RocksDB, txId: ByteStr): Option[EthereumTransactionMeta] = db.withResource { resource =>
     for {
       tm <- resource.get(Keys.transactionMetaById(TransactionId(txId)))
       m  <- resource.get(Keys.ethereumTransactionMeta(Height(tm.height), TxNum(tm.num.toShort)))
@@ -34,7 +34,7 @@ object AddressTransactions {
   }
 
   def allAddressTransactions(
-      db: DB,
+      db: RocksDB,
       maybeDiff: Option[(Height, Diff)],
       subject: Address,
       sender: Option[Address],
@@ -51,7 +51,7 @@ object AddressTransactions {
       )
 
   def transactionsFromDB(
-      db: DB,
+      db: RocksDB,
       subject: Address,
       sender: Option[Address],
       types: Set[Transaction.Type],

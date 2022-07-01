@@ -34,7 +34,7 @@ import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeS
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
 import monix.reactive.Observer
-import org.iq80.leveldb.DB
+import org.rocksdb.RocksDB
 import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
@@ -77,7 +77,7 @@ object LevelDBWriter extends ScorexLogging {
       } yield db.get(valueKey(lastChange))
   }
 
-  private def loadHeight(db: DB): Int = db.get(Keys.height)
+  private def loadHeight(db: RocksDB): Int = db.get(Keys.height)
 
   private[database] def merge(wbh: Seq[Int], lbh: Seq[Int]): Seq[(Int, Int)] = {
 
@@ -106,7 +106,7 @@ object LevelDBWriter extends ScorexLogging {
     recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty).toSeq
   }
 
-  def apply(db: DB, spendableBalanceChanged: Observer[(Address, Asset)], settings: WavesSettings): LevelDBWriter & AutoCloseable = {
+  def apply(db: RocksDB, spendableBalanceChanged: Observer[(Address, Asset)], settings: WavesSettings): LevelDBWriter & AutoCloseable = {
     val expectedHeight = loadHeight(db)
     def load(name: String, key: KeyTags.KeyTag): Option[BloomFilterImpl] = {
       if (settings.dbSettings.useBloomFilter)
@@ -137,7 +137,7 @@ object LevelDBWriter extends ScorexLogging {
     }
   }
 
-  def readOnly(db: DB, settings: WavesSettings): LevelDBWriter = {
+  def readOnly(db: RocksDB, settings: WavesSettings): LevelDBWriter = {
     val expectedHeight = loadHeight(db)
     def loadFilter(filterName: String) =
       if (settings.dbSettings.useBloomFilter)
@@ -158,7 +158,7 @@ object LevelDBWriter extends ScorexLogging {
 
 //noinspection UnstableApiUsage
 abstract class LevelDBWriter private[database] (
-    writableDB: DB,
+    writableDB: RocksDB,
     spendableBalanceChanged: Observer[(Address, Asset)],
     val settings: BlockchainSettings,
     val dbSettings: DBSettings
@@ -962,12 +962,11 @@ abstract class LevelDBWriter private[database] (
   }
 
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] = writableDB.withResource { r =>
-    import scala.jdk.CollectionConverters.*
     r.iterator.seek(Bytes.concat(KeyTags.AssetStaticInfo.prefixBytes, address.arr))
-    r.iterator.asScala
-      .to(LazyList)
-      .headOption
-      .map(e => IssuedAsset(ByteStr(e.getKey.drop(2))))
-      .filter(asset => asset.id.size == 32 && ERC20Address(asset) == address)
+
+    if (r.iterator.isValid)
+      Option(IssuedAsset(ByteStr(r.iterator.key())))
+        .filter(asset => asset.id.size == 32 && ERC20Address(asset) == address)
+    else None
   }
 }

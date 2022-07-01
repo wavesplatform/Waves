@@ -8,7 +8,7 @@ import com.wavesplatform.state.{AssetDescription, Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import monix.reactive.Observable
-import org.iq80.leveldb.DB
+import org.rocksdb.RocksDB
 
 trait CommonAssetsApi {
   def description(assetId: IssuedAsset): Option[AssetDescription]
@@ -23,7 +23,7 @@ trait CommonAssetsApi {
 object CommonAssetsApi {
   final case class AssetInfo(description: AssetDescription, issueTransaction: Option[IssueTransaction], sponsorBalance: Option[Long])
 
-  def apply(diff: () => Diff, db: DB, blockchain: Blockchain): CommonAssetsApi = new CommonAssetsApi {
+  def apply(diff: () => Diff, db: RocksDB, blockchain: Blockchain): CommonAssetsApi = new CommonAssetsApi {
     def description(assetId: IssuedAsset): Option[AssetDescription] =
       blockchain.assetDescription(assetId)
 
