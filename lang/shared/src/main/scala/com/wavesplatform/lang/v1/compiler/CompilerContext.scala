@@ -27,14 +27,8 @@ case class CompilerContext(
 
   private def resolveFunction(name: String): FunctionInfo =
     if (arbitraryDeclarations) {
-      val primitives = List(LONG, BYTESTR, BOOLEAN, STRING)
-      val maybeAllTypes = UNION(
-        UNION(primitives),
-        UNION.create(predefTypes.values.toSeq),
-        LIST(UNION(primitives))
-      )
       def signature(name: String, i: Int) = {
-        FunctionTypeSignature(maybeAllTypes, Seq.fill(i)(("arg", maybeAllTypes)), FunctionHeader.User(name))
+        FunctionTypeSignature(ANY, Seq.fill(i)(("arg", ANY)), FunctionHeader.User(name))
       }
       allFuncDefs
         .withDefault(name => FunctionInfo(AnyPos, (0 to 22).map(i => signature(name, i)).toList))
