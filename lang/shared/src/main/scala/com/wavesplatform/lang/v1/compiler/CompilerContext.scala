@@ -25,20 +25,16 @@ case class CompilerContext(
           FunctionInfo(AnyPos, List(FunctionTypeSignature(CASETYPEREF(typeName, fields), fields, FunctionHeader.User(typeName))))
       } ++ functionDefs
 
-  private def resolveFunction(name: String): FunctionInfo =
+  private def resolveFunction(name: String, args: Int): FunctionInfo =
     if (arbitraryDeclarations) {
-      def signature(name: String, i: Int) = {
-        FunctionTypeSignature(ANY, Seq.fill(i)(("arg", ANY)), FunctionHeader.User(name))
-      }
-      allFuncDefs
-        .withDefault(name => FunctionInfo(AnyPos, (0 to 22).map(i => signature(name, i)).toList))
-        .apply(name)
+      val signature = FunctionTypeSignature(ANY, Seq.fill(args)(("arg", ANY)), FunctionHeader.User(name))
+      allFuncDefs.withDefaultValue(FunctionInfo(AnyPos, List(signature))).apply(name)
     } else {
       allFuncDefs.getOrElse(name, FunctionInfo(AnyPos, List.empty))
     }
 
-  def functionTypeSignaturesByName(name: String): List[FunctionTypeSignature] =
-    resolveFunction(name).fSigList
+  def functionTypeSignaturesByName(name: String, args: Int): List[FunctionTypeSignature] =
+    resolveFunction(name, args).fSigList
 
   def resolveVar(name: String): Option[VariableInfo] =
     if (arbitraryDeclarations) {

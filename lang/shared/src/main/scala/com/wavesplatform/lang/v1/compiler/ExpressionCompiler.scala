@@ -584,7 +584,7 @@ object ExpressionCompiler {
       ctx         <- get[Id, CompilerContext, CompilationError]
       nameWithErr <- handlePart(namePart).handleError()
       name = nameWithErr._1.getOrElse("NO_NAME")
-      signatures   <- get[Id, CompilerContext, CompilationError].map(_.functionTypeSignaturesByName(name))
+      signatures   <- get[Id, CompilerContext, CompilationError].map(_.functionTypeSignaturesByName(name, args.size))
       compiledArgs <- args.traverse(arg => compileExprWithCtx(arg, saveExprContext, allowIllFormedStrings))
       funcCallWithErr <- (signatures match {
         case Nil           => FunctionNotFound(p.start, p.end, name, compiledArgs.map(_.t.toString)).asLeft[(EXPR, FINAL)]
@@ -681,7 +681,7 @@ object ExpressionCompiler {
       funcName                       <- handlePart(func)
       ctx                            <- get[Id, CompilerContext, CompilationError]
       compiledFunc <- ctx
-        .functionTypeSignaturesByName(funcName)
+        .functionTypeSignaturesByName(funcName, args = 2)
         .collectFirst {
           case s @ FunctionTypeSignature(_, Seq((_, type1: FINAL), (_, type2: FINAL)), _) if type1 >= accType && type2 >= listInnerType =>
             Right(s)
