@@ -37,10 +37,13 @@ class Handler(id: String, maybeLiquidState: Option[LiquidState], subject: Publis
     queue.zipWithIndex
       .collectFirst {
         case (ba: BlockAppended, idx) if ba.id == rollbackEvent.id =>
-          // block is found, remove all microblocks
+          // block to rollback is found, remove all microblocks
+          queue.takeInPlace(idx + 1)
+        case (ba: MicroBlockAppended, idx) if ba.id == rollbackEvent.id =>
+          // microblock to rollback is found, remove all microblocks after
           queue.takeInPlace(idx + 1)
         case (mba: MicroBlockAppended, idx) if mba.references(rollbackEvent) =>
-          // first microblock is found, remove all microblocks with it
+          // first microblock to remove is found, remove all microblocks with it
           queue.takeInPlace(idx)
       }
       .getOrElse(

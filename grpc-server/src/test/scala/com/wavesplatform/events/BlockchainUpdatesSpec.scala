@@ -446,7 +446,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       subscription.fetchAllEvents(d.blockchain).map(_.getUpdate.height) shouldBe Seq(1, 2, 3)
     }
 
-    "should clear event queue on microblock rollback if block was not sent" in {
+    "should clear event queue on microblock rollback to block if it was not sent" in {
       var sendUpdate: () => Unit = null
       withManualHandle(currentSettings, sendUpdate = _) { case (d, repo) =>
         val keyBlockId   = d.appendKeyBlock().id()
@@ -468,7 +468,29 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       }
     }
 
-    "should clear event queue on microblock rollback if block was sent but first microblock wasn't" in {
+    "should clear event queue on rollback to microblock if it was not sent" in {
+      var sendUpdate: () => Unit = null
+      withManualHandle(currentSettings, sendUpdate = _) { case (d, repo) =>
+        d.appendKeyBlock().id()
+        val subscription = repo.createFakeObserver(SubscribeRequest.of(1, 0))
+
+        val microBlockId = d.appendMicroBlock(TxHelpers.transfer())
+        d.appendMicroBlock(TxHelpers.transfer())
+        d.appendKeyBlock(Some(microBlockId))
+
+        (1 to 3).foreach(_ => sendUpdate())
+
+        subscription.fetchAllEvents(d.blockchain).map(_.getUpdate) should matchPattern {
+          case Seq(
+                E.Block(1, _),
+                E.Micro(1, `microBlockId`),
+                E.Block(2, _)
+              ) =>
+        }
+      }
+    }
+
+    "should clear event queue on microblock rollback to block if it was sent but microblock after wasn't" in {
       var sendUpdate: () => Unit = null
       withManualHandle(currentSettings, sendUpdate = _) { case (d, repo) =>
         val keyBlockId   = d.appendKeyBlock().id()
@@ -489,7 +511,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       }
     }
 
-    "should send event on microblock rollback if first microblock was sent" in {
+    "should send event on microblock rollback if first microblock after was sent" in {
       var sendUpdate: () => Unit = null
       withManualHandle(currentSettings, sendUpdate = _) { case (d, repo) =>
         val keyBlockId   = d.appendKeyBlock().id()
