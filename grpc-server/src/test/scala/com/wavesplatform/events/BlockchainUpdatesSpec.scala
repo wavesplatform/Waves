@@ -35,6 +35,7 @@ import com.wavesplatform.transaction.{Asset, GenesisTransaction, PaymentTransact
 import io.grpc.StatusException
 import monix.execution.Scheduler.Implicits.global
 import org.scalactic.source.Position
+import org.scalatest.Assertion
 import org.scalatest.concurrent.ScalaFutures
 
 import java.util.concurrent.locks.ReentrantLock
@@ -44,6 +45,26 @@ import scala.util.Random
 
 class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures {
   val currentSettings: WavesSettings = RideV5
+
+  val transfer = TxHelpers.transfer()
+  val lease    = TxHelpers.lease(fee = TestValues.fee)
+  val issue    = TxHelpers.issue(amount = 1000)
+  val reissue  = TxHelpers.reissue(issue.asset)
+  val data     = TxHelpers.dataSingle()
+
+  val description = AssetDescription(
+    issue.assetId,
+    issue.sender,
+    issue.name,
+    issue.description,
+    issue.decimals.value,
+    issue.reissuable,
+    issue.quantity.value + reissue.quantity.value,
+    Height @@ 2,
+    None,
+    0L,
+    nft = false
+  )
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(10 seconds, 500 millis)
 
@@ -330,93 +351,69 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       }
     }
 
-    "should handle rollback properly" in {
-      val transfer = TxHelpers.transfer()
-      val lease    = TxHelpers.lease(fee = TestValues.fee)
-      val issue    = TxHelpers.issue(amount = 1000)
-      val reissue  = TxHelpers.reissue(issue.asset)
-      val data     = TxHelpers.dataSingle()
-
-      val description = AssetDescription(
-        issue.assetId,
-        issue.sender,
-        issue.name,
-        issue.description,
-        issue.decimals.value,
-        issue.reissuable,
-        issue.quantity.value + reissue.quantity.value,
-        Height @@ 2,
-        None,
-        0L,
-        nft = false
-      )
-
-      withGenerateSubscription(settings = currentSettings) { d =>
+    "should return correct content of block rollback" in {
+      var sendUpdate: () => Unit = null
+      withManualHandle(currentSettings, sendUpdate = _) { case (d, repo) =>
+        d.appendBlock(TxHelpers.genesis(TxHelpers.defaultSigner.toAddress, Constants.TotalWaves * Constants.UnitsInWave))
         d.appendKeyBlock()
+
+        val subscription = repo.createFakeObserver(SubscribeRequest.of(1, 0))
+        sendUpdate()
+        sendUpdate()
+
         d.appendMicroBlock(transfer, lease, issue, reissue, data)
-        d.appendKeyBlock()
-        d.rollbackTo(1)
-      } { events =>
-        val rollback: RollbackResult = events.collect { case bu if bu.update.isRollback => vanillaRollback(bu).rollbackResult }(1)
-        rollback.removedTransactionIds shouldBe Seq(data, reissue, issue, lease, transfer).map(_.id())
-        rollback.removedBlocks should have length 1
+        sendUpdate()
 
+        d.appendKeyBlock()
+        sendUpdate()
+
+        d.rollbackTo(1)
+        sendUpdate()
+        sendUpdate()
+
+        val rollbackEvent = subscription.fetchAllEvents(d.blockchain).findLast(_.getUpdate.update.isRollback)
+        val rollback      = vanillaRollback(rollbackEvent.get.getUpdate).rollbackResult
+
+        rollback.removedBlocks should have length 1
         rollback.stateUpdate.balances shouldBe Seq(
           BalanceUpdate(TxHelpers.defaultAddress, Waves, 10000001036400000L, after = 10000000600000000L),
           BalanceUpdate(TxHelpers.defaultAddress, issue.asset, 2000, after = 0),
           BalanceUpdate(TxHelpers.secondAddress, Waves, 100000000, after = 0)
         )
-
-        rollback.stateUpdate.leasingForAddress shouldBe Seq(
-          LeasingBalanceUpdate(TxHelpers.secondAddress, LeaseBalance(1000000000, 0), LeaseBalance(0, 0)),
-          LeasingBalanceUpdate(TxHelpers.defaultAddress, LeaseBalance(0, 1000000000), LeaseBalance(0, 0))
-        )
-
-        rollback.stateUpdate.leases shouldBe Seq(
-          LeaseUpdate(lease.id(), LeaseStatus.Inactive, lease.amount.value, lease.sender, lease.recipient.asInstanceOf[Address], lease.id())
-        )
-
-        rollback.stateUpdate.dataEntries shouldBe Seq(
-          DataEntryUpdate(TxHelpers.defaultAddress, StringDataEntry("test", "test"), EmptyDataEntry("test"))
-        )
-
-        rollback.stateUpdate.assets shouldBe Seq(
-          AssetStateUpdate(issue.assetId, Some(description), None)
-        )
+        assertCommon(rollback)
       }
+    }
 
-      withGenerateSubscription(settings = currentSettings) { d =>
+    "should return correct content of microblock rollback" in {
+      var sendUpdate: () => Unit = null
+      withManualHandle(currentSettings, sendUpdate = _) { case (d, repo) =>
+        d.appendBlock(TxHelpers.genesis(TxHelpers.defaultSigner.toAddress, Constants.TotalWaves * Constants.UnitsInWave))
         d.appendKeyBlock()
-        val firstMicroId = d.appendMicroBlock(TxHelpers.transfer())
-        d.appendMicroBlock(transfer, lease, issue, reissue, data)
-        d.appendKeyBlock(Some(firstMicroId))
-      } { events =>
-        val rollback: RollbackResult = events.collectFirst { case r if r.update.isRollback => vanillaMicroRollback(r).rollbackResult }.get
-        rollback.removedTransactionIds shouldBe Seq(data, reissue, issue, lease, transfer).map(_.id())
-        rollback.removedBlocks shouldBe empty
 
+        val subscription = repo.createFakeObserver(SubscribeRequest.of(1, 0))
+        sendUpdate()
+        sendUpdate()
+
+        val firstMicroId = d.appendMicroBlock(TxHelpers.transfer())
+        sendUpdate()
+
+        d.appendMicroBlock(transfer, lease, issue, reissue, data)
+        sendUpdate()
+
+        d.appendKeyBlock(Some(firstMicroId))
+        sendUpdate()
+        sendUpdate()
+
+        val rollbackEvent = subscription.fetchAllEvents(d.blockchain).findLast(_.getUpdate.update.isRollback)
+        val rollback      = vanillaMicroRollback(rollbackEvent.get.getUpdate).rollbackResult
+
+        rollback.removedBlocks shouldBe empty
         rollback.stateUpdate.balances shouldBe Seq(
           BalanceUpdate(TxHelpers.defaultAddress, Waves, 10000000935800000L, after = 10000001099400000L),
           BalanceUpdate(TxHelpers.defaultAddress, issue.asset, 2000, after = 0),
           BalanceUpdate(TxHelpers.secondAddress, Waves, 200000000, after = 100000000)
         )
-
-        rollback.stateUpdate.leasingForAddress shouldBe Seq(
-          LeasingBalanceUpdate(TxHelpers.secondAddress, LeaseBalance(1000000000, 0), LeaseBalance(0, 0)),
-          LeasingBalanceUpdate(TxHelpers.defaultAddress, LeaseBalance(0, 1000000000), LeaseBalance(0, 0))
-        )
-
-        rollback.stateUpdate.leases shouldBe Seq(
-          LeaseUpdate(lease.id(), LeaseStatus.Inactive, lease.amount.value, lease.sender, lease.recipient.asInstanceOf[Address], lease.id())
-        )
-
-        rollback.stateUpdate.dataEntries shouldBe Seq(
-          DataEntryUpdate(TxHelpers.defaultAddress, StringDataEntry("test", "test"), EmptyDataEntry("test"))
-        )
-
-        rollback.stateUpdate.assets shouldBe Seq(
-          AssetStateUpdate(issue.assetId, Some(description), None)
-        )
+        assertCommon(rollback)
       }
     }
 
@@ -458,13 +455,11 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       withManualHandle(currentSettings, sendUpdate = _) { case (d, repo) =>
         val keyBlockId   = d.appendKeyBlock().id()
         val subscription = repo.createFakeObserver(SubscribeRequest.of(1, 0))
-
         sendUpdate()
 
         d.appendMicroBlock(TxHelpers.transfer())
         d.appendMicroBlock(TxHelpers.transfer())
         d.appendKeyBlock(Some(keyBlockId))
-
         sendUpdate()
 
         subscription.fetchAllEvents(d.blockchain).map(_.getUpdate) should matchPattern {
@@ -590,6 +585,23 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       subscribeAndCheckResult(0, d => { (1 to 249).foreach(_ => d.appendMicroBlock(TxHelpers.transfer(amount = 1))) }, (1 to 4) ++ Seq.fill(250)(5))
       subscribeAndCheckResult(0, d => { (1 to 250).foreach(_ => d.appendMicroBlock(TxHelpers.transfer(amount = 1))) }, 1 to 4, isStreamClosed = true)
     }
+  }
+
+  private def assertCommon(rollback: RollbackResult): Assertion = {
+    rollback.stateUpdate.leasingForAddress shouldBe Seq(
+      LeasingBalanceUpdate(TxHelpers.secondAddress, LeaseBalance(1000000000, 0), LeaseBalance(0, 0)),
+      LeasingBalanceUpdate(TxHelpers.defaultAddress, LeaseBalance(0, 1000000000), LeaseBalance(0, 0))
+    )
+    rollback.stateUpdate.leases shouldBe Seq(
+      LeaseUpdate(lease.id(), LeaseStatus.Inactive, lease.amount.value, lease.sender, lease.recipient.asInstanceOf[Address], lease.id())
+    )
+    rollback.stateUpdate.dataEntries shouldBe Seq(
+      DataEntryUpdate(TxHelpers.defaultAddress, StringDataEntry("test", "test"), EmptyDataEntry("test"))
+    )
+    rollback.stateUpdate.assets shouldBe Seq(
+      AssetStateUpdate(issue.assetId, Some(description), None)
+    )
+    rollback.removedTransactionIds shouldBe Seq(data, reissue, issue, lease, transfer).map(_.id())
   }
 
   private def subscribeAndCheckResult(
