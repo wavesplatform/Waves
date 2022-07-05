@@ -228,16 +228,25 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       d.blockchain.removeAfter(mb1Id) // Should not do anything
       d.appendKeyBlock(ref = Some(mb2Id))
 
-      sub.fetchAllEvents(d.blockchain).map(_.getUpdate) should matchPattern {
-        case Seq(
-              E.Block(1, _),
-              E.Micro(1, _),
-              E.Micro(1, _),
-              E.Micro(1, _),
-              E.MicroRollback(1, `mb2Id`),
-              E.Block(2, _)
-            ) =>
-      }
+      sub.fetchAllEvents(d.blockchain).map(_.getUpdate) should (
+        matchPattern {
+          case Seq(
+                E.Block(1, _),
+                E.Micro(1, _),
+                E.Micro(1, _),
+                E.Micro(1, _),
+                E.MicroRollback(1, `mb2Id`),
+                E.Block(2, _)
+              ) =>
+        } or matchPattern {
+          case Seq(
+                E.Block(1, _),
+                E.Micro(1, _),
+                E.Micro(1, _),
+                E.Block(2, _)
+              ) =>
+        }
+      )
     }
 
     "should survive rollback to key block" in withDomainAndRepo(currentSettings) { (d, repo) =>
@@ -247,15 +256,24 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       d.appendMicroBlock(TxHelpers.transfer())
       d.appendKeyBlock(ref = Some(keyBlockId)) // Remove micro
 
-      subscription.fetchAllEvents(d.blockchain).map(_.getUpdate) should matchPattern {
-        case Seq(
-              E.Block(1, _),
-              E.Block(2, _),
-              E.Micro(2, _),
-              E.MicroRollback(2, `keyBlockId`),
-              E.Block(3, _)
-            ) =>
-      }
+      subscription.fetchAllEvents(d.blockchain).map(_.getUpdate) should (
+        matchPattern {
+          case Seq(
+                E.Block(1, _),
+                E.Block(2, _),
+                E.Micro(2, _),
+                E.MicroRollback(2, `keyBlockId`),
+                E.Block(3, _)
+              ) =>
+        } or
+          matchPattern {
+            case Seq(
+                  E.Block(1, _),
+                  E.Block(2, _),
+                  E.Block(3, _)
+                ) =>
+          }
+      )
     }
 
     "should include correct waves amount" in withNEmptyBlocksSubscription(settings = currentSettings) { result =>
