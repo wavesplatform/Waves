@@ -1,10 +1,10 @@
 package com.wavesplatform
 
 import java.io.File
-import java.nio.ByteBuffer
 import java.util
 
 import com.google.common.primitives.Longs
+import com.protonail.leveldb.jna.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{AddressPortfolio, CommonAccountsApi}
 import com.wavesplatform.common.state.ByteStr
@@ -16,15 +16,16 @@ import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.diffs.{DiffsCommon, SetScriptTransactionDiff}
 import com.wavesplatform.state.{Blockchain, Diff, Height, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.utils.{Schedulers, ScorexLogging}
+import com.wavesplatform.utils.ScorexLogging
 import monix.execution.{ExecutionModel, Scheduler}
-import org.rocksdb.RocksDB
+import org.rocksdb.{RocksDB, WriteBatch, WriteOptions}
 
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
 import scala.jdk.CollectionConverters.*
+import scala.util.Using
 
 //noinspection ScalaStyle
 object Explorer extends ScorexLogging {
@@ -296,7 +297,8 @@ object Explorer extends ScorexLogging {
                 log.info(s"${Base58.encode(prevAssetId)} ~ ${Base58.encode(thisAssetId)}")
               }
             }
-            prevAssetId = thisAssetId}
+            prevAssetId = thisAssetId
+          }
           log.info(s"Checked $assetCounter asset(s)")
 
         case "LDT" =>
@@ -311,11 +313,45 @@ object Explorer extends ScorexLogging {
 
           import scala.concurrent.ExecutionContext.Implicits.global
 
-          println(Await.result(
-            Future.sequence(Seq.fill(16)(countEntries())),
-            Duration.Inf
-          ))
+          println(
+            Await.result(
+              Future.sequence(Seq.fill(16)(countEntries())),
+              Duration.Inf
+            )
+          )
 
+        case "CONV" =>
+          Using.resource(new LevelDBOptions()) { o =>
+            o.setCreateIfMissing(true)
+            o.setParanoidChecks(true)
+            Using.resource(new LevelDB(settings.directory + "/data", o)) { ldb =>
+              Using.resource(new LevelDBReadOptions()) { ro =>
+                Using.resource(new WriteOptions()) { wo =>
+                  wo.setSync(false).setDisableWAL(true)
+                  Using.resource(new LevelDBKeyValueIterator(ldb, ro)) { kvi =>
+                    kvi.seekToFirst()
+                    var totalEntries = 0
+                    while (kvi.hasNext) {
+                      Using.resource(new WriteBatch()) { wb =>
+                        var i = 0
+                        while (kvi.hasNext && i <= 100000) {
+                          val kv = kvi.next()
+                          i += 1
+                          wb.put(kv.getKey, kv.getValue)
+                        }
+                        db.write(wo, wb)
+                        log.info("Written 100000 entries")
+                        totalEntries += i
+                      }
+                    }
+                    log.info(s"Total: $totalEntries")
+                  }
+
+                }
+              }
+            }
+
+          }
       }
     } finally db.close()
   }

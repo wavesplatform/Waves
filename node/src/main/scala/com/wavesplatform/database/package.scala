@@ -53,13 +53,17 @@ package object database {
       .setCreateIfMissing(true)
       .setParanoidChecks(true)
       .setIncreaseParallelism(4)
+      .setBytesPerSync(2 << 20)
 
     val cfo = new ColumnFamilyOptions()
       .setTableFormatConfig(
         new BlockBasedTableConfig()
           .setFilterPolicy(new RBloomFilter())
+          .setOptimizeFiltersForMemory(true)
+          .setCacheIndexAndFilterBlocks(true)
       )
       .setWriteBufferSize(128 << 20)
+      .setLevelCompactionDynamicLevelBytes(true)
 
     file.getAbsoluteFile.getParentFile.mkdirs()
     RocksDB.open(

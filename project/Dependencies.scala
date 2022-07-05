@@ -140,8 +140,8 @@ object Dependencies {
     val levelDbVersion = "1.23.1"
     Seq(
       "org.rocksdb" % "rocksdbjni" % "7.3.1",
-      "com.wavesplatform.leveldb-jna" % "leveldb-jna-core"   % levelDbVersion % "test",
-      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion % "test",
+      "com.wavesplatform.leveldb-jna" % "leveldb-jna-core"   % levelDbVersion,
+      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion,
       leveldbJava("api") % "test"
     )
   }
