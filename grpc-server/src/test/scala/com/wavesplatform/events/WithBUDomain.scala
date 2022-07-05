@@ -1,5 +1,6 @@
 package com.wavesplatform.events
 
+import com.google.common.util.concurrent.MoreExecutors
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.events.FakeObserver.*
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeRequest
@@ -8,6 +9,7 @@ import com.wavesplatform.events.repo.LiquidState
 import com.wavesplatform.history.Domain
 import com.wavesplatform.settings.{Constants, WavesSettings}
 import com.wavesplatform.transaction.TxHelpers
+import monix.execution.Scheduler
 import monix.execution.Scheduler.Implicits.global
 import monix.reactive.subjects.PublishToOneSubject
 import org.iq80.leveldb.DB
@@ -35,7 +37,7 @@ trait WithBUDomain extends WithDomain { _: Suite =>
               subject: PublishToOneSubject[BlockchainUpdated],
               maxQueueSize: Int
           ): Handler =
-            new Handler(id, maybeLiquidState, subject, maxQueueSize) {
+            new Handler(id, maybeLiquidState, subject, maxQueueSize)(Scheduler(MoreExecutors.newDirectExecutorService())) {
               setSendUpdate(() => super.sendUpdate())
               override def sendUpdate(): Unit = ()
             }
