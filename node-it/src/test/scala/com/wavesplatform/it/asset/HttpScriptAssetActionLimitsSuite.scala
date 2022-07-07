@@ -25,6 +25,7 @@ class HttpScriptAssetActionLimitsSuite extends ScriptAssetActionLimitsSuite {
       ._1
 
     miner.transfer(sender.keyPair, address.publicKey.toAddress.toString, initialWavesBalance, minFee, waitForTx = true)
+    nodes.waitForHeightArise()
 
     nodes.waitForHeightAriseAndTxPresent(
       miner
