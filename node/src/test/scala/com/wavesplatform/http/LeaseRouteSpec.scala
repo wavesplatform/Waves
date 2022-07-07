@@ -4,6 +4,7 @@ import akka.http.scaladsl.model.{ContentTypes, FormData, HttpEntity}
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
 import com.wavesplatform.api.common.{CommonAccountsApi, LeaseInfo}
+import com.wavesplatform.api.http.RouteTimeout
 import com.wavesplatform.api.http.leasing.LeaseApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -35,6 +36,7 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.{JsArray, JsObject, Json}
 
+import scala.concurrent.duration.*
 import scala.concurrent.Future
 
 class LeaseRouteSpec
@@ -53,7 +55,7 @@ class LeaseRouteSpec
       (_, _) => Future.successful(TracedResult(Right(true))),
       ntpTime,
       CommonAccountsApi(() => domain.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), domain.db, domain.blockchain),
-      Schedulers.fixedPool(4, "heavy-request-scheduler")
+      new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
     )
 
   private def withRoute(balances: Seq[AddrWithBalance], settings: WavesSettings = mostRecent)(f: (Domain, Route) => Unit): Unit =
@@ -527,7 +529,7 @@ class LeaseRouteSpec
       stub[TransactionPublisher],
       SystemTime,
       commonApi,
-      Schedulers.fixedPool(4, "heavy-request-scheduler")
+      new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
     ).route
 
     val lease       = TxHelpers.lease()

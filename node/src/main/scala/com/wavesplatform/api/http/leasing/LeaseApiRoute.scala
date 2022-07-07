@@ -13,7 +13,6 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.*
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
-import monix.execution.Scheduler
 import play.api.libs.json.JsonConfiguration.Aux
 import play.api.libs.json.*
 
@@ -24,7 +23,7 @@ case class LeaseApiRoute(
     transactionPublisher: TransactionPublisher,
     time: Time,
     commonAccountApi: CommonAccountsApi,
-    heavyRequestScheduler: Scheduler
+    routeTimeout: RouteTimeout
 ) extends ApiRoute
     with BroadcastRoute
     with AuthRoute {
@@ -45,9 +44,10 @@ case class LeaseApiRoute(
     } ~ pathPrefix("info")(leaseInfo)
 
   private[this] def active: Route = (pathPrefix("active") & get) {
-    implicit val sc: Scheduler = heavyRequestScheduler
     path(AddrSegment) { address =>
-      complete(commonAccountApi.activeLeases(address).map(Json.toJson(_)).toListL.runToFuture)
+      routeTimeout.executeToFuture(
+        commonAccountApi.activeLeases(address).map(Json.toJson(_)).toListL
+      )
     }
   }
 

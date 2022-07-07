@@ -1,6 +1,6 @@
 package com.wavesplatform.http
 
-import com.wavesplatform.api.http.{ApiMarshallers, TransactionsApiRoute}
+import com.wavesplatform.api.http.{ApiMarshallers, RouteTimeout, TransactionsApiRoute}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
@@ -19,6 +19,8 @@ import com.wavesplatform.{BlockGen, TestWallet}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.OptionValues
 import play.api.libs.json.JsObject
+
+import scala.concurrent.duration.*
 
 class SpentComplexitySpec
     extends RouteSpec("/transactions")
@@ -73,7 +75,7 @@ class SpentComplexitySpec
         () => 0,
         DummyTransactionPublisher.accepting,
         ntpTime,
-        Schedulers.fixedPool(4, "heavy-request-scheduler")
+        new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
       ).route
     )
 

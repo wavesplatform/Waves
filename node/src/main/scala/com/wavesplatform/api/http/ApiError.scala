@@ -91,7 +91,7 @@ object ApiError {
     val Message = "failed to parse json message"
   }
 
-  //API Auth
+  // API Auth
   case object ApiKeyNotValid extends ApiError {
     override val id              = 2
     override val code            = StatusCodes.Forbidden
@@ -110,7 +110,7 @@ object ApiError {
     override val code: StatusCode = StatusCodes.BadRequest
   }
 
-  //VALIDATION
+  // VALIDATION
   case object InvalidSignature extends ApiError {
     override val id      = 101
     override val code    = StatusCodes.BadRequest
@@ -145,7 +145,7 @@ object ApiError {
     override val id: Int          = StateCheckFailed.Id
     override val message: String  = StateCheckFailed.message(errorMsg)
     override val code: StatusCode = StateCheckFailed.Code
-    override lazy val json        = details.fold(JsObject.empty)(identity) ++ Json.obj("error" -> id, "message" -> message, "transaction" -> tx.json())
+    override lazy val json = details.fold(JsObject.empty)(identity) ++ Json.obj("error" -> id, "message" -> message, "transaction" -> tx.json())
   }
 
   case object StateCheckFailed {
@@ -278,7 +278,7 @@ object ApiError {
     val Code    = StatusCodes.BadRequest
   }
 
-  //TRANSACTIONS
+  // TRANSACTIONS
   case object TransactionDoesNotExist extends ApiError {
     override val id: Int          = 311
     override val message: String  = "transactions does not exist"
@@ -360,8 +360,8 @@ object ApiError {
         "details" -> Json
           .toJson(
             errs
-              .map {
-                case (addr, err) => addr.toString -> err
+              .map { case (addr, err) =>
+                addr.toString -> err
               }
           )
       )
@@ -413,5 +413,11 @@ object ApiError {
     override val id      = 4007
     override val message = "Invalid asset id"
     override val code    = StatusCodes.BadRequest
+  }
+
+  case object ServerRequestTimeout extends ApiError {
+    override val id: Int         = 5031
+    override val code            = StatusCodes.ServiceUnavailable
+    override val message: String = "The server was not able to produce a timely response to request"
   }
 }

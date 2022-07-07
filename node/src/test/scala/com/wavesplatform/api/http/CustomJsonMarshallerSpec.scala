@@ -24,6 +24,7 @@ import org.scalactic.source.Position
 import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.*
 
+import scala.concurrent.duration.DurationInt
 import scala.reflect.ClassTag
 
 class CustomJsonMarshallerSpec
@@ -69,7 +70,7 @@ class CustomJsonMarshallerSpec
       () => utx.size,
       publisher,
       ntpTime,
-      Schedulers.fixedPool(4, "heavy-request-scheduler")
+      new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
     ).route
 
   property("/transactions/info/{id}") {
@@ -118,7 +119,7 @@ class CustomJsonMarshallerSpec
     accountsApi,
     assetsApi,
     1000,
-    Schedulers.fixedPool(4, "heavy-request-scheduler")
+    new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
   ).route
 
   property("/assets/{assetId}/distribution/{height}/limit/{limit}") {

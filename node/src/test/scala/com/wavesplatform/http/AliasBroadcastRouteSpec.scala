@@ -3,6 +3,7 @@ package com.wavesplatform.http
 import com.wavesplatform.RequestGen
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError.*
+import com.wavesplatform.api.http.RouteTimeout
 import com.wavesplatform.api.http.alias.AliasApiRoute
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
@@ -14,6 +15,8 @@ import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.*
 import play.api.libs.json.Json.*
 
+import scala.concurrent.duration.DurationInt
+
 class AliasBroadcastRouteSpec extends RouteSpec("/alias/broadcast/") with RequestGen with PathMockFactory with RestAPISettingsHelper {
   private[this] val utxPoolSynchronizer = DummyTransactionPublisher.rejecting(tx => TransactionValidationError(GenericError("foo"), tx))
 
@@ -24,7 +27,7 @@ class AliasBroadcastRouteSpec extends RouteSpec("/alias/broadcast/") with Reques
     utxPoolSynchronizer,
     stub[Time],
     stub[Blockchain],
-    Schedulers.fixedPool(4, "heavy-request-scheduler")
+    new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
   ).route
 
   "returns StateCheckFiled" - {

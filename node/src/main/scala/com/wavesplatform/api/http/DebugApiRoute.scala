@@ -2,18 +2,14 @@ package com.wavesplatform.api.http
 
 import java.net.{InetAddress, InetSocketAddress, URI}
 import java.util.concurrent.ConcurrentMap
-
-import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.{Failure, Success}
 import scala.util.control.NonFatal
-
 import akka.http.scaladsl.common.{EntityStreamingSupport, JsonEntityStreamingSupport}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
-import akka.stream.scaladsl.Source
-import cats.syntax.either._
+import cats.syntax.either.*
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.TransactionMeta
@@ -22,12 +18,12 @@ import com.wavesplatform.api.http.TransactionsApiRoute.TransactionJsonSerializer
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
-import com.wavesplatform.network.{PeerDatabase, PeerInfo, _}
+import com.wavesplatform.network.{PeerDatabase, PeerInfo, *}
 import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
 import com.wavesplatform.state.{Blockchain, Height, LeaseBalance, NG, Portfolio, StateHash}
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidRequestSignature}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -38,13 +34,15 @@ import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
 import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler
-import play.api.libs.json._
+import play.api.libs.json.*
 import play.api.libs.json.Json.JsValueWrapper
+
+import scala.concurrent.Future
 
 case class DebugApiRoute(
     ws: WavesSettings,
     time: Time,
-    blockchain: Blockchain with NG,
+    blockchain: Blockchain & NG,
     wallet: Wallet,
     accountsApi: CommonAccountsApi,
     transactionsApi: CommonTransactionsApi,
@@ -53,7 +51,7 @@ case class DebugApiRoute(
     establishedConnections: ConcurrentMap[Channel, PeerInfo],
     rollbackTask: (ByteStr, Boolean) => Task[Either[ValidationError, Unit]],
     utxStorage: UtxPool,
-    miner: Miner with MinerDebugInfo,
+    miner: Miner & MinerDebugInfo,
     historyReplier: HistoryReplier,
     extLoaderStateReporter: Coeval[RxExtensionLoader.State],
     mbsCacheSizesReporter: Coeval[MicroBlockSynchronizer.CacheSizes],
@@ -62,12 +60,13 @@ case class DebugApiRoute(
     loadBalanceHistory: Address => Seq[(Int, Long)],
     loadStateHash: Int => Option[StateHash],
     priorityPoolBlockchain: () => Blockchain,
+    routeTimeout: RouteTimeout,
     heavyRequestScheduler: Scheduler
 ) extends ApiRoute
     with AuthRoute
     with ScorexLogging {
 
-  import DebugApiRoute._
+  import DebugApiRoute.*
 
   private lazy val configStr             = configRoot.render(ConfigRenderOptions.concise().setJson(true).setFormatted(true))
   private lazy val fullConfig: JsValue   = Json.parse(configStr)
@@ -97,19 +96,17 @@ case class DebugApiRoute(
   }
 
   private def distribution(height: Int): Route = optionalHeaderValueByType(Accept) { accept =>
-    implicit val sc: Scheduler = heavyRequestScheduler
-    complete(
+    routeTimeout.executeToFuture {
       assetsApi
         .wavesDistribution(height, None)
         .toListL
-        .runToFuture
         .map {
           case l if accept.exists(_.mediaRanges.exists(CustomJson.acceptsNumbersAsStrings)) =>
             Json.obj(l.map { case (address, balance) => address.toString -> (balance.toString: JsValueWrapper) }*)
           case l =>
             Json.obj(l.map { case (address, balance) => address.toString -> (balance: JsValueWrapper) }*)
         }
-    )
+    }
   }
 
   def state: Route = (path("state") & get) {
@@ -120,16 +117,14 @@ case class DebugApiRoute(
     distribution(height)
   }
 
-  private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean)(implicit
-      ec: ExecutionContext
-  ): Future[Either[ValidationError, JsObject]] = {
+  private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean): Future[Either[ValidationError, JsObject]] = {
+    implicit val sc: Scheduler = heavyRequestScheduler
     rollbackTask(blockId, returnTransactionsToUtx)
       .map(_.map(_ => Json.obj("BlockId" -> blockId.toString)))
-      .runAsyncLogErr(Scheduler(ec))
+      .runAsyncLogErr
   }
 
   def rollback: Route = (path("rollback") & withRequestTimeout(15.minutes)) {
-    implicit val sc: Scheduler = heavyRequestScheduler
     jsonPost[RollbackParams] { params =>
       blockchain.blockHeader(params.rollbackTo) match {
         case Some(sh) =>
@@ -180,7 +175,6 @@ case class DebugApiRoute(
 
   def rollbackTo: Route = path("rollback-to" / Segment) { signature =>
     delete {
-      implicit val sc: Scheduler = heavyRequestScheduler
       val signatureEi: Either[ValidationError, ByteStr] =
         ByteStr
           .decodeBase58(signature)
@@ -284,20 +278,13 @@ case class DebugApiRoute(
   def stateChangesByAddress: Route =
     (get & path("stateChanges" / "address" / AddrSegment / "limit" / IntNumber) & parameter("after".as[ByteStr].?)) { (address, limit, afterOpt) =>
       validate(limit <= settings.transactionsByAddressLimit, s"Max limit is ${settings.transactionsByAddressLimit}") {
-        complete {
-          implicit val ss: JsonEntityStreamingSupport = EntityStreamingSupport.json()
-          implicit val sc: Scheduler                  = heavyRequestScheduler
-
-          Source
-            .future(
-              transactionsApi
-                .transactionsByAddress(address, None, Set.empty, afterOpt)
-                .take(limit)
-                .toListL
-                .runToFuture
-            )
-            .mapConcat(_.map(Json.toJsObject(_)))
-        }
+        implicit val ss: JsonEntityStreamingSupport = EntityStreamingSupport.json()
+        routeTimeout.executeStreamed {
+          transactionsApi
+            .transactionsByAddress(address, None, Set.empty, afterOpt)
+            .take(limit)
+            .toListL
+        }(Json.toJsObject(_))
       }
     }
 
@@ -348,7 +335,7 @@ object DebugApiRoute {
   implicit val BigIntWrite: Writes[BigInt]                                    = (bigInt: BigInt) => JsNumber(BigDecimal(bigInt))
   implicit val scoreReporterStatsWrite: Writes[RxScoreObserver.Stats]         = Json.writes[RxScoreObserver.Stats]
 
-  import MinerDebugInfo._
+  import MinerDebugInfo.*
   implicit val minerStateWrites: Writes[MinerDebugInfo.State] = (s: MinerDebugInfo.State) =>
     JsString(s match {
       case MiningBlocks      => "mining blocks"
