@@ -10,7 +10,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.crypto
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonAccountsApi
-import com.wavesplatform.api.http.AddressApiRoute
+import com.wavesplatform.api.http.{AddressApiRoute, RouteTimeout}
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
@@ -64,7 +64,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
       1,
       "rest-time-limited"
     ),
-    Schedulers.fixedPool(4, "heavy-request-scheduler"),
+    new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler")),
     commonAccountApi,
     5
   )

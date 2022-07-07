@@ -350,22 +350,17 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           throw new RejectedExecutionException
         }
       )
-      val maybeInstrumentedHeavyRequestExecutor =
-        if (settings.config.getBoolean("kamon.enable"))
-          ExecutorInstrumentation.instrument(heavyRequestExecutor, "heavy-request-executor")
-        else heavyRequestExecutor
 
-      val heavyRequestScheduler =
-        Scheduler(
-          maybeInstrumentedHeavyRequestExecutor,
-          UncaughtExceptionReporter((t: Throwable) => log.error("Error processing request", t)),
-          ExecutionModel.AlwaysAsyncExecution
-        )
+      val heavyRequestScheduler = Scheduler(heavyRequestExecutor, ExecutionModel.AlwaysAsyncExecution)
+
+      val routeTimeout = new RouteTimeout(
+        FiniteDuration(settings.config.getDuration("akka.http.server.request-timeout").getSeconds, TimeUnit.SECONDS)
+      )(heavyRequestScheduler)
 
       val apiRoutes = Seq(
         new EthRpcRoute(blockchainUpdater, extensionContext.transactionsApi, time),
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => shutdown()),
-        BlocksApiRoute(settings.restAPISettings, extensionContext.blocksApi, time, heavyRequestScheduler),
+        BlocksApiRoute(settings.restAPISettings, extensionContext.blocksApi, time, routeTimeout),
         TransactionsApiRoute(
           settings.restAPISettings,
           extensionContext.transactionsApi,
@@ -374,7 +369,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           () => utxStorage.size,
           transactionPublisher,
           time,
-          heavyRequestScheduler
+          routeTimeout
         ),
         WalletApiRoute(settings.restAPISettings, wallet),
         UtilsApiRoute(
@@ -392,7 +387,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           transactionPublisher,
           time,
           limitedScheduler,
-          heavyRequestScheduler,
+          routeTimeout,
           extensionContext.accountsApi,
           settings.dbSettings.maxRollbackDepth
         ),
@@ -417,6 +412,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           loadBalanceHistory,
           levelDB.loadStateHash,
           () => utxStorage.priorityPool.compositeBlockchain,
+          routeTimeout,
           heavyRequestScheduler
         ),
         AssetsApiRoute(
@@ -428,7 +424,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           extensionContext.accountsApi,
           extensionContext.assetsApi,
           settings.dbSettings.maxRollbackDepth,
-          heavyRequestScheduler
+          routeTimeout
         ),
         ActivationApiRoute(settings.restAPISettings, settings.featuresSettings, blockchainUpdater),
         LeaseApiRoute(
@@ -438,7 +434,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           transactionPublisher,
           time,
           extensionContext.accountsApi,
-          heavyRequestScheduler
+          routeTimeout
         ),
         AliasApiRoute(
           settings.restAPISettings,
@@ -447,7 +443,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           transactionPublisher,
           time,
           blockchainUpdater,
-          heavyRequestScheduler
+          routeTimeout
         ),
         RewardApiRoute(blockchainUpdater)
       )

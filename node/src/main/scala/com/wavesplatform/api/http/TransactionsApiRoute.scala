@@ -2,36 +2,34 @@ package com.wavesplatform.api.http
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
-import cats.instances.either._
-import cats.instances.list._
-import cats.instances.try_._
-import cats.syntax.alternative._
-import cats.syntax.either._
-import cats.syntax.traverse._
+import cats.instances.either.*
+import cats.instances.list.*
+import cats.instances.try_.*
+import cats.syntax.alternative.*
+import cats.syntax.either.*
+import cats.syntax.traverse.*
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
-import com.wavesplatform.api.http.ApiError._
+import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, _}
+import com.wavesplatform.common.utils.{Base58, *}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{Blockchain, InvokeScriptResult, TxMeta}
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.lease._
+import com.wavesplatform.transaction.*
+import com.wavesplatform.transaction.lease.*
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.utils.{EthEncoding, Time}
 import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
-import monix.execution.Scheduler
-import play.api.libs.json._
+import play.api.libs.json.*
 
-import scala.concurrent.Future
 import scala.util.Success
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta.Payload
 import com.wavesplatform.lang.v1.serialization.SerdeV1
@@ -44,7 +42,7 @@ case class TransactionsApiRoute(
     utxPoolSize: () => Int,
     transactionPublisher: TransactionPublisher,
     time: Time,
-    heavyRequestScheduler: Scheduler
+    routeTimeout: RouteTimeout
 ) extends ApiRoute
     with BroadcastRoute
     with AuthRoute {
@@ -60,12 +58,13 @@ case class TransactionsApiRoute(
 
   def addressWithLimit: Route = {
     (get & path("address" / AddrSegment / "limit" / IntNumber) & parameter("after".?)) { (address, limit, maybeAfter) =>
-      implicit val sc: Scheduler = heavyRequestScheduler
+      routeTimeout.executeToFuture {
+        val after =
+          maybeAfter.map(s => ByteStr.decodeBase58(s).getOrElse(throw ApiException(CustomValidationError(s"Unable to decode transaction id $s"))))
+        if (limit > settings.transactionsByAddressLimit) throw ApiException(TooBigArrayAllocation)
 
-      val after =
-        maybeAfter.map(s => ByteStr.decodeBase58(s).getOrElse(throw ApiException(CustomValidationError(s"Unable to decode transaction id $s"))))
-      if (limit > settings.transactionsByAddressLimit) throw ApiException(TooBigArrayAllocation)
-      complete(transactionsByAddress(address, limit, after).map(txs => List(txs))) // Double list - [ [tx1, tx2, ...] ]
+        transactionsByAddress(address, limit, after).map(txs => List(txs)) // Double list - [ [tx1, tx2, ...] ]
+      }
     }
   }
 
@@ -199,7 +198,7 @@ case class TransactionsApiRoute(
       case _ => InvalidSignature
     }
 
-  def transactionsByAddress(address: Address, limitParam: Int, maybeAfter: Option[ByteStr])(implicit sc: Scheduler): Future[List[JsObject]] = {
+  def transactionsByAddress(address: Address, limitParam: Int, maybeAfter: Option[ByteStr]): Task[List[JsObject]] = {
     val aliasesOfAddress: Task[Set[Alias]] =
       commonApi
         .aliasesOfAddress(address)
@@ -233,7 +232,6 @@ case class TransactionsApiRoute(
       .take(limitParam)
       .mapEval(compactJson(address, _))
       .toListL
-      .runToFuture
   }
 }
 

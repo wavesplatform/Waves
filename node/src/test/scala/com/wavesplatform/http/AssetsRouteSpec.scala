@@ -5,6 +5,7 @@ import akka.http.scaladsl.server.Route
 import com.google.protobuf.ByteString
 import com.wavesplatform.TestWallet
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.api.http.RouteTimeout
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.api.http.requests.{TransferV1Request, TransferV2Request}
 import com.wavesplatform.common.state.ByteStr
@@ -33,6 +34,8 @@ import org.scalatest.concurrent.Eventually
 import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 
+import scala.concurrent.duration.*
+
 class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPISettingsHelper with WithDomain with TestWallet {
 
   private val MaxDistributionDepth = 1
@@ -51,7 +54,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
             d.accountsApi,
             d.assetsApi,
             MaxDistributionDepth,
-            Schedulers.fixedPool(4, "heavy-request-scheduler")
+            new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
           ).route
         )
       )

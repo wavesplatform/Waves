@@ -4,6 +4,7 @@ import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.RequestGen
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiError.*
+import com.wavesplatform.api.http.RouteTimeout
 import com.wavesplatform.api.http.assets.*
 import com.wavesplatform.api.http.requests.{SignedTransferV1Request, SignedTransferV2Request}
 import com.wavesplatform.common.state.ByteStr
@@ -21,6 +22,8 @@ import org.scalacheck.Gen as G
 import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.*
 
+import scala.concurrent.duration.*
+
 class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with RequestGen with PathMockFactory with RestAPISettingsHelper {
 
   private[this] val route = AssetsApiRoute(
@@ -32,7 +35,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     stub[CommonAccountsApi],
     stub[CommonAssetsApi],
     1000,
-    Schedulers.fixedPool(4, "heavy-request-scheduler")
+    new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
   ).route
 
   private[this] val fixedIssueGen = for {
@@ -182,7 +185,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
       stub[CommonAccountsApi],
       stub[CommonAssetsApi],
       1000,
-      Schedulers.fixedPool(4, "heavy-request-scheduler")
+      new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
     ).route
 
     val seed               = "seed".getBytes("UTF-8")

@@ -5,7 +5,7 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.TestWallet
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.common.CommonTransactionsApi
-import com.wavesplatform.api.http.TransactionsApiRoute
+import com.wavesplatform.api.http.{RouteTimeout, TransactionsApiRoute}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.lang.v1.FunctionHeader.User
@@ -38,6 +38,8 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.OptionValues
 import play.api.libs.json.*
 
+import scala.concurrent.duration.*
+
 class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestAPISettingsHelper with MockFactory with OptionValues with TestWallet {
 
   private val MinFee: Long            = (0.001 * Constants.UnitsInWave).toLong
@@ -64,7 +66,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       () => utx.size,
       DummyTransactionPublisher.accepting,
       ntpTime,
-      Schedulers.fixedPool(4, "heavy-request-scheduler")
+      new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
     ).route
 
   "Proto transactions should be able to broadcast " - {

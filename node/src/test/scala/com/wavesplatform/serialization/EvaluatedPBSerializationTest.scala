@@ -3,7 +3,7 @@ package com.wavesplatform.serialization
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.http.{ApiMarshallers, TransactionsApiRoute}
+import com.wavesplatform.api.http.{ApiMarshallers, RouteTimeout, TransactionsApiRoute}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.Domain
@@ -18,6 +18,7 @@ import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utils.{JsonMatchers, Schedulers}
 import play.api.libs.json.*
 
+import scala.concurrent.duration.*
 import scala.concurrent.Future
 
 class EvaluatedPBSerializationTest
@@ -117,6 +118,6 @@ class EvaluatedPBSerializationTest
     () => d.utxPool.size,
     (_, _) => Future.successful(TracedResult(Right(true))),
     ntpTime,
-    Schedulers.fixedPool(4, "heavy-request-scheduler")
+    new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
   )
 }

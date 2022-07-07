@@ -5,7 +5,7 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.http.ApiError.*
-import com.wavesplatform.api.http.TransactionsApiRoute
+import com.wavesplatform.api.http.{RouteTimeout, TransactionsApiRoute}
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
@@ -42,6 +42,7 @@ import org.scalatest.OptionValues
 import play.api.libs.json.*
 import play.api.libs.json.Json.JsValueWrapper
 
+import scala.concurrent.duration.*
 import scala.concurrent.Future
 import scala.util.Random
 
@@ -70,7 +71,7 @@ class TransactionsRouteSpec
     utxPoolSize,
     utxPoolSynchronizer,
     testTime,
-    Schedulers.fixedPool(4, "heavy-request-scheduler")
+    new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
   )
 
   private val route = seal(transactionsApiRoute.route)
@@ -127,7 +128,7 @@ class TransactionsRouteSpec
         () => 0,
         (t, _) => d.commonApi.transactions.broadcastTransaction(t),
         ntpTime,
-        Schedulers.fixedPool(4, "heavy-request-scheduler")
+        new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
       ).route
     )
 
