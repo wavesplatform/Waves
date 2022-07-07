@@ -7,10 +7,9 @@ import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.api.grpc.TransactionsRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.it.api.SyncGrpcApi._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.api.SyncGrpcApi.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.sync.transactions.FailedTransactionSuiteLike
-import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
@@ -19,13 +18,13 @@ import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction.DataTransactionData.DataEntry
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBSignedTransaction, PBTransactions, Recipient}
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTransactionSuiteLike[PBSignedTransaction] {
-  import FailedTransactionSuiteLike._
-  import grpcApi._
+  import FailedTransactionSuiteLike.*
+  import grpcApi.*
 
   private val contract     = KeyPair("thirdContract".getBytes("UTF-8"))
   private val contractAddr = PBRecipients.create(Address.fromPublicKey(contract.publicKey)).getPublicKeyHash
@@ -385,80 +384,6 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
       val invalid = assertInvalidTxs(txs)
       sender.wavesBalance(callerAddr).regular shouldBe prevBalance - (txs.size - invalid.size) * invokeFee - priorityFee
       invalid
-    }
-  }
-
-  test("ExchangeTransaction: failed exchange tx when asset script fails") {
-    val init = Seq(
-      sender.setScript(firstAcc, Right(None), setScriptFee + smartFee),
-      sender.setScript(secondAcc, Right(None), setScriptFee + smartFee),
-      sender.setScript(thirdAcc, Right(None), setScriptFee + smartFee)
-    )
-
-    waitForTxs(init)
-
-    val quantity = 1000000000L
-    val initScript: Either[Array[Byte], Option[Script]] =
-      Right(ScriptCompiler.compile("true", ScriptEstimatorV3(fixOverflow = true, overhead = false)).toOption.map(_._1))
-    val amountAsset         = sender.broadcastIssue(seller, "Amount asset", quantity, 8, reissuable = true, issueFee, script = initScript)
-    val priceAsset          = sender.broadcastIssue(buyer, "Price asset", quantity, 8, reissuable = true, issueFee, script = initScript)
-    val sellMatcherFeeAsset = sender.broadcastIssue(matcher, "Seller fee asset", quantity, 8, reissuable = true, issueFee, script = initScript)
-    val buyMatcherFeeAsset  = sender.broadcastIssue(matcher, "Buyer fee asset", quantity, 8, reissuable = true, issueFee, script = initScript)
-
-    val preconditions = Seq(
-      amountAsset,
-      priceAsset,
-      sellMatcherFeeAsset,
-      buyMatcherFeeAsset
-    )
-
-    waitForTxs(preconditions)
-
-    val sellMatcherFeeAssetId = PBTransactions.vanillaUnsafe(sellMatcherFeeAsset).id().toString
-    val buyMatcherFeeAssetId  = PBTransactions.vanillaUnsafe(buyMatcherFeeAsset).id().toString
-
-    val transferToSeller = sender.broadcastTransfer(
-      matcher,
-      Recipient().withPublicKeyHash(sellerAddress),
-      quantity,
-      fee = minFee + smartFee,
-      assetId = sellMatcherFeeAssetId
-    )
-    val transferToBuyer = sender.broadcastTransfer(
-      matcher,
-      Recipient().withPublicKeyHash(buyerAddress),
-      quantity,
-      fee = minFee + smartFee,
-      assetId = buyMatcherFeeAssetId
-    )
-
-    waitForTxs(Seq(transferToSeller, transferToBuyer))
-
-    val amountAssetId  = PBTransactions.vanillaUnsafe(amountAsset).id().toString
-    val priceAssetId   = PBTransactions.vanillaUnsafe(priceAsset).id().toString
-    val assetPair      = AssetPair.createAssetPair(amountAssetId, priceAssetId).get
-    val fee            = 0.003.waves + 4 * smartFee
-    val sellMatcherFee = fee / 100000L
-    val buyMatcherFee  = fee / 100000L
-    val priorityFee    = setAssetScriptFee + smartFee + fee * 10
-
-    val allCases =
-      Seq((amountAssetId, seller), (priceAssetId, buyer), (sellMatcherFeeAssetId, matcher), (buyMatcherFeeAssetId, matcher))
-
-    for ((invalidScriptAsset, owner) <- allCases) {
-      val txsSend = (_: Int) => {
-        val tx = PBTransactions.protobuf(
-          mkExchange(buyer, seller, matcher, assetPair, fee, buyMatcherFeeAssetId, sellMatcherFeeAssetId, buyMatcherFee, sellMatcherFee)
-        )
-        sender.broadcast(tx.getWavesTransaction, tx.proofs)
-      }
-      overflowBlock()
-      sendTxsAndThenPriorityTx(
-        txsSend,
-        () => updateAssetScript(result = false, invalidScriptAsset, owner, priorityFee, waitForTx = false)
-      )((txs, _) => assertFailedTxs(txs))
-
-      updateAssetScript(result = true, invalidScriptAsset, owner, priorityFee * 2)
     }
   }
 
