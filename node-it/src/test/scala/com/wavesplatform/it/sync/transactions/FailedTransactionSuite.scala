@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.transactions
 
 import com.google.common.primitives.Longs
 import com.typesafe.config.Config
-import com.wavesplatform.api.http.ApiError.{ScriptExecutionError, TransactionNotAllowedByAccountScript, TransactionNotAllowedByAssetScript}
+import com.wavesplatform.api.http.ApiError.{ScriptExecutionError, TransactionNotAllowedByAssetScript}
 import com.wavesplatform.api.http.DebugMessage
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -508,65 +508,6 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
       )
       assertInvalidTxs(Seq(tx.id().toString))
       updateAssetScript(result = true, invalidScriptAsset, owner, setAssetScriptFee + smartFee)
-    }
-  }
-
-  test("ExchangeTransaction: transactionHeightById and transactionById returns only succeed transactions") {
-    val Precondition(amountAsset, priceAsset, buyFeeAsset, sellFeeAsset) =
-      exchangePreconditions(
-        Some(ScriptCompiler.compile("true", ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64)
-      )
-
-    val assetPair      = AssetPair.createAssetPair(amountAsset, priceAsset).get
-    val fee            = 0.003.waves + 4 * smartFee
-    val sellMatcherFee = fee / 100000L
-    val buyMatcherFee  = fee / 100000L
-    val priorityFee    = setAssetScriptFee + smartFee + fee * 10
-
-    updateAssetScript(result = true, amountAsset, sellerAddress, priorityFee)
-
-    val txsSend = (_: Int) => {
-      val tx = mkExchange(buyer, seller, matcher, assetPair, fee, buyFeeAsset, sellFeeAsset, buyMatcherFee, sellMatcherFee)
-      sender.signedBroadcast(tx.json()).id
-    }
-
-    val failedTxs = sendTxsAndThenPriorityTx(
-      txsSend,
-      () => updateAssetScript(result = false, amountAsset, sellerAddress, priorityFee)
-    ) { (txs, priorityTx) =>
-      logPriorityTx(priorityTx)
-      assertFailedTxs(txs)
-    }
-
-    checkTransactionHeightById(failedTxs)
-
-    val failedTxsSample = failedTxs.head
-
-    sender.setScript(
-      caller,
-      Some(
-        ScriptCompiler
-          .compile(
-            s"""
-               |{-# STDLIB_VERSION 2 #-}
-               |{-# CONTENT_TYPE EXPRESSION #-}
-               |{-# SCRIPT_TYPE ACCOUNT #-}
-               |
-               |transactionById(fromBase58String("${failedTxsSample.id}")).isDefined()
-               |""".stripMargin,
-            ScriptEstimatorV3(fixOverflow = true, overhead = false)
-          )
-          .explicitGet()
-          ._1
-          .bytes()
-          .base64
-      ),
-      fee = setScriptFee + smartFee,
-      waitForTx = true
-    )
-    assertApiError(sender.transfer(caller, contractAddress, 100, fee = smartMinFee)) { e =>
-      e.message should include("Transaction is not allowed by account-script")
-      e.id shouldBe TransactionNotAllowedByAccountScript.Id
     }
   }
 
