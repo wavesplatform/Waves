@@ -34,12 +34,6 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
   private var smartAsset     = ""
   private var sponsoredAsset = ""
 
-  private val seller        = firstAcc
-  private val buyer         = secondAcc
-  private val matcher       = thirdAcc
-  private val sellerAddress = firstAddress
-  private val buyerAddress  = secondAddress
-
   protected override def beforeAll(): Unit = {
     super.beforeAll()
 
@@ -404,10 +398,6 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
 
   private def updateTikTok(result: String, fee: Long, waitForTx: Boolean = true): PBSignedTransaction =
     sender.putData(contract, List(StringDataEntry("tikTok", result)).map(PBTransactions.toPBDataEntry), fee = fee, waitForTx = waitForTx)
-
-  private def waitForTxs(txs: Seq[PBSignedTransaction]): Unit = {
-    txs.foreach(tx => sender.waitForTransaction(PBTransactions.vanillaUnsafe(tx).id().toString))
-  }
 
   override protected def waitForHeightArise(): Unit = sender.waitForHeightArise()
 
