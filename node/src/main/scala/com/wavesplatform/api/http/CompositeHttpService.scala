@@ -36,6 +36,8 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
 
   val loggingCompositeRoute: Route = Route.seal(DebuggingDirectives.logRequestResult(LoggingMagnet(_ => logRequestResponse))(compositeRoute))
 
+  private val CorsAllowAllOrigin = "origin-from-request"
+
   private def logRequestResponse(req: HttpRequest)(res: RouteResult): Unit = res match {
     case Complete(resp) =>
       val msg = s"HTTP ${resp.status.value} from ${req.method.value} ${req.uri}"
@@ -43,25 +45,39 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
     case _ =>
   }
 
-  private val commonCorsHeaders =
-    Seq(
-      `Access-Control-Allow-Headers`(settings.corsHeaders.accessControlAllowHeaders),
-      `Access-Control-Allow-Methods`(settings.corsHeaders.accessControlAllowMethods.flatMap(getForKeyCaseInsensitive))
-    )
+  private def preflightCorsHeaders(requestOrigin: Option[Origin]): Seq[HttpHeader] =
+    requestOrigin
+      .flatMap(_.origins.headOption)
+      .fold(Seq[HttpHeader]()) { _ =>
+        Seq(
+          `Access-Control-Allow-Headers`(settings.corsHeaders.accessControlAllowHeaders),
+          `Access-Control-Allow-Methods`(settings.corsHeaders.accessControlAllowMethods.flatMap(getForKeyCaseInsensitive))
+        )
+      }
 
-  private def corsAllowAll =
-    respondWithHeaders(
-      commonCorsHeaders :+ `Access-Control-Allow-Origin`(settings.corsHeaders.accessControlAllowOrigin)
-    )
+  private def corsHeaders(requestOrigin: Option[Origin]): Seq[HttpHeader] =
+    requestOrigin
+      .flatMap(_.origins.headOption)
+      .fold(Seq[HttpHeader]()) { requestOriginValue =>
+        val responseOrigin =
+          settings.corsHeaders.accessControlAllowOrigin match {
+            case "*"                => `Access-Control-Allow-Origin`.*
+            case CorsAllowAllOrigin => `Access-Control-Allow-Origin`(requestOriginValue)
+            case origin             => `Access-Control-Allow-Origin`(origin)
+          }
+        Seq(responseOrigin, `Access-Control-Allow-Credentials`(settings.corsHeaders.accessControlAllowCredentials))
+      }
 
-  private def extendRoute(base: Route): Route = handleAllExceptions { ctx =>
-    val extendedRoute =
-      options {
-        val headers = commonCorsHeaders :+ `Access-Control-Allow-Credentials`(settings.corsHeaders.accessControlAllowCredentials)
-        respondWithDefaultHeaders(headers)(corsAllowAll(complete(StatusCodes.OK)))
-      } ~ corsAllowAll(base)
-
-    extendedRoute(ctx)
+  private def extendRoute(base: Route): Route = handleAllExceptions {
+    optionalHeaderValueByType(Origin) { maybeOrigin =>
+      respondWithDefaultHeaders(corsHeaders(maybeOrigin)) {
+        options {
+          respondWithDefaultHeaders(preflightCorsHeaders(maybeOrigin)) {
+            complete(StatusCodes.OK)
+          }
+        } ~ base
+      }
+    }
   }
 
   private[this] lazy val patchedSwaggerJson = {
