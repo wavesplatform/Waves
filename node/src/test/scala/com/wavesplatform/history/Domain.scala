@@ -234,6 +234,9 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     lastBlock
   }
 
+  def appendMicroBlockE(txs: Transaction*): Either[Throwable, BlockId] =
+    Try(appendMicroBlock(txs*)).toEither
+
   def appendMicroBlock(txs: Transaction*): BlockId = {
     val lastBlock = this.lastBlock
     val block = Block

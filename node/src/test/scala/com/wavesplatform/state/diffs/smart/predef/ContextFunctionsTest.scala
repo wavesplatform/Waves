@@ -193,7 +193,7 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
     outOfBounds shouldBe Left(s"Index $badIndex out of bounds for length ${tx.data.size}")
   }
 
-  property("base64 amplification") {
+  ignore("base64 amplification") {
     val script =
       """
         |let a = base58'7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy'
@@ -372,8 +372,8 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
                |
                | let lastBlockBaseTarget = lastBlock.baseTarget == 2
                | let lastBlockGenerationSignature = lastBlock.generationSignature == base58'${ByteStr(
-                 Array.fill(Block.GenerationSignatureLength)(0: Byte)
-               )}'
+              Array.fill(Block.GenerationSignatureLength)(0: Byte)
+            )}'
                | let lastBlockGenerator = lastBlock.generator.bytes == base58'${TestBlock.defaultSigner.publicKey.toAddress}'
                | let lastBlockGeneratorPublicKey = lastBlock.generatorPublicKey == base58'${TestBlock.defaultSigner.publicKey}'
                |
@@ -686,12 +686,12 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
       .filter(_ >= V5)
       .foreach { version =>
         val (masterAcc, recipient, genesis, _, dataTransaction, transferTx, _) = preconditionsAndPayments
-        val fs = settingsForRide(version).blockchainSettings.functionalitySettings
+        val fs                                                                 = settingsForRide(version).blockchainSettings.functionalitySettings
         assertDiffAndState(fs) { append =>
           val (intKey, intValue)         = dataTransaction.data.collectFirst { case IntegerDataEntry(key, value) => (key, value) }.get
           val (booleanKey, booleanValue) = dataTransaction.data.collectFirst { case BooleanDataEntry(key, value) => (key, value) }.get
-          val (binaryKey, binaryValue)   = dataTransaction.data.collectFirst { case BinaryDataEntry(key, value)  => (key, value) }.get
-          val (stringKey, stringValue)   = dataTransaction.data.collectFirst { case StringDataEntry(key, value)  => (key, value) }.get
+          val (binaryKey, binaryValue)   = dataTransaction.data.collectFirst { case BinaryDataEntry(key, value) => (key, value) }.get
+          val (stringKey, stringValue)   = dataTransaction.data.collectFirst { case StringDataEntry(key, value) => (key, value) }.get
 
           val script =
             s"""
@@ -777,16 +777,19 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
          """.stripMargin
       )
       d.appendBlock(setScript(secondSigner, failingDApp))
-
       val failedInvoke = invoke()
-      d.appendAndAssertFailed(failedInvoke)
 
       val checkTransactionHeightById = TestCompiler(V6).compileExpression(s"transactionHeightById(base58'${failedInvoke.id().toString}').isDefined()")
-      d.appendBlock(setScript(signer(2), checkTransactionHeightById))
-      d.appendBlockE(transfer(signer(2))) should produce("TransactionNotAllowedByScript")
+      val checkTransactionById       = TestCompiler(V2).compileExpression(s"transactionById(base58'${failedInvoke.id().toString}').isDefined()")
 
-      val checkTransactionById = TestCompiler(V2).compileExpression(s"transactionById(base58'${failedInvoke.id().toString}').isDefined()")
+      d.appendBlock(setScript(signer(2), checkTransactionHeightById))
       d.appendBlock(setScript(signer(3), checkTransactionById))
+
+      d.appendMicroBlock(failedInvoke)
+      d.appendMicroBlockE(transfer(signer(2))) should produce("TransactionNotAllowedByScript")
+      d.appendMicroBlockE(transfer(signer(3))) should produce("TransactionNotAllowedByScript")
+      d.appendKeyBlock()
+      d.appendBlockE(transfer(signer(2))) should produce("TransactionNotAllowedByScript")
       d.appendBlockE(transfer(signer(3))) should produce("TransactionNotAllowedByScript")
     }
   }
