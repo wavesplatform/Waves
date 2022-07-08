@@ -19,7 +19,6 @@ import com.wavesplatform.protobuf.transaction.DataTransactionData.DataEntry
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBSignedTransaction, PBTransactions, Recipient}
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTransactionSuiteLike[PBSignedTransaction] {
@@ -384,72 +383,6 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
       val invalid = assertInvalidTxs(txs)
       sender.wavesBalance(callerAddr).regular shouldBe prevBalance - (txs.size - invalid.size) * invokeFee - priorityFee
       invalid
-    }
-  }
-
-  test("ExchangeTransaction: invalid exchange tx when account script fails") {
-    waitForEmptyUtx()
-
-    val quantity            = 1000000000L
-    val amountAsset         = sender.broadcastIssue(seller, "Amount asset", quantity, 8, reissuable = true, issueFee)
-    val priceAsset          = sender.broadcastIssue(buyer, "Price asset", quantity, 8, reissuable = true, issueFee)
-    val sellMatcherFeeAsset = sender.broadcastIssue(matcher, "Seller fee asset", quantity, 8, reissuable = true, issueFee)
-    val buyMatcherFeeAsset  = sender.broadcastIssue(matcher, "Buyer fee asset", quantity, 8, reissuable = true, issueFee)
-
-    val preconditions = Seq(
-      amountAsset,
-      priceAsset,
-      sellMatcherFeeAsset,
-      buyMatcherFeeAsset
-    )
-
-    waitForTxs(preconditions)
-
-    val sellMatcherFeeAssetId = PBTransactions.vanillaUnsafe(sellMatcherFeeAsset).id().toString
-    val buyMatcherFeeAssetId  = PBTransactions.vanillaUnsafe(buyMatcherFeeAsset).id().toString
-
-    val transferToSeller = sender.broadcastTransfer(
-      matcher,
-      Recipient().withPublicKeyHash(sellerAddress),
-      quantity,
-      fee = minFee + smartFee,
-      assetId = sellMatcherFeeAssetId
-    )
-    val transferToBuyer = sender.broadcastTransfer(
-      matcher,
-      Recipient().withPublicKeyHash(buyerAddress),
-      quantity,
-      fee = minFee + smartFee,
-      assetId = buyMatcherFeeAssetId
-    )
-
-    waitForTxs(Seq(transferToSeller, transferToBuyer))
-
-    val amountAssetId  = PBTransactions.vanillaUnsafe(amountAsset).id().toString
-    val priceAssetId   = PBTransactions.vanillaUnsafe(priceAsset).id().toString
-    val assetPair      = AssetPair.createAssetPair(amountAssetId, priceAssetId).get
-    val fee            = 0.003.waves + smartFee
-    val sellMatcherFee = fee / 100000L
-    val buyMatcherFee  = fee / 100000L
-    val priorityFee    = setScriptFee + smartFee + fee * 10
-
-    val allCases = Seq(seller, buyer, matcher)
-    allCases.foreach(address => updateAccountScript(None, address, setScriptFee + smartFee))
-
-    for (invalidAccount <- allCases) {
-      val txsSend = (_: Int) => {
-        val tx = PBTransactions.protobuf(
-          mkExchange(buyer, seller, matcher, assetPair, fee, buyMatcherFeeAssetId, sellMatcherFeeAssetId, buyMatcherFee, sellMatcherFee)
-        )
-        sender.broadcast(tx.getWavesTransaction, tx.proofs)
-      }
-
-      overflowBlock()
-      sendTxsAndThenPriorityTx(
-        txsSend,
-        () => updateAccountScript(Some(false), invalidAccount, priorityFee, waitForTx = false)
-      )((txs, _) => assertInvalidTxs(txs))
-      updateAccountScript(None, invalidAccount, setScriptFee + smartFee)
     }
   }
 

@@ -511,37 +511,6 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     }
   }
 
-  test("ExchangeTransaction: invalid exchange tx when account script fails") {
-    val Precondition(amountAsset, priceAsset, buyFeeAsset, sellFeeAsset) = exchangePreconditions(None)
-
-    val assetPair      = AssetPair.createAssetPair(amountAsset, priceAsset).get
-    val fee            = 0.003.waves + smartFee
-    val sellMatcherFee = fee / 100000L
-    val buyMatcherFee  = fee / 100000L
-    val priorityFee    = setScriptFee + smartFee + fee * 10
-
-    val allCases = Seq(sellerAddress, buyerAddress, matcherAddress)
-    allCases.foreach(address => updateAccountScript(None, address, setScriptFee + smartFee))
-
-    for (invalidAccount <- allCases) {
-      val txsSend = (_: Int) => {
-        val tx = mkExchange(buyer, seller, matcher, assetPair, fee, buyFeeAsset, sellFeeAsset, buyMatcherFee, sellMatcherFee)
-        sender.signedBroadcast(tx.json()).id
-      }
-
-      updateAccountScript(None, invalidAccount, setScriptFee + smartFee)
-      overflowBlock()
-      sendTxsAndThenPriorityTx(
-        txsSend,
-        () => updateAccountScript(Some(false), invalidAccount, priorityFee, waitForTx = false)
-      ) { (txs, priorityTx) =>
-        logPriorityTx(priorityTx)
-        assertInvalidTxs(txs)
-      }
-      updateAccountScript(None, invalidAccount, setScriptFee + smartFee)
-    }
-  }
-
   test("ExchangeTransaction: transactionHeightById and transactionById returns only succeed transactions") {
     val Precondition(amountAsset, priceAsset, buyFeeAsset, sellFeeAsset) =
       exchangePreconditions(
