@@ -18,7 +18,7 @@ object Dependencies {
 
   private def catsModule(module: String, version: String = "2.6.1") = Def.setting("org.typelevel" %%% s"cats-$module" % version)
 
-  private def web3jModule(module: String) = "org.web3j" % module % "4.9.2"
+  private def web3jModule(module: String) = "org.web3j" % module % "4.9.3"
 
   def monixModule(module: String): Def.Initialize[ModuleID] = Def.setting("io.monix" %%% s"monix-$module" % "3.4.1")
 
