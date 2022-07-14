@@ -31,7 +31,15 @@ import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{EthereumTransaction, GenesisTransaction, PBSince, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
+import com.wavesplatform.transaction.{
+  EthereumTransaction,
+  GenesisTransaction,
+  PBSince,
+  PaymentTransaction,
+  Transaction,
+  TransactionParsers,
+  TxValidationError
+}
 import com.wavesplatform.utils.*
 import monix.eval.Task
 import monix.reactive.Observable
@@ -630,23 +638,25 @@ package object database {
 
   def loadLeaseIds(resource: DBResource, fromHeight: Int, toHeight: Int, includeCancelled: Boolean): Set[ByteStr] = {
     val leaseIds = mutable.Set.empty[ByteStr]
-//    val iterator = resource.iterator
-//
-//    @inline
-//    def keyInRange(): Boolean = {
-//      val actualKey = iterator.peekNext().getKey
-//      actualKey.startsWith(KeyTags.LeaseDetails.prefixBytes) && Ints.fromByteArray(actualKey.slice(2, 6)) <= toHeight
-//    }
-//
-//    iterator.seek(KeyTags.LeaseDetails.prefixBytes ++ Ints.toByteArray(fromHeight))
-//    while (iterator.hasNext && keyInRange()) {
-//      val e       = iterator.next()
-//      val leaseId = ByteStr(e.getKey.drop(6))
-//      if (includeCancelled || readLeaseDetails(e.getValue).fold(identity, _.isActive))
-//        leaseIds += leaseId
-//      else
-//        leaseIds -= leaseId
-//    }
+
+    val iterator = resource.iterator
+
+    @inline
+    def keyInRange(): Boolean = {
+      val actualKey = iterator.key()
+      actualKey.startsWith(KeyTags.LeaseDetails.prefixBytes) && Ints.fromByteArray(actualKey.slice(2, 6)) <= toHeight
+    }
+
+    iterator.seek(KeyTags.LeaseDetails.prefixBytes ++ Ints.toByteArray(fromHeight))
+    while (iterator.isValid && keyInRange()) {
+      val leaseId = ByteStr(iterator.key().drop(6))
+      if (includeCancelled || readLeaseDetails(iterator.value()).fold(identity, _.isActive))
+        leaseIds += leaseId
+      else
+        leaseIds -= leaseId
+
+      iterator.next()
+    }
 
     leaseIds.toSet
   }

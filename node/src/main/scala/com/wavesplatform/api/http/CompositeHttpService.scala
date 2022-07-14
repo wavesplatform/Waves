@@ -9,7 +9,6 @@ import akka.http.scaladsl.server.RouteResult.Complete
 import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.utils.ScorexLogging
-import io.netty.util.concurrent.DefaultThreadFactory
 
 import scala.io.Source
 

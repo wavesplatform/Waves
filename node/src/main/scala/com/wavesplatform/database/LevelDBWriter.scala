@@ -610,7 +610,7 @@ abstract class LevelDBWriter private[database] (
         val scriptsToDiscard        = Seq.newBuilder[Address]
         val assetScriptsToDiscard   = Seq.newBuilder[IssuedAsset]
         val accountDataToInvalidate = Seq.newBuilder[(Address, String)]
-        val aliasesToInvalidate = Seq.newBuilder[Alias]
+        val aliasesToInvalidate     = Seq.newBuilder[Alias]
 
         val discardedBlock = readWrite { rw =>
           rw.put(Keys.height, currentHeight - 1)
@@ -965,7 +965,7 @@ abstract class LevelDBWriter private[database] (
     r.iterator.seek(Bytes.concat(KeyTags.AssetStaticInfo.prefixBytes, address.arr))
 
     if (r.iterator.isValid)
-      Option(IssuedAsset(ByteStr(r.iterator.key())))
+      Option(IssuedAsset(ByteStr(r.iterator.key().drop(2))))
         .filter(asset => asset.id.size == 32 && ERC20Address(asset) == address)
     else None
   }
