@@ -1726,6 +1726,8 @@ paths:
                     type: string
                   expr:
                     type: string
+                  complexity:
+                    type: integer
                   result:
                     type: object
                     properties:
