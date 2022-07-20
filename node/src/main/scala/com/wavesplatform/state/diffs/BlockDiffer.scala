@@ -137,7 +137,7 @@ object BlockDiffer {
     } yield r
   }
 
-  private def maybeApplySponsorship(blockchain: Blockchain, sponsorshipEnabled: Boolean, transactionFee: (Asset, Long)): (Asset, Long) =
+  def maybeApplySponsorship(blockchain: Blockchain, sponsorshipEnabled: Boolean, transactionFee: (Asset, Long)): (Asset, Long) =
     transactionFee match {
       case (ia: IssuedAsset, fee) if sponsorshipEnabled =>
         Waves -> Sponsorship.toWaves(fee, blockchain.assetDescription(ia).get.sponsorship)
