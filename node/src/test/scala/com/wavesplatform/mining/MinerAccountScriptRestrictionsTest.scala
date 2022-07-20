@@ -3,7 +3,6 @@ package com.wavesplatform.mining
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
@@ -24,30 +23,62 @@ import io.netty.util.concurrent.GlobalEventExecutor
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import DomainPresets.*
+import com.wavesplatform.block.Block
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.v1.compiler.Terms.CONST_STRING
+import com.wavesplatform.state.appender.BlockAppender
+import monix.eval.Task
+
+import scala.concurrent.duration.*
 
 class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
 
-  val minerAcc: KeyPair = TxHelpers.signer(1)
+  type Appender = Block => Task[Either[ValidationError, Option[BigInt]]]
+
+  val time: TestTime            = TestTime()
+  val minerAcc: KeyPair         = TxHelpers.signer(1)
+  val invoker: KeyPair          = TxHelpers.signer(2)
+  val allowedRecipient: KeyPair = TxHelpers.signer(3)
+
+  val dataKey = "testKey"
 
   property("miner account can have any script after RideV6 feature activation") {
     Seq(
-      dAppScriptWithVerifier(true),
-      dAppScriptWithVerifier(false),
-      dAppScriptWithoutVerifier,
-      accountScript(true),
-      accountScript(false)
-    ).foreach { script =>
+      (dAppScriptWithVerifier, true, true),
+      (dAppScriptWithoutVerifier, true, false),
+      (accountScript, false, true)
+    ).foreach { case (script, hasCallable, hasVerifier) =>
+      val checkCallableTxCount = if (hasCallable) 2 else 0
+      val checkVerifierTxCount = if (hasVerifier) 1 else 0
+      val activationHeight     = 3 + checkCallableTxCount + checkVerifierTxCount
+
       withDomain(
-        DomainPresets.RideV5.setFeaturesHeight((BlockchainFeatures.RideV6, 3)),
-        AddrWithBalance.enoughBalances(minerAcc)
+        DomainPresets.RideV5.setFeaturesHeight((BlockchainFeatures.RideV6, activationHeight)),
+        AddrWithBalance.enoughBalances(minerAcc, invoker)
       ) { d =>
-        val miner = createMiner(d)
+        withMiner(d) { (miner, appender, scheduler) =>
+          d.appendBlock(setScript(script))
+          if (hasCallable) {
+            d.appendAndAssertSucceed(
+              TxHelpers.invoke(minerAcc.toAddress, Some("c"), Seq(CONST_STRING("invoker").explicitGet()), invoker = invoker)
+            )
+            d.accountsApi.data(minerAcc.toAddress, dataKey).get.value shouldBe "invoker"
+            d.appendAndAssertSucceed(
+              TxHelpers.invoke(minerAcc.toAddress, Some("c"), Seq(CONST_STRING("miner").explicitGet()), invoker = minerAcc)
+            )
+            d.accountsApi.data(minerAcc.toAddress, dataKey).get.value shouldBe "miner"
+          }
+          if (hasVerifier) {
+            d.appendAndAssertSucceed(TxHelpers.transfer(minerAcc, allowedRecipient.toAddress))
+            d.appendAndCatchError(TxHelpers.transfer(minerAcc, invoker.toAddress)).toString should include("TransactionNotAllowedByScript")
+          }
+          miner.getNextBlockGenerationOffset(minerAcc) should produce(errMsgBeforeRideV6)
+          forgeAndAppendBlock(d, miner, appender)(scheduler) should produce(errMsgBeforeRideV6)
 
-        d.appendBlock(setScript(script))
-        miner.getNextBlockGenerationOffset(minerAcc) should produce(errMsgBeforeRideV6)
-
-        d.appendBlock()
-        miner.getNextBlockGenerationOffset(minerAcc) should beRight
+          d.appendBlock()
+          miner.getNextBlockGenerationOffset(minerAcc) should beRight
+          forgeAndAppendBlock(d, miner, appender)(scheduler) should beRight
+        }
       }
     }
   }
@@ -57,47 +88,76 @@ class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
 
   private def ts: Long = System.currentTimeMillis()
 
-  private def createMiner(d: Domain): MinerImpl = {
-    val wavesSettings = WavesSettings.default()
+  private def withMiner(d: Domain)(f: (MinerImpl, Appender, Scheduler) => Unit): Unit = {
+    val defaultSettings = WavesSettings.default()
+    val wavesSettings   = defaultSettings.copy(minerSettings = defaultSettings.minerSettings.copy(quorum = 0))
 
-    new MinerImpl(
+    val utx = new UtxPoolImpl(time, d.blockchainUpdater, wavesSettings.utxSettings, isMiningEnabled = wavesSettings.minerSettings.enable)
+    val appenderScheduler = Scheduler.singleThread("appender")
+
+    val miner = new MinerImpl(
       new DefaultChannelGroup(GlobalEventExecutor.INSTANCE),
       d.blockchainUpdater,
       wavesSettings,
-      ntpTime,
-      new UtxPoolImpl(ntpTime, d.blockchainUpdater, wavesSettings.utxSettings, isMiningEnabled = wavesSettings.minerSettings.enable),
+      time,
+      utx,
       Wallet(WalletSettings(None, Some("123"), Some(ByteStr(minerAcc.seed)))),
-      PoSSelector(d.blockchainUpdater, wavesSettings.synchronizationSettings.maxBaseTarget),
+      d.posSelector,
       Scheduler.singleThread("miner"),
-      Scheduler.singleThread("appender"),
+      appenderScheduler,
       Observable.empty
     )
+
+    val appender = BlockAppender(d.blockchainUpdater, time, utx, d.posSelector, appenderScheduler) _
+
+    f(miner, appender, appenderScheduler)
+  }
+
+  private def forgeAndAppendBlock(d: Domain, miner: MinerImpl, appender: Appender)(implicit scheduler: Scheduler) = {
+    time.setTime(
+      d.lastBlock.header.timestamp + d.posSelector
+        .getValidBlockDelay(d.blockchain.height, minerAcc, d.lastBlock.header.baseTarget, d.blockchain.generatingBalance(minerAcc.toAddress))
+        .explicitGet()
+    )
+    val forge = miner.forgeBlock(minerAcc)
+    val block = forge.explicitGet()._1
+    appender(block).runSyncUnsafe(10.seconds)
   }
 
   private def setScript(script: Script): SetScriptTransaction =
     SetScriptTransaction.selfSigned(TxVersion.V2, minerAcc, Some(script), 0.01.waves, ts).explicitGet()
 
-  private def accountScript(result: Boolean): ExprScript =
-    TestCompiler(V5).compileExpression(result.toString)
+  private def verifierScriptStr: String =
+    s"""
+       |match tx {
+       |    case t: TransferTransaction => t.recipient == Address(base58'${allowedRecipient.toAddress}')
+       |    case _ => true
+       |}
+       |""".stripMargin
 
-  private def dAppScriptWithVerifier(result: Boolean): ContractScriptImpl = {
+  private def callableFuncStr: String =
+    s"""
+       |@Callable(i)
+       |func c(value: String) = {
+       |  [StringEntry("$dataKey", value)]
+       |}""".stripMargin
+
+  private def accountScript: ExprScript =
+    TestCompiler(V5).compileExpression(verifierScriptStr)
+
+  private def dAppScriptWithVerifier: ContractScriptImpl = {
     val expr =
       s"""
-        |@Callable(i)
-        |func c() = []
-        |
-        |@Verifier(tx)
-        |func v() = $result
-        |""".stripMargin
+         |$callableFuncStr
+         |
+         |@Verifier(tx)
+         |func v() = {
+         |  $verifierScriptStr
+         |}
+         |""".stripMargin
     TestCompiler(V5).compileContract(expr)
   }
 
-  private def dAppScriptWithoutVerifier: ContractScriptImpl = {
-    val expr =
-      """
-        |@Callable(i)
-        |func c() = []
-        |""".stripMargin
-    TestCompiler(V5).compileContract(expr)
-  }
+  private def dAppScriptWithoutVerifier: ContractScriptImpl =
+    TestCompiler(V5).compileContract(callableFuncStr)
 }
