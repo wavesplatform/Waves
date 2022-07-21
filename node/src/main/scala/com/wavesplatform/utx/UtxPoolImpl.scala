@@ -311,7 +311,7 @@ class UtxPoolImpl(
 
       def isUnlimited: Boolean = strategy == PackStrategy.Unlimited
 
-      def minerFeePortfolio(currBlockchain: Blockchain, tx: Transaction) = {
+      def minerFeePortfolio(currBlockchain: Blockchain, tx: Transaction): Diff = {
         val (feeAsset, feeAmount) = BlockDiffer.maybeApplySponsorship(currBlockchain, blockchain.isSponsorshipActive, tx.assetFee)
         val minerPortfolio = if (!blockchain.isNGActive) Portfolio.empty else Portfolio.build(feeAsset, feeAmount).multiply(CurrentBlockFeePart)
 
