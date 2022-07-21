@@ -7,7 +7,7 @@ import com.wavesplatform.api.http.DebugMessage
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi.*
-import com.wavesplatform.it.api.{DebugStateChanges, TransactionStatus}
+import com.wavesplatform.it.api.{StateChanges, TransactionStatus}
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -151,7 +151,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
       sender.balance(caller.toAddress.toString).balance shouldBe prevBalance - txs.size * invokeFee
 
       failed.foreach { s =>
-        checkStateChange(sender.debugStateChanges(s.id), 1, "Crashed by dApp", strict = true)
+        checkStateChange(sender.stateChanges(s.id), 1, "Crashed by dApp", strict = true)
       }
 
       assertApiError(
@@ -201,7 +201,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
           s"$scriptInvokedInfo$issuedInfo does not exceed minimal value of $minFee WAVES."
 
         failed.foreach { s =>
-          checkStateChange(sender.debugStateChanges(s.id), 2, text)
+          checkStateChange(sender.stateChanges(s.id), 2, text)
         }
 
         failed
@@ -235,7 +235,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
       sender.assetsBalance(contractAddress).balances.map(_.assetId) should contain theSameElementsAs prevAssets
 
       failed.foreach { s =>
-        checkStateChange(sender.debugStateChanges(s.id), 3, "Transaction is not allowed by script of the asset")
+        checkStateChange(sender.stateChanges(s.id), 3, "Transaction is not allowed by script of the asset")
       }
 
       failed
@@ -299,7 +299,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
       )
 
       failed.foreach { s =>
-        checkStateChange(sender.debugStateChanges(s.id), 4, "Transaction is not allowed by script of the asset")
+        checkStateChange(sender.stateChanges(s.id), 4, "Transaction is not allowed by script of the asset")
       }
 
       failed
@@ -372,7 +372,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
         sender.getDataByKey(contractAddress, key) shouldBe lastSuccessWrites.getOrElse(key, initial)
       }
 
-      failed.foreach(s => checkStateChange(sender.debugStateChanges(s.id), 3, "Transaction is not allowed by script of the asset"))
+      failed.foreach(s => checkStateChange(sender.stateChanges(s.id), 3, "Transaction is not allowed by script of the asset"))
 
       val failedIds             = failed.map(_.id).toSet
       val stateChangesByAddress = sender.debugStateChangesByAddress(contractAddress, 10).takeWhile(sc => failedIds.contains(sc.id))
@@ -626,7 +626,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
   private def waitForTxs(txs: Seq[String]): Unit =
     nodes.waitFor("preconditions", 500.millis)(_.transactionStatus(txs).forall(_.status == "confirmed"))(_.forall(identity))
 
-  private def checkStateChange(info: DebugStateChanges, code: Int, text: String, strict: Boolean = false): Unit = {
+  private def checkStateChange(info: StateChanges, code: Int, text: String, strict: Boolean = false): Unit = {
     info.stateChanges shouldBe defined
     info.stateChanges.get.issues.size shouldBe 0
     info.stateChanges.get.reissues.size shouldBe 0
