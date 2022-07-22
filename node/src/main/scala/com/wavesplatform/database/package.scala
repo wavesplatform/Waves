@@ -4,7 +4,6 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.util
 import java.util.{Collections, Map as JMap}
-
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.collect.Maps
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
@@ -47,6 +46,7 @@ import org.rocksdb.{BloomFilter as RBloomFilter, *}
 import org.slf4j.LoggerFactory
 import supertagged.TaggedType
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.Using
 
@@ -62,6 +62,7 @@ package object database {
       .setParanoidChecks(true)
       .setIncreaseParallelism(4)
       .setBytesPerSync(2 << 20)
+      .setMaxBackgroundJobs(4)
 
     val cfo = new ColumnFamilyOptions()
       .setTableFormatConfig(
@@ -69,9 +70,18 @@ package object database {
           .setFilterPolicy(new RBloomFilter())
           .setOptimizeFiltersForMemory(true)
           .setCacheIndexAndFilterBlocks(true)
+          .setPinL0FilterAndIndexBlocksInCache(true)
+          .setFormatVersion(5)
+          .setBlockSize(64 << 10)
+          .setBlockCache(new LRUCache(128 << 20))
+          .setDataBlockIndexType(DataBlockIndexType.kDataBlockBinaryAndHash)
+          .setDataBlockHashTableUtilRatio(0.75)
       )
       .setWriteBufferSize(128 << 20)
       .setLevelCompactionDynamicLevelBytes(true)
+      .useCappedPrefixExtractor(10)
+      .setMemtablePrefixBloomSizeRatio(0.25)
+      .setCompressionType(CompressionType.LZ4_COMPRESSION)
 
     file.getAbsoluteFile.getParentFile.mkdirs()
     RocksDB.open(
@@ -511,13 +521,20 @@ package object database {
     def iterateOver(tag: KeyTags.KeyTag)(f: DBEntry => Unit): Unit = iterateOver(tag.prefixBytes)(f)
 
     def iterateOver(prefix: Array[Byte], seekPrefix: Array[Byte] = Array.emptyByteArray)(f: DBEntry => Unit): Unit = {
-      val iterator = db.newIterator()
+      @tailrec
+      def loop(iter: RocksIterator): Unit = {
+        val key = iter.key()
+        if (iter.isValid) {
+          f(Maps.immutableEntry(key, iter.value()))
+          iter.next()
+          loop(iter)
+        } else ()
+      }
+
+      val iterator = db.newIterator(new ReadOptions().setTotalOrderSeek(false).setPrefixSameAsStart(true))
       try {
         iterator.seek(Bytes.concat(prefix, seekPrefix))
-        while (iterator.isValid && iterator.key().startsWith(prefix)) {
-          f(Maps.immutableEntry(iterator.key(), iterator.value()))
-          iterator.next()
-        }
+        loop(iterator)
       } finally iterator.close()
     }
 
@@ -639,7 +656,7 @@ package object database {
   def loadLeaseIds(resource: DBResource, fromHeight: Int, toHeight: Int, includeCancelled: Boolean): Set[ByteStr] = {
     val leaseIds = mutable.Set.empty[ByteStr]
 
-    val iterator = resource.iterator
+    val iterator = resource.fullIterator
 
     @inline
     def keyInRange(): Boolean = {

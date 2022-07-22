@@ -625,6 +625,7 @@ abstract class LevelDBWriter private[database] (
             addressId <- rw.get(Keys.changedAddresses(currentHeight))
           } yield addressId -> rw.get(Keys.idToAddress(addressId))
 
+          // FIXME: use iterator correctly
           rw.iterateOver(KeyTags.ChangedAssetBalances.prefixBytes ++ Ints.toByteArray(currentHeight)) { e =>
             val assetId = IssuedAsset(ByteStr(e.getKey.takeRight(32)))
             for ((addressId, address) <- changedAddresses) {
@@ -962,10 +963,10 @@ abstract class LevelDBWriter private[database] (
   }
 
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] = writableDB.withResource { r =>
-    r.iterator.seek(Bytes.concat(KeyTags.AssetStaticInfo.prefixBytes, address.arr))
+    r.prefixIterator.seek(Bytes.concat(KeyTags.AssetStaticInfo.prefixBytes, address.arr))
 
-    if (r.iterator.isValid)
-      Option(IssuedAsset(ByteStr(r.iterator.key().drop(2))))
+    if (r.prefixIterator.isValid)
+      Option(IssuedAsset(ByteStr(r.prefixIterator.key().drop(2))))
         .filter(asset => asset.id.size == 32 && ERC20Address(asset) == address)
     else None
   }

@@ -5,7 +5,8 @@ import org.rocksdb.{ReadOptions, RocksDB, RocksIterator}
 trait DBResource extends AutoCloseable {
   def get[V](key: Key[V]): V
   def get(key: Array[Byte]): Array[Byte]
-  def iterator: RocksIterator // Should have a single instance
+  def prefixIterator: RocksIterator // Should have a single instance
+  def fullIterator: RocksIterator
 }
 
 object DBResource {
@@ -17,10 +18,12 @@ object DBResource {
 
     override def get(key: Array[Byte]): Array[Byte] = db.get(readOptions, key)
 
-    override lazy val iterator: RocksIterator = db.newIterator(readOptions)
+    override lazy val prefixIterator: RocksIterator = db.newIterator(readOptions.setTotalOrderSeek(false).setPrefixSameAsStart(true))
+
+    override lazy val fullIterator: RocksIterator = db.newIterator(readOptions)
 
     override def close(): Unit = {
-      iterator.close()
+      prefixIterator.close()
       snapshot.close()
     }
   }

@@ -6,6 +6,8 @@ import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.database.{DBExt, DBResource, Keys}
 import com.wavesplatform.state.{Diff, Height, InvokeScriptResult, TransactionId, TxMeta, TxNum}
 import com.wavesplatform.transaction.{Authorized, EthereumTransaction, GenesisTransaction, Transaction, TransactionType}
+import monix.eval.Task
+import monix.reactive.Observable
 import org.rocksdb.RocksDB
 
 object AddressTransactions {
@@ -40,7 +42,7 @@ object AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Iterator[(TxMeta, Transaction)] =
+  ): Observable[(TxMeta, Transaction)] =
     transactionsFromDiff(maybeDiff, subject, sender, types, fromId) ++
       transactionsFromDB(
         db,
@@ -56,9 +58,9 @@ object AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Iterator[(TxMeta, Transaction)] =
+  ): Observable[(TxMeta, Transaction)] = {
     db.get(Keys.addressId(subject))
-      .fold(Iterable.empty[(TxMeta, Transaction)]) { addressId =>
+      .fold(Observable.empty[(TxMeta, Transaction)]) { addressId =>
         val (maxHeight, maxTxNum) =
           fromId
             .flatMap(id => db.get(Keys.transactionMetaById(TransactionId(id))))
@@ -66,16 +68,24 @@ object AddressTransactions {
               Height(tm.height) -> TxNum(tm.num.toShort)
             }
 
-        (for {
-          seqNr                    <- (db.get(Keys.addressTransactionSeqNr(addressId)) to 0 by -1).view
-          (height, transactionIds) <- db.get(Keys.addressTransactionHN(addressId, seqNr)).view if height <= maxHeight
-          (txType, txNum)          <- transactionIds.view
-        } yield (height, txNum, txType))
-          .dropWhile { case (h, txNum, _) => h > maxHeight || h == maxHeight && txNum >= maxTxNum }
-          .collect { case (h, txNum, txType) if types.isEmpty || types(TransactionType(txType)) => h -> txNum }
-          .flatMap { case (h, txNum) => loadTransaction(db, h, txNum, sender) }
+        Observable
+          .fromIterator(
+            Task {
+              (for {
+                seqNr                    <- (db.get(Keys.addressTransactionSeqNr(addressId)) to 0 by -1).view
+                (height, transactionIds) <- db.get(Keys.addressTransactionHN(addressId, seqNr)).view if height <= maxHeight
+                (txType, txNum)          <- transactionIds.view
+              } yield (height, txNum, txType))
+                .dropWhile { case (h, txNum, _) => h > maxHeight || h == maxHeight && txNum >= maxTxNum }
+                .collect { case (h, txNum, txType) if types.isEmpty || types(TransactionType(txType)) => h -> txNum }
+                .iterator
+            }
+          )
+          .concatMapIterable { case (h, txNum) =>
+            loadTransaction(db, h, txNum, sender).toSeq
+          }
       }
-      .iterator
+  }
 
   def transactionsFromDiff(
       maybeDiff: Option[(Height, Diff)],
@@ -83,15 +93,20 @@ object AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Iterator[(TxMeta, Transaction)] =
-    (for {
-      (height, diff) <- maybeDiff.toSeq
-      nti            <- diff.transactions.values.toSeq.reverse
-      if nti.affected(subject)
-    } yield (TxMeta(height, nti.applied, nti.spentComplexity), nti.transaction))
-      .dropWhile { case (_, tx) => fromId.isDefined && !fromId.contains(tx.id()) }
-      .dropWhile { case (_, tx) => fromId.contains(tx.id()) }
-      .filter { case (_, tx) => types.isEmpty || types.contains(tx.tpe) }
-      .collect { case v @ (_, tx: Authorized) if sender.forall(_ == tx.sender.toAddress) => v }
-      .iterator
+  ): Observable[(TxMeta, Transaction)] = {
+    Observable.fromIterator(
+      Task {
+        (for {
+          (height, diff) <- maybeDiff.toSeq
+          nti            <- diff.transactions.values.toSeq.reverse
+          if nti.affected(subject)
+        } yield (TxMeta(height, nti.applied, nti.spentComplexity), nti.transaction))
+          .dropWhile { case (_, tx) => fromId.isDefined && !fromId.contains(tx.id()) }
+          .dropWhile { case (_, tx) => fromId.contains(tx.id()) }
+          .filter { case (_, tx) => types.isEmpty || types.contains(tx.tpe) }
+          .collect { case v @ (_, tx: Authorized) if sender.forall(_ == tx.sender.toAddress) => v }
+          .iterator
+      }
+    )
+  }
 }

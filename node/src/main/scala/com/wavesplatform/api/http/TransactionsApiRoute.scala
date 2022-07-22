@@ -33,6 +33,7 @@ import play.api.libs.json.*
 import scala.util.Success
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta.Payload
 import com.wavesplatform.lang.v1.serialization.SerdeV1
+import monix.reactive.Observable
 
 case class TransactionsApiRoute(
     settings: RestAPISettings,
@@ -58,13 +59,13 @@ case class TransactionsApiRoute(
 
   def addressWithLimit: Route = {
     (get & path("address" / AddrSegment / "limit" / IntNumber) & parameter("after".?)) { (address, limit, maybeAfter) =>
-      routeTimeout.executeToFuture {
+      routeTimeout.executeFromObservable {
         val after =
           maybeAfter.map(s => ByteStr.decodeBase58(s).getOrElse(throw ApiException(CustomValidationError(s"Unable to decode transaction id $s"))))
         if (limit > settings.transactionsByAddressLimit) throw ApiException(TooBigArrayAllocation)
 
-        transactionsByAddress(address, limit, after).map(txs => List(txs)) // Double list - [ [tx1, tx2, ...] ]
-      }
+        transactionsByAddress(address, limit, after) // Double list - [ [tx1, tx2, ...] ]
+      }(jsonStreamMarshaller("[[", ",", "]]"))
     }
   }
 
@@ -198,7 +199,7 @@ case class TransactionsApiRoute(
       case _ => InvalidSignature
     }
 
-  def transactionsByAddress(address: Address, limitParam: Int, maybeAfter: Option[ByteStr]): Task[List[JsObject]] = {
+  def transactionsByAddress(address: Address, limitParam: Int, maybeAfter: Option[ByteStr]): Observable[JsObject] = {
     val aliasesOfAddress: Task[Set[Alias]] =
       commonApi
         .aliasesOfAddress(address)
@@ -231,7 +232,6 @@ case class TransactionsApiRoute(
       .transactionsByAddress(address, None, Set.empty, maybeAfter)
       .take(limitParam)
       .mapEval(compactJson(address, _))
-      .toListL
   }
 }
 

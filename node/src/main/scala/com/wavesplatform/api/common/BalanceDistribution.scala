@@ -18,16 +18,16 @@ object BalanceDistribution {
       private var pendingPortfolios: Map[Address, Portfolio]
   ) extends AbstractIterator[(Address, Long)] {
     @inline
-    private def stillSameAddress(expected: AddressId): Boolean = resource.iterator.isValid && {
-      val maybeNext = resource.iterator.key()
+    private def stillSameAddress(expected: AddressId): Boolean = resource.fullIterator.isValid && {
+      val maybeNext = resource.fullIterator.key()
       maybeNext.startsWith(globalPrefix) && addressId(maybeNext) == expected
     }
     @tailrec
     private def findNextBalance(): Option[(Address, Long)] = {
-      if (!resource.iterator.isValid) None
+      if (!resource.fullIterator.isValid) None
       else {
-        val key   = resource.iterator.key()
-        val value = resource.iterator.value()
+        val key   = resource.fullIterator.key()
+        val value = resource.fullIterator.value()
         if (!key.startsWith(globalPrefix)) None
         else {
           val aid           = addressId(key)
@@ -36,12 +36,12 @@ object BalanceDistribution {
           var currentHeight = Ints.fromByteArray(key.takeRight(4))
 
           while (stillSameAddress(aid)) {
-            val nextHeight = Ints.fromByteArray(resource.iterator.key.takeRight(4))
+            val nextHeight = Ints.fromByteArray(resource.fullIterator.key.takeRight(4))
             if (nextHeight <= height) {
               currentHeight = nextHeight
-              balance = Longs.fromByteArray(resource.iterator.value())
+              balance = Longs.fromByteArray(resource.fullIterator.value())
             }
-            resource.iterator.next()
+            resource.fullIterator.next()
           }
 
           val adjustedBalanceE = safeSum(balance, pendingPortfolios.get(address).fold(0L)(balanceOf), "Next distribution balance")

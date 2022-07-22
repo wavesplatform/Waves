@@ -24,27 +24,26 @@ package object common {
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
   ): Observable[TransactionMeta] =
-    Observable
-      .fromIterator(Task(allAddressTransactions(db, maybeDiff, subject, sender, types, fromId).map { case (m, transaction) =>
-        def loadISR(t: Transaction) =
-          maybeDiff
-            .flatMap { case (_, diff) => diff.scriptResults.get(t.id()) }
-            .orElse(loadInvokeScriptResult(db, t.id()))
+    allAddressTransactions(db, maybeDiff, subject, sender, types, fromId).map { case (m, transaction) =>
+      def loadISR(t: Transaction) =
+        maybeDiff
+          .flatMap { case (_, diff) => diff.scriptResults.get(t.id()) }
+          .orElse(loadInvokeScriptResult(db, t.id()))
 
-        def loadETM(t: Transaction) =
-          maybeDiff
-            .flatMap { case (_, diff) => diff.ethereumTransactionMeta.get(t.id()) }
-            .orElse(loadEthereumMetadata(db, t.id()))
+      def loadETM(t: Transaction) =
+        maybeDiff
+          .flatMap { case (_, diff) => diff.ethereumTransactionMeta.get(t.id()) }
+          .orElse(loadEthereumMetadata(db, t.id()))
 
-        TransactionMeta.create(
-          m.height,
-          transaction,
-          m.succeeded,
-          m.spentComplexity,
-          loadISR,
-          loadETM
-        )
-      }))
+      TransactionMeta.create(
+        m.height,
+        transaction,
+        m.succeeded,
+        m.spentComplexity,
+        loadISR,
+        loadETM
+      )
+    }
 
   def balanceDistribution(
       db: RocksDB,
@@ -57,7 +56,7 @@ package object common {
   ): Observable[(Address, Long)] =
     db.resourceObservable
       .flatMap { resource =>
-        resource.iterator.seek(
+        resource.fullIterator.seek(
           globalPrefix ++ after
             .flatMap(address => resource.get(Keys.addressId(address)))
             .fold(Array.emptyByteArray)(id => Longs.toByteArray(id.toLong + 1))

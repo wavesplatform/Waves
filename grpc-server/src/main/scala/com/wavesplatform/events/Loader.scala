@@ -19,11 +19,11 @@ import scala.util.{Failure, Success, Try}
 
 class Loader(db: DB, blocksApi: CommonBlocksApi, target: Option[(Int, ByteStr)], streamId: String) extends ScorexLogging {
   private def loadBatch(res: DBResource, fromHeight: Int): Try[Seq[PBBlockchainUpdated]] = Try {
-    res.iterator.seek(Ints.toByteArray(fromHeight))
+    res.prefixIterator.seek(Ints.toByteArray(fromHeight))
     val buffer = ArrayBuffer[PBBlockchainUpdated]()
 
-    while (res.iterator.hasNext && buffer.size < 100 && target.forall { case (h, _) => fromHeight + buffer.size <= h }) {
-      buffer.append(Loader.parseUpdate(res.iterator.next().getValue, blocksApi, fromHeight + buffer.size))
+    while (res.prefixIterator.hasNext && buffer.size < 100 && target.forall { case (h, _) => fromHeight + buffer.size <= h }) {
+      buffer.append(Loader.parseUpdate(res.prefixIterator.next().getValue, blocksApi, fromHeight + buffer.size))
     }
 
     for ((h, id) <- target if h == fromHeight + buffer.size - 1; u <- buffer.lastOption) {
@@ -59,8 +59,8 @@ object Loader {
         _.append.update(
           _.body.modify {
             case Body.Block(value) =>
-              Body.Block(value.copy(block = blocksApi.blockAtHeight(height).map {
-                case (meta, txs) => PBBlock(Some(meta.header.toPBHeader), meta.signature.toByteString, txs.map(_._2.toPB))
+              Body.Block(value.copy(block = blocksApi.blockAtHeight(height).map { case (meta, txs) =>
+                PBBlock(Some(meta.header.toPBHeader), meta.signature.toByteString, txs.map(_._2.toPB))
               }))
             case other => other
           }
