@@ -1,16 +1,17 @@
 package com.wavesplatform.lang.doc
 
-import cats.syntax.semigroup._
+import cats.syntax.semigroup.*
 import com.wavesplatform.DocSource
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{Account, Expression, StdLibVersion, _}
+import com.wavesplatform.lang.directives.values.{Account, Expression, StdLibVersion, *}
 import com.wavesplatform.lang.v1.CTX
+import com.wavesplatform.lang.v1.compiler.UtilityFunctionPrefix
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 
 class DocExportTest extends PropSpec {
 
@@ -57,7 +58,7 @@ class DocExportTest extends PropSpec {
 
   def funcDoc(ctx: CTX[Environment], ver: StdLibVersion): Array[(Option[(String, List[String], Int)], String)] =
     ctx.functions
-      .filterNot(_.name.startsWith("$"))
+      .filterNot(_.name.startsWith(UtilityFunctionPrefix))
       .map(f => (f.name, f.signature.args.map(_._2.toString).toList))
       .map(k => (DocSource.funcData.get((k._1, k._2, ver.value.asInstanceOf[Int])), k._1))
 }

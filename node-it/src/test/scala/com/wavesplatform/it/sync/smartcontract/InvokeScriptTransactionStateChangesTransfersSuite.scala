@@ -22,12 +22,12 @@ class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionS
     val script = ScriptCompiler
       .compile(
         """
-      |{-# STDLIB_VERSION 4 #-}
-      |{-# CONTENT_TYPE DAPP #-}
-      |
-      |@Callable(inv)
-      |func sendToCaller(amount: Int) = [ScriptTransfer(inv.caller, amount, unit)]
-      |
+          |{-# STDLIB_VERSION 4 #-}
+          |{-# CONTENT_TYPE DAPP #-}
+          |
+          |@Callable(inv)
+          |func sendToCaller(amount: Int) = [ScriptTransfer(inv.caller, amount, unit)]
+          |
       """.stripMargin,
         ScriptEstimatorV2
       )
@@ -52,7 +52,7 @@ class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionS
       waitForTx = true
     )
     nodes.waitForHeightAriseAndTxPresent(invokeScriptTx._1.id)
-    val txStateChanges = sender.debugStateChanges(invokeScriptTx._1.id)
+    val txStateChanges = sender.stateChanges(invokeScriptTx._1.id)
 
     val transferCountOpt            = txStateChanges.stateChanges.map(_.transfers.size)
     val firstTransferAddrOpt        = txStateChanges.stateChanges.map(_.transfers.head.address)
@@ -77,7 +77,7 @@ class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionS
       waitForTx = true
     )
     nodes.waitForHeightAriseAndTxPresent(invokeScriptTx._1.id)
-    val txStateChanges = sender.debugStateChanges(invokeScriptTx._1.id)
+    val txStateChanges = sender.stateChanges(invokeScriptTx._1.id)
 
     val transferCountOpt            = txStateChanges.stateChanges.map(_.transfers.size)
     val firstTransferAddrOpt        = txStateChanges.stateChanges.map(_.transfers.head.address)
@@ -102,7 +102,7 @@ class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionS
       waitForTx = true
     )
     nodes.waitForHeightAriseAndTxPresent(invokeScriptTx._1.id)
-    val txStateChanges = sender.debugStateChanges(invokeScriptTx._1.id)
+    val txStateChanges = sender.stateChanges(invokeScriptTx._1.id)
 
     val transferCountOpt            = txStateChanges.stateChanges.map(_.transfers.size)
     val firstTransferAddrOpt        = txStateChanges.stateChanges.map(_.transfers.head.address)
@@ -127,7 +127,7 @@ class InvokeScriptTransactionStateChangesTransfersSuite extends BaseTransactionS
       waitForTx = true
     )
     nodes.waitForHeightAriseAndTxPresent(invokeScriptTx._1.id)
-    val txStateChanges = sender.debugStateChanges(invokeScriptTx._1.id)
+    val txStateChanges = sender.stateChanges(invokeScriptTx._1.id)
 
     val transferCountOpt            = txStateChanges.stateChanges.map(_.transfers.size)
     val firstTransferAddrOpt        = txStateChanges.stateChanges.map(_.transfers.head.address)
