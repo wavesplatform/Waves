@@ -656,6 +656,26 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
       }
     }
 
+
+    "processes transaction fees" in {
+      val blockMiner = TxHelpers.signer(1200)
+      val recipient = TxHelpers.signer(1201)
+      val initialAmount = 10000.waves
+      val minerBalance = initialAmount + 0.001.waves * 2
+
+      withDomain(DomainPresets.NG, balances = Seq(AddrWithBalance(blockMiner.toAddress, minerBalance))) { d =>
+        val transfer1 = TxHelpers.transfer(blockMiner, recipient.toAddress, version = 1.toByte, amount = initialAmount, fee = 0.001.waves)
+        val transfer2 = TxHelpers.transfer(blockMiner, recipient.toAddress, version = 1.toByte, amount = 0.0004.waves, fee = 0.001.waves)
+        d.appendBlock(
+          d.createBlock(Block.NgBlockVersion, Seq.empty, generator = blockMiner)
+        )
+        d.utxPool.addTransaction(transfer1, verify = true)
+        d.utxPool.addTransaction(transfer2, verify = true)
+
+        d.utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1.get shouldEqual Seq(transfer1, transfer2)
+      }
+    }
+
     "blacklisting" - {
       "prevent a transfer transaction from specific addresses" in {
         val transferGen = Gen.oneOf(withBlacklisted, massTransferWithBlacklisted(allowRecipients = false))

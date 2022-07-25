@@ -92,7 +92,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
       all(block.transactions.map(_.applicationStatus)) shouldBe None
       all(sender.blockById(block.id).transactions.map(_.applicationStatus)) shouldBe None
       all(sender.blockSeq(txHeight - 1, txHeight).flatMap(_.transactions.map(_.applicationStatus))) shouldBe None
-      sender.debugStateChanges(tx).applicationStatus shouldBe None
+      sender.stateChanges(tx).applicationStatus shouldBe None
       all(sender.debugStateChangesByAddress(caller, 1).map(_.applicationStatus)) shouldBe None
     }
 
@@ -132,13 +132,13 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
       }
 
       val heightToId            = statuses.map(s => s.height.get -> s.id).toMap
-      val idToApplicationStatus = statuses.map(s => s.id         -> s.applicationStatus).toMap
+      val idToApplicationStatus = statuses.map(s => s.id -> s.applicationStatus).toMap
       heightToId.keys.foreach { h =>
         val block = sender.blockAt(h)
         block.transactions.foreach { tx =>
           tx.applicationStatus shouldBe idToApplicationStatus.getOrElse(tx.id, Some("succeeded"))
           if (tx._type == InvokeScriptTransaction.typeId) {
-            sender.debugStateChanges(tx.id).applicationStatus shouldBe idToApplicationStatus.getOrElse(tx.id, Some("succeeded"))
+            sender.stateChanges(tx.id).applicationStatus shouldBe idToApplicationStatus.getOrElse(tx.id, Some("succeeded"))
           }
         }
         sender.blockById(block.id).transactions.foreach { tx =>
@@ -472,13 +472,13 @@ object AcceptFailedScriptActivationSuite {
   private def assetScript(result: Boolean): Option[String] =
     mkScript(
       s"""
-       |match tx {
-       |  case _: SetAssetScriptTransaction => true
-       |  case _ =>
-       |   let check = ${"sigVerify(base58'', base58'', base58'') ||" * 16} false
-       |   if (check) then false else $result
-       |}
-       |""".stripMargin
+         |match tx {
+         |  case _: SetAssetScriptTransaction => true
+         |  case _ =>
+         |   let check = ${"sigVerify(base58'', base58'', base58'') ||" * 16} false
+         |   if (check) then false else $result
+         |}
+         |""".stripMargin
     )
 
   private def mkScript(scriptText: String): Option[String] = Some(ScriptCompiler.compile(scriptText, estimator).explicitGet()._1.bytes().base64)
