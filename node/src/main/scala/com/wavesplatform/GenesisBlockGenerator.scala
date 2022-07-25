@@ -148,6 +148,7 @@ object GenesisBlockGenerator {
     val shares: Seq[(FullAddressInfo, Share)] = settings.distributions
       .map(x => (toFullAddressInfo(x), x.amount))
       .sortBy(_._2)
+    val minerShares = shares.filter(_._1.miner)
 
     val timestamp = settings.timestamp.getOrElse(System.currentTimeMillis())
 
@@ -250,7 +251,7 @@ object GenesisBlockGenerator {
         else {
           val currentHitSource = if (height > 100) hitSources(100) else hitSources.head
           val (delay, newHitSource) = parallelMapMin[(FullAddressInfo, Share), (Long, ByteStr), Long](
-            shares,
+            minerShares,
             { case (miner, balance) =>
               val (hit, newHitSource) = getHitWithSource(miner.account, currentHitSource)
               val delay               = posCalculator.calculateDelay(hit, baseTargets.head, balance)
@@ -270,7 +271,7 @@ object GenesisBlockGenerator {
         }
 
       val startHitSource  = ByteStr(Array.fill(crypto.DigestLength)(0: Byte))
-      val startBaseTarget = inverseCalculateDelay(shares.map(_._2).max, 0.5)
+      val startBaseTarget = inverseCalculateDelay(minerShares.map(_._2).max, 0.5)
 
       val totalCount       = 1000
       val significantCount = 100
