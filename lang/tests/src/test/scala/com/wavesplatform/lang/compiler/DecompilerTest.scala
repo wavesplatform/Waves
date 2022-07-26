@@ -1116,8 +1116,4 @@ class DecompilerTest extends PropSpec {
       .filter(_ >= V6)
       .foreach(assertDecompile(script, decompiledV6, _))
   }
-
-  property("example") {
-    Global.serializeExpression(CONST_BOOLEAN(true), V3).foreach(println)
-  }
 }
