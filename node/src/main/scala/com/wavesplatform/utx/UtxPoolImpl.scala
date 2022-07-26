@@ -14,10 +14,11 @@ import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.UtxSettings
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
-import com.wavesplatform.state.diffs.TransactionDiffer
+import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
+import com.wavesplatform.state.diffs.{BlockDiffer, TransactionDiffer}
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.{Blockchain, Diff}
+import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.TxValidationError.{AlreadyInTheState, GenericError, SenderIsBlacklisted}
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
@@ -310,75 +311,82 @@ class UtxPoolImpl(
 
       def isUnlimited: Boolean = strategy == PackStrategy.Unlimited
 
+      def minerFeePortfolio(currBlockchain: Blockchain, tx: Transaction): Diff = {
+        val (feeAsset, feeAmount) = BlockDiffer.maybeApplySponsorship(currBlockchain, blockchain.isSponsorshipActive, tx.assetFee)
+        val minerPortfolio = if (!blockchain.isNGActive) Portfolio.empty else Portfolio.build(feeAsset, feeAmount).multiply(CurrentBlockFeePart)
+
+        Diff(portfolios = Map(currBlockchain.lastBlockHeader.get.header.generator.toAddress -> minerPortfolio))
+      }
+
       def packIteration(prevResult: PackResult, sortedTransactions: Iterator[TxEntry]): PackResult =
         sortedTransactions
           .filterNot(e => prevResult.validatedTransactions(e.tx.id()))
-          .foldLeft[PackResult](prevResult) {
-            case (r, TxEntry(tx, priority)) =>
-              def isLimitReached   = r.transactions.exists(_.nonEmpty) && isTimeLimitReached
-              def isAlreadyRemoved = !priority && !transactions.containsKey(tx.id())
+          .foldLeft[PackResult](prevResult) { case (r, TxEntry(tx, priority)) =>
+            def isLimitReached   = r.transactions.exists(_.nonEmpty) && isTimeLimitReached
+            def isAlreadyRemoved = !priority && !transactions.containsKey(tx.id())
 
-              if (r.constraint.isFull || isLimitReached || isAlreadyRemoved || cancelled())
-                r // don't run any checks here to speed up mining
-              else if (TxCheck.isExpired(tx)) {
-                TxStateActions.removeExpired(tx)
-                r.copy(iterations = r.iterations + 1, removedTransactions = r.removedTransactions + tx.id())
-              } else {
-                val newScriptedAddresses = scriptedAddresses(tx)
-                if (!priority && r.checkedAddresses.intersect(newScriptedAddresses).nonEmpty) r
-                else {
-                  val updatedBlockchain   = CompositeBlockchain(blockchain, r.totalDiff)
-                  val newCheckedAddresses = newScriptedAddresses ++ r.checkedAddresses
-                  val e                   = differ(updatedBlockchain, tx).resultE
-                  e match {
-                    case Right(newDiff) =>
-                      val updatedConstraint = r.constraint.put(updatedBlockchain, tx, newDiff)
-                      if (updatedConstraint.isOverfilled) {
-                        log.trace(
-                          s"Transaction ${tx.id()} does not fit into the block: " +
-                            s"${MultiDimensionalMiningConstraint.formatOverfilledConstraints(r.constraint, updatedConstraint).mkString(", ")}"
-                        )
-                        r.copy(
-                          transactions = r.transactions.orElse(Some(Seq.empty[Transaction])),
-                          iterations = r.iterations + 1,
-                          checkedAddresses = newCheckedAddresses,
-                          validatedTransactions = r.validatedTransactions + tx.id()
-                        )
-                      } else {
-                        newDiff.errorMessage(tx.id()) match {
-                          case Some(ErrorMessage(code, text)) =>
-                            log.trace(s"Packing transaction ${tx.id()} as failed due to $code: $text")
+            if (r.constraint.isFull || isLimitReached || isAlreadyRemoved || cancelled())
+              r // don't run any checks here to speed up mining
+            else if (TxCheck.isExpired(tx)) {
+              TxStateActions.removeExpired(tx)
+              r.copy(iterations = r.iterations + 1, removedTransactions = r.removedTransactions + tx.id())
+            } else {
+              val newScriptedAddresses = scriptedAddresses(tx)
+              if (!priority && r.checkedAddresses.intersect(newScriptedAddresses).nonEmpty) r
+              else {
+                val updatedBlockchain   = CompositeBlockchain(blockchain, r.totalDiff)
+                val newCheckedAddresses = newScriptedAddresses ++ r.checkedAddresses
+                val e                   = differ(updatedBlockchain, tx).resultE
+                e match {
+                  case Right(newDiff) =>
+                    val updatedConstraint = r.constraint.put(updatedBlockchain, tx, newDiff)
+                    if (updatedConstraint.isOverfilled) {
+                      log.trace(
+                        s"Transaction ${tx.id()} does not fit into the block: " +
+                          s"${MultiDimensionalMiningConstraint.formatOverfilledConstraints(r.constraint, updatedConstraint).mkString(", ")}"
+                      )
+                      r.copy(
+                        transactions = r.transactions.orElse(Some(Seq.empty[Transaction])),
+                        iterations = r.iterations + 1,
+                        checkedAddresses = newCheckedAddresses,
+                        validatedTransactions = r.validatedTransactions + tx.id()
+                      )
+                    } else {
+                      newDiff.errorMessage(tx.id()) match {
+                        case Some(ErrorMessage(code, text)) =>
+                          log.trace(s"Packing transaction ${tx.id()} as failed due to $code: $text")
 
-                          case None =>
-                            log.trace(s"Packing transaction ${tx.id()}")
-                        }
-
-                        r.totalDiff
-                          .combineF(newDiff)
-                          .fold(
-                            error => removeInvalid(r, tx, newCheckedAddresses, GenericError(error)),
-                            PackResult(
-                              Some(r.transactions.fold(Seq(tx))(tx +: _)),
-                              _,
-                              updatedConstraint,
-                              r.iterations + 1,
-                              newCheckedAddresses,
-                              r.validatedTransactions + tx.id(),
-                              r.removedTransactions
-                            )
-                          )
+                        case None =>
+                          log.trace(s"Packing transaction ${tx.id()}")
                       }
 
-                    case Left(TransactionValidationError(AlreadyInTheState(txId, _), tx)) if r.validatedTransactions.contains(tx.id()) =>
-                      log.trace(s"Transaction $txId already validated in priority pool")
-                      removeFromOrdPool(tx.id()) // Dont run events/metrics publication here because the tx is still exists in the priority pool
-                      r
+                      r.totalDiff
+                        .combineF(newDiff)
+                        .flatMap(_.combineF(minerFeePortfolio(updatedBlockchain, tx)))
+                        .fold(
+                          error => removeInvalid(r, tx, newCheckedAddresses, GenericError(error)),
+                          PackResult(
+                            Some(r.transactions.fold(Seq(tx))(tx +: _)),
+                            _,
+                            updatedConstraint,
+                            r.iterations + 1,
+                            newCheckedAddresses,
+                            r.validatedTransactions + tx.id(),
+                            r.removedTransactions
+                          )
+                        )
+                    }
 
-                    case Left(error) =>
-                      removeInvalid(r, tx, newCheckedAddresses, error)
-                  }
+                  case Left(TransactionValidationError(AlreadyInTheState(txId, _), tx)) if r.validatedTransactions.contains(tx.id()) =>
+                    log.trace(s"Transaction $txId already validated in priority pool")
+                    removeFromOrdPool(tx.id()) // Dont run events/metrics publication here because the tx is still exists in the priority pool
+                    r
+
+                  case Left(error) =>
+                    removeInvalid(r, tx, newCheckedAddresses, error)
                 }
               }
+            }
           }
 
       @tailrec
@@ -398,13 +406,14 @@ class UtxPoolImpl(
             log.trace("No more transactions to validate")
             newSeed
           } else {
-            val continue = try {
-              while (!cancelled() && !isTimeEstimateReached && allValidated(newSeed)) Thread.sleep(200)
-              !cancelled() && (!isTimeEstimateReached || isUnlimited)
-            } catch {
-              case _: InterruptedException =>
-                false
-            }
+            val continue =
+              try {
+                while (!cancelled() && !isTimeEstimateReached && allValidated(newSeed)) Thread.sleep(200)
+                !cancelled() && (!isTimeEstimateReached || isUnlimited)
+              } catch {
+                case _: InterruptedException =>
+                  false
+              }
             if (continue) loop(newSeed)
             else newSeed
           }
@@ -444,7 +453,8 @@ class UtxPoolImpl(
   private[this] object TxStateActions {
     def addReceived(tx: Transaction, diff: Option[Diff]): Unit =
       UtxPoolImpl.this.transactions.computeIfAbsent(
-        tx.id(), { _ =>
+        tx.id(),
+        { _ =>
           PoolMetrics.addTransaction(tx)
           ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Received)
           diff.foreach(diff => onEvent(UtxEvent.TxAdded(tx, diff))) // Only emits event if diff was computed
@@ -476,7 +486,7 @@ class UtxPoolImpl(
     }
   }
 
-  //noinspection ScalaStyle
+  // noinspection ScalaStyle
   private[this] object TxCheck {
     private[this] val ExpirationTime = blockchain.settings.functionalitySettings.maxTransactionTimeBackOffset.toMillis
 
@@ -492,7 +502,7 @@ class UtxPoolImpl(
       }
   }
 
-  //noinspection NameBooleanParameters
+  // noinspection NameBooleanParameters
   private[this] object TxCleanup {
     private[this] val scheduled = AtomicBoolean(false)
 
@@ -525,7 +535,7 @@ class UtxPoolImpl(
     cleanupScheduler.awaitTermination(10 seconds)
   }
 
-  //noinspection TypeAnnotation
+  // noinspection TypeAnnotation
   private[this] object PoolMetrics {
     private[this] val SampleInterval: Duration = Duration.of(500, ChronoUnit.MILLIS)
 

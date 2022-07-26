@@ -61,7 +61,7 @@ object JsAPI {
       "MaxAccountVerifierComplexityByVersion" -> ((ver: Int) => MaxAccountVerifierComplexityByVersion(DirectiveDictionary[StdLibVersion].idMap(ver))),
       "MaxCallableComplexityByVersion"        -> ((ver: Int) => MaxCallableComplexityByVersion(DirectiveDictionary[StdLibVersion].idMap(ver))),
       "MaxExprSizeInBytes"                    -> MaxExprSizeInBytes,
-      "MaxContractSizeInBytes"                -> MaxContractSizeInBytes,
+      "MaxContractSizeInBytes"                -> MaxContractSizeInBytesV6,
       "MaxInvokeScriptArgs"                   -> MaxInvokeScriptArgs,
       "MaxInvokeScriptSizeInBytes"            -> MaxInvokeScriptSizeInBytes,
       "MaxWriteSetSizeInBytes"                -> MaxWriteSetSizeInBytes,
