@@ -39,7 +39,8 @@ object Dependencies {
   val catsCore   = catsModule("core", "2.7.0")
   val shapeless  = Def.setting("com.chuusai" %%% "shapeless" % "2.3.9")
 
-  val scalaTest = "org.scalatest" %% "scalatest" % "3.2.12" % Test
+  val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.12" % Test
+  val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.0" % Test)
 
   val sttp3 = "com.softwaremill.sttp.client3" % "core_2.13" % "3.5.2"
 
