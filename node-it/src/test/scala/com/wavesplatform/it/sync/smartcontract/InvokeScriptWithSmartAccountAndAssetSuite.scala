@@ -70,7 +70,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
       .id
     nodes.waitForHeightAriseAndTxPresent(invokeScriptTxId)
 
-    sender.debugStateChanges(invokeScriptTxId).stateChanges.get.error shouldBe empty
+    sender.stateChanges(invokeScriptTxId).stateChanges.get.error shouldBe empty
   }
 
   test("can't invoke with insufficient payment for @Verifier") {

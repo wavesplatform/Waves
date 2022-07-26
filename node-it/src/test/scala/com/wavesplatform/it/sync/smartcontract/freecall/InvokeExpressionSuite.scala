@@ -47,7 +47,7 @@ class InvokeExpressionSuite extends BaseTransactionSuite with CancelAfterFailure
     val txFromByAddress = sender.transactionsByAddress(firstAddress, 100).find(_.id == id).get
     List(txFromInfoById, txFromByAddress).foreach(checkTxInfo(_, lastBlock.height))
 
-    val stateChanges          = sender.debugStateChanges(id).stateChanges
+    val stateChanges          = sender.stateChanges(id).stateChanges
     val stateChangesByAddress = sender.debugStateChangesByAddress(firstAddress, 1).flatMap(_.stateChanges).headOption
     List(stateChanges, stateChangesByAddress).foreach(checkStateChanges)
 

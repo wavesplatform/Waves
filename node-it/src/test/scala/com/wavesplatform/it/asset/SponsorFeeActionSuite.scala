@@ -59,7 +59,7 @@ class SponsorFeeActionSuite extends BaseFreeSpec {
             ) if issueAssetId == sponsorFeeAssetId =>
       }
 
-      val stateChanges = miner.debugStateChanges(invokeTx._1.id).stateChanges.toSeq
+      val stateChanges = miner.stateChanges(invokeTx._1.id).stateChanges.toSeq
       stateChanges should matchDebugResult
       miner.debugStateChangesByAddress(globalDAppAddress, limit = 100).flatMap(_.stateChanges) should matchDebugResult
 
@@ -155,12 +155,12 @@ class SponsorFeeActionSuite extends BaseFreeSpec {
       miner.invokeScript(miner.keyPair, dAppAddress, Some("sponsor2assets"), waitForTx = true, fee = smartMinFee)
       val cancelTx = miner.invokeScript(miner.keyPair, dAppAddress, Some("cancelSponsorship"), waitForTx = true, fee = smartMinFee)
 
-      val assetIdByName    = miner.debugStateChanges(issueTx._1.id).stateChanges.get.issues.map(issue => (issue.name, issue.assetId)).toMap
+      val assetIdByName    = miner.stateChanges(issueTx._1.id).stateChanges.get.issues.map(issue => (issue.name, issue.assetId)).toMap
       val sponsoredAssetId = assetIdByName("SponsoredAsset1")
       val cancelledAssetId = assetIdByName("SponsoredAsset0")
 
       miner
-        .debugStateChanges(cancelTx._1.id)
+        .stateChanges(cancelTx._1.id)
         .stateChanges
         .toSeq
         .find(_.sponsorFees == Seq(SponsorFeeResponse(`cancelledAssetId`, None)))
@@ -210,7 +210,7 @@ class SponsorFeeActionSuite extends BaseFreeSpec {
 
       val dAppAddress = dApp.toAddress.toString
       val invokeTx = miner.invokeScript(miner.keyPair, dAppAddress, Some("issueAndMultipleSponsor"), waitForTx = true, fee = smartMinFee + issueFee)
-      val txStateChanges = miner.debugStateChanges(invokeTx._1.id).stateChanges.toSeq
+      val txStateChanges = miner.stateChanges(invokeTx._1.id).stateChanges.toSeq
       val assetId        = txStateChanges.flatMap(_.issues).head.assetId
 
       val matchDebugResult = matchPattern {
@@ -258,7 +258,7 @@ class SponsorFeeActionSuite extends BaseFreeSpec {
 
       val dAppAddress    = dApp.toAddress.toString
       val invokeTx       = miner.invokeScript(miner.keyPair, dAppAddress, Some("sponsorAndCancel"), waitForTx = true, fee = smartMinFee + issueFee)
-      val txStateChanges = miner.debugStateChanges(invokeTx._1.id).stateChanges.toSeq
+      val txStateChanges = miner.stateChanges(invokeTx._1.id).stateChanges.toSeq
       val assetId        = txStateChanges.flatMap(_.issues).head.assetId
 
       val matchDebugResult = matchPattern {
@@ -307,7 +307,7 @@ class SponsorFeeActionSuite extends BaseFreeSpec {
       )
 
       val tx = miner.invokeScript(miner.keyPair, dApp.toAddress.toString, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee)
-      sender.debugStateChanges(tx._1.id).stateChanges.get.sponsorFees.head shouldBe SponsorFeeResponse(assetId, Some(1000))
+      sender.stateChanges(tx._1.id).stateChanges.get.sponsorFees.head shouldBe SponsorFeeResponse(assetId, Some(1000))
     }
 
     "Negative fee is not available" in {
@@ -416,12 +416,12 @@ class SponsorFeeActionSuite extends BaseFreeSpec {
       val dApp = createDApp(script).toAddress.toString
 
       val invokeTx1     = miner.invokeScript(miner.keyPair, dApp, Some("issueAsset"), waitForTx = true, fee = smartMinFee + issueFee)
-      val assetId       = miner.debugStateChanges(invokeTx1._1.id).stateChanges.get.issues.head.assetId
+      val assetId       = miner.stateChanges(invokeTx1._1.id).stateChanges.get.issues.head.assetId
       val firstTxHeight = miner.height
       nodes.waitForHeight(firstTxHeight + 1)
 
       val invokeTx2 = miner.invokeScript(miner.keyPair, dApp, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee + issueFee)
-      miner.debugStateChanges(invokeTx2._1.id).stateChanges.get.sponsorFees.head.assetId shouldBe assetId
+      miner.stateChanges(invokeTx2._1.id).stateChanges.get.sponsorFees.head.assetId shouldBe assetId
 
       nodes.rollback(firstTxHeight, returnToUTX = false)
       nodes.waitForHeight(miner.height + 1)
@@ -436,12 +436,12 @@ class SponsorFeeActionSuite extends BaseFreeSpec {
     "with returning to utx" in {
       val dAppAddress   = createDApp(script).toAddress.toString
       val invokeTx1     = miner.invokeScript(miner.keyPair, dAppAddress, Some("issueAsset"), waitForTx = true, fee = smartMinFee + issueFee)
-      val assetId       = miner.debugStateChanges(invokeTx1._1.id).stateChanges.get.issues.head.assetId
+      val assetId       = miner.stateChanges(invokeTx1._1.id).stateChanges.get.issues.head.assetId
       val firstTxHeight = miner.height
       nodes.waitForHeight(firstTxHeight + 1)
 
       val invokeTx2 = miner.invokeScript(miner.keyPair, dAppAddress, Some("sponsorAsset"), waitForTx = true, fee = smartMinFee + issueFee)
-      miner.debugStateChanges(invokeTx2._1.id).stateChanges.get.sponsorFees.head.assetId shouldBe assetId
+      miner.stateChanges(invokeTx2._1.id).stateChanges.get.sponsorFees.head.assetId shouldBe assetId
 
       nodes.rollback(firstTxHeight)
       nodes.waitForTransaction(invokeTx2._1.id)

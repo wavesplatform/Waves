@@ -25,6 +25,7 @@ class HttpScriptAssetActionLimitsSuite extends ScriptAssetActionLimitsSuite {
       ._1
 
     miner.transfer(sender.keyPair, address.publicKey.toAddress.toString, initialWavesBalance, minFee, waitForTx = true)
+    nodes.waitForHeightArise()
 
     nodes.waitForHeightAriseAndTxPresent(
       miner
@@ -65,8 +66,8 @@ class HttpScriptAssetActionLimitsSuite extends ScriptAssetActionLimitsSuite {
       )
       val invokeTx2 = miner.invokeScript(miner.keyPair, dAppAddress, Some(s"sponsor${actionsLimit}assets"), waitForTx = true, fee = smartMinFee)
 
-      val assetIds    = miner.debugStateChanges(invokeTx1._1.id).stateChanges.get.issues.map(_.assetId)
-      val sponsorFees = miner.debugStateChanges(invokeTx2._1.id).stateChanges.get.sponsorFees
+      val assetIds    = miner.stateChanges(invokeTx1._1.id).stateChanges.get.issues.map(_.assetId)
+      val sponsorFees = miner.stateChanges(invokeTx2._1.id).stateChanges.get.sponsorFees
 
       (assetIds zip sponsorFees)
         .foreach { case (issueAssetId, sponsorFee) =>
@@ -95,7 +96,7 @@ class HttpScriptAssetActionLimitsSuite extends ScriptAssetActionLimitsSuite {
         waitForTx = true
       )
       for (nth <- 0 until actionsLimit) {
-        val assetInfo = sender.debugStateChanges(tx.id).stateChanges.get.issues(nth)
+        val assetInfo = sender.stateChanges(tx.id).stateChanges.get.issues(nth)
         assetInfo.quantity shouldBe asset.quantity
         assetInfo.name shouldBe asset.name
         assetInfo.description shouldBe asset.description
