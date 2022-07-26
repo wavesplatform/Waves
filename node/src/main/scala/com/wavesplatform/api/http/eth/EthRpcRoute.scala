@@ -144,14 +144,12 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
           val dataString      = (call \ "data").as[String]
           val contractAddress = (call \ "to").as[String]
 
-          log.info(s"balance: contract address = $contractAddress, assetId = ${assetId(contractAddress)}") // TODO remove logging
-
           cleanHexPrefix(dataString).take(8) match {
-            case "95d89b41" =>
+            case "95d89b41" => // symbol()
               resp(id, encodeResponse(assetDescription(contractAddress).fold("")(_.name.toStringUtf8)))
-            case "313ce567" =>
+            case "313ce567" => // decimals()
               resp(id, encodeResponse(new Uint8(assetDescription(contractAddress).fold(0)(_.decimals))))
-            case "70a08231" =>
+            case "70a08231" => // balanceOf(address)
               resp(
                 id,
                 encodeResponse(
@@ -160,10 +158,10 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
                   )
                 )
               )
-            case "01ffc9a7" => // supportsInterface()
+            case "01ffc9a7" => // supportsInterface() https://eips.ethereum.org/EIPS/eip-165
               resp(id, encodeResponse(new Bool(false)))
             case _ =>
-              log.info(s"Unexpected call $dataString at $contractAddress")
+              log.debug(s"Unexpected call $dataString at $contractAddress")
               resp(id, "0x")
           }
         case "eth_estimateGas" =>
