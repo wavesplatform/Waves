@@ -172,7 +172,8 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
             BigInteger.valueOf(System.currentTimeMillis()),
             EthereumTransaction.GasPrice,
             BigInteger.ONE,
-            (txParams \ "to").as[String],
+            // "to" may be missing when estimating base currency transfer
+            (txParams \ "to").asOpt[String].getOrElse("0x0000000000000000000000000000000000000000"),
             (txParams \ "value").asOpt[String].fold(BigInteger.ZERO)(s => new BigInteger(cleanHexPrefix(s), 16)),
             (txParams \ "data").asOpt[String].getOrElse("0x")
           )
