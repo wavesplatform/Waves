@@ -3,18 +3,18 @@ package com.wavesplatform.lang.compiler
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.Common.*
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
-import com.wavesplatform.lang.v1.FunctionHeader.User
-import com.wavesplatform.lang.v1.FunctionHeader.Native
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.CompilerContext.VariableInfo
-import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler, Terms, TestCompiler, Types}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.BinaryOperation.SUM_OP
@@ -24,20 +24,20 @@ import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 import com.wavesplatform.lang.{Common, Global}
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 
 import scala.util.Try
 
 class ExpressionCompilerV1Test extends PropSpec {
 
   property("should infer generic function return type") {
-    import com.wavesplatform.lang.v1.parser.Expressions._
+    import com.wavesplatform.lang.v1.parser.Expressions.*
     val v = ExpressionCompiler(compilerContext, FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, idT.name), List(CONST_LONG(AnyPos, 1)))).explicitGet()
     v._2 shouldBe LONG
   }
 
   property("should infer inner types") {
-    import com.wavesplatform.lang.v1.parser.Expressions._
+    import com.wavesplatform.lang.v1.parser.Expressions.*
     val v =
       ExpressionCompiler(
         compilerContext,
@@ -398,13 +398,13 @@ class ExpressionCompilerV1Test extends PropSpec {
     def expr(v: StdLibVersion) = {
       val script =
         s"""
-          | {-# STDLIB_VERSION ${v.id}    #-}
-          | {-# CONTENT_TYPE   EXPRESSION #-}
-          |
-          | let a = Lease(Address(base58''), 1)
-          | let b = Lease(Address(base58''), 1, 0)
-          | let c = calculateLeaseId(b)
-          | true
+           | {-# STDLIB_VERSION ${v.id}    #-}
+           | {-# CONTENT_TYPE   EXPRESSION #-}
+           |
+           | let a = Lease(Address(base58''), 1)
+           | let b = Lease(Address(base58''), 1, 0)
+           | let c = calculateLeaseId(b)
+           | true
         """.stripMargin
       Parser.parseExpr(script).get.value
     }
@@ -429,13 +429,13 @@ class ExpressionCompilerV1Test extends PropSpec {
     def expr(v: StdLibVersion) = {
       val script =
         s"""
-          | {-# STDLIB_VERSION ${v.id}    #-}
-          | {-# CONTENT_TYPE   EXPRESSION #-}
-          |
-          | match tx {
-          |   case m: MassTransferTransaction => m.feeAssetId == unit
-          |   case _                          => throw()
-          | }
+           | {-# STDLIB_VERSION ${v.id}    #-}
+           | {-# CONTENT_TYPE   EXPRESSION #-}
+           |
+           | match tx {
+           |   case m: MassTransferTransaction => m.feeAssetId == unit
+           |   case _                          => throw()
+           | }
         """.stripMargin
       Parser.parseExpr(script).get.value
     }
@@ -456,24 +456,24 @@ class ExpressionCompilerV1Test extends PropSpec {
     def expr(v: StdLibVersion) = {
       val script =
         s"""
-          | {-# STDLIB_VERSION ${v.id}    #-}
-          | {-# CONTENT_TYPE   EXPRESSION #-}
-          |
-          | let r = 
-          |  if (true) then
-          |   DOWN 
-          |  else if (true) then
-          |   HALFUP 
-          |  else if (true) then
-          |   HALFEVEN 
-          |  else if (true) then
-          |   CEILING 
-          |  else
-          |   FLOOR
-          |   
-          | func f(r: Ceiling|Down|Floor|HalfEven|HalfUp) = true
-          | f(r)
-          |
+           | {-# STDLIB_VERSION ${v.id}    #-}
+           | {-# CONTENT_TYPE   EXPRESSION #-}
+           |
+           | let r = 
+           |  if (true) then
+           |   DOWN 
+           |  else if (true) then
+           |   HALFUP 
+           |  else if (true) then
+           |   HALFEVEN 
+           |  else if (true) then
+           |   CEILING 
+           |  else
+           |   FLOOR
+           |   
+           | func f(r: Ceiling|Down|Floor|HalfEven|HalfUp) = true
+           | f(r)
+           |
         """.stripMargin
       Parser.parseExpr(script).get.value
     }
@@ -488,20 +488,20 @@ class ExpressionCompilerV1Test extends PropSpec {
     def expr(v: StdLibVersion) = {
       val script =
         s"""
-          | {-# STDLIB_VERSION ${v.id}    #-}
-          | {-# CONTENT_TYPE   EXPRESSION #-}
-          |
-          | let r =
-          |  if (true) then
-          |   UP
-          |  else
-          |   HALFDOWN
-          |
-          | func f(r: HalfDown) = true
-          | func g(r: Up) = true
-          |
-          | true
-          |
+           | {-# STDLIB_VERSION ${v.id}    #-}
+           | {-# CONTENT_TYPE   EXPRESSION #-}
+           |
+           | let r =
+           |  if (true) then
+           |   UP
+           |  else
+           |   HALFDOWN
+           |
+           | func f(r: HalfDown) = true
+           | func g(r: Up) = true
+           |
+           | true
+           |
         """.stripMargin
       Parser.parseExpr(script).get.value
     }
@@ -525,12 +525,12 @@ class ExpressionCompilerV1Test extends PropSpec {
     def expr(v: StdLibVersion) = {
       val script =
         s"""
-          | {-# STDLIB_VERSION ${v.id}    #-}
-          | {-# CONTENT_TYPE   EXPRESSION #-}
-          |
-          |  let r1 = invoke(Address(base58''), "default", [], [])
-          |  let r2 = reentrantInvoke(Address(base58''), "default", [], [])
-          |  r1 == r2
+           | {-# STDLIB_VERSION ${v.id}    #-}
+           | {-# CONTENT_TYPE   EXPRESSION #-}
+           |
+           |  let r1 = invoke(Address(base58''), "default", [], [])
+           |  let r2 = reentrantInvoke(Address(base58''), "default", [], [])
+           |  r1 == r2
         """.stripMargin
       Parser.parseExpr(script).get.value
     }
@@ -584,7 +584,20 @@ class ExpressionCompilerV1Test extends PropSpec {
     ExpressionCompiler.compile(script, compilerContextV4) shouldBe Right(
       (
         LET_BLOCK(
-          LET("t", FUNCTION_CALL(Native(1301), List(CONST_LONG(1), FUNCTION_CALL(Native(1100), List(CONST_LONG(2), FUNCTION_CALL(Native(1100), List(CONST_LONG(3), FUNCTION_CALL(Native(1100), List(CONST_LONG(4), REF("nil"))))))), CONST_LONG(5)))),
+          LET(
+            "t",
+            FUNCTION_CALL(
+              Native(1301),
+              List(
+                CONST_LONG(1),
+                FUNCTION_CALL(
+                  Native(1100),
+                  List(CONST_LONG(2), FUNCTION_CALL(Native(1100), List(CONST_LONG(3), FUNCTION_CALL(Native(1100), List(CONST_LONG(4), REF("nil"))))))
+                ),
+                CONST_LONG(5)
+              )
+            )
+          ),
           LET_BLOCK(
             LET("ind", CONST_LONG(1)),
             FUNCTION_CALL(Native(0), List(FUNCTION_CALL(Native(401), List(GETTER(REF("t"), "_2"), REF("ind"))), CONST_LONG(3)))
@@ -608,10 +621,32 @@ class ExpressionCompilerV1Test extends PropSpec {
     )
   }
 
+  property("match result of function with composite types instantiated in signature") {
+    Seq(
+      ("transferTransactionFromProto(base58'')", "TransferTransaction"),
+      ("transferTransactionById(base58'')", "TransferTransaction"),
+      ("assetInfo(base58'')", "Asset"),
+      ("blockInfoByHeight(1)", "BlockInfo")
+    ).foreach { case (function, resultType) =>
+      DirectiveDictionary[StdLibVersion].all
+        .filter(_ >= V4)
+        .foreach(
+          TestCompiler(_).compileExpression(
+            s"""
+               |match $function {
+               |  case r: $resultType => r
+               |  case _: Unit        => throw()
+               |}
+          """.stripMargin
+          ) shouldBe an[ExprScript]
+        )
+    }
+  }
+
   treeTypeTest("GETTER")(
     ctx = CompilerContext(
       predefTypes = Map(pointType.name -> pointType),
-      varDefs = Map("p"                -> VariableInfo(AnyPos, pointType)),
+      varDefs = Map("p" -> VariableInfo(AnyPos, pointType)),
       functionDefs = Map.empty,
       provideRuntimeTypeOnCastError = false
     ),
@@ -628,7 +663,7 @@ class ExpressionCompilerV1Test extends PropSpec {
   treeTypeTest("REF(OBJECT)")(
     ctx = CompilerContext(
       predefTypes = Map(pointType.name -> pointType),
-      varDefs = Map("p"                -> VariableInfo(AnyPos, pointType)),
+      varDefs = Map("p" -> VariableInfo(AnyPos, pointType)),
       functionDefs = Map.empty,
       provideRuntimeTypeOnCastError = false
     ),
@@ -641,7 +676,7 @@ class ExpressionCompilerV1Test extends PropSpec {
   treeTypeTest("REF x = y")(
     ctx = CompilerContext(
       predefTypes = Map(pointType.name -> pointType),
-      varDefs = Map("p"                -> VariableInfo(AnyPos, pointType)),
+      varDefs = Map("p" -> VariableInfo(AnyPos, pointType)),
       functionDefs = Map.empty,
       provideRuntimeTypeOnCastError = false
     ),
