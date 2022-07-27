@@ -845,6 +845,18 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
                                            |func testThis() = this
                                            |func testListArg(list: List[String|ByteVector|Int], str: String, bytes: ByteVector) = list.containsElement(str)
                                            |
+                                           |func nestedCalls(x: List[(String, String, List[Any])]) = {
+                                           |  func call(a: String, x: (String, String, List[Any])) = {
+                                           |    let (dAppAddress, funcName, args) = x
+                                           |    strict res = Address(fromBase58String(dAppAddress)).invoke(funcName, args, [])
+                                           |    a + res.exactAs[String] + "\n"
+                                           |  }
+                                           |  FOLD<20>(x, "", call)
+                                           |}
+                                           |
+                                           |@Callable(i)
+                                           |func getValue() = ([], "value")
+                                           |
                                            |@Callable(i)
                                            |func testCallable() = [BinaryEntry("test", i.caller.bytes)]
                                            |
@@ -1034,6 +1046,18 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       responseAs[JsValue] should matchJson(
         """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"testSyncInvoke"},"value":{"type":"ByteVector","value":"11111111111111111111111111"}}}]},"complexity":297,"expr":" callable() ","address":"3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"}"""
       )
+    }
+
+    val dApp2 = TxHelpers.scriptV5(
+      s"""
+         | @Callable(i)
+         | func call(a: Int, b: String) = ([], b + a.toString())
+       """.stripMargin
+    )
+    d.helpers.setScript(dAppAccount2, dApp2)
+
+    evalScript(s"nestedCalls([(\"$dAppAddress2\", \"call\", [123, \"abc\"]), (\"$dAppAddress\", \"getValue\", [])])") ~> route ~> check {
+      (responseAs[JsValue] \ "result" \ "value").as[String] shouldBe "abc123\nvalue\n"
     }
   }
 
