@@ -928,6 +928,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     BlockchainFeatures.FairPoS             -> 0
   )
 
+  private val RideV6 = DomainPresets.RideV6.blockchainSettings.functionalitySettings
+
   private def createSettings(preActivatedFeatures: (BlockchainFeature, Int)*): FunctionalitySettings =
     TestFunctionalitySettings.Enabled
       .copy(
@@ -980,25 +982,25 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
 
   property("ExchangeTransactions invalid if buyer scripts fails") {
     for {
-      buyerScriptSrc  <- script("Order", false)
+      buyerScriptSrc  <- script("Order", false, complex = true)
       sellerScriptSrc <- script("Order", true)
       txScript        <- script("ExchangeTransaction", true)
     } yield {
       val (genesis, transfers, issueAndScripts, exchangeTx, _) = smartTradePreconditions(buyerScriptSrc, sellerScriptSrc, txScript)
       val preconBlocks = Seq(TestBlock.create(Seq(genesis)), TestBlock.create(transfers), TestBlock.create(issueAndScripts))
-      assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), fsV2)("TransactionNotAllowedByScript")
+      assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), RideV6)("TransactionNotAllowedByScript")
     }
   }
 
   property("ExchangeTransactions invalid if seller scripts fails") {
     for {
       buyerScriptSrc  <- script("Order", true)
-      sellerScriptSrc <- script("Order", false)
+      sellerScriptSrc <- script("Order", false, complex = true)
       txScript        <- script("ExchangeTransaction", true)
     } yield {
       val (genesis, transfers, issueAndScripts, exchangeTx, _) = smartTradePreconditions(buyerScriptSrc, sellerScriptSrc, txScript)
       val preconBlocks = Seq(TestBlock.create(Seq(genesis)), TestBlock.create(transfers), TestBlock.create(issueAndScripts))
-      assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), fsV2)("TransactionNotAllowedByScript")
+      assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), RideV6)("TransactionNotAllowedByScript")
     }
   }
 
@@ -1006,11 +1008,11 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     for {
       buyerScriptSrc  <- script("Order", true)
       sellerScriptSrc <- script("Order", true)
-      txScript        <- script("ExchangeTransaction", false)
+      txScript        <- script("ExchangeTransaction", false, complex = true)
     } yield {
       val (genesis, transfers, issueAndScripts, exchangeTx, _) = smartTradePreconditions(buyerScriptSrc, sellerScriptSrc, txScript)
       val preconBlocks = Seq(TestBlock.create(Seq(genesis)), TestBlock.create(transfers), TestBlock.create(issueAndScripts))
-      assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), fsV2)("TransactionNotAllowedByScript")
+      assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), RideV6)("TransactionNotAllowedByScript")
     }
   }
 
@@ -1747,9 +1749,10 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     }
   }
 
-  def script(caseType: String, v: Boolean): Seq[String] = Seq(true, false).map { full =>
+  def script(caseType: String, v: Boolean, complex: Boolean = false): Seq[String] = Seq(true, false).map { full =>
     val expr =
       s"""
+         |  strict c = ${if (complex) (1 to 16).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ") else "true"}
          |  match tx {
          |   case _: $caseType => $v
          |   case _ => ${!v}
