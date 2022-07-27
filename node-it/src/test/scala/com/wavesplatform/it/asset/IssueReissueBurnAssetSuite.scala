@@ -78,8 +78,7 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
       sender.assertAssetBalance(acc.toAddress.toString, assetId, 0)
 
       if (isCallable) assertStateChanges(tx) { sd =>
-        sd.burns should matchPattern {
-          case Seq(BurnInfoResponse(`assetId`, data.quantity)) =>
+        sd.burns should matchPattern { case Seq(BurnInfoResponse(`assetId`, data.quantity)) =>
         }
       }
 
@@ -253,14 +252,14 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
       invokeScript(acc, "transferAndBurn", assetId = asset, count = 100)
       nodes.waitForHeightArise()
       sender.assetDistribution(asset).map { case (a, v) => a.toString -> v } shouldBe Map(
-        miner.address            -> 100L,
+        miner.address          -> 100L,
         acc.toAddress.toString -> (simpleReissuableAsset.quantity - 200)
       )
       reissue(acc, CallableMethod, asset, 400, reissuable = false)
       invokeScript(acc, "transferAndBurn", assetId = asset, count = 100)
       nodes.waitForHeightArise()
       sender.assetDistribution(asset).map { case (a, v) => a.toString -> v } shouldBe Map(
-        miner.address            -> 200L,
+        miner.address          -> 200L,
         acc.toAddress.toString -> simpleReissuableAsset.quantity
       )
     }
@@ -279,7 +278,7 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
       val txId = invokeScript(acc, "reissueIssueAndNft", assetId = assetA, fee = invocationCost(1)).id
 
       val (assetNft, assetB) = sender
-        .debugStateChanges(txId)
+        .stateChanges(txId)
         .stateChanges
         .map { scd =>
           val nft   = scd.issues.find(_.name == nftAsset.name).get.assetId
@@ -295,7 +294,7 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
       sender.debugStateChangesByAddress(addressStr, 100).flatMap(_.stateChanges) should matchPattern {
         case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil, Nil, None, Nil)) if issue.name == simpleReissuableAsset.name =>
       }
-      assertApiError(sender.debugStateChanges(txId), TransactionDoesNotExist)
+      assertApiError(sender.stateChanges(txId), TransactionDoesNotExist)
 
       assertAssetDetails(assetA) { ai =>
         ai.quantity shouldBe simpleReissuableAsset.quantity
@@ -353,9 +352,9 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
       case "reissueIssueAndNft" => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet())
       case "process11actions"   => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet())
       case "burnAsset"          => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_LONG(count))
-      case "reissueAsset"       => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_BOOLEAN(isReissuable), CONST_LONG(count))
-      case "reissueAndReissue"  => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_LONG(count))
-      case _                    => Nil
+      case "reissueAsset"      => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_BOOLEAN(isReissuable), CONST_LONG(count))
+      case "reissueAndReissue" => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_LONG(count))
+      case _                   => Nil
     }
 
     val tx = miner
@@ -389,10 +388,10 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
   }
 
   def stateChanges(tx: Transaction): StateChangesDetails =
-    sender.debugStateChanges(tx.id).stateChanges.get
+    sender.stateChanges(tx.id).stateChanges.get
 
   def stateChangesStrings(tx: Transaction): StateChangesDetails =
-    sender.debugStateChanges(tx.id, amountsAsStrings = true).stateChanges.get
+    sender.stateChanges(tx.id, amountsAsStrings = true).stateChanges.get
 
   def validateIssue(issue: IssueInfoResponse, data: Asset): Unit = {
     issue.name shouldBe data.name
@@ -492,8 +491,7 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
         val tx = invokeScript(account, "reissueAsset", assetId = assetId, count = quantity, isReissuable = reissuable, fee = fee)
         if (checkStateChanges)
           assertStateChanges(tx) { sd =>
-            sd.reissues should matchPattern {
-              case Seq(ReissueInfoResponse(`assetId`, `reissuable`, `quantity`)) =>
+            sd.reissues should matchPattern { case Seq(ReissueInfoResponse(`assetId`, `reissuable`, `quantity`)) =>
             }
           }
         tx
@@ -507,8 +505,7 @@ class IssueReissueBurnAssetSuite extends BaseFreeSpec {
       case CallableMethod =>
         val tx = invokeScript(account, "burnAsset", assetId = assetId, count = quantity, fee = fee)
         assertStateChanges(tx) { sd =>
-          sd.burns should matchPattern {
-            case Seq(BurnInfoResponse(`assetId`, `quantity`)) =>
+          sd.burns should matchPattern { case Seq(BurnInfoResponse(`assetId`, `quantity`)) =>
           }
         }
         tx
