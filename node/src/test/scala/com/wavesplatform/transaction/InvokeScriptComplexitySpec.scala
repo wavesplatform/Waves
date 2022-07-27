@@ -101,7 +101,7 @@ class InvokeScriptComplexitySpec extends FreeSpec with WithDomain with NTPTime {
       utx.putIfNew(invocation, forceValidate = true).resultE.explicitGet() shouldBe true
       utx.size shouldBe 1
 
-      utx.cleanUnconfirmed()
+      d.cleanupUtxSync()
 
       utx.size shouldBe 1
 

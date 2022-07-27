@@ -929,7 +929,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         d.helpers.creditWavesToDefaultSigner(11.waves)
         val transfers = Seq.fill(10)(TxHelpers.transfer(amount = 10.waves))
         transfers.foreach(tx => d.utxPool.addTransaction(tx, verify = false))
-        d.utxPool.cleanUnconfirmed()
+        d.cleanupUtxSync()
         d.utxPool.nonPriorityTransactions.toSet shouldBe transfers.toSet
       }
 
@@ -941,7 +941,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         d.utxPool.priorityPool.setPriorityDiffs(Seq(d.createDiff(transfer1)))
         d.utxPool.addTransaction(transfer2, verify = false)
 
-        d.utxPool.cleanUnconfirmed()
+        d.cleanupUtxSync()
         d.utxPool.nonPriorityTransactions shouldBe Nil
       }
 
@@ -1128,7 +1128,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
 
           d.utxPool.size shouldBe 1
 
-          d.utxPool.cleanUnconfirmed()
+          d.cleanupUtxSync()
 
           val expectedResult = if (!isMiningEnabled && forceValidateInCleanup) {
             None

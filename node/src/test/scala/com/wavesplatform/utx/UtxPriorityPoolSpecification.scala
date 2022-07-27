@@ -101,7 +101,7 @@ class UtxPriorityPoolSpecification extends FreeSpec with SharedDomain {
       domain.appendMicroBlock(transferToCarol)
 
       domain.appendKeyBlock(Some(rollbackTarget))
-      domain.utxPool.cleanUnconfirmed()
+      domain.cleanupUtxSync()
       domain.utxPool.priorityPool.priorityTransactions shouldEqual Seq(transferToCarol)
       pack() shouldBe None
       domain.utxPool.priorityPool.priorityTransactions shouldBe empty

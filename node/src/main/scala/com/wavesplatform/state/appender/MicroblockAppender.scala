@@ -34,7 +34,6 @@ object MicroblockAppender extends ScorexLogging {
             s"Removing mined txs from ${microBlock.stringRepr(totalBlockId)}: ${microBlock.transactionData.map(_.id()).mkString(", ")}"
           }
           utxStorage.removeAll(microBlock.transactionData)
-          utxStorage.runCleanup()
           totalBlockId
         }
     }).executeOn(scheduler)
@@ -47,24 +46,21 @@ object MicroblockAppender extends ScorexLogging {
       scheduler: Scheduler
   )(ch: Channel, md: MicroblockData): Task[Unit] = {
     import md.microBlock
-    val microblockTotalResBlockSig = microBlock.totalResBlockSig
     (for {
       _       <- EitherT(Task.now(microBlock.signaturesValid()))
       blockId <- EitherT(apply(blockchainUpdater, utxStorage, scheduler)(microBlock))
     } yield blockId).value.map {
       case Right(blockId) =>
-        md.invOpt match {
-          case Some(mi) => allChannels.broadcast(mi, except = md.microblockOwners())
-          case None     => log.warn(s"${id(ch)} Not broadcasting MicroBlockInv")
-        }
+            utxStorage.runCleanup()
+            allChannels.broadcast(md.invOpt, except = md.microblockOwners())
         BlockStats.applied(microBlock, blockId)
       case Left(is: InvalidSignature) =>
-        val idOpt = md.invOpt.map(_.totalBlockId)
-        peerDatabase.blacklistAndClose(ch, s"Could not append microblock ${idOpt.getOrElse(s"(sig=$microblockTotalResBlockSig)")}: $is")
+        val idOpt = md.invOpt.totalBlockId
+        peerDatabase.blacklistAndClose(ch, s"Could not append microblock $idOpt: $is")
       case Left(ve) =>
-        md.invOpt.foreach(mi => BlockStats.declined(mi.totalBlockId))
-        val idOpt = md.invOpt.map(_.totalBlockId)
-        log.debug(s"${id(ch)} Could not append microblock ${idOpt.getOrElse(s"(sig=$microblockTotalResBlockSig)")}: $ve")
+        BlockStats.declined(md.invOpt.totalBlockId)
+        val idOpt = md.invOpt.totalBlockId
+        log.debug(s"${id(ch)} Could not append microblock $idOpt: $ve")
     }
   }
 }

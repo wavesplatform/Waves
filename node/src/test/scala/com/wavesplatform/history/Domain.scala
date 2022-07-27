@@ -51,9 +51,11 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   def createDiffE(tx: Transaction): Either[ValidationError, Diff] = transactionDiffer(tx).resultE
   def createDiff(tx: Transaction): Diff                           = createDiffE(tx).explicitGet()
 
-  lazy val utxPool = new UtxPoolImpl(SystemTime, blockchain, settings.utxSettings, settings.minerSettings.enable) {
-    def syncCleanup(): Unit = cleanUnconfirmed()
-  }
+  private lazy val utxPoolImpl = new CleanableUtxPool(blockchain, settings)
+
+  lazy val utxPool: UtxPoolImpl = utxPoolImpl
+
+  def cleanupUtxSync(): Unit = utxPoolImpl.runSyncCleanup()
 
   lazy val wallet: Wallet = Wallet(settings.walletSettings.copy(file = None))
 
@@ -233,7 +235,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     val block          = createBlock(Block.NgBlockVersion, Nil, ref.orElse(Some(lastBlockId)))
     val discardedDiffs = appendBlock(block)
     utxPool.setPriorityDiffs(discardedDiffs)
-    utxPool.syncCleanup()
+    cleanupUtxSync()
     lastBlock
   }
 
@@ -410,6 +412,11 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 }
 
 object Domain {
+  private class CleanableUtxPool(blockchain: Blockchain, settings: WavesSettings)
+      extends UtxPoolImpl(SystemTime, blockchain, settings.utxSettings, settings.minerSettings.enable) {
+    def runSyncCleanup(): Unit = cleanUnconfirmed()
+  }
+
   implicit class BlockchainUpdaterExt[A <: BlockchainUpdater](bcu: A) {
     def processBlock(block: Block): Either[ValidationError, Seq[Diff]] =
       bcu.processBlock(block, block.header.generationSignature)

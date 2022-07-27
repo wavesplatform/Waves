@@ -130,13 +130,13 @@ object MicroBlockSynchronizer extends ScorexLogging {
           case Some(mi) =>
             log.trace(s"${id(ch)} Got ${mb.stringRepr(totalRef)}, as expected")
             awaiting.invalidate(totalRef)
-            Observable((ch, MicroblockData(Option(mi), mb, Coeval.evalOnce(owners(totalRef)))))
+            Observable((ch, MicroblockData(mi, mb, Coeval.evalOnce(owners(totalRef)))))
         }
     }
     (observable, cacheSizesReporter)
   }
 
-  case class MicroblockData(invOpt: Option[MicroBlockInv], microBlock: MicroBlock, microblockOwners: Coeval[Set[Channel]])
+  case class MicroblockData(invOpt: MicroBlockInv, microBlock: MicroBlock, microblockOwners: Coeval[Set[Channel]])
 
   type MicroBlockSignature = ByteStr
 
