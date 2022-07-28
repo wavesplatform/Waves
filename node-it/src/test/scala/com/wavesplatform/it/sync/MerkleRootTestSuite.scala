@@ -30,6 +30,7 @@ class MerkleRootTestSuite extends BaseFreeSpec with ActivationStatusRequest with
       CustomValidationError(s"transactions do not exist or block version < ${Block.ProtoBlockVersion}")
     )
   }
+
   "able to get merkle proof after activation" in {
     miner.waitForHeight(ActivationHeight, 2.minutes)
     val txId1 = miner.broadcastTransfer(miner.keyPair, miner.address, transferAmount, minFee, None, None, waitForTx = true).id
@@ -44,6 +45,7 @@ class MerkleRootTestSuite extends BaseFreeSpec with ActivationStatusRequest with
     assert(Base58.tryDecode(miner.getMerkleProof(txId1).head.merkleProof.head).isSuccess)
     assert(Base58.tryDecode(miner.getMerkleProofPost(txId1).head.merkleProof.head).isSuccess)
   }
+
   "error raised if transaction id is not valid" in {
     assertApiError(
       miner.getMerkleProof("FCymvrY43ddiKKTkznawWasoMbWd1LWyX8DUrwAAbcUA"),
@@ -64,6 +66,7 @@ class MerkleRootTestSuite extends BaseFreeSpec with ActivationStatusRequest with
       InvalidSignature
     )
   }
+
   "merkle proof api returns only existent txs when existent and inexistent ids passed" in {
     val txId1        = miner.broadcastTransfer(miner.keyPair, miner.address, transferAmount, minFee, None, None, waitForTx = true).id
     val txId2        = miner.broadcastTransfer(miner.keyPair, miner.address, transferAmount, minFee, None, None, waitForTx = true).id
@@ -71,6 +74,7 @@ class MerkleRootTestSuite extends BaseFreeSpec with ActivationStatusRequest with
     miner.getMerkleProof(txId1, txId2, inexistentTx).map(resp => resp.id) should contain theSameElementsAs Seq(txId1, txId2)
     miner.getMerkleProofPost(txId1, txId2, inexistentTx).map(resp => resp.id) should contain theSameElementsAs Seq(txId1, txId2)
   }
+
   "merkle proof api can handle transactionsRoot changes caused by miner settings" in {
 
     /**
