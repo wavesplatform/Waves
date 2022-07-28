@@ -56,7 +56,7 @@ class MerkleRootTestSuite extends BaseFreeSpec with ActivationStatusRequest with
       CustomValidationError(s"transactions do not exist or block version < ${Block.ProtoBlockVersion}")
     )
 
-    val invalidId = "FCym43ddiKKT000kznawWasoMbWd1LWyX8DUrwAAbcUA" //id is invalid because base58 cannot contain "0"
+    val invalidId = "FCym43ddiKKT000kznawWasoMbWd1LWyX8DUrwAAbcUA" // id is invalid because base58 cannot contain "0"
     assertApiError(
       miner.getMerkleProof(invalidId),
       InvalidSignature
@@ -77,31 +77,33 @@ class MerkleRootTestSuite extends BaseFreeSpec with ActivationStatusRequest with
 
   "merkle proof api can handle transactionsRoot changes caused by miner settings" in {
 
-    /**
-      * In this case we check that when some of generated microblocks connected to one keyblock transfers to next keyblock
-      * due to miner setting "min-micro-block-age" it causes transactionsRoot and merkleProof recalculation
+    /** In this case we check that when some of generated microblocks connected to one keyblock transfers to next keyblock due to miner setting
+      * "min-micro-block-age" it causes transactionsRoot and merkleProof recalculation
       */
-    nodes.waitForHeightArise()
-    val currentHeight               = miner.height
-    val txsBuf                      = collection.mutable.ListBuffer[String]()
-    var merkleProofBefore           = Seq(Seq(""))
-    var merkleProofPostBefore       = Seq(Seq(""))
-    var blockTransactionsRootBefore = ""
+    val currentHeight = nodes.waitForHeightArise()
+
+    var txIds                  = Seq[String]()
+    var merkleProofGetBefore   = Seq(Seq(""))
+    var merkleProofPostBefore  = Seq(Seq(""))
+    var transactionsRootBefore = ""
+
     while (miner.height == currentHeight) {
-      val tx = miner.broadcastTransfer(miner.keyPair, miner.address, transferAmount, minFee, None, None, waitForTx = true).id
+      val newTxId                   = miner.transfer(miner.keyPair, miner.address, 1, waitForTx = true).id
+      val newTxIds                  = txIds :+ newTxId
+      val newMerkleProofGetBefore   = miner.getMerkleProof(newTxIds*).map(_.merkleProof)
+      val newMerkleProofPostBefore  = miner.getMerkleProofPost(newTxIds*).map(_.merkleProof)
+      val newTransactionsRootBefore = miner.blockAt(currentHeight).transactionsRoot.get
       if (miner.height == currentHeight) {
-        txsBuf += tx
-        val txsSeq = txsBuf.toSeq
-        merkleProofBefore = miner.getMerkleProof(txsSeq*).map(resp => resp.merkleProof)
-        merkleProofPostBefore = miner.getMerkleProofPost(txsSeq*).map(resp => resp.merkleProof)
-        blockTransactionsRootBefore = miner.blockAt(currentHeight).transactionsRoot.get
+        txIds = newTxIds
+        merkleProofGetBefore = newMerkleProofGetBefore
+        merkleProofPostBefore = newMerkleProofPostBefore
+        transactionsRootBefore = newTransactionsRootBefore
       }
     }
     miner.height shouldBe currentHeight + 1
-    val txsSeq = txsBuf.toSeq
-    miner.getMerkleProof(txsSeq*).map(resp => resp.merkleProof) should not be merkleProofBefore
-    miner.getMerkleProofPost(txsSeq*).map(resp => resp.merkleProof) should not be merkleProofPostBefore
-    miner.blockAt(currentHeight).transactionsRoot.get should not be blockTransactionsRootBefore
+    miner.getMerkleProof(txIds*).map(_.merkleProof) should not be merkleProofGetBefore
+    miner.getMerkleProofPost(txIds*).map(_.merkleProof) should not be merkleProofPostBefore
+    miner.blockAt(currentHeight).transactionsRoot.get should not be transactionsRootBefore
   }
 }
 
