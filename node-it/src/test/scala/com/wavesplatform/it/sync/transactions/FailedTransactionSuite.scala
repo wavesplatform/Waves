@@ -14,9 +14,7 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.AssetPair
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
@@ -209,103 +207,6 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
 
         failed
       }
-    }
-  }
-
-  test("InvokeScriptTransaction: invoke script error in action asset propagates failed transaction") {
-    val invokeFee            = 0.005.waves + smartFee
-    val setAssetScriptMinFee = setAssetScriptFee + smartFee
-    val priorityFee          = setAssetScriptMinFee + invokeFee
-
-    updateTikTok("reissue", setAssetScriptMinFee)
-    updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
-
-    val prevBalance      = sender.balance(caller.toAddress.toString).balance
-    val prevAssetBalance = sender.assetBalance(contractAddress, smartAsset)
-    val prevAssets       = sender.assetsBalance(contractAddress).balances.map(_.assetId)
-
-    sendTxsAndThenPriorityTx(
-      _ => sender.invokeScript(caller, contractAddress, Some("tikTok"), fee = invokeFee)._1.id,
-      () => updateAssetScript(result = false, smartAsset, contract, priorityFee)
-    ) { (txs, priorityTx) =>
-      logPriorityTx(priorityTx)
-
-      val failed   = assertFailedTxs(txs)
-      val reissued = 15 * (txs.size - failed.size)
-
-      sender.balance(caller.toAddress.toString).balance shouldBe prevBalance - txs.size * invokeFee
-      sender.assetBalance(contractAddress, smartAsset) shouldBe prevAssetBalance.copy(balance = prevAssetBalance.balance + reissued)
-      sender.assetsBalance(contractAddress).balances.map(_.assetId) should contain theSameElementsAs prevAssets
-
-      failed.foreach { s =>
-        checkStateChange(sender.stateChanges(s.id), 3, "Transaction is not allowed by script of the asset")
-      }
-
-      failed
-    }
-  }
-
-  test("InvokeScriptTransaction: invoke script error in payment asset propagates failed transaction") {
-    val invokeFee            = 0.005.waves + smartFee
-    val setAssetScriptMinFee = setAssetScriptFee + smartFee
-    val priorityFee          = setAssetScriptMinFee + invokeFee
-
-    val paymentAsset = sender
-      .issue(
-        caller,
-        "paymentAsset",
-        script = Some(ScriptCompiler.compile("true", ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64),
-        fee = issueFee + smartFee,
-        waitForTx = true
-      )
-      .id
-
-    updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
-    updateTikTok("unknown", setAssetScriptMinFee)
-
-    val prevBalance             = sender.balance(caller.toAddress.toString).balance
-    val prevAssetBalance        = sender.assetBalance(contractAddress, smartAsset)
-    val prevPaymentAssetBalance = sender.assetBalance(caller.toAddress.toString, paymentAsset)
-    val prevAssets              = sender.assetsBalance(contractAddress).balances.map(_.assetId)
-
-    sendTxsAndThenPriorityTx(
-      _ =>
-        sender
-          .invokeScript(
-            caller,
-            contractAddress,
-            Some("tikTok"),
-            fee = invokeFee,
-            payment = Seq(InvokeScriptTransaction.Payment(15L, IssuedAsset(ByteStr.decodeBase58(paymentAsset).get)))
-          )
-          ._1
-          .id,
-      () => updateAssetScript(result = false, paymentAsset, caller, priorityFee)
-    ) { (txs, priorityTx) =>
-      logPriorityTx(priorityTx)
-
-      val failed = assertFailedTxs(txs)
-
-      val succeedSize  = txs.size - failed.size
-      val paymentDelta = -succeedSize * 15
-
-      sender.balance(caller.toAddress.toString).balance shouldBe prevBalance - txs.size * invokeFee - priorityFee
-      sender.assetBalance(contractAddress, smartAsset) shouldBe prevAssetBalance
-
-      val includePaymentAsset = if (txs.size > failed.size) List(paymentAsset) else List.empty
-      sender
-        .assetsBalance(contractAddress)
-        .balances
-        .map(_.assetId) should contain theSameElementsAs prevAssets ++ includePaymentAsset
-      sender.assetBalance(caller.toAddress.toString, paymentAsset) shouldBe prevPaymentAssetBalance.copy(
-        balance = prevPaymentAssetBalance.balance + paymentDelta
-      )
-
-      failed.foreach { s =>
-        checkStateChange(sender.stateChanges(s.id), 4, "Transaction is not allowed by script of the asset")
-      }
-
-      failed
     }
   }
 
