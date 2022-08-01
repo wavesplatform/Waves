@@ -209,39 +209,6 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     }
   }
 
-  test("InvokeScriptTransaction: invoke script error in action asset propagates failed transaction") {
-    val invokeFee            = 0.005.waves + smartFee
-    val setAssetScriptMinFee = setAssetScriptFee + smartFee
-    val priorityFee          = setAssetScriptMinFee + invokeFee
-
-    updateTikTok("reissue", setAssetScriptMinFee)
-    updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
-
-    val prevBalance      = sender.balance(caller.toAddress.toString).balance
-    val prevAssetBalance = sender.assetBalance(contractAddress, smartAsset)
-    val prevAssets       = sender.assetsBalance(contractAddress).balances.map(_.assetId)
-
-    sendTxsAndThenPriorityTx(
-      _ => sender.invokeScript(caller, contractAddress, Some("tikTok"), fee = invokeFee)._1.id,
-      () => updateAssetScript(result = false, smartAsset, contract, priorityFee)
-    ) { (txs, priorityTx) =>
-      logPriorityTx(priorityTx)
-
-      val failed   = assertFailedTxs(txs)
-      val reissued = 15 * (txs.size - failed.size)
-
-      sender.balance(caller.toAddress.toString).balance shouldBe prevBalance - txs.size * invokeFee
-      sender.assetBalance(contractAddress, smartAsset) shouldBe prevAssetBalance.copy(balance = prevAssetBalance.balance + reissued)
-      sender.assetsBalance(contractAddress).balances.map(_.assetId) should contain theSameElementsAs prevAssets
-
-      failed.foreach { s =>
-        checkStateChange(sender.debugStateChanges(s.id), 3, "Transaction is not allowed by script of the asset")
-      }
-
-      failed
-    }
-  }
-
   test("InvokeScriptTransaction: invoke script error in payment asset propagates failed transaction") {
     val invokeFee            = 0.005.waves + smartFee
     val setAssetScriptMinFee = setAssetScriptFee + smartFee
