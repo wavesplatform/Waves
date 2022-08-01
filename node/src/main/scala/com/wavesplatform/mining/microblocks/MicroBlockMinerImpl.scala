@@ -136,7 +136,7 @@ class MicroBlockMinerImpl(
   }
 
   private def broadcastMicroBlock(account: KeyPair, microBlock: MicroBlock, blockId: BlockId): Task[Unit] =
-    Task(if (allChannels != null) allChannels.broadcast(MicroBlockInv(account, blockId, microBlock.reference)))
+    Task(allChannels.broadcast(MicroBlockInv(account, blockId, microBlock.reference)))
 
   private def appendMicroBlock(microBlock: MicroBlock): Task[BlockId] =
     MicroblockAppender(blockchainUpdater, utx, appenderScheduler)(microBlock)
