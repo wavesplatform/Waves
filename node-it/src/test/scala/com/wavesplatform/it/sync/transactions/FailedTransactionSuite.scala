@@ -210,34 +210,6 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     }
   }
 
-  test("InvokeScriptTransaction: sponsored fee on failed transaction should be charged correctly") {
-    val invokeFee            = 0.005.waves + smartFee
-    val invokeFeeInAsset     = invokeFee / 100000 // assetFee = feeInWaves / feeUnit * sponsorship
-    val setAssetScriptMinFee = setAssetScriptFee + smartFee
-    val priorityFee          = setAssetScriptMinFee + invokeFee
-
-    updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
-    updateTikTok("reissue", setAssetScriptMinFee)
-
-    sender.sponsorAsset(contract, sponsoredAsset, 1, sponsorReducedFee + smartFee, waitForTx = true)
-    sender.transfer(contract, caller.toAddress.toString, assetAmount, smartMinFee, assetId = Some(sponsoredAsset), waitForTx = true)
-
-    val prevBalance = sender.balance(contractAddress).balance
-
-    sendTxsAndThenPriorityTx(
-      _ => sender.invokeScript(caller, contractAddress, Some("tikTok"), fee = invokeFeeInAsset, feeAssetId = Some(sponsoredAsset))._1.id,
-      () => updateAssetScript(result = false, smartAsset, contract, priorityFee)
-    ) { (txs, priorityTx) =>
-      logPriorityTx(priorityTx)
-
-      sender.assetBalance(caller.toAddress.toString, sponsoredAsset).balance shouldBe assetAmount - txs.size * invokeFeeInAsset
-      sender.assetBalance(contractAddress, sponsoredAsset).balance shouldBe txs.size * invokeFeeInAsset
-      sender.balance(contractAddress).balance shouldBe prevBalance - invokeFee * txs.size - priorityFee
-
-      assertFailedTxs(txs)
-    }
-  }
-
   test("InvokeScriptTransaction: account state should not be changed after accepting failed transaction") {
     val invokeFee            = 0.005.waves + smartFee
     val setAssetScriptMinFee = setAssetScriptFee + smartFee
