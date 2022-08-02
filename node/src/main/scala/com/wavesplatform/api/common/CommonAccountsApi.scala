@@ -55,7 +55,8 @@ object CommonAccountsApi {
 
   final case class BalanceDetails(regular: Long, generating: Long, available: Long, effective: Long, leaseIn: Long, leaseOut: Long)
 
-  def apply(diff: () => Diff, db: DB, blockchain: Blockchain): CommonAccountsApi = new CommonAccountsApi {
+  def apply(useLiquidDiff: UseLiquidDiff, db: DB, blockchain: Blockchain): CommonAccountsApi = new CommonAccountsApi {
+    def diff(): Diff = useLiquidDiff(identity).map(_._2).getOrElse(Diff())
 
     override def balance(address: Address, confirmations: Int = 0): Long = {
       blockchain.balance(address, blockchain.height, confirmations)
@@ -130,7 +131,7 @@ object CommonAccountsApi {
     override def activeLeases(address: Address): Observable[LeaseInfo] =
       addressTransactions(
         db,
-        Some(Height(blockchain.height) -> diff()),
+        useLiquidDiff,
         address,
         None,
         Set(TransactionType.Lease, TransactionType.InvokeScript, TransactionType.InvokeExpression, TransactionType.Ethereum),

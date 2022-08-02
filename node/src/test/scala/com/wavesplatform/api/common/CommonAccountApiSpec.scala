@@ -1,7 +1,7 @@
 package com.wavesplatform.api.common
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
@@ -9,7 +9,7 @@ import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.{DataEntry, Diff, EmptyDataEntry, StringDataEntry, diffs}
+import com.wavesplatform.state.{DataEntry, Diff, EmptyDataEntry, Height, StringDataEntry, diffs}
 import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxHelpers}
 import com.wavesplatform.{BlocksTransactionsHelpers, history}
@@ -38,32 +38,31 @@ class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransacti
         (block3, mbs3) = UnsafeBlocks.unsafeChainBaseAndMicro(mbs2.last.totalResBlockSig, Seq(data4), Seq(Seq(data5)), acc, 3, ts)
       } yield (acc, block1, mbs1.head, block2, mbs2.head, block3, mbs3.head)
 
-      forAll(preconditions) {
-        case (acc, block1, mb1, block2, mb2, block3, mb3) =>
-          withDomain(
-            domainSettingsWithFS(
-              TestFunctionalitySettings.withFeatures(
-                BlockchainFeatures.NG,
-                BlockchainFeatures.DataTransaction,
-                BlockchainFeatures.BlockV5
-              )
+      forAll(preconditions) { case (acc, block1, mb1, block2, mb2, block3, mb3) =>
+        withDomain(
+          domainSettingsWithFS(
+            TestFunctionalitySettings.withFeatures(
+              BlockchainFeatures.NG,
+              BlockchainFeatures.DataTransaction,
+              BlockchainFeatures.BlockV5
             )
-          ) { d =>
-            val commonAccountsApi             = CommonAccountsApi(() => d.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), d.db, d.blockchainUpdater)
-            def dataList(): Set[DataEntry[_]] = commonAccountsApi.dataStream(acc.toAddress, None).toListL.runSyncUnsafe().toSet
+          )
+        ) { d =>
+          val commonAccountsApi             = CommonAccountsApi(d.blockchainUpdater.useLiquidDiff, d.db, d.blockchainUpdater)
+          def dataList(): Set[DataEntry[_]] = commonAccountsApi.dataStream(acc.toAddress, None).toListL.runSyncUnsafe().toSet
 
-            d.appendBlock(block1)
-            d.appendMicroBlock(mb1)
-            dataList() shouldBe Set(entry1)
-            d.appendBlock(block2)
-            dataList() shouldBe Set(entry1, entry2)
-            d.appendMicroBlock(mb2)
-            dataList() shouldBe Set(entry1, entry2, entry3)
-            d.appendBlock(block3)
-            dataList() shouldBe Set(entry3)
-            d.appendMicroBlock(mb3)
-            dataList() shouldBe Set(entry1, entry2)
-          }
+          d.appendBlock(block1)
+          d.appendMicroBlock(mb1)
+          dataList() shouldBe Set(entry1)
+          d.appendBlock(block2)
+          dataList() shouldBe Set(entry1, entry2)
+          d.appendMicroBlock(mb2)
+          dataList() shouldBe Set(entry1, entry2, entry3)
+          d.appendBlock(block3)
+          dataList() shouldBe Set(entry3)
+          d.appendMicroBlock(mb3)
+          dataList() shouldBe Set(entry1, entry2)
+        }
       }
     }
 
@@ -84,21 +83,20 @@ class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransacti
         (block2, mbs2) = UnsafeBlocks.unsafeChainBaseAndMicro(mbs1.last.totalResBlockSig, Seq(data2), Seq(Seq(data3)), acc, 3, ts)
       } yield (acc, block1, mbs1.head, block2, mbs2.head)
 
-      forAll(preconditions) {
-        case (acc, block1, mb1, block2, mb2) =>
-          withDomain(domainSettingsWithFS(TestFunctionalitySettings.withFeatures(BlockchainFeatures.NG, BlockchainFeatures.DataTransaction))) { d =>
-            val commonAccountsApi             = CommonAccountsApi(() => d.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), d.db, d.blockchainUpdater)
-            def dataList(): Set[DataEntry[_]] = commonAccountsApi.dataStream(acc.toAddress, Some("test_.*")).toListL.runSyncUnsafe().toSet
+      forAll(preconditions) { case (acc, block1, mb1, block2, mb2) =>
+        withDomain(domainSettingsWithFS(TestFunctionalitySettings.withFeatures(BlockchainFeatures.NG, BlockchainFeatures.DataTransaction))) { d =>
+          val commonAccountsApi             = CommonAccountsApi(d.blockchainUpdater.useLiquidDiff, d.db, d.blockchainUpdater)
+          def dataList(): Set[DataEntry[_]] = commonAccountsApi.dataStream(acc.toAddress, Some("test_.*")).toListL.runSyncUnsafe().toSet
 
-            d.appendBlock(block1)
-            dataList() shouldBe empty
-            d.appendMicroBlock(mb1)
-            dataList() shouldBe Set(entry1)
-            d.appendBlock(block2)
-            dataList() shouldBe Set(entry1)
-            d.appendMicroBlock(mb2)
-            dataList() shouldBe Set(entry1, entry3)
-          }
+          d.appendBlock(block1)
+          dataList() shouldBe empty
+          d.appendMicroBlock(mb1)
+          dataList() shouldBe Set(entry1)
+          d.appendBlock(block2)
+          dataList() shouldBe Set(entry1)
+          d.appendMicroBlock(mb2)
+          dataList() shouldBe Set(entry1, entry3)
+        }
       }
     }
   }
@@ -161,7 +159,7 @@ class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransacti
           invoke
         )
 
-        val api = CommonAccountsApi(() => Diff.empty, d.db, d.blockchain)
+        val api = CommonAccountsApi(new UseLiquidDiff { override def apply[A](f: Option[(Height, Diff)] => A): A = f(None) }, d.db, d.blockchain)
         val leaseId = Lease.calculateId(
           Lease(
             Recipient.Address(ByteStr(TxHelpers.defaultAddress.bytes)),

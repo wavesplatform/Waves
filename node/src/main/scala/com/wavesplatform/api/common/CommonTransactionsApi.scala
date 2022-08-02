@@ -9,7 +9,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
-import com.wavesplatform.state.{Blockchain, Diff, Height, TxMeta}
+import com.wavesplatform.state.{Blockchain, Height, TxMeta}
 import com.wavesplatform.transaction.TransactionType.TransactionType
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Transaction}
@@ -46,7 +46,7 @@ trait CommonTransactionsApi {
 
 object CommonTransactionsApi {
   def apply(
-      maybeDiff: => Option[(Height, Diff)],
+      useLiquidDiff: UseLiquidDiff,
       db: DB,
       blockchain: Blockchain,
       utx: UtxPool,
@@ -54,7 +54,8 @@ object CommonTransactionsApi {
       publishTransaction: Transaction => Future[TracedResult[ValidationError, Boolean]],
       blockAt: Int => Option[(BlockMeta, Seq[(TxMeta, Transaction)])]
   ): CommonTransactionsApi = new CommonTransactionsApi {
-    override def aliasesOfAddress(address: Address): Observable[(Height, CreateAliasTransaction)] = common.aliasesOfAddress(db, maybeDiff, address)
+    override def aliasesOfAddress(address: Address): Observable[(Height, CreateAliasTransaction)] =
+      common.aliasesOfAddress(db, useLiquidDiff, address)
 
     override def transactionsByAddress(
         subject: Address,
@@ -62,10 +63,10 @@ object CommonTransactionsApi {
         transactionTypes: Set[TransactionType],
         fromId: Option[ByteStr] = None
     ): Observable[TransactionMeta] =
-      common.addressTransactions(db, maybeDiff, subject, sender, transactionTypes, fromId)
+      common.addressTransactions(db, useLiquidDiff, subject, sender, transactionTypes, fromId)
 
     override def transactionById(transactionId: ByteStr): Option[TransactionMeta] =
-      blockchain.transactionInfo(transactionId).map(common.loadTransactionMeta(db, maybeDiff))
+      useLiquidDiff(maybeDiff => blockchain.transactionInfo(transactionId).map(common.loadTransactionMeta(db, maybeDiff)))
 
     override def unconfirmedTransactions: Seq[Transaction] = utx.all
 
@@ -75,9 +76,8 @@ object CommonTransactionsApi {
     override def calculateFee(tx: Transaction): Either[ValidationError, (Asset, Long, Long)] =
       FeeValidation
         .getMinFee(blockchain, tx)
-        .map {
-          case FeeDetails(asset, _, feeInAsset, feeInWaves) =>
-            (asset, feeInAsset, feeInWaves)
+        .map { case FeeDetails(asset, _, feeInAsset, feeInWaves) =>
+          (asset, feeInAsset, feeInWaves)
         }
 
     override def broadcastTransaction(tx: Transaction): Future[TracedResult[ValidationError, Boolean]] = publishTransaction(tx)

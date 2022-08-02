@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory
 package object wavesplatform {
   private lazy val logger: Logger =
     Logger(LoggerFactory.getLogger(getClass.getName))
+
   private def checkOrAppend(block: Block, blockchainUpdater: Blockchain & BlockchainUpdater, miner: Miner): Either[ValidationError, Unit] =
     if (blockchainUpdater.isEmpty) {
       blockchainUpdater.processBlock(block, block.header.generationSignature).map { _ =>

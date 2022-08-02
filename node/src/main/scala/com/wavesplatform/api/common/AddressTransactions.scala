@@ -35,22 +35,24 @@ object AddressTransactions {
 
   def allAddressTransactions(
       db: DB,
-      maybeDiff: Option[(Height, Diff)],
+      useLiquidDiff: UseLiquidDiff,
       subject: Address,
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
   ): Iterator[(TxMeta, Transaction)] =
-    transactionsFromDiff(maybeDiff, subject, sender, types, fromId) ++
-      transactionsFromDB(
-        db,
-        subject,
-        sender,
-        types,
-        fromId.filter(id => maybeDiff.exists { case (_, diff) => !diff.transactions.contains(id) })
-      )
+    useLiquidDiff(maybeDiff =>
+      transactionsFromDiff(maybeDiff, subject, sender, types, fromId) ++
+        transactionsFromDB(
+          db,
+          subject,
+          sender,
+          types,
+          fromId.filter(id => maybeDiff.exists { case (_, diff) => !diff.transactions.contains(id) })
+        )
+    )
 
-  def transactionsFromDB(
+  private def transactionsFromDB(
       db: DB,
       subject: Address,
       sender: Option[Address],
@@ -77,7 +79,7 @@ object AddressTransactions {
       }
       .iterator
 
-  def transactionsFromDiff(
+  private def transactionsFromDiff(
       maybeDiff: Option[(Height, Diff)],
       subject: Address,
       sender: Option[Address],
