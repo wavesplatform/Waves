@@ -214,7 +214,7 @@ class TransactionsRouteSpec
         "limit is too big" in {
           forAll(addressGen, choose(MaxTransactionsPerRequest + 1, Int.MaxValue).label("limitExceeded")) {
             case (address, limit) =>
-              Get(routePath(s"/address/$address/limit/$limit")) ~> route should produce(TooBigArrayAllocation)
+              Get(routePath(s"/address/$address/limit/$limit")) ~> route should produce(TooBigArrayAllocation())
           }
         }
       }

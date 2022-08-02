@@ -818,7 +818,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
 
   routePath("/seed/{length}") in forAll(Gen.posNum[Int]) { l =>
     if (l > UtilsApiRoute.MaxSeedSize) {
-      Get(routePath(s"/seed/$l")) ~> route should produce(TooBigArrayAllocation)
+      Get(routePath(s"/seed/$l")) ~> route should produce(TooBigArrayAllocation())
     } else {
       Get(routePath(s"/seed/$l")) ~> route ~> check {
         val seed = Base58.tryDecodeWithLimit((responseAs[JsValue] \ "seed").as[String])

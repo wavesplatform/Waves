@@ -55,7 +55,7 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
             .runToFuture
         )
       } else {
-        complete(TooBigArrayAllocation)
+        complete(TooBigArrayAllocation())
       }
     } ~ pathPrefix("headers") {
       path("at" / IntNumber) { height =>
@@ -105,7 +105,7 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
 
       extractScheduler(implicit sc => complete(blocks.toListL.map(JsArray(_)).runToFuture))
     } else {
-      complete(TooBigArrayAllocation)
+      complete(TooBigArrayAllocation())
     }
   }
 

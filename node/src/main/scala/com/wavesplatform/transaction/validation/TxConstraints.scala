@@ -91,7 +91,12 @@ object TxConstraints {
   // Transaction specific
   def transferAttachment(attachment: ByteStr): ValidatedV[ByteStr] = {
     this.seq(attachment)(
-      cond(attachment.size <= TransferTransaction.MaxAttachmentSize, TxValidationError.TooBigArray)
+      cond(
+        attachment.size <= TransferTransaction.MaxAttachmentSize,
+        TxValidationError.TooBigArray(
+          s"Invalid attachment. Length attachment ${attachment.size} bytes exceeds maximum size ${TransferTransaction.MaxAttachmentSize} bytes."
+        )
+      )
     )
   }
 
@@ -119,6 +124,6 @@ object TxConstraints {
       .condNel(
         description.size <= IssueTransaction.MaxAssetDescriptionLength,
         description,
-        TxValidationError.TooBigArray
+        TxValidationError.TooBigArray()
       )
 }

@@ -252,7 +252,7 @@ case class AssetsApiRoute(
 
   def nft(address: Address, limit: Int, maybeAfter: Option[String]): Route = {
     val after = maybeAfter.collect { case s if s.nonEmpty => IssuedAsset(ByteStr.decodeBase58(s).getOrElse(throw ApiException(InvalidAssetId))) }
-    if (limit > settings.transactionsByAddressLimit) complete(TooBigArrayAllocation)
+    if (limit > settings.transactionsByAddressLimit) complete(TooBigArrayAllocation())
     else
       extractScheduler { implicit sc =>
         import cats.syntax.either._

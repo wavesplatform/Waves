@@ -249,7 +249,7 @@ case class UtilsApiRoute(
 
   def length: Route = (path("seed" / IntNumber) & get) { length =>
     if (length <= MaxSeedSize) complete(seed(length))
-    else complete(TooBigArrayAllocation)
+    else complete(TooBigArrayAllocation())
   }
 
   def hashSecure: Route = (path("hash" / "secure") & post) {

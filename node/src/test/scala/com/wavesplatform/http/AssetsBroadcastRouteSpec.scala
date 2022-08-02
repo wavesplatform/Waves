@@ -11,7 +11,7 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.{GenericError, TooBigArray}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.{Asset, Proofs, Transaction, TxPositiveAmount}
@@ -92,7 +92,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
           posting(ir.copy(decimals = d)) should produce(InvalidDecimals(d.toString))
         }
         forAll(longDescription) { d =>
-          posting(ir.copy(description = d)) should produce(TooBigArrayAllocation)
+          posting(ir.copy(description = d)) should produce(TooBigArrayAllocation())
         }
         forAll(invalidName) { name =>
           posting(ir.copy(name = name)) should produce(InvalidName)
@@ -161,7 +161,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
         }
         forAll(longAttachment) { a =>
           posting(tr.copy(attachment = Some(a))) should produce(
-            GenericError(
+            TooBigArray(
               s"Invalid attachment. Length attachment ${a.length} bytes exceeds maximum size ${TransferTransaction.MaxAttachmentSize} bytes."
             )
           )

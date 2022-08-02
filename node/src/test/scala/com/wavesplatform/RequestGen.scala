@@ -22,7 +22,7 @@ trait RequestGen extends TransactionGen { _: Suite =>
       genBoundedBytes(TransferTransaction.MaxAttachmentSize + 10, TransferTransaction.MaxAttachmentSize + 50)
         .map(Base58.encode),
       // Corner case, when a string length equals to a decoded array size
-      G.choose(TransferTransaction.MaxAttachmentSize - 1, TransferTransaction.MaxAttachmentStringSize + 1).map(n => "1" * n)
+      G.choose(TransferTransaction.MaxAttachmentSize + 1, TransferTransaction.MaxAttachmentStringSize - 1).map(n => "1" * n)
     )
   }
   val invalidBase58: G[String] = listOfN(50, oneOf(alphaNumChar, oneOf('O', '0', 'l')))

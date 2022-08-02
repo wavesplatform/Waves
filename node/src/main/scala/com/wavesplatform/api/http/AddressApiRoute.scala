@@ -241,7 +241,7 @@ case class AddressApiRoute(
   }
 
   private def balancesJson(height: Int, addresses: Seq[String], assetId: Asset): ToResponseMarshallable =
-    if (addresses.length > settings.transactionsByAddressLimit) TooBigArrayAllocation
+    if (addresses.length > settings.transactionsByAddressLimit) TooBigArrayAllocation()
     else if (height < 1 || height > blockchain.height) CustomValidationError(s"Illegal height: $height")
     else {
       implicit val balancesWrites: Writes[(String, Long)] = Writes[(String, Long)] { b =>

@@ -37,7 +37,7 @@ object ApiError {
       case TxValidationError.InvalidName                     => InvalidName
       case TxValidationError.InvalidSignature(_, _)          => InvalidSignature
       case TxValidationError.InvalidRequestSignature         => InvalidSignature
-      case TxValidationError.TooBigArray                     => TooBigArrayAllocation
+      case TxValidationError.TooBigArray(detals)             => TooBigArrayAllocation(detals)
       case TxValidationError.OverflowError                   => OverflowError
       case TxValidationError.ToSelf                          => ToSelfError
       case TxValidationError.MissingSenderPrivateKey         => MissingSenderPrivateKey
@@ -91,26 +91,24 @@ object ApiError {
     val Message = "failed to parse json message"
   }
 
-  //API Auth
+  // API Auth
   case object ApiKeyNotValid extends ApiError {
     override val id              = 2
     override val code            = StatusCodes.Forbidden
     override val message: String = "Provided API key is not correct"
   }
 
-  case object TooBigArrayAllocation extends ApiError {
+  object TooBigArrayAllocation {
+    def apply(limit: Int): TooBigArrayAllocation = apply(s"Too big sequence requested: max limit is $limit entries")
+    def apply(message: String = "Too big sequence requested"): TooBigArrayAllocation = new TooBigArrayAllocation(message)
+  }
+
+  case class TooBigArrayAllocation(message: String) extends ApiError {
     override val id: Int          = 10
-    override val message: String  = "Too big sequence requested"
     override val code: StatusCode = StatusCodes.BadRequest
   }
 
-  case class TooBigArrayAllocation(limit: Int) extends ApiError {
-    override val id: Int          = 10
-    override val message: String  = s"Too big sequence requested: max limit is $limit entries"
-    override val code: StatusCode = StatusCodes.BadRequest
-  }
-
-  //VALIDATION
+  // VALIDATION
   case object InvalidSignature extends ApiError {
     override val id      = 101
     override val code    = StatusCodes.BadRequest
@@ -145,7 +143,7 @@ object ApiError {
     override val id: Int          = StateCheckFailed.Id
     override val message: String  = StateCheckFailed.message(errorMsg)
     override val code: StatusCode = StateCheckFailed.Code
-    override lazy val json        = details.fold(JsObject.empty)(identity) ++ Json.obj("error" -> id, "message" -> message, "transaction" -> tx.json())
+    override lazy val json = details.fold(JsObject.empty)(identity) ++ Json.obj("error" -> id, "message" -> message, "transaction" -> tx.json())
   }
 
   case object StateCheckFailed {
@@ -278,7 +276,7 @@ object ApiError {
     val Code    = StatusCodes.BadRequest
   }
 
-  //TRANSACTIONS
+  // TRANSACTIONS
   case object TransactionDoesNotExist extends ApiError {
     override val id: Int          = 311
     override val message: String  = "transactions does not exist"
@@ -358,12 +356,7 @@ object ApiError {
         "error"   -> id,
         "message" -> message,
         "details" -> Json
-          .toJson(
-            errs
-              .map {
-                case (addr, err) => addr.toString -> err
-              }
-          )
+          .toJson(errs.map { case (addr, err) => addr.toString -> err })
       )
   }
 
