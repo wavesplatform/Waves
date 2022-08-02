@@ -7,8 +7,8 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.{Transaction, _}
-import play.api.libs.json._
+import com.wavesplatform.transaction.{Transaction, *}
+import play.api.libs.json.*
 
 case class ApiErrorResponse(error: Int, message: String)
 
@@ -37,7 +37,9 @@ object ApiError {
       case TxValidationError.InvalidName                     => InvalidName
       case TxValidationError.InvalidSignature(_, _)          => InvalidSignature
       case TxValidationError.InvalidRequestSignature         => InvalidSignature
-      case TxValidationError.TooBigArray(detals)             => TooBigArrayAllocation(detals)
+      case TxValidationError.TooBigArray(details)            => TooBigArrayAllocation(details)
+      case TxValidationError.TooBigInBytes(details)          => TooBigInBytes(details)
+      case TxValidationError.TooBigInSymbols(details)        => TooBigInSymbols(details)
       case TxValidationError.OverflowError                   => OverflowError
       case TxValidationError.ToSelf                          => ToSelfError
       case TxValidationError.MissingSenderPrivateKey         => MissingSenderPrivateKey
@@ -121,10 +123,20 @@ object ApiError {
     override val message = "invalid address"
   }
 
+  case class TooBigInBytes(message: String) extends ApiError {
+    override val id   = 107
+    override val code = StatusCodes.BadRequest
+  }
+
   case object InvalidPublicKey extends ApiError {
     override val id      = 108
     override val code    = StatusCodes.BadRequest
     override val message = "invalid public key"
+  }
+
+  case class TooBigInSymbols(message: String) extends ApiError {
+    override val id   = 109
+    override val code = StatusCodes.BadRequest
   }
 
   case object InvalidMessage extends ApiError {

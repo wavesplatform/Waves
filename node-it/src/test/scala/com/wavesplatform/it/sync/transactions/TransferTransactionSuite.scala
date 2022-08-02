@@ -98,7 +98,10 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
       x <- Seq(
         (invalidTx(v, timestamp = System.currentTimeMillis + 1.day.toMillis), "Transaction timestamp .* is more than .*ms in the future"),
         (invalidTx(v, fee = 99999), "Fee .* does not exceed minimal value"),
-        (invalidTx(v, attachment = ("1" * (MaxAttachmentSize + 1)).getBytes(StandardCharsets.UTF_8)), "Length attachment \\d+ bytes exceeds maximum size")
+        (
+          invalidTx(v, attachment = ("1" * (MaxAttachmentSize + 1)).getBytes(StandardCharsets.UTF_8)),
+          "Invalid attachment. String length \\d+ exceeds maximum \\d+ chars"
+        )
       )
     } yield x
 

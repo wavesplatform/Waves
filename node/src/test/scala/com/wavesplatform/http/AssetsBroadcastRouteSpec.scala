@@ -11,7 +11,7 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.TxValidationError.{GenericError, TooBigArray}
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.{Asset, Proofs, Transaction, TxPositiveAmount}
@@ -159,10 +159,17 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
             WrongJson(errors = Seq(JsPath \ "feeAssetId" -> Seq(JsonValidationError(s"Too long assetId: length of $a exceeds 44"))))
           )
         }
-        forAll(longAttachment) { a =>
+        forAll(longAttachmentInSymbols) { a =>
           posting(tr.copy(attachment = Some(a))) should produce(
-            TooBigArray(
-              s"Invalid attachment. Length attachment ${a.length} bytes exceeds maximum size ${TransferTransaction.MaxAttachmentSize} bytes."
+            TooBigInSymbols(
+              s"Invalid attachment. Length ${a.length} symbols exceeds maximum of ${TransferTransaction.MaxAttachmentStringSize} symbols."
+            )
+          )
+        }
+        forAll(longAttachmentInBytes) { a =>
+          posting(tr.copy(attachment = Some(a))) should produce(
+            TooBigInBytes(
+              s"Invalid attachment. Length ${Base58.decode(a).length} bytes exceeds maximum of ${TransferTransaction.MaxAttachmentSize} bytes."
             )
           )
         }

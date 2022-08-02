@@ -93,8 +93,8 @@ object TxConstraints {
     this.seq(attachment)(
       cond(
         attachment.size <= TransferTransaction.MaxAttachmentSize,
-        TxValidationError.TooBigArray(
-          s"Invalid attachment. Length attachment ${attachment.size} bytes exceeds maximum size ${TransferTransaction.MaxAttachmentSize} bytes."
+        TxValidationError.TooBigInBytes(
+          s"Invalid attachment. Length ${attachment.size} bytes exceeds maximum of ${TransferTransaction.MaxAttachmentSize} bytes."
         )
       )
     )
