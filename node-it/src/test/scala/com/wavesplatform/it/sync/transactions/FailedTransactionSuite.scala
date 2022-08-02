@@ -30,7 +30,6 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
 
   private val assetAmount    = 1000000000L
   private var smartAsset     = ""
-  private var sponsoredAsset = ""
 
   private def seller  = firstKeyPair
   private def buyer   = secondKeyPair
