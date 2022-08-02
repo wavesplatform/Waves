@@ -38,8 +38,8 @@ object ApiError {
       case TxValidationError.InvalidSignature(_, _)          => InvalidSignature
       case TxValidationError.InvalidRequestSignature         => InvalidSignature
       case TxValidationError.TooBigArray                     => TooBigArrayAllocation
-      case TxValidationError.TooBigInBytes(details)          => TooBigInBytes(details)
-      case TxValidationError.TooBigInSymbols(details)        => TooBigInSymbols(details)
+      case TxValidationError.TooBigInBytes(err)              => TooBigInBytes(err)
+      case TxValidationError.TooBigInSymbols(err)            => TooBigInSymbols(err)
       case TxValidationError.OverflowError                   => OverflowError
       case TxValidationError.ToSelf                          => ToSelfError
       case TxValidationError.MissingSenderPrivateKey         => MissingSenderPrivateKey
