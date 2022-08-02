@@ -10,7 +10,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.*
-import com.wavesplatform.transaction.transfer.TransferTransaction.MaxAttachmentSize
+import com.wavesplatform.transaction.transfer.TransferTransaction.{MaxAttachmentSize, MaxAttachmentStringSize}
 import com.wavesplatform.transaction.{Proofs, TxPositiveAmount, TxVersion}
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.Json
@@ -100,7 +100,11 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
         (invalidTx(v, fee = 99999), "Fee .* does not exceed minimal value"),
         (
           invalidTx(v, attachment = ("1" * (MaxAttachmentSize + 1)).getBytes(StandardCharsets.UTF_8)),
-          "Invalid attachment. String length \\d+ exceeds maximum \\d+ chars"
+          "Invalid attachment. Length \\d+ symbols exceeds maximum of \\d+ symbols."
+        ),
+        (
+          invalidTx(v, attachment = Array.fill(MaxAttachmentSize + 1)(1)),
+          "Invalid attachment. Length \\d+ bytes exceeds maximum of \\d+ bytes."
         )
       )
     } yield x
