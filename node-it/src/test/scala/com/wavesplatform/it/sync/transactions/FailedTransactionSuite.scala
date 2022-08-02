@@ -58,18 +58,6 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
       )
       .id
 
-    sponsoredAsset = sender
-      .issue(
-        contract,
-        "Sponsored Asset",
-        "Description",
-        assetAmount,
-        8,
-        script = None,
-        waitForTx = true
-      )
-      .id
-
     val scriptTextV4 =
       s"""
          |{-# STDLIB_VERSION 4 #-}
