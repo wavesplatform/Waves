@@ -37,7 +37,7 @@ object ApiError {
       case TxValidationError.InvalidName                     => InvalidName
       case TxValidationError.InvalidSignature(_, _)          => InvalidSignature
       case TxValidationError.InvalidRequestSignature         => InvalidSignature
-      case TxValidationError.TooBigArray(details)            => TooBigArrayAllocation(details)
+      case TxValidationError.TooBigArray                     => TooBigArrayAllocation
       case TxValidationError.TooBigInBytes(details)          => TooBigInBytes(details)
       case TxValidationError.TooBigInSymbols(details)        => TooBigInSymbols(details)
       case TxValidationError.OverflowError                   => OverflowError
@@ -100,13 +100,15 @@ object ApiError {
     override val message: String = "Provided API key is not correct"
   }
 
-  object TooBigArrayAllocation {
-    def apply(limit: Int): TooBigArrayAllocation = apply(s"Too big sequence requested: max limit is $limit entries")
-    def apply(message: String = "Too big sequence requested"): TooBigArrayAllocation = new TooBigArrayAllocation(message)
+  case object TooBigArrayAllocation extends ApiError {
+    override val id: Int          = 10
+    override val message: String  = "Too big sequence requested"
+    override val code: StatusCode = StatusCodes.BadRequest
   }
 
-  case class TooBigArrayAllocation(message: String) extends ApiError {
+  case class TooBigArrayAllocation(limit: Int) extends ApiError {
     override val id: Int          = 10
+    override val message: String  = s"Too big sequence requested: max limit is $limit entries"
     override val code: StatusCode = StatusCodes.BadRequest
   }
 
@@ -367,8 +369,7 @@ object ApiError {
       Json.obj(
         "error"   -> id,
         "message" -> message,
-        "details" -> Json
-          .toJson(errs.map { case (addr, err) => addr.toString -> err })
+        "details" -> Json.toJson(errs.map { case (addr, err) => addr.toString -> err })
       )
   }
 

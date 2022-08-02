@@ -294,7 +294,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     invalidDescs.foreach { desc =>
       assertApiError(
         sender.updateAssetInfo(issuer, assetId, "updatedName", desc, minFee),
-        TooBigArrayAllocation()
+        TooBigArrayAllocation
       )
     }
     validDescs.foreach { desc =>

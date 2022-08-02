@@ -61,7 +61,7 @@ case class TransactionsApiRoute(
     (get & path("address" / AddrSegment / "limit" / IntNumber) & parameter("after".?)) { (address, limit, maybeAfter) =>
       val after =
         maybeAfter.map(s => ByteStr.decodeBase58(s).getOrElse(throw ApiException(CustomValidationError(s"Unable to decode transaction id $s"))))
-      if (limit > settings.transactionsByAddressLimit) throw ApiException(TooBigArrayAllocation())
+      if (limit > settings.transactionsByAddressLimit) throw ApiException(TooBigArrayAllocation)
       extractScheduler { implicit sc =>
         complete(transactionsByAddress(address, limit, after).map(txs => List(txs))) // Double list - [ [tx1, tx2, ...] ]
       }
@@ -111,7 +111,7 @@ case class TransactionsApiRoute(
     } ~ pathEndOrSingleSlash {
       anyParam("id").filter(_.nonEmpty) { ids =>
         if (ids.toSeq.length > settings.transactionsByAddressLimit)
-          complete(TooBigArrayAllocation())
+          complete(TooBigArrayAllocation)
         else {
           ids.map(id => ByteStr.decodeBase58(id).toEither.leftMap(_ => id)).toList.separate match {
             case (Nil, ids) =>

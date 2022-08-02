@@ -124,6 +124,6 @@ object TxConstraints {
       .condNel(
         description.size <= IssueTransaction.MaxAssetDescriptionLength,
         description,
-        TxValidationError.TooBigArray()
+        TxValidationError.TooBigArray
       )
 }

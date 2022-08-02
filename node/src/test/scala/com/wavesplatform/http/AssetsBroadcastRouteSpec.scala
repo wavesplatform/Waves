@@ -92,7 +92,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
           posting(ir.copy(decimals = d)) should produce(InvalidDecimals(d.toString))
         }
         forAll(longDescription) { d =>
-          posting(ir.copy(description = d)) should produce(TooBigArrayAllocation())
+          posting(ir.copy(description = d)) should produce(TooBigArrayAllocation)
         }
         forAll(invalidName) { name =>
           posting(ir.copy(name = name)) should produce(InvalidName)

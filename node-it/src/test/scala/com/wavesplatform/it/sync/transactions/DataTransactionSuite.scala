@@ -140,14 +140,14 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     val tooLargeSizeDataEntries = updateAndRemoveDataEntries ++ (1 to 11).map(k => EmptyDataEntry(s"another-unknown-$k"))
     assertApiError(
       sender.broadcastData(sender.keyPair, tooLargeSizeDataEntries, calcDataFee(tooLargeSizeDataEntries, TxVersion.V2), version = TxVersion.V2),
-      TooBigArrayAllocation()
+      TooBigArrayAllocation
     )
 
     // max key size is 400 byte
     val tooLargeKeyDataEntries = List(BinaryDataEntry("a" * 401, ByteStr("value".getBytes("utf-8"))))
     assertApiError(
       sender.broadcastData(sender.keyPair, tooLargeKeyDataEntries, calcDataFee(tooLargeKeyDataEntries, TxVersion.V2), version = TxVersion.V2),
-      TooBigArrayAllocation()
+      TooBigArrayAllocation
     )
 
     // can put and remove same data within one block

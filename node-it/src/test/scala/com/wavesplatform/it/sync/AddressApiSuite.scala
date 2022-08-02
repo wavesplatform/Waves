@@ -76,11 +76,11 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
     val addresses = List.fill(limit + 1)(firstAddress)
     assertApiError(
       miner.get(s"/addresses/balance?${addresses.map(a => s"address=$a").mkString("&")}"),
-      TooBigArrayAllocation()
+      TooBigArrayAllocation
     )
     assertApiError(
       miner.accountsBalances(None, addresses),
-      TooBigArrayAllocation()
+      TooBigArrayAllocation
     )
   }
 
