@@ -18,7 +18,7 @@ import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{BinaryDataEntry, Blockchain, Height, TxMeta}
+import com.wavesplatform.state.{BinaryDataEntry, Blockchain, Diff, Height, TxMeta}
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -52,7 +52,7 @@ class LeaseRouteSpec
       domain.blockchain,
       (_, _) => Future.successful(TracedResult(Right(true))),
       ntpTime,
-      CommonAccountsApi(domain.blockchainUpdater.useLiquidDiff, domain.db, domain.blockchain)
+      CommonAccountsApi(() => domain.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), domain.db, domain.blockchain)
     )
 
   private def withRoute(balances: Seq[AddrWithBalance], settings: WavesSettings = mostRecent)(f: (Domain, Route) => Unit): Unit =

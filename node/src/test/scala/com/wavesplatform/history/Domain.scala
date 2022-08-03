@@ -84,7 +84,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       transactions.transactionsByAddress(address, None, Set.empty, None).toListL.runSyncUnsafe()
 
     lazy val transactions: CommonTransactionsApi = CommonTransactionsApi(
-      blockchainUpdater.useLiquidDiff,
+      blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
       db,
       blockchain,
       utxPool,
@@ -165,7 +165,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     AddressTransactions
       .allAddressTransactions(
         db,
-        blockchainUpdater.useLiquidDiff,
+        blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
         address,
         None,
         Set.empty,
@@ -377,7 +377,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   }
 
   val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(
-    blockchainUpdater.useLiquidDiff,
+    blockchainUpdater.bestLiquidDiff.map(Height(blockchainUpdater.height) -> _),
     db,
     blockchain,
     utxPool,
@@ -386,7 +386,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   )
 
   val accountsApi: CommonAccountsApi = CommonAccountsApi(
-    blockchainUpdater.useLiquidDiff,
+    () => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty),
     db,
     blockchain
   )

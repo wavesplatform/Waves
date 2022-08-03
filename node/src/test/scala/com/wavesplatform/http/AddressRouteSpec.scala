@@ -78,7 +78,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
   routePath("/balance/{address}/{confirmations}") in withDomain(balances = Seq(AddrWithBalance(TxHelpers.defaultAddress))) { d =>
     val route =
       addressApiRoute
-        .copy(blockchain = d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(d.blockchainUpdater.useLiquidDiff, d.db, d.blockchainUpdater))
+        .copy(blockchain = d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(() => d.liquidDiff, d.db, d.blockchainUpdater))
         .route
     val address = TxHelpers.signer(1).toAddress
 
@@ -405,7 +405,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
 
       val route =
         addressApiRoute
-          .copy(blockchain = d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(d.blockchainUpdater.useLiquidDiff, d.db, d.blockchainUpdater))
+          .copy(blockchain = d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(() => d.liquidDiff, d.db, d.blockchainUpdater))
           .route
 
       val requestBody = Json.obj("keys" -> Seq("test"))

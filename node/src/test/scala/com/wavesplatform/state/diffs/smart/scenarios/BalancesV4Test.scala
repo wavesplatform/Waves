@@ -1,7 +1,6 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
 import cats.syntax.semigroup.*
-import com.wavesplatform.api.common.UseLiquidDiff
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
@@ -21,8 +20,8 @@ import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctio
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.*
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.*
+import com.wavesplatform.transaction.*
 
 class BalancesV4Test extends PropSpec with WithState {
 
@@ -33,8 +32,7 @@ class BalancesV4Test extends PropSpec with WithState {
   val SetScriptFee: Long      = Constants.UnitsInWave / 1000L
   val SetAssetScriptFee: Long = Constants.UnitsInWave
 
-  val rideV4Activated: FunctionalitySettings = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures =
-    Map(
+  val rideV4Activated: FunctionalitySettings = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(
       BlockchainFeatures.Ride4DApps.id    -> 0,
       BlockchainFeatures.SmartAccounts.id -> 0,
       BlockchainFeatures.BlockV5.id       -> 0
@@ -94,18 +92,18 @@ class BalancesV4Test extends PropSpec with WithState {
         Seq(TestBlock.create(b)),
       TestBlock.create(Seq(ci)),
       rideV4Activated
-    ) { case (d, s) =>
-      val useLiquidDiff = new UseLiquidDiff { override def apply[A](f: Option[(Height, Diff)] => A): A = f(Some((Height(1), d))) }
-      val apiBalance    = com.wavesplatform.api.common.CommonAccountsApi(useLiquidDiff, db, s).balanceDetails(acc1.toAddress).explicitGet()
-      val data          = d.accountData(dapp.toAddress)
-      data.data("available") shouldBe IntegerDataEntry("available", apiBalance.available)
-      apiBalance.available shouldBe 16 * Constants.UnitsInWave
-      data.data("regular") shouldBe IntegerDataEntry("regular", apiBalance.regular)
-      apiBalance.regular shouldBe 26 * Constants.UnitsInWave
-      data.data("generating") shouldBe IntegerDataEntry("generating", apiBalance.generating)
-      apiBalance.generating shouldBe 5 * Constants.UnitsInWave
-      data.data("effective") shouldBe IntegerDataEntry("effective", apiBalance.effective)
-      apiBalance.effective shouldBe 17 * Constants.UnitsInWave
+    ) {
+      case (d, s) =>
+        val apiBalance = com.wavesplatform.api.common.CommonAccountsApi(() => d, db, s).balanceDetails(acc1.toAddress).explicitGet()
+        val data       = d.accountData(dapp.toAddress)
+        data.data("available") shouldBe IntegerDataEntry("available", apiBalance.available)
+        apiBalance.available shouldBe 16 * Constants.UnitsInWave
+        data.data("regular") shouldBe IntegerDataEntry("regular", apiBalance.regular)
+        apiBalance.regular shouldBe 26 * Constants.UnitsInWave
+        data.data("generating") shouldBe IntegerDataEntry("generating", apiBalance.generating)
+        apiBalance.generating shouldBe 5 * Constants.UnitsInWave
+        data.data("effective") shouldBe IntegerDataEntry("effective", apiBalance.effective)
+        apiBalance.effective shouldBe 17 * Constants.UnitsInWave
 
     }
   }
@@ -122,11 +120,11 @@ class BalancesV4Test extends PropSpec with WithState {
 
       val script =
         s"""
-           | {-# STDLIB_VERSION 4 #-}
-           | {-# CONTENT_TYPE EXPRESSION #-}
-           | {-# SCRIPT_TYPE ASSET #-}
-           |
-           | assetBalance(Address(base58'$acc'), this.id) == $a && assetBalance(Alias("alias"), this.id) == $a
+          | {-# STDLIB_VERSION 4 #-}
+          | {-# CONTENT_TYPE EXPRESSION #-}
+          | {-# SCRIPT_TYPE ASSET #-}
+          |
+          | assetBalance(Address(base58'$acc'), this.id) == $a && assetBalance(Alias("alias"), this.id) == $a
         """.stripMargin
       val parsedScript = Parser.parseExpr(script).get.value
       ExprScript(V4, ExpressionCompiler(ctx.compilerContext, parsedScript).explicitGet()._1)
@@ -184,11 +182,11 @@ class BalancesV4Test extends PropSpec with WithState {
 
       val script =
         s"""
-           | {-# STDLIB_VERSION 4 #-}
-           | {-# CONTENT_TYPE EXPRESSION #-}
-           | {-# SCRIPT_TYPE ASSET #-}
-           |
-           | wavesBalance(Address(base58'$acc')).regular == $w
+          | {-# STDLIB_VERSION 4 #-}
+          | {-# CONTENT_TYPE EXPRESSION #-}
+          | {-# SCRIPT_TYPE ASSET #-}
+          |
+          | wavesBalance(Address(base58'$acc')).regular == $w
         """.stripMargin
       val parsedScript = Parser.parseExpr(script).get.value
       ExprScript(V4, ExpressionCompiler(ctx.compilerContext, parsedScript).explicitGet()._1)
@@ -224,11 +222,12 @@ class BalancesV4Test extends PropSpec with WithState {
     val setScript = TxHelpers.setScript(acc1, dappScript(ByteStr(acc2.toAddress.bytes), issue.id()), SetScriptFee)
     val invoke    = TxHelpers.invoke(acc1.toAddress, func = Some("bar"), invoker = acc2, fee = InvokeScriptTxFee)
 
-    assertDiffAndState(Seq(TestBlock.create(genesis :+ issue :+ setScript)), TestBlock.create(Seq(invoke)), rideV4Activated) { case (d, s) =>
-      val error = d.scriptResults(invoke.id()).error
-      error.get.code shouldBe 3
-      error.get.text should include("Transaction is not allowed by script of the asset")
-      s.wavesPortfolio(acc1.toAddress).balance shouldBe w
+    assertDiffAndState(Seq(TestBlock.create(genesis :+ issue :+ setScript)), TestBlock.create(Seq(invoke)), rideV4Activated) {
+      case (d, s) =>
+        val error = d.scriptResults(invoke.id()).error
+        error.get.code shouldBe 3
+        error.get.text should include("Transaction is not allowed by script of the asset")
+        s.wavesPortfolio(acc1.toAddress).balance shouldBe w
     }
   }
 

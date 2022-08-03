@@ -18,43 +18,34 @@ package object common {
 
   def addressTransactions(
       db: DB,
-      useLiquidDiff: UseLiquidDiff,
+      maybeDiff: Option[(Height, Diff)],
       subject: Address,
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Observable[TransactionMeta] = {
-    val addressTxs = allAddressTransactions(db, useLiquidDiff, subject, sender, types, fromId)
-    def metas      = addressTxs.map { case (dbMeta, transaction) => toMeta(useLiquidDiff, db, dbMeta, transaction) }
-    Observable.fromIterator(Task(metas))
-  }
+  ): Observable[TransactionMeta] =
+    Observable
+      .fromIterator(Task(allAddressTransactions(db, maybeDiff, subject, sender, types, fromId).map {
+        case (m, transaction) =>
+          def loadISR(t: Transaction) =
+            maybeDiff
+              .flatMap { case (_, diff) => diff.scriptResults.get(t.id()) }
+              .orElse(loadInvokeScriptResult(db, t.id()))
 
-  private def toMeta(
-      useLiquidDiff: UseLiquidDiff,
-      db: DB,
-      dbMeta: TxMeta,
-      transaction: Transaction
-  ): TransactionMeta =
-    useLiquidDiff { maybeDiff =>
-      def loadISR(t: Transaction) =
-        maybeDiff
-          .flatMap(_._2.scriptResults.get(t.id()))
-          .orElse(loadInvokeScriptResult(db, t.id()))
+          def loadETM(t: Transaction) =
+            maybeDiff
+              .flatMap { case (_, diff) => diff.ethereumTransactionMeta.get(t.id()) }
+              .orElse(loadEthereumMetadata(db, t.id()))
 
-      def loadETM(t: Transaction) =
-        maybeDiff
-          .flatMap(_._2.ethereumTransactionMeta.get(t.id()))
-          .orElse(loadEthereumMetadata(db, t.id()))
-
-      TransactionMeta.create(
-        dbMeta.height,
-        transaction,
-        dbMeta.succeeded,
-        dbMeta.spentComplexity,
-        loadISR,
-        loadETM
-      )
-    }
+          TransactionMeta.create(
+            m.height,
+            transaction,
+            m.succeeded,
+            m.spentComplexity,
+            loadISR,
+            loadETM
+          )
+      }))
 
   def balanceDistribution(
       db: DB,
@@ -75,9 +66,9 @@ package object common {
         Observable.fromIterator(Task(new BalanceIterator(resource, globalPrefix, addressId, balanceOf, height, overrides).asScala.filter(_._2 > 0)))
       }
 
-  def aliasesOfAddress(db: DB, useLiquidDiff: UseLiquidDiff, address: Address): Observable[(Height, CreateAliasTransaction)] = {
+  def aliasesOfAddress(db: DB, maybeDiff: => Option[(Height, Diff)], address: Address): Observable[(Height, CreateAliasTransaction)] = {
     val disabledAliases = db.get(Keys.disabledAliases)
-    addressTransactions(db, useLiquidDiff, address, Some(address), Set(TransactionType.CreateAlias), None)
+    addressTransactions(db, maybeDiff, address, Some(address), Set(TransactionType.CreateAlias), None)
       .collect {
         case TransactionMeta(height, cat: CreateAliasTransaction, true) if disabledAliases.isEmpty || !disabledAliases(cat.alias) => height -> cat
       }

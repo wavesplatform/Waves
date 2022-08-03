@@ -1,10 +1,11 @@
 package com.wavesplatform.state
 
+import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
+
 import cats.syntax.either.*
 import cats.syntax.option.*
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
-import com.wavesplatform.api.common.UseLiquidDiff
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -26,8 +27,6 @@ import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceSt
 import kamon.Kamon
 import monix.reactive.subjects.ReplaySubject
 import monix.reactive.{Observable, Observer}
-
-import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
 class BlockchainUpdaterImpl(
     leveldb: Blockchain & Storage,
@@ -96,11 +95,6 @@ class BlockchainUpdaterImpl(
 
   @noinline
   def bestLiquidDiff: Option[Diff] = readLock(ngState.map(_.bestLiquidDiff))
-
-  val useLiquidDiff: UseLiquidDiff = new UseLiquidDiff {
-    override def apply[A](f: Option[(Height, Diff)] => A): A =
-      readLock(f(ngState.map(ng => (Height(height), ng.bestLiquidDiff))))
-  }
 
   def bestLiquidDiffAndFees: Option[(Diff, Long, Long)] = readLock(ngState.map(_.bestLiquidDiffAndFees))
 

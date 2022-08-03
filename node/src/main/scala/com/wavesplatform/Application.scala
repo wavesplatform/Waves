@@ -213,7 +213,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override def utxEvents: Observable[UtxEvent]                       = app.utxEvents
 
       override val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(
-        blockchainUpdater.useLiquidDiff,
+        blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
         db,
         blockchainUpdater,
         utxStorage,
@@ -223,7 +223,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override val blocksApi: CommonBlocksApi =
         CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockInfoAt(db, blockchainUpdater))
       override val accountsApi: CommonAccountsApi =
-        CommonAccountsApi(blockchainUpdater.useLiquidDiff, db, blockchainUpdater)
+        CommonAccountsApi(() => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
       override val assetsApi: CommonAssetsApi = CommonAssetsApi(() => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
     }
 
