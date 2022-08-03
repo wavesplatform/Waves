@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import cats.Order as _
-import com.wavesplatform.account.{Address, KeyPair, PrivateKey}
+import com.wavesplatform.account.{Address, AddressScheme, KeyPair, PrivateKey}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -1035,6 +1035,52 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       val blockWithExchange = TestBlock.create(Seq(exchangeWithResignedOrder))
 
       assertLeft(preconBlocks, blockWithExchange, fsWithOrderFeature)("Proof doesn't validate as signature")
+    }
+  }
+
+  property("ExchangeTransaction invalid if price > buyOrder.price or price < sellOrder.price") {
+    val buyer   = TxHelpers.signer(1)
+    val seller  = TxHelpers.signer(2)
+    val matcher = TxHelpers.signer(3)
+
+    val genesis = Seq(buyer, seller, matcher).map(acc => TxHelpers.genesis(acc.toAddress))
+    val issue1  = TxHelpers.issue(buyer, ENOUGH_AMT, name = "asset1", version = TxVersion.V1)
+    val issue2  = TxHelpers.issue(seller, ENOUGH_AMT, name = "asset2", version = TxVersion.V1)
+    val baseBlocks = Seq(TestBlock.create(genesis :+ issue1 :+ issue2))
+
+    List(
+      (1, 2, "price should be <= buyOrder.price"),
+      (2, 3, "price should be >= sellOrder.price")
+    ).map { case (buyOrderPrice, sellOrderPrice, expectedError) =>
+      val exchange = TxHelpers.exchangeFromOrders(
+        order1 = TxHelpers.order(
+          OrderType.BUY,
+          Asset.IssuedAsset(issue2.assetId),
+          Asset.IssuedAsset(issue1.assetId),
+          price = buyOrderPrice,
+          sender = buyer,
+          matcher = matcher,
+          version = Order.V3
+        ),
+        order2 = TxHelpers.order(
+          OrderType.SELL,
+          Asset.IssuedAsset(issue2.assetId),
+          Asset.IssuedAsset(issue1.assetId),
+          price = sellOrderPrice,
+          sender = seller,
+          matcher = matcher,
+          version = Order.V3
+        ),
+        price = 2,
+        matcher = matcher,
+        version = TxVersion.V2,
+        fee = TestValues.fee,
+        chainId = AddressScheme.current.chainId
+      )
+
+      assertDiffEi(baseBlocks, TestBlock.create(Seq(exchange)), fsWithOrderFeature) { blockDiffEi =>
+        blockDiffEi should produce(expectedError)
+      }
     }
   }
 
