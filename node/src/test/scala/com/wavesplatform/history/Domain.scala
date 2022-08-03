@@ -96,7 +96,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def liquidState: Option[NgState] = {
     val cls   = classOf[BlockchainUpdaterImpl]
-    val field = cls.getDeclaredField("ngState")
+    val field = cls.getDeclaredFields.find(_.getName.endsWith("ngState")).get
     field.setAccessible(true)
     field.get(blockchain).asInstanceOf[Option[NgState]]
   }
