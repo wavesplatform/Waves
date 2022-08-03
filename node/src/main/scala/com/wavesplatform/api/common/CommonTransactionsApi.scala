@@ -14,7 +14,6 @@ import com.wavesplatform.transaction.TransactionType.TransactionType
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Transaction}
 import com.wavesplatform.utx.UtxPool
-import com.wavesplatform.wallet.Wallet
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
 
@@ -50,7 +49,6 @@ object CommonTransactionsApi {
       db: DB,
       blockchain: Blockchain,
       utx: UtxPool,
-      wallet: Wallet,
       publishTransaction: Transaction => Future[TracedResult[ValidationError, Boolean]],
       blockAt: Int => Option[(BlockMeta, Seq[(TxMeta, Transaction)])]
   ): CommonTransactionsApi = new CommonTransactionsApi {

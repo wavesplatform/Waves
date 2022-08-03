@@ -88,7 +88,6 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       db,
       blockchain,
       utxPool,
-      wallet,
       tx => Future.successful(utxPool.putIfNew(tx)),
       Application.loadBlockAt(db, blockchain)
     )
@@ -382,7 +381,6 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     db,
     blockchain,
     utxPool,
-    wallet,
     _ => Future.successful(TracedResult(Right(true))),
     h => blocksApi.blockAtHeight(h)
   )
