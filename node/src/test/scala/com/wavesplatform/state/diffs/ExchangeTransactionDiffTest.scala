@@ -1043,42 +1043,123 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     val seller  = TxHelpers.signer(2)
     val matcher = TxHelpers.signer(3)
 
-    val genesis = Seq(buyer, seller, matcher).map(acc => TxHelpers.genesis(acc.toAddress))
-    val issue1  = TxHelpers.issue(buyer, ENOUGH_AMT, name = "asset1", version = TxVersion.V1)
-    val issue2  = TxHelpers.issue(seller, ENOUGH_AMT, name = "asset2", version = TxVersion.V1)
-    val baseBlocks = Seq(TestBlock.create(genesis :+ issue1 :+ issue2))
+    val genesis            = Seq(buyer, seller, matcher).map(acc => TxHelpers.genesis(acc.toAddress))
+    val amountAssetIssueTx = TxHelpers.issue(seller, ENOUGH_AMT, name = "asset2", decimals = 8, version = TxVersion.V1)
+    val priceAssetIssueTx  = TxHelpers.issue(buyer, ENOUGH_AMT, name = "asset1", decimals = 6, version = TxVersion.V1)
+    val baseBlocks         = Seq(TestBlock.create(genesis :+ priceAssetIssueTx :+ amountAssetIssueTx))
 
-    List(
-      (1, 2, "price should be <= buyOrder.price"),
-      (2, 3, "price should be >= sellOrder.price")
-    ).map { case (buyOrderPrice, sellOrderPrice, expectedError) =>
+    val amountAsset = Asset.IssuedAsset(amountAssetIssueTx.assetId)
+    val priceAsset  = Asset.IssuedAsset(priceAssetIssueTx.assetId)
+
+    def mkTestOrder(tpe: OrderType, price: Long, version: Int, priceMode: OrderPriceMode) = TxHelpers.order(
+      tpe,
+      amountAsset,
+      priceAsset,
+      price = price,
+      sender = buyer,
+      matcher = matcher,
+      version = version.toByte,
+      priceMode = priceMode
+    )
+
+    // exchange decimalPrice = 12.5
+    val cases = {
+      val tx1v1 = Seq(
+        // decimalPrice * 10^(8 + priceAssetDecimals - amountAssetDecimals)
+        (
+          1,
+          12_500_000L,
+          mkTestOrder(OrderType.BUY, 12_400_000L, 1, OrderPriceMode.Default),
+          mkTestOrder(OrderType.SELL, 12_500_000L, 1, OrderPriceMode.Default),
+          "price=12500000 should be <= buyOrder.price=12400000"
+        ),
+        (
+          1,
+          12_500_000L,
+          mkTestOrder(OrderType.BUY, 12_500_000L, 1, OrderPriceMode.Default),
+          mkTestOrder(OrderType.SELL, 12_600_000L, 1, OrderPriceMode.Default),
+          "price=12500000 should be >= sellOrder.price=12600000"
+        )
+      )
+
+      val tx2v13 = for {
+        buyOrderVersion  <- 1 to 3
+        sellOrderVersion <- 1 to 3
+        r <- Seq(
+          // decimalPrice * 10^(8 + priceAssetDecimals - amountAssetDecimals)
+          (
+            2,
+            12_500_000L,
+            mkTestOrder(OrderType.BUY, 12_400_000L, buyOrderVersion, OrderPriceMode.Default),
+            mkTestOrder(OrderType.SELL, 12_500_000L, sellOrderVersion, OrderPriceMode.Default),
+            "price=12500000 should be <= buyOrder.price=12400000"
+          ),
+          (
+            2,
+            12_500_000L,
+            mkTestOrder(OrderType.BUY, 12_500_000L, buyOrderVersion, OrderPriceMode.Default),
+            mkTestOrder(OrderType.SELL, 12_600_000L, sellOrderVersion, OrderPriceMode.Default),
+            "price=12500000 should be >= sellOrder.price=12600000"
+          )
+        )
+      } yield r
+
+      // TODO OrderPriceMode
+      val tx3o13 = for {
+        buyOrderVersion  <- 1 to 3
+        sellOrderVersion <- 1 to 3
+        r <- Seq(
+          // decimalPrice * 10^8
+          (
+            3,
+            1_250_000_000L,
+            mkTestOrder(OrderType.BUY, 1_240_000_000L, buyOrderVersion, OrderPriceMode.Default),
+            mkTestOrder(OrderType.SELL, 1_250_000_000L, sellOrderVersion, OrderPriceMode.Default),
+            "price=1250000000 should be <= buyOrder.price=1240000000"
+          ),
+          (
+            3,
+            1_250_000_000L,
+            mkTestOrder(OrderType.BUY, 1_250_000_000L, buyOrderVersion, OrderPriceMode.Default),
+            mkTestOrder(OrderType.SELL, 1_260_000_000L, sellOrderVersion, OrderPriceMode.Default),
+            "price=1250000000 should be >= sellOrder.price=1260000000"
+          )
+        )
+      } yield r
+
+      val tx3o4AssetDecimals = Seq(
+        // decimalPrice * 10^8
+        (
+          3,
+          1_250_000_000L,
+          mkTestOrder(OrderType.BUY, 1_240_000_000L, 4, OrderPriceMode.FixedDecimals),
+          mkTestOrder(OrderType.SELL, 1_250_000_000L, 4, OrderPriceMode.FixedDecimals), // TODO ov=3
+          "price=1250000000 should be <= buyOrder.price=1240000000"
+        ),
+        (
+          3,
+          1_250_000_000L,
+          mkTestOrder(OrderType.BUY, 1_250_000_000L, 4, OrderPriceMode.FixedDecimals),
+          mkTestOrder(OrderType.SELL, 1_260_000_000L, 4, OrderPriceMode.FixedDecimals),
+          "price=1250000000 should be >= sellOrder.price=1260000000"
+        )
+      )
+
+      tx1v1 ++ tx2v13 ++ /*tx3o13 ++*/ tx3o4AssetDecimals
+    }
+
+    cases.map { case (txVersion, txPrice, buyOrder, sellOrder, expectedError) =>
       val exchange = TxHelpers.exchangeFromOrders(
-        order1 = TxHelpers.order(
-          OrderType.BUY,
-          Asset.IssuedAsset(issue2.assetId),
-          Asset.IssuedAsset(issue1.assetId),
-          price = buyOrderPrice,
-          sender = buyer,
-          matcher = matcher,
-          version = Order.V3
-        ),
-        order2 = TxHelpers.order(
-          OrderType.SELL,
-          Asset.IssuedAsset(issue2.assetId),
-          Asset.IssuedAsset(issue1.assetId),
-          price = sellOrderPrice,
-          sender = seller,
-          matcher = matcher,
-          version = Order.V3
-        ),
-        price = 2,
+        order1 = buyOrder,
+        order2 = sellOrder,
+        price = txPrice,
         matcher = matcher,
-        version = TxVersion.V2,
+        version = txVersion.toByte,
         fee = TestValues.fee,
         chainId = AddressScheme.current.chainId
       )
 
-      assertDiffEi(baseBlocks, TestBlock.create(Seq(exchange)), fsWithOrderFeature) { blockDiffEi =>
+      assertDiffEi(baseBlocks, TestBlock.create(Seq(exchange)), fsWithBlockV5) { blockDiffEi =>
         blockDiffEi should produce(expectedError)
       }
     }

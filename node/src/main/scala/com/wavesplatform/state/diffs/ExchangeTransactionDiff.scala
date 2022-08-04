@@ -102,8 +102,16 @@ object ExchangeTransactionDiff {
       for {
         buyOrderPrice  <- orderPrice(tx.buyOrder, amountDecimals, priceDecimals)
         sellOrderPrice <- orderPrice(tx.sellOrder, amountDecimals, priceDecimals)
-        _              <- Either.cond(tx.price.value <= buyOrderPrice, (), GenericError("price should be <= buyOrder.price"))
-        _              <- Either.cond(tx.price.value >= sellOrderPrice, (), GenericError("price should be >= sellOrder.price"))
+        _ <- Either.cond(
+          tx.price.value <= buyOrderPrice,
+          (),
+          GenericError(s"price=${tx.price.value} should be <= buyOrder.price=$buyOrderPrice")
+        )
+        _ <- Either.cond(
+          tx.price.value >= sellOrderPrice,
+          (),
+          GenericError(s"price=${tx.price.value} should be >= sellOrder.price=$sellOrderPrice")
+        )
       } yield ()
     }
 
@@ -137,13 +145,12 @@ object ExchangeTransactionDiff {
       ).foldM(Portfolio())(_.combine(_))
 
     lazy val feeDiffE =
-      matcherPortfolioE.flatMap(
-        matcherPortfolio =>
-          Seq(
-            Map[Address, Portfolio](matcher -> matcherPortfolio),
-            Map[Address, Portfolio](buyer   -> getOrderFeePortfolio(tx.buyOrder, -tx.buyMatcherFee)),
-            Map[Address, Portfolio](seller  -> getOrderFeePortfolio(tx.sellOrder, -tx.sellMatcherFee))
-          ).foldM(Map.empty[Address, Portfolio])(Diff.combine)
+      matcherPortfolioE.flatMap(matcherPortfolio =>
+        Seq(
+          Map[Address, Portfolio](matcher -> matcherPortfolio),
+          Map[Address, Portfolio](buyer   -> getOrderFeePortfolio(tx.buyOrder, -tx.buyMatcherFee)),
+          Map[Address, Portfolio](seller  -> getOrderFeePortfolio(tx.sellOrder, -tx.sellMatcherFee))
+        ).foldM(Map.empty[Address, Portfolio])(Diff.combine)
       )
 
     for {
