@@ -161,8 +161,8 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
         }
         forAll(longAttachmentInSymbols) { a =>
           posting(tr.copy(attachment = Some(a))) should produce(
-            TooBigInSymbols(
-              s"Invalid attachment. Length ${a.length} symbols exceeds maximum of ${TransferTransaction.MaxAttachmentStringSize} symbols."
+            WrongJson(errors =
+              Seq(JsPath \ "attachment" -> Seq(JsonValidationError(s"base58-encoded string length (${a.length}) exceeds maximum length of 192")))
             )
           )
         }

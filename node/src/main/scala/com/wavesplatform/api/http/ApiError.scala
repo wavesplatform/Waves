@@ -39,7 +39,6 @@ object ApiError {
       case TxValidationError.InvalidRequestSignature         => InvalidSignature
       case TxValidationError.TooBigArray                     => TooBigArrayAllocation
       case TxValidationError.TooBigInBytes(err)              => TooBigInBytes(err)
-      case TxValidationError.TooBigInSymbols(err)            => TooBigInSymbols(err)
       case TxValidationError.OverflowError                   => OverflowError
       case TxValidationError.ToSelf                          => ToSelfError
       case TxValidationError.MissingSenderPrivateKey         => MissingSenderPrivateKey
@@ -134,11 +133,6 @@ object ApiError {
     override val id      = 108
     override val code    = StatusCodes.BadRequest
     override val message = "invalid public key"
-  }
-
-  case class TooBigInSymbols(message: String) extends ApiError {
-    override val id   = 109
-    override val code = StatusCodes.BadRequest
   }
 
   case object InvalidMessage extends ApiError {

@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.validation
 
 import cats.data.Validated
 import cats.data.Validated.{Invalid, Valid}
-import cats.syntax.validated._
+import cats.syntax.validated.*
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.common.state.ByteStr

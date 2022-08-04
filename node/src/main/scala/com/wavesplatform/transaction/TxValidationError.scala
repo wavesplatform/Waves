@@ -21,7 +21,6 @@ object TxValidationError {
   case object InsufficientFee                                extends ValidationError
   case object TooBigArray                                    extends ValidationError
   case class TooBigInBytes(err: String)                      extends ValidationError
-  case class TooBigInSymbols(err: String)                    extends ValidationError
   case object InvalidName                                    extends ValidationError
   case object InvalidAssetId                                 extends ValidationError
   case object OverflowError                                  extends ValidationError

@@ -6,17 +6,17 @@ import com.wavesplatform.api.http.requests.TransferRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
+import com.wavesplatform.it.{NTPTime, NodeConfigs}
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.it.{NTPTime, NodeConfigs}
 import com.wavesplatform.state.*
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.*
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.assets.exchange.AssetPair.extractAssetId
+import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -69,7 +69,6 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
     assertSignBadJson(obsoleteTx, "transaction type not supported", 501)
     assertSignBadJson(obsoleteTx + ("type" -> Json.toJson(PaymentTransaction.typeId)), "transaction type not supported", 501)
 
-    val attachmentLen = 524291
     val bigBaseTx =
       Json.obj(
         "type"       -> TransferTransaction.typeId,
@@ -77,12 +76,9 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime with Be
         "recipient"  -> firstAddress,
         "amount"     -> 1,
         "fee"        -> 100000,
-        "attachment" -> "W" * attachmentLen
+        "attachment" -> "W" * 524291
       )
-    assertSignBadJson(
-      bigBaseTx,
-      s"Invalid attachment. Length $attachmentLen symbols exceeds maximum of ${TransferTransaction.MaxAttachmentStringSize} symbols."
-    )
+    assertSignBadJson(bigBaseTx, "failed to parse json message")
   }
 
   test("/transaction/calculateFee should handle coding size limit") {

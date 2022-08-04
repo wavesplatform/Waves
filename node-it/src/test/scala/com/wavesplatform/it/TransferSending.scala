@@ -150,7 +150,7 @@ trait TransferSending extends ScorexLogging {
       amount.value,
       Some(feeAssetId),
       fee.value,
-      Some(attachment.toString),
+      Some(attachment),
       Some(timestamp),
       None,
       Some(proofs)
