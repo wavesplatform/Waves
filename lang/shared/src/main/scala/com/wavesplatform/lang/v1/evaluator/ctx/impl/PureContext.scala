@@ -5,6 +5,7 @@ import cats.{Id, Monad}
 import com.google.common.annotations.VisibleForTesting
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.*
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.utils.getDecompilerContext
@@ -21,7 +22,6 @@ import com.wavesplatform.lang.v1.evaluator.{ContextfulUserFunction, ContextfulVa
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation.*
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX, FunctionHeader, compiler}
-import com.wavesplatform.lang.*
 
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.charset.{MalformedInputException, StandardCharsets}
@@ -269,26 +269,32 @@ object PureContext {
     ) {
       new ContextfulUserFunction[NoContext] {
         override def apply[F[_]: Monad](env: NoContext[F], startArgs: List[EXPR]): EXPR = {
-          lazy val errorMessageDetails = {
-            val ctx = getDecompilerContext(DirectiveDictionary[StdLibVersion].all.last, Expression)
-            def functionName(h: FunctionHeader) =
-              h match {
-                case Native(id) => ctx.opCodes.get(id).orElse(ctx.binaryOps.get(id)).getOrElse(id.toString)
-                case u: User    => u.name
-              }
-            startArgs.head match {
-              case GETTER(_, field)         => s" while accessing field '$field'"
-              case REF(key)                 => s" by reference '$key'"
-              case FUNCTION_CALL(header, _) => s" on function '${functionName(header)}' call"
-              case LET_BLOCK(_, _)          => " after let block evaluation"
-              case BLOCK(_, _)              => " after block evaluation"
-              case IF(_, _, _)              => " after condition evaluation"
-              case _                        => ""
+          val ctx  = getDecompilerContext(DirectiveDictionary[StdLibVersion].all.last, Expression)
+          val base = "value() called on unit value"
+          def call(h: FunctionHeader, postfix: Boolean = true) = {
+            val name = h match {
+              case Native(id) => ctx.opCodes.get(id).orElse(ctx.binaryOps.get(id)).getOrElse(id.toString)
+              case u: User    => u.name
             }
+            s"on function '$name${if (postfix) "Value" else ""}' call"
+          }
+          def address(args: List[EXPR]) = s"base58'${args.head.asInstanceOf[CaseObj].fields.head._2}'"
+          val errorMessage = startArgs.head match {
+            case FUNCTION_CALL(h, args) if stateDataHeaders(h) => s"value by key '${args(1)}' not found for the address ${address(args)} ${call(h)}"
+            case FUNCTION_CALL(h, args) if stateDataSelfHeaders(h)    => s"value by key '${args(0)}' not found for the contract address ${call(h)}"
+            case FUNCTION_CALL(h, args) if arrayDataByKeyHeaders(h)   => s"value by key '${args(1)}' not found in the list ${call(h)}"
+            case FUNCTION_CALL(h, args) if arrayDataByIndexHeaders(h) => s"value by index ${args(1)} not found in the list ${call(h)}"
+            case FUNCTION_CALL(h, _)                                  => s"$base ${call(h, postfix = false)}"
+            case GETTER(_, field)                                     => s"$base while accessing field '$field'"
+            case REF(key)                                             => s"$base by reference '$key'"
+            case LET_BLOCK(_, _)                                      => s"$base after let block evaluation"
+            case BLOCK(_, _)                                          => s"$base after block evaluation"
+            case IF(_, _, _)                                          => s"$base after condition evaluation"
+            case _                                                    => base
           }
           IF(
             FUNCTION_CALL(PureContext.eq, List(REF("@a"), REF("unit"))),
-            FUNCTION_CALL(throwWithMessage, List(CONST_STRING(s"value() called on unit value$errorMessageDetails").explicitGet())),
+            FUNCTION_CALL(throwWithMessage, List(CONST_STRING(errorMessage).explicitGet())),
             REF("@a")
           )
         }
