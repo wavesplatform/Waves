@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransf
 import play.api.libs.json.Json
 
 import java.nio.charset.StandardCharsets
-import scala.util.Success
+import scala.util.{Random, Success}
 
 class MassTransferTransactionSpecification extends PropSpec {
 
@@ -24,18 +24,27 @@ class MassTransferTransactionSpecification extends PropSpec {
 
   private val asset = IssuedAsset(ByteStr((1 to AssetIdLength).map(_.toByte).to(Array)))
 
+  private val proofs = Seq(
+    Seq.empty,
+    Seq(ByteStr.empty),
+    Seq(ByteStr(Random.nextBytes(Proofs.MaxProofSize))),
+    (1 to Proofs.MaxProofs).map(_ => ByteStr.empty),
+    (1 to Proofs.MaxProofs).map(_ => ByteStr(Random.nextBytes(Proofs.MaxProofSize)))
+  ).view
+
   private val massTransfers = for {
-    chainId   <- Seq[Byte](Byte.MinValue, 0, AddressScheme.current.chainId, Byte.MaxValue).view
+    chainId   <- Seq(Byte.MinValue, 0: Byte, AddressScheme.current.chainId, Byte.MaxValue).view
     v         <- massTransferTxSupportedVersions
     asset     <- Seq(Waves, asset)
     recipient <- Seq(recipient.toAddress, Alias(chainId, "0000"))
     fee       <- Seq(1, Long.MaxValue)
     transfers <- Seq(
       Seq.empty,
-      Seq(ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(Long.MaxValue - fee)))
+      Seq(ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(Long.MaxValue - fee))),
+      (1 to MaxTransferCount).map(_ => ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(1 / MaxTransferCount)))
     )
-    attachment <- Seq(ByteStr.empty)
-    proofs     <- Seq(Seq.empty, Seq(ByteStr.empty))
+    attachment <- Seq(ByteStr.empty, ByteStr(Random.nextBytes(TransferTransaction.MaxAttachmentSize)))
+    proofs     <- proofs
   } yield MassTransferTransaction(
     version = v,
     sender = sender.publicKey,
