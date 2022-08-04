@@ -58,6 +58,9 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
   val fsWithBlockV5: FunctionalitySettings =
     fsWithOrderFeature.copy(preActivatedFeatures = fsWithOrderFeature.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
 
+  val fsWithRideV6: FunctionalitySettings =
+    fsWithBlockV5.copy(preActivatedFeatures = fsWithBlockV5.preActivatedFeatures + (BlockchainFeatures.RideV6.id -> 0))
+
   private val estimator = ScriptEstimatorV2
 
   property("Not enough order sender balance and failed script") {
@@ -1062,7 +1065,6 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       priceMode = priceMode
     )
 
-    // Exchange decimalPrice = 12.5
     val cases = {
       val case1 = for {
         txVersion <- 1 to 2
@@ -1079,7 +1081,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         sellOrderPriceMode = if (sellOrderVersion < 4) OrderPriceMode.Default else OrderPriceMode.AssetDecimals
 
         r <- Seq(
-          // normalizedPrice = decimalPrice * 10^(8 + priceAssetDecimals - amountAssetDecimals)
+          // decimalPrice = 12.5
+          // normalizedPrice = decimalPrice * 10^(8 + priceAssetDecimals - amountAssetDecimals) = 12_500_000
           (
             txVersion,
             12_500_000L,
@@ -1098,7 +1101,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       } yield r
 
       val case2 = Seq(
-        // normalizedPrice = decimalPrice * 10^8
+        // decimalPrice = 12.5
+        // normalizedPrice = decimalPrice * 10^8 = 1_250_000_000
         (
           3,
           1_250_000_000L,
@@ -1115,8 +1119,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         )
       )
 
-      // decimalPrice = 1500
       val case3 = Seq(
+        // decimalPrice = 1500
         // normalizedPrice = decimalPrice * 10^(priceAssetDecimals - amountAssetDecimals) = 15
         (
           3,
@@ -1134,7 +1138,24 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         )
       )
 
-      case1 ++ case2 ++ case3
+      val mixedCase = Seq(
+        (
+          3,
+          150_000_000_000L,
+          mkTestOrder(OrderType.BUY, 1_400_000_000L, 2, OrderPriceMode.Default),
+          mkTestOrder(OrderType.SELL, 150_000_000_000L, 4, OrderPriceMode.FixedDecimals),
+          "price=150000000000 should be <= buyOrder.price=140000000000"
+        ),
+        (
+          3,
+          1500L,
+          mkTestOrder(OrderType.BUY, 150_000_000_000L, 4, OrderPriceMode.FixedDecimals),
+          mkTestOrder(OrderType.SELL, 16L, 4, OrderPriceMode.AssetDecimals),
+          "price=1500 should be >= sellOrder.price=1600"
+        )
+      )
+
+      case1 ++ case2 ++ case3 ++ mixedCase
     }
 
     cases.map { case (txVersion, txPrice, buyOrder, sellOrder, expectedError) =>
@@ -1148,7 +1169,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         chainId = AddressScheme.current.chainId
       )
 
-      assertDiffEi(baseBlocks, TestBlock.create(Seq(exchange)), fsWithBlockV5) { blockDiffEi =>
+      assertDiffEi(baseBlocks, TestBlock.create(Seq(exchange)), fsWithRideV6) { blockDiffEi =>
         blockDiffEi should produce(expectedError)
       }
     }
