@@ -1062,78 +1062,48 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       priceMode = priceMode
     )
 
-    // exchange decimalPrice = 12.5
+    // Exchange decimalPrice = 12.5
     val cases = {
-      val tx1v1 = Seq(
-        // decimalPrice * 10^(8 + priceAssetDecimals - amountAssetDecimals)
-        (
-          1,
-          12_500_000L,
-          mkTestOrder(OrderType.BUY, 12_400_000L, 1, OrderPriceMode.Default),
-          mkTestOrder(OrderType.SELL, 12_500_000L, 1, OrderPriceMode.Default),
-          "price=12500000 should be <= buyOrder.price=12400000"
-        ),
-        (
-          1,
-          12_500_000L,
-          mkTestOrder(OrderType.BUY, 12_500_000L, 1, OrderPriceMode.Default),
-          mkTestOrder(OrderType.SELL, 12_600_000L, 1, OrderPriceMode.Default),
-          "price=12500000 should be >= sellOrder.price=12600000"
-        )
-      )
+      val case1 = for {
+        txVersion <- 1 to 2
+        // See ExchangeTxValidator
+        ordersVersions = txVersion match {
+          case 1 => 1 to 1
+          case 2 => 1 to 3
+        }
 
-      val tx2v13 = for {
-        buyOrderVersion  <- 1 to 3
-        sellOrderVersion <- 1 to 3
+        buyOrderVersion <- ordersVersions
+        buyOrderPriceMode = if (buyOrderVersion < 4) OrderPriceMode.Default else OrderPriceMode.AssetDecimals
+
+        sellOrderVersion <- ordersVersions
+        sellOrderPriceMode = if (sellOrderVersion < 4) OrderPriceMode.Default else OrderPriceMode.AssetDecimals
+
         r <- Seq(
-          // decimalPrice * 10^(8 + priceAssetDecimals - amountAssetDecimals)
+          // normalizedPrice = decimalPrice * 10^(8 + priceAssetDecimals - amountAssetDecimals)
           (
-            2,
+            txVersion,
             12_500_000L,
-            mkTestOrder(OrderType.BUY, 12_400_000L, buyOrderVersion, OrderPriceMode.Default),
-            mkTestOrder(OrderType.SELL, 12_500_000L, sellOrderVersion, OrderPriceMode.Default),
+            mkTestOrder(OrderType.BUY, 12_400_000L, buyOrderVersion, buyOrderPriceMode),
+            mkTestOrder(OrderType.SELL, 12_500_000L, sellOrderVersion, sellOrderPriceMode),
             "price=12500000 should be <= buyOrder.price=12400000"
           ),
           (
-            2,
+            txVersion,
             12_500_000L,
-            mkTestOrder(OrderType.BUY, 12_500_000L, buyOrderVersion, OrderPriceMode.Default),
-            mkTestOrder(OrderType.SELL, 12_600_000L, sellOrderVersion, OrderPriceMode.Default),
+            mkTestOrder(OrderType.BUY, 12_500_000L, buyOrderVersion, buyOrderPriceMode),
+            mkTestOrder(OrderType.SELL, 12_600_000L, sellOrderVersion, sellOrderPriceMode),
             "price=12500000 should be >= sellOrder.price=12600000"
           )
         )
       } yield r
 
-      // TODO OrderPriceMode
-      val tx3o13 = for {
-        buyOrderVersion  <- 1 to 3
-        sellOrderVersion <- 1 to 3
-        r <- Seq(
-          // decimalPrice * 10^8
-          (
-            3,
-            1_250_000_000L,
-            mkTestOrder(OrderType.BUY, 1_240_000_000L, buyOrderVersion, OrderPriceMode.Default),
-            mkTestOrder(OrderType.SELL, 1_250_000_000L, sellOrderVersion, OrderPriceMode.Default),
-            "price=1250000000 should be <= buyOrder.price=1240000000"
-          ),
-          (
-            3,
-            1_250_000_000L,
-            mkTestOrder(OrderType.BUY, 1_250_000_000L, buyOrderVersion, OrderPriceMode.Default),
-            mkTestOrder(OrderType.SELL, 1_260_000_000L, sellOrderVersion, OrderPriceMode.Default),
-            "price=1250000000 should be >= sellOrder.price=1260000000"
-          )
-        )
-      } yield r
-
-      val tx3o4AssetDecimals = Seq(
-        // decimalPrice * 10^8
+      val case2 = Seq(
+        // normalizedPrice = decimalPrice * 10^8
         (
           3,
           1_250_000_000L,
           mkTestOrder(OrderType.BUY, 1_240_000_000L, 4, OrderPriceMode.FixedDecimals),
-          mkTestOrder(OrderType.SELL, 1_250_000_000L, 4, OrderPriceMode.FixedDecimals), // TODO ov=3
+          mkTestOrder(OrderType.SELL, 1_250_000_000L, 4, OrderPriceMode.FixedDecimals),
           "price=1250000000 should be <= buyOrder.price=1240000000"
         ),
         (
@@ -1145,7 +1115,26 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         )
       )
 
-      tx1v1 ++ tx2v13 ++ /*tx3o13 ++*/ tx3o4AssetDecimals
+      // decimalPrice = 1500
+      val case3 = Seq(
+        // normalizedPrice = decimalPrice * 10^(priceAssetDecimals - amountAssetDecimals) = 15
+        (
+          3,
+          1500L,
+          mkTestOrder(OrderType.BUY, 14L, 4, OrderPriceMode.AssetDecimals),
+          mkTestOrder(OrderType.SELL, 15L, 4, OrderPriceMode.AssetDecimals),
+          "price=1500 should be <= buyOrder.price=1400"
+        ),
+        (
+          3,
+          1500L,
+          mkTestOrder(OrderType.BUY, 15L, 4, OrderPriceMode.AssetDecimals),
+          mkTestOrder(OrderType.SELL, 16L, 4, OrderPriceMode.AssetDecimals),
+          "price=1500 should be >= sellOrder.price=1600"
+        )
+      )
+
+      case1 ++ case2 ++ case3
     }
 
     cases.map { case (txVersion, txPrice, buyOrder, sellOrder, expectedError) =>
