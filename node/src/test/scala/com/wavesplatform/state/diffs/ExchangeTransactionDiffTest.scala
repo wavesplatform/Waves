@@ -1065,8 +1065,9 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       priceMode = priceMode
     )
 
+    // decimalPrice = 12.5
     val cases = {
-      val case1 = for {
+      val case1OldTxs = for {
         txVersion <- 1 to 2
         // See ExchangeTxValidator
         ordersVersions = txVersion match {
@@ -1074,34 +1075,47 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
           case 2 => 1 to 3
         }
 
-        buyOrderVersion <- ordersVersions
-        buyOrderPriceMode = if (buyOrderVersion < 4) OrderPriceMode.Default else OrderPriceMode.AssetDecimals
-
+        buyOrderVersion  <- ordersVersions
         sellOrderVersion <- ordersVersions
-        sellOrderPriceMode = if (sellOrderVersion < 4) OrderPriceMode.Default else OrderPriceMode.AssetDecimals
 
         r <- Seq(
-          // decimalPrice = 12.5
           // normalizedPrice = decimalPrice * 10^(8 + priceAssetDecimals - amountAssetDecimals) = 12_500_000
           (
             txVersion,
             12_500_000L,
-            mkTestOrder(OrderType.BUY, 12_400_000L, buyOrderVersion, buyOrderPriceMode),
-            mkTestOrder(OrderType.SELL, 12_500_000L, sellOrderVersion, sellOrderPriceMode),
+            mkTestOrder(OrderType.BUY, 12_400_000L, buyOrderVersion, OrderPriceMode.Default),
+            mkTestOrder(OrderType.SELL, 12_500_000L, sellOrderVersion, OrderPriceMode.Default),
             "price=12500000 should be <= buyOrder.price=12400000"
           ),
           (
             txVersion,
             12_500_000L,
-            mkTestOrder(OrderType.BUY, 12_500_000L, buyOrderVersion, buyOrderPriceMode),
-            mkTestOrder(OrderType.SELL, 12_600_000L, sellOrderVersion, sellOrderPriceMode),
+            mkTestOrder(OrderType.BUY, 12_500_000L, buyOrderVersion, OrderPriceMode.Default),
+            mkTestOrder(OrderType.SELL, 12_600_000L, sellOrderVersion, OrderPriceMode.Default),
             "price=12500000 should be >= sellOrder.price=12600000"
           )
         )
       } yield r
 
+      val case1NewTxs = Seq(
+        // normalizedPrice = decimalPrice * 10^(priceAssetDecimals - amountAssetDecimals) = 15
+        (
+          3,
+          1_250_000_000L,
+          mkTestOrder(OrderType.BUY, 12_400_000L, 4, OrderPriceMode.AssetDecimals),
+          mkTestOrder(OrderType.SELL, 12_500_000L, 4, OrderPriceMode.AssetDecimals),
+          "price=1250000000 should be <= buyOrder.price=1240000000"
+        ),
+        (
+          3,
+          1_250_000_000L,
+          mkTestOrder(OrderType.BUY, 12_500_000L, 4, OrderPriceMode.AssetDecimals),
+          mkTestOrder(OrderType.SELL, 12_600_000L, 4, OrderPriceMode.AssetDecimals),
+          "price=1250000000 should be >= sellOrder.price=1260000000"
+        )
+      )
+
       val case2 = Seq(
-        // decimalPrice = 12.5
         // normalizedPrice = decimalPrice * 10^8 = 1_250_000_000
         (
           3,
@@ -1119,46 +1133,30 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         )
       )
 
-      val case3 = Seq(
-        // decimalPrice = 1500
-        // normalizedPrice = decimalPrice * 10^(priceAssetDecimals - amountAssetDecimals) = 15
-        (
-          3,
-          1500L,
-          mkTestOrder(OrderType.BUY, 14L, 4, OrderPriceMode.AssetDecimals),
-          mkTestOrder(OrderType.SELL, 15L, 4, OrderPriceMode.AssetDecimals),
-          "price=1500 should be <= buyOrder.price=1400"
-        ),
-        (
-          3,
-          1500L,
-          mkTestOrder(OrderType.BUY, 15L, 4, OrderPriceMode.AssetDecimals),
-          mkTestOrder(OrderType.SELL, 16L, 4, OrderPriceMode.AssetDecimals),
-          "price=1500 should be >= sellOrder.price=1600"
-        )
-      )
-
       val mixedCase = Seq(
         (
           3,
-          150_000_000_000L,
-          mkTestOrder(OrderType.BUY, 1_400_000_000L, 2, OrderPriceMode.Default),
-          mkTestOrder(OrderType.SELL, 150_000_000_000L, 4, OrderPriceMode.FixedDecimals),
-          "price=150000000000 should be <= buyOrder.price=140000000000"
+          1_250_000_000L,
+          mkTestOrder(OrderType.BUY, 12_400_000L, 2, OrderPriceMode.Default),
+          mkTestOrder(OrderType.SELL, 1_250_000_000L, 4, OrderPriceMode.FixedDecimals),
+          "price=1250000000 should be <= buyOrder.price=1240000000"
         ),
         (
           3,
-          1500L,
-          mkTestOrder(OrderType.BUY, 150_000_000_000L, 4, OrderPriceMode.FixedDecimals),
-          mkTestOrder(OrderType.SELL, 16L, 4, OrderPriceMode.AssetDecimals),
-          "price=1500 should be >= sellOrder.price=1600"
+          1_250_000_000L,
+          mkTestOrder(OrderType.BUY, 1_250_000_000L, 4, OrderPriceMode.FixedDecimals),
+          mkTestOrder(OrderType.SELL, 12_600_000L, 4, OrderPriceMode.AssetDecimals),
+          "price=1250000000 should be >= sellOrder.price=1260000000"
         )
       )
 
-      case1 ++ case2 ++ case3 ++ mixedCase
+      Table(
+        ("txVersion", "txPrice", "buyOrder", "sellOrder", "expectedError"),
+        (case1OldTxs ++ case2 ++ case1NewTxs ++ mixedCase) *
+      )
     }
 
-    cases.map { case (txVersion, txPrice, buyOrder, sellOrder, expectedError) =>
+    forAll(cases) { case (txVersion, txPrice, buyOrder, sellOrder, expectedError) =>
       val exchange = TxHelpers.exchangeFromOrders(
         order1 = buyOrder,
         order2 = sellOrder,
