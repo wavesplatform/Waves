@@ -3,6 +3,7 @@ package com.wavesplatform.http
 import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import com.typesafe.config.ConfigObject
+import com.wavesplatform.*
 import com.wavesplatform.account.Alias
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
@@ -35,7 +36,6 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{ERC20Address, TxHelpers, TxVersion}
-import com.wavesplatform.{BlockchainStubHelpers, NTPTime, TestValues, TestWallet}
 import monix.eval.Task
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.Assertion
@@ -105,7 +105,11 @@ class DebugApiRouteSpec
       (blockchain.blockHeader(_: Int)).when(*).returning(Some(SignedBlockHeader(block.header, block.signature)))
       Get(routePath("/stateHash/2")) ~> route ~> check {
         status shouldBe StatusCodes.OK
-        responseAs[JsObject] shouldBe (Json.toJson(testStateHash).as[JsObject] ++ Json.obj("blockId" -> block.id().toString))
+        responseAs[JsObject] shouldBe (Json.toJson(testStateHash).as[JsObject] ++ Json.obj(
+          "blockId" -> block.id().toString,
+          "height"  -> 2,
+          "version" -> Version.VersionString
+        ))
       }
 
       Get(routePath("/stateHash/3")) ~> route ~> check {
