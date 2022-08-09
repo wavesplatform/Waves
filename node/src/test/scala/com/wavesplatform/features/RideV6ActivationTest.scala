@@ -17,6 +17,8 @@ import org.scalatest.OptionValues
 
 // TODO Tx version?
 class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
+  private val chainId = DomainPresets.SettingsFromDefaultConfig.blockchainSettings.addressSchemeCharacter.toByte
+
   "After RideV6 activation" - {
     "NODE-540 If a transaction exceeds the limit of writes number" - {
       "<=1000 complexity - rejected" - Seq(110, ContractLimits.FailFreeInvokeComplexity).foreach { complexity =>
@@ -202,23 +204,66 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         )
       }
     }
+
+    "NODE-548 If a transaction exceeds the limit of non-data actions" - {
+      "<=1000 complexity - rejected" - Seq(110, ContractLimits.FailFreeInvokeComplexity).foreach { complexity =>
+        s"complexity = $complexity" in withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(defaultSigner)) { d =>
+          val setScriptTx = SetScriptTransaction
+            .selfSigned(TxVersion.V3, defaultSigner, Some(mkDApp(complexity)), 0.01.waves, System.currentTimeMillis())
+            .explicitGet()
+          d.appendBlock(setScriptTx)
+
+          d.createDiffE(invokeTx) should produce("ScriptTransfer, Lease, LeaseCancel actions count limit is exceeded")
+        }
+      }
+
+      ">1000 complexity - failed" in {
+        withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(defaultSigner)) { d =>
+          val complexity = ContractLimits.FailFreeInvokeComplexity + 1
+          val setScriptTx = SetScriptTransaction
+            .selfSigned(TxVersion.V3, defaultSigner, Some(mkDApp(complexity)), 0.01.waves, System.currentTimeMillis())
+            .explicitGet()
+          d.appendBlock(setScriptTx)
+
+          d.appendBlock(invokeTx)
+          val invokeTxMeta = d.transactionsApi.transactionById(invokeTx.id()).value
+          invokeTxMeta.spentComplexity shouldBe complexity
+          invokeTxMeta.succeeded shouldBe false
+        }
+      }
+
+      def mkDApp(complexity: Int): ContractScript.ContractScriptImpl = {
+        val baseComplexity = 101 + 101 + 1 // Because we spend 101 on ScriptTransfer, 101 on a list construction and 1 for Address
+        TestCompiler(V6).compileContract(
+          s"""
+             |{-#STDLIB_VERSION 6 #-}
+             |{-#SCRIPT_TYPE ACCOUNT #-}
+             |{-#CONTENT_TYPE DAPP #-}
+             |
+             |@Callable(inv)
+             |func foo() = {
+             |  let to = Address(base58'${defaultSigner.toAddress(chainId)}')
+             |  let x = ${mkExprWithComplexity(complexity - baseComplexity)}
+             |  ${(1 to 101).map(i => s"""ScriptTransfer(to, x, unit)""").mkString("[", ", ", "]")}
+             |}
+        """.stripMargin
+        )
+      }
+    }
   }
 
   private def mkExprWithComplexity(complexity: Int): String = s"1 ${"+ 1" * complexity}"
 
-  private lazy val invokeTx: InvokeScriptTransaction = {
-    val chainId = DomainPresets.SettingsFromDefaultConfig.blockchainSettings.addressSchemeCharacter.toByte
-    InvokeScriptTransaction(
-      chainId = chainId,
-      version = TxVersion.V3,
-      sender = defaultSigner.publicKey,
-      fee = TxPositiveAmount.unsafeFrom(1000000L),
-      feeAssetId = Waves,
-      dApp = defaultSigner.toAddress(chainId),
-      funcCallOpt = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), Nil).some,
-      payments = Seq.empty,
-      timestamp = System.currentTimeMillis(),
-      proofs = Proofs.empty
-    ).signWith(defaultSigner.privateKey)
-  }
+  private lazy val invokeTx = InvokeScriptTransaction(
+    chainId = chainId,
+    version = TxVersion.V3,
+    sender = defaultSigner.publicKey,
+    fee = TxPositiveAmount.unsafeFrom(1000000L),
+    feeAssetId = Waves,
+    dApp = defaultSigner.toAddress(chainId),
+    funcCallOpt = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), Nil).some,
+    payments = Seq.empty,
+    timestamp = System.currentTimeMillis(),
+    proofs = Proofs.empty
+  ).signWith(defaultSigner.privateKey)
 }
