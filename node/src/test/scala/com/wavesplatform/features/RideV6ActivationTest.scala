@@ -5,7 +5,7 @@ import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.*
-import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.test.*
@@ -78,11 +78,23 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         "NODE-548 If a transaction exceeds the limit of non-data actions",
         "ScriptTransfer, Lease, LeaseCancel actions count limit is exceeded",
         { complexity =>
-          val baseComplexity = 101 + 101 + 1 // Because we spend 101 on ScriptTransfer, 101 on a list construction and 1 for Address
+          val baseComplexity = 1 + 101 + 101 // Because we spend 1 for Address, 101 on ScriptTransfer and 101 on a list construction
           mkV6ContractScript(
             s""" let to = Address(base58'${defaultSigner.toAddress(chainId)}')
                | let x = ${mkExprWithComplexity(complexity - baseComplexity)}
                | ${(1 to 101).map(i => s"""ScriptTransfer(to, x, unit)""").mkString("[", ", ", "]")}
+               | """.stripMargin
+          )
+        }
+      ),
+      Case(
+        "NODE-550 If a sender sends a payment himself in a transaction",
+        "DApp self-transfer is forbidden since V4",
+        { complexity =>
+          val baseComplexity = 1 + 1 // Because we spend 1 on ScriptTransfer, 1 on a list construction
+          mkV6ContractScript(
+            s""" let x = ${mkExprWithComplexity(complexity - baseComplexity)}
+               | [ ScriptTransfer(inv.caller, x, unit) ]
                | """.stripMargin
           )
         }
