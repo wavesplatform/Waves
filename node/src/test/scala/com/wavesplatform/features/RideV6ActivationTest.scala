@@ -111,6 +111,51 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         )
       }
     }
+
+    "NODE-544 If a transaction exceeds the limit of writes number through WriteSet" - {
+      "<=1000 complexity - rejected" - Seq(110, ContractLimits.FailFreeInvokeComplexity).foreach { complexity =>
+        s"complexity = $complexity" in withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(defaultSigner)) { d =>
+          val setScriptTx = SetScriptTransaction
+            .selfSigned(TxVersion.V2, defaultSigner, Some(mkDApp(complexity)), 0.021.waves, System.currentTimeMillis())
+            .explicitGet()
+          d.appendBlock(setScriptTx)
+
+          d.createDiffE(invokeTx) should produce("Stored data count limit is exceeded")
+        }
+      }
+
+      ">1000 complexity - failed" in {
+        withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(defaultSigner)) { d =>
+          val complexity = ContractLimits.FailFreeInvokeComplexity + 1
+          val setScriptTx = SetScriptTransaction
+            .selfSigned(TxVersion.V3, defaultSigner, Some(mkDApp(complexity)), 0.021.waves, System.currentTimeMillis())
+            .explicitGet()
+          d.appendBlock(setScriptTx)
+
+          d.appendBlock(invokeTx)
+          val invokeTxMeta = d.transactionsApi.transactionById(invokeTx.id()).value
+          invokeTxMeta.spentComplexity shouldBe complexity
+          invokeTxMeta.succeeded shouldBe false
+        }
+      }
+
+      def mkDApp(complexity: Int): ContractScript.ContractScriptImpl = {
+        val baseComplexity = 2 * 101 + 101 + 1 // Because we spend 2*101 on DataEntry and 101 on a list construction and 1 for WriteSet
+        TestCompiler(V3).compileContract(
+          s"""
+             |{-#STDLIB_VERSION 3 #-}
+             |{-#SCRIPT_TYPE ACCOUNT #-}
+             |{-#CONTENT_TYPE DAPP #-}
+             |
+             |@Callable(inv)
+             |func foo() = {
+             |  let x = ${mkExprWithComplexity(complexity - baseComplexity)}
+             |  ${(1 to 101).map(i => s"""DataEntry("i$i", x)""").mkString("WriteSet([", ", ", "])")}
+             |}
+        """.stripMargin
+        )
+      }
+    }
   }
 
   private def mkExprWithComplexity(complexity: Int): String = s"1 ${"+ 1" * complexity}"
