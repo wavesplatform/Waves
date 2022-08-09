@@ -15,13 +15,14 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import com.wavesplatform.transaction.{Proofs, TxPositiveAmount, TxVersion}
 import org.scalatest.OptionValues
 
+// TODO Tx version?
 class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
   "After RideV6 activation" - {
     "NODE-540 If a transaction exceeds the limit of writes number" - {
       "<=1000 complexity - rejected" - Seq(110, ContractLimits.FailFreeInvokeComplexity).foreach { complexity =>
         s"complexity = $complexity" in withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(defaultSigner)) { d =>
           val setScriptTx = SetScriptTransaction
-            .selfSigned(TxVersion.V2, defaultSigner, Some(mkDApp(complexity)), 0.01.waves, System.currentTimeMillis())
+            .selfSigned(TxVersion.V3, defaultSigner, Some(mkDApp(complexity)), 0.01.waves, System.currentTimeMillis())
             .explicitGet()
           d.appendBlock(setScriptTx)
 
@@ -66,7 +67,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
       "<=1000 complexity - rejected" - Seq(110, ContractLimits.FailFreeInvokeComplexity).foreach { complexity =>
         s"complexity = $complexity" in withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(defaultSigner)) { d =>
           val setScriptTx = SetScriptTransaction
-            .selfSigned(TxVersion.V2, defaultSigner, Some(mkDApp(complexity)), 0.011.waves, System.currentTimeMillis())
+            .selfSigned(TxVersion.V3, defaultSigner, Some(mkDApp(complexity)), 0.011.waves, System.currentTimeMillis())
             .explicitGet()
           d.appendBlock(setScriptTx)
 
@@ -116,7 +117,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
       "<=1000 complexity - rejected" - Seq(110, ContractLimits.FailFreeInvokeComplexity).foreach { complexity =>
         s"complexity = $complexity" in withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(defaultSigner)) { d =>
           val setScriptTx = SetScriptTransaction
-            .selfSigned(TxVersion.V2, defaultSigner, Some(mkDApp(complexity)), 0.021.waves, System.currentTimeMillis())
+            .selfSigned(TxVersion.V3, defaultSigner, Some(mkDApp(complexity)), 0.021.waves, System.currentTimeMillis())
             .explicitGet()
           d.appendBlock(setScriptTx)
 
@@ -151,6 +152,51 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
              |func foo() = {
              |  let x = ${mkExprWithComplexity(complexity - baseComplexity)}
              |  ${(1 to 101).map(i => s"""DataEntry("i$i", x)""").mkString("WriteSet([", ", ", "])")}
+             |}
+        """.stripMargin
+        )
+      }
+    }
+
+    "NODE-546 If a transaction tries to write an empty key to the state" - {
+      "<=1000 complexity - rejected" - Seq(110, ContractLimits.FailFreeInvokeComplexity).foreach { complexity =>
+        s"complexity = $complexity" in withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(defaultSigner)) { d =>
+          val setScriptTx = SetScriptTransaction
+            .selfSigned(TxVersion.V3, defaultSigner, Some(mkDApp(complexity)), 0.01.waves, System.currentTimeMillis())
+            .explicitGet()
+          d.appendBlock(setScriptTx)
+
+          d.createDiffE(invokeTx) should produce("Empty keys aren't allowed in tx version >= 2")
+        }
+      }
+
+      ">1000 complexity - failed" in {
+        withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(defaultSigner)) { d =>
+          val complexity = ContractLimits.FailFreeInvokeComplexity + 1
+          val setScriptTx = SetScriptTransaction
+            .selfSigned(TxVersion.V3, defaultSigner, Some(mkDApp(complexity)), 0.01.waves, System.currentTimeMillis())
+            .explicitGet()
+          d.appendBlock(setScriptTx)
+
+          d.appendBlock(invokeTx)
+          val invokeTxMeta = d.transactionsApi.transactionById(invokeTx.id()).value
+          invokeTxMeta.spentComplexity shouldBe complexity
+          invokeTxMeta.succeeded shouldBe false
+        }
+      }
+
+      def mkDApp(complexity: Int): ContractScript.ContractScriptImpl = {
+        val baseComplexity = 1 + 1 // Because we spend 1 on IntegerEntry and 1 on a list construction
+        TestCompiler(V6).compileContract(
+          s"""
+             |{-#STDLIB_VERSION 6 #-}
+             |{-#SCRIPT_TYPE ACCOUNT #-}
+             |{-#CONTENT_TYPE DAPP #-}
+             |
+             |@Callable(inv)
+             |func foo() = {
+             |  let x = ${mkExprWithComplexity(complexity - baseComplexity)}
+             |  [IntegerEntry("", x)]
              |}
         """.stripMargin
         )
