@@ -8,7 +8,7 @@ import com.wavesplatform.account.Alias
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
 import com.wavesplatform.api.http.DebugApiRoute
-import com.wavesplatform.block.{Block, SignedBlockHeader}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.crypto.DigestLength
@@ -101,27 +101,38 @@ class DebugApiRouteSpec
   }
 
   routePath("/stateHash") - {
-    "works" in {
-      (blockchain.blockHeader(_: Int)).when(*).returning(Some(SignedBlockHeader(block.header, block.signature)))
-      Get(routePath("/stateHash/2")) ~> route ~> check {
-        status shouldBe StatusCodes.OK
-        responseAs[JsObject] shouldBe (Json.toJson(testStateHash).as[JsObject] ++ Json.obj(
-          "blockId" -> block.id().toString,
-          "height"  -> 2,
-          "version" -> Version.VersionString
-        ))
+    "works" - {
+      "at not existed height" in withDomain() { d =>
+        d.appendBlock(TestBlock.create(Nil))
+        Get(routePath("/stateHash/2")) ~> routeWithBlockchain(d.blockchain) ~> check {
+          status shouldBe StatusCodes.NotFound
+        }
       }
 
-      Get(routePath("/stateHash/3")) ~> route ~> check {
-        status shouldBe StatusCodes.NotFound
+      "at existed height" in expectStateHashAt2("2")
+      "last" in expectStateHashAt2("last")
+
+      def expectStateHashAt2(suffix: String): Assertion = withDomain() { d =>
+        val genesisBlock = TestBlock.create(Nil)
+        d.appendBlock(genesisBlock)
+
+        val blockAt2 = TestBlock.create(0, genesisBlock.id(), Nil)
+        d.appendBlock(blockAt2)
+        d.appendBlock(TestBlock.create(0, blockAt2.id(), Nil))
+
+        Get(routePath(s"/stateHash/$suffix")) ~> routeWithBlockchain(d.blockchain) ~> check {
+          status shouldBe StatusCodes.OK
+          responseAs[JsObject] shouldBe (Json.toJson(testStateHash).as[JsObject] ++ Json.obj(
+            "blockId" -> blockAt2.id().toString,
+            "height"  -> 2,
+            "version" -> Version.VersionString
+          ))
+        }
       }
     }
   }
 
   routePath("/validate") - {
-    def routeWithBlockchain(blockchain: Blockchain & NG) =
-      debugApiRoute.copy(blockchain = blockchain, priorityPoolBlockchain = () => blockchain).route
-
     def validatePost(tx: TransferTransaction) =
       Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, tx.json().toString()))
 
@@ -1100,6 +1111,9 @@ class DebugApiRouteSpec
       }
     }
   }
+
+  private def routeWithBlockchain(blockchain: Blockchain & NG) =
+    debugApiRoute.copy(blockchain = blockchain, priorityPoolBlockchain = () => blockchain).route
 
   private[this] def jsonPost(path: String, json: JsValue) = {
     Post(path, HttpEntity(ContentTypes.`application/json`, json.toString()))
