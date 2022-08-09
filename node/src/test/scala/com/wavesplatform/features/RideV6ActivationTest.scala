@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.TxHelpers.defaultSigner
+import com.wavesplatform.transaction.TxHelpers.{defaultSigner, secondSigner}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{Proofs, TxPositiveAmount, TxVersion}
 import org.scalatest.OptionValues
@@ -80,7 +80,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         { complexity =>
           val baseComplexity = 1 + 101 + 101 // Because we spend 1 for Address, 101 on ScriptTransfer and 101 on a list construction
           mkV6ContractScript(
-            s""" let to = Address(base58'${defaultSigner.toAddress(chainId)}')
+            s""" let to = Address(base58'${secondSigner.toAddress(chainId)}')
                | let x = ${mkExprWithComplexity(complexity - baseComplexity)}
                | ${(1 to 101).map(i => s"""ScriptTransfer(to, x, unit)""").mkString("[", ", ", "]")}
                | """.stripMargin
@@ -88,13 +88,40 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         }
       ),
       Case(
-        "NODE-550 If a sender sends a payment himself in a transaction",
+        "NODE-550 If a transaction has a self-payment",
+        "DApp self-payment is forbidden since V4",
+        { complexity =>
+          val baseComplexity = 1 + 1 // Because we spend 1 on IntegerEntry, 1 on a list construction
+          mkV6ContractScript(
+            s""" let x = ${mkExprWithComplexity(complexity - baseComplexity)}
+               | [ IntegerEntry("i", x) ]
+               | """.stripMargin
+          )
+        },
+        invokeTx = invokeWithSelfPaymentTx
+      ),
+      Case(
+        "NODE-552 If a sender sends a ScriptTransfer himself in a transaction",
         "DApp self-transfer is forbidden since V4",
         { complexity =>
           val baseComplexity = 1 + 1 // Because we spend 1 on ScriptTransfer, 1 on a list construction
           mkV6ContractScript(
             s""" let x = ${mkExprWithComplexity(complexity - baseComplexity)}
                | [ ScriptTransfer(inv.caller, x, unit) ]
+               | """.stripMargin
+          )
+        }
+      ),
+      Case(
+        "NODE-554 If a transaction sends a negative amount",
+        "Negative transfer amount",
+        { complexity =>
+          // Because we spend 1 for Address, 1 on ScriptTransfer, 1 on a list construction and 1 for "-x"
+          val baseComplexity = 1 + 1 + 1 + 1
+          mkV6ContractScript(
+            s""" let to = Address(base58'${secondSigner.toAddress(chainId)}')
+               | let x = ${mkExprWithComplexity(complexity - baseComplexity)}
+               | [ ScriptTransfer(to, -x, unit) ]
                | """.stripMargin
           )
         }
@@ -109,7 +136,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
               .selfSigned(TxVersion.V3, defaultSigner, Some(testCase.mkDApp(complexity)), 1.waves, System.currentTimeMillis())
               .explicitGet()
             d.appendBlock(setScriptTx)
-            d.createDiffE(invokeTx) should produce(testCase.rejectError)
+            d.createDiffE(testCase.invokeTx) should produce(testCase.rejectError)
           }
         }
         ">1000 complexity - failed" in {
@@ -119,8 +146,8 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
               .selfSigned(TxVersion.V3, defaultSigner, Some(testCase.mkDApp(complexity)), 1.waves, System.currentTimeMillis())
               .explicitGet()
             d.appendBlock(setScriptTx)
-            d.appendBlock(invokeTx)
-            val invokeTxMeta = d.transactionsApi.transactionById(invokeTx.id()).value
+            d.appendBlock(testCase.invokeTx)
+            val invokeTxMeta = d.transactionsApi.transactionById(testCase.invokeTx.id()).value
             invokeTxMeta.spentComplexity shouldBe complexity
             invokeTxMeta.succeeded shouldBe false
           }
@@ -129,7 +156,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
     }
   }
 
-  private case class Case(title: String, rejectError: String, mkDApp: Int => Script)
+  private case class Case(title: String, rejectError: String, mkDApp: Int => Script, invokeTx: InvokeScriptTransaction = invokeTx)
 
   private def mkV3ContractScript(funBody: String): Script = mkContractScript(V3, funBody)
   private def mkV6ContractScript(funBody: String): Script = mkContractScript(V6, funBody)
@@ -158,6 +185,19 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
     dApp = defaultSigner.toAddress(chainId),
     funcCallOpt = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), Nil).some,
     payments = Seq.empty,
+    timestamp = System.currentTimeMillis(),
+    proofs = Proofs.empty
+  ).signWith(defaultSigner.privateKey)
+
+  private lazy val invokeWithSelfPaymentTx = InvokeScriptTransaction(
+    chainId = chainId,
+    version = TxVersion.V3,
+    sender = defaultSigner.publicKey,
+    fee = TxPositiveAmount.unsafeFrom(1000000L),
+    feeAssetId = Waves,
+    dApp = defaultSigner.toAddress(chainId),
+    funcCallOpt = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), Nil).some,
+    payments = Seq(InvokeScriptTransaction.Payment(1, Waves)),
     timestamp = System.currentTimeMillis(),
     proofs = Proofs.empty
   ).signWith(defaultSigner.privateKey)
