@@ -11,6 +11,7 @@ import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers.{defaultSigner, secondSigner}
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{Proofs, TxPositiveAmount, TxVersion}
 import org.scalatest.OptionValues
@@ -116,12 +117,38 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         "NODE-554 If a transaction sends a negative amount",
         "Negative transfer amount",
         { complexity =>
-          // Because we spend 1 for Address, 1 on ScriptTransfer, 1 on a list construction and 1 for "-x"
+          // Because we spend 1 on Address, 1 on ScriptTransfer, 1 on a list construction and 1 for "-x"
           val baseComplexity = 1 + 1 + 1 + 1
           mkV6ContractScript(
             s""" let to = Address(base58'${secondSigner.toAddress(chainId)}')
                | let x = ${mkExprWithComplexity(complexity - baseComplexity)}
                | [ ScriptTransfer(to, -x, unit) ]
+               | """.stripMargin
+          )
+        }
+      ),
+      Case(
+        "NODE-558 If a transaction issues a token with invalid name",
+        "Invalid asset name",
+        { complexity =>
+          // Because we spend 1 on Issue, 1 on a list construction
+          val baseComplexity = 1 + 1
+          mkV6ContractScript(
+            s""" let x = ${mkExprWithComplexity(complexity - baseComplexity)}
+               | [ Issue("n", "Test token", x, 2, true) ]
+               | """.stripMargin
+          )
+        }
+      ),
+      Case(
+        "NODE-560 If a transaction issues a token with invalid description",
+        "Invalid asset description",
+        { complexity =>
+          // Because we spend 1 on Issue, 1 on a list construction
+          val baseComplexity = 1 + 1
+          mkV6ContractScript(
+            s""" let x = ${mkExprWithComplexity(complexity - baseComplexity)}
+               | [ Issue("Token", "${"a" * (IssueTransaction.MaxAssetDescriptionLength + 1)}", x, 2, true) ]
                | """.stripMargin
           )
         }
