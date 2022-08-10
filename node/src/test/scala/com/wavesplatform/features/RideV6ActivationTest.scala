@@ -21,7 +21,9 @@ import java.nio.charset.StandardCharsets
 
 // TODO Tx version?
 class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
-  private val chainId        = DomainPresets.SettingsFromDefaultConfig.blockchainSettings.addressSchemeCharacter.toByte
+  private val chainId      = DomainPresets.SettingsFromDefaultConfig.blockchainSettings.addressSchemeCharacter.toByte
+  private val otherChainId = (chainId + 1).toByte
+
   private val unknownAssetId = IssuedAsset(ByteStr.decodeBase58("F9th5zKSTwtKaKEjf28A2Fj6Z6KMKoDX9jmZce6fsAhS").get)
 
   "After RideV6 activation" - {
@@ -227,6 +229,75 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           )
         },
         invokeTx
+      ),
+      Case(
+        "NODE-576 If a transaction sends a Reissue with unknown assetId",
+        "Referenced assetId not found",
+        { complexity =>
+          // Because we spend 1 on Reissue, 1 on a list construction
+          val baseComplexity = 1 + 1
+          mkV6ContractScript(
+            s""" let x = ${mkExprWithComplexity(complexity - baseComplexity)}
+               | [ Reissue(base58'$unknownAssetId', x, true) ]
+               | """.stripMargin
+          )
+        }
+      ),
+      Case(
+        "NODE-576 If a transaction sends a SponsorFee with unknown assetId",
+        s"SponsorFee assetId=$unknownAssetId was not issued from address of current dApp",
+        { complexity =>
+          // Because we spend 1 on SponsorFee, 1 on a list construction
+          val baseComplexity = 1 + 1
+          mkV6ContractScript(
+            s""" let x = ${mkExprWithComplexity(complexity - baseComplexity)}
+               | [ SponsorFee(base58'$unknownAssetId', x) ]
+               | """.stripMargin
+          )
+        }
+      ),
+      Case(
+        "NODE-578 If a transaction sends a ScriptTransfer with address of another network",
+        "Address belongs to another network",
+        { complexity =>
+          // Because we spend 1 on Address, 1 on ScriptTransfer, 1 on a list construction
+          val baseComplexity = 1 + 1 + 1
+          mkV6ContractScript(
+            s""" let to = Address(base58'${secondSigner.toAddress(otherChainId)}')
+               | let x = ${mkExprWithComplexity(complexity - baseComplexity)}
+               | [ ScriptTransfer(to, x, unit) ]
+               | """.stripMargin
+          )
+        }
+      ),
+      Case(
+        "NODE-578 If a transaction sends a Lease with address of another network",
+        "Address belongs to another network",
+        { complexity =>
+          // Because we spend 1 on Address, 1 on Lease, 1 on a list construction
+          val baseComplexity = 1 + 1 + 1
+          mkV6ContractScript(
+            s""" let to = Address(base58'${secondSigner.toAddress(otherChainId)}')
+               | let x = ${mkExprWithComplexity(complexity - baseComplexity)}
+               | [ Lease(to, x) ]
+               | """.stripMargin
+          )
+        }
+      ),
+      Case(
+        "NODE-578 If a transaction sends an invoke with address of another network",
+        "Address belongs to another network",
+        { complexity =>
+          // Because we spend 1 on Address, 75 on invoke, 1 on throw (exactAs)
+          val baseComplexity = 1 + 75 + 1
+          mkV6ContractScript(
+            s""" let to = Address(base58'${secondSigner.toAddress(otherChainId)}')
+               | let x = ${mkExprWithComplexity(complexity - baseComplexity)}
+               | strict res = invoke(to, "bar", [x], [])
+               | ([], res.exactAs[Int])
+               | """.stripMargin
+          )
+        }
       )
     )
 
