@@ -26,6 +26,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
   private val otherChainId = (chainId + 1).toByte
 
   private val unknownAssetId = IssuedAsset(ByteStr.decodeBase58("F9th5zKSTwtKaKEjf28A2Fj6Z6KMKoDX9jmZce6fsAhS").get)
+  private val unknownLeaseId = ByteStr(Array.fill[Byte](DigestLength)(0))
 
   "After RideV6 activation" - {
     val cases = Seq(
@@ -94,7 +95,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
       Seq(
         "ScriptTransfer" -> "ScriptTransfer(to, 1, unit)",
         "Lease"          -> "Lease(to, 1)",
-        "LeaseCancel"    -> s"LeaseCancel(base58'${Base58.encode(Array.fill[Byte](DigestLength)(0))}')"
+        "LeaseCancel"    -> s"LeaseCancel(base58'$unknownLeaseId')"
       ).map { case (actionType, v) =>
         Case(
           s"NODE-548 If a transaction exceeds the limit of $actionType actions",
@@ -118,14 +119,18 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
       } ++
       Seq(
         Case(
-          "NODE-548 If a transaction exceeds the limit of non-data actions",
+          "NODE-548 If a transaction exceeds the limit of mixed non-data actions",
           "ScriptTransfer, Lease, LeaseCancel actions count limit is exceeded",
           { complexity =>
             val baseComplexity = 1 + 101 + 101 // Because we spend 1 for Address, 101 on actions and 101 on a list construction
             mkV6ContractScript(
               s""" let to = Address(base58'${secondSigner.toAddress(chainId)}')
                  | let x = ${mkExprWithComplexity(complexity - baseComplexity)}
-                 | ${(1 to 101).map(_ => s"""ScriptTransfer(to, x, unit)""").mkString("[", ", ", "]")}
+                 | [
+                 |   ${(1 to 34).map(_ => s"""ScriptTransfer(to, x, unit)""").mkString(", ")},
+                 |   ${(1 to 34).map(_ => s"""Lease(to, 1)""").mkString(", ")},
+                 |   ${(1 to 33).map(_ => s"""LeaseCancel(base58'$unknownLeaseId')""").mkString(", ")}
+                 | ]
                  | """.stripMargin
             )
           }
