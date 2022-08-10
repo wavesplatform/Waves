@@ -3,6 +3,7 @@ package com.wavesplatform.features
 import cats.syntax.option.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
+import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.*
@@ -91,15 +92,40 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         )
       } ++
       Seq(
+        "ScriptTransfer" -> "ScriptTransfer(to, 1, unit)",
+        "Lease"          -> "Lease(to, 1)",
+        "LeaseCancel"    -> s"LeaseCancel(base58'${Base58.encode(Array.fill[Byte](DigestLength)(0))}')"
+      ).map { case (actionType, v) =>
+        Case(
+          s"NODE-548 If a transaction exceeds the limit of $actionType actions",
+          "ScriptTransfer, Lease, LeaseCancel actions count limit is exceeded",
+          { complexity =>
+            // Because we spend 1 for Address, 101 on actions, 101 on a list construction, 10 on getInteger,
+            // 2 on valueOrElse, and 1 on "+" and 1 for what? TODO
+            val baseComplexity = 1 + 101 + 101 + 10 + 2 + 1 + 1
+            mkV6ContractScript(
+              s""" let to = Address(base58'${secondSigner.toAddress(chainId)}')
+                 | let x = ${mkExprWithComplexity(complexity - baseComplexity)}
+                 | (
+                 |   [ ${(1 to 101).map(_ => v).mkString(", ")} ],
+                 |   # otherwise a script with LeaseCancel will be with a different complexity
+                 |   valueOrElse(getInteger(to, "force-use-of-to"), 0) + x
+                 | )
+                 | """.stripMargin
+            )
+          }
+        )
+      } ++
+      Seq(
         Case(
           "NODE-548 If a transaction exceeds the limit of non-data actions",
           "ScriptTransfer, Lease, LeaseCancel actions count limit is exceeded",
           { complexity =>
-            val baseComplexity = 1 + 101 + 101 // Because we spend 1 for Address, 101 on ScriptTransfer and 101 on a list construction
+            val baseComplexity = 1 + 101 + 101 // Because we spend 1 for Address, 101 on actions and 101 on a list construction
             mkV6ContractScript(
               s""" let to = Address(base58'${secondSigner.toAddress(chainId)}')
                  | let x = ${mkExprWithComplexity(complexity - baseComplexity)}
-                 | ${(1 to 101).map(i => s"""ScriptTransfer(to, x, unit)""").mkString("[", ", ", "]")}
+                 | ${(1 to 101).map(_ => s"""ScriptTransfer(to, x, unit)""").mkString("[", ", ", "]")}
                  | """.stripMargin
             )
           }
@@ -115,7 +141,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
                  | """.stripMargin
             )
           },
-          invokeTx = invokeTxWithPayment(1, Waves)
+          invokeTx = invokeTxWithPayment(1, Waves) // self-payment
         ),
         Case(
           "NODE-552 If a sender sends a ScriptTransfer himself in a transaction",
