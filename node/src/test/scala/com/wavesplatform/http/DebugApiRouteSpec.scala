@@ -108,14 +108,14 @@ class DebugApiRouteSpec
         dbSettings = DomainPresets.SettingsFromDefaultConfig.dbSettings.copy(storeStateHashes = true)
       )
 
-      "at not existed height" in withDomain(settingsWithStateHashes) { d =>
+      "at nonexistent height" in withDomain(settingsWithStateHashes) { d =>
         d.appendBlock(TestBlock.create(Nil))
         Get(routePath("/stateHash/2")) ~> routeWithBlockchain(d) ~> check {
           status shouldBe StatusCodes.NotFound
         }
       }
 
-      "at existed height" in expectStateHashAt2("2")
+      "at existing height" in expectStateHashAt2("2")
       "last" in expectStateHashAt2("last")
 
       def expectStateHashAt2(suffix: String): Assertion = withDomain(settingsWithStateHashes) { d =>
