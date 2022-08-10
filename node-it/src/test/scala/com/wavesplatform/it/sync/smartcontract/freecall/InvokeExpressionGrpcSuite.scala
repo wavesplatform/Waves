@@ -3,14 +3,14 @@ package com.wavesplatform.it.sync.smartcontract.freecall
 import com.google.protobuf.ByteString
 import com.typesafe.config.Config
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.features.BlockchainFeatures.RideV6
+import com.wavesplatform.features.BlockchainFeatures.ContinuationTransaction
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.api.SyncGrpcApi._
+import com.wavesplatform.it.api.SyncGrpcApi.*
 import com.wavesplatform.it.api.{PutDataResponse, StateChangesDetails}
 import com.wavesplatform.it.sync.grpc.GrpcBaseTransactionSuite
 import com.wavesplatform.it.sync.invokeExpressionFee
-import com.wavesplatform.lang.directives.values.StdLibVersion.V6
+import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.protobuf.block.VanillaBlock
@@ -22,7 +22,7 @@ class InvokeExpressionGrpcSuite extends GrpcBaseTransactionSuite with CancelAfte
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs
       .Builder(Default, 2, Seq.empty)
-      .overrideBase(_.preactivatedFeatures((RideV6.id, 1)))
+      .overrideBase(_.preactivatedFeatures((ContinuationTransaction.id, 1)))
       .buildNonConflicting()
 
   private val expr: ExprScript =
@@ -35,9 +35,10 @@ class InvokeExpressionGrpcSuite extends GrpcBaseTransactionSuite with CancelAfte
     )
 
   test("successful applying to the state") {
-    val id = sender.broadcastInvokeExpression(firstAcc, expr, waitForTx = true).id
+    val id     = sender.broadcastInvokeExpression(firstAcc, expr, waitForTx = true).id
+    val height = sender.getTransactionInfo(id).height.toInt
 
-    val lastBlock          = sender.blockAt(sender.height - 1)
+    val lastBlock          = sender.blockAt(height)
     val blockById          = sender.blockById(ByteString.copyFrom(lastBlock.id.value().arr))
     val blocksSeq          = sender.blockSeq(1, 100)
     val blocksSeqByAddress = sender.blockSeqByAddress(lastBlock.header.generator.toAddress.toString, 1, 100)
@@ -62,7 +63,7 @@ class InvokeExpressionGrpcSuite extends GrpcBaseTransactionSuite with CancelAfte
     b.flatMap(_.transactionData).find(_.id.value().toString == id).get.asInstanceOf[InvokeExpressionTransaction]
 
   private def checkTx(tx: InvokeExpressionTransaction): Assertion = {
-    tx.fee shouldBe invokeExpressionFee
+    tx.fee.value shouldBe invokeExpressionFee
     tx.feeAssetId shouldBe Waves
     tx.sender shouldBe firstAcc.publicKey
     tx.expression shouldBe expr

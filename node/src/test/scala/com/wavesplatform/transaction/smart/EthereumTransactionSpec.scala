@@ -1,26 +1,26 @@
 package com.wavesplatform.transaction.smart
 
-import scala.concurrent.duration.*
-import cats.syntax.monoid.*
-import com.wavesplatform.{BlockchainStubHelpers, TestValues}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.state.diffs.produceRejectOrFailedDiff
 import com.wavesplatform.state.Portfolio
+import com.wavesplatform.state.diffs.produceRejectOrFailedDiff
 import com.wavesplatform.test.{FlatSpec, TestTime, produce}
-import com.wavesplatform.transaction.{ERC20Address, EthereumTransaction, TxHelpers}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.transaction.utils.EthTxGenerator
 import com.wavesplatform.transaction.utils.EthTxGenerator.Arg
+import com.wavesplatform.transaction.{ERC20Address, EthereumTransaction, TxHelpers}
 import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, JsonMatchers}
+import com.wavesplatform.{BlockchainStubHelpers, TestValues}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, Inside}
 import org.web3j.crypto.{RawTransaction, Sign, SignedRawTransaction, TransactionEncoder}
 import play.api.libs.json.Json
+
+import scala.concurrent.duration.*
 
 class EthereumTransactionSpec
     extends FlatSpec
@@ -46,17 +46,16 @@ class EthereumTransactionSpec
     val assetTransfer = EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, 1, TestValues.asset)
     val invoke        = EthTxGenerator.generateEthInvoke(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, "test", Nil, Nil)
 
-
-    inside(EthereumTransaction(transfer.toSignedRawTransaction).explicitGet().payload) {
-      case t: EthereumTransaction.Transfer => t.recipient.chainId shouldBe 'T'.toByte
+    inside(EthereumTransaction(transfer.toSignedRawTransaction).explicitGet().payload) { case t: EthereumTransaction.Transfer =>
+      t.recipient.chainId shouldBe 'T'.toByte
     }
 
-    inside(EthereumTransaction(assetTransfer.toSignedRawTransaction).explicitGet().payload) {
-      case t: EthereumTransaction.Transfer => t.recipient.chainId shouldBe 'T'.toByte
+    inside(EthereumTransaction(assetTransfer.toSignedRawTransaction).explicitGet().payload) { case t: EthereumTransaction.Transfer =>
+      t.recipient.chainId shouldBe 'T'.toByte
     }
 
-    inside(EthereumTransaction(invoke.toSignedRawTransaction).explicitGet().payload) {
-      case t: EthereumTransaction.Invocation => t.dApp.chainId shouldBe 'T'.toByte
+    inside(EthereumTransaction(invoke.toSignedRawTransaction).explicitGet().payload) { case t: EthereumTransaction.Invocation =>
+      t.dApp.chainId shouldBe 'T'.toByte
     }
   }
 
@@ -98,9 +97,9 @@ class EthereumTransactionSpec
     val transfer        = EthTxGenerator.generateEthTransfer(senderAccount, recipientAddress, LongMaxMinusFee, Waves)
     val assetTransfer   = EthTxGenerator.generateEthTransfer(senderAccount, recipientAddress, Long.MaxValue, TestAsset)
 
-    (differ(transfer) |+| differ(assetTransfer)).portfolios shouldBe Map(
-      senderAddress    -> Portfolio(-Long.MaxValue, assets = Map(TestAsset  -> -Long.MaxValue)),
-      recipientAddress -> Portfolio(LongMaxMinusFee, assets = Map(TestAsset -> Long.MaxValue))
+    differ(transfer).combineF(differ(assetTransfer)).explicitGet().portfolios shouldBe Map(
+      senderAddress    -> Portfolio.build(-Long.MaxValue, TestAsset, -Long.MaxValue),
+      recipientAddress -> Portfolio.build(LongMaxMinusFee, TestAsset, Long.MaxValue)
     )
   }
 
@@ -109,23 +108,27 @@ class EthereumTransactionSpec
       BigInt(System.currentTimeMillis()).bigInteger,
       EthereumTransaction.GasPrice,
       BigInt(100000).bigInteger, // fee
-      "", // empty "to"
+      "",                        // empty "to"
       (BigInt(1) * EthereumTransaction.AmountMultiplier).bigInteger,
       ""
     )
-    a[RuntimeException] should be thrownBy(EthTxGenerator.signRawTransaction(TxHelpers.defaultEthSigner, TxHelpers.defaultAddress.chainId)(rawTransaction))
+    a[RuntimeException] should be thrownBy (EthTxGenerator.signRawTransaction(TxHelpers.defaultEthSigner, TxHelpers.defaultAddress.chainId)(
+      rawTransaction
+    ))
   }
-       
+
   it should "fail with invalid to field" in {
     val rawTransaction = RawTransaction.createTransaction(
       BigInt(System.currentTimeMillis()).bigInteger,
       EthereumTransaction.GasPrice,
       BigInt(100000).bigInteger, // fee
-      "0xffffffff", // invalid "to"
+      "0xffffffff",              // invalid "to"
       (BigInt(1) * EthereumTransaction.AmountMultiplier).bigInteger,
       ""
     )
-    a[RuntimeException] should be thrownBy(EthTxGenerator.signRawTransaction(TxHelpers.defaultEthSigner, TxHelpers.defaultAddress.chainId)(rawTransaction))
+    a[RuntimeException] should be thrownBy (EthTxGenerator.signRawTransaction(TxHelpers.defaultEthSigner, TxHelpers.defaultAddress.chainId)(
+      rawTransaction
+    ))
   }
 
   it should "use chainId in signer key recovery" in {
@@ -250,13 +253,15 @@ class EthereumTransactionSpec
   it should "not be accepted before RideV6 activation" in {
     val blockchain = createBlockchainStub { blockchain =>
       // Activate all features except ride v6
-      val features = BlockchainFeatures.implemented.collect { case id if id != BlockchainFeatures.RideV6.id => BlockchainFeatures.feature(id) }.flatten
+      val features = BlockchainFeatures.implemented.collect {
+        case id if id != BlockchainFeatures.RideV6.id => BlockchainFeatures.feature(id)
+      }.flatten
       blockchain.stub.activateFeatures(features.toSeq*)
     }
     val differ = blockchain.stub.transactionDiffer().andThen(_.resultE)
 
     val transaction = EthTxGenerator.generateEthTransfer(TxHelpers.defaultEthSigner, TxHelpers.secondAddress, 123, Waves)
-    differ(transaction) should produceRejectOrFailedDiff("Ride V6, MetaMask support, Invoke Expression feature has not been activated yet")
+    differ(transaction) should produceRejectOrFailedDiff(s"${BlockchainFeatures.RideV6.description} feature has not been activated yet")
   }
 
   "Ethereum invoke" should "recover correct key" in {
@@ -564,17 +569,17 @@ class EthereumTransactionSpec
 
       val script = TxHelpers.script(
         s"""{-# STDLIB_VERSION 4 #-}
-          |{-# SCRIPT_TYPE ACCOUNT #-}
-          |{-# CONTENT_TYPE DAPP #-}
-          |
-          |@Callable (i)
-          |func default() = {
-          |  [
-          |    ScriptTransfer(i.caller, 123, unit),
-          |    ScriptTransfer(i.caller, 123, base58'$TestAsset')
-          |  ]
-          |}
-          |""".stripMargin
+           |{-# SCRIPT_TYPE ACCOUNT #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |
+           |@Callable (i)
+           |func default() = {
+           |  [
+           |    ScriptTransfer(i.caller, 123, unit),
+           |    ScriptTransfer(i.caller, 123, base58'$TestAsset')
+           |  ]
+           |}
+           |""".stripMargin
       )
       sh.setScript(dAppAccount.toAddress, script)
     }
@@ -590,25 +595,25 @@ class EthereumTransactionSpec
     val diff = differ(transaction).resultE.explicitGet()
     diff should containAppliedTx(transaction.id())
     Json.toJson(diff.scriptResults.values.head) should matchJson(s"""{
-                                                                   |  "data" : [ ],
-                                                                   |  "transfers" : [ {
-                                                                   |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                                   |    "asset" : null,
-                                                                   |    "amount" : 123
-                                                                   |  },
-                                                                   |   {
-                                                                   |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
-                                                                   |    "asset" : "$TestAsset",
-                                                                   |    "amount" : 123
-                                                                   |  }],
-                                                                   |  "issues" : [ ],
-                                                                   |  "reissues" : [ ],
-                                                                   |  "burns" : [ ],
-                                                                   |  "sponsorFees" : [ ],
-                                                                   |  "leases" : [ ],
-                                                                   |  "leaseCancels" : [ ],
-                                                                   |  "invokes" : [ ]
-                                                                   |}""".stripMargin)
+                                                                    |  "data" : [ ],
+                                                                    |  "transfers" : [ {
+                                                                    |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
+                                                                    |    "asset" : null,
+                                                                    |    "amount" : 123
+                                                                    |  },
+                                                                    |   {
+                                                                    |    "address" : "3NByUD1YE9SQPzmf2KqVqrjGMutNSfc4oBC",
+                                                                    |    "asset" : "$TestAsset",
+                                                                    |    "amount" : 123
+                                                                    |  }],
+                                                                    |  "issues" : [ ],
+                                                                    |  "reissues" : [ ],
+                                                                    |  "burns" : [ ],
+                                                                    |  "sponsorFees" : [ ],
+                                                                    |  "leases" : [ ],
+                                                                    |  "leaseCancels" : [ ],
+                                                                    |  "invokes" : [ ]
+                                                                    |}""".stripMargin)
   }
 
   it should "test minimum fee" in {

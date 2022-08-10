@@ -3,14 +3,14 @@ package com.wavesplatform.state.diffs.ci.sync
 import com.wavesplatform.account.Address
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.features.BlockchainFeatures.*
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.{Asset, TxHelpers}
+import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.{Asset, TxHelpers}
 
 class SyncDAppNegativeSponsorFeeTest extends PropSpec with WithDomain {
 
@@ -43,8 +43,9 @@ class SyncDAppNegativeSponsorFeeTest extends PropSpec with WithDomain {
     )
 
   private val settings =
-    TestFunctionalitySettings
-      .withFeatures(BlockV5, SynchronousCalls)
+    DomainPresets.RideV5
+      .configure(_.copy(enforceTransferValidationAfter = 3))
+      .setFeaturesHeight(BlockchainFeatures.RideV6 -> 4)
 
   property("negative sponsor amount") {
     for {
@@ -66,8 +67,10 @@ class SyncDAppNegativeSponsorFeeTest extends PropSpec with WithDomain {
 
       val invoke = TxHelpers.invoke(dApp1.toAddress, func = None, invoker = invoker)
 
-      withDomain(domainSettingsWithFS(settings), balances) { d =>
+      withDomain(settings, balances) { d =>
         d.appendBlock(preparingTxs*)
+        d.appendAndCatchError(invoke).toString should include("Negative sponsor amount")
+        d.appendBlock()
 
         if (!bigComplexityDApp1 && !bigComplexityDApp2) {
           d.appendAndCatchError(invoke).toString should include("Negative sponsor amount")

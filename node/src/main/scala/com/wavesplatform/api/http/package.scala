@@ -112,7 +112,7 @@ package object http {
   val TransactionId: PathMatcher1[ByteStr] = idOrHash(InvalidTransactionId)
   val BlockId: PathMatcher1[ByteStr]       = idOrHash(InvalidBlockId)
 
-  val AssetId: PathMatcher1[IssuedAsset] = base58Segment(Some(crypto.DigestLength), _ => InvalidAssetId).map(IssuedAsset)
+  val AssetId: PathMatcher1[IssuedAsset] = base58Segment(Some(crypto.DigestLength), _ => InvalidAssetId).map(IssuedAsset(_))
 
   val Signature: PathMatcher1[ByteStr] = base58Segment(Some(crypto.SignatureLength), _ => InvalidSignature)
 

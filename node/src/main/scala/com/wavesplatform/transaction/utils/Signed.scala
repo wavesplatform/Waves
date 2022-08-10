@@ -1,12 +1,12 @@
 package com.wavesplatform.transaction.utils
 
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{Asset, Proofs, TxAmount, TxTimestamp}
+import com.wavesplatform.transaction.{Asset, Proofs, TxTimestamp}
 
 object Signed {
   def invokeScript(
@@ -15,7 +15,7 @@ object Signed {
       dApp: AddressOrAlias,
       functionCall: Option[Terms.FUNCTION_CALL],
       payments: Seq[InvokeScriptTransaction.Payment],
-      fee: TxAmount,
+      fee: Long,
       feeAssetId: Asset,
       timestamp: TxTimestamp
   ): InvokeScriptTransaction =
@@ -45,7 +45,7 @@ object Signed {
       version: Byte,
       sender: KeyPair,
       script: Option[Script],
-      fee: TxAmount,
+      fee: Long,
       timestamp: TxTimestamp
   ): SetScriptTransaction =
     SetScriptTransaction

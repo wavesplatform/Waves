@@ -14,11 +14,7 @@ import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.*
 import play.api.libs.json.Json.*
 
-class AliasBroadcastRouteSpec
-    extends RouteSpec("/alias/broadcast/")
-    with RequestGen
-    with PathMockFactory
-    with RestAPISettingsHelper {
+class AliasBroadcastRouteSpec extends RouteSpec("/alias/broadcast/") with RequestGen with PathMockFactory with RestAPISettingsHelper {
   private[this] val utxPoolSynchronizer = DummyTransactionPublisher.rejecting(tx => TransactionValidationError(GenericError("foo"), tx))
 
   val route = AliasApiRoute(restAPISettings, stub[CommonTransactionsApi], stub[Wallet], utxPoolSynchronizer, stub[Time], stub[Blockchain]).route
@@ -45,7 +41,7 @@ class AliasBroadcastRouteSpec
         posting(toJson(req.copy(senderPublicKey = s))) should produce(InvalidAddress)
       }
       forAll(nonPositiveLong) { q =>
-        posting(toJson(req.copy(fee = q))) should produce(InsufficientFee())
+        posting(toJson(req.copy(fee = q))) should produce(InsufficientFee)
       }
       forAll(invalidAliasStringByLength) { q =>
         val obj = toJson(req).as[JsObject] ++ Json.obj("alias" -> JsString(q))

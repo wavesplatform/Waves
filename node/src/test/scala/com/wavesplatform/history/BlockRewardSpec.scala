@@ -127,7 +127,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
   "Miner receives reward as soon as the feature is activated and changes reward amount after voting" in forAll(activationScenario) {
     case (miner, transfers, b1s, b2s, activationBlock, b3s, b4s, newTermBlock, b5s, b6s, b7s) =>
       withDomain(rewardSettings) { d =>
-        val totalFee = transfers.map(_.fee).sum
+        val totalFee = transfers.map(_.fee.value).sum
 
         b1s.foreach(b => d.blockchainUpdater.processBlock(b) should beRight)
 

@@ -9,14 +9,13 @@ import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V6}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.diffs.ci.ciFee
 import com.wavesplatform.state.diffs.smart.predef.{assertProvenPart, provenPart}
-import com.wavesplatform.test.{PropSpec, TestTime}
-import com.wavesplatform.transaction.{ERC20Address, EthereumTransaction, GenesisTransaction}
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{ERC20Address, EthereumTransaction, GenesisTransaction, TxHelpers}
 import com.wavesplatform.utils.EthHelpers
 
 class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers {
@@ -68,10 +67,9 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
      """.stripMargin
 
   property("access to Ethereum transfer from RIDE script") {
-    val fee       = ciFee().sample.get
-    val recipient = accountGen.sample.get
+    val recipient = RandomKeyPair()
 
-    val issue = IssueTransaction.selfSigned(2.toByte, recipient, "Asset", "", ENOUGH_AMT, 8, true, None, fee, ts).explicitGet()
+    val issue = IssueTransaction.selfSigned(2.toByte, recipient, "Asset", "", ENOUGH_AMT, 8, true, None, 1.waves, ts).explicitGet()
     val asset = IssuedAsset(issue.id())
 
     for {
@@ -81,14 +79,15 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
       val transfer    = EthereumTransaction.Transfer(token, transferAmount, recipient.toAddress)
       val ethTransfer = EthereumTransaction(transfer, TestEthRawTransaction, TestEthSignature, 'T'.toByte)
       val ethSender   = ethTransfer.senderAddress()
-      val preTransfer = TransferTransaction.selfSigned(2.toByte, recipient, ethSender, asset, ENOUGH_AMT, Waves, fee, ByteStr.empty, ts).explicitGet()
+      val preTransfer =
+        TransferTransaction.selfSigned(2.toByte, recipient, ethSender, asset, ENOUGH_AMT, Waves, 0.001.waves, ByteStr.empty, ts).explicitGet()
 
       val genesis1 = GenesisTransaction.create(ethSender, ENOUGH_AMT, ts).explicitGet()
       val genesis2 = GenesisTransaction.create(recipient.toAddress, ENOUGH_AMT, ts).explicitGet()
 
       val function    = if (version >= V3) "transferTransactionById" else "transactionById"
       val verifier    = Some(accountScript(version, function, ethTransfer, token.map(_ => asset), recipient.toAddress))
-      val setVerifier = () => SetScriptTransaction.selfSigned(1.toByte, recipient, verifier, fee, ts).explicitGet()
+      val setVerifier = () => SetScriptTransaction.selfSigned(1.toByte, recipient, verifier, 0.01.waves, ts).explicitGet()
 
       withDomain(RideV6) { d =>
         d.appendBlock(genesis1, genesis2, issue, preTransfer, setVerifier())
@@ -109,31 +108,30 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
           )
         } else
           (the[Exception] thrownBy d.appendBlock(setVerifier())).getMessage should include(
-            s"t = Left(extract() called on unit value)"
+            s"t = Left(CommonError(extract() called on unit value))"
           )
       }
     }
   }
 
   property("transfer scripted asset via Ethereum transaction") {
-    val fee       = ciFee().sample.get
-    val recipient = accountGen.sample.get
+    val recipient = RandomKeyPair()
 
     val dummyTransfer    = EthereumTransaction.Transfer(None, transferAmount, recipient.toAddress)
     val dummyEthTransfer = EthereumTransaction(dummyTransfer, TestEthRawTransaction, TestEthSignature, 'T'.toByte) // needed to pass into asset script
     val ethSender        = dummyEthTransfer.senderAddress()
 
-    val genesis1 = GenesisTransaction.create(ethSender, ENOUGH_AMT, ts).explicitGet()
-    val genesis2 = GenesisTransaction.create(recipient.toAddress, ENOUGH_AMT, ts).explicitGet()
+    val genesis1 = TxHelpers.genesis(ethSender, ENOUGH_AMT)
+    val genesis2 = TxHelpers.genesis(recipient.toAddress, ENOUGH_AMT)
 
     DirectiveDictionary[StdLibVersion].all
       .foreach { version =>
         val script      = assetScript(version, dummyEthTransfer, recipient.toAddress)
-        val issue       = IssueTransaction.selfSigned(2.toByte, recipient, "Asset", "", ENOUGH_AMT, 8, true, Some(script), fee, ts).explicitGet()
+        val issue       = IssueTransaction.selfSigned(2.toByte, recipient, "Asset", "", ENOUGH_AMT, 8, true, Some(script), 1.waves, ts).explicitGet()
         val asset       = IssuedAsset(issue.id())
         val ethTransfer = dummyEthTransfer.copy(dummyTransfer.copy(Some(ERC20Address(asset.id.take(20)))))
         val preTransfer =
-          TransferTransaction.selfSigned(2.toByte, recipient, ethSender, asset, ENOUGH_AMT, Waves, fee, ByteStr.empty, ts).explicitGet()
+          TransferTransaction.selfSigned(2.toByte, recipient, ethSender, asset, ENOUGH_AMT, Waves, 0.005.waves, ByteStr.empty, ts).explicitGet()
 
         withDomain(RideV6) { d =>
           d.appendBlock(genesis1, genesis2, issue, preTransfer)
@@ -141,8 +139,10 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
 
           d.liquidDiff.errorMessage(ethTransfer.id()) shouldBe None
           d.liquidDiff.portfolios(recipient.toAddress) shouldBe Portfolio.build(asset, transferAmount)
-          d.liquidDiff.portfolios(ethTransfer.senderAddress()) shouldBe Portfolio(-ethTransfer.underlying.getGasPrice.longValue(),
-                                                                                  assets = Map(asset -> -transferAmount))
+          d.liquidDiff.portfolios(ethTransfer.senderAddress()) shouldBe Portfolio(
+            -ethTransfer.underlying.getGasPrice.longValue(),
+            assets = Map(asset -> -transferAmount)
+          )
 
           d.liquidDiff.scriptsComplexity should be > 0L
         }

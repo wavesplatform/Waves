@@ -1,5 +1,6 @@
 package com.wavesplatform.lang
 
+import cats.implicits._
 import cats.Id
 import cats.kernel.Monoid
 import com.wavesplatform.lang.directives.values.V3
@@ -19,7 +20,7 @@ import com.wavesplatform.test._
 class ScriptPreprocessorTest extends PropSpec with ScriptGenParser {
   private val evaluator = new EvaluatorV1[Id, NoContext]()
 
-  private def processAndEval(src: String, libraries: Map[String, String]): Either[ExecutionError, EVALUATED] =
+  private def processAndEval(src: String, libraries: Map[String, String]): Either[String, EVALUATED] =
     for {
       directives <- DirectiveParser(src)
       ds         <- Directive.extractDirectives(directives)
@@ -31,7 +32,7 @@ class ScriptPreprocessorTest extends PropSpec with ScriptGenParser {
     val untyped  = Parser.parseExpr(code).get.value
     val ctx: CTX[NoContext] = Monoid.combineAll(Seq(PureContext.build(V3, useNewPowPrecision = true)))
     val typed    = ExpressionCompiler(ctx.compilerContext, untyped)
-    typed.flatMap(v => evaluator.apply[EVALUATED](ctx.evaluationContext, v._1))
+    typed.flatMap(v => evaluator[EVALUATED](ctx.evaluationContext, v._1).leftMap(_.toString))
   }
 
   property("multiple libraries") {

@@ -6,7 +6,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.{DefaultWavesSettings, Domain, settingsWithFeatures}
 import com.wavesplatform.http.RouteSpec
-import com.wavesplatform.lang.directives.values.StdLibVersion.V5
+import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.BinaryDataEntry
 import com.wavesplatform.test.*
@@ -100,19 +100,19 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
 
       withClue("asset name")(
         routeTest(d, "eth_call", Json.obj("to" -> assetContract, "data" -> "0x95d89b41"))(
-          result shouldBe "000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000045445535400000000000000000000000000000000000000000000000000000000"
+          result shouldBe "0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000045445535400000000000000000000000000000000000000000000000000000000"
         )
       )
 
       withClue("asset decimals")(
         routeTest(d, "eth_call", Json.obj("to" -> assetContract, "data" -> "0x313ce567"))(
-          result shouldBe "0000000000000000000000000000000000000000000000000000000000000002"
+          result shouldBe "0x0000000000000000000000000000000000000000000000000000000000000002"
         )
       )
 
       withClue("asset balance")(
         routeTest(d, "eth_call", Json.obj("to" -> assetContract, "data" -> ("0x70a08231" + randomKP.toAddress.toEthAddress)))(
-          result shouldBe "00000000000000000000000000000000000000000000000000000000000186a0"
+          result shouldBe "0x00000000000000000000000000000000000000000000000000000000000186a0"
         )
       )
     }
@@ -127,9 +127,9 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
     routeTest(d, "eth_getTransactionReceipt", transaction.id().toHexString)(
       resultJson should matchJson(s"""{
       |  "transactionHash" : "${transaction.id().toHexString}",
-      |  "transactionIndex" : "0x01",
+      |  "transactionIndex" : "0x1",
       |  "blockHash" : "${d.blockchain.lastBlockId.get.toHexString}",
-      |  "blockNumber" : "0x02",
+      |  "blockNumber" : "0x2",
       |  "from" : "0xf1f6bdabc1b48e7d75957b361881be9c40e4b424",
       |  "to" : "0x3d3ad884fa042927b9d6c37df70af5c0bd9516c5",
       |  "cumulativeGasUsed" : "0x186a0",

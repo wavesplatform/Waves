@@ -1,25 +1,25 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
-import cats.syntax.either._
-import cats.syntax.functor._
+import cats.syntax.either.*
+import cats.syntax.functor.*
 import cats.{Eval, Monad}
-import com.wavesplatform.lang.ExecutionError
+import com.wavesplatform.lang.{CommonError, ExecutionError}
 import com.wavesplatform.lang.directives.values.StdLibVersion
-import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.evaluator.ContextfulVal
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings.{buildAssetInfo, ordType, orderObject, transactionObject}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.*
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.OrdType
-import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
+import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, InvokePseudoTx, ReissuePseudoTx, ScriptTransfer, SponsorFeePseudoTx}
 
 object Vals {
   def tx(
       isTokenContext: Boolean,
       version: StdLibVersion,
       proofsEnabled: Boolean
-  ): (ExecutionError, (UNION, ContextfulVal[Environment])) =
+  ): (String, (UNION, ContextfulVal[Environment])) =
     ("tx", (scriptInputType(isTokenContext, version, proofsEnabled), inputEntityVal(version, proofsEnabled)))
 
   private def scriptInputType(isTokenContext: Boolean, version: StdLibVersion, proofsEnabled: Boolean) =
@@ -43,8 +43,9 @@ object Vals {
                     case r: ReissuePseudoTx     => Bindings.mapReissuePseudoTx(r, version).asRight[ExecutionError]
                     case sf: SponsorFeePseudoTx => Bindings.mapSponsorFeePseudoTx(sf, version).asRight[ExecutionError]
                     case st: ScriptTransfer     => Bindings.scriptTransfer(st, version).asRight[ExecutionError]
+                    case inv: InvokePseudoTx    => Bindings.mapInvokePseudoTx(inv, version).asRight[ExecutionError]
                   },
-                  _ => "Expected Transaction or Order".asLeft[EVALUATED]
+                  _ => CommonError("Expected Transaction or Order").asLeft[EVALUATED]
                 )
               )
             )
@@ -65,13 +66,15 @@ object Vals {
     new ContextfulVal.Lifted[Environment] {
       override def liftF[F[_]: Monad](env: Environment[F]): Eval[Either[ExecutionError, EVALUATED]] =
         Eval.later {
-         if(env.dAppAlias) {
-           (FAIL("Use alias is disabled"): EVALUATED)
-             .asRight[ExecutionError]
-         } else {
-           (Bindings.senderObject(env.tthis.eliminate(identity, _ => throw new Exception("In the account's script value 'this` must be Address"))): EVALUATED)
-             .asRight[ExecutionError]
-         }
+          if (env.dAppAlias) {
+            (FAIL("Use alias is disabled"): EVALUATED)
+              .asRight[ExecutionError]
+          } else {
+            (Bindings.senderObject(
+              env.tthis.eliminate(identity, _ => throw new Exception("In the account's script value 'this` must be Address"))
+            ): EVALUATED)
+              .asRight[ExecutionError]
+          }
         }
     }
 
@@ -80,7 +83,12 @@ object Vals {
       override def apply[F[_]: Monad](env: Environment[F]): Eval[F[Either[ExecutionError, EVALUATED]]] =
         Eval.later {
           env
-            .assetInfoById(env.tthis.eliminate(_ => throw new Exception("In the account's script value 'this` must be Address"), _.eliminate(_.id, v => throw new Exception(s"Incorrect value $v for 'this'"))))
+            .assetInfoById(
+              env.tthis.eliminate(
+                _ => throw new Exception("In the account's script value 'this` must be Address"),
+                _.eliminate(_.id, v => throw new Exception(s"Incorrect value $v for 'this'"))
+              )
+            )
             .map(v => buildAssetInfo(v.get, version): EVALUATED)
             .map(_.asRight[ExecutionError])
         }
@@ -105,10 +113,10 @@ object Vals {
   val sell = ("Sell", (ordTypeType, sellOrdTypeVal))
   val buy  = ("Buy", (ordTypeType, buyOrdTypeVal))
 
-  val height: (ExecutionError, (LONG.type, ContextfulVal[Environment])) = ("height", (LONG, heightVal))
+  val height: (String, (LONG.type, ContextfulVal[Environment])) = ("height", (LONG, heightVal))
 
-  val accountThis: (ExecutionError, (CASETYPEREF, ContextfulVal[Environment])) = ("this", (addressType, accountThisVal))
-  def assetThis(version: StdLibVersion): (ExecutionError, (CASETYPEREF, ContextfulVal[Environment])) =
+  val accountThis: (String, (CASETYPEREF, ContextfulVal[Environment])) = ("this", (addressType, accountThisVal))
+  def assetThis(version: StdLibVersion): (String, (CASETYPEREF, ContextfulVal[Environment])) =
     ("this", (assetType(version), assetThisVal(version)))
 
 }

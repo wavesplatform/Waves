@@ -28,7 +28,7 @@ object CachedDAppCTX {
     cache(
       (
         version,
-        blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls), // fixUnicodeFunctions + useNewPowPrecision
+        blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls) && blockchain.height > blockchain.settings.functionalitySettings.enforceTransferValidationAfter
       )
     )
 }

@@ -44,18 +44,29 @@ object ScriptRunner {
       scriptContainerAddress,
       complexityLimit,
       default,
-      blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
+      blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls),
+      blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls),
+      blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls) &&
+        blockchain.height > blockchain.settings.functionalitySettings.enforceTransferValidationAfter,
+      blockchain.checkEstimatorSumOverflow,
+      blockchain.newEvaluatorMode,
+      blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
     )
 
   def applyGeneric(
-                    in: TxOrd,
-                    blockchain: Blockchain,
-                    script: Script,
-                    isAssetScript: Boolean,
-                    scriptContainerAddress: Environment.Tthis,
-                    defaultLimit: Int,
-                    default: EVALUATED,
-                    useCorrectScriptVersion: Boolean
+      in: TxOrd,
+      blockchain: Blockchain,
+      script: Script,
+      isAssetScript: Boolean,
+      scriptContainerAddress: Environment.Tthis,
+      defaultLimit: Int,
+      default: EVALUATED,
+      useCorrectScriptVersion: Boolean,
+      fixUnicodeFunctions: Boolean,
+      useNewPowPrecision: Boolean,
+      checkEstimatorSumOverflow: Boolean,
+      newEvaluatorMode: Boolean,
+      checkWeakPk: Boolean
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
 
     def evalVerifier(
@@ -77,7 +88,9 @@ object ScriptRunner {
               isAssetScript,
               isContract,
               scriptContainerAddress,
-              txId
+              txId,
+              fixUnicodeFunctions,
+              useNewPowPrecision
             )
         } yield (ds, ctx)
 
@@ -93,15 +106,23 @@ object ScriptRunner {
 
       val (limit, onExceed) =
         if (defaultLimit == Int.MaxValue)
-          if (blockchain.checkEstimatorSumOverflow)
-            (correctedLimit, (_: EXPR) => Left(s"Verifier complexity limit = $correctedLimit is exceeded"))
+          if (checkEstimatorSumOverflow)
+            (correctedLimit, (_: EXPR) => Left(CommonError(s"Verifier complexity limit = $correctedLimit is exceeded")))
           else
-            (defaultLimit, (_: EXPR) => Left(s"Verifier complexity limit = $defaultLimit is exceeded"))
+            (defaultLimit, (_: EXPR) => Left(CommonError(s"Verifier complexity limit = $defaultLimit is exceeded")))
         else
           (defaultLimit, (_: EXPR) => Right(default))
 
       val (log, unusedComplexity, result) =
-        EvaluatorV2.applyOrDefault(ctx, expr, script.stdLibVersion, limit, correctFunctionCallScope = blockchain.checkEstimatorSumOverflow, newMode = blockchain.newEvaluatorMode, onExceed)
+        EvaluatorV2.applyOrDefault(
+          ctx,
+          expr,
+          script.stdLibVersion,
+          limit,
+          correctFunctionCallScope = checkEstimatorSumOverflow,
+          newMode = newEvaluatorMode,
+          onExceed
+        )
 
       (log, limit - unusedComplexity, result)
     }
@@ -140,10 +161,10 @@ object ScriptRunner {
               _ => ???
             )
           )
-        (Nil, 0, Verifier.verifyAsEllipticCurveSignature(proven, blockchain.isFeatureActivated(BlockchainFeatures.RideV6)).bimap(_.err, _ => TRUE))
+        (Nil, 0, Verifier.verifyAsEllipticCurveSignature(proven, checkWeakPk).bimap(_.err, _ => TRUE))
 
       case other =>
-        (Nil, 0, s"$other: Unsupported script version".asLeft[EVALUATED])
+        (Nil, 0, Left(s"$other: Unsupported script version"))
     }
   }
 }

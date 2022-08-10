@@ -1,11 +1,11 @@
 package com.wavesplatform.api.http
 
 import akka.NotUsed
-import cats.syntax.traverse.*
-import cats.instances.option.*
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.server.{Directive0, Route}
 import akka.stream.scaladsl.Source
+import cats.instances.option.*
+import cats.syntax.traverse.*
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.ApiError.*
@@ -47,7 +47,7 @@ case class AddressApiRoute(
     with AuthRoute
     with TimeLimitedRoute {
 
-  import AddressApiRoute._
+  import AddressApiRoute.*
 
   val MaxAddressesPerRequest = 1000
 
@@ -134,11 +134,22 @@ case class AddressApiRoute(
   }
 
   def balanceDetails: Route = (path("balance" / "details" / AddrSegment) & get) { address =>
-    val details = commonAccountsApi.balanceDetails(address)
-    import details._
-    complete(
-      Json.obj("address" -> address, "regular" -> regular, "generating" -> generating, "available" -> available, "effective" -> effective)
-    )
+    commonAccountsApi
+      .balanceDetails(address)
+      .fold(
+        e => complete(CustomValidationError(e)), { details =>
+          import details.*
+          complete(
+            Json.obj(
+              "address"    -> address,
+              "regular"    -> regular,
+              "generating" -> generating,
+              "available"  -> available,
+              "effective"  -> effective
+            )
+          )
+        }
+      )
   }
 
   def balanceWithConfirmations: Route = {
@@ -190,19 +201,21 @@ case class AddressApiRoute(
         complete(accountDataEntry(address, key))
       } ~ extractScheduler(
         implicit sc =>
-          (formField("matches") | parameter("matches")) { matches =>
-            Try(matches.r)
-              .fold(
-                { e =>
-                  log.trace(s"Error compiling regex $matches: ${e.getMessage}")
-                  complete(ApiError.fromValidationError(GenericError(s"Cannot compile regex")))
-                },
-                _ => complete(accountData(address, matches))
-              )
-          } ~ anyParam("key").filter(_.nonEmpty) { keys =>
-            complete(accountDataList(address, keys.toSeq*))
-          } ~ get {
-            complete(accountData(address))
+          strictEntity {
+            (formField("matches") | parameter("matches")) { matches =>
+              Try(matches.r)
+                .fold(
+                  { e =>
+                    log.trace(s"Error compiling regex $matches: ${e.getMessage}")
+                    complete(ApiError.fromValidationError(GenericError(s"Cannot compile regex")))
+                  },
+                  _ => complete(accountData(address, matches))
+                )
+            } ~ anyParam("key").filter(_.nonEmpty) { keys =>
+              complete(accountDataList(address, keys.toSeq*))
+            } ~ get {
+              complete(accountData(address))
+            }
           }
       )
     }

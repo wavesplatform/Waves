@@ -16,6 +16,7 @@ import com.wavesplatform.protobuf.{Amount, transaction}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxHelpers.defaultAddress
 import com.wavesplatform.transaction.TxValidationError.NonPositiveAmount
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, Verifier}
@@ -50,7 +51,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
     val unsigned = transaction.PBTransaction(
       tx.chainId,
       ByteString.copyFrom(caller.publicKey.arr),
-      Some(Amount.of(PBAmounts.toPBAssetId(tx.feeAssetId), tx.fee)),
+      Some(Amount.of(PBAmounts.toPBAssetId(tx.feeAssetId), tx.fee.value)),
       tx.timestamp,
       tx.version,
       transaction.PBTransaction.Data.InvokeScript(
@@ -223,19 +224,10 @@ class InvokeScriptTransactionSpecification extends PropSpec {
   }
 
   property(s"can't have more than ${ContractLimits.MaxInvokeScriptArgs} args") {
-    val pk = PublicKey.fromBase58String(publicKey).explicitGet()
-    InvokeScriptTransaction.create(
-      1.toByte,
-      pk,
-      pk.toAddress,
-      Some(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), Range(0, 23).map(_ => Terms.CONST_LONG(0)).toList)),
-      Seq(),
-      1,
-      Waves,
-      1,
-      Proofs.empty,
-      AddressScheme.current.chainId
-    ) should produce("more than 22 arguments")
+    TxHelpers.invoke(defaultAddress, Some(""), Seq.fill(22)(CONST_LONG(0))).funcCallOpt.get.args.length shouldBe 22
+    (the[Exception] thrownBy TxHelpers.invoke(defaultAddress, Some(""), Seq.fill(23)(CONST_LONG(0)))).getMessage should include(
+      "InvokeScript can't have more than 22 arguments"
+    )
   }
 
   property(s"can call a func with ARR") {
@@ -305,7 +297,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
 
   property("can't be more 5kb") {
     val largeString = "abcde" * 1024
-    val pk          = PublicKey.fromBase58String(publicKey).explicitGet()
+    val pk          = KeyPair("test8".getBytes("UTF-8")).publicKey
     InvokeScriptTransaction.create(
       1.toByte,
       pk,
@@ -317,7 +309,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
       1,
       Proofs.empty,
       AddressScheme.current.chainId
-    ) should produce("TooBigArray")
+    ) should produce("InvokeScriptTransaction bytes length = 5223 exceeds limit = 5120")
   }
 
   property("can't have zero amount") {

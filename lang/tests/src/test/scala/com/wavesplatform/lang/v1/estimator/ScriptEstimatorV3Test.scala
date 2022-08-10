@@ -1,7 +1,6 @@
 package com.wavesplatform.lang.v1.estimator
 
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.utils.functionCosts
 import com.wavesplatform.lang.v1.FunctionHeader.Native
@@ -18,7 +17,7 @@ class ScriptEstimatorV3Test
       ScriptEstimatorV3(fixOverflow = true, overhead = true),
       ScriptEstimatorV3(fixOverflow = false, overhead = true)
     ) {
-  private def estimateNoOverhead(script: String): Either[ExecutionError, Long] =
+  private def estimateNoOverhead(script: String): Either[String, Long] =
     ScriptEstimatorV3(fixOverflow = true, overhead = false)(lets, functionCosts(V6), compile(script)(V6))
 
   property("multiple func calls") {

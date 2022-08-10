@@ -21,7 +21,7 @@ class RollbackSuite extends BaseFunSuite with TransferSending with TableDrivenPr
       .withSpecial(1, _.nonMiner)
       .buildNonConflicting()
 
-  private lazy val nodeAddresses        = nodeConfigs.map(_.getString("address")).toSet
+  private lazy val nodeAddresses = nodeConfigs.map(_.getString("address")).toSet
 
   private def notMinerAddress: String = notMiner.address
 

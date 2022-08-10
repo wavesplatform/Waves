@@ -9,27 +9,26 @@ import com.wavesplatform.database
 import com.wavesplatform.database.{DBExt, KeyTags, Keys}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Diff, Height, InvokeScriptResult}
 import com.wavesplatform.state.patch.CancelLeasesToDisabledAliases
 import com.wavesplatform.state.reader.LeaseDetails.Status
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Diff, Height, InvokeScriptResult}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.EthereumTransaction.Invocation
-import com.wavesplatform.transaction.{EthereumTransaction, TransactionType}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.transaction.{EthereumTransaction, TransactionType}
 import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
 
 trait CommonAccountsApi {
-  import CommonAccountsApi._
+  import CommonAccountsApi.*
 
   def balance(address: Address, confirmations: Int = 0): Long
 
   def effectiveBalance(address: Address, confirmations: Int = 0): Long
 
-  def balanceDetails(address: Address): BalanceDetails
+  def balanceDetails(address: Address): Either[String, BalanceDetails]
 
   def assetBalance(address: Address, asset: IssuedAsset): Long
 
@@ -39,9 +38,9 @@ trait CommonAccountsApi {
 
   def script(address: Address): Option[AccountScriptInfo]
 
-  def data(address: Address, key: String): Option[DataEntry[_]]
+  def data(address: Address, key: String): Option[DataEntry[?]]
 
-  def dataStream(address: Address, regex: Option[String]): Observable[DataEntry[_]]
+  def dataStream(address: Address, regex: Option[String]): Observable[DataEntry[?]]
 
   def activeLeases(address: Address): Observable[LeaseInfo]
 
@@ -50,7 +49,7 @@ trait CommonAccountsApi {
   def resolveAlias(alias: Alias): Either[ValidationError, Address]
 }
 
-object CommonAccountsApi extends ScorexLogging {
+object CommonAccountsApi {
   def includeNft(blockchain: Blockchain)(assetId: IssuedAsset): Boolean =
     !blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee) || !blockchain.assetDescription(assetId).exists(_.nft)
 
@@ -66,15 +65,17 @@ object CommonAccountsApi extends ScorexLogging {
       blockchain.effectiveBalance(address, confirmations)
     }
 
-    override def balanceDetails(address: Address): BalanceDetails = {
+    override def balanceDetails(address: Address): Either[String, BalanceDetails] = {
       val portfolio = blockchain.wavesPortfolio(address)
-      BalanceDetails(
-        portfolio.balance,
-        blockchain.generatingBalance(address),
-        portfolio.balance - portfolio.lease.out,
-        portfolio.effectiveBalance,
-        portfolio.lease.in,
-        portfolio.lease.out
+      portfolio.effectiveBalance.map(effectiveBalance =>
+        BalanceDetails(
+          portfolio.balance,
+          blockchain.generatingBalance(address),
+          portfolio.balance - portfolio.lease.out,
+          effectiveBalance,
+          portfolio.lease.in,
+          portfolio.lease.out
+        )
       )
     }
 
@@ -96,17 +97,17 @@ object CommonAccountsApi extends ScorexLogging {
 
     override def script(address: Address): Option[AccountScriptInfo] = blockchain.accountScript(address)
 
-    override def data(address: Address, key: String): Option[DataEntry[_]] =
+    override def data(address: Address, key: String): Option[DataEntry[?]] =
       blockchain.accountData(address, key)
 
-    override def dataStream(address: Address, regex: Option[String]): Observable[DataEntry[_]] = Observable.defer {
+    override def dataStream(address: Address, regex: Option[String]): Observable[DataEntry[?]] = Observable.defer {
       val pattern = regex.map(_.r.pattern)
       val entriesFromDiff = diff().accountData
         .get(address)
-        .fold[Map[String, DataEntry[_]]](Map.empty)(_.data.filter { case (k, _) => pattern.forall(_.matcher(k).matches()) })
+        .fold[Map[String, DataEntry[?]]](Map.empty)(_.data.filter { case (k, _) => pattern.forall(_.matcher(k).matches()) })
 
       val entries = db.readOnly { ro =>
-        ro.get(Keys.addressId(address)).fold(Seq.empty[DataEntry[_]]) { addressId =>
+        ro.get(Keys.addressId(address)).fold(Seq.empty[DataEntry[?]]) { addressId =>
           val filteredKeys = Set.newBuilder[String]
 
           ro.iterateOver(KeyTags.ChangedDataKeys.prefixBytes ++ addressId.toByteArray) { e =>
@@ -142,39 +143,42 @@ object CommonAccountsApi extends ScorexLogging {
               lt.id(),
               lt.sender.toAddress,
               blockchain.resolveAlias(lt.recipient).explicitGet(),
-              lt.amount,
+              lt.amount.value,
               leaseHeight,
               LeaseInfo.Status.Active
             )
           )
-        case inv @ TransactionMeta.Invoke(invokeHeight, originTransaction, true, _, Some(scriptResult)) =>
-          extractLeases(blockchain.resolveAlias(inv.transaction.dApp).explicitGet(), scriptResult, originTransaction.id(), invokeHeight)
+        case TransactionMeta.Invoke(invokeHeight, originTransaction, true, _, Some(scriptResult)) =>
+          extractLeases(address, scriptResult, originTransaction.id(), invokeHeight)
         case Ethereum(height, tx @ EthereumTransaction(inv: Invocation, _, _, _), true, _, _, Some(scriptResult)) =>
-          extractLeases(inv.dApp, scriptResult, tx.id(), height)
+          extractLeases(address, scriptResult, tx.id(), height)
         case _ => Seq()
       }
 
-    private def extractLeases(sender: Address, result: InvokeScriptResult, txId: ByteStr, height: Height): Seq[LeaseInfo] =
-      result.leases.collect {
-        case lease if leaseIsActive(lease.id) =>
-          LeaseInfo(
-            lease.id,
-            txId,
-            sender,
-            blockchain.resolveAlias(lease.recipient).explicitGet(),
-            lease.amount,
-            height,
-            LeaseInfo.Status.Active
-          )
-      } ++ {
-        result.invokes.flatMap(i => extractLeases(i.dApp, i.stateChanges, txId, height))
+    private def extractLeases(subject: Address, result: InvokeScriptResult, txId: ByteStr, height: Height): Seq[LeaseInfo] = {
+      (for {
+        lease   <- result.leases
+        details <- blockchain.leaseDetails(lease.id) if details.isActive
+        sender = details.sender.toAddress
+        recipient <- blockchain.resolveAlias(lease.recipient).toOption if subject == sender || subject == recipient
+      } yield LeaseInfo(
+        lease.id,
+        txId,
+        sender,
+        recipient,
+        lease.amount,
+        height,
+        LeaseInfo.Status.Active
+      )) ++ {
+        result.invokes.flatMap(i => extractLeases(subject, i.stateChanges, txId, height))
       }
+    }
 
     private def resolveDisabledAlias(leaseId: ByteStr): Either[ValidationError, Address] =
       CancelLeasesToDisabledAliases.patchData
         .get(leaseId)
-        .fold[Either[ValidationError, Address]](Left(GenericError("Unknown lease ID"))) {
-          case (_, recipientAddress) => Right(recipientAddress)
+        .fold[Either[ValidationError, Address]](Left(GenericError("Unknown lease ID"))) { case (_, recipientAddress) =>
+          Right(recipientAddress)
         }
 
     def leaseInfo(leaseId: ByteStr): Option[LeaseInfo] = blockchain.leaseDetails(leaseId) map { ld =>

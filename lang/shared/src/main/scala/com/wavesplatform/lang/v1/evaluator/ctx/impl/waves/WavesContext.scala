@@ -1,13 +1,15 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
-import cats.syntax.semigroup._
+import cats.syntax.semigroup.*
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.*
+import com.wavesplatform.lang.v1.compiler.Types.FINAL
+import com.wavesplatform.lang.v1.evaluator.ContextfulVal
 import com.wavesplatform.lang.v1.evaluator.ctx.BaseFunction
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Functions.{addressFromStringF, _}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Vals._
-import com.wavesplatform.lang.v1.traits._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Functions.*
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.*
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Vals.*
+import com.wavesplatform.lang.v1.traits.*
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
 
 object WavesContext {
@@ -42,38 +44,43 @@ object WavesContext {
   private val ctxCache = scala.collection.mutable.AnyRefMap.empty[(BaseGlobal, DirectiveSet), CTX[Environment]]
 
   private def variableCtxCache(global: BaseGlobal, ds: DirectiveSet) =
-    ctxCache.getOrElse((global, ds), ctxCache.synchronized {
-      ctxCache.getOrElseUpdate((global, ds), variableCtx(global, ds))
-    })
+    ctxCache.getOrElse(
+      (global, ds),
+      ctxCache.synchronized {
+        ctxCache.getOrElseUpdate((global, ds), variableCtx(global, ds))
+      }
+    )
 
   private def variableCtx(global: BaseGlobal, ds: DirectiveSet): CTX[Environment] = {
     val isTokenContext = ds.scriptType == Asset
     val proofsEnabled  = !isTokenContext
     val version        = ds.stdLibVersion
+    val types          = variableTypes(version, proofsEnabled)
+    val typeDefs       = types.view.map(t => t.name -> t).toMap
     CTX(
-      variableTypes(version, proofsEnabled),
+      types,
       variableVars(isTokenContext, version, ds.contentType, proofsEnabled),
-      variableFuncs(global, version, ds.scriptType, ds.contentType, proofsEnabled)
+      variableFuncs(global, ds, typeDefs, proofsEnabled)
     )
   }
 
-  private def fromV3Funcs(proofsEnabled: Boolean, v: StdLibVersion) =
+  private def fromV3Funcs(proofsEnabled: Boolean, v: StdLibVersion, typeDefs: Map[String, FINAL]) =
     extractedFuncs(v) ++ Array(
-      assetInfoF(v),
-      blockInfoByHeightF(v),
-      transferTxByIdF(proofsEnabled, v),
+      assetInfoF(v, typeDefs),
+      blockInfoByHeightF(v, typeDefs),
+      transferTxByIdF(proofsEnabled, v, typeDefs),
       stringFromAddressF
     )
 
-  private def fromV4Funcs(proofsEnabled: Boolean, version: StdLibVersion) =
-    fromV3Funcs(proofsEnabled, version) ++ Array(
+  private def fromV4Funcs(proofsEnabled: Boolean, version: StdLibVersion, typeDefs: Map[String, FINAL]) =
+    fromV3Funcs(proofsEnabled, version, typeDefs) ++ Array(
       calculateAssetIdF,
-      transactionFromProtoBytesF(proofsEnabled, version),
+      transactionFromProtoBytesF(proofsEnabled, version, typeDefs),
       simplifiedIssueActionConstructor,
       detailedIssueActionConstructor
     ) ++ balanceV4Functions
 
-  private def fromV5Funcs(proofsEnabled: Boolean, version: StdLibVersion, contentType: ContentType, scriptType: ScriptType) = {
+  private def fromV5Funcs(proofsEnabled: Boolean, ds: DirectiveSet, typeDefs: Map[String, FINAL]) = {
     val v5Funcs = Array(
       simplifiedLeaseActionConstructor,
       detailedLeaseActionConstructor,
@@ -82,18 +89,18 @@ object WavesContext {
     )
 
     val dAppFuncs =
-      if (contentType == DApp || scriptType == Call)
+      if (ds.contentType == DApp || ds.scriptType == Call)
         Array(callDAppF(reentrant = false), callDAppF(reentrant = true))
       else
         Array[BaseFunction[Environment]]()
 
     val accountFuncs =
-      if (scriptType == Account)
+      if (ds.scriptType == Account)
         selfCallFunctions(V5)
       else
         Array[BaseFunction[Environment]]()
 
-    fromV4Funcs(proofsEnabled, version) ++ v5Funcs ++ dAppFuncs ++ accountFuncs
+    fromV4Funcs(proofsEnabled, ds.stdLibVersion, typeDefs) ++ v5Funcs ++ dAppFuncs ++ accountFuncs
   }
 
   private def selfCallFunctions(v: StdLibVersion) =
@@ -104,7 +111,8 @@ object WavesContext {
       getStringFromStateSelfF
     ) ++ extractedStateSelfFuncs(v)
 
-  private def variableFuncs(global: BaseGlobal, version: StdLibVersion, scriptType: ScriptType, contentType: ContentType, proofsEnabled: Boolean) = {
+  private def variableFuncs(global: BaseGlobal, ds: DirectiveSet, typeDefs: Map[String, FINAL], proofsEnabled: Boolean) = {
+    val version = ds.stdLibVersion
     val commonFuncs =
       Array(
         getIntegerFromArrayF(version),
@@ -122,10 +130,10 @@ object WavesContext {
     val versionSpecificFuncs =
       version match {
         case V1 | V2 => Array(txByIdF(proofsEnabled, version)) ++ balanceV123Functions
-        case V3      => fromV3Funcs(proofsEnabled, version) ++ balanceV123Functions
-        case V4      => fromV4Funcs(proofsEnabled, version)
-        case V5      => fromV5Funcs(proofsEnabled, version, contentType, scriptType)
-        case V6      => fromV5Funcs(proofsEnabled, version, contentType, scriptType)
+        case V3      => fromV3Funcs(proofsEnabled, version, typeDefs) ++ balanceV123Functions
+        case V4      => fromV4Funcs(proofsEnabled, version, typeDefs)
+        case V5      => fromV5Funcs(proofsEnabled, ds, typeDefs)
+        case V6      => fromV5Funcs(proofsEnabled, ds, typeDefs)
       }
     commonFuncs ++ versionSpecificFuncs
   }
@@ -135,7 +143,7 @@ object WavesContext {
       version: StdLibVersion,
       contentType: ContentType,
       proofsEnabled: Boolean
-  ) = {
+  ): Map[String, (FINAL, ContextfulVal[Environment])] = {
     val txVal = tx(isTokenContext, version, proofsEnabled)
     version match {
       case V1 => Map(txVal)

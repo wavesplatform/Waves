@@ -9,11 +9,11 @@ inTask(docker)(
     dockerfile := NativeDockerfile(baseDirectory.value.getParentFile / "docker" / "Dockerfile"),
     buildOptions := BuildOptions(),
     dockerBuildArguments := Map(
-      "ENABLE_GRPC" -> "true",
+      "ENABLE_GRPC"   -> "true",
       "WAVES_NETWORK" -> "custom"
     )
   )
 )
 
 val packageAll = taskKey[Unit]("build all packages")
-docker := docker.dependsOn(LocalProject("root") / packageAll).value
+docker := docker.dependsOn(LocalProject("waves-node") / packageAll).value

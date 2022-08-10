@@ -1,8 +1,6 @@
 package com.wavesplatform.state.diffs.ci.sync
 
 import cats.instances.list.*
-import cats.instances.map.*
-import cats.syntax.semigroup.*
 import cats.syntax.traverse.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
@@ -13,9 +11,10 @@ import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.state.Portfolio
+import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.diffs.BlockDiffer.CurrentBlockFeePart
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, ci}
+import com.wavesplatform.state.{Diff, Portfolio}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -28,24 +27,24 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
 
   private def dApp(otherDApps: List[Address], paymentAsset: Option[IssuedAsset], transferAsset: Option[IssuedAsset], condition: String): Script =
     TestCompiler(V5).compileContract(s"""
-      | {-# STDLIB_VERSION 5       #-}
-      | {-# CONTENT_TYPE   DAPP    #-}
-      | {-# SCRIPT_TYPE    ACCOUNT #-}
-      |
-      | @Callable(i)
-      | func default() = {
-      |    if (
-      |      $condition
-      |    ) then {
-      |      let payment = ${paymentAsset.fold("[]")(id => s"[AttachedPayment(base58'$id', 1)]")}
-      |      let transfer = ${transferAsset.fold("[]")(id => s"[ScriptTransfer(i.caller, 1, base58'$id')]")}
-      |      ${otherDApps.mapWithIndex((a, i) => s""" strict r$i = invoke(Address(base58'$a'), "default", [], payment) """).mkString("\n")}
-      |      transfer
-      |    } else {
-      |      throw("Error raised")
-      |    }
-      | }
-      |""".stripMargin)
+                                        | {-# STDLIB_VERSION 5       #-}
+                                        | {-# CONTENT_TYPE   DAPP    #-}
+                                        | {-# SCRIPT_TYPE    ACCOUNT #-}
+                                        |
+                                        | @Callable(i)
+                                        | func default() = {
+                                        |    if (
+                                        |      $condition
+                                        |    ) then {
+                                        |      let payment = ${paymentAsset.fold("[]")(id => s"[AttachedPayment(base58'$id', 1)]")}
+                                        |      let transfer = ${transferAsset.fold("[]")(id => s"[ScriptTransfer(i.caller, 1, base58'$id')]")}
+                                        |      ${otherDApps.mapWithIndex((a, i) => s""" strict r$i = invoke(Address(base58'$a'), "default", [], payment) """).mkString("\n")}
+                                        |      transfer
+                                        |    } else {
+                                        |      throw("Error raised")
+                                        |    }
+                                        | }
+                                        |""".stripMargin)
 
   // ~1900 complexity
   private val verifierScript: Script = {
@@ -98,18 +97,18 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
       sequentialCalls: Boolean,
       invokeExpression: Boolean
   ): (Seq[Transaction], InvokeTransaction, IssuedAsset, Address) = {
-    val invoker = TxHelpers.signer(0)
+    val invoker  = TxHelpers.signer(0)
     val dAppAccs = (1 to dAppCount).map(idx => TxHelpers.signer(idx))
 
-      val fee = TxHelpers.ciFee(
-        sc = (if (withVerifier) 1 else 0) + (if (withPayment) 1 else 0) + (if (withThroughTransfer) 1 else 0),
-        freeCall = invokeExpression
-      )
+    val fee = TxHelpers.ciFee(
+      sc = (if (withVerifier) 1 else 0) + (if (withPayment) 1 else 0) + (if (withThroughTransfer) 1 else 0),
+      freeCall = invokeExpression
+    )
 
     val invokerGenesis = TxHelpers.genesis(invoker.toAddress)
-    val assetIssue = TxHelpers.issue(invoker, ENOUGH_AMT, script = Some(assetScript(if (raiseError) sigVerify else groth)), fee = fee)
-    val asset   = IssuedAsset(assetIssue.id())
-    val payment = List(Payment(1, asset))
+    val assetIssue     = TxHelpers.issue(invoker, ENOUGH_AMT, script = Some(assetScript(if (raiseError) sigVerify else groth)), fee = 1.waves)
+    val asset          = IssuedAsset(assetIssue.id())
+    val payment        = List(Payment(1, asset))
 
     val dAppGenesisTxs = dAppAccs.flatMap { dAppAcc =>
       List(
@@ -117,24 +116,23 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
         TxHelpers.transfer(invoker, dAppAcc.toAddress, 10, asset, fee = fee)
       )
     }
-    val setScriptTxs = dAppAccs.foldLeft(List.empty[SetScriptTransaction]) {
-      case (txs, currentAcc) =>
-        val isLast      = txs.size == dAppAccs.size - 1
-        val callPayment = if (withThroughPayment) Some(asset) else None
-        val transfer    = if (withThroughTransfer) Some(asset) else None
-        val condition   = if (raiseError) if (txs.nonEmpty) "true" else "false" else groth
-        val script =
-          if (sequentialCalls)
-            if (isLast)
-              dApp(txs.map(_.sender.toAddress), callPayment, transfer, condition)
-            else
-              dApp(Nil, callPayment, transfer, condition)
+    val setScriptTxs = dAppAccs.foldLeft(List.empty[SetScriptTransaction]) { case (txs, currentAcc) =>
+      val isLast      = txs.size == dAppAccs.size - 1
+      val callPayment = if (withThroughPayment) Some(asset) else None
+      val transfer    = if (withThroughTransfer) Some(asset) else None
+      val condition   = if (raiseError) if (txs.nonEmpty) "true" else "false" else groth
+      val script =
+        if (sequentialCalls)
+          if (isLast)
+            dApp(txs.map(_.sender.toAddress), callPayment, transfer, condition)
           else
-            dApp(txs.headOption.map(_.sender.toAddress).toList, callPayment, transfer, condition)
+            dApp(Nil, callPayment, transfer, condition)
+        else
+          dApp(txs.headOption.map(_.sender.toAddress).toList, callPayment, transfer, condition)
 
-        val nextTx = TxHelpers.setScript(currentAcc, script, fee)
-        nextTx :: txs
-      }
+      val nextTx = TxHelpers.setScript(currentAcc, script, fee)
+      nextTx :: txs
+    }
 
     val setVerifier = if (withVerifier) List(TxHelpers.setScript(invoker, verifierScript)) else Nil
 
@@ -171,9 +169,9 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
     val (preparingTxs, invokeTx, asset, lastCallingDApp) =
       scenario(dAppCount, withPayment, withThroughPayment, withThroughTransfer, withVerifier, raiseError, sequentialCalls, invokeExpression)
     assertDiffEi(
-      Seq(TestBlock.create(preparingTxs)),
+      Seq(TestBlock.create(preparingTxs), TestBlock.create(Seq.empty)),
       TestBlock.create(Seq(invokeTx), Block.ProtoBlockVersion),
-      RideV6.blockchainSettings.functionalitySettings
+      features(invokeExpression)
     ) { diffE =>
       if (reject) {
         diffE shouldBe Symbol("left")
@@ -189,23 +187,20 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
           diff.errorMessage(invokeTx.id()) shouldBe None
 
         val dAppAddress = invokeTx.dApp.asInstanceOf[Address]
-        val basePortfolios = Map(
-          TestBlock.defaultSigner.toAddress -> Portfolio(CurrentBlockFeePart(invokeTx.fee)),
-          invokeTx.sender.toAddress            -> Portfolio(-invokeTx.fee)
-        )
-        val paymentsPortfolios = Map(
-          invokeTx.sender.toAddress -> Portfolio(assets = Map(asset -> -1)),
-          dAppAddress            -> Portfolio(assets = Map(asset -> 1))
-        )
-        val throughTransfersPortfolios = Map(
-          invokeTx.sender.toAddress -> Portfolio(assets = Map(asset -> 1)),
-          lastCallingDApp        -> Portfolio(assets = Map(asset -> -1))
-        )
+        val basePortfolios =
+          Map(TestBlock.defaultSigner.toAddress -> Portfolio(CurrentBlockFeePart(invokeTx.fee.value))) |+|
+            Map(invokeTx.sender.toAddress       -> Portfolio(-invokeTx.fee.value))
+        val paymentsPortfolios =
+          Map(invokeTx.sender.toAddress -> Portfolio.build(asset, -1)) |+|
+            Map(dAppAddress             -> Portfolio.build(asset, 1))
+        val throughTransfersPortfolios =
+          Map(invokeTx.sender.toAddress -> Portfolio.build(asset, 1)) |+|
+            Map(lastCallingDApp         -> Portfolio.build(asset, -1))
         val throughPaymentsPortfolios =
-          Map(lastCallingDApp -> Portfolio(assets = Map(asset -> 1))) |+|
-            Map(dAppAddress   -> Portfolio(assets = Map(asset -> -1)))
+          Map(lastCallingDApp -> Portfolio.build(asset, 1)) |+|
+            Map(dAppAddress   -> Portfolio.build(asset, -1))
 
-        val overlappedPortfolio = Portfolio(assets = Map(asset -> 0))
+        val overlappedPortfolio = Portfolio.build(asset, 0)
         val emptyPortfolios     = Map.empty[Address, Portfolio]
 
         val additionalPortfolios =
@@ -218,6 +213,11 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
         diff.portfolios.filter(_._2 != overlappedPortfolio) shouldBe totalPortfolios.filter(_._2 != overlappedPortfolio)
       }
     }
+  }
+
+  private implicit class Ops(m: Map[Address, Portfolio]) {
+    def |+|(m2: Map[Address, Portfolio]): Map[Address, Portfolio] =
+      Diff.combine(m, m2).explicitGet()
   }
 
   property("complexity border") {
@@ -268,6 +268,14 @@ class SyncDAppComplexityCountTest extends PropSpec with WithDomain {
 
       assert(14, 0, raiseError = true, withThroughTransfer = true, reject = true, invokeExpression = b)
       assert(15, 1065, raiseError = true, withThroughTransfer = true, invokeExpression = b)
+    }
+  }
+
+  private def features(invokeExpression: Boolean): FunctionalitySettings = {
+    if (invokeExpression) {
+      ContinuationTransaction.blockchainSettings.functionalitySettings
+    } else {
+      RideV6.blockchainSettings.functionalitySettings
     }
   }
 }

@@ -7,7 +7,9 @@
  */
 
 import sbt.Def
-import sbt.Keys._
+import sbt.Keys.{concurrentRestrictions, _}
+
+import scala.collection.Seq
 
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
@@ -108,7 +110,7 @@ lazy val `repl-js` = repl.js.dependsOn(`lang-js`)
 
 lazy val `curve25519-test` = project.dependsOn(node)
 
-lazy val root = (project in file("."))
+lazy val `waves-node` = (project in file("."))
   .aggregate(
     `lang-js`,
     `lang-jvm`,
@@ -129,9 +131,9 @@ inScope(Global)(
     scalaVersion         := "2.13.8",
     organization         := "com.wavesplatform",
     organizationName     := "Waves Platform",
-    V.fallback           := (1, 4, 2),
     organizationHomepage := Some(url("https://wavesplatform.com")),
     licenses             := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
+    publish / skip       := true,
     scalacOptions ++= Seq(
       "-Xsource:3",
       "-feature",
@@ -148,11 +150,8 @@ inScope(Global)(
     ),
     crossPaths := false,
     dependencyOverrides ++= Dependencies.enforcedVersions.value,
-    cancelable := true,
+    cancelable        := true,
     parallelExecution := true,
-    Test / fork := true,
-    Test / testForkedParallel := true,
-    testListeners := Seq.empty, // Fix for doubled test reports
     /* http://www.scalatest.org/user_guide/using_the_runner
      * o - select the standard output reporter
      * I - show reminder of failed and canceled tests without stack traces
@@ -169,7 +168,8 @@ inScope(Global)(
       Resolver.mavenLocal
     ),
     Compile / doc / sources                := Seq.empty,
-    Compile / packageDoc / publishArtifact := false
+    Compile / packageDoc / publishArtifact := false,
+    concurrentRestrictions                 := Seq(Tags.limit(Tags.Test, math.min(EvaluateTask.SystemProcessors, 8)))
   )
 )
 
@@ -189,7 +189,7 @@ packageAll := {
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
 checkPRRaw := Def
   .sequential(
-    root / clean,
+    `waves-node` / clean,
     Def.task {
       (Test / compile).value
       (`lang-tests` / Test / test).value

@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs.smart
 
+import com.wavesplatform.TestValues.invokeFee
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
@@ -9,7 +10,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.EmptyDataEntry
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
-import com.wavesplatform.test.*
+import com.wavesplatform.test.{PropSpec, produce}
 import com.wavesplatform.transaction.{Transaction, TransactionType, TxHelpers, TxWithFee}
 
 class SmartAccountFeeTest extends PropSpec with WithDomain {
@@ -65,7 +66,7 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
     ))
 
   private val preconditions = {
-    val accountWithPaidVerifier = TxHelpers.signer(0)
+    val accountWithPaidVerifier  = TxHelpers.signer(0)
     val accountWithSmallVerifier = TxHelpers.signer(1)
     val accountWithEmptyVerifier = TxHelpers.signer(2)
 
@@ -80,21 +81,26 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
       TxHelpers.setScript(accountWithEmptyVerifier, scriptWithEmptyVerifier, fee = setScriptFee)
     )
 
-    val invokeFromPaidVerifier = () => TxHelpers.invoke(accountWithSmallVerifier.toAddress, invoker = accountWithPaidVerifier)
-    val invokeFromSmallVerifier = () => TxHelpers.invoke(accountWithPaidVerifier.toAddress, invoker = accountWithSmallVerifier)
-    val invokeFromEmptyVerifier = () => TxHelpers.invoke(accountWithPaidVerifier.toAddress, invoker = accountWithEmptyVerifier)
+    val invokeFromEnoughPaidVerifier = TxHelpers.invoke(accountWithSmallVerifier.toAddress, invoker = accountWithPaidVerifier, fee = invokeFee(1))
+    val invokeFromPaidVerifier       = () => TxHelpers.invoke(accountWithSmallVerifier.toAddress, invoker = accountWithPaidVerifier)
+    val invokeFromSmallVerifier      = () => TxHelpers.invoke(accountWithPaidVerifier.toAddress, invoker = accountWithSmallVerifier)
+    val invokeFromEmptyVerifier      = () => TxHelpers.invoke(accountWithPaidVerifier.toAddress, invoker = accountWithEmptyVerifier)
 
+    val transferFromEnoughPaidVerifier =
+      TxHelpers.transfer(accountWithPaidVerifier, accountWithSmallVerifier.toAddress, 1, fee = transferFee + ScriptExtraFee)
+    val transferFromPaidVerifier  = () => TxHelpers.transfer(accountWithPaidVerifier, accountWithSmallVerifier.toAddress, 1, fee = transferFee)
     val transferFromSmallVerifier = () => TxHelpers.transfer(accountWithSmallVerifier, accountWithPaidVerifier.toAddress, 1, fee = transferFee)
-    val transferFromPaidVerifier = () => TxHelpers.transfer(accountWithPaidVerifier, accountWithSmallVerifier.toAddress, 1, fee = transferFee)
     val transferFromEmptyVerifier = () => TxHelpers.transfer(accountWithEmptyVerifier, accountWithSmallVerifier.toAddress, 1, fee = transferFee)
 
-    val dataFromSmallVerifier = () => TxHelpers.dataV2(accountWithSmallVerifier, Seq(EmptyDataEntry("key")), fee = transferFee)
-    val dataFromPaidVerifier = () => TxHelpers.dataV2(accountWithPaidVerifier, Seq(EmptyDataEntry("key")), fee = transferFee)
-    val dataFromEmptyVerifier = () => TxHelpers.dataV2(accountWithEmptyVerifier, Seq(EmptyDataEntry("key")), fee = transferFee)
+    val dataFromEnoughPaidVerifier = TxHelpers.dataV2(accountWithPaidVerifier, Seq(EmptyDataEntry("key")), fee = transferFee + ScriptExtraFee)
+    val dataFromPaidVerifier       = () => TxHelpers.dataV2(accountWithPaidVerifier, Seq(EmptyDataEntry("key")), fee = transferFee)
+    val dataFromSmallVerifier      = () => TxHelpers.dataV2(accountWithSmallVerifier, Seq(EmptyDataEntry("key")), fee = transferFee)
+    val dataFromEmptyVerifier      = () => TxHelpers.dataV2(accountWithEmptyVerifier, Seq(EmptyDataEntry("key")), fee = transferFee)
 
     (
       balances,
       setScript,
+      List(invokeFromEnoughPaidVerifier, transferFromEnoughPaidVerifier, dataFromEnoughPaidVerifier),
       List(invokeFromPaidVerifier, transferFromPaidVerifier, dataFromPaidVerifier),
       List(
         invokeFromSmallVerifier,
@@ -110,30 +116,26 @@ class SmartAccountFeeTest extends PropSpec with WithDomain {
   private def appendAndAssertNotEnoughFee(tx: Transaction & TxWithFee, d: Domain) = {
     d.appendBlockE(tx) should produce(
       "TransactionValidationError(cause = GenericError(Transaction sent from smart account. " +
-        s"Requires $ScriptExtraFee extra fee.. " +
+        s"Requires $ScriptExtraFee extra fee. " +
         s"Fee for ${tx.tpe.transactionName} (${tx.fee} in WAVES) " +
         s"does not exceed minimal value of ${FeeConstants(tx.tpe) * FeeUnit + ScriptExtraFee} WAVES.)"
     )
   }
 
-  private def assertNoError(tx: Transaction, d: Domain) =
-    d.blockchain.bestLiquidDiff.get.errorMessage(tx.id()) shouldBe None
-
   property(s"small verifier is free after ${BlockchainFeatures.SynchronousCalls} activation") {
-    val (balances, preparingTxs, paidVerifierTxs, freeVerifierTxs) = preconditions
+    val (balances, preparingTxs, enoughPaidVerifierTxs, notEnoughPaidVerifierTxs, freeVerifierTxs) = preconditions
     withDomain(domainSettingsWithFS(features), balances) { d =>
       d.appendBlock(preparingTxs*)
 
-      (paidVerifierTxs ::: freeVerifierTxs).foreach(tx => appendAndAssertNotEnoughFee(tx(), d))
+      (notEnoughPaidVerifierTxs ::: freeVerifierTxs).foreach(tx => appendAndAssertNotEnoughFee(tx(), d))
+      d.appendBlock(enoughPaidVerifierTxs: _*)
 
-      d.appendBlock()
       d.appendBlock()
       d.blockchain.height shouldBe activationHeight
       d.blockchain.bestLiquidDiff.get.scriptsRun shouldBe 0
 
-      paidVerifierTxs.foreach(tx => appendAndAssertNotEnoughFee(tx(), d))
-      d.appendBlock(freeVerifierTxs.map(_())*)
-      freeVerifierTxs.foreach(tx => assertNoError(tx(), d))
+      notEnoughPaidVerifierTxs.foreach(tx => appendAndAssertNotEnoughFee(tx(), d))
+      d.appendAndAssertSucceed(freeVerifierTxs.map(_())*)
       d.blockchain.bestLiquidDiff.get.scriptsRun shouldBe freeVerifierTxs.size
     }
   }

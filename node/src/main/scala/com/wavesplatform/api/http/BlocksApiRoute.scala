@@ -68,12 +68,12 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
         complete(commonApi.meta(id).map(_.json()).toRight(BlockDoesNotExist))
       }
     } ~ path("heightByTimestamp" / LongNumber) { timestamp =>
-      val heightE = (for {
+      val heightE = for {
         _ <- Either.cond(timestamp <= time.correctedTime(), (), "Indicated timestamp belongs to the future")
         genesisTimestamp = commonApi.metaAtHeight(1).fold(0L)(_.header.timestamp)
-        _ <- Either.cond(timestamp >= genesisTimestamp, (), "Indicated timestamp is before the start of the blockchain")
+        _      <- Either.cond(timestamp >= genesisTimestamp, (), "Indicated timestamp is before the start of the blockchain")
         result <- Try(heightByTimestamp(timestamp)).toEither.leftMap(_.getMessage)
-      } yield result)
+      } yield result
 
       complete(heightE.bimap(GenericError(_), h => Json.obj("height" -> h)))
     } ~ path(BlockId) { id =>
@@ -82,10 +82,11 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
   }
 
   private def at(height: Int, includeTransactions: Boolean): StandardRoute = {
-    val result = if (includeTransactions)
-      commonApi.blockAtHeight(height).map(toJson)
-    else
-      commonApi.metaAtHeight(height).map(_.json())
+    val result =
+      if (includeTransactions)
+        commonApi.blockAtHeight(height).map(toJson)
+      else
+        commonApi.metaAtHeight(height).map(_.json())
 
     complete(result.toRight(BlockDoesNotExist))
   }

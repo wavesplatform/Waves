@@ -96,7 +96,8 @@ class ConfigSettingsValidator(config: Config) {
   }
 
   def validateByPredicateWithDefault[T: ValueReader](
-      settingName: String)(predicate: T => Boolean, errorMsg: String, defaultValue: T): ErrorsListOr[T] = {
+      settingName: String
+  )(predicate: T => Boolean, errorMsg: String, defaultValue: T): ErrorsListOr[T] = {
     validateWithDefault[T](settingName, defaultValue, showError = true).ensure(createError(settingName, errorMsg))(predicate)
   }
 }

@@ -157,9 +157,9 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
     Table(
       ("assetVal", "decimals", "message"),
       (0L, 2, "non-positive amount"),
-      (1L, IssueTransaction.MaxAssetDecimals + 1, "Too big sequence requested"),
+      (1L, IssueTransaction.MaxAssetDecimals + 1, "invalid decimals value: 9, decimals should be in interval \\[0; 8\\]"),
       (-1L, 1, "non-positive amount"),
-      (1L, -1, "Too big sequence requested")
+      (1L, -1, "invalid decimals value: -1, decimals should be in interval \\[0; 8\\]")
     )
 
   forAll(invalidAssetValue) { (assetVal: Long, decimals: Int, error: String) =>
@@ -173,6 +173,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
       )
     }
   }
+
   val tooSmallAssetName = Random.alphanumeric.filter(_.isLetter).take(IssueTransaction.MinAssetNameLength - 1).mkString
   val tooBigAssetName   = Random.alphanumeric.filter(_.isLetter).take(IssueTransaction.MaxAssetNameLength + 1).mkString
   val invalid_assets_names =
@@ -201,8 +202,9 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
     )
   }
 
-  def scriptText(version: Int): Either[Array[Byte], Option[Script]] = Right(version match {
-    case 2 => Some(script)
-    case _ => None
-  })
+  def scriptText(version: Int): Either[Array[Byte], Option[Script]] =
+    Right(version match {
+      case 2 => Some(script)
+      case _ => None
+    })
 }

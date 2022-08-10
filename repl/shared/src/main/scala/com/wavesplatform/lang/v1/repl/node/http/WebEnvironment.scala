@@ -1,31 +1,30 @@
 package com.wavesplatform.lang.v1.repl.node.http
 
-import scala.concurrent.{ExecutionContext, Future}
-
-import cats.{Functor, Id}
 import cats.implicits.*
+import cats.{Functor, Id}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.repl.node.http.NodeClient.*
 import com.wavesplatform.lang.v1.repl.node.http.response.ImplicitMappings
 import com.wavesplatform.lang.v1.repl.node.http.response.model.*
 import com.wavesplatform.lang.v1.repl.node.http.response.model.Transaction.*
-import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.traits.Environment.{BalanceDetails, InputEntity}
-import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
-import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
+import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import io.circe.{Decoder, HCursor}
 import monix.eval.Coeval
 import shapeless.Coproduct
 
+import scala.concurrent.{ExecutionContext, Future}
+
 //noinspection NotImplementedCode
-private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extends Environment[Future] {
+private[repl] case class WebEnvironment(settings: NodeConnectionSettings, client: NodeClient) extends Environment[Future] {
   import WebEnvironment.*
 
-  private val client   = NodeClient(settings.normalizedUrl)
   private val mappings = ImplicitMappings(settings.chainId)
   import mappings.*
 

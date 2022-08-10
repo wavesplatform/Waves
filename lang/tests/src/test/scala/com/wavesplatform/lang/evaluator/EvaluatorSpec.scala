@@ -1,11 +1,12 @@
 package com.wavesplatform.lang.evaluator
 
+import cats.implicits.*
 import cats.Id
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.{Common, ExecutionError}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.directives.values.*
-import com.wavesplatform.lang.utils.{lazyContexts, lazyContextsAll}
+import com.wavesplatform.lang.utils.lazyContexts
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV2, Log}
@@ -53,7 +54,7 @@ abstract class EvaluatorSpec extends PropSpec with ScriptGen with Inside {
       for {
         compiled <- toExpr(version)
         (_, cost, result) = evalExpr(compiled, version, useNewPowPrecision)
-        evaluated <- result
+        evaluated <- result.leftMap(_.message)
       } yield (evaluated, cost)
 
     val results = (for {
@@ -71,13 +72,13 @@ abstract class EvaluatorSpec extends PropSpec with ScriptGen with Inside {
   }
 
   private def evalExpr(expr: EXPR, version: StdLibVersion, useNewPowPrecision: Boolean): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
-    val ctx     = lazyContextsAll(DirectiveSet(version, Account, Expression).explicitGet() -> useNewPowPrecision).value()
+    val ctx     = lazyContexts(DirectiveSet(version, Account, Expression).explicitGet() -> useNewPowPrecision).value()
     val evalCtx = ctx.evaluationContext(Common.emptyBlockchainEnvironment())
     EvaluatorV2.applyCompleted(evalCtx, expr, version, correctFunctionCallScope = true, newMode = true)
   }
 
   def compile(code: String, version: StdLibVersion): Either[String, EXPR] = {
-    val ctx    = lazyContexts(DirectiveSet(version, Account, Expression).explicitGet()).value()
+    val ctx    = lazyContexts(DirectiveSet(version, Account, Expression).explicitGet() -> true).value()
     val parsed = Parser.parseExpr(code).get.value
     ExpressionCompiler(ctx.compilerContext, parsed, allowIllFormedStrings = true).map(_._1)
   }

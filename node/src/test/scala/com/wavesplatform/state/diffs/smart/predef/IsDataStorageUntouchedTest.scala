@@ -28,17 +28,17 @@ class IsDataStorageUntouchedTest extends PropSpec with WithDomain {
   )
 
   private val scenario = {
-    val master = TxHelpers.signer(0)
+    val master  = TxHelpers.signer(0)
     val invoker = TxHelpers.signer(1)
 
     val genesis = Seq(
       TxHelpers.genesis(master.toAddress),
       TxHelpers.genesis(invoker.toAddress)
     )
-    val dataTx = TxHelpers.dataV2(master, Seq(BooleanDataEntry("q", true)))
+    val dataTx       = TxHelpers.dataV2(master, Seq(BooleanDataEntry("q", true)))
     val deleteDataTx = TxHelpers.dataV2(master, Seq(EmptyDataEntry("q")))
-    val setScript = TxHelpers.setScript(master, contract)
-    val invoke = TxHelpers.invoke(master.toAddress, invoker = invoker)
+    val setScript    = TxHelpers.setScript(master, contract)
+    val invoke       = TxHelpers.invoke(master.toAddress, invoker = invoker)
 
     (genesis :+ setScript, dataTx, deleteDataTx, invoke, master.toAddress)
   }

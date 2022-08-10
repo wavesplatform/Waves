@@ -1,18 +1,17 @@
 package com.wavesplatform.api.http
 
-import java.util.concurrent.{LinkedBlockingQueue, RejectedExecutionException, ThreadPoolExecutor, TimeUnit}
-
-import akka.http.scaladsl.model.HttpMethods._
-import akka.http.scaladsl.model._
-import akka.http.scaladsl.model.headers._
-import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.model.*
+import akka.http.scaladsl.model.HttpMethods.*
+import akka.http.scaladsl.model.headers.*
+import akka.http.scaladsl.server.*
+import akka.http.scaladsl.server.Directives.*
 import akka.http.scaladsl.server.RouteResult.Complete
-import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.util.concurrent.DefaultThreadFactory
 
+import java.util.concurrent.{LinkedBlockingQueue, RejectedExecutionException, ThreadPoolExecutor, TimeUnit}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService}
 import scala.io.Source
 
@@ -27,7 +26,8 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
       60,
       TimeUnit.SECONDS,
       new LinkedBlockingQueue[Runnable],
-      new DefaultThreadFactory("rest-heavy-request-processor", true), { (r: Runnable, executor: ThreadPoolExecutor) =>
+      new DefaultThreadFactory("rest-heavy-request-processor", true),
+      { (r: Runnable, executor: ThreadPoolExecutor) =>
         log.error(s"$r has been rejected from $executor")
         throw new RejectedExecutionException
       }
@@ -50,6 +50,8 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
 
   val loggingCompositeRoute: Route = Route.seal(DebuggingDirectives.logRequestResult(LoggingMagnet(_ => logRequestResponse))(compositeRoute))
 
+  private val CorsAllowAllOrigin = "origin-from-request"
+
   private def logRequestResponse(req: HttpRequest)(res: RouteResult): Unit = res match {
     case Complete(resp) =>
       val msg = s"HTTP ${resp.status.value} from ${req.method.value} ${req.uri}"
@@ -57,27 +59,39 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
     case _ =>
   }
 
-  private val corsAllowedHeaders = (if (settings.apiKeyDifferentHost) List("api_key", "X-API-Key") else List.empty[String]) ++
-    Seq("Authorization", "Content-Type", "X-Requested-With", "Timestamp", "Signature")
+  private def preflightCorsHeaders(requestOrigin: Option[Origin]): Seq[HttpHeader] =
+    requestOrigin
+      .flatMap(_.origins.headOption)
+      .fold(Seq[HttpHeader]()) { _ =>
+        Seq(
+          `Access-Control-Allow-Headers`(settings.corsHeaders.accessControlAllowHeaders),
+          `Access-Control-Allow-Methods`(settings.corsHeaders.accessControlAllowMethods.flatMap(getForKeyCaseInsensitive))
+        )
+      }
 
-  private def corsAllowAll =
-    if (settings.cors) respondWithHeaders(`Access-Control-Allow-Credentials`(true),
-      `Access-Control-Allow-Headers`(corsAllowedHeaders),
-      `Access-Control-Allow-Methods`(OPTIONS, POST, PUT, GET, DELETE),
-      `Access-Control-Allow-Origin`(HttpOrigin("http://localhost:8080"))) else pass
+  private def corsHeaders(requestOrigin: Option[Origin]): Seq[HttpHeader] =
+    requestOrigin
+      .flatMap(_.origins.headOption)
+      .fold(Seq[HttpHeader]()) { requestOriginValue =>
+        val responseOrigin =
+          settings.corsHeaders.accessControlAllowOrigin match {
+            case "*"                => `Access-Control-Allow-Origin`.*
+            case CorsAllowAllOrigin => `Access-Control-Allow-Origin`(requestOriginValue)
+            case origin             => `Access-Control-Allow-Origin`(origin)
+          }
+        Seq(responseOrigin, `Access-Control-Allow-Credentials`(settings.corsHeaders.accessControlAllowCredentials))
+      }
 
   private def extendRoute(base: Route): Route = handleAllExceptions {
-    if (settings.cors) { ctx =>
-      val extendedRoute = options {
-        respondWithDefaultHeaders(
-          `Access-Control-Allow-Credentials`(true),
-          `Access-Control-Allow-Headers`(corsAllowedHeaders),
-          `Access-Control-Allow-Methods`(OPTIONS, POST, PUT, GET, DELETE)
-        )(corsAllowAll(complete(StatusCodes.OK)))
-      } ~ corsAllowAll(base)
-
-      extendedRoute(ctx)
-    } else base
+    optionalHeaderValueByType(Origin) { maybeOrigin =>
+      respondWithDefaultHeaders(corsHeaders(maybeOrigin)) {
+        options {
+          respondWithDefaultHeaders(preflightCorsHeaders(maybeOrigin)) {
+            complete(StatusCodes.OK)
+          }
+        } ~ base
+      }
+    }
   }
 
   private[this] lazy val patchedSwaggerJson = {

@@ -23,7 +23,7 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
     sender.transfer(sender.keyPair, address, 1, waitForTx = true)
     nodes.waitForHeightArise()
 
-    val Seq(_, h2, _) = sender.debugBalanceHistory(address): @unchecked
+    val Seq(_, h2, _)     = sender.debugBalanceHistory(address): @unchecked
     val Seq((_, balance)) = sender.accountsBalances(Some(h2.height), Seq(address)): @unchecked
     balance shouldBe 2
   }

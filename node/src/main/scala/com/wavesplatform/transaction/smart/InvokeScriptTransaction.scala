@@ -1,17 +1,17 @@
 package com.wavesplatform.transaction.smart
 
-import com.wavesplatform.account._
+import com.wavesplatform.account.*
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.state.diffs.invoke.{InvokeScriptLike, InvokeScriptTransactionLike}
-import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.InvokeScriptTxValidator
 import monix.eval.Coeval
-import play.api.libs.json._
+import play.api.libs.json.*
 
 import scala.util.Try
 
@@ -21,9 +21,9 @@ case class InvokeScriptTransaction(
     dApp: AddressOrAlias,
     funcCallOpt: Option[FUNCTION_CALL],
     payments: Seq[Payment],
-    fee: TxAmount,
+    fee: TxPositiveAmount,
     feeAssetId: Asset,
-    override val timestamp: TxTimestamp,
+    timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
 ) extends Transaction(TransactionType.InvokeScript, payments.collect(InvokeScriptLike.IssuedAssets))
@@ -37,7 +37,6 @@ case class InvokeScriptTransaction(
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(InvokeScriptTxSerializer.bodyBytes(this))
   val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(InvokeScriptTxSerializer.toBytes(this))
   val json: Coeval[JsObject]         = Coeval.evalOnce(InvokeScriptTxSerializer.toJson(this))
-
 }
 
 object InvokeScriptTransaction extends TransactionParser {
@@ -54,7 +53,7 @@ object InvokeScriptTransaction extends TransactionParser {
   override def parseBytes(bytes: Array[Byte]): Try[InvokeScriptTransaction] =
     InvokeScriptTxSerializer.parseBytes(bytes)
 
-  case class Payment(amount: TxAmount, assetId: Asset)
+  case class Payment(amount: Long, assetId: Asset)
   object Payment {
     implicit val jsonFormat: Format[Payment] = Json.format
   }
@@ -65,11 +64,14 @@ object InvokeScriptTransaction extends TransactionParser {
       dappAddress: AddressOrAlias,
       fc: Option[FUNCTION_CALL],
       p: Seq[Payment],
-      fee: TxAmount,
+      fee: Long,
       feeAssetId: Asset,
       timestamp: TxTimestamp,
       proofs: Proofs,
       chainId: Byte
   ): Either[ValidationError, InvokeScriptTransaction] =
-    InvokeScriptTransaction(version, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, proofs, chainId).validatedEither
+    for {
+      fee <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
+      tx  <- InvokeScriptTransaction(version, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, proofs, chainId).validatedEither
+    } yield tx
 }

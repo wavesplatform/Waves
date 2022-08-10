@@ -1,11 +1,9 @@
 package com.wavesplatform.lang.v1.evaluator
 
 import cats.Id
-import cats.instances.either._
-import cats.instances.list._
-import cats.syntax.traverse._
+import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.ExecutionError
+import com.wavesplatform.lang.{ExecutionError, CommonError}
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5}
 import com.wavesplatform.lang.v1.compiler.ScriptResultSource.CallableFunction
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -38,11 +36,11 @@ object ScriptResult {
   private def err[A](actual: AnyRef, version: StdLibVersion, expected: String = ""): Either[ExecutionError, A] =
     Types
       .callableReturnType(version)
-      .flatMap(
-        t =>
-          Left(
-            callableResultError(t, actual, CallableFunction) + (if (expected.isEmpty) "" else s" instead of $expected")
-          )
+      .leftMap(CommonError)
+      .flatMap(t =>
+        Left(
+          callableResultError(t, actual, CallableFunction) + (if (expected.isEmpty) "" else s" instead of $expected")
+        )
       )
 
   private def processDataEntryV3(fields: Map[String, EVALUATED]): Either[ExecutionError, DataItem[_]] =
@@ -92,7 +90,7 @@ object ScriptResult {
       constructor(key, valueExtractor(value))
   }
 
-  private def processDeleteEntry(fields: Map[String, EVALUATED], version: StdLibVersion): Either[String, DataItem.Delete] =
+  private def processDeleteEntry(fields: Map[String, EVALUATED], version: StdLibVersion): Either[ExecutionError, DataItem.Delete] =
     fields.get(FieldNames.Key) match {
       case Some(CONST_STRING(key)) => Right(DataItem.Delete(key))
       case other                   => err(other, version, FieldNames.DeleteEntry)
@@ -114,26 +112,28 @@ object ScriptResult {
           recipient <- processRecipient(recipient, ctx, version)
           address <- recipient match {
             case a: Address  => Right(a)
-            case Alias(name) => ctx.environment.resolveAlias(name)
+            case Alias(name) => ctx.environment.resolveAlias(name).leftMap(CommonError)
           }
         } yield AssetTransfer(address, recipient, b, token)
       case other =>
         err(other, version, FieldNames.ScriptTransfer)
     }
 
-  private def processRecipient(obj: CaseObj, ctx: EvaluationContext[Environment, Id], version: StdLibVersion): Either[String, Recipient] =
+  private def processRecipient(obj: CaseObj, ctx: EvaluationContext[Environment, Id], version: StdLibVersion): Either[ExecutionError, Recipient] =
     if (obj.caseType.name == Types.addressType.name)
       obj.fields("bytes") match {
         case CONST_BYTESTR(addBytes) => Right(Address(addBytes))
         case other                   => err(s"can't reconstruct address from $other", version)
-      } else if (obj.caseType.name == Types.aliasType.name && ctx.environment.multiPaymentAllowed)
+      }
+    else if (obj.caseType.name == Types.aliasType.name && ctx.environment.multiPaymentAllowed)
       obj.fields("alias") match {
         case CONST_STRING(alias) => Right(Alias(alias))
         case other               => err(s"can't reconstruct alias from $other", version)
-      } else
+      }
+    else
       err(obj, version, FieldNames.Recipient)
 
-  private def processWriteSetV3(fields: Map[String, EVALUATED]): Either[String, List[DataItem[_]]] =
+  private def processWriteSetV3(fields: Map[String, EVALUATED]): Either[ExecutionError, List[DataItem[_]]] =
     fields(FieldNames.Data) match {
       case ARR(xs) =>
         xs.toList.traverse {
@@ -143,7 +143,10 @@ object ScriptResult {
       case other => err(other, V3, s"List(${FieldNames.Data})")
     }
 
-  private def processTransferSetV3(ctx: EvaluationContext[Environment, Id], fields: Map[String, EVALUATED]): Either[String, List[AssetTransfer]] =
+  private def processTransferSetV3(
+      ctx: EvaluationContext[Environment, Id],
+      fields: Map[String, EVALUATED]
+  ): Either[ExecutionError, List[AssetTransfer]] =
     fields(FieldNames.Transfers) match {
       case ARR(xs) =>
         xs.toList.traverse {
@@ -157,7 +160,7 @@ object ScriptResult {
       ctx: EvaluationContext[Environment, Id],
       fields: Map[String, EVALUATED],
       unusedComplexity: Int
-  ): Either[String, ScriptResultV3] = {
+  ): Either[ExecutionError, ScriptResultV3] = {
     val writes = fields(FieldNames.ScriptWriteSet) match {
       case CaseObj(tpe, fields) if tpe.name == FieldNames.WriteSet => processWriteSetV3(fields)
       case other                                                   => err(other, V3, FieldNames.Data)
@@ -185,7 +188,7 @@ object ScriptResult {
       case f                       => err(f, V3)
     }
 
-  private def processIssue(input: ActionInput): Either[String, Issue] = {
+  private def processIssue(input: ActionInput): Either[ExecutionError, Issue] = {
     val (_, parentId, fields) = input
     (
       fields.get(FieldNames.IssueQuantity),
@@ -197,13 +200,13 @@ object ScriptResult {
       fields.get(FieldNames.IssueNonce)
     ) match {
       case (
-          Some(CONST_LONG(quantity)),
-          Some(CONST_LONG(decimals)),
-          Some(CONST_STRING(name)),
-          Some(CONST_STRING(description)),
-          Some(script),
-          Some(CONST_BOOLEAN(isReissuable)),
-          Some(CONST_LONG(nonce))
+            Some(CONST_LONG(quantity)),
+            Some(CONST_LONG(decimals)),
+            Some(CONST_STRING(name)),
+            Some(CONST_STRING(description)),
+            Some(script),
+            Some(CONST_BOOLEAN(isReissuable)),
+            Some(CONST_LONG(nonce))
           ) =>
         if (script == unit) {
           if (0 <= decimals && decimals <= 8) {
@@ -218,23 +221,23 @@ object ScriptResult {
     }
   }
 
-  private def processReissue(fields: Map[String, EVALUATED], version: StdLibVersion): Either[String, Reissue] =
+  private def processReissue(fields: Map[String, EVALUATED], version: StdLibVersion): Either[ExecutionError, Reissue] =
     (
       fields.get(FieldNames.ReissueAssetId),
       fields.get(FieldNames.ReissueQuantity),
       fields.get(FieldNames.ReissueIsReissuable)
     ) match {
       case (
-          Some(CONST_BYTESTR(assetId)),
-          Some(CONST_LONG(quantity)),
-          Some(CONST_BOOLEAN(isReissuable))
+            Some(CONST_BYTESTR(assetId)),
+            Some(CONST_LONG(quantity)),
+            Some(CONST_BOOLEAN(isReissuable))
           ) =>
         Right(Reissue(assetId, isReissuable, quantity))
       case other =>
         err(other, version, FieldNames.Reissue)
     }
 
-  private def processBurn(fields: Map[String, EVALUATED], version: StdLibVersion): Either[String, Burn] =
+  private def processBurn(fields: Map[String, EVALUATED], version: StdLibVersion): Either[ExecutionError, Burn] =
     (fields.get(FieldNames.BurnAssetId), fields.get(FieldNames.BurnQuantity)) match {
       case (Some(CONST_BYTESTR(assetId)), Some(CONST_LONG(quantity))) =>
         Right(Burn(assetId, quantity))
@@ -242,7 +245,7 @@ object ScriptResult {
         err(other, version, FieldNames.Burn)
     }
 
-  private def processSponsorFee(fields: Map[String, EVALUATED], version: StdLibVersion): Either[String, SponsorFee] =
+  private def processSponsorFee(fields: Map[String, EVALUATED], version: StdLibVersion): Either[ExecutionError, SponsorFee] =
     (fields.get(FieldNames.SponsorFeeAssetId), fields.get(FieldNames.SponsorFeeMinFee)) match {
       case (Some(CONST_BYTESTR(assetId)), Some(minFeeOpt)) =>
         val minFeeValueOpt = minFeeOpt match {
@@ -255,7 +258,11 @@ object ScriptResult {
         err(other, version, FieldNames.SponsorFee)
     }
 
-  private def processLease(ctx: EvaluationContext[Environment, Id], fields: Map[String, EVALUATED], version: StdLibVersion): Either[String, Lease] =
+  private def processLease(
+      ctx: EvaluationContext[Environment, Id],
+      fields: Map[String, EVALUATED],
+      version: StdLibVersion
+  ): Either[ExecutionError, Lease] =
     (fields.get(FieldNames.LeaseRecipient), fields.get(FieldNames.LeaseAmount), fields.get(FieldNames.LeaseNonce)) match {
       case (Some(recipient: CaseObj), Some(CONST_LONG(quantity)), Some(CONST_LONG(nonce))) =>
         processRecipient(recipient, ctx, version)
@@ -264,7 +271,7 @@ object ScriptResult {
         err(other, version, FieldNames.Lease)
     }
 
-  private def processLeaseCancel(fields: Map[String, EVALUATED], version: StdLibVersion): Either[String, LeaseCancel] =
+  private def processLeaseCancel(fields: Map[String, EVALUATED], version: StdLibVersion): Either[ExecutionError, LeaseCancel] =
     fields.get(FieldNames.LeaseId) match {
       case Some(CONST_BYTESTR(leaseId)) =>
         Right(LeaseCancel(leaseId))
@@ -280,7 +287,7 @@ object ScriptResult {
       version: StdLibVersion,
       unusedComplexity: Int,
       ret: EVALUATED = unit
-  ): Either[String, ScriptResultV4] =
+  ): Either[ExecutionError, ScriptResultV4] =
     actions.toList
       .traverse {
         case obj @ CaseObj(actionType, fields) =>
@@ -310,7 +317,7 @@ object ScriptResult {
   private def fromV5ActionHandlers(v: StdLibVersion): ActionHandlers =
     Map(
       FieldNames.Lease       -> { case (ctx, _, fields) => processLease(ctx, fields, v) },
-      FieldNames.LeaseCancel -> { case (_, _, fields)   => processLeaseCancel(fields, v) }
+      FieldNames.LeaseCancel -> { case (_, _, fields) => processLeaseCancel(fields, v) }
     )
 
   private val v4ActionHandlers = fromV4ActionHandlers(V4)

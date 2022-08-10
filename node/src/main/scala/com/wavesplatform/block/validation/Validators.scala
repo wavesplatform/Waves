@@ -40,7 +40,7 @@ object Validators {
         GenericError("Passed genesis signature is not valid")
       )
       // Verify initial balance
-      txsSum = block.transactionData.collect { case tx: GenesisTransaction => tx.amount }.reduce(Math.addExact(_: Long, _: Long))
+      txsSum = block.transactionData.collect { case tx: GenesisTransaction => tx.amount.value }.reduce(Math.addExact(_: Long, _: Long))
       _ <- Either.cond(
         txsSum == genesisSettings.initialBalance,
         (),

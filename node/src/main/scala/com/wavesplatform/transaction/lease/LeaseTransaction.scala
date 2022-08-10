@@ -15,8 +15,8 @@ final case class LeaseTransaction(
     version: TxVersion,
     sender: PublicKey,
     recipient: AddressOrAlias,
-    amount: TxAmount,
-    fee: TxAmount,
+    amount: TxPositiveAmount,
+    fee: TxPositiveAmount,
     timestamp: TxTimestamp,
     proofs: Proofs,
     chainId: Byte
@@ -49,19 +49,25 @@ object LeaseTransaction extends TransactionParser {
       version: TxVersion,
       sender: PublicKey,
       recipient: AddressOrAlias,
-      amount: TxAmount,
-      fee: TxAmount,
+      amount: Long,
+      fee: Long,
       timestamp: TxTimestamp,
       proofs: Proofs
-  ): Either[ValidationError, TransactionT] =
-    LeaseTransaction(version, sender, recipient, amount, fee, timestamp, proofs, recipient.chainId).validatedEither
+  ): Either[ValidationError, TransactionT] = {
+    for {
+      fee    <- TxPositiveAmount(fee)(TxValidationError.InsufficientFee)
+      amount <- TxPositiveAmount(amount)(TxValidationError.NonPositiveAmount(amount, "waves"))
+      tx     <- LeaseTransaction(version, sender, recipient, amount, fee, timestamp, proofs, recipient.chainId).validatedEither
+    } yield tx
+
+  }
 
   def signed(
       version: TxVersion,
       sender: PublicKey,
       recipient: AddressOrAlias,
-      amount: TxAmount,
-      fee: TxAmount,
+      amount: Long,
+      fee: Long,
       timestamp: TxTimestamp,
       signer: PrivateKey
   ): Either[ValidationError, TransactionT] =
@@ -71,8 +77,8 @@ object LeaseTransaction extends TransactionParser {
       version: TxVersion,
       sender: KeyPair,
       recipient: AddressOrAlias,
-      amount: TxAmount,
-      fee: TxAmount,
+      amount: Long,
+      fee: Long,
       timestamp: TxTimestamp
   ): Either[ValidationError, TransactionT] =
     signed(version, sender.publicKey, recipient, amount, fee, timestamp, sender.privateKey)

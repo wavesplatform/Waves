@@ -21,7 +21,7 @@ import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{DataTransaction, Proofs}
+import com.wavesplatform.transaction.{DataTransaction, Proofs, TxPositiveAmount}
 import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
 
@@ -73,9 +73,9 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec {
       PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
       recipient,
       Waves,
-      100000000,
+      TxPositiveAmount.unsafeFrom(100000000),
       Waves,
-      100000000,
+      TxPositiveAmount.unsafeFrom(100000000),
       ByteStr.decodeBase58("4t2Xazb2SX").get,
       1526641218066L,
       Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get)),

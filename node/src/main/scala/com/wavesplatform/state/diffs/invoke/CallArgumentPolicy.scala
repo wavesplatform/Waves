@@ -1,8 +1,7 @@
 package com.wavesplatform.state.diffs.invoke
 
-import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.v1.compiler.ContractCompiler
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 
 trait CallArgumentPolicy {
   def check(e: EXPR): Boolean
@@ -30,7 +29,7 @@ object CallArgumentPolicy {
   }
 
   implicit class CallCheck(fc: FUNCTION_CALL) {
-    def check(c: CallArgumentPolicy): Either[ExecutionError, Unit] =
+    def check(c: CallArgumentPolicy): Either[String, Unit] =
       Either.cond(
         fc.args.forall(c.check),
         (),

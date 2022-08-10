@@ -17,7 +17,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TxVersion
+import com.wavesplatform.transaction.{TxExchangePrice, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -92,17 +92,18 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
       all(block.transactions.map(_.applicationStatus)) shouldBe None
       all(sender.blockById(block.id).transactions.map(_.applicationStatus)) shouldBe None
       all(sender.blockSeq(txHeight - 1, txHeight).flatMap(_.transactions.map(_.applicationStatus))) shouldBe None
-      sender.debugStateChanges(tx).applicationStatus shouldBe None
+      sender.stateChanges(tx).applicationStatus shouldBe None
       all(sender.debugStateChangesByAddress(caller, 1).map(_.applicationStatus)) shouldBe None
     }
 
     nodes.waitForHeightArise()
     check() // hardened
-    all(sender.blockSeqByAddress(sender.address, 1, ActivationHeight - 1).flatMap(_.transactions.map(_.applicationStatus))) shouldBe None
+    all(sender.blockSeqByAddress(sender.address, 1, sender.height).flatMap(_.transactions.map(_.applicationStatus))) shouldBe None
   }
 
   test("accept failed transaction after activation height") {
-    sender.waitForHeight(ActivationHeight)
+    docker.restartNode(dockerNodes().head, configs(activate = true).head)
+    val startHeight = sender.height
 
     sender.setAssetScript(asset, dAppKP, setAssetScriptFee + smartFee, assetScript(true), waitForTx = true)
     overflowBlock()
@@ -131,13 +132,13 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
       }
 
       val heightToId            = statuses.map(s => s.height.get -> s.id).toMap
-      val idToApplicationStatus = statuses.map(s => s.id         -> s.applicationStatus).toMap
+      val idToApplicationStatus = statuses.map(s => s.id -> s.applicationStatus).toMap
       heightToId.keys.foreach { h =>
         val block = sender.blockAt(h)
         block.transactions.foreach { tx =>
           tx.applicationStatus shouldBe idToApplicationStatus.getOrElse(tx.id, Some("succeeded"))
           if (tx._type == InvokeScriptTransaction.typeId) {
-            sender.debugStateChanges(tx.id).applicationStatus shouldBe idToApplicationStatus.getOrElse(tx.id, Some("succeeded"))
+            sender.stateChanges(tx.id).applicationStatus shouldBe idToApplicationStatus.getOrElse(tx.id, Some("succeeded"))
           }
         }
         sender.blockById(block.id).transactions.foreach { tx =>
@@ -151,7 +152,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
       sender.debugStateChangesByAddress(caller, txs.size).foreach { s =>
         s.applicationStatus shouldBe idToApplicationStatus.getOrElse(s.id, Some("succeeded"))
       }
-      sender.blockSeqByAddress(sender.address, ActivationHeight, sender.height).flatMap(_.transactions).foreach { tx =>
+      sender.blockSeqByAddress(sender.address, startHeight, sender.height).flatMap(_.transactions).foreach { tx =>
         tx.applicationStatus shouldBe idToApplicationStatus.getOrElse(tx.id, Some("succeeded"))
       }
     }
@@ -290,29 +291,33 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
     val assetPair = AssetPair.createAssetPair("WAVES", tradeAsset)
 
     val ts = ntpTime.getTimestamp()
-    val buyOrder = Order.buy(
-      Order.V4,
-      otherCallerKP,
-      dAppKP.publicKey,
-      assetPair.get,
-      smartMatcherFee,
-      100L,
-      ts,
-      ts + Order.MaxLiveTime,
-      smartMatcherFee
-    )
+    val buyOrder = Order
+      .buy(
+        Order.V4,
+        otherCallerKP,
+        dAppKP.publicKey,
+        assetPair.get,
+        smartMatcherFee,
+        100L,
+        ts,
+        ts + Order.MaxLiveTime,
+        smartMatcherFee
+      )
+      .explicitGet()
 
-    val sellOrder = Order.sell(
-      Order.V4,
-      callerKP,
-      dAppKP.publicKey,
-      assetPair.get,
-      smartMatcherFee,
-      100L,
-      ts,
-      ts + Order.MaxLiveTime,
-      smartMatcherFee
-    )
+    val sellOrder = Order
+      .sell(
+        Order.V4,
+        callerKP,
+        dAppKP.publicKey,
+        assetPair.get,
+        smartMatcherFee,
+        100L,
+        ts,
+        ts + Order.MaxLiveTime,
+        smartMatcherFee
+      )
+      .explicitGet()
 
     assertApiError(
       sender.broadcastExchange(
@@ -320,7 +325,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
         sellOrder,
         buyOrder,
         amount = buyOrder.amount,
-        price = buyOrder.price,
+        price = TxExchangePrice.unsafeFrom(buyOrder.price.value),
         buyMatcherFee = smartMatcherFee,
         sellMatcherFee = smartMatcherFee,
         fee = priorityFee,
@@ -333,8 +338,6 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
   }
 
   test("accept invalid by order asset scripts ExchangeTransaction to utx and save it as failed after activation height") {
-    sender.waitForHeight(ActivationHeight, 5 minutes)
-
     sender.setAssetScript(asset, dAppKP, priorityFee, assetScript(true), waitForTx = true)
     sender.transfer(sender.keyPair, dApp, 100.waves, waitForTx = true)
     val tradeAsset =
@@ -363,22 +366,10 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
 
     def orders: (Order, Order) = {
       val ts = ntpTime.getTimestamp()
-      val buy = Order.buy(
-        Order.V4,
-        otherCallerKP,
-        dAppKP.publicKey,
-        assetPair,
-        10L,
-        100L,
-        ts,
-        ts + Order.MaxLiveTime,
-        smartMatcherFee,
-        matcherFeeAssetId = IssuedAsset(ByteStr.decodeBase58(feeAsset).get)
-      )
-      val sell =
-        Order.sell(
+      val buy = Order
+        .buy(
           Order.V4,
-          callerKP,
+          otherCallerKP,
           dAppKP.publicKey,
           assetPair,
           10L,
@@ -388,6 +379,22 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
           smartMatcherFee,
           matcherFeeAssetId = IssuedAsset(ByteStr.decodeBase58(feeAsset).get)
         )
+        .explicitGet()
+      val sell =
+        Order
+          .sell(
+            Order.V4,
+            callerKP,
+            dAppKP.publicKey,
+            assetPair,
+            10L,
+            100L,
+            ts,
+            ts + Order.MaxLiveTime,
+            smartMatcherFee,
+            matcherFeeAssetId = IssuedAsset(ByteStr.decodeBase58(feeAsset).get)
+          )
+          .explicitGet()
       (buy, sell)
     }
 
@@ -402,9 +409,9 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
           buy,
           sell,
           buy.amount,
-          buy.price,
-          buy.matcherFee,
-          sell.matcherFee,
+          TxExchangePrice.unsafeFrom(buy.price.value),
+          buy.matcherFee.value,
+          sell.matcherFee.value,
           matcherFee + smartFee * 3,
           version = TxVersion.V3
         )
@@ -431,9 +438,9 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
           buy,
           sell,
           buy.amount,
-          buy.price,
-          buy.matcherFee,
-          sell.matcherFee,
+          TxExchangePrice.unsafeFrom(buy.price.value),
+          buy.matcherFee.value,
+          sell.matcherFee.value,
           matcherFee + smartFee * 3,
           version = TxVersion.V3
         )
@@ -450,11 +457,10 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
 
   }
 
-  override protected def nodeConfigs: Seq[Config] = Configs
+  override protected def nodeConfigs: Seq[Config] = configs(activate = false)
 }
 
 object AcceptFailedScriptActivationSuite {
-  private val ActivationHeight   = 9
   private val UpdateInterval     = 3
   private val MaxTxsInMicroBlock = 2
 
@@ -466,24 +472,24 @@ object AcceptFailedScriptActivationSuite {
   private def assetScript(result: Boolean): Option[String] =
     mkScript(
       s"""
-       |match tx {
-       |  case _: SetAssetScriptTransaction => true
-       |  case _ =>
-       |   let check = ${"sigVerify(base58'', base58'', base58'') ||" * 16} false
-       |   if (check) then false else $result
-       |}
-       |""".stripMargin
+         |match tx {
+         |  case _: SetAssetScriptTransaction => true
+         |  case _ =>
+         |   let check = ${"sigVerify(base58'', base58'', base58'') ||" * 16} false
+         |   if (check) then false else $result
+         |}
+         |""".stripMargin
     )
 
   private def mkScript(scriptText: String): Option[String] = Some(ScriptCompiler.compile(scriptText, estimator).explicitGet()._1.bytes().base64)
 
-  private val Configs: Seq[Config] =
+  private def configs(activate: Boolean): Seq[Config] =
     NodeConfigs
       .Builder(Default, 1, Seq.empty)
       .overrideBase(_.quorum(0))
       .overrideBase(
         _.preactivatedFeatures(
-          (BlockchainFeatures.BlockV5.id, ActivationHeight)
+          (BlockchainFeatures.BlockV5.id, if (activate) 0 else 9999)
         )
       )
       .overrideBase(_.raw(s"waves.blockchain.custom.functionality.min-asset-info-update-interval = $UpdateInterval"))

@@ -4,6 +4,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.V4
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 
@@ -33,13 +34,13 @@ class PowNewPrecisionTest extends PropSpec with WithDomain {
   )
 
   private val scenario = {
-    val master = TxHelpers.signer(0)
+    val master  = TxHelpers.signer(0)
     val invoker = TxHelpers.signer(1)
 
     val balances = AddrWithBalance.enoughBalances(master, invoker)
 
     val setScript = TxHelpers.setScript(master, contract)
-    val invoke = () => TxHelpers.invoke(master.toAddress, invoker = invoker, version = TxVersion.V3)
+    val invoke    = () => TxHelpers.invoke(master.toAddress, invoker = invoker, version = TxVersion.V3)
 
     (balances, setScript, invoke, master.toAddress)
   }
@@ -57,7 +58,7 @@ class PowNewPrecisionTest extends PropSpec with WithDomain {
 
   property("pow changes precision after SynchronousCalls") {
     val (balances, setScript, invoke, dApp) = scenario
-    withDomain(DomainPresets.RideV5, balances) { d =>
+    withDomain(DomainPresets.RideV5.configure(_.copy(enforceTransferValidationAfter = 0)), balances) { d =>
       d.appendBlock(setScript)
 
       d.appendBlock(invoke())

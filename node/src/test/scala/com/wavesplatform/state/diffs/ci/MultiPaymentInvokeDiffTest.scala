@@ -28,24 +28,25 @@ class MultiPaymentInvokeDiffTest extends PropSpec with WithState {
       dApp(V4, transferPaymentAmount = wavesTransfer, _),
       accountVerifiers(V4),
       verifier(V4, Asset)
-    ).foreach { case (genesis, setVerifier, setDApp, ci, issues, dAppAcc, invoker, fee) =>
-      assertDiffAndState(
-        Seq(TestBlock.create(genesis ++ issues ++ Seq(setDApp, setVerifier))),
-        TestBlock.create(Seq(ci)),
-        features
-      ) {
-        case (diff, blockchain) =>
-          val assetBalance = issues
-            .map(_.id())
-            .map(IssuedAsset)
-            .map(asset => asset -> blockchain.balance(dAppAcc.toAddress, asset))
-            .filter(_._2 != 0)
-            .toMap
+    ).foreach {
+      case (genesis, setVerifier, setDApp, ci, issues, dAppAcc, invoker, fee) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(genesis ++ issues ++ Seq(setDApp, setVerifier))),
+          TestBlock.create(Seq(ci)),
+          features
+        ) {
+          case (diff, blockchain) =>
+            val assetBalance = issues
+              .map(_.id())
+              .map(IssuedAsset(_))
+              .map(asset => asset -> blockchain.balance(dAppAcc.toAddress, asset))
+              .filter(_._2 != 0)
+              .toMap
 
-          diff.portfolios(dAppAcc.toAddress).assets shouldBe assetBalance
-          diff.portfolios(dAppAcc.toAddress).balance shouldBe -wavesTransfer
-          diff.portfolios(invoker.toAddress).balance shouldBe wavesTransfer - fee
-      }
+            diff.portfolios(dAppAcc.toAddress).assets shouldBe assetBalance
+            diff.portfolios(dAppAcc.toAddress).balance shouldBe -wavesTransfer
+            diff.portfolios(invoker.toAddress).balance shouldBe wavesTransfer - fee
+        }
 
     }
   }
@@ -56,22 +57,23 @@ class MultiPaymentInvokeDiffTest extends PropSpec with WithState {
       accountVerifiers(V4),
       verifier(V4, Asset),
       repeatAdditionalAsset = true
-    ).foreach { case (genesis, setVerifier, setDApp, ci, issues, dAppAcc, _, _) =>
-      assertDiffAndState(
-        Seq(TestBlock.create(genesis ++ issues ++ Seq(setDApp, setVerifier))),
-        TestBlock.create(Seq(ci)),
-        features
-      ) {
-        case (diff, blockchain) =>
-          val assetBalance = issues
-            .map(_.id())
-            .map(IssuedAsset)
-            .map(asset => asset -> blockchain.balance(dAppAcc.toAddress, asset))
-            .filter(_._2 != 0)
-            .toMap
+    ).foreach {
+      case (genesis, setVerifier, setDApp, ci, issues, dAppAcc, _, _) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(genesis ++ issues ++ Seq(setDApp, setVerifier))),
+          TestBlock.create(Seq(ci)),
+          features
+        ) {
+          case (diff, blockchain) =>
+            val assetBalance = issues
+              .map(_.id())
+              .map(IssuedAsset(_))
+              .map(asset => asset -> blockchain.balance(dAppAcc.toAddress, asset))
+              .filter(_._2 != 0)
+              .toMap
 
-          diff.portfolios(dAppAcc.toAddress).assets shouldBe assetBalance
-      }
+            diff.portfolios(dAppAcc.toAddress).assets shouldBe assetBalance
+        }
     }
   }
 
@@ -86,14 +88,15 @@ class MultiPaymentInvokeDiffTest extends PropSpec with WithState {
           verifier(V4, Asset, result = "false")
         )
       )
-    ).foreach { case (genesis, setVerifier, setDApp, ci, issues, _, _, _) =>
-      assertDiffEi(
-        Seq(TestBlock.create(genesis ++ issues ++ Seq(setDApp, setVerifier))),
-        TestBlock.create(Seq(ci)),
-        features
-      )(_ should matchPattern {
-        case Right(diff: Diff) if diff.transactions.exists(!_._2.applied) =>
-      })
+    ).foreach {
+      case (genesis, setVerifier, setDApp, ci, issues, _, _, _) =>
+        assertDiffEi(
+          Seq(TestBlock.create(genesis ++ issues ++ Seq(setDApp, setVerifier))),
+          TestBlock.create(Seq(ci)),
+          features
+        )(_ should matchPattern {
+          case Right(diff: Diff) if diff.transactions.exists(!_._2.applied) =>
+        })
     }
   }
 
@@ -118,19 +121,20 @@ class MultiPaymentInvokeDiffTest extends PropSpec with WithState {
       accountVerifiers(V4),
       verifier(V4, Asset),
       withEnoughFee = false
-    ).foreach { case (genesis, setVerifier, setDApp, ci, issues, _, _, _) =>
-      assertDiffEi(
-        Seq(TestBlock.create(genesis ++ issues ++ Seq(setVerifier, setDApp))),
-        TestBlock.create(Seq(ci)),
-        features
-      ) {
-        val expectedFee = (0.005 + 0.004 + 0.004 * (ContractLimits.MaxAttachedPaymentAmount - 1)) * Constants.UnitsInWave
-        _ should produceRejectOrFailedDiff(
-          s"Fee in WAVES for InvokeScriptTransaction (${ci.fee} in WAVES) " +
-            s"with ${ContractLimits.MaxAttachedPaymentAmount} total scripts invoked " +
-            s"does not exceed minimal value of ${expectedFee.toLong} WAVES"
-        )
-      }
+    ).foreach {
+      case (genesis, setVerifier, setDApp, ci, issues, _, _, _) =>
+        assertDiffEi(
+          Seq(TestBlock.create(genesis ++ issues ++ Seq(setVerifier, setDApp))),
+          TestBlock.create(Seq(ci)),
+          features
+        ) {
+          val expectedFee = (0.005 + 0.004 + 0.004 * (ContractLimits.MaxAttachedPaymentAmount - 1)) * Constants.UnitsInWave
+          _ should produceRejectOrFailedDiff(
+            s"Fee in WAVES for InvokeScriptTransaction (${ci.fee} in WAVES) " +
+              s"with ${ContractLimits.MaxAttachedPaymentAmount} total scripts invoked " +
+              s"does not exceed minimal value of ${expectedFee.toLong} WAVES"
+          )
+        }
     }
   }
 
@@ -141,24 +145,25 @@ class MultiPaymentInvokeDiffTest extends PropSpec with WithState {
       accountVerifiers(V3),
       verifier(V3, Asset),
       multiPayment = false
-    ).foreach { case (genesis, setVerifier, setDApp, ci, issues, dAppAcc, invoker, fee) =>
-      assertDiffAndState(
-        Seq(TestBlock.create(genesis ++ issues ++ Seq(setDApp, setVerifier))),
-        TestBlock.create(Seq(ci)),
-        features
-      ) {
-        case (diff, blockchain) =>
-          val assetBalance = issues
-            .map(_.id())
-            .map(IssuedAsset)
-            .map(asset => asset -> blockchain.balance(dAppAcc.toAddress, asset))
-            .filter(_._2 != 0)
-            .toMap
+    ).foreach {
+      case (genesis, setVerifier, setDApp, ci, issues, dAppAcc, invoker, fee) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(genesis ++ issues ++ Seq(setDApp, setVerifier))),
+          TestBlock.create(Seq(ci)),
+          features
+        ) {
+          case (diff, blockchain) =>
+            val assetBalance = issues
+              .map(_.id())
+              .map(IssuedAsset(_))
+              .map(asset => asset -> blockchain.balance(dAppAcc.toAddress, asset))
+              .filter(_._2 != 0)
+              .toMap
 
-          diff.portfolios(dAppAcc.toAddress).assets shouldBe assetBalance
-          diff.portfolios(dAppAcc.toAddress).balance shouldBe -wavesTransfer
-          diff.portfolios(invoker.toAddress).balance shouldBe wavesTransfer - fee
-      }
+            diff.portfolios(dAppAcc.toAddress).assets shouldBe assetBalance
+            diff.portfolios(dAppAcc.toAddress).balance shouldBe -wavesTransfer
+            diff.portfolios(invoker.toAddress).balance shouldBe wavesTransfer - fee
+        }
     }
   }
 
@@ -168,23 +173,28 @@ class MultiPaymentInvokeDiffTest extends PropSpec with WithState {
       dApp(V3, transferPaymentAmount = wavesTransfer, _),
       accountVerifiers(V3),
       verifier(V3, Asset)
-    ).foreach { case (genesis, setVerifier, setDApp, ci, issues, _, _, _) =>
-      assertDiffEi(
-        Seq(TestBlock.create(genesis ++ issues ++ Seq(setDApp, setVerifier))),
-        TestBlock.create(Seq(ci)),
-        features.copy(preActivatedFeatures = features.preActivatedFeatures - BlockchainFeatures.BlockV5.id)
-      ) { _ should produce("Multiple payments isn't allowed now") }
+    ).foreach {
+      case (genesis, setVerifier, setDApp, ci, issues, _, _, _) =>
+        assertDiffEi(
+          Seq(TestBlock.create(genesis ++ issues ++ Seq(setDApp, setVerifier))),
+          TestBlock.create(Seq(ci)),
+          features.copy(preActivatedFeatures = features.preActivatedFeatures - BlockchainFeatures.BlockV5.id)
+        ) { _ should produce("Multiple payments isn't allowed now") }
     }
   }
 
-  private def paymentPreconditions(dApp: KeyPair => Script,
-                                   verifiers: Seq[Script],
-                                   commonAssetScript: Script,
-                                   additionalAssetScripts: Option[Seq[Script]] = None,
-                                   repeatAdditionalAsset: Boolean = false,
-                                   withEnoughFee: Boolean = true,
-                                   multiPayment: Boolean = true): Seq[(Seq[GenesisTransaction], SetScriptTransaction, SetScriptTransaction, InvokeScriptTransaction, List[IssueTransaction], KeyPair, KeyPair, Long)] = {
-    val master = TxHelpers.signer(0)
+  private def paymentPreconditions(
+      dApp: KeyPair => Script,
+      verifiers: Seq[Script],
+      commonAssetScript: Script,
+      additionalAssetScripts: Option[Seq[Script]] = None,
+      repeatAdditionalAsset: Boolean = false,
+      withEnoughFee: Boolean = true,
+      multiPayment: Boolean = true
+  ): Seq[
+    (Seq[GenesisTransaction], SetScriptTransaction, SetScriptTransaction, InvokeScriptTransaction, List[IssueTransaction], KeyPair, KeyPair, Long)
+  ] = {
+    val master  = TxHelpers.signer(0)
     val invoker = TxHelpers.signer(1)
 
     val fee = if (withEnoughFee) TxHelpers.ciFee(ContractLimits.MaxAttachedPaymentAmount + 1) else TxHelpers.ciFee(1)
@@ -209,8 +219,8 @@ class MultiPaymentInvokeDiffTest extends PropSpec with WithState {
         Seq(None)
       }
     } yield {
-      val setVerifier = TxHelpers.setScript(invoker, accountScript)
-      val setDApp = TxHelpers.setScript(master, dApp(invoker))
+      val setVerifier  = TxHelpers.setScript(invoker, accountScript)
+      val setDApp      = TxHelpers.setScript(master, dApp(invoker))
       val specialIssue = TxHelpers.issue(invoker, name = "special", script = additionalAssetScript)
 
       val (issues, payments) = if (repeatAdditionalAsset) {
@@ -229,10 +239,12 @@ class MultiPaymentInvokeDiffTest extends PropSpec with WithState {
     }
   }
 
-  private def assertScriptVersionError(message: (Int, ByteStr) => String,
-                                       dAppVersions: Seq[StdLibVersion] = Seq(V4),
-                                       verifierVersions: Seq[StdLibVersion] = Seq(V4),
-                                       assetsScriptVersions: Seq[StdLibVersion] = Seq(V4)): Unit = {
+  private def assertScriptVersionError(
+      message: (Int, ByteStr) => String,
+      dAppVersions: Seq[StdLibVersion] = Seq(V4),
+      verifierVersions: Seq[StdLibVersion] = Seq(V4),
+      assetsScriptVersions: Seq[StdLibVersion] = Seq(V4)
+  ): Unit = {
     for {
       dAppVersion         <- dAppVersions
       verifierVersion     <- verifierVersions

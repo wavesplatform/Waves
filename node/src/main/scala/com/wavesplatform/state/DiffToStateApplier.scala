@@ -1,6 +1,6 @@
 package com.wavesplatform.state
 
-import cats.syntax.monoid._
+import cats.Id
 import com.wavesplatform.account.Address
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
@@ -25,19 +25,19 @@ object DiffToStateApplier {
       val bs = Map.newBuilder[Asset, Long]
 
       if (portfolioDiff.balance != 0) {
-        bs += Waves -> math.addExact(blockchain.balance(address, Waves), portfolioDiff.balance).ensuring(_ >= 0)
+        bs += Waves -> (blockchain.balance(address, Waves) + portfolioDiff.balance)
       }
 
       portfolioDiff.assets.collect {
-        case (asset, delta) if delta != 0 =>
-          bs += asset -> math.addExact(blockchain.balance(address, asset), delta).ensuring(_ >= 0)
+        case (asset, balanceDiff) if balanceDiff != 0 =>
+          bs += asset -> (blockchain.balance(address, asset) + balanceDiff)
       }
 
       balances += address -> bs.result()
 
       // leases
       if (portfolioDiff.lease != LeaseBalance.empty) {
-        leases += address -> blockchain.leaseBalance(address).combine(portfolioDiff.lease)
+        leases += address -> blockchain.leaseBalance(address).combineF[Id](portfolioDiff.lease)
       }
     }
 

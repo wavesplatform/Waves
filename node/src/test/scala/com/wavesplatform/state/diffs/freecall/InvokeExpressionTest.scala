@@ -1,53 +1,56 @@
 package com.wavesplatform.state.diffs.freecall
 
-import scala.util.Try
-
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.directives.DirectiveDictionary
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V6}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V5, V6}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.ContractLimits
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, NewAssetInfo}
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.ci.ciFee
-import com.wavesplatform.test.PropSpec
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxHelpers, TxVersion}
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, NewAssetInfo}
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.JsonMatchers
 import org.scalatest.{Assertion, EitherValues}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import play.api.libs.json.Json
 
+import scala.util.Try
+
 class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with WithDomain with EitherValues with JsonMatchers {
-  import DomainPresets.{RideV5, RideV6}
+  import DomainPresets.{ContinuationTransaction, RideV6}
   import InvokeExpressionTest.*
 
   property("can use max contract complexity") {
     def sigVerifyList(size: Int): String = (1 to size).map(_ => "sigVerify(base58'', base58'', base58'')").mkString("[", ", ", "]")
 
     val script = TxHelpers.freeCallScript(s"""
-                                             |strict a = ${sigVerifyList(ContractLimits.MaxTotalInvokeComplexity(StdLibVersion.V6) / 181)}
+                                             |strict a = ${sigVerifyList(ContractLimits.MaxTotalInvokeComplexity(V6) / 181)}
                                              |[]
                                              |""".stripMargin)
 
     TxHelpers.estimate(script) shouldBe 51949
 
     val bigScript = TxHelpers.freeCallScript(s"""
-                                             |strict a = ${sigVerifyList(ContractLimits.MaxTotalInvokeComplexity(StdLibVersion.V6) / 181 + 1)}
-                                             |[]
-                                             |""".stripMargin)
+                                                |strict a = ${sigVerifyList(ContractLimits.MaxTotalInvokeComplexity(V6) / 181 + 1)}
+                                                |[]
+                                                |""".stripMargin)
 
-    withDomain(DomainPresets.RideV6) { d =>
+    withDomain(DomainPresets.ContinuationTransaction) { d =>
       d.helpers.creditWavesToDefaultSigner()
       d.appendAndAssertSucceed(TxHelpers.invokeExpression(script))
-      d.appendAndCatchError(TxHelpers.invokeExpression(bigScript)).toString should include("Contract function (default) is too complex: 52130 > 52000")
+      d.appendAndCatchError(TxHelpers.invokeExpression(bigScript)).toString should include(
+        "Contract function (default) is too complex: 52130 > 52000"
+      )
     }
   }
 
@@ -81,13 +84,13 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
            |strict transfer = $constructor
            |true
            |""".stripMargin
-      val scriptV5 = Try(TxHelpers.exprScript(StdLibVersion.V5)(scriptText))
+      val scriptV5 = Try(TxHelpers.exprScript(V5)(scriptText))
       scriptV5 shouldBe Symbol("success")
 
-      val scriptV6 = scriptV5.get.copy(stdLibVersion = StdLibVersion.V6, isFreeCall = true)
-      intercept[RuntimeException](TxHelpers.exprScript(StdLibVersion.V6)(scriptText)).toString should include("Can't find a function")
+      val scriptV6 = scriptV5.get.copy(stdLibVersion = V6, isFreeCall = true)
+      intercept[RuntimeException](TxHelpers.exprScript(V6)(scriptText)).toString should include("Can't find a function")
 
-      withDomain(DomainPresets.RideV6) { d =>
+      withDomain(ContinuationTransaction) { d =>
         d.helpers.creditWavesToDefaultSigner()
         d.appendAndCatchError(TxHelpers.invokeExpression(scriptV6)).toString should include regex "function 'User\\(\\w+\\)' not found".r
       }
@@ -107,7 +110,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
     val invoke = InvokeExpressionTransaction
       .selfSigned(TxVersion.V1, TxHelpers.defaultSigner, freeCall, 1000000L, Waves, System.currentTimeMillis())
       .explicitGet()
-    withDomain(RideV6) { d =>
+    withDomain(ContinuationTransaction) { d =>
       d.helpers.creditWavesToDefaultSigner()
       d.helpers.creditWavesFromDefaultSigner(dAppAccount.toAddress)
       d.helpers.setScript(dAppAccount, dAppScript)
@@ -148,7 +151,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
 
   property("successful applying to the state") {
     val (genesisTxs, invoke) = scenario()
-    withDomain(RideV6) { d =>
+    withDomain(ContinuationTransaction) { d =>
       d.appendBlock(genesisTxs*)
       d.appendBlock(invoke)
       d.blockchain.accountData(invoke.sender.toAddress, "check").get shouldBe BooleanDataEntry("check", true)
@@ -160,7 +163,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
 
   property("insufficient fee leading to reject") {
     val (genesisTxs, invoke) = scenario(enoughFee = false, issue = false)
-    withDomain(RideV6) { d =>
+    withDomain(ContinuationTransaction) { d =>
       d.appendBlock(genesisTxs*)
       intercept[Exception](d.appendBlock(invoke)).getMessage should include(feeErrorMessage(invoke))
     }
@@ -168,7 +171,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
 
   property("insufficient fee for issue leading to reject") {
     val (genesisTxs, invoke) = scenario(enoughFee = false)
-    withDomain(RideV6) { d =>
+    withDomain(ContinuationTransaction) { d =>
       d.appendBlock(genesisTxs*)
       d.appendAndCatchError(invoke).toString should include(feeErrorMessage(invoke, issue = true))
     }
@@ -176,7 +179,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
 
   property("insufficient fee for big verifier leading to reject") {
     val (genesisTxs, invoke) = scenario(issue = false, verifier = Some(bigVerifier))
-    withDomain(RideV6) { d =>
+    withDomain(ContinuationTransaction) { d =>
       d.appendBlock(genesisTxs*)
       d.appendAndCatchError(invoke).toString should include(feeErrorMessage(invoke, verifier = true))
     }
@@ -184,7 +187,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
 
   property("big verifier with enough fee") {
     val (genesisTxs, invoke) = scenario(issue = false, verifier = Some(bigVerifier), bigVerifier = true)
-    withDomain(RideV6) { d =>
+    withDomain(ContinuationTransaction) { d =>
       d.appendBlock(genesisTxs*)
       d.appendBlock(invoke)
       d.blockchain.transactionSucceeded(invoke.id.value()) shouldBe true
@@ -204,7 +207,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
 
     def assertLowVersion(v: StdLibVersion, dApp: Boolean = false): Assertion = {
       val (genesisTxs, invoke) = scenario(verifier = Some(if (dApp) dAppVerifier(v) else verifier(v)))
-      withDomain(RideV6) { d =>
+      withDomain(ContinuationTransaction) { d =>
         d.appendBlock(genesisTxs*)
         intercept[Exception](d.appendBlock(invoke)).getMessage should include(
           s"Can't process InvokeExpressionTransaction from RIDE $v verifier, it might be used from V6"
@@ -214,7 +217,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
 
     def assertNoVerifierNoError(v: StdLibVersion): Assertion = {
       val (genesisTxs, invoke) = scenario(verifier = Some(dAppWithNoVerifier(v)))
-      withDomain(RideV6) { d =>
+      withDomain(ContinuationTransaction) { d =>
         d.appendBlock(genesisTxs*)
         d.appendBlock(invoke)
         d.blockchain.transactionSucceeded(invoke.id.value()) shouldBe true
@@ -224,7 +227,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
 
   property("allow for V6 verifier") {
     val (genesisTxs, invoke) = scenario(verifier = Some(verifier(V6)))
-    withDomain(RideV6) { d =>
+    withDomain(ContinuationTransaction) { d =>
       d.appendBlock(genesisTxs*)
       d.appendBlock(invoke)
       d.blockchain.transactionSucceeded(invoke.txId) shouldBe true
@@ -233,7 +236,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
 
   property("disallow by V6 verifier by type") {
     val (genesisTxs, invoke) = scenario(verifier = Some(forbidByTypeVerifier))
-    withDomain(RideV6) { d =>
+    withDomain(ContinuationTransaction) { d =>
       d.appendBlock(genesisTxs*)
       intercept[Exception](d.appendBlock(invoke)).getMessage should include("TransactionNotAllowedByScript")
     }
@@ -241,7 +244,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
 
   property("disallow by V6 verifier rejecting all") {
     val (genesisTxs, invoke) = scenario(verifier = Some(forbidAllVerifier))
-    withDomain(RideV6) { d =>
+    withDomain(ContinuationTransaction) { d =>
       d.appendBlock(genesisTxs*)
       intercept[Exception](d.appendBlock(invoke)).getMessage should include("TransactionNotAllowedByScript")
     }
@@ -249,10 +252,10 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
 
   property("activation") {
     val (genesisTxs, invoke) = scenario()
-    withDomain(RideV5) { d =>
+    withDomain(RideV6) { d =>
       d.appendBlock(genesisTxs*)
       intercept[Exception](d.appendBlock(invoke)).getMessage should include(
-        "Ride V6, MetaMask support, Invoke Expression feature has not been activated yet"
+        s"${BlockchainFeatures.ContinuationTransaction.description} feature has not been activated yet"
       )
     }
   }
@@ -260,7 +263,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
   ignore("available versions") { // TODO check is commented in CommonValidation
     val unsupportedVersion   = InvokeExpressionTransaction.supportedVersions.max + 1
     val (genesisTxs, invoke) = scenario(version = unsupportedVersion.toByte)
-    withDomain(RideV6) { d =>
+    withDomain(ContinuationTransaction) { d =>
       d.appendBlock(genesisTxs*)
       intercept[Exception](d.appendBlock(invoke)).getMessage should include("Invalid tx version")
     }
@@ -268,33 +271,41 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
 
   property("sponsor fee") {
     val (genesisTxs, invoke) = scenario(sponsor = true)
-    withDomain(RideV6) { d =>
+    withDomain(ContinuationTransaction) { d =>
       d.appendBlock(genesisTxs*)
       d.appendBlock(invoke)
       d.blockchain.transactionSucceeded(invoke.id.value()) shouldBe true
     }
   }
 
-  property("issue with 29 transfers") {
-    val (genesisTxs, invoke) = scenario(transfersCount = 29)
-    withDomain(RideV6) { d =>
+  property("issue with 99 transfers") {
+    val (genesisTxs, invoke) = scenario(transfersCount = 99)
+    withDomain(ContinuationTransaction) { d =>
       d.appendBlock(genesisTxs*)
       d.appendBlock(invoke)
       d.blockchain.transactionSucceeded(invoke.id.value()) shouldBe true
     }
   }
 
-  property("issue with 30 transfers") {
-    val (genesisTxs, invoke) = scenario(transfersCount = 30)
-    withDomain(RideV6) { d =>
+  property(s"issue with ${ContractLimits.MaxBalanceScriptActionsAmountV6} transfers") {
+    val (genesisTxs, invoke) = scenario(transfersCount = ContractLimits.MaxBalanceScriptActionsAmountV6)
+    withDomain(ContinuationTransaction) { d =>
       d.appendBlock(genesisTxs*)
-      d.appendAndCatchError(invoke).toString should include("Actions count limit is exceeded")
+      d.appendAndAssertSucceed(invoke)
+    }
+  }
+
+  property(s"issue with ${ContractLimits.MaxBalanceScriptActionsAmountV6 + 1} transfers") {
+    val (genesisTxs, invoke) = scenario(transfersCount = ContractLimits.MaxBalanceScriptActionsAmountV6 + 1)
+    withDomain(ContinuationTransaction) { d =>
+      d.appendBlock(genesisTxs*)
+      d.appendAndCatchError(invoke).toString should include("ScriptTransfer, Lease, LeaseCancel actions count limit is exceeded")
     }
   }
 
   property("complexity limit") {
     val (genesisTxs, invoke) = scenario(sigVerifyCount = 300)
-    withDomain(RideV6) { d =>
+    withDomain(ContinuationTransaction) { d =>
       d.appendBlock(genesisTxs*)
       d.appendAndCatchError(invoke).toString should include("Contract function (default) is too complex: 54317 > 52000")
     }
@@ -302,7 +313,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
 
   property("reject due to script error") {
     val (genesisTxs, invoke) = scenario(raiseError = true)
-    withDomain(RideV6) { d =>
+    withDomain(ContinuationTransaction) { d =>
       d.appendBlock(genesisTxs*)
       intercept[Exception](d.appendBlock(invoke)).getMessage should include("ScriptExecutionError(error = Explicit script termination")
     }
@@ -310,7 +321,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
 
   property("fail due to script error") {
     val (genesisTxs, invoke) = scenario(raiseError = true, sigVerifyCount = 6)
-    withDomain(RideV6) { d =>
+    withDomain(ContinuationTransaction) { d =>
       d.appendBlock(genesisTxs*)
       d.appendBlock(invoke)
       d.liquidDiff.errorMessage(invoke.id.value()).get.text should include("Explicit script termination")
@@ -391,10 +402,11 @@ private object InvokeExpressionTest {
     val genesis     = GenesisTransaction.create(invoker.toAddress, ENOUGH_AMT, TxHelpers.timestamp).explicitGet()
     val setVerifier = SetScriptTransaction.selfSigned(TxVersion.V2, invoker, verifier, fee, TxHelpers.timestamp).explicitGet()
 
-    val sponsorIssueTx = IssueTransaction.selfSigned(TxVersion.V2, invoker, "name", "", 1000, 1, true, None, fee, TxHelpers.timestamp).explicitGet()
-    val sponsorAsset   = IssuedAsset(sponsorIssueTx.id.value())
-    val sponsorTx      = SponsorFeeTransaction.selfSigned(TxVersion.V2, invoker, sponsorAsset, Some(1000L), fee, TxHelpers.timestamp).explicitGet()
-    val feeAsset       = if (sponsor) sponsorAsset else Waves
+    val sponsorIssueTx =
+      IssueTransaction.selfSigned(TxVersion.V2, invoker, "name", "", 1000, 1, true, None, 1.waves, TxHelpers.timestamp).explicitGet()
+    val sponsorAsset = IssuedAsset(sponsorIssueTx.id.value())
+    val sponsorTx    = SponsorFeeTransaction.selfSigned(TxVersion.V2, invoker, sponsorAsset, Some(1000L), fee, TxHelpers.timestamp).explicitGet()
+    val feeAsset     = if (sponsor) sponsorAsset else Waves
 
     val call   = makeExpression(invoker, fee, issue, transfersCount, receiver.toAddress, sigVerifyCount, raiseError)
     val invoke = InvokeExpressionTransaction.selfSigned(version, invoker, call, fee, feeAsset, TxHelpers.timestamp).explicitGet()
@@ -405,9 +417,8 @@ private object InvokeExpressionTest {
   def feeErrorMessage(invoke: InvokeExpressionTransaction, issue: Boolean = false, verifier: Boolean = false): String = {
     val expectingFee =
       FeeConstants(invoke.tpe) * FeeUnit + (if (issue) 1 else 0) * 1_0000_0000L + (if (verifier) 1 else 0) * FeeValidation.ScriptExtraFee
-    val issueErr    = if (issue) " with 1 assets issued" else ""
-    val verifierErr = if (verifier) " with 1 total scripts invoked" else ""
-    s"Fee in WAVES for InvokeExpressionTransaction (${invoke.fee} in WAVES)$issueErr$verifierErr does not exceed minimal value of $expectingFee WAVES."
+    val issueErr = if (issue) " with 1 assets issued" else ""
+    s"for InvokeExpressionTransaction (${invoke.fee} in WAVES)$issueErr does not exceed minimal value of $expectingFee WAVES."
   }
 
   def verifier(version: StdLibVersion): Script =

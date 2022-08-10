@@ -41,14 +41,14 @@ class MultiSig2of3Test extends PropSpec with WithState {
   }
 
   val preconditionsAndTransfer: (GenesisTransaction, SetScriptTransaction, TransferTransaction, Seq[ByteStr]) = {
-    val master = TxHelpers.signer(1)
-    val s0 = TxHelpers.signer(2)
-    val s1 = TxHelpers.signer(3)
-    val s2 = TxHelpers.signer(4)
+    val master    = TxHelpers.signer(1)
+    val s0        = TxHelpers.signer(2)
+    val s1        = TxHelpers.signer(3)
+    val s2        = TxHelpers.signer(4)
     val recipient = TxHelpers.signer(5)
 
-    val genesis = TxHelpers.genesis(master.toAddress)
-    val setScript = TxHelpers.setScript(master, ExprScript(multisigTypedExpr(s0.publicKey, s1.publicKey, s2.publicKey)).explicitGet())
+    val genesis          = TxHelpers.genesis(master.toAddress)
+    val setScript        = TxHelpers.setScript(master, ExprScript(multisigTypedExpr(s0.publicKey, s1.publicKey, s2.publicKey)).explicitGet())
     val transferUnsigned = TxHelpers.transferUnsigned(master, recipient.toAddress)
 
     val sig0 = crypto.sign(s0.privateKey, transferUnsigned.bodyBytes())

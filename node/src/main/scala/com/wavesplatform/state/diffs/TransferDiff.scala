@@ -1,22 +1,20 @@
 package com.wavesplatform.state.diffs
 
-import scala.util.Right
-import scala.util.control.NonFatal
-
-import cats.instances.map._
-import cats.syntax.semigroup._
+import cats.implicits.toBifunctorOps
 import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state._
-import com.wavesplatform.transaction.{Asset, TxValidationError}
+import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{Asset, TxValidationError}
+
+import scala.util.control.NonFatal
 
 object TransferTransactionDiff {
   def apply(blockchain: Blockchain)(tx: TransferTransaction): Either[ValidationError, Diff] = {
-    TransferDiff(blockchain)(tx.sender.toAddress, tx.recipient, tx.amount, tx.assetId, tx.fee, tx.feeAssetId)
+    TransferDiff(blockchain)(tx.sender.toAddress, tx.recipient, tx.amount.value, tx.assetId, tx.fee.value, tx.feeAssetId)
       .map(_.copy(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)))
   }
 }
@@ -40,33 +38,39 @@ object TransferDiff {
       _         <- Either.cond(!isSmartAsset, (), GenericError("Smart assets can't participate in TransferTransactions as a fee"))
 
       _ <- validateOverflow(blockchain, blockchain.height, amount, fee)
-      portfolios = (assetId match {
+      transferPf <- assetId match {
         case Waves =>
-          Map(senderAddress -> Portfolio(-amount, LeaseBalance.empty, Map.empty)).combine(
-            Map(recipient -> Portfolio(amount, LeaseBalance.empty, Map.empty))
-          )
+          Diff
+            .combine(
+              Map(senderAddress -> Portfolio(-amount)),
+              Map(recipient     -> Portfolio(amount))
+            )
+            .leftMap(GenericError(_))
         case asset @ IssuedAsset(_) =>
-          Map(senderAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amount))).combine(
-            Map(recipient -> Portfolio(0, LeaseBalance.empty, Map(asset -> amount)))
-          )
-      }).combine(
-        feeAssetId match {
-          case Waves => Map(senderAddress -> Portfolio(-fee, LeaseBalance.empty, Map.empty))
-          case asset @ IssuedAsset(_) =>
-            val senderPf = Map(senderAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -fee)))
-            if (blockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
-              val sponsorPf = blockchain
-                .assetDescription(asset)
-                .collect {
-                  case desc if desc.sponsorship > 0 =>
-                    val feeInWaves = Sponsorship.toWaves(fee, desc.sponsorship)
-                    Map[Address, Portfolio](desc.issuer.toAddress -> Portfolio(-feeInWaves, LeaseBalance.empty, Map(asset -> fee)))
-                }
-                .getOrElse(Map.empty)
-              senderPf.combine(sponsorPf)
-            } else senderPf
-        }
-      )
+          Diff
+            .combine(
+              Map(senderAddress -> Portfolio.build(asset -> -amount)),
+              Map(recipient     -> Portfolio.build(asset -> amount))
+            )
+            .leftMap(GenericError(_))
+      }
+      feePf <- feeAssetId match {
+        case Waves => Right(Map(senderAddress -> Portfolio(-fee)))
+        case asset @ IssuedAsset(_) =>
+          val senderPf = Map(senderAddress -> Portfolio.build(asset -> -fee))
+          if (blockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)) {
+            val sponsorPf = blockchain
+              .assetDescription(asset)
+              .collect {
+                case desc if desc.sponsorship > 0 =>
+                  val feeInWaves = Sponsorship.toWaves(fee, desc.sponsorship)
+                  Map[Address, Portfolio](desc.issuer.toAddress -> Portfolio.build(-feeInWaves, asset, fee))
+              }
+              .getOrElse(Map.empty)
+            Diff.combine(senderPf, sponsorPf).leftMap(GenericError(_))
+          } else Right(senderPf)
+      }
+      portfolios <- Diff.combine(transferPf, feePf).leftMap(GenericError(_))
       assetIssued    = assetId.fold(true)(blockchain.assetDescription(_).isDefined)
       feeAssetIssued = feeAssetId.fold(true)(blockchain.assetDescription(_).isDefined)
       _ <- Either.cond(
@@ -80,7 +84,7 @@ object TransferDiff {
     } yield Diff(portfolios = portfolios)
   }
 
-  private def validateOverflow(blockchain: Blockchain, height: Int, amount: Long, fee: Long) =
+  private def validateOverflow(blockchain: Blockchain, height: Int, amount: Long, fee: Long): Either[ValidationError, Unit] =
     if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, height))
       Right(()) // lets transaction validates itself
     else

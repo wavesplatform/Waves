@@ -19,28 +19,28 @@ import org.openjdk.jmh.infra.Blackhole
 @Measurement(iterations = 10, time = 1)
 class FractionIntBenchmark {
   @Benchmark
-  def fraction1(bh: Blackhole, s: St): Unit = bh.consume(eval(s.ctx, s.expr1, V6))
+  def fraction1(bh: Blackhole, s: St): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr1, V5, true))
 
   @Benchmark
-  def fraction2(bh: Blackhole, s: St): Unit = bh.consume(eval(s.ctx, s.expr2, V6))
+  def fraction2(bh: Blackhole, s: St): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr2, V5, true))
 
   @Benchmark
-  def fraction3(bh: Blackhole, s: St): Unit = bh.consume(eval(s.ctx, s.expr3, V6))
+  def fraction3(bh: Blackhole, s: St): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr3, V5, true))
 
   @Benchmark
-  def fraction1Round(bh: Blackhole, s: St): Unit = bh.consume(eval(s.ctx, s.expr1Round, V6))
+  def fraction1Round(bh: Blackhole, s: St): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr1Round, V5, true))
 
   @Benchmark
-  def fraction2Round(bh: Blackhole, s: St): Unit = bh.consume(eval(s.ctx, s.expr2Round, V6))
+  def fraction2Round(bh: Blackhole, s: St): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr2Round, V5, true))
 
   @Benchmark
-  def fraction3Round(bh: Blackhole, s: St): Unit = bh.consume(eval(s.ctx, s.expr3Round, V6))
+  def fraction3Round(bh: Blackhole, s: St): Unit = bh.consume(EvaluatorV2.applyCompleted(s.ctx, s.expr3Round, V5, true))
 }
 
 @State(Scope.Benchmark)
 class St {
   val ds  = DirectiveSet(V6, Account, Expression).fold(null, identity)
-  val ctx = lazyContexts(ds).value().evaluationContext(Common.emptyBlockchainEnvironment())
+  val ctx = lazyContexts((ds, true)).value().evaluationContext(Common.emptyBlockchainEnvironment())
 
   val max     = Long.MaxValue
   val maxSqrt = 3037000499L

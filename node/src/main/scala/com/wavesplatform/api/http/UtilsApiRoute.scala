@@ -1,6 +1,7 @@
 package com.wavesplatform.api.http
 
 import java.security.SecureRandom
+
 import akka.http.scaladsl.server.{PathMatcher1, Route}
 import cats.syntax.either.*
 import cats.syntax.semigroup.*
@@ -14,16 +15,13 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.{RideV6, SynchronousCalls}
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.features.EvaluatorFixProvider.*
-import com.wavesplatform.features.RideVersionProvider.RideVersionBlockchainExt
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp as DAppType, *}
-import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
-import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
-import com.wavesplatform.lang.v1.compiler.{ContractScriptCompactor, ExpressionCompiler, Terms}
+import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -32,7 +30,7 @@ import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
-import com.wavesplatform.lang.{Global, ValidationError}
+import com.wavesplatform.lang.{API, CompileResult, Global, ValidationError}
 import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.FeeValidation
@@ -63,7 +61,7 @@ case class UtilsApiRoute(
 
   private def seed(length: Int): JsObject = {
     val seed = new Array[Byte](length)
-    new SecureRandom().nextBytes(seed) //seed mutated here!
+    new SecureRandom().nextBytes(seed) // seed mutated here!
     Json.obj("seed" -> Base58.encode(seed))
   }
 
@@ -72,16 +70,6 @@ case class UtilsApiRoute(
       0
     else
       FeeValidation.ScriptExtraFee
-
-  private def checkInvokeExpression[A](result: Either[String, (Script, A)]): Either[String, (Script, A)] =
-    result
-      .filterOrElse(
-        {
-          case (e: ExprScript, _) => !e.isFreeCall || blockchain.isFeatureActivated(RideV6)
-          case _                  => true
-        },
-        "Invoke Expression Transaction is not activated yet"
-      )
 
   override val route: Route = pathPrefix("utils") {
     decompile ~ compile ~ compileCode ~ compileWithImports ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ transactionSerialize ~ evaluate
@@ -94,20 +82,21 @@ case class UtilsApiRoute(
       Script.fromBase64String(code.trim) match {
         case Left(err) => complete(err)
         case Right(script) =>
-          executeLimited(Script.decompile(script)) {
-            case (scriptText, meta) =>
-              val directives: List[(String, JsValue)] = meta.map {
-                case (k, v) =>
-                  (k, v match {
-                    case n: Number => JsNumber(BigDecimal(n.toString))
-                    case s         => JsString(s.toString)
-                  })
-              }
-              val result  = directives ::: "script" -> JsString(scriptText) :: Nil
-              val wrapped = result.map { case (k, v) => (k, toJsFieldJsValueWrapper(v)) }
-              complete(
-                Json.obj(wrapped*)
+          executeLimited(Script.decompile(script)) { case (scriptText, meta) =>
+            val directives: List[(String, JsValue)] = meta.map { case (k, v) =>
+              (
+                k,
+                v match {
+                  case n: Number => JsNumber(BigDecimal(n.toString))
+                  case s         => JsString(s.toString)
+                }
               )
+            }
+            val result  = directives ::: "script" -> JsString(scriptText) :: Nil
+            val wrapped = result.map { case (k, v) => (k, toJsFieldJsValueWrapper(v)) }
+            complete(
+              Json.obj(wrapped*)
+            )
           }
       }
     }
@@ -120,13 +109,13 @@ case class UtilsApiRoute(
         executeLimited(ScriptCompiler(code, isAssetScript, estimator())) { result =>
           complete(
             result.fold(
-              e => ScriptCompilerError(e), {
-                case (script, complexity) =>
-                  Json.obj(
-                    "script"     -> script.bytes().base64,
-                    "complexity" -> complexity,
-                    "extraFee"   -> FeeValidation.ScriptExtraFee
-                  )
+              e => ScriptCompilerError(e),
+              { case (script, complexity) =>
+                Json.obj(
+                  "script"     -> script.bytes().base64,
+                  "complexity" -> complexity,
+                  "extraFee"   -> FeeValidation.ScriptExtraFee
+                )
               }
             )
           )
@@ -135,61 +124,75 @@ case class UtilsApiRoute(
     }
   }
 
+  private def defaultStdlibVersion(): StdLibVersion = {
+    val v5Activated = blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
+    if (v5Activated)
+      V5
+    else if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps))
+      V4
+    else
+      StdLibVersion.VersionDic.default
+  }
+
   def compileCode: Route = path("script" / "compileCode") {
     (post & entity(as[String]) & parameter("compact".as[Boolean] ? false)) { (code, compact) =>
-      val version               = blockchain.actualRideVersion
-      val fixEstimateOfVerifier = blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
-      executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator(), version, fixEstimateOfVerifier)) { result =>
-        complete(
-          checkInvokeExpression(result)
-            .fold(
-              e => ScriptCompilerError(e), {
-                case (script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity)) =>
-                  val extraFee =
-                    if (verifierComplexity <= ContractLimits.FreeVerifierComplexity && blockchain
-                          .isFeatureActivated(BlockchainFeatures.SynchronousCalls))
-                      0
-                    else
-                      FeeValidation.ScriptExtraFee
-
-                  val compactedScript = script match {
-                    case ContractScript.ContractScriptImpl(stdLibVersion, expr) if compact =>
-                      val compacted = ContractScriptCompactor.compact(expr)
-
-                      ContractScriptImpl(stdLibVersion, compacted)
-
-                    case _ => script
-                  }
-                  Json.obj(
-                    "script"               -> compactedScript.bytes().base64,
-                    "complexity"           -> maxComplexity,
-                    "verifierComplexity"   -> verifierComplexity,
-                    "callableComplexities" -> callableComplexities,
-                    "extraFee"             -> extraFee
-                  )
-              }
-            )
+      executeLimited(
+        API.compile(
+          code,
+          estimator(),
+          compact,
+          defaultStdLib = defaultStdlibVersion(),
+          allowFreeCall = blockchain.isFeatureActivated(BlockchainFeatures.ContinuationTransaction)
         )
-      }
+      )(
+        _.fold(
+          e => complete(ScriptCompilerError(e)),
+          { cr =>
+            val v5Activated = blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)
+            val extraFee =
+              if (cr.verifierComplexity <= ContractLimits.FreeVerifierComplexity && v5Activated)
+                0
+              else
+                FeeValidation.ScriptExtraFee
+
+            complete(
+              Json.obj(
+                "script"               -> ByteStr(cr.bytes).base64,
+                "complexity"           -> cr.maxComplexity,
+                "verifierComplexity"   -> cr.verifierComplexity,
+                "callableComplexities" -> cr.callableComplexities,
+                "extraFee"             -> extraFee
+              )
+            )
+          }
+        )
+      )
     }
   }
 
   def compileWithImports: Route = path("script" / "compileWithImports") {
     import ScriptWithImportsRequest.*
     (post & entity(as[ScriptWithImportsRequest])) { req =>
-      val version               = blockchain.actualRideVersion
-      val fixEstimateOfVerifier = blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
-      executeLimited(ScriptCompiler.compile(req.script, estimator(), req.imports, version, fixEstimateOfVerifier)) { result =>
+      executeLimited(
+        API.compile(
+          req.script,
+          estimator(),
+          needCompaction = false,
+          removeUnusedCode = false,
+          req.imports,
+          defaultStdLib = defaultStdlibVersion()
+        )
+      ) { result =>
         complete(
-          checkInvokeExpression(result)
+          result
             .fold(
-              e => ScriptCompilerError(e), {
-                case (script, complexity) =>
-                  Json.obj(
-                    "script"     -> script.bytes().base64,
-                    "complexity" -> complexity,
-                    "extraFee"   -> extraFee(complexity)
-                  )
+              e => ScriptCompilerError(e),
+              { cr: CompileResult =>
+                Json.obj(
+                  "script"     -> ByteStr(cr.bytes).base64,
+                  "complexity" -> cr.verifierComplexity,
+                  "extraFee"   -> FeeValidation.ScriptExtraFee
+                )
               }
             )
         )
@@ -219,16 +222,16 @@ case class UtilsApiRoute(
         complete(
           result
             .fold(
-              e => ScriptCompilerError(e), {
-                case (script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity)) =>
-                  Json.obj(
-                    "script"               -> code,
-                    "scriptText"           -> script.expr.toString, // [WAIT] Script.decompile(script),
-                    "complexity"           -> maxComplexity,
-                    "verifierComplexity"   -> verifierComplexity,
-                    "callableComplexities" -> callableComplexities,
-                    "extraFee"             -> extraFee(verifierComplexity)
-                  )
+              e => ScriptCompilerError(e),
+              { case (script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity)) =>
+                Json.obj(
+                  "script"               -> code,
+                  "scriptText"           -> script.expr.toString, // [WAIT] Script.decompile(script),
+                  "complexity"           -> maxComplexity,
+                  "verifierComplexity"   -> verifierComplexity,
+                  "callableComplexities" -> callableComplexities,
+                  "extraFee"             -> extraFee(verifierComplexity)
+                )
               }
             )
         )
@@ -378,8 +381,11 @@ object UtilsApiRoute {
               limitedExecution = false,
               limit,
               remainingCalls = ContractLimits.MaxSyncDAppCalls(script.stdLibVersion),
-              availableActions = ContractLimits.MaxCallableActionsAmount(script.stdLibVersion),
-              availableData = ContractLimits.MaxWriteSetSize(script.stdLibVersion),
+              availableActions = ContractLimits.MaxCallableActionsAmountBeforeV6(script.stdLibVersion),
+              availableBalanceActions = ContractLimits.MaxBalanceScriptActionsAmountV6,
+              availableAssetActions = ContractLimits.MaxAssetScriptActionsAmountV6,
+              availablePayments = ContractLimits.MaxTotalPaymentAmountRideV6,
+              availableData = ContractLimits.MaxWriteSetSize,
               availableDataSize = ContractLimits.MaxTotalWriteSetSizeInBytes,
               currentDiff = Diff.empty,
               invocationRoot = DAppEnvironment.InvocationTreeTracker(DAppEnvironment.DAppInvocation(address, null, Nil))
@@ -399,7 +405,7 @@ object UtilsApiRoute {
             checkConstructorArgsTypes = true
           )
           .value()
-          .leftMap { case (err, _, log) => ScriptExecutionError.dAppExecution(err, log) }
+          .leftMap { case (err, _, log) => ScriptExecutionError.dAppExecution(err.message, log) }
         result <- limitedResult match {
           case (eval: EVALUATED, unusedComplexity, _) => Right((eval, limit - unusedComplexity))
           case (_: EXPR, _, log)                      => Left(ScriptExecutionError.dAppExecution(s"Calculation complexity limit exceeded", log))

@@ -1,9 +1,12 @@
 package com.wavesplatform.state.diffs.smart.predef
 
-import com.wavesplatform.account.{Address, Alias}
+import cats.syntax.either.*
+import com.wavesplatform.account.{Address, Alias, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
+import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.Testing.evaluated
 import com.wavesplatform.lang.directives.values.{Asset as AssetType, *}
@@ -26,9 +29,9 @@ import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.smart.BlockchainContext.In
-import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, WavesEnvironment, buildThisValue}
+import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, WavesEnvironment, buildThisValue}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.{DataTransaction, Proofs, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{Asset, DataTransaction, Proofs, TxHelpers, TxVersion}
 import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
 import org.scalamock.scalatest.PathMockFactory
@@ -38,7 +41,7 @@ import shapeless.Coproduct
 
 import scala.util.Random
 
-class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherValues {
+class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherValues with WithDomain {
   private val T = 'T'.toByte
 
   property("TransferTransaction binding") {
@@ -145,14 +148,14 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     val tx = TxHelpers.createAlias("alias")
     val result = runScript(
       s"""
-        |match tx {
-        | case t : CreateAliasTransaction =>
-        |   ${provenPart(tx)}
-        |   let alias = t.alias == ${Json.toJson(tx.alias.name)}
-        |   ${assertProvenPart("t")} && alias
-        | case _ => throw()
-        | }
-        |""".stripMargin,
+         |match tx {
+         | case t : CreateAliasTransaction =>
+         |   ${provenPart(tx)}
+         |   let alias = t.alias == ${Json.toJson(tx.alias.name)}
+         |   ${assertProvenPart("t")} && alias
+         | case _ => throw()
+         | }
+         |""".stripMargin,
       Coproduct(tx),
       T
     )
@@ -231,8 +234,8 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
          | case t : SetScriptTransaction =>
          |   ${provenPart(tx)}
          |   let script = if (${tx.script.isDefined}) then blake2b256(extract(t.script)) == base64'${tx.script
-           .map(s => ByteStr(crypto.fastHash(s.bytes().arr)).base64)
-           .getOrElse("")}' else isDefined(t.script) == false
+        .map(s => ByteStr(crypto.fastHash(s.bytes().arr)).base64)
+        .getOrElse("")}' else isDefined(t.script) == false
          |   ${assertProvenPart("t")} && script
          | case _ => throw()
          | }
@@ -358,6 +361,80 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     result shouldBe evaluated(true)
   }
 
+  property("InvokeScriptTransaction binding in sync call") {
+    def assetVerifier(invoke: InvokeScriptTransaction, masterDApp: KeyPair, serviceDApp: KeyPair, asset: Asset) = TestCompiler(V6).compileAsset(
+      s"""
+         |{-# STDLIB_VERSION 6 #-}
+         |{-# CONTENT_TYPE EXPRESSION #-}
+         |{-# SCRIPT_TYPE ASSET #-}
+         |
+         |match tx {
+         |  case t : InvokeScriptTransaction => 
+         |    t.dApp == Address(base58'${serviceDApp.toAddress}') &&
+         |      t.payments == [AttachedPayment(base58'$asset', 1)] &&
+         |      t.feeAssetId == unit &&
+         |      t.function == "bar" &&
+         |      t.args == [12345] &&
+         |      t.id == base58'${invoke.id()}' &&
+         |      t.fee == 0 &&
+         |      t.timestamp == ${invoke.timestamp} &&
+         |      t.version == 0 &&
+         |      t.sender == Address(base58'${invoke.dApp}') &&
+         |      t.senderPublicKey == base58'${masterDApp.publicKey}' &&
+         |      t.bodyBytes == base58''
+         |  case _ => false
+         |}
+         |
+       """.stripMargin
+    )
+
+    def masterDAppScript(asset: Asset, serviceDApp: Address) = TestCompiler(V6).compileContract(
+      s"""
+         |{-# STDLIB_VERSION 6 #-}
+         |{-# CONTENT_TYPE DAPP #-}
+         |{-# SCRIPT_TYPE ACCOUNT #-}
+         |
+         |@Callable(i)
+         |func foo() = {
+         |  strict inv = invoke(Address(base58'$serviceDApp'), "bar", [12345], [AttachedPayment(base58'$asset', 1)])
+         |  ([], nil)
+         |}
+         """.stripMargin
+    )
+
+    val serviceDAppScript = TestCompiler(V6).compileContract(
+      s"""
+         |{-# STDLIB_VERSION 6 #-}
+         |{-# CONTENT_TYPE DAPP #-}
+         |{-# SCRIPT_TYPE ACCOUNT #-}
+         |
+         |@Callable(i)
+         |func bar(arg: Int) = {
+         |  ([], nil)
+         |}
+         """.stripMargin
+    )
+
+    val invoker     = TxHelpers.signer(1)
+    val masterDApp  = TxHelpers.signer(2)
+    val serviceDApp = TxHelpers.signer(3)
+
+    withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(invoker, masterDApp, serviceDApp)) { d =>
+      val invoke = TxHelpers.invoke(masterDApp.toAddress, func = Some("foo"), invoker = invoker)
+      val issue  = TxHelpers.issue(masterDApp, script = Some(TestCompiler(V6).compileAsset("true")))
+      val setAssetScript =
+        TxHelpers.setAssetScript(masterDApp, issue.asset, assetVerifier(invoke, masterDApp, serviceDApp, issue.asset), fee = 1.waves)
+
+      d.appendBlock(
+        issue,
+        setAssetScript,
+        TxHelpers.setScript(masterDApp, masterDAppScript(issue.asset, serviceDApp.toAddress)),
+        TxHelpers.setScript(serviceDApp, serviceDAppScript)
+      )
+      d.appendAndAssertSucceed(invoke)
+    }
+  }
+
   property("InvokeExpressionTransaction binding") {
     val expression = TestCompiler(V6).compileFreeCall("[]")
     def script(tx: InvokeExpressionTransaction) =
@@ -390,8 +467,8 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
          | case t : SetAssetScriptTransaction =>
          |   ${provenPart(tx)}
          |   let script = if (${tx.script.isDefined}) then extract(t.script) == base64'${tx.script
-           .map(_.bytes().base64)
-           .getOrElse("")}' else isDefined(t.script) == false
+        .map(_.bytes().base64)
+        .getOrElse("")}' else isDefined(t.script) == false
          |    let assetId = t.assetId == base58'${tx.asset.id.toString}'
          |   ${assertProvenPart("t")} && script && assetId
          | case _ => throw()
@@ -408,8 +485,8 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
       version    <- DirectiveDictionary[StdLibVersion].all
       useV4Check <- Seq(true, false)
       entryCount <- Seq(0, 1, DataTransaction.MaxEntryCount)
-      dataEntries   = (1 to entryCount).map(idx => StringDataEntry(s"key$idx", "value"))
-      tx            <- Seq(TxHelpers.data(TxHelpers.defaultSigner, dataEntries), TxHelpers.dataV2(TxHelpers.defaultSigner, dataEntries))
+      dataEntries = (1 to entryCount).map(idx => StringDataEntry(s"key$idx", "value"))
+      tx <- Seq(TxHelpers.data(TxHelpers.defaultSigner, dataEntries), TxHelpers.dataV2(TxHelpers.defaultSigner, dataEntries))
     } {
       def check(i: Int, rideType: String, valueOpt: Option[Any]): String = {
         val key        = s""" "${tx.data(i).key}" """
@@ -464,13 +541,13 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
 
       val script =
         s"""
-            | match tx {
-            |   case t : DataTransaction =>
-            |     ${provenPart(tx)}
-            |     ${assertProvenPart("t")} &&
-            |     $assertTxData
-            |   case _ => throw()
-            | }
+           | match tx {
+           |   case t : DataTransaction =>
+           |     ${provenPart(tx)}
+           |     ${assertProvenPart("t")} &&
+           |     $assertTxData
+           |   case _ => throw()
+           | }
           """.stripMargin
 
       val result = runScript(script, Coproduct(tx), ctxV = version, chainId = T)
@@ -507,10 +584,10 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
                     |match tx {
                     | case t : MassTransferTransaction =>
                     |    let assetId = if (${tx.assetId != Waves}) then extract(t.assetId) == base58'${tx.assetId.maybeBase58Repr
-                      .getOrElse("")}'
+      .getOrElse("")}'
                     |      else isDefined(t.assetId) == false
                     |     let transferCount = t.transferCount == ${tx.transfers.length}
-                    |     let totalAmount = t.totalAmount == ${tx.transfers.map(_.amount).sum}
+                    |     let totalAmount = t.totalAmount == ${tx.transfers.map(_.amount.value).sum}
                     |     let attachment = t.attachment == base58'${Base58.encode(tx.attachment.arr)}'
                     |     ${tx.transfers.indices.map(pg).mkString("\n")}
                     |   ${provenPart(tx)}
@@ -548,13 +625,13 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
                       |   ${Range(0, 8).map(letProof(Proofs(Seq(ord.signature)), s"t.${oType}Order")).mkString("\n")}
                       |   let ${oType}Proofs =${assertProofs(s"t.${oType}Order")}
                       |   let ${oType}AssetPairAmount = if (${ord.assetPair.amountAsset != Waves}) then extract(t.${oType}Order.assetPair.amountAsset) == base58'${ord.assetPair.amountAsset.maybeBase58Repr
-                        .getOrElse("")}'
+        .getOrElse("")}'
                       |   else isDefined(t.${oType}Order.assetPair.amountAsset) == false
                       |   let ${oType}AssetPairPrice = if (${ord.assetPair.priceAsset != Waves}) then extract(t.${oType}Order.assetPair.priceAsset) == base58'${ord.assetPair.priceAsset.maybeBase58Repr
-                        .getOrElse("")}'
+        .getOrElse("")}'
                       |   else isDefined(t.${oType}Order.assetPair.priceAsset) == false
                       |   let ${oType}MatcherFeeAssetId = if (${ord.matcherFeeAssetId != Waves}) then extract(t.${oType}Order.matcherFeeAssetId) == base58'${ord.matcherFeeAssetId.maybeBase58Repr
-                        .getOrElse("")}'
+        .getOrElse("")}'
                       |   else isDefined(t.${oType}Order.matcherFeeAssetId) == false
        """.stripMargin
 
@@ -580,18 +657,18 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     }
 
     val s = s"""|match tx {
-              | case t : ExchangeTransaction =>
-              |   ${provenPart(tx)}
-              |   let price = t.price == ${tx.price}
-              |   let amount = t.amount == ${tx.amount}
-              |   let buyMatcherFee = t.buyMatcherFee == ${tx.buyMatcherFee}
-              |   let sellMatcherFee = t.sellMatcherFee == ${tx.sellMatcherFee}
-              |   ${pg(tx.buyOrder)._1}
-              |   ${pg(tx.sellOrder)._1}
-              |   ${assertProvenPart("t")} && price && amount && buyMatcherFee && sellMatcherFee && ${pg(tx.buyOrder)._2} && ${pg(tx.sellOrder)._2}
-              | case _ => throw()
-              | }
-              |""".stripMargin
+                | case t : ExchangeTransaction =>
+                |   ${provenPart(tx)}
+                |   let price = t.price == ${tx.price}
+                |   let amount = t.amount == ${tx.amount}
+                |   let buyMatcherFee = t.buyMatcherFee == ${tx.buyMatcherFee}
+                |   let sellMatcherFee = t.sellMatcherFee == ${tx.sellMatcherFee}
+                |   ${pg(tx.buyOrder)._1}
+                |   ${pg(tx.sellOrder)._1}
+                |   ${assertProvenPart("t")} && price && amount && buyMatcherFee && sellMatcherFee && ${pg(tx.buyOrder)._2} && ${pg(tx.sellOrder)._2}
+                | case _ => throw()
+                | }
+                |""".stripMargin
 
     val result = runScript(
       s,
@@ -618,17 +695,17 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
                |   let bodyBytes = t.bodyBytes == base64'${ByteStr(order.bodyBytes.apply()).base64}'
                |   ${Range(0, 8).map(letProof(order.proofs, "t")).mkString("\n")}
                |   let assetPairAmount = if (${order.assetPair.amountAsset != Waves}) then extract(t.assetPair.amountAsset) == base58'${order.assetPair.amountAsset.maybeBase58Repr
-                 .getOrElse("")}'
+      .getOrElse("")}'
                |   else isDefined(t.assetPair.amountAsset) == false
                |   let assetPairPrice = if (${order.assetPair.priceAsset != Waves}) then extract(t.assetPair.priceAsset) == base58'${order.assetPair.priceAsset.maybeBase58Repr
-                 .getOrElse("")}'
+      .getOrElse("")}'
                |   else isDefined(t.assetPair.priceAsset) == false
                |   let matcherFeeAssetId = if (${order.matcherFeeAssetId != Waves}) then extract(t.matcherFeeAssetId) == base58'${order.matcherFeeAssetId.maybeBase58Repr
-                 .getOrElse("")}'
+      .getOrElse("")}'
                |   else isDefined(t.matcherFeeAssetId) == false
                |   id && sender && senderPublicKey && matcherPublicKey && timestamp && price && amount && expiration && matcherFee && bodyBytes && ${assertProofs(
-                 "t"
-               )} && assetPairAmount && assetPairPrice && matcherFeeAssetId
+      "t"
+    )} && assetPairAmount && assetPairPrice && matcherFeeAssetId
                | case _ => throw()
                | }
                |""".stripMargin
@@ -724,7 +801,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     for {
       compileResult <- compiler.ExpressionCompiler(ctx.compilerContext, expr)
       (typedExpr, _) = compileResult
-      r <- EvaluatorV1().apply[EVALUATED](ctx.evaluationContext(environment), typedExpr)
+      r <- EvaluatorV1().apply[EVALUATED](ctx.evaluationContext(environment), typedExpr).leftMap(_.message)
     } yield r
   }
 
@@ -756,7 +833,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
     for {
       compileResult <- ExpressionCompiler(ctx.compilerContext, expr)
       (typedExpr, _) = compileResult
-      r <- EvaluatorV1().apply[EVALUATED](ctx.evaluationContext(env), typedExpr)
+      r <- EvaluatorV1().apply[EVALUATED](ctx.evaluationContext(env), typedExpr).leftMap(_.message)
     } yield r
   }
 }

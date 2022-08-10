@@ -1,8 +1,5 @@
 package com.wavesplatform.http
 
-import scala.concurrent.Future
-import scala.util.Random
-
 import com.wavesplatform.BlockchainStubHelpers
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.common.CommonTransactionsApi
@@ -14,15 +11,18 @@ import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
 import com.wavesplatform.test.TestTime
-import com.wavesplatform.transaction.{Asset, Proofs, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
+import com.wavesplatform.transaction.{Asset, Proofs, TxHelpers, TxPositiveAmount, TxVersion}
 import com.wavesplatform.utils.{EthEncoding, EthHelpers}
 import com.wavesplatform.wallet.Wallet
 import org.scalamock.scalatest.PathMockFactory
-import play.api.libs.json.{JsObject, Json, JsValue}
+import play.api.libs.json.{JsObject, JsValue, Json}
+
+import scala.concurrent.Future
+import scala.util.Random
 
 class TransactionBroadcastSpec
     extends RouteSpec("/transactions")
@@ -62,7 +62,15 @@ class TransactionBroadcastSpec
 
       val route = transactionsApiRoute.copy(blockchain = blockchain, transactionPublisher = transactionPublisher).route
 
-      val transaction = TxHelpers.exchange(ethBuyOrder, ethSellOrder, price = 100, buyMatcherFee = ethBuyOrder.matcherFee, sellMatcherFee = ethSellOrder.matcherFee, version = TxVersion.V3, timestamp = 100)
+      val transaction = TxHelpers.exchange(
+        ethBuyOrder,
+        ethSellOrder,
+        price = 100,
+        buyMatcherFee = ethBuyOrder.matcherFee.value,
+        sellMatcherFee = ethSellOrder.matcherFee.value,
+        version = TxVersion.V3,
+        timestamp = 100
+      )
       testTime.setTime(100)
       val validResponseJson =
         s"""{
@@ -161,7 +169,7 @@ class TransactionBroadcastSpec
         sender.toAddress,
         None,
         Seq.empty,
-        500000L,
+        TxPositiveAmount.unsafeFrom(500000L),
         Asset.Waves,
         testTime.getTimestamp(),
         Proofs.empty,

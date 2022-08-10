@@ -3,12 +3,13 @@ package com.wavesplatform
 import java.io.File
 import java.nio.ByteBuffer
 import java.util
+
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.AddressPortfolio
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
-import com.wavesplatform.database._
+import com.wavesplatform.database.*
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.settings.Constants
@@ -20,7 +21,7 @@ import org.iq80.leveldb.DB
 
 import scala.annotation.tailrec
 import scala.collection.mutable
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 //noinspection ScalaStyle
 object Explorer extends ScorexLogging {

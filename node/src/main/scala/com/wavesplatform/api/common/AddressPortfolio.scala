@@ -1,19 +1,17 @@
 package com.wavesplatform.api.common
 
-import cats.syntax.option._
-import cats.syntax.semigroup._
+import cats.syntax.semigroup.*
 import com.google.common.collect.AbstractIterator
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.database.{AddressId, DBResource, KeyTags, Keys, readIntSeq}
-import com.wavesplatform.state.Portfolio.longSemigroup
-import com.wavesplatform.state.{AssetDescription, Diff}
+import com.wavesplatform.state.{AssetDescription, Diff, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utils.ScorexLogging
 
 import scala.annotation.tailrec
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 class NFTIterator(addressId: AddressId, maybeAfter: Option[IssuedAsset], resource: DBResource)
     extends AbstractIterator[(IssuedAsset, Long)]
@@ -80,7 +78,7 @@ class BalanceIterator(
     } else nextOverride()
 }
 
-object AddressPortfolio extends ScorexLogging {
+object AddressPortfolio {
   def nftIterator(
       resource: DBResource,
       address: Address,
@@ -93,7 +91,7 @@ object AddressPortfolio extends ScorexLogging {
         .get(Keys.addressId(address))
         .fold[Iterator[(IssuedAsset, Long)]](Iterator())(addressId => new NFTIterator(addressId, maybeAfter, resource).asScala),
       asset => loadAssetDescription(asset).exists(_.nft),
-      diff.portfolios.get(address).orEmpty.assets
+      diff.portfolios.getOrElse(address, Portfolio.empty).assets
     ).asScala
       .collect { case (asset, balance) if balance > 0 => asset }
       .flatMap(a => loadAssetDescription(a).map(a -> _))
@@ -109,7 +107,7 @@ object AddressPortfolio extends ScorexLogging {
         .get(Keys.addressId(address))
         .fold[Iterator[(IssuedAsset, Long)]](Iterator())(addressId => new AssetBalanceIterator(addressId, resource).asScala),
       includeAsset,
-      diff.portfolios.get(address).orEmpty.assets
+      diff.portfolios.getOrElse(address, Portfolio.empty).assets
     ).asScala.filter {
       case (asset, balance) => includeAsset(asset) && balance > 0
     }

@@ -175,7 +175,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
 
         val (buy, sell) = orders(pair, o1ver, o2ver, orderFee, ntpTime, acc1, acc0, acc2)
 
-        val amount = math.min(buy.amount, sell.amount)
+        val amount = math.min(buy.amount.value, sell.amount.value)
         val tx = ExchangeTransaction
           .signed(
             3.toByte,
@@ -184,8 +184,8 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
             order2 = buy,
             amount = amount,
             price = sellPrice,
-            buyMatcherFee = (BigInt(orderFee) * amount / buy.amount).toLong,
-            sellMatcherFee = (BigInt(orderFee) * amount / sell.amount).toLong,
+            buyMatcherFee = (BigInt(orderFee) * amount / buy.amount.value).toLong,
+            sellMatcherFee = (BigInt(orderFee) * amount / sell.amount.value).toLong,
             fee = smartMatcherFee,
             timestamp = ntpTime.correctedTime()
           )
@@ -217,7 +217,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
          )) {
       val (buy, sell) = orders(pair, o1ver, o2ver, orderFee, ntpTime, acc1, acc0, acc2)
 
-      val amount = math.min(buy.amount, sell.amount)
+      val amount = math.min(buy.amount.value, sell.amount.value)
       val tx = ExchangeTransaction
         .signed(
           2.toByte,
@@ -226,8 +226,8 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
           order2 = sell,
           amount = amount,
           price = sellPrice,
-          buyMatcherFee = (BigInt(orderFee) * amount / buy.amount).toLong,
-          sellMatcherFee = (BigInt(orderFee) * amount / sell.amount).toLong,
+          buyMatcherFee = (BigInt(orderFee) * amount / buy.amount.value).toLong,
+          sellMatcherFee = (BigInt(orderFee) * amount / sell.amount.value).toLong,
           fee = smartMatcherFee,
           timestamp = ntpTime.correctedTime()
         )

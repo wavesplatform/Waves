@@ -1,7 +1,6 @@
 package com.wavesplatform.events
 
 import java.nio.{ByteBuffer, ByteOrder}
-
 import cats.syntax.semigroup._
 import com.google.common.primitives.Ints
 import com.wavesplatform.api.common.CommonBlocksApi
@@ -25,21 +24,26 @@ import monix.reactive.Observable
 import monix.reactive.subjects.PublishToOneSubject
 import org.iq80.leveldb.DB
 
+import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.Future
 import scala.util.Using
 import scala.util.control.Exception
 
-class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
-    extends BlockchainUpdatesApi
-    with BlockchainUpdateTriggers
-    with ScorexLogging {
+class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler) extends BlockchainUpdatesApi with BlockchainUpdateTriggers with ScorexLogging {
   private[this] val monitor     = new Object
   private[this] var liquidState = Option.empty[LiquidState]
-  private[this] var handlers    = Set.empty[Handler]
+  private[this] val handlers    = ConcurrentHashMap.newKeySet[Handler]()
 
-  def shutdown(): Unit = monitor.synchronized {
+  def newHandler(id: String, maybeLiquidState: Option[LiquidState], subject: PublishToOneSubject[BlockchainUpdated], maxQueueSize: Int): Handler =
+    new Handler(id, maybeLiquidState, subject, maxQueueSize)
+
+  def shutdownHandlers(): Unit = monitor.synchronized {
+    handlers.forEach(_.shutdown())
+  }
+
+  def shutdown(): Unit = {
+    shutdownHandlers()
     db.close()
-    handlers.foreach(_.shutdown())
   }
 
   def height: Int =
@@ -65,13 +69,13 @@ class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
       s"Block reference ${block.header.reference} does not match last block id ${liquidState.get.totalBlockId}"
     )
 
-    liquidState.foreach(
-      ls => db.put(keyForHeight(ls.keyBlock.height), ls.solidify().protobuf.update(_.append.block.optionalBlock := None).toByteArray)
+    liquidState.foreach(ls =>
+      db.put(keyForHeight(ls.keyBlock.height), ls.solidify().protobuf.update(_.append.block.optionalBlock := None).toByteArray)
     )
 
     val ba = BlockAppended.from(block, diff, blockchainBeforeWithMinerReward)
     liquidState = Some(LiquidState(ba, Seq.empty))
-    handlers.foreach(_.handleUpdate(ba))
+    handlers.forEach(_.handleUpdate(ba))
   }
 
   override def onProcessMicroBlock(
@@ -90,7 +94,7 @@ class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
     val mba = MicroBlockAppended.from(microBlock, diff, blockchainBeforeWithMinerReward, totalBlockId, totalTransactionsRoot)
     liquidState = Some(ls.copy(microBlocks = ls.microBlocks :+ mba))
 
-    handlers.foreach(_.handleUpdate(mba))
+    handlers.forEach(_.handleUpdate(mba))
   }
 
   def rollbackData(toHeight: Int): Seq[BlockAppended] =
@@ -160,7 +164,7 @@ class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
 
     liquidState = None
 
-    handlers.foreach(_.rollbackBlock(microRollbacks, blockRollbacks))
+    handlers.forEach(_.rollbackBlock(microRollbacks, blockRollbacks))
   }
 
   override def onMicroBlockRollback(blockchainBefore: Blockchain, toBlockId: ByteStr): Unit = monitor.synchronized {
@@ -184,7 +188,7 @@ class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
             }
         }
 
-        handlers.foreach(
+        handlers.forEach(
           _.rollbackMicroBlock(
             MicroBlockRollbackCompleted(
               toBlockId,
@@ -224,13 +228,13 @@ class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
     require(toHeight == 0 || toHeight >= fromHeight, "fromHeight must not exceed toHeight")
     monitor.synchronized {
       val subject = PublishToOneSubject[BlockchainUpdated]()
-      val handler = new Handler(streamId, liquidState, subject, 250)
-      handlers += handler
+      val handler = newHandler(streamId, liquidState, subject, 250)
+      handlers.add(handler)
 
-      val removeHandler = Task(monitor.synchronized {
+      val removeHandler = Task {
         log.info(s"[$streamId] Removing handler")
-        handlers -= handler
-      })
+        handlers.remove(handler)
+      }.void
 
       (new Loader(
         db,

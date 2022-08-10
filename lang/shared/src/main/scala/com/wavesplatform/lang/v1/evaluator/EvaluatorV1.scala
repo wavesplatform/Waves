@@ -7,11 +7,11 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, NOTHING}
 import com.wavesplatform.lang.v1.evaluator.ContextfulNativeFunction.{Extended, Simple}
-import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext.Lenses
 import com.wavesplatform.lang.v1.evaluator.ctx.*
+import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext.Lenses
 import com.wavesplatform.lang.v1.task.imports.*
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.{CoevalF, EvalF, ExecutionError}
+import com.wavesplatform.lang.{CoevalF, CommonError, EvalF, ExecutionError}
 
 import scala.collection.mutable.ListBuffer
 import scala.util.Try
@@ -31,7 +31,7 @@ object EvaluatorV1 {
 
 class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: Monad[CoevalF[F, *]]) {
   private val lenses = new Lenses[F, C]
-  import lenses._
+  import lenses.*
 
   private def evalLetBlock(let: LET, inner: EXPR): EvalM[F, C, (EvaluationContext[C, F], EVALUATED)] =
     for {
@@ -104,9 +104,9 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: M
                 case f: Simple[C]   =>
                   val r = Try(f.evaluate(ctx.ec.environment, args))
                     .toEither
-                    .leftMap(_.toString)
+                    .bimap(e => CommonError(e.toString): ExecutionError, EitherT(_))
                     .pure[F]
-                  Eval.now(EitherT(r).map(EitherT(_)).flatten.value)
+                  EitherT(r).flatten.value.pure[Eval]
                 case f: Extended[C] =>
                   f.evaluate(ctx.ec.environment, args, Int.MaxValue)
                     .map(_.map(_._1))

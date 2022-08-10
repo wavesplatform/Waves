@@ -1,21 +1,16 @@
 package com.wavesplatform.lang.evaluator
 
-import cats.Id
-import cats.syntax.semigroup.*
+import cats.syntax.either.*
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.*
+import com.wavesplatform.lang.utils.lazyContexts
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, *}
 import com.wavesplatform.lang.v1.compiler.{Decompiler, ExpressionCompiler}
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.EvaluationException
-import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV2, FunctionIds}
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.{Common, Global}
 import com.wavesplatform.test.*
 import org.scalatest.Inside
 
@@ -23,30 +18,30 @@ import scala.annotation.tailrec
 import scala.util.Random
 
 class EvaluatorV2Test extends PropSpec with Inside {
-  private val version = V4
-  private val ctx =
-    PureContext.build(version, useNewPowPrecision = true).withEnvironment[Environment] |+|
-      WavesContext.build(Global, DirectiveSet(version, Account, DApp).explicitGet())
-
+  private val version     = V4
+  private val ctx         = lazyContexts(DirectiveSet(version, Account, DApp).explicitGet() -> true)()
   private val environment = Common.emptyBlockchainEnvironment()
-  private val evalCtx     = LoggedEvaluationContext[Environment, Id](_ => _ => (), ctx.evaluationContext(environment))
 
-  private val oldEvaluator = new EvaluatorV2(evalCtx, version, correctFunctionCallScope = true, newMode = false)
-  private val newEvaluator = new EvaluatorV2(evalCtx, version, correctFunctionCallScope = true, newMode = true)
+  private def evalEither(expr: EXPR, limit: Int, newMode: Boolean): Either[String, (EXPR, Int)] =
+    EvaluatorV2
+      .applyLimitedCoeval(expr, limit, ctx.evaluationContext(environment), version, correctFunctionCallScope = true, newMode)
+      .value()
+      .bimap(_._1.message, { case (result, complexity, _) => (result, complexity) })
 
-  private def evalBoth(expr: EXPR, limit: Int): (EXPR, String, Int) = {
-    val (result, unusedComplexity)   = newEvaluator(expr, limit)
-    val (result2, unusedComplexity2) = oldEvaluator(expr, limit)
+  private def evalBothEither(expr: EXPR, limit: Int): Either[String, (EXPR, Int)] = {
+    val result  = evalEither(expr, limit, newMode = true)
+    val result2 = evalEither(expr, limit, newMode = false)
     result shouldBe result2
-    unusedComplexity shouldBe unusedComplexity2
+    result
+  }
+
+  private def evalBoth(script: String, limit: Int): (EXPR, String, Int) = {
+    val (result, unusedComplexity) = evalBothEither(compile(script), limit).explicitGet()
     (result, Decompiler(result, ctx.decompilerContext), limit - unusedComplexity)
   }
 
-  private def evalBoth(script: String, limit: Int): (EXPR, String, Int) =
-    evalBoth(compile(script), limit)
-
   private def evalNew(expr: EXPR, limit: Int): (EXPR, String, Int) = {
-    val (result, unusedComplexity) = newEvaluator(expr, limit)
+    val (result, unusedComplexity) = evalEither(expr, limit, newMode = true).explicitGet()
     (result, Decompiler(result, ctx.decompilerContext), limit - unusedComplexity)
   }
 
@@ -54,7 +49,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
     evalNew(compile(script), limit)
 
   private def evalOld(expr: EXPR, limit: Int): (EXPR, String, Int) = {
-    val (result, unusedComplexity) = oldEvaluator(expr, limit)
+    val (result, unusedComplexity) = evalEither(expr, limit, newMode = false).explicitGet()
     (result, Decompiler(result, ctx.decompilerContext), limit - unusedComplexity)
   }
 
@@ -75,252 +70,230 @@ class EvaluatorV2Test extends PropSpec with Inside {
         | c + a
       """.stripMargin
 
-    inside(evalOld(script, limit = 0)) {
-      case (_, result, cost) =>
-        cost shouldBe 0
-        result shouldBe
-          """
-            |let a = ((1 + 10) + 100)
-            |let b = ((1000 + a) + 10000)
-            |let c = ((a + b) + 100000)
-            |(c + a)
+    inside(evalOld(script, limit = 0)) { case (_, result, cost) =>
+      cost shouldBe 0
+      result shouldBe
+        """
+          |let a = ((1 + 10) + 100)
+          |let b = ((1000 + a) + 10000)
+          |let c = ((a + b) + 100000)
+          |(c + a)
           """.stripMargin.trim
     }
 
-    inside(evalOld(script, limit = 1)) {
-      case (_, result, cost) =>
-        cost shouldBe 1
-        result shouldBe
-          """
-            |let a = (11 + 100)
-            |let b = ((1000 + a) + 10000)
-            |let c = ((a + b) + 100000)
-            |(c + a)
+    inside(evalOld(script, limit = 1)) { case (_, result, cost) =>
+      cost shouldBe 1
+      result shouldBe
+        """
+          |let a = (11 + 100)
+          |let b = ((1000 + a) + 10000)
+          |let c = ((a + b) + 100000)
+          |(c + a)
           """.stripMargin.trim
     }
 
-    inside(evalOld(script, limit = 2)) {
-      case (_, result, cost) =>
-        cost shouldBe 2
-        result shouldBe
-          """
-            |let a = 111
-            |let b = ((1000 + a) + 10000)
-            |let c = ((a + b) + 100000)
-            |(c + a)
+    inside(evalOld(script, limit = 2)) { case (_, result, cost) =>
+      cost shouldBe 2
+      result shouldBe
+        """
+          |let a = 111
+          |let b = ((1000 + a) + 10000)
+          |let c = ((a + b) + 100000)
+          |(c + a)
+        """.stripMargin.trim
+    }
+
+    inside(evalOld(script, limit = 3)) { case (_, result, cost) =>
+      cost shouldBe 3
+      result shouldBe
+        """
+          |let a = 111
+          |let b = ((1000 + a) + 10000)
+          |let c = ((111 + b) + 100000)
+          |(c + a)
           """.stripMargin.trim
     }
 
-    inside(evalOld(script, limit = 3)) {
-      case (_, result, cost) =>
-        cost shouldBe 3
-        result shouldBe
-          """
-            |let a = 111
-            |let b = ((1000 + a) + 10000)
-            |let c = ((111 + b) + 100000)
-            |(c + a)
-          """.stripMargin.trim
-    }
-
-    inside(evalOld(script, limit = 4)) {
-      case (_, result, cost) =>
-        cost shouldBe 4
-        result shouldBe
-          """
-            |let a = 111
-            |let b = ((1000 + 111) + 10000)
-            |let c = ((111 + b) + 100000)
-            |(c + a)
+    inside(evalOld(script, limit = 4)) { case (_, result, cost) =>
+      cost shouldBe 4
+      result shouldBe
+        """
+          |let a = 111
+          |let b = ((1000 + 111) + 10000)
+          |let c = ((111 + b) + 100000)
+          |(c + a)
           """.stripMargin.trim
 
     }
 
-    inside(evalOld(script, limit = 5)) {
-      case (_, result, cost) =>
-        cost shouldBe 5
-        result shouldBe
-          """
-            |let a = 111
-            |let b = (1111 + 10000)
-            |let c = ((111 + b) + 100000)
-            |(c + a)
+    inside(evalOld(script, limit = 5)) { case (_, result, cost) =>
+      cost shouldBe 5
+      result shouldBe
+        """
+          |let a = 111
+          |let b = (1111 + 10000)
+          |let c = ((111 + b) + 100000)
+          |(c + a)
           """.stripMargin.trim
 
     }
 
-    inside(evalOld(script, limit = 6)) {
-      case (_, result, cost) =>
-        cost shouldBe 6
-        result shouldBe
-          """
-            |let a = 111
-            |let b = 11111
-            |let c = ((111 + b) + 100000)
-            |(c + a)
+    inside(evalOld(script, limit = 6)) { case (_, result, cost) =>
+      cost shouldBe 6
+      result shouldBe
+        """
+          |let a = 111
+          |let b = 11111
+          |let c = ((111 + b) + 100000)
+          |(c + a)
           """.stripMargin.trim
     }
 
-    inside(evalOld(script, limit = 7)) {
-      case (_, result, cost) =>
-        cost shouldBe 7
-        result shouldBe
-          """
-            |let a = 111
-            |let b = 11111
-            |let c = ((111 + 11111) + 100000)
-            |(c + a)
+    inside(evalOld(script, limit = 7)) { case (_, result, cost) =>
+      cost shouldBe 7
+      result shouldBe
+        """
+          |let a = 111
+          |let b = 11111
+          |let c = ((111 + 11111) + 100000)
+          |(c + a)
           """.stripMargin.trim
     }
 
-    inside(evalOld(script, limit = 8)) {
-      case (_, result, cost) =>
-        cost shouldBe 8
-        result shouldBe
-          """
-            |let a = 111
-            |let b = 11111
-            |let c = (11222 + 100000)
-            |(c + a)
+    inside(evalOld(script, limit = 8)) { case (_, result, cost) =>
+      cost shouldBe 8
+      result shouldBe
+        """
+          |let a = 111
+          |let b = 11111
+          |let c = (11222 + 100000)
+          |(c + a)
           """.stripMargin.trim
     }
 
-    inside(evalOld(script, limit = 9)) {
-      case (_, result, cost) =>
-        cost shouldBe 9
-        result shouldBe
-          """
-            |let a = 111
-            |let b = 11111
-            |let c = 111222
-            |(c + a)
+    inside(evalOld(script, limit = 9)) { case (_, result, cost) =>
+      cost shouldBe 9
+      result shouldBe
+        """
+          |let a = 111
+          |let b = 11111
+          |let c = 111222
+          |(c + a)
           """.stripMargin.trim
     }
 
-    inside(evalOld(script, limit = 10)) {
-      case (_, result, cost) =>
-        cost shouldBe 10
-        result shouldBe
-          """
-            |let a = 111
-            |let b = 11111
-            |let c = 111222
-            |(111222 + a)
+    inside(evalOld(script, limit = 10)) { case (_, result, cost) =>
+      cost shouldBe 10
+      result shouldBe
+        """
+          |let a = 111
+          |let b = 11111
+          |let c = 111222
+          |(111222 + a)
           """.stripMargin.trim
     }
 
-    inside(evalOld(script, limit = 11)) {
-      case (_, result, cost) =>
-        cost shouldBe 11
-        result shouldBe
-          """
-            |let a = 111
-            |let b = 11111
-            |let c = 111222
-            |(111222 + 111)
+    inside(evalOld(script, limit = 11)) { case (_, result, cost) =>
+      cost shouldBe 11
+      result shouldBe
+        """
+          |let a = 111
+          |let b = 11111
+          |let c = 111222
+          |(111222 + 111)
           """.stripMargin.trim
     }
 
-    inside(evalOld(script, limit = 12)) {
-      case (_, result, cost) =>
-        cost shouldBe 12
-        result shouldBe "111333"
+    inside(evalOld(script, limit = 12)) { case (_, result, cost) =>
+      cost shouldBe 12
+      result shouldBe "111333"
     }
 
-    inside(evalOld(script, limit = 13)) {
-      case (_, result, cost) =>
-        cost shouldBe 12
-        result shouldBe "111333"
+    inside(evalOld(script, limit = 13)) { case (_, result, cost) =>
+      cost shouldBe 12
+      result shouldBe "111333"
     }
 
-    inside(evalNew(script, limit = 0)) {
-      case (_, result, cost) =>
-        cost shouldBe 0
-        result shouldBe
-          """
-            |let a = ((1 + 10) + 100)
-            |let b = ((1000 + a) + 10000)
-            |let c = ((a + b) + 100000)
-            |(c + a)
+    inside(evalNew(script, limit = 0)) { case (_, result, cost) =>
+      cost shouldBe 0
+      result shouldBe
+        """
+          |let a = ((1 + 10) + 100)
+          |let b = ((1000 + a) + 10000)
+          |let c = ((a + b) + 100000)
+          |(c + a)
           """.stripMargin.trim
     }
 
-    inside(evalNew(script, limit = 1)) {
-      case (_, result, cost) =>
-        cost shouldBe 1
-        result shouldBe
-          """
-            |let a = (11 + 100)
-            |let b = ((1000 + a) + 10000)
-            |let c = ((a + b) + 100000)
-            |(c + a)
+    inside(evalNew(script, limit = 1)) { case (_, result, cost) =>
+      cost shouldBe 1
+      result shouldBe
+        """
+          |let a = (11 + 100)
+          |let b = ((1000 + a) + 10000)
+          |let c = ((a + b) + 100000)
+          |(c + a)
           """.stripMargin.trim
     }
 
-    inside(evalNew(script, limit = 2)) {
-      case (_, result, cost) =>
-        cost shouldBe 2
-        result shouldBe
-          """
-            |let a = 111
-            |let b = ((1000 + a) + 10000)
-            |let c = ((a + b) + 100000)
-            |(c + a)
+    inside(evalNew(script, limit = 2)) { case (_, result, cost) =>
+      cost shouldBe 2
+      result shouldBe
+        """
+          |let a = 111
+          |let b = ((1000 + a) + 10000)
+          |let c = ((a + b) + 100000)
+          |(c + a)
           """.stripMargin.trim
     }
 
-    inside(evalNew(script, limit = 3)) {
-      case (_, result, cost) =>
-        cost shouldBe 3
-        result shouldBe
-          """
-            |let a = 111
-            |let b = (1111 + 10000)
-            |let c = ((111 + b) + 100000)
-            |(c + a)
+    inside(evalNew(script, limit = 3)) { case (_, result, cost) =>
+      cost shouldBe 3
+      result shouldBe
+        """
+          |let a = 111
+          |let b = (1111 + 10000)
+          |let c = ((111 + b) + 100000)
+          |(c + a)
           """.stripMargin.trim
     }
 
-    inside(evalNew(script, limit = 4)) {
-      case (_, result, cost) =>
-        cost shouldBe 4
-        result shouldBe
-          """
-            |let a = 111
-            |let b = 11111
-            |let c = ((111 + b) + 100000)
-            |(c + a)
+    inside(evalNew(script, limit = 4)) { case (_, result, cost) =>
+      cost shouldBe 4
+      result shouldBe
+        """
+          |let a = 111
+          |let b = 11111
+          |let c = ((111 + b) + 100000)
+          |(c + a)
           """.stripMargin.trim
     }
 
-    inside(evalNew(script, limit = 5)) {
-      case (_, result, cost) =>
-        cost shouldBe 5
-        result shouldBe
-          """
-            |let a = 111
-            |let b = 11111
-            |let c = (11222 + 100000)
-            |(c + a)
+    inside(evalNew(script, limit = 5)) { case (_, result, cost) =>
+      cost shouldBe 5
+      result shouldBe
+        """
+          |let a = 111
+          |let b = 11111
+          |let c = (11222 + 100000)
+          |(c + a)
           """.stripMargin.trim
     }
 
-    inside(evalNew(script, limit = 6)) {
-      case (_, result, cost) =>
-        cost shouldBe 6
-        result shouldBe
-          """
-            |let a = 111
-            |let b = 11111
-            |let c = 111222
-            |(c + a)
+    inside(evalNew(script, limit = 6)) { case (_, result, cost) =>
+      cost shouldBe 6
+      result shouldBe
+        """
+          |let a = 111
+          |let b = 11111
+          |let c = 111222
+          |(c + a)
           """.stripMargin.trim
     }
 
-    inside(evalNew(script, limit = 7)) {
-      case (_, result, cost) =>
-        cost shouldBe 7
-        result shouldBe "111333"
+    inside(evalNew(script, limit = 7)) { case (_, result, cost) =>
+      cost shouldBe 7
+      result shouldBe "111333"
     }
   }
 
@@ -335,274 +308,258 @@ class EvaluatorV2Test extends PropSpec with Inside {
         | f(1, 2)
       """.stripMargin
 
-    inside(evalOld(script, limit = 0)) {
-      case (_, result, cost) =>
-        cost shouldBe 0
-        result shouldBe
-          """
-            |func f (a,b) = {
-            |    let c = (a + b)
-            |    let d = (a - b)
-            |    ((c * d) - 1)
-            |    }
-            |
-            |f(1, 2)
+    inside(evalOld(script, limit = 0)) { case (_, result, cost) =>
+      cost shouldBe 0
+      result shouldBe
+        """
+          |func f (a,b) = {
+          |    let c = (a + b)
+          |    let d = (a - b)
+          |    ((c * d) - 1)
+          |    }
+          |
+          |f(1, 2)
           """.stripMargin.trim
     }
 
-    inside(evalOld(script, limit = 1)) {
-      case (_, result, cost) =>
-        cost shouldBe 1
-        result shouldBe
-          """
-            |func f (a,b) = {
-            |    let c = (a + b)
-            |    let d = (a - b)
-            |    ((c * d) - 1)
-            |    }
-            |
-            |let a = 1
-            |let b = 2
-            |let c = (1 + b)
-            |let d = (a - b)
-            |((c * d) - 1)
+    inside(evalOld(script, limit = 1)) { case (_, result, cost) =>
+      cost shouldBe 1
+      result shouldBe
+        """
+          |func f (a,b) = {
+          |    let c = (a + b)
+          |    let d = (a - b)
+          |    ((c * d) - 1)
+          |    }
+          |
+          |let a = 1
+          |let b = 2
+          |let c = (1 + b)
+          |let d = (a - b)
+          |((c * d) - 1)
           """.stripMargin.trim
     }
 
-    inside(evalOld(script, limit = 2)) {
-      case (_, result, cost) =>
-        cost shouldBe 2
-        result shouldBe
-          """
-            |func f (a,b) = {
-            |    let c = (a + b)
-            |    let d = (a - b)
-            |    ((c * d) - 1)
-            |    }
-            |
-            |let a = 1
-            |let b = 2
-            |let c = (1 + 2)
-            |let d = (a - b)
-            |((c * d) - 1)
+    inside(evalOld(script, limit = 2)) { case (_, result, cost) =>
+      cost shouldBe 2
+      result shouldBe
+        """
+          |func f (a,b) = {
+          |    let c = (a + b)
+          |    let d = (a - b)
+          |    ((c * d) - 1)
+          |    }
+          |
+          |let a = 1
+          |let b = 2
+          |let c = (1 + 2)
+          |let d = (a - b)
+          |((c * d) - 1)
           """.stripMargin.trim
     }
 
-    inside(evalOld(script, limit = 3)) {
-      case (_, result, cost) =>
-        cost shouldBe 3
-        result shouldBe
-          """
-            |func f (a,b) = {
-            |    let c = (a + b)
-            |    let d = (a - b)
-            |    ((c * d) - 1)
-            |    }
-            |
-            |let a = 1
-            |let b = 2
-            |let c = 3
-            |let d = (a - b)
-            |((c * d) - 1)
+    inside(evalOld(script, limit = 3)) { case (_, result, cost) =>
+      cost shouldBe 3
+      result shouldBe
+        """
+          |func f (a,b) = {
+          |    let c = (a + b)
+          |    let d = (a - b)
+          |    ((c * d) - 1)
+          |    }
+          |
+          |let a = 1
+          |let b = 2
+          |let c = 3
+          |let d = (a - b)
+          |((c * d) - 1)
           """.stripMargin.trim
     }
 
-    inside(evalOld(script, limit = 4)) {
-      case (_, result, cost) =>
-        cost shouldBe 4
-        result shouldBe
-          """
-            |func f (a,b) = {
-            |    let c = (a + b)
-            |    let d = (a - b)
-            |    ((c * d) - 1)
-            |    }
-            |
-            |let a = 1
-            |let b = 2
-            |let c = 3
-            |let d = (a - b)
-            |((3 * d) - 1)
+    inside(evalOld(script, limit = 4)) { case (_, result, cost) =>
+      cost shouldBe 4
+      result shouldBe
+        """
+          |func f (a,b) = {
+          |    let c = (a + b)
+          |    let d = (a - b)
+          |    ((c * d) - 1)
+          |    }
+          |
+          |let a = 1
+          |let b = 2
+          |let c = 3
+          |let d = (a - b)
+          |((3 * d) - 1)
           """.stripMargin.trim
     }
 
-    inside(evalOld(script, limit = 5)) {
-      case (_, result, cost) =>
-        cost shouldBe 5
-        result shouldBe
-          """
-            |func f (a,b) = {
-            |    let c = (a + b)
-            |    let d = (a - b)
-            |    ((c * d) - 1)
-            |    }
-            |
-            |let a = 1
-            |let b = 2
-            |let c = 3
-            |let d = (1 - b)
-            |((3 * d) - 1)
+    inside(evalOld(script, limit = 5)) { case (_, result, cost) =>
+      cost shouldBe 5
+      result shouldBe
+        """
+          |func f (a,b) = {
+          |    let c = (a + b)
+          |    let d = (a - b)
+          |    ((c * d) - 1)
+          |    }
+          |
+          |let a = 1
+          |let b = 2
+          |let c = 3
+          |let d = (1 - b)
+          |((3 * d) - 1)
           """.stripMargin.trim
     }
 
-    inside(evalOld(script, limit = 6)) {
-      case (_, result, cost) =>
-        cost shouldBe 6
-        result shouldBe
-          """
-            |func f (a,b) = {
-            |    let c = (a + b)
-            |    let d = (a - b)
-            |    ((c * d) - 1)
-            |    }
-            |
-            |let a = 1
-            |let b = 2
-            |let c = 3
-            |let d = (1 - 2)
-            |((3 * d) - 1)
+    inside(evalOld(script, limit = 6)) { case (_, result, cost) =>
+      cost shouldBe 6
+      result shouldBe
+        """
+          |func f (a,b) = {
+          |    let c = (a + b)
+          |    let d = (a - b)
+          |    ((c * d) - 1)
+          |    }
+          |
+          |let a = 1
+          |let b = 2
+          |let c = 3
+          |let d = (1 - 2)
+          |((3 * d) - 1)
           """.stripMargin.trim
     }
 
-    inside(evalOld(script, limit = 7)) {
-      case (_, result, cost) =>
-        cost shouldBe 7
-        result shouldBe
-          """
-            |func f (a,b) = {
-            |    let c = (a + b)
-            |    let d = (a - b)
-            |    ((c * d) - 1)
-            |    }
-            |
-            |let a = 1
-            |let b = 2
-            |let c = 3
-            |let d = -1
-            |((3 * d) - 1)
+    inside(evalOld(script, limit = 7)) { case (_, result, cost) =>
+      cost shouldBe 7
+      result shouldBe
+        """
+          |func f (a,b) = {
+          |    let c = (a + b)
+          |    let d = (a - b)
+          |    ((c * d) - 1)
+          |    }
+          |
+          |let a = 1
+          |let b = 2
+          |let c = 3
+          |let d = -1
+          |((3 * d) - 1)
           """.stripMargin.trim
     }
 
-    inside(evalOld(script, limit = 8)) {
-      case (_, result, cost) =>
-        cost shouldBe 8
-        result shouldBe
-          """
-            |func f (a,b) = {
-            |    let c = (a + b)
-            |    let d = (a - b)
-            |    ((c * d) - 1)
-            |    }
-            |
-            |let a = 1
-            |let b = 2
-            |let c = 3
-            |let d = -1
-            |((3 * -1) - 1)
+    inside(evalOld(script, limit = 8)) { case (_, result, cost) =>
+      cost shouldBe 8
+      result shouldBe
+        """
+          |func f (a,b) = {
+          |    let c = (a + b)
+          |    let d = (a - b)
+          |    ((c * d) - 1)
+          |    }
+          |
+          |let a = 1
+          |let b = 2
+          |let c = 3
+          |let d = -1
+          |((3 * -1) - 1)
           """.stripMargin.trim
     }
 
-    inside(evalOld(script, limit = 9)) {
-      case (_, result, cost) =>
-        cost shouldBe 9
-        result shouldBe
-          """
-            |func f (a,b) = {
-            |    let c = (a + b)
-            |    let d = (a - b)
-            |    ((c * d) - 1)
-            |    }
-            |
-            |let a = 1
-            |let b = 2
-            |let c = 3
-            |let d = -1
-            |(-3 - 1)
+    inside(evalOld(script, limit = 9)) { case (_, result, cost) =>
+      cost shouldBe 9
+      result shouldBe
+        """
+          |func f (a,b) = {
+          |    let c = (a + b)
+          |    let d = (a - b)
+          |    ((c * d) - 1)
+          |    }
+          |
+          |let a = 1
+          |let b = 2
+          |let c = 3
+          |let d = -1
+          |(-3 - 1)
           """.stripMargin.trim
     }
 
-    inside(evalOld(script, limit = 10)) {
-      case (_, result, cost) =>
-        cost shouldBe 10
-        result shouldBe "-4"
+    inside(evalOld(script, limit = 10)) { case (_, result, cost) =>
+      cost shouldBe 10
+      result shouldBe "-4"
     }
 
-    inside(evalNew(script, limit = 0)) {
-      case (_, result, cost) =>
-        cost shouldBe 0
-        result shouldBe
-          """
-            |func f (a,b) = {
-            |    let c = (a + b)
-            |    let d = (a - b)
-            |    ((c * d) - 1)
-            |    }
-            |
-            |f(1, 2)
+    inside(evalNew(script, limit = 0)) { case (_, result, cost) =>
+      cost shouldBe 0
+      result shouldBe
+        """
+          |func f (a,b) = {
+          |    let c = (a + b)
+          |    let d = (a - b)
+          |    ((c * d) - 1)
+          |    }
+          |
+          |f(1, 2)
           """.stripMargin.trim
     }
 
-    inside(evalNew(script, limit = 1)) {
-      case (_, result, cost) =>
-        cost shouldBe 1
-        result shouldBe
-          """
-            |func f (a,b) = {
-            |    let c = (a + b)
-            |    let d = (a - b)
-            |    ((c * d) - 1)
-            |    }
-            |
-            |let a = 1
-            |let b = 2
-            |let c = 3
-            |let d = (a - b)
-            |((c * d) - 1)
+    inside(evalNew(script, limit = 1)) { case (_, result, cost) =>
+      cost shouldBe 1
+      result shouldBe
+        """
+          |func f (a,b) = {
+          |    let c = (a + b)
+          |    let d = (a - b)
+          |    ((c * d) - 1)
+          |    }
+          |
+          |let a = 1
+          |let b = 2
+          |let c = 3
+          |let d = (a - b)
+          |((c * d) - 1)
           """.stripMargin.trim
     }
 
-    inside(evalNew(script, limit = 2)) {
-      case (_, result, cost) =>
-        cost shouldBe 2
-        result shouldBe
-          """
-            |func f (a,b) = {
-            |    let c = (a + b)
-            |    let d = (a - b)
-            |    ((c * d) - 1)
-            |    }
-            |
-            |let a = 1
-            |let b = 2
-            |let c = 3
-            |let d = -1
-            |((3 * d) - 1)
+    inside(evalNew(script, limit = 2)) { case (_, result, cost) =>
+      cost shouldBe 2
+      result shouldBe
+        """
+          |func f (a,b) = {
+          |    let c = (a + b)
+          |    let d = (a - b)
+          |    ((c * d) - 1)
+          |    }
+          |
+          |let a = 1
+          |let b = 2
+          |let c = 3
+          |let d = -1
+          |((3 * d) - 1)
           """.stripMargin.trim
     }
 
-    inside(evalNew(script, limit = 3)) {
-      case (_, result, cost) =>
-        cost shouldBe 3
-        result shouldBe
-          """
-            |func f (a,b) = {
-            |    let c = (a + b)
-            |    let d = (a - b)
-            |    ((c * d) - 1)
-            |    }
-            |
-            |let a = 1
-            |let b = 2
-            |let c = 3
-            |let d = -1
-            |(-3 - 1)
+    inside(evalNew(script, limit = 3)) { case (_, result, cost) =>
+      cost shouldBe 3
+      result shouldBe
+        """
+          |func f (a,b) = {
+          |    let c = (a + b)
+          |    let d = (a - b)
+          |    ((c * d) - 1)
+          |    }
+          |
+          |let a = 1
+          |let b = 2
+          |let c = 3
+          |let d = -1
+          |(-3 - 1)
           """.stripMargin.trim
     }
 
-    inside(evalNew(script, limit = 4)) {
-      case (_, result, cost) =>
-        cost shouldBe 4
-        result shouldBe "-4"
+    inside(evalNew(script, limit = 4)) { case (_, result, cost) =>
+      cost shouldBe 4
+      result shouldBe "-4"
     }
   }
 
@@ -626,16 +583,14 @@ class EvaluatorV2Test extends PropSpec with Inside {
         | # Total new: 11 + 1 + 1 + 1 + 1 + 2 (x value) + 1 (a value) = 18
       """.stripMargin
 
-    inside(evalOld(script, limit = 47)) {
-      case (_, result, cost) =>
-        cost shouldBe 47
-        result shouldBe "true"
+    inside(evalOld(script, limit = 47)) { case (_, result, cost) =>
+      cost shouldBe 47
+      result shouldBe "true"
     }
 
-    inside(evalNew(script, limit = 18)) {
-      case (_, result, cost) =>
-        cost shouldBe 18
-        result shouldBe "true"
+    inside(evalNew(script, limit = 18)) { case (_, result, cost) =>
+      cost shouldBe 18
+      result shouldBe "true"
     }
   }
 
@@ -655,16 +610,14 @@ class EvaluatorV2Test extends PropSpec with Inside {
         | # Total new: 1 (f) + 2 (g) + 3(h) + 1 (y value) + 1 (==) + 4 (x value) + 2 (2 +) = 14
       """.stripMargin
 
-    inside(evalOld(script, limit = 21)) {
-      case (_, result, cost) =>
-        cost shouldBe 21
-        result shouldBe "true"
+    inside(evalOld(script, limit = 21)) { case (_, result, cost) =>
+      cost shouldBe 21
+      result shouldBe "true"
     }
 
-    inside(evalNew(script, limit = 14)) {
-      case (_, result, cost) =>
-        cost shouldBe 14
-        result shouldBe "true"
+    inside(evalNew(script, limit = 14)) { case (_, result, cost) =>
+      cost shouldBe 14
+      result shouldBe "true"
     }
   }
 
@@ -723,7 +676,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
         )
       )
 
-    (the[EvaluationException] thrownBy evalBoth(expr, limit = 100)).getMessage shouldBe "A definition of 'b' not found"
+    evalBothEither(expr, limit = 100) shouldBe Left("A definition of 'b' not found")
 
     val expr2 =
       BLOCK(
@@ -734,7 +687,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
         )
       )
 
-    (the[EvaluationException] thrownBy evalBoth(expr2, limit = 100)).getMessage shouldBe "Function or type 'b' not found"
+    evalBothEither(expr2, limit = 100) shouldBe Left("Function or type 'b' not found")
   }
 
   property("function context leak") {
@@ -757,7 +710,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
       f() + x
      */
 
-    (the[EvaluationException] thrownBy evalBoth(expr, limit = 100)).getMessage shouldBe "A definition of 'x' not found"
+    evalBothEither(expr, limit = 100) shouldBe Left("A definition of 'x' not found")
 
     val expr2 = BLOCK(
       FUNC("f", Nil, BLOCK(FUNC("g", Nil, CONST_LONG(1)), FUNCTION_CALL(FunctionHeader.User("g"), Nil))),
@@ -778,84 +731,75 @@ class EvaluatorV2Test extends PropSpec with Inside {
       f() + g()
      */
 
-    (the[NoSuchElementException] thrownBy evalBoth(expr2, limit = 100)).getMessage shouldBe "Function or type 'g' not found"
+    evalBothEither(expr2, limit = 100) shouldBe Left("Function or type 'g' not found")
   }
 
   property("if block by step") {
     val script = "if (2 > 1) then 1 + 2 + 3 else 3 + 4"
 
-    inside(evalOld(script, limit = 0)) {
-      case (_, result, cost) =>
-        cost shouldBe 0
-        result shouldBe
-          """
-            |if ((2 > 1))
-            |    then ((1 + 2) + 3)
-            |    else (3 + 4)
+    inside(evalOld(script, limit = 0)) { case (_, result, cost) =>
+      cost shouldBe 0
+      result shouldBe
+        """
+          |if ((2 > 1))
+          |    then ((1 + 2) + 3)
+          |    else (3 + 4)
           """.stripMargin.trim
     }
 
-    inside(evalOld(script, limit = 1)) {
-      case (_, result, cost) =>
-        cost shouldBe 1
-        result shouldBe
-          """
-            |if (true)
-            |    then ((1 + 2) + 3)
-            |    else (3 + 4)
+    inside(evalOld(script, limit = 1)) { case (_, result, cost) =>
+      cost shouldBe 1
+      result shouldBe
+        """
+          |if (true)
+          |    then ((1 + 2) + 3)
+          |    else (3 + 4)
           """.stripMargin.trim
     }
 
-    inside(evalOld(script, limit = 2)) {
-      case (_, result, cost) =>
-        cost shouldBe 2
-        result shouldBe "((1 + 2) + 3)"
+    inside(evalOld(script, limit = 2)) { case (_, result, cost) =>
+      cost shouldBe 2
+      result shouldBe "((1 + 2) + 3)"
     }
 
-    inside(evalOld(script, limit = 3)) {
-      case (_, result, cost) =>
-        cost shouldBe 3
-        result shouldBe "(3 + 3)"
+    inside(evalOld(script, limit = 3)) { case (_, result, cost) =>
+      cost shouldBe 3
+      result shouldBe "(3 + 3)"
     }
 
-    inside(evalOld(script, limit = 4)) {
-      case (_, result, cost) =>
-        cost shouldBe 4
-        result shouldBe "6"
+    inside(evalOld(script, limit = 4)) { case (_, result, cost) =>
+      cost shouldBe 4
+      result shouldBe "6"
     }
 
-    inside(evalNew(script, limit = 0)) {
-      case (_, result, cost) =>
-        cost shouldBe 0
-        result shouldBe
-          """
-            |if ((2 > 1))
-            |    then ((1 + 2) + 3)
-            |    else (3 + 4)
+    inside(evalNew(script, limit = 0)) { case (_, result, cost) =>
+      cost shouldBe 0
+      result shouldBe
+        """
+          |if ((2 > 1))
+          |    then ((1 + 2) + 3)
+          |    else (3 + 4)
           """.stripMargin.trim
     }
 
-    inside(evalNew(script, limit = 1)) {
-      case (_, result, cost) =>
-        cost shouldBe 1
-        result shouldBe
-          """
-            |if (true)
-            |    then ((1 + 2) + 3)
-            |    else (3 + 4)
+    inside(evalNew(script, limit = 1)) { case (_, result, cost) =>
+      cost shouldBe 1
+      result shouldBe
+        """
+          |if (true)
+          |    then ((1 + 2) + 3)
+          |    else (3 + 4)
           """.stripMargin.trim
     }
 
-    inside(evalNew(script, limit = 2)) {
-      case (_, result, cost) =>
-        cost shouldBe 2
-        result shouldBe "(3 + 3)"
+    inside(evalNew(script, limit = 2)) { case (_, result, cost) =>
+      cost shouldBe 2
+      result shouldBe "(3 + 3)"
     }
 
-    inside(evalNew(script, limit = 3)) {
-      case (_, result, cost) =>
-        cost shouldBe 3
-        result shouldBe "6"
+    inside(evalNew(script, limit = 3)) { case (_, result, cost) =>
+      cost shouldBe 3
+      result shouldBe "6"
     }
   }
 
@@ -866,53 +810,48 @@ class EvaluatorV2Test extends PropSpec with Inside {
         |address.bytes
       """.stripMargin.trim
 
-    inside(evalOld(script, limit = 0)) {
-      case (_, result, cost) =>
-        cost shouldBe 0
-        result shouldBe script
+    inside(evalOld(script, limit = 0)) { case (_, result, cost) =>
+      cost shouldBe 0
+      result shouldBe script
     }
 
-    inside(evalOld(script, limit = 1)) {
-      case (_, result, cost) =>
-        cost shouldBe 1
-        result shouldBe
-          """
-            |let address = Address(
-            |	bytes = base58'aaaa'
-            |)
-            |Address(
-            |	bytes = base58'aaaa'
-            |).bytes
+    inside(evalOld(script, limit = 1)) { case (_, result, cost) =>
+      cost shouldBe 1
+      result shouldBe
+        """
+          |let address = Address(
+          |	bytes = base58'aaaa'
+          |)
+          |Address(
+          |	bytes = base58'aaaa'
+          |).bytes
           """.stripMargin.trim
     }
 
-    inside(evalOld(script, limit = 2)) {
-      case (_, result, cost) =>
-        cost shouldBe 2
-        result shouldBe "base58'aaaa'"
+    inside(evalOld(script, limit = 2)) { case (_, result, cost) =>
+      cost shouldBe 2
+      result shouldBe "base58'aaaa'"
     }
 
-    inside(evalNew(script, limit = 1)) {
-      case (_, result, cost) =>
-        cost shouldBe 1
-        result shouldBe
-          """
-            |let address = Address(
-            |	bytes = base58'aaaa'
-            |)
-            |address.bytes
+    inside(evalNew(script, limit = 1)) { case (_, result, cost) =>
+      cost shouldBe 1
+      result shouldBe
+        """
+          |let address = Address(
+          |	bytes = base58'aaaa'
+          |)
+          |address.bytes
           """.stripMargin.trim
     }
 
-    inside(evalNew(script, limit = 2)) {
-      case (_, result, cost) =>
-        cost shouldBe 1
-        result shouldBe "base58'aaaa'"
+    inside(evalNew(script, limit = 2)) { case (_, result, cost) =>
+      cost shouldBe 1
+      result shouldBe "base58'aaaa'"
     }
   }
 
   property("big function assignment chain") {
-    val count = 3000
+    val count = 5000
     val script =
       s"""
          | func a0() = 1 + 1
@@ -1101,11 +1040,10 @@ class EvaluatorV2Test extends PropSpec with Inside {
 
       val pieces = randomPieces(precalculatedComplexity, Random.nextInt(99) + 2)
       val (resultExpr, summarizedCost) =
-        pieces.foldLeft((expr, startCost)) {
-          case ((currentExpr, costSum), nextCostLimit) =>
-            currentExpr should not be an[EVALUATED]
-            val (nextExpr, _, cost) = eval(currentExpr, nextCostLimit)
-            (nextExpr, cost + costSum)
+        pieces.foldLeft((expr, startCost)) { case ((currentExpr, costSum), nextCostLimit) =>
+          currentExpr should not be an[EVALUATED]
+          val (nextExpr, _, cost) = eval(currentExpr, nextCostLimit)
+          (nextExpr, cost + costSum)
         }
       summarizedCost shouldBe precalculatedComplexity
       resultExpr shouldBe evaluated
@@ -1123,16 +1061,14 @@ class EvaluatorV2Test extends PropSpec with Inside {
         |
       """.stripMargin.trim
 
-    inside(evalOld(strictScript, 100)) {
-      case (expr, _, cost) =>
-        expr shouldBe CONST_LONG(100542)
-        cost shouldBe 6
+    inside(evalOld(strictScript, 100)) { case (expr, _, cost) =>
+      expr shouldBe CONST_LONG(100542)
+      cost shouldBe 6
     }
 
-    inside(evalNew(strictScript, 100)) {
-      case (expr, _, cost) =>
-        expr shouldBe CONST_LONG(100542)
-        cost shouldBe 2
+    inside(evalNew(strictScript, 100)) { case (expr, _, cost) =>
+      expr shouldBe CONST_LONG(100542)
+      cost shouldBe 2
     }
   }
 
@@ -1147,7 +1083,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
         |
       """.stripMargin.trim
 
-    (the[RuntimeException] thrownBy evalBoth(strictScript, limit = 100)).getMessage shouldBe "Strict executed error"
+    evalBothEither(compile(strictScript), limit = 100) shouldBe Left("Strict executed error")
   }
 
   property("strict var add cost without usage") {
@@ -1162,10 +1098,9 @@ class EvaluatorV2Test extends PropSpec with Inside {
         |
       """.stripMargin.trim
 
-    inside(evalBoth(defaultScript, 100)) {
-      case (expr, _, cost) =>
-        expr shouldBe CONST_STRING("42").explicitGet()
-        cost shouldBe 1
+    inside(evalBoth(defaultScript, 100)) { case (expr, _, cost) =>
+      expr shouldBe CONST_STRING("42").explicitGet()
+      cost shouldBe 1
     }
 
     val strictScript =
@@ -1179,15 +1114,13 @@ class EvaluatorV2Test extends PropSpec with Inside {
         |
       """.stripMargin.trim
 
-    inside(evalOld(strictScript, 100)) {
-      case (expr, _, cost) =>
-        expr shouldBe CONST_STRING("42").explicitGet()
-        cost shouldBe 15
+    inside(evalOld(strictScript, 100)) { case (expr, _, cost) =>
+      expr shouldBe CONST_STRING("42").explicitGet()
+      cost shouldBe 15
     }
-    inside(evalNew(strictScript, 100)) {
-      case (expr, _, cost) =>
-        expr shouldBe CONST_STRING("42").explicitGet()
-        cost shouldBe 11
+    inside(evalNew(strictScript, 100)) { case (expr, _, cost) =>
+      expr shouldBe CONST_STRING("42").explicitGet()
+      cost shouldBe 11
     }
   }
 

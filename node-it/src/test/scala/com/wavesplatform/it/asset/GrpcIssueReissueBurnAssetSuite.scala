@@ -4,15 +4,15 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.grpc.AssetInfoResponse
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.it.api.SyncGrpcApi._
+import com.wavesplatform.it.api.SyncGrpcApi.*
 import com.wavesplatform.it.api.{BurnInfoResponse, IssueInfoResponse, ReissueInfoResponse, StateChangesDetails}
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.sync.grpc.GrpcBaseTransactionSuiteLike
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -74,8 +74,7 @@ class GrpcIssueReissueBurnAssetSuite extends AnyFreeSpec with GrpcBaseTransactio
       sender.assertAssetBalance(acc, assetId, 0)
 
       if (isCallable) assertStateChanges(tx) { sd =>
-        sd.burns should matchPattern {
-          case Seq(BurnInfoResponse(`assetId`, data.quantity)) =>
+        sd.burns should matchPattern { case Seq(BurnInfoResponse(`assetId`, data.quantity)) =>
         }
       }
 
@@ -169,34 +168,6 @@ class GrpcIssueReissueBurnAssetSuite extends AnyFreeSpec with GrpcBaseTransactio
       invokeScript(acc, "reissueAndReissue", assetId = assetId, count = 1000)
 
       sender.assetInfo(assetId).totalVolume should be(simpleReissuableAsset.quantity + 1000)
-    }
-
-    "Issue 10 assets should not produce an error" in {
-      val acc = createDapp(script(simpleNonreissuableAsset))
-      val tx  = invokeScript(acc, "issue10Assets", fee = invocationCost(issuesCount = 10))
-      for (nth <- 0 to 9) {
-        val assetId = validateIssuedAssets(acc, tx, simpleNonreissuableAsset, nth, CallableMethod)
-        assertQuantity(assetId)(simpleNonreissuableAsset.quantity, reissuable = false)
-        sender.assertAssetBalance(acc, assetId, simpleNonreissuableAsset.quantity)
-      }
-    }
-
-    "Issue more than 10 assets should produce an error" in {
-      val acc = createDapp(script(simpleNonreissuableAsset))
-      assertGrpcError(invokeScript(acc, "issue11Assets"), "Actions count limit is exceeded")
-    }
-
-    "More than 10 actions Issue/Reissue/Burn should produce an error" in {
-      val acc     = createDapp(script(simpleReissuableAsset))
-      val txIssue = issue(acc, method, simpleReissuableAsset, invocationCost(1))
-      val assetId = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
-
-      assertGrpcError(invokeScript(acc, "process11actions", assetId = assetId), "Actions count limit is exceeded")
-    }
-
-    "More than 10 issue action in one invocation should produce an error" in {
-      val acc = createDapp(script(simpleNonreissuableAsset))
-      assertGrpcError(invokeScript(acc, "issue11Assets", fee = invocationCost(1)), "Actions count limit is exceeded")
     }
   }
 
@@ -313,9 +284,9 @@ class GrpcIssueReissueBurnAssetSuite extends AnyFreeSpec with GrpcBaseTransactio
       case "reissueIssueAndNft" => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet())
       case "process11actions"   => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet())
       case "burnAsset"          => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_LONG(count))
-      case "reissueAsset"       => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_BOOLEAN(isReissuable), CONST_LONG(count))
-      case "reissueAndReissue"  => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_LONG(count))
-      case _                    => Nil
+      case "reissueAsset"      => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_BOOLEAN(isReissuable), CONST_LONG(count))
+      case "reissueAndReissue" => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_LONG(count))
+      case _                   => Nil
     }
 
     val fc = FUNCTION_CALL(FunctionHeader.User(function), args)
@@ -360,7 +331,7 @@ class GrpcIssueReissueBurnAssetSuite extends AnyFreeSpec with GrpcBaseTransactio
   }
 
   def assertGrpcAssetDetails(assetId: String)(f: AssetInfoResponse => Unit): Unit = {
-    import com.wavesplatform.it.api.SyncGrpcApi._
+    import com.wavesplatform.it.api.SyncGrpcApi.*
     val assetInfo = sender.grpc.assetInfo(assetId)
     f(assetInfo)
   }
@@ -442,8 +413,7 @@ class GrpcIssueReissueBurnAssetSuite extends AnyFreeSpec with GrpcBaseTransactio
         val tx = invokeScript(account, "reissueAsset", assetId = assetId, count = quantity, isReissuable = reissuable)
         if (checkStateChanges)
           assertStateChanges(tx) { sd =>
-            sd.reissues should matchPattern {
-              case Seq(ReissueInfoResponse(`assetId`, `reissuable`, `quantity`)) =>
+            sd.reissues should matchPattern { case Seq(ReissueInfoResponse(`assetId`, `reissuable`, `quantity`)) =>
             }
           }
         tx
@@ -457,8 +427,7 @@ class GrpcIssueReissueBurnAssetSuite extends AnyFreeSpec with GrpcBaseTransactio
       case CallableMethod =>
         val tx = invokeScript(account, "burnAsset", assetId = assetId, count = quantity, fee = fee)
         assertStateChanges(tx) { sd =>
-          sd.burns should matchPattern {
-            case Seq(BurnInfoResponse(`assetId`, `quantity`)) =>
+          sd.burns should matchPattern { case Seq(BurnInfoResponse(`assetId`, `quantity`)) =>
           }
         }
         tx

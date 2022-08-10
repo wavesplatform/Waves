@@ -1,7 +1,7 @@
 package com.wavesplatform.state
 
-import com.wavesplatform.account._
-import com.wavesplatform.block.Block._
+import com.wavesplatform.account.*
+import com.wavesplatform.block.Block.*
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
@@ -66,7 +66,7 @@ trait Blockchain {
 
   def assetScript(id: IssuedAsset): Option[AssetScriptInfo]
 
-  def accountData(acc: Address, key: String): Option[DataEntry[_]]
+  def accountData(acc: Address, key: String): Option[DataEntry[?]]
   def hasData(address: Address): Boolean
 
   def leaseBalance(address: Address): LeaseBalance
@@ -79,6 +79,9 @@ trait Blockchain {
 object Blockchain {
   implicit class BlockchainExt(private val blockchain: Blockchain) extends AnyVal {
     def isEmpty: Boolean = blockchain.height == 0
+
+    def isSponsorshipActive: Boolean = blockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
+    def isNGActive: Boolean = blockchain.isFeatureActivated(BlockchainFeatures.NG, blockchain.height - 1)
 
     def parentHeader(block: BlockHeader, back: Int = 1): Option[BlockHeader] =
       blockchain
@@ -128,8 +131,7 @@ object Blockchain {
 
     def wavesPortfolio(address: Address): Portfolio = Portfolio(
       blockchain.balance(address),
-      blockchain.leaseBalance(address),
-      Map.empty
+      blockchain.leaseBalance(address)
     )
 
     def isMiningAllowed(height: Int, effectiveBalance: Long): Boolean =
@@ -155,8 +157,9 @@ object Blockchain {
         .blockHeader(atHeight)
         .flatMap(header => if (header.header.version >= Block.ProtoBlockVersion) blockchain.hitSource(atHeight) else None)
 
-    def isNFT(issueTransaction: IssueTransaction): Boolean = isNFT(issueTransaction.quantity, issueTransaction.decimals, issueTransaction.reissuable)
-    def isNFT(issueAction: Issue): Boolean                 = isNFT(issueAction.quantity, issueAction.decimals, issueAction.isReissuable)
+    def isNFT(issueTransaction: IssueTransaction): Boolean =
+      isNFT(issueTransaction.quantity.value, issueTransaction.decimals.value, issueTransaction.reissuable)
+    def isNFT(issueAction: Issue): Boolean = isNFT(issueAction.quantity, issueAction.decimals, issueAction.isReissuable)
     def isNFT(quantity: Long, decimals: Int, reissuable: Boolean): Boolean =
       isFeatureActivated(BlockchainFeatures.ReduceNFTFee) && quantity == 1 && decimals == 0 && !reissuable
 

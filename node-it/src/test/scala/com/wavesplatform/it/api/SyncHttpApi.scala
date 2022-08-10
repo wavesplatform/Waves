@@ -1,7 +1,6 @@
 package com.wavesplatform.it.api
 
 import java.net.InetSocketAddress
-
 import akka.http.scaladsl.model.StatusCodes.BadRequest
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
@@ -21,7 +20,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, TxVersion}
+import com.wavesplatform.transaction.{Asset, TxExchangeAmount, TxExchangePrice, TxVersion}
 import io.grpc.Status.Code
 import org.asynchttpclient.Response
 import org.scalactic.source.Position
@@ -57,24 +56,28 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     )((id, message, json) => GenericApiError(id, message, StatusCodes.BadRequest.intValue, json))
   }
 
-  /**
-    *
-    * @param id Expected API error code
-    * @param message Expected API error full message or regex template
-    * @param code Expected HTTP status code, 400/Bad Request by default
-    * @param matchMessage When true, uses `message` as regular expression to find it in response. When false, fully tests `message` equality with received error message.
+  /** @param id
+    *   Expected API error code
+    * @param message
+    *   Expected API error full message or regex template
+    * @param code
+    *   Expected HTTP status code, 400/Bad Request by default
+    * @param matchMessage
+    *   When true, uses `message` as regular expression to find it in response. When false, fully tests `message` equality with received error
+    *   message.
     */
   case class AssertiveApiError(id: Int, message: String, code: StatusCode = StatusCodes.BadRequest, matchMessage: Boolean = false)
 
   implicit class ApiErrorOps(error: ApiError) {
     def assertive(matchMessage: Boolean = false): AssertiveApiError = AssertiveApiError(error.id, error.message, error.code, matchMessage)
-    def assertiveRegex: AssertiveApiError = assertive(matchMessage = true)
+    def assertiveRegex: AssertiveApiError                           = assertive(matchMessage = true)
   }
 
   def assertBadRequestAndResponse[R](f: => R, errorRegex: String): Assertion = Try(f) match {
     case Failure(ApiCallException(UnexpectedStatusCodeException(_, _, statusCode, responseBody))) =>
       Assertions.assert(
-        statusCode == BadRequest.intValue && responseBody.replace("\n", "").matches(s".*$errorRegex.*"), s"\nexpected '$errorRegex'\nactual '$responseBody'"
+        statusCode == BadRequest.intValue && responseBody.replace("\n", "").matches(s".*$errorRegex.*"),
+        s"\nexpected '$errorRegex'\nactual '$responseBody'"
       )
     case Failure(e) => Assertions.fail(e)
     case _          => Assertions.fail("Expecting bad request")
@@ -148,7 +151,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
       case NonFatal(cause) => throw ApiCallException(cause)
     }
 
-  //noinspection ScalaStyle
+  // noinspection ScalaStyle
   implicit class NodeExtSync(n: Node) extends Assertions with matchers.should.Matchers {
     import com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi as async
 
@@ -300,11 +303,11 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     ): Transaction =
       maybeWaitForTransaction(sync(async(n).reissue(sender, assetId, quantity, reissuable, fee, version)), waitForTx)
 
-    def debugStateChanges(transactionId: String, amountsAsStrings: Boolean = false): DebugStateChanges = {
-      sync(async(n).debugStateChanges(transactionId, amountsAsStrings))
+    def stateChanges(transactionId: String, amountsAsStrings: Boolean = false): StateChanges = {
+      sync(async(n).stateChanges(transactionId, amountsAsStrings))
     }
 
-    def debugStateChangesByAddress(address: String, limit: Int, after: Option[String] = None): Seq[DebugStateChanges] = {
+    def debugStateChangesByAddress(address: String, limit: Int, after: Option[String] = None): Seq[StateChanges] = {
       sync(async(n).debugStateChangesByAddress(address, limit, after))
     }
 
@@ -406,8 +409,8 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
         matcher: KeyPair,
         order1: Order,
         order2: Order,
-        amount: Long,
-        price: Long,
+        amount: TxExchangeAmount,
+        price: TxExchangePrice,
         buyMatcherFee: Long,
         sellMatcherFee: Long,
         fee: Long,

@@ -14,8 +14,8 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 class PaymentValidationSuite extends BaseTransactionSuite {
 
   test("payment's validation order check") {
-    val dApp = firstKeyPair
-    val caller = secondKeyPair
+    val dApp             = firstKeyPair
+    val caller           = secondKeyPair
     val (wrKey, wrValue) = ("key", "value")
 
     val sourceV4 =
@@ -23,7 +23,7 @@ class PaymentValidationSuite extends BaseTransactionSuite {
          |{-# CONTENT_TYPE DAPP #-}
          |{-# SCRIPT_TYPE ACCOUNT #-}
          |
-        |@Callable(i)
+         |@Callable(i)
          |func write() = {
          |  [StringEntry("$wrKey", "$wrValue")]
          |}
@@ -45,11 +45,16 @@ class PaymentValidationSuite extends BaseTransactionSuite {
     val smartAssetId = sender.issue(caller, script = Some(scr), fee = issueFee + smartFee, waitForTx = true).id
 
     assertApiError(
-      sender.invokeScript(caller, dApp.toAddress.toString, func = Some("write"),
-        payment = Seq(Payment(1000L, IssuedAsset(ByteStr(Base58.decode(smartAssetId))))), fee = issueFee)) {
-      err =>
-        err.message should include regex "called on unit"
-        err.id shouldBe ScriptExecutionError.Id
+      sender.invokeScript(
+        caller,
+        dApp.toAddress.toString,
+        func = Some("write"),
+        payment = Seq(Payment(1000L, IssuedAsset(ByteStr(Base58.decode(smartAssetId))))),
+        fee = issueFee
+      )
+    ) { err =>
+      err.message should include regex "value by key 'key' not found for the address"
+      err.id shouldBe ScriptExecutionError.Id
     }
 
   }

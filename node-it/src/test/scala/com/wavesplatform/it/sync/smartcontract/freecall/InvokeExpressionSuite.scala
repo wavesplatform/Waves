@@ -2,14 +2,14 @@ package com.wavesplatform.it.sync.smartcontract.freecall
 import com.typesafe.config.Config
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.http.ApiError.StateCheckFailed
-import com.wavesplatform.features.BlockchainFeatures.RideV6
+import com.wavesplatform.features.BlockchainFeatures.ContinuationTransaction
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.{PutDataResponse, StateChangesDetails, Transaction, TransactionInfo}
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.sync.invokeExpressionFee
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.lang.directives.values.StdLibVersion.V6
+import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.transaction.smart.InvokeExpressionTransaction
@@ -20,7 +20,7 @@ class InvokeExpressionSuite extends BaseTransactionSuite with CancelAfterFailure
     NodeConfigs
       .Builder(Default, 1, Seq.empty)
       .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((RideV6.id, 0)))
+      .overrideBase(_.preactivatedFeatures((ContinuationTransaction.id, 0)))
       .buildNonConflicting()
 
   private val expr: ExprScript =
@@ -47,7 +47,7 @@ class InvokeExpressionSuite extends BaseTransactionSuite with CancelAfterFailure
     val txFromByAddress = sender.transactionsByAddress(firstAddress, 100).find(_.id == id).get
     List(txFromInfoById, txFromByAddress).foreach(checkTxInfo(_, lastBlock.height))
 
-    val stateChanges          = sender.debugStateChanges(id).stateChanges
+    val stateChanges          = sender.stateChanges(id).stateChanges
     val stateChangesByAddress = sender.debugStateChangesByAddress(firstAddress, 1).flatMap(_.stateChanges).headOption
     List(stateChanges, stateChangesByAddress).foreach(checkStateChanges)
 

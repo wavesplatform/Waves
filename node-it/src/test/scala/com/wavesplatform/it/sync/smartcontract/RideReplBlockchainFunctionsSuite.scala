@@ -39,13 +39,13 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
   private lazy val settings = NodeConnectionSettings(miner.nodeApiEndpoint.toString, chainId.toByte, alice.toAddress.toString)
   private lazy val repl     = Repl(Some(settings))
 
-  private var dataTxId       = ""
-  private var assetId        = ""
-  private var transferTxIds  = Map[TxVersion, String]()
+  private var dataTxId      = ""
+  private var assetId       = ""
+  private var transferTxIds = Map[TxVersion, String]()
 
-  private val alias = "nickname"
+  private val alias          = "nickname"
   private val transferAmount = 100
-  private val attachment = "attachment"
+  private val attachment     = "attachment"
 
   private def execute(expr: String): Either[String, String] =
     Await.result(repl.execute(expr), 2 seconds)
@@ -71,22 +71,18 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
     sender.createAlias(bob, alias, minFee).id
     assetId = sender.issue(alice, "Asset", "descr", 1000, 2, waitForTx = true).id
 
-    transferTxIds =
-      Seq(TxVersion.V1, TxVersion.V2, TxVersion.V3)
-          .map {
-            version =>
-              val tx = sender.transfer(
-                alice,
-                s"alias:$chainId:$alias",
-                transferAmount,
-                minFee,
-                Some(assetId),
-                version = version,
-                attachment = Some(attachment)
-              )
-              (version, tx.id)
-          }
-          .toMap
+    transferTxIds = Seq(TxVersion.V1, TxVersion.V2, TxVersion.V3).map { version =>
+      val tx = sender.transfer(
+        alice,
+        s"alias:$chainId:$alias",
+        transferAmount,
+        minFee,
+        Some(assetId),
+        version = version,
+        attachment = Some(attachment)
+      )
+      (version, tx.id)
+    }.toMap
 
     transferTxIds.values.foreach(nodes.waitForHeightAriseAndTxPresent)
   }
@@ -141,7 +137,7 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
 
   test("getBoolean()") {
     assert("""this.getBoolean("bool1").value()""", " true")
-    assert("""this.getBoolean("bool2").value()"""," false")
+    assert("""this.getBoolean("bool2").value()""", " false")
   }
 
   test("getBooleanValue()") {
@@ -200,11 +196,11 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
 
   test("transferTransactionById()") {
     Seq(TxVersion.V1, TxVersion.V2, TxVersion.V3)
-      .foreach {
-        version =>
-          val transferTxId = transferTxIds(version)
-          val responseTx = sender.transactionInfo[TransferTransactionInfo](transferTxId)
-          val bodyBytes = TransferTransaction.selfSigned(
+      .foreach { version =>
+        val transferTxId = transferTxIds(version)
+        val responseTx   = sender.transactionInfo[TransferTransactionInfo](transferTxId)
+        val bodyBytes = TransferTransaction
+          .selfSigned(
             version = version,
             sender = alice,
             recipient = Alias.createWithChainId(alias, chainId.toByte).explicitGet(),
@@ -215,14 +211,14 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
             attachment = ByteStr(attachment.getBytes(StandardCharsets.UTF_8)),
             timestamp = responseTx.timestamp
           )
-            .explicitGet()
-            .bodyBytes
-            .value()
+          .explicitGet()
+          .bodyBytes
+          .value()
 
-          execute(s"let transferTx$version = transferTransactionById(base58'$transferTxId').value()")
-          assert(
-            s"transferTx$version",
-            s"""
+        execute(s"let transferTx$version = transferTransactionById(base58'$transferTxId').value()")
+        assert(
+          s"transferTx$version",
+          s"""
                |TransferTransaction(
                |	recipient = Alias(
                |		alias = "$alias"
@@ -243,7 +239,7 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
                |	fee = ${responseTx.fee}
                |)
             """.trim.stripMargin
-          )
+        )
       }
   }
 

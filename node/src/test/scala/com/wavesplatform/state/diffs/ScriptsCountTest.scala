@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs
 
-import cats.kernel.Monoid
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
@@ -49,7 +48,7 @@ object ScriptsCountTest {
 
     val invokeScriptRun = tx match {
       case _: InvokeScriptTransaction => 1
-      case _                           => 0
+      case _                          => 0
     }
 
     smartAccountRun + smartTokenRuns + invokeScriptRun
@@ -93,7 +92,7 @@ class ScriptsCountTest extends PropSpec with WithState with Inside {
           val newDiff  = TransactionDiffer(Some(tx.timestamp), tx.timestamp)(newState, tx).resultE.explicitGet()
           val oldRuns  = ScriptsCountTest.calculateLegacy(newState, tx)
           if (newDiff.scriptsRun != oldRuns) throw new IllegalArgumentException(s"$tx ${newDiff.scriptsRun} != $oldRuns")
-          Monoid.combine(diff, newDiff)
+          diff.combineF(newDiff).explicitGet()
         }
     }
 
@@ -119,39 +118,94 @@ class ScriptsCountTest extends PropSpec with WithState with Inside {
 
   private def preconditions: (GenesisTransaction, Seq[Transaction]) = {
     val master = TxHelpers.signer(1)
-    val acc = TxHelpers.signer(2)
+    val acc    = TxHelpers.signer(2)
 
-    val issueAmount = 1000
+    val issueAmount      = 1000
     val additionalAmount = 1000000000L
 
-    val genesis = TxHelpers.genesis(master.toAddress)
-    val setContract = TxHelpers.setScript(master, allAllowed)
+    val genesis       = TxHelpers.genesis(master.toAddress)
+    val setContract   = TxHelpers.setScript(master, allAllowed)
     val resetContract = TxHelpers.setScript(master, allAllowed)
-    val issueSp = TxHelpers.issue(master, issueAmount + additionalAmount)
-    val sponsorTx = TxHelpers.sponsor(issueSp.asset, Some(1), master)
-    val burnSp = TxHelpers.burn(issueSp.asset, sender = master, version = TxVersion.V2)
-    val reissueSp = TxHelpers.reissue(issueSp.asset, master, 1)
-    val issueScr = TxHelpers.issue(master, issueAmount + additionalAmount, script = Some(allAllowed))
-    val burnScr = TxHelpers.burn(issueScr.asset, sender = master, version = TxVersion.V2)
-    val reissueScr = TxHelpers.reissue(issueScr.asset, master, 1)
-    val assetScript = TxHelpers.setAssetScript(master, issueScr.asset, allAllowed)
-    val data = TxHelpers.data(master, Seq(BooleanDataEntry("q", true)))
-    val tr1 = TxHelpers.transfer(master, acc.toAddress, 10000000000L)
-    val tr2 = TxHelpers.transfer(master, acc.toAddress, additionalAmount, issueScr.asset)
-    val mt1 = TxHelpers.massTransfer(master, Seq(ParsedTransfer(acc.toAddress, 1)), version = TxVersion.V1)
-    val mt2 = TxHelpers.massTransfer(master, Seq(ParsedTransfer(acc.toAddress, 1)), issueScr.asset, version = TxVersion.V1)
-    val l = TxHelpers.lease(master, acc.toAddress, 1)
+    val issueSp       = TxHelpers.issue(master, issueAmount + additionalAmount)
+    val sponsorTx     = TxHelpers.sponsor(issueSp.asset, Some(1), master)
+    val burnSp        = TxHelpers.burn(issueSp.asset, sender = master, version = TxVersion.V2)
+    val reissueSp     = TxHelpers.reissue(issueSp.asset, master, 1)
+    val issueScr      = TxHelpers.issue(master, issueAmount + additionalAmount, script = Some(allAllowed))
+    val burnScr       = TxHelpers.burn(issueScr.asset, sender = master, version = TxVersion.V2)
+    val reissueScr    = TxHelpers.reissue(issueScr.asset, master, 1)
+    val assetScript   = TxHelpers.setAssetScript(master, issueScr.asset, allAllowed)
+    val data          = TxHelpers.data(master, Seq(BooleanDataEntry("q", true)))
+    val tr1           = TxHelpers.transfer(master, acc.toAddress, 10000000000L)
+    val tr2           = TxHelpers.transfer(master, acc.toAddress, additionalAmount, issueScr.asset)
+    val mt1           = TxHelpers.massTransfer(master, Seq(ParsedTransfer(acc.toAddress, TxNonNegativeAmount.unsafeFrom(1))), version = TxVersion.V1)
+    val mt2 =
+      TxHelpers.massTransfer(master, Seq(ParsedTransfer(acc.toAddress, TxNonNegativeAmount.unsafeFrom(1))), issueScr.asset, version = TxVersion.V1)
+    val l  = TxHelpers.lease(master, acc.toAddress, 1)
     val lc = TxHelpers.leaseCancel(l.id(), master)
-    val o1 = TxHelpers.order(OrderType.BUY, issueScr.asset, issueSp.asset, amount = 100000000L, price = 100000000L, version = Order.V2, sender = master, matcher = master)
-    val o2 = TxHelpers.order(OrderType.SELL, issueScr.asset, issueSp.asset, amount = 100000000L, price = 100000000L, version = Order.V2, sender = acc, matcher = master)
+    val o1 = TxHelpers.order(
+      OrderType.BUY,
+      issueScr.asset,
+      issueSp.asset,
+      amount = 100000000L,
+      price = 100000000L,
+      version = Order.V2,
+      sender = master,
+      matcher = master
+    )
+    val o2 = TxHelpers.order(
+      OrderType.SELL,
+      issueScr.asset,
+      issueSp.asset,
+      amount = 100000000L,
+      price = 100000000L,
+      version = Order.V2,
+      sender = acc,
+      matcher = master
+    )
     val exchange = TxHelpers.exchangeFromOrders(o1, o2, master, version = TxVersion.V2)
-    val o1a = TxHelpers.order(OrderType.BUY, issueScr.asset, issueSp.asset, amount = 100000000L, price = 100000000L, version = Order.V2, sender = master, matcher = acc)
-    val o2a = TxHelpers.order(OrderType.SELL, issueScr.asset, issueSp.asset, amount = 100000000L, price = 100000000L, version = Order.V2, sender = acc, matcher = acc)
-    val exchangea = TxHelpers.exchangeFromOrders(o1a, o2a, acc, version = TxVersion.V2)
+    val o1a = TxHelpers.order(
+      OrderType.BUY,
+      issueScr.asset,
+      issueSp.asset,
+      amount = 100000000L,
+      price = 100000000L,
+      version = Order.V2,
+      sender = master,
+      matcher = acc
+    )
+    val o2a = TxHelpers.order(
+      OrderType.SELL,
+      issueScr.asset,
+      issueSp.asset,
+      amount = 100000000L,
+      price = 100000000L,
+      version = Order.V2,
+      sender = acc,
+      matcher = acc
+    )
+    val exchangea    = TxHelpers.exchangeFromOrders(o1a, o2a, acc, version = TxVersion.V2)
     val setContractB = TxHelpers.setScript(acc, allAllowed)
-    val issueScrB = TxHelpers.issue(acc, issueAmount + additionalAmount, script = Some(allAllowed))
-    val o1b = TxHelpers.order(OrderType.BUY, issueScrB.asset, issueScr.asset, amount = 100000001L, price = 100000001L, version = Order.V2, sender = master, matcher = master)
-    val o2b = TxHelpers.order(OrderType.SELL, issueScrB.asset, issueScr.asset, amount = 100000001L, price = 100000001L, version = Order.V2, sender = acc, matcher = master)
+    val issueScrB    = TxHelpers.issue(acc, issueAmount + additionalAmount, script = Some(allAllowed))
+    val o1b = TxHelpers.order(
+      OrderType.BUY,
+      issueScrB.asset,
+      issueScr.asset,
+      amount = 100000001L,
+      price = 100000001L,
+      version = Order.V2,
+      sender = master,
+      matcher = master
+    )
+    val o2b = TxHelpers.order(
+      OrderType.SELL,
+      issueScrB.asset,
+      issueScr.asset,
+      amount = 100000001L,
+      price = 100000001L,
+      version = Order.V2,
+      sender = acc,
+      matcher = master
+    )
     val exchangeB = TxHelpers.exchangeFromOrders(o1b, o2b, master, version = TxVersion.V2)
 
     val txs = Seq[Transaction](

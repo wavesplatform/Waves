@@ -25,6 +25,8 @@ import org.scalatest.concurrent.Eventually
 class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
   val dApp: KeyPair = TxHelpers.secondSigner
 
+  override implicit val patienceConfig: PatienceConfig = super.patienceConfig.copy(timeout = 1 second)
+
   "UTX pool" should s"drop failed Invoke with complexity <= ${ContractLimits.FailFreeInvokeComplexity}" in utxTest { (d, utx) =>
     d.appendBlock(TxHelpers.setScript(dApp, genScript(ContractLimits.FailFreeInvokeComplexity)))
 
@@ -293,7 +295,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     val balances = AddrWithBalance.enoughBalances(TxHelpers.defaultSigner, dApp)
 
     withDomain(settings, balances) { d =>
-      val utx = new UtxPoolImpl(ntpTime, d.blockchainUpdater, settings.utxSettings)
+      val utx = new UtxPoolImpl(ntpTime, d.blockchainUpdater, settings.utxSettings, settings.minerSettings.enable)
       f(d, utx)
       utx.close()
     }

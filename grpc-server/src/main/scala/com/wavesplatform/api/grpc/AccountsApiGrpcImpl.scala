@@ -3,6 +3,7 @@ package com.wavesplatform.api.grpc
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.{CommonAccountsApi, LeaseInfo}
+import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.protobuf._
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
 import com.wavesplatform.protobuf.utils.PBImplicitConversions.fromAssetIdAndAmount
@@ -16,17 +17,22 @@ import scala.concurrent.Future
 class AccountsApiGrpcImpl(commonApi: CommonAccountsApi)(implicit sc: Scheduler) extends AccountsApiGrpc.AccountsApi {
 
   private def loadWavesBalance(address: Address): BalanceResponse = {
-    val details = commonApi.balanceDetails(address)
-    BalanceResponse().withWaves(
-      BalanceResponse.WavesBalances(
-        details.regular,
-        details.generating,
-        details.available,
-        details.effective,
-        details.leaseIn,
-        details.leaseOut
+    commonApi
+      .balanceDetails(address)
+      .fold(
+        e => throw GRPCErrors.toStatusException(CustomValidationError(e)),
+        details =>
+          BalanceResponse().withWaves(
+            BalanceResponse.WavesBalances(
+              details.regular,
+              details.generating,
+              details.available,
+              details.effective,
+              details.leaseIn,
+              details.leaseOut
+            )
+          )
       )
-    )
   }
 
   private def assetBalanceResponse(v: (Asset.IssuedAsset, Long)): BalanceResponse =
