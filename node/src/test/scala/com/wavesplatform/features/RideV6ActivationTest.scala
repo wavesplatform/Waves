@@ -28,6 +28,8 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
   private val unknownAssetId = IssuedAsset(ByteStr.decodeBase58("F9th5zKSTwtKaKEjf28A2Fj6Z6KMKoDX9jmZce6fsAhS").get)
   private val unknownLeaseId = ByteStr(Array.fill[Byte](DigestLength)(0))
 
+  private val secondSignedAddr = secondSigner.toAddress(chainId)
+
   "After RideV6 activation" - {
     val cases = Seq(
       Case(
@@ -105,7 +107,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
             // 2 on valueOrElse, and 1 on "+" and 1 for what? TODO
             val baseComplexity = 1 + 101 + 101 + 10 + 2 + 1 + 1
             mkV6Script(
-              s""" let to = Address(base58'${secondSigner.toAddress(chainId)}')
+              s""" let to = Address(base58'$secondSignedAddr')
                  | let complexInt = ${mkExprWithComplexity(complexity - baseComplexity)}
                  | (
                  |   [ ${(1 to 101).map(_ => v).mkString(", ")} ],
@@ -124,7 +126,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           { complexity =>
             val baseComplexity = 1 + 101 + 101 // 1 for Address, 101 on actions and 101 on a list construction
             mkV6Script(
-              s""" let to = Address(base58'${secondSigner.toAddress(chainId)}')
+              s""" let to = Address(base58'$secondSignedAddr')
                  | let complexInt = ${mkExprWithComplexity(complexity - baseComplexity)}
                  | [
                  |   ${(1 to 34).map(_ => s"""ScriptTransfer(to, complexInt, unit)""").mkString(", ")},
@@ -153,7 +155,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
             // 1 on Address, 1 on ScriptTransfer, 1 on a list construction and 1 for "-complexInt"
             val baseComplexity = 1 + 1 + 1 + 1
             mkV6Script(
-              s""" let to = Address(base58'${secondSigner.toAddress(chainId)}')
+              s""" let to = Address(base58'$secondSignedAddr')
                  | let complexInt = ${mkExprWithComplexity(complexity - baseComplexity)}
                  | [ ScriptTransfer(to, -complexInt, unit) ]
                  | """.stripMargin
@@ -177,7 +179,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
             // 1 on Address, 1 on ScriptTransfer, 1 on a list construction
             val baseComplexity = 1 + 1 + 1
             mkV6Script(
-              s""" let to = Address(base58'${secondSigner.toAddress(chainId)}')
+              s""" let to = Address(base58'$secondSignedAddr')
                  | let complexInt = ${mkExprWithComplexity(complexity - baseComplexity)}
                  | [ ScriptTransfer(to, complexInt, base58'${Base58.encode("test".getBytes(StandardCharsets.UTF_8))}') ]
                  | """.stripMargin
@@ -206,7 +208,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
             // 1 on Address, 1 on ScriptTransfer, 1 on a list construction
             val baseComplexity = 1 + 1 + 1
             mkV6Script(
-              s""" let to = Address(base58'${secondSigner.toAddress(chainId)}')
+              s""" let to = Address(base58'$secondSignedAddr')
                  | let complexInt = ${mkExprWithComplexity(complexity - baseComplexity)}
                  | [ ScriptTransfer(to, complexInt, base58'$unknownAssetId') ]
                  | """.stripMargin
@@ -232,7 +234,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
                  |
                  | @Callable(inv)
                  | func bar() = {
-                 |   let to = Address(base58'${secondSigner.toAddress(chainId)}')
+                 |   let to = Address(base58'$secondSignedAddr')
                  |   let complexInt = ${mkExprWithComplexity(complexity - baseComplexity)}
                  |   ([ ScriptTransfer(to, complexInt, base58'$unknownAssetId') ], 1)
                  | }
@@ -289,8 +291,67 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
                  | """.stripMargin
             )
           }
+        ),
+        Case(
+          "NODE-580 If a transaction invokes a script with invalid address",
+          "Wrong addressBytes length",
+          { complexity =>
+            // 1 on Address, 1 on tuple, 1 on a list construction, 1 on ScriptTransfer
+            val baseComplexity = 1 + 1 + 1 + 1
+            mkV6Script(
+              s""" let to = Address(base58'${secondSignedAddr.toString.take(5)}')
+                 | let complexInt = ${mkExprWithComplexity(complexity - baseComplexity)}
+                 | ([ScriptTransfer(to, 1, unit)], complexInt)
+                 | """.stripMargin
+            )
+          }
         )
-      )
+      ) ++ Seq(
+        ("negative", -1, "Negative lease amount = -1"),
+        ("zero", 0, "NonPositiveAmount(0,waves)")
+      ).map { case (tpe, leaseAmount, rejectError) =>
+        Case(
+          s"NODE-584 If a transaction does a $tpe leasing",
+          rejectError,
+          { complexity =>
+            // 1 on Address, 1 on tuple, 1 on a list construction, 1 on Lease
+            val baseComplexity = 1 + 1 + 1 + 1
+            mkV6Script(
+              s""" let to = Address(base58'$secondSignedAddr')
+                 | let complexInt = ${mkExprWithComplexity(complexity - baseComplexity)}
+                 | ([Lease(to, $leaseAmount)], complexInt)
+                 | """.stripMargin
+            )
+          }
+        )
+      }
+
+    // NODE-562 После активации Ride V6 при установке спонсорства для чужого ассета транзакция отклоняется до 1000 комплексити и фейлится после
+    // NODE-564 После активации Ride V6 при установке спонсорства для смарт-ассета транзакция отклоняется до 1000 комплексити и фейлится после
+    // NODE-570 После активации Ride V6 при переполнении в Reissue транзакция отклоняется до 1000 комплексити и фейлится после
+    // NODE-572 После активации Ride V6 при попытке Reissue ассета с reissuable=false транзакция отклоняется до 1000 комплексити и фейлится после
+    // NODE-574 После активации Ride V6 при попытке Reissue ассета, выпущенного другим адресом, транзакция отклоняется до 1000 комплексити и фейлится после
+
+    // NODE-586 После активации Ride V6 при лизинге самому себе транзакция отклоняется до 1000 комплексити и фейлится после
+    // NODE-588 После активации Ride V6 при создании лизинга с существующим leaseId транзакция отклоняется до 1000 комплексити и фейлится после
+    // NODE-590 После активации Ride V6 при попытке лизинга средств, отсутствующих на балансе, транзакция отклоняется до 1000 комплексити и фейлится после
+    // NODE-592 После активации Ride V6 при отмене лизинга с leaseId невалидной длины транзакция отклоняется до 1000 комплексити и фейлится после
+    // NODE-594 После активации Ride V6 при отмене несуществующего лизинга транзакция отклоняется до 1000 комплексити и фейлится после
+    // NODE-596 После активации Ride V6 при отмене уже отмененного лизинга транзакция отклоняется до 1000 комплексити и фейлится после
+    // NODE-598 После активации Ride V6 при попытке отмены чужого лизинга транзакция отклоняется до 1000 комплексити и фейлится после
+    // NODE-600 После активации Ride V6 если верификатор вернул не boolean, транзакция отклоняется до 1000 комплексити и фейлится после
+    // NODE-604 После активации Ride V6 при ошибке в скрипте ассета транзакция отклоняется до 1000 комплексити и фейлится после
+    // NODE-606 После активации Ride V6 при отрицательном вложенном пэйменте транзакция отклоняется до 1000 комплексити и фейлится после
+    // NODE-608 После активации Ride V6 при попытке выпустить ассет с существующим id транзакция отклоняется до 1000 комплексити и фейлится после
+    // NODE-610 После активации Ride V6 при отрицательном Reissue транзакция отклоняется до 1000 комплексити и фейлится после
+    // NODE-612 После активации Ride V6 при отрицательном Burn транзакция отклоняется до 1000 комплексити и фейлится после
+    // NODE-614 После активации Ride V6 при отрицательном ScriptTransfer (Negative transfer amount = ${t.amount}) транзакция отклоняется до 1000 комплексити и фейлится после
+    // NODE-616 После активации Ride V6 при отрицательном Lease транзакция отклоняется до 1000 комплексити и фейлится после
+    // NODE-618 После активации Ride V6 при отрицательном спонсировании транзакция отклоняется до 1000 комплексити и фейлится после
+    // NODE-620 После активации Ride V6 при возникновении промежуточного отрицательного баланса транзакция отклоняется до 1000 комплексити и фейлится после
+    // NODE-698 После активации Ride V6 при invoke адреса без установленного скрипта dapp транзакция отклоняется до 1000 комплексити и фейлится после
+
+    // ??? NODE-556 После активации Ride V6 при переполнении в наборе ScriptTransfer в одном массиве экшенов транзакция отклоняется до 1000 комплексити и фейлится после
 
     cases.foreach { testCase =>
       testCase.title - {
