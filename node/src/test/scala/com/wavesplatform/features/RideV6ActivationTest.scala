@@ -10,6 +10,7 @@ import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
+import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers.{defaultSigner, secondSigner}
@@ -324,34 +325,62 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
             )
           }
         )
-      }
-
-    // NODE-562 После активации Ride V6 при установке спонсорства для чужого ассета транзакция отклоняется до 1000 комплексити и фейлится после
-    // NODE-564 После активации Ride V6 при установке спонсорства для смарт-ассета транзакция отклоняется до 1000 комплексити и фейлится после
-    // NODE-570 После активации Ride V6 при переполнении в Reissue транзакция отклоняется до 1000 комплексити и фейлится после
-    // NODE-572 После активации Ride V6 при попытке Reissue ассета с reissuable=false транзакция отклоняется до 1000 комплексити и фейлится после
-    // NODE-574 После активации Ride V6 при попытке Reissue ассета, выпущенного другим адресом, транзакция отклоняется до 1000 комплексити и фейлится после
-
-    // NODE-586 После активации Ride V6 при лизинге самому себе транзакция отклоняется до 1000 комплексити и фейлится после
-    // NODE-588 После активации Ride V6 при создании лизинга с существующим leaseId транзакция отклоняется до 1000 комплексити и фейлится после
-    // NODE-590 После активации Ride V6 при попытке лизинга средств, отсутствующих на балансе, транзакция отклоняется до 1000 комплексити и фейлится после
-    // NODE-592 После активации Ride V6 при отмене лизинга с leaseId невалидной длины транзакция отклоняется до 1000 комплексити и фейлится после
-    // NODE-594 После активации Ride V6 при отмене несуществующего лизинга транзакция отклоняется до 1000 комплексити и фейлится после
-    // NODE-596 После активации Ride V6 при отмене уже отмененного лизинга транзакция отклоняется до 1000 комплексити и фейлится после
-    // NODE-598 После активации Ride V6 при попытке отмены чужого лизинга транзакция отклоняется до 1000 комплексити и фейлится после
-    // NODE-600 После активации Ride V6 если верификатор вернул не boolean, транзакция отклоняется до 1000 комплексити и фейлится после
-    // NODE-604 После активации Ride V6 при ошибке в скрипте ассета транзакция отклоняется до 1000 комплексити и фейлится после
-    // NODE-606 После активации Ride V6 при отрицательном вложенном пэйменте транзакция отклоняется до 1000 комплексити и фейлится после
-    // NODE-608 После активации Ride V6 при попытке выпустить ассет с существующим id транзакция отклоняется до 1000 комплексити и фейлится после
-    // NODE-610 После активации Ride V6 при отрицательном Reissue транзакция отклоняется до 1000 комплексити и фейлится после
-    // NODE-612 После активации Ride V6 при отрицательном Burn транзакция отклоняется до 1000 комплексити и фейлится после
-    // NODE-614 После активации Ride V6 при отрицательном ScriptTransfer (Negative transfer amount = ${t.amount}) транзакция отклоняется до 1000 комплексити и фейлится после
-    // NODE-616 После активации Ride V6 при отрицательном Lease транзакция отклоняется до 1000 комплексити и фейлится после
-    // NODE-618 После активации Ride V6 при отрицательном спонсировании транзакция отклоняется до 1000 комплексити и фейлится после
-    // NODE-620 После активации Ride V6 при возникновении промежуточного отрицательного баланса транзакция отклоняется до 1000 комплексити и фейлится после
-    // NODE-698 После активации Ride V6 при invoke адреса без установленного скрипта dapp транзакция отклоняется до 1000 комплексити и фейлится после
-
-    // ??? NODE-556 После активации Ride V6 при переполнении в наборе ScriptTransfer в одном массиве экшенов транзакция отклоняется до 1000 комплексити и фейлится после
+      } ++ Seq(
+        Case(
+          "NODE-586 If a transaction does a self-leasing",
+          "Cannot lease to self",
+          { complexity =>
+            // 1 on tuple, 1 on a list construction, 1 on Lease
+            val baseComplexity = 1 + 1 + 1
+            mkV6Script(
+              s""" let complexInt = ${mkExprWithComplexity(complexity - baseComplexity)}
+                 | ([Lease(this, 1)], complexInt)
+                 | """.stripMargin
+            )
+          }
+        ),
+        Case(
+          "NODE-590 If a transaction does a leasing with nonexistent funds",
+          "Cannot lease more than own",
+          // TODO ENOUGH_AMT + 1
+          { complexity =>
+            // 1 on Address, 1 on tuple, 1 on a list construction, 1 on Lease
+            val baseComplexity = 1 + 1 + 1 + 1
+            mkV6Script(
+              s""" let to = Address(base58'$secondSignedAddr')
+                 | let complexInt = ${mkExprWithComplexity(complexity - baseComplexity)}
+                 | ([Lease(to, ${ENOUGH_AMT * 2})], complexInt)
+                 | """.stripMargin
+            )
+          }
+        ),
+        Case(
+          "NODE-592 If a transaction cancels a leasing with wrong lease id",
+          s"Lease id=${unknownLeaseId.toString.take(5)} has invalid length",
+          { complexity =>
+            // 1 on tuple, 1 on a list construction, 1 on LeaseCancel
+            val baseComplexity = 1 + 1 + 1
+            mkV6Script(
+              s""" let complexInt = ${mkExprWithComplexity(complexity - baseComplexity)}
+                 | ([LeaseCancel(base58'${unknownLeaseId.toString.take(5)}')], complexInt)
+                 | """.stripMargin
+            )
+          }
+        ),
+        Case(
+          "NODE-594 If a transaction cancels an unknown leasing",
+          s"Lease with id=$unknownLeaseId not found",
+          { complexity =>
+            // 1 on tuple, 1 on a list construction, 1 on LeaseCancel
+            val baseComplexity = 1 + 1 + 1
+            mkV6Script(
+              s""" let complexInt = ${mkExprWithComplexity(complexity - baseComplexity)}
+                 | ([LeaseCancel(base58'$unknownLeaseId')], complexInt)
+                 | """.stripMargin
+            )
+          }
+        )
+      )
 
     cases.foreach { testCase =>
       testCase.title - {
