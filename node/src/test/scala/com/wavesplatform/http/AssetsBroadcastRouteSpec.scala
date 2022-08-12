@@ -159,20 +159,6 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
             WrongJson(errors = Seq(JsPath \ "feeAssetId" -> Seq(JsonValidationError(s"Too long assetId: length of $a exceeds 44"))))
           )
         }
-        forAll(longAttachmentInSymbols) { a =>
-          posting(tr.copy(attachment = Some(a))) should produce(
-            WrongJson(errors =
-              Seq(JsPath \ "attachment" -> Seq(JsonValidationError(s"base58-encoded string length (${a.length}) exceeds maximum length of 192")))
-            )
-          )
-        }
-        forAll(longAttachmentInBytes) { a =>
-          posting(tr.copy(attachment = Some(a))) should produce(
-            TooBigInBytes(
-              s"Invalid attachment. Length ${Base58.decode(a).length} bytes exceeds maximum of ${TransferTransaction.MaxAttachmentSize} bytes."
-            )
-          )
-        }
         forAll(nonPositiveLong) { fee =>
           posting(tr.copy(fee = fee)) should produce(InsufficientFee)
         }

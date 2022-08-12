@@ -5,7 +5,6 @@ import com.wavesplatform.api.http.requests._
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto._
 import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.transfer._
 import org.scalacheck.Gen.{alphaNumChar, choose, listOfN, oneOf}
 import org.scalacheck.{Arbitrary, Gen => G}
 import org.scalatest.Suite
@@ -16,14 +15,6 @@ trait RequestGen extends TransactionGen { _: Suite =>
     choose[Byte](Byte.MinValue, -1),
     choose((IssueTransaction.MaxAssetDecimals + 1).toByte, Byte.MaxValue)
   ).label("invalid decimals")
-
-  val longAttachmentInSymbols: G[String] =
-    genBoundedBytes(TransferTransaction.MaxAttachmentSize + 10, TransferTransaction.MaxAttachmentSize + 50)
-      .map(Base58.encode)
-
-  // Corner case, when a string length equals to a decoded array size
-  val longAttachmentInBytes: G[String] =
-    G.choose(TransferTransaction.MaxAttachmentSize + 1, TransferTransaction.MaxAttachmentStringSize - 1).map(n => "1" * n)
 
   val invalidBase58: G[String] = listOfN(50, oneOf(alphaNumChar, oneOf('O', '0', 'l')))
     .map(_.mkString)
