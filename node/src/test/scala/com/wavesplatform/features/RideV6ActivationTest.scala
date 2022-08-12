@@ -1,5 +1,6 @@
 package com.wavesplatform.features
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
@@ -9,7 +10,7 @@ import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxHelpers.{defaultSigner, secondSigner}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -22,6 +23,8 @@ import java.nio.charset.StandardCharsets
 class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
   private val chainId      = DomainPresets.SettingsFromDefaultConfig.blockchainSettings.addressSchemeCharacter.toByte
   private val otherChainId = (chainId + 1).toByte
+
+  private val invalidAssetId = IssuedAsset(ByteStr(("1" * 5).getBytes(StandardCharsets.UTF_8)))
 
   private val regularAssetTx       = TxHelpers.issue(amount = Long.MaxValue - 1)
   private val notReIssuableAssetTx = TxHelpers.issue(amount = 100, reissuable = false)
@@ -226,26 +229,55 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
             mkV6Script(
               s""" let to = Address(base58'$secondSignedAddr')
                  | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
-                 | [ ScriptTransfer(to, complexInt, base58'${Base58.encode("test".getBytes(StandardCharsets.UTF_8))}') ]
+                 | [ ScriptTransfer(to, complexInt, base58'$invalidAssetId') ]
                  | """.stripMargin
             )
           }
         ),
-        // TODO Can't create a test with invalid payment. Probably in node-it?
-        // Case(
-        //   "NODE-566 If a transaction contains a payment with invalid assetId",
-        //   "invalid asset ID",
-        //   { targetComplexity =>
-        //     // 1 for Address, 1 for ScriptTransfer, 1 for list
-        //     val baseComplexity = 1 + 1 + 1
-        //     mkV6Script(
-        //       s""" let to = Address(base58'$secondSignedAddr')
-        //          | let x = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
-        //          | [ ScriptTransfer(to, x, unit) ]
-        //          | """.stripMargin
-        //     )
-        //   }
-        // ),
+        Case(
+          "NODE-566 If a transaction contains an inner payment with invalid assetId",
+          s"invalid asset ID '$invalidAssetId'",
+          { targetComplexity =>
+            // 75 for invoke, 1 for Address, 1 for list, 1 for second list, 1 for secondSigner.foo() body
+            val baseComplexity = 75 + 1 + 1 + 1 + 1
+            TestCompiler(V6).compileContract(
+              s""" {-#STDLIB_VERSION 6 #-}
+                 | {-#SCRIPT_TYPE ACCOUNT #-}
+                 | {-#CONTENT_TYPE DAPP #-}
+                 |
+                 | @Callable(inv)
+                 | func foo() = {
+                 |   let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 |   strict res = invoke(
+                 |     Address(base58'$secondSignedAddr'),
+                 |     "bar",
+                 |     [ complexInt ],
+                 |     [ AttachedPayment(base58'$invalidAssetId', 1) ]
+                 |   )
+                 |   ([], res.exactAs[Int])
+                 | }
+                 | """.stripMargin
+            )
+          },
+          knownTxs = Seq(
+            TxHelpers.setScript(
+              secondSigner, {
+                val baseComplexity = 1 // 1 for tuple
+                TestCompiler(V6).compileContract(
+                  s""" {-#STDLIB_VERSION 6 #-}
+                     | {-#SCRIPT_TYPE ACCOUNT #-}
+                     | {-#CONTENT_TYPE DAPP #-}
+                     |
+                     | @Callable(inv)
+                     | func bar(n: Int) = {
+                     |   ([], ${mkIntExprWithComplexity(500 - baseComplexity)})
+                     | }
+                     | """.stripMargin
+                )
+              }
+            )
+          )
+        ),
         Case(
           "NODE-568 If a transaction sends a ScriptTransfer with unknown assetId",
           s"Transfer error: asset '$secondSignerAssetId' is not found on the blockchain",
@@ -523,10 +555,50 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
             )
           }
         ),
-        mkInnerTransferCase(
-          "NODE-606 If a negative payment happens during invoke",
-          "Negative transfer amount",
-          transferAmount = -1
+        // TODO Unify with NODE-566
+        Case(
+          "NODE-606 If an inner invoke contains a negative payment",
+          "with attached WAVES amount = -1",
+          { targetComplexity =>
+            // 75 for invoke, 1 for Address, 1 for list, 1 for second list, 1 for secondSigner.foo() body
+            val baseComplexity = 75 + 1 + 1 + 1 + 1
+            TestCompiler(V6).compileContract(
+              s""" {-#STDLIB_VERSION 6 #-}
+                 | {-#SCRIPT_TYPE ACCOUNT #-}
+                 | {-#CONTENT_TYPE DAPP #-}
+                 |
+                 | @Callable(inv)
+                 | func foo() = {
+                 |   let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 |   strict res = invoke(
+                 |     Address(base58'$secondSignedAddr'),
+                 |     "bar",
+                 |     [ complexInt ],
+                 |     [ AttachedPayment(unit, -1) ]
+                 |   )
+                 |   ([], res.exactAs[Int])
+                 | }
+                 | """.stripMargin
+            )
+          },
+          knownTxs = Seq(
+            TxHelpers.setScript(
+              secondSigner, {
+                val baseComplexity = 1 // 1 for tuple
+                TestCompiler(V6).compileContract(
+                  s""" {-#STDLIB_VERSION 6 #-}
+                     | {-#SCRIPT_TYPE ACCOUNT #-}
+                     | {-#CONTENT_TYPE DAPP #-}
+                     |
+                     | @Callable(inv)
+                     | func bar(n: Int) = {
+                     |   ([], ${mkIntExprWithComplexity(500 - baseComplexity)})
+                     | }
+                     | """.stripMargin
+                )
+              }
+            )
+          )
         ),
         Case(
           "NODE-608 If a script tries to issue the same asset multiple times",
@@ -575,7 +647,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
     title,
     rejectError,
     { targetComplexity =>
-      // 75 for invoke, 1 for Address, 1 for list, 500 for secondSigner.foo() call
+      // 75 for invoke, 1 for Address, 1 for list, 500 for secondSigner.foo() body
       val baseComplexity = 75 + 1 + 1 + 500
       TestCompiler(V6).compileContract(
         s""" {-#STDLIB_VERSION 6 #-}
