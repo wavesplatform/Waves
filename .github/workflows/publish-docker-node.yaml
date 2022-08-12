@@ -71,17 +71,13 @@ jobs:
           context: ./docker
           push: true
           tags: ${{ steps.meta-public.outputs.tags }}
-          build-args: |
-            NODE_TAG=${{ github.event.release.tag_name }}
 
       - name: Build and push Docker private image
         id: build-and-push-private
         uses: docker/build-push-action@v3
         with:
-          context: ./docker
+          context: ./docker/private
           push: true
           tags: ${{ steps.meta-private.outputs.tags }}
           build-args: |
             NODE_TAG=${{ github.event.release.tag_name }}
-            PRIVATE_NODE=true
-            WAVES_NETWORK=custom

@@ -1,0 +1,6 @@
+waves {
+  blockchain.type = ${WAVES_NETWORK}
+  rest-api.bind-address = "0.0.0.0"
+}
+
+include "local.conf"

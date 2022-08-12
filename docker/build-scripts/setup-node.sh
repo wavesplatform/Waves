@@ -1,7 +1,9 @@
 #!/bin/bash
 
+NETWORKS="mainnet testnet stagenet custom"
+
 # Create data directories
-mkdir -p $WVDATA $WVLOG
+mkdir -p $WVDATA $WVLOG /etc/waves
 
 # Create user
 groupadd -r waves --gid=999
@@ -16,7 +18,23 @@ if [[ $ENABLE_GRPC == true ]]; then
 fi
 
 # Set permissions
-chown -R waves:waves $WVDATA $WVLOG $WAVES_INSTALL_PATH && chmod 777 $WVDATA $WVLOG
+chown -R waves:waves $WVDATA $WVLOG $WAVES_INSTALL_PATH && chmod 755 $WVDATA $WVLOG
 
 cp /tmp/entrypoint.sh $WAVES_INSTALL_PATH/bin/entrypoint.sh
 chmod +x $WAVES_INSTALL_PATH/bin/entrypoint.sh
+
+if [[ $NETWORKS == *"${WAVES_NETWORK,,}"* ]]; then
+  # don't use indentation for heredoc because of its restrictions
+eval "cat <<EOF
+$(</tmp/waves.conf.template)
+EOF" 2> /dev/null > $WAVES_CONFIG
+
+else
+  echo "Network '${WAVES_NETWORK,,}' not found. Exiting."
+  exit 1
+fi
+
+cp $WAVES_INSTALL_PATH/lib/plugins/* $WAVES_INSTALL_PATH/lib/
+
+# Cleanup
+rm -rf /tmp/*

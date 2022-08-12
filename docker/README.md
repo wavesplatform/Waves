@@ -5,7 +5,7 @@ Waves is a decentralized platform that allows any user to issue, transfer, swap 
 
 
 ## About the image
-This Docker image contains scripts and configs to run Waves Node for `mainnet`, 'testnet' or 'stagenet' networks.
+This Docker image contains scripts and configs to run Waves Node for `mainnet`, `testnet` or `stagenet` networks.
 The image is focused on fast and convenient deployment of Waves Node.
 
 GitHub repository: https://github.com/wavesplatform/Waves/tree/master/docker
@@ -21,7 +21,7 @@ It is highly recommended to read more about [Waves Node configuration](https://d
 
 |Argument              | Default value |Description   |
 |----------------------|-------------------|--------------|
-|`WAVES_NETWORK`       | `mainnet`         | Waves Blockchain network. Available values are `mainnet`, `testnet`, `stagenet`. Can be overridden in a runtime using environment variable with the same name.|
+|`WAVES_NETWORK`       | `mainnet`         | Waves Blockchain network. Available values are `mainnet`, `testnet`, `stagenet`.|
 |`WAVES_LOG_LEVEL`     | `DEBUG`           | Default Waves Node log level. Available values: `OFF`, `ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`. More details about logging are available [here](https://docs.waves.tech/en/waves-node/logging-configuration). Can be overridden in a runtime using environment variable with the same name. |
 |`WAVES_HEAP_SIZE`     | `2g`              | Default Waves Node JVM Heap Size limit in -X Command-line Options notation (`-Xms=[your value]`). More details [here](https://docs.oracle.com/cd/E13150_01/jrockit_jvm/jrockit/jrdocs/refman/optionX.html). Can be overridden in a runtime using environment variable with the same name. |
 
@@ -31,13 +31,13 @@ It is highly recommended to read more about [Waves Node configuration](https://d
 
 ### Configuration options
 
-1. The image supports Waves Node config customization. To change a config field use corrresponding JVM options. JVM options can be sent to JVM using `JAVA_OPTS` environment variable. Please refer to ([complete configuration file](https://raw.githubusercontent.com/wavesplatform/Waves/2634f71899e3100808c44c5ed70b8efdbb600b05/Node/src/main/resources/application.conf)) to get the full path of the configuration item you want to change.
+1. The image supports Waves Node config customization. To change a config field use corresponding JVM options. JVM options can be sent to JVM using `JAVA_OPTS` environment variable. Please refer to ([complete configuration file](https://github.com/wavesplatform/Waves/blob/master/node/src/main/resources/application.conf)) to get the full path of the configuration item you want to change.
 
 ```
-docker run -v /docker/waves/waves-data:/var/lib/waves -v /docker/waves/waves-config:/etc/waves -p 6869:6869 -p 6862:6862 -e JAVA_OPTS="-Dwaves.rest-api.enable=yes -Dwaves.rest-api.bind-address=0.0.0.0 -Dwaves.wallet.password=myWalletSuperPassword" -e WAVES_NETWORK=stagenet -ti wavesplatform/wavesnode
+docker run -v /docker/waves/waves-data:/var/lib/waves -v /docker/waves/waves-config:/etc/waves -p 6869:6869 -p 6862:6862 -e JAVA_OPTS="-Dwaves.rest-api.enable=yes -Dwaves.rest-api.bind-address=0.0.0.0 -Dwaves.wallet.password=myWalletSuperPassword" -ti wavesplatform/wavesnode
 ```
 
-2. Waves Node is looking for a config in the directory `/etc/waves/waves.conf` which can be mounted using Docker volumes. If this directory does not exist, a default configuration will be copied to this directory. Default configuration is chosen depending on `WAVES_NETWORK` environment variable. If the value of `WAVES_NETWORK` is not `mainnet`, `testnet` or `stagenet`, default configuration won't be applied. This is a scenario of using `CUSTOM` network - correct configuration must be provided. If you use `CUSTOM` network and `/etc/waves/waves.conf` is NOT found Waves Node container will exit.
+2. Waves Node is looking for a config in the directory `/etc/waves/waves.conf` which can be mounted using Docker volumes. During image build, a default configuration will be copied to this directory. Default configuration is chosen depending on `WAVES_NETWORK` build argument. If the value of `WAVES_NETWORK` is not `mainnet`, `testnet` or `stagenet`, default configuration won't be enough for correct node working. This is a scenario of using `CUSTOM` network - correct configuration must be provided when starting container. If you use `CUSTOM` network and `/etc/waves/waves.conf` is NOT found Waves Node container will exit.
 
 3. By default, `/etc/waves/waves.conf` config includes `/etc/waves/local.conf`. Custom `/etc/waves/local.conf` can be used to override default config entries. Custom `/etc/waves/waves.conf` can be used to override or the whole configuration. For additional information about Docker volumes mapping please refer to `Managing data` item.
 
@@ -51,7 +51,6 @@ docker run -v /docker/waves/waves-data:/var/lib/waves -v /docker/waves/waves-con
 | `WAVES_WALLET_PASSWORD`           | Password for the wallet file. Overrides `-Dwaves.wallet.password` JVM config option. |
 | `WAVES_LOG_LEVEL`                 | Node logging level. Available values: `OFF`, `ERROR`, `WARN`, `INFO`, `DEBUG`, `TRACE`. More details about logging are available [here](https://docs.waves.tech/en/waves-node/logging-configuration).|
 | `WAVES_HEAP_SIZE`                 | Default Java Heap Size limit in -X Command-line Options notation (`-Xms=[your value]`). More details [here](https://docs.oracle.com/cd/E13150_01/jrockit_jvm/jrockit/jrdocs/refman/optionX.html). |
-|`WAVES_NETWORK`                    | Waves Blockchain network. Available values are `mainnet`, `testnet`, `stagenet`.|
 |`JAVA_OPTS`                        | Additional Waves Node JVM configuration options. 	|
 
 **Note: All variables are optional.**  
@@ -179,7 +178,7 @@ The node is configured with:
       Account address:     3M4qwDomRabJKLZxuXhwfqLApQkU592nWxF
   ```
 
-Full node configuration is available on Github in `waves.custom.conf`: https://github.com/wavesplatform/private-node-docker-image
+Full node configuration is available on Github in `waves.custom.conf`: https://github.com/wavesplatform/Waves/blob/master/docker/private/waves.custom.conf
 
 ### Image tags
 
