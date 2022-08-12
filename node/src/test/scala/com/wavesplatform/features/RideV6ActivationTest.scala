@@ -542,6 +542,55 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           }
         ),
         Case(
+          "NODE-606 If a negative payment happens during invoke",
+          "Negative transfer amount",
+          { targetComplexity =>
+            // 75 for invoke, 1 for Address, 1 for list, 500 for secondSigner.foo() call
+            val baseComplexity = 75 + 1 + 1 + 500
+            TestCompiler(V6).compileContract(
+              s""" {-#STDLIB_VERSION 6 #-}
+                 | {-#SCRIPT_TYPE ACCOUNT #-}
+                 | {-#CONTENT_TYPE DAPP #-}
+                 |
+                 | @Callable(inv)
+                 | func foo() = {
+                 |   let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 |   strict res = invoke(
+                 |     Address(base58'$secondSignedAddr'), 
+                 |     "bar",
+                 |     [ complexInt ],
+                 |     [ ]
+                 |   )
+                 |   ([], res.exactAs[Int])
+                 | }
+                 | """.stripMargin
+            )
+          },
+          knownTxs = Seq(
+            TxHelpers.setScript(
+              secondSigner, {
+                // 1 for Address, 1 for tuple, 1 for a list construction 1 for ScriptTransfer
+                val baseComplexity = 1 + 1 + 1 + 1
+                TestCompiler(V6).compileContract(
+                  s""" {-#STDLIB_VERSION 6 #-}
+                     | {-#SCRIPT_TYPE ACCOUNT #-}
+                     | {-#CONTENT_TYPE DAPP #-}
+                     |
+                     | @Callable(inv)
+                     | func bar(n: Int) = {
+                     |   let to = Address(base58'${defaultSigner.toAddress(chainId)}')
+                     |   (
+                     |     [ScriptTransfer(to, -1, unit)],
+                     |     ${mkIntExprWithComplexity(500 - baseComplexity)}
+                     |   )
+                     | }
+                     | """.stripMargin
+                )
+              }
+            )
+          )
+        ),
+        Case(
           "NODE-608 If a script tries to issue the same asset multiple times",
           "is already issued",
           { targetComplexity =>
