@@ -25,9 +25,11 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
   private val chainId      = DomainPresets.SettingsFromDefaultConfig.blockchainSettings.addressSchemeCharacter.toByte
   private val otherChainId = (chainId + 1).toByte
 
-  private val regularAssetTx = TxHelpers.issue(secondSigner, chainId = chainId)
-  private val regularAssetId = regularAssetTx.id()
+  private val secondSignerAssetTx = TxHelpers.issue(secondSigner, chainId = chainId)
+  private val secondSignerAssetId = secondSignerAssetTx.id()
 
+  private val regularAssetTx       = TxHelpers.issue(defaultSigner, amount = Long.MaxValue - 1, chainId = chainId)
+  private val notReIssuableAssetTx = TxHelpers.issue(defaultSigner, amount = 100, reissuable = false, chainId = chainId)
   private val smartAssetTx = TxHelpers.issue(
     defaultSigner,
     script = Some(
@@ -42,7 +44,6 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
     ),
     chainId = chainId
   )
-  private val smartAssetId = smartAssetTx.id()
 
   private val unknownLeaseId = ByteStr(Array.fill[Byte](DigestLength)(0))
 
@@ -198,11 +199,11 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
             val baseComplexity = 1 + 1 + 1
             mkV6Script(
               s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
-                 | ([SponsorFee(base58'$regularAssetId', 1)], complexInt)
+                 | ([SponsorFee(base58'$secondSignerAssetId', 1)], complexInt)
                  | """.stripMargin
             )
           },
-          knownTxs = Seq(regularAssetTx)
+          knownTxs = Seq(secondSignerAssetTx)
         ),
         Case(
           "NODE-564 If a script tries to set a sponsor fee for smart asset",
@@ -212,7 +213,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
             val baseComplexity = 1 + 1 + 1
             mkV6Script(
               s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
-                 | ([SponsorFee(base58'$smartAssetId', 1)], complexInt)
+                 | ([SponsorFee(base58'${smartAssetTx.id()}', 1)], complexInt)
                  | """.stripMargin
             )
           },
@@ -249,21 +250,21 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         // ),
         Case(
           "NODE-568 If a transaction sends a ScriptTransfer with unknown assetId",
-          s"Transfer error: asset '$regularAssetId' is not found on the blockchain",
+          s"Transfer error: asset '$secondSignerAssetId' is not found on the blockchain",
           { complexity =>
             // 1 on Address, 1 on ScriptTransfer, 1 on a list construction
             val baseComplexity = 1 + 1 + 1
             mkV6Script(
               s""" let to = Address(base58'$secondSignedAddr')
                  | let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
-                 | [ ScriptTransfer(to, complexInt, base58'$regularAssetId') ]
+                 | [ ScriptTransfer(to, complexInt, base58'$secondSignerAssetId') ]
                  | """.stripMargin
             )
           }
         ),
         Case(
           "NODE-568 If a transaction sends an inner invoke with a payment with unknown assetId",
-          s"Transfer error: asset '$regularAssetId' is not found on the blockchain",
+          s"Transfer error: asset '$secondSignerAssetId' is not found on the blockchain",
           { complexity =>
             // 1 on Address, 1 on ScriptTransfer, 1 on a list construction, 75 on invoke, 1 on throw (exactAs)
             val baseComplexity = 1 + 1 + 1 + 75 + 1
@@ -282,7 +283,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
                  | func bar() = {
                  |   let to = Address(base58'$secondSignedAddr')
                  |   let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
-                 |   ([ ScriptTransfer(to, complexInt, base58'$regularAssetId') ], 1)
+                 |   ([ ScriptTransfer(to, complexInt, base58'$secondSignerAssetId') ], 1)
                  | }
                  | """.stripMargin
             )
@@ -290,19 +291,61 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           invokeTx
         ),
         Case(
+          "NODE-570 If a script tries to overflow the amount of assets through Reissue",
+          "Asset total value overflow",
+          { targetComplexity =>
+            // 1 on tuple, 1 on Reissue, 1 on list
+            val baseComplexity = 1 + 1 + 1
+            mkV6Script(
+              s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 | ([Reissue(base58'${regularAssetTx.id()}', 2, true)], complexInt) # Amount will be (Long.MaxValue - 1) + 2
+                 | """.stripMargin
+            )
+          },
+          knownTxs = Seq(regularAssetTx)
+        ),
+        Case(
+          "NODE-572 If a script tries to reissue a not reissuable asset",
+          "Asset is not reissuable",
+          { targetComplexity =>
+            // 1 on tuple, 1 on Reissue, 1 on list
+            val baseComplexity = 1 + 1 + 1
+            mkV6Script(
+              s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 | ([Reissue(base58'${notReIssuableAssetTx.id()}', 1, true)], complexInt)
+                 | """.stripMargin
+            )
+          },
+          knownTxs = Seq(notReIssuableAssetTx)
+        ),
+        Case(
+          "NODE-574 If a script tries to reissue an asset issued by other address",
+          "Asset was issued by other address",
+          { targetComplexity =>
+            // 1 on tuple, 1 on Reissue, 1 on list
+            val baseComplexity = 1 + 1 + 1
+            mkV6Script(
+              s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 | ([Reissue(base58'$secondSignerAssetId', 1, true)], complexInt)
+                 | """.stripMargin
+            )
+          },
+          knownTxs = Seq(secondSignerAssetTx)
+        ),
+        Case(
           "NODE-576 If a transaction sends a Burn with unknown assetId",
           "Referenced assetId not found",
-          mkScriptWithOneAction(s"Burn(base58'$regularAssetId', 1)")
+          mkScriptWithOneAction(s"Burn(base58'$secondSignerAssetId', 1)")
         ),
         Case(
           "NODE-576 If a transaction sends a Reissue with unknown assetId",
           "Referenced assetId not found",
-          mkScriptWithOneAction(s"Reissue(base58'$regularAssetId', 1, true)")
+          mkScriptWithOneAction(s"Reissue(base58'$secondSignerAssetId', 1, true)")
         ),
         Case(
           "NODE-576 If a transaction sends a SponsorFee with unknown assetId",
           "was not issued from address of current dApp",
-          mkScriptWithOneAction(s"SponsorFee(base58'$regularAssetId', 1)")
+          mkScriptWithOneAction(s"SponsorFee(base58'$secondSignerAssetId', 1)")
         )
       ) ++ Seq(
         "ScriptTransfer" -> "ScriptTransfer(to, complexInt, unit)",
