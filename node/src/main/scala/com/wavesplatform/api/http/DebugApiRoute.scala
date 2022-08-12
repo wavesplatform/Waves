@@ -295,22 +295,25 @@ case class DebugApiRoute(
       }
     }
 
-  def stateHash: Route =
-    (get & path("stateHash" / IntNumber)) { height =>
-      val result = for {
-        sh <- loadStateHash(height)
-        h  <- blockchain.blockHeader(height)
-      } yield Json.toJson(sh).as[JsObject] ++ Json.obj(
-        "blockId" -> h.id().toString,
-        "height"  -> height,
-        "version" -> Version.VersionString
-      )
+  def stateHash: Route = (get & pathPrefix("stateHash")) {
+    path("last")(stateHashAt(blockchain.height - 1)) ~ path(IntNumber)(stateHashAt)
+  }
 
-      result match {
-        case Some(value) => complete(value)
-        case None        => complete(StatusCodes.NotFound)
-      }
+  private def stateHashAt(height: Int): Route = {
+    val result = for {
+      sh <- loadStateHash(height)
+      h  <- blockchain.blockHeader(height)
+    } yield Json.toJson(sh).as[JsObject] ++ Json.obj(
+      "blockId" -> h.id().toString,
+      "height"  -> height,
+      "version" -> Version.VersionString
+    )
+
+    result match {
+      case Some(value) => complete(value)
+      case None        => complete(StatusCodes.NotFound)
     }
+  }
 }
 
 object DebugApiRoute {
