@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.validation
 
 import cats.data.Validated
 import cats.data.Validated.{Invalid, Valid}
-import cats.syntax.validated._
+import cats.syntax.validated.*
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.common.state.ByteStr
@@ -91,7 +91,12 @@ object TxConstraints {
   // Transaction specific
   def transferAttachment(attachment: ByteStr): ValidatedV[ByteStr] = {
     this.seq(attachment)(
-      cond(attachment.size <= TransferTransaction.MaxAttachmentSize, TxValidationError.TooBigArray)
+      cond(
+        attachment.size <= TransferTransaction.MaxAttachmentSize,
+        TxValidationError.TooBigInBytes(
+          s"Invalid attachment. Length ${attachment.size} bytes exceeds maximum of ${TransferTransaction.MaxAttachmentSize} bytes."
+        )
+      )
     )
   }
 

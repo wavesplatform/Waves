@@ -1,7 +1,5 @@
 package com.wavesplatform.transaction
 
-import scala.util.Either
-
 import cats.Id
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, MicroBlock}
@@ -22,6 +20,7 @@ object TxValidationError {
   case class NegativeMinFee(minFee: Long, of: String)        extends ValidationError
   case object InsufficientFee                                extends ValidationError
   case object TooBigArray                                    extends ValidationError
+  case class TooBigInBytes(err: String)                      extends ValidationError
   case object InvalidName                                    extends ValidationError
   case object InvalidAssetId                                 extends ValidationError
   case object OverflowError                                  extends ValidationError
@@ -32,14 +31,14 @@ object TxValidationError {
   case class BlockFromFuture(ts: Long)                       extends ValidationError
   case class AlreadyInTheState(txId: ByteStr, txHeight: Int) extends ValidationError
   case class AccountBalanceError(errs: Map[Address, String]) extends ValidationError
-  case class AliasDoesNotExist(a: Alias)                     extends ValidationError { override def toString: String = s"Alias '$a' does not exists." }
-  case class AliasIsDisabled(a: Alias)                       extends ValidationError
+  case class AliasDoesNotExist(a: Alias) extends ValidationError { override def toString: String = s"Alias '$a' does not exists." }
+  case class AliasIsDisabled(a: Alias)   extends ValidationError
   case class OrderValidationError(order: Order, err: String) extends ValidationError
   case class SenderIsBlacklisted(addr: String)               extends ValidationError
   case class Mistiming(err: String)                          extends ValidationError
   case class BlockAppendError(err: String, b: Block)         extends ValidationError
   case class ActivationError(err: String)                    extends ValidationError
-  case class GenericError(err: String)                         extends ValidationError
+  case class GenericError(err: String)                       extends ValidationError
 
   object GenericError {
     def apply(ex: Throwable): GenericError = new GenericError(ex.getMessage)
@@ -63,7 +62,7 @@ object TxValidationError {
       invocations: Seq[InvokeScriptResult.Invocation] = Nil
   ) extends ValidationError
       with WithLog {
-    import FailedTransactionError._
+    import FailedTransactionError.*
 
     def code: Int = cause.code
     def message: String = cause match {
