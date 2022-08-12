@@ -1,6 +1,5 @@
 package com.wavesplatform.features
 
-import cats.syntax.option.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.crypto.DigestLength
@@ -12,11 +11,11 @@ import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers.{defaultSigner, secondSigner}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{Asset, Proofs, TxPositiveAmount, TxVersion}
+import com.wavesplatform.transaction.{Asset, Proofs, Transaction, TxHelpers, TxPositiveAmount, TxVersion}
 import org.scalatest.OptionValues
 
 import java.nio.charset.StandardCharsets
@@ -26,7 +25,25 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
   private val chainId      = DomainPresets.SettingsFromDefaultConfig.blockchainSettings.addressSchemeCharacter.toByte
   private val otherChainId = (chainId + 1).toByte
 
-  private val unknownAssetId = IssuedAsset(ByteStr.decodeBase58("F9th5zKSTwtKaKEjf28A2Fj6Z6KMKoDX9jmZce6fsAhS").get)
+  private val regularAssetTx = TxHelpers.issue(secondSigner, chainId = chainId)
+  private val regularAssetId = regularAssetTx.id()
+
+  private val smartAssetTx = TxHelpers.issue(
+    defaultSigner,
+    script = Some(
+      TestCompiler(V5).compileAsset(
+        s""" {-# STDLIB_VERSION 5 #-}
+           | {-# CONTENT_TYPE EXPRESSION #-}
+           | {-# SCRIPT_TYPE ASSET #-}
+           |
+           | true
+           |""".stripMargin
+      )
+    ),
+    chainId = chainId
+  )
+  private val smartAssetId = smartAssetTx.id()
+
   private val unknownLeaseId = ByteStr(Array.fill[Byte](DigestLength)(0))
 
   private val secondSignedAddr = secondSigner.toAddress(chainId)
@@ -174,6 +191,34 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           mkScriptWithOneAction(s"""Issue("Token", "${"a" * (IssueTransaction.MaxAssetDescriptionLength + 1)}", 1, 2, true)""")
         ),
         Case(
+          "NODE-562 If a script tries to set a sponsor fee for another's account asset",
+          "was not issued from address of current dApp",
+          { targetComplexity =>
+            // 1 on tuple, 1 on SponsorFee, 1 on list
+            val baseComplexity = 1 + 1 + 1
+            mkV6Script(
+              s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 | ([SponsorFee(base58'$regularAssetId', 1)], complexInt)
+                 | """.stripMargin
+            )
+          },
+          knownTxs = Seq(regularAssetTx)
+        ),
+        Case(
+          "NODE-564 If a script tries to set a sponsor fee for smart asset",
+          "Sponsorship smart assets is disabled",
+          { targetComplexity =>
+            // 1 on tuple, 1 on SponsorFee, 1 on list
+            val baseComplexity = 1 + 1 + 1
+            mkV6Script(
+              s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 | ([SponsorFee(base58'$smartAssetId', 1)], complexInt)
+                 | """.stripMargin
+            )
+          },
+          knownTxs = Seq(smartAssetTx)
+        ),
+        Case(
           "NODE-566 If a transaction sends a ScriptTransfer with invalid assetId",
           "invalid asset ID",
           { complexity =>
@@ -204,21 +249,21 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         // ),
         Case(
           "NODE-568 If a transaction sends a ScriptTransfer with unknown assetId",
-          s"Transfer error: asset '$unknownAssetId' is not found on the blockchain",
+          s"Transfer error: asset '$regularAssetId' is not found on the blockchain",
           { complexity =>
             // 1 on Address, 1 on ScriptTransfer, 1 on a list construction
             val baseComplexity = 1 + 1 + 1
             mkV6Script(
               s""" let to = Address(base58'$secondSignedAddr')
                  | let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
-                 | [ ScriptTransfer(to, complexInt, base58'$unknownAssetId') ]
+                 | [ ScriptTransfer(to, complexInt, base58'$regularAssetId') ]
                  | """.stripMargin
             )
           }
         ),
         Case(
           "NODE-568 If a transaction sends an inner invoke with a payment with unknown assetId",
-          s"Transfer error: asset '$unknownAssetId' is not found on the blockchain",
+          s"Transfer error: asset '$regularAssetId' is not found on the blockchain",
           { complexity =>
             // 1 on Address, 1 on ScriptTransfer, 1 on a list construction, 75 on invoke, 1 on throw (exactAs)
             val baseComplexity = 1 + 1 + 1 + 75 + 1
@@ -237,7 +282,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
                  | func bar() = {
                  |   let to = Address(base58'$secondSignedAddr')
                  |   let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
-                 |   ([ ScriptTransfer(to, complexInt, base58'$unknownAssetId') ], 1)
+                 |   ([ ScriptTransfer(to, complexInt, base58'$regularAssetId') ], 1)
                  | }
                  | """.stripMargin
             )
@@ -247,17 +292,17 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         Case(
           "NODE-576 If a transaction sends a Burn with unknown assetId",
           "Referenced assetId not found",
-          mkScriptWithOneAction(s"Burn(base58'$unknownAssetId', 1)")
+          mkScriptWithOneAction(s"Burn(base58'$regularAssetId', 1)")
         ),
         Case(
           "NODE-576 If a transaction sends a Reissue with unknown assetId",
           "Referenced assetId not found",
-          mkScriptWithOneAction(s"Reissue(base58'$unknownAssetId', 1, true)")
+          mkScriptWithOneAction(s"Reissue(base58'$regularAssetId', 1, true)")
         ),
         Case(
           "NODE-576 If a transaction sends a SponsorFee with unknown assetId",
           "was not issued from address of current dApp",
-          mkScriptWithOneAction(s"SponsorFee(base58'$unknownAssetId', 1)")
+          mkScriptWithOneAction(s"SponsorFee(base58'$regularAssetId', 1)")
         )
       ) ++ Seq(
         "ScriptTransfer" -> "ScriptTransfer(to, complexInt, unit)",
@@ -403,21 +448,21 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
     cases.foreach { testCase =>
       testCase.title - {
         "<=1000 complexity - rejected" - Seq(110, ContractLimits.FailFreeInvokeComplexity).foreach { complexity =>
-          s"complexity = $complexity" in withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(defaultSigner)) { d =>
+          s"complexity = $complexity" in withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(defaultSigner, secondSigner)) { d =>
             val setScriptTx = SetScriptTransaction
               .selfSigned(TxVersion.V3, defaultSigner, Some(testCase.mkDApp(complexity)), 1.waves, System.currentTimeMillis())
               .explicitGet()
-            d.appendBlock(setScriptTx)
+            d.appendBlock((testCase.knownTxs :+ setScriptTx)*)
             d.createDiffE(testCase.invokeTx) should produce(testCase.rejectError)
           }
         }
         ">1000 complexity - failed" in {
-          withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(defaultSigner)) { d =>
+          withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(defaultSigner, secondSigner)) { d =>
             val complexity = ContractLimits.FailFreeInvokeComplexity + 1
             val setScriptTx = SetScriptTransaction
               .selfSigned(TxVersion.V3, defaultSigner, Some(testCase.mkDApp(complexity)), 1.waves, System.currentTimeMillis())
               .explicitGet()
-            d.appendBlock(setScriptTx)
+            d.appendBlock((testCase.knownTxs :+ setScriptTx)*)
             d.appendBlock(testCase.invokeTx)
             val invokeTxMeta = d.transactionsApi.transactionById(testCase.invokeTx.id()).value
             invokeTxMeta.spentComplexity shouldBe complexity
@@ -428,7 +473,13 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
     }
   }
 
-  private case class Case(title: String, rejectError: String, mkDApp: Int => Script, invokeTx: InvokeScriptTransaction = invokeTx)
+  private case class Case(
+      title: String,
+      rejectError: String,
+      mkDApp: Int => Script,
+      invokeTx: InvokeScriptTransaction = invokeTx,
+      knownTxs: Seq[Transaction] = Seq.empty
+  )
 
   private def mkScriptWithOneAction(actionSrc: String): Int => Script = { targetComplexity =>
     // 1 on tuple, 1 on action, 1 on a list construction
@@ -464,7 +515,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
     fee = TxPositiveAmount.unsafeFrom(1000000L),
     feeAssetId = Waves,
     dApp = defaultSigner.toAddress(chainId),
-    funcCallOpt = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), Nil).some,
+    funcCallOpt = Some(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), Nil)),
     payments = Seq.empty,
     timestamp = System.currentTimeMillis(),
     proofs = Proofs.empty
