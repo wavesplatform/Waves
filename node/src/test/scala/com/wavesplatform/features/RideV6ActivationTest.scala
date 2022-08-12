@@ -1,8 +1,6 @@
 package com.wavesplatform.features
 
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
-import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.*
@@ -25,13 +23,14 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
   private val chainId      = DomainPresets.SettingsFromDefaultConfig.blockchainSettings.addressSchemeCharacter.toByte
   private val otherChainId = (chainId + 1).toByte
 
-  private val secondSignerAssetTx = TxHelpers.issue(secondSigner, chainId = chainId)
+  private val secondSignedAddr = secondSigner.toAddress(chainId)
+
+  private val secondSignerAssetTx = TxHelpers.issue(issuer = secondSigner)
   private val secondSignerAssetId = secondSignerAssetTx.id()
 
-  private val regularAssetTx       = TxHelpers.issue(defaultSigner, amount = Long.MaxValue - 1, chainId = chainId)
-  private val notReIssuableAssetTx = TxHelpers.issue(defaultSigner, amount = 100, reissuable = false, chainId = chainId)
+  private val regularAssetTx       = TxHelpers.issue(amount = Long.MaxValue - 1)
+  private val notReIssuableAssetTx = TxHelpers.issue(amount = 100, reissuable = false)
   private val smartAssetTx = TxHelpers.issue(
-    defaultSigner,
     script = Some(
       TestCompiler(V5).compileAsset(
         s""" {-# STDLIB_VERSION 5 #-}
@@ -41,13 +40,11 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
            | true
            |""".stripMargin
       )
-    ),
-    chainId = chainId
+    )
   )
 
-  private val unknownLeaseId = ByteStr(Array.fill[Byte](DigestLength)(0))
-
-  private val secondSignedAddr = secondSigner.toAddress(chainId)
+  private val secondSignerLeasingTx = TxHelpers.lease(sender = secondSigner, recipient = defaultSigner.toAddress(chainId))
+  private val secondSignerLeasingId = secondSignerLeasingTx.id()
 
   "After RideV6 activation" - {
     val cases = Seq(
@@ -116,7 +113,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
       Seq(
         "ScriptTransfer" -> "ScriptTransfer(to, 1, unit)",
         "Lease"          -> "Lease(to, 1)",
-        "LeaseCancel"    -> s"LeaseCancel(base58'$unknownLeaseId')"
+        "LeaseCancel"    -> s"LeaseCancel(base58'$secondSignerLeasingId')"
       ).map { case (actionType, v) =>
         Case(
           s"NODE-548 If a transaction exceeds the limit of $actionType actions",
@@ -150,7 +147,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
                  | [
                  |   ${(1 to 34).map(_ => s"""ScriptTransfer(to, complexInt, unit)""").mkString(", ")},
                  |   ${(1 to 34).map(_ => s"""Lease(to, 1)""").mkString(", ")},
-                 |   ${(1 to 33).map(_ => s"""LeaseCancel(base58'$unknownLeaseId')""").mkString(", ")}
+                 |   ${(1 to 33).map(_ => s"""LeaseCancel(base58'$secondSignerLeasingId')""").mkString(", ")}
                  | ]
                  | """.stripMargin
             )
@@ -428,6 +425,34 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           }
         ),
         Case(
+          "NODE-588 If a transaction does same leasing multiple times",
+          "is already in the state",
+          { complexity =>
+            // 1 on Address, 1 on tuple, 1+1 on a list construction, 1+1 on Lease
+            val baseComplexity = 1 + 1 + 1 + 1 + 1 + 1
+            mkV6Script(
+              s""" let to = Address(base58'$secondSignedAddr')
+                 | let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
+                 | ([Lease(to, 1, 3), Lease(to, 1, 3)], complexInt) # Leasing id is a hash of its data and invoke tx id
+                 | """.stripMargin
+            )
+          }
+        ),
+        Case(
+          "NODE-598 If a transaction tries to cancel another account leasing",
+          "LeaseTransaction was leased by other sender and time",
+          { complexity =>
+            // 1 on tuple, 1 on a list construction, 1 on LeaseCancel
+            val baseComplexity = 1 + 1 + 1
+            mkV6Script(
+              s""" let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
+                 | ([LeaseCancel(base58'$secondSignerLeasingId')], complexInt)
+                 | """.stripMargin
+            )
+          },
+          knownTxs = Seq(secondSignerLeasingTx)
+        ),
+        Case(
           "NODE-590 If a transaction does a leasing with nonexistent funds",
           "Cannot lease more than own",
           // TODO ENOUGH_AMT + 1
@@ -444,26 +469,26 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         ),
         Case(
           "NODE-592 If a transaction cancels a leasing with wrong lease id",
-          s"Lease id=${unknownLeaseId.toString.take(5)} has invalid length",
+          s"Lease id=${secondSignerLeasingId.toString.take(5)} has invalid length",
           { complexity =>
             // 1 on tuple, 1 on a list construction, 1 on LeaseCancel
             val baseComplexity = 1 + 1 + 1
             mkV6Script(
               s""" let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
-                 | ([LeaseCancel(base58'${unknownLeaseId.toString.take(5)}')], complexInt)
+                 | ([LeaseCancel(base58'${secondSignerLeasingId.toString.take(5)}')], complexInt)
                  | """.stripMargin
             )
           }
         ),
         Case(
           "NODE-594 If a transaction cancels an unknown leasing",
-          s"Lease with id=$unknownLeaseId not found",
+          s"Lease with id=$secondSignerLeasingId not found",
           { complexity =>
             // 1 on tuple, 1 on a list construction, 1 on LeaseCancel
             val baseComplexity = 1 + 1 + 1
             mkV6Script(
               s""" let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
-                 | ([LeaseCancel(base58'$unknownLeaseId')], complexInt)
+                 | ([LeaseCancel(base58'$secondSignerLeasingId')], complexInt)
                  | """.stripMargin
             )
           }
