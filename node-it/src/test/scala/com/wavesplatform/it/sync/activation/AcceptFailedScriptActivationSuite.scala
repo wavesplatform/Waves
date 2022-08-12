@@ -98,11 +98,12 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
 
     nodes.waitForHeightArise()
     check() // hardened
-    all(sender.blockSeqByAddress(sender.address, 1, ActivationHeight - 1).flatMap(_.transactions.map(_.applicationStatus))) shouldBe None
+    all(sender.blockSeqByAddress(sender.address, 1, sender.height).flatMap(_.transactions.map(_.applicationStatus))) shouldBe None
   }
 
   test("accept failed transaction after activation height") {
-    sender.waitForHeight(ActivationHeight)
+    docker.restartNode(dockerNodes().head, configs(activate = true).head)
+    val startHeight = sender.height
 
     sender.setAssetScript(asset, dAppKP, setAssetScriptFee + smartFee, assetScript(true), waitForTx = true)
     overflowBlock()
@@ -151,7 +152,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
       sender.debugStateChangesByAddress(caller, txs.size).foreach { s =>
         s.applicationStatus shouldBe idToApplicationStatus.getOrElse(s.id, Some("succeeded"))
       }
-      sender.blockSeqByAddress(sender.address, ActivationHeight, sender.height).flatMap(_.transactions).foreach { tx =>
+      sender.blockSeqByAddress(sender.address, startHeight, sender.height).flatMap(_.transactions).foreach { tx =>
         tx.applicationStatus shouldBe idToApplicationStatus.getOrElse(tx.id, Some("succeeded"))
       }
     }
@@ -337,8 +338,6 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
   }
 
   test("accept invalid by order asset scripts ExchangeTransaction to utx and save it as failed after activation height") {
-    sender.waitForHeight(ActivationHeight, 5 minutes)
-
     sender.setAssetScript(asset, dAppKP, priorityFee, assetScript(true), waitForTx = true)
     sender.transfer(sender.keyPair, dApp, 100.waves, waitForTx = true)
     val tradeAsset =
@@ -458,11 +457,10 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
 
   }
 
-  override protected def nodeConfigs: Seq[Config] = Configs
+  override protected def nodeConfigs: Seq[Config] = configs(activate = false)
 }
 
 object AcceptFailedScriptActivationSuite {
-  private val ActivationHeight   = 11
   private val UpdateInterval     = 3
   private val MaxTxsInMicroBlock = 2
 
@@ -485,13 +483,13 @@ object AcceptFailedScriptActivationSuite {
 
   private def mkScript(scriptText: String): Option[String] = Some(ScriptCompiler.compile(scriptText, estimator).explicitGet()._1.bytes().base64)
 
-  private val Configs: Seq[Config] =
+  private def configs(activate: Boolean): Seq[Config] =
     NodeConfigs
       .Builder(Default, 1, Seq.empty)
       .overrideBase(_.quorum(0))
       .overrideBase(
         _.preactivatedFeatures(
-          (BlockchainFeatures.BlockV5.id, ActivationHeight)
+          (BlockchainFeatures.BlockV5.id, if (activate) 0 else 9999)
         )
       )
       .overrideBase(_.raw(s"waves.blockchain.custom.functionality.min-asset-info-update-interval = $UpdateInterval"))

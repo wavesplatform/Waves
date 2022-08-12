@@ -97,7 +97,7 @@ class ReplTest extends BaseTransactionSuite with FailedTransactionSuiteLike[Stri
           fee = 1.waves
         )
         .id
-    val height = miner.height
+    val height = miner.transactionStatus(assetId).height.get
 
     miner.putData(
       issuer,

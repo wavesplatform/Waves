@@ -25,6 +25,7 @@ class HttpScriptAssetActionLimitsSuite extends ScriptAssetActionLimitsSuite {
       ._1
 
     miner.transfer(sender.keyPair, address.publicKey.toAddress.toString, initialWavesBalance, minFee, waitForTx = true)
+    nodes.waitForHeightArise()
 
     nodes.waitForHeightAriseAndTxPresent(
       miner
@@ -95,13 +96,13 @@ class HttpScriptAssetActionLimitsSuite extends ScriptAssetActionLimitsSuite {
         waitForTx = true
       )
       for (nth <- 0 until actionsLimit) {
-        val assetInfo = sender.stateChanges(tx.id).stateChanges.get.issues(nth)
+        val assetInfo = miner.stateChanges(tx.id).stateChanges.get.issues(nth)
         assetInfo.quantity shouldBe asset.quantity
         assetInfo.name shouldBe asset.name
         assetInfo.description shouldBe asset.description
         assetInfo.decimals shouldBe asset.decimals
         assetInfo.isReissuable shouldBe asset.reissuable
-        sender.assertAssetBalance(acc.toAddress.toString, assetInfo.assetId, asset.quantity)
+        miner.assertAssetBalance(acc.toAddress.toString, assetInfo.assetId, asset.quantity)
       }
     }
 

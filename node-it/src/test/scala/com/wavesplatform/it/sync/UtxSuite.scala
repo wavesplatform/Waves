@@ -1,16 +1,15 @@
 package com.wavesplatform.it.sync
 
 import scala.util.{Random, Try}
-
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.{BaseFunSuite, Node}
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.TransactionInfo
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.api.{AsyncHttpApi, TransactionInfo}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
-import com.wavesplatform.transaction.{utils, TxVersion}
+import com.wavesplatform.transaction.{TxVersion, utils}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -90,7 +89,7 @@ class UtxSuite extends BaseFunSuite {
           miner.keyPair,
           whitelistedAccount.toAddress,
           Waves,
-          5 * minTransferFee + 5,
+          5 * minTransferFee + 5 + (1 to 5).sum,
           Waves,
           minTransferFee,
           ByteStr.empty,
@@ -117,7 +116,7 @@ class UtxSuite extends BaseFunSuite {
         miner.keyPair,
         invokeAccount.toAddress,
         Waves,
-        5 * minInvokeFee,
+        5 * minInvokeFee + (1 to 5).sum,
         Waves,
         minTransferFee,
         ByteStr.empty,
@@ -142,31 +141,30 @@ class UtxSuite extends BaseFunSuite {
     miner.signedBroadcast(setScript.json())
     nodes.waitForHeightAriseAndTxPresent(setScript.id().toString)
 
-    val txs = (1 to 5000).map { _ =>
+    val txs = (1 to 10).map { _ =>
       TransferTransaction
         .selfSigned(TxVersion.V1, miner.keyPair, UtxSuite.createAccount.toAddress, Waves, 1L, Waves, higherFee, ByteStr.empty, time)
         .explicitGet()
     }
 
     val whitelistedTxs = {
-      val bySender = (1 to 5).map { _ =>
+      val bySender = (1 to 5).map { i =>
         TransferTransaction
-          .selfSigned(TxVersion.V1, whitelistedAccount, UtxSuite.createAccount.toAddress, Waves, 1L, Waves, minTransferFee, ByteStr.empty, time)
+          .selfSigned(TxVersion.V1, whitelistedAccount, UtxSuite.createAccount.toAddress, Waves, 1L, Waves, minTransferFee + i, ByteStr.empty, time)
           .explicitGet()
       }
-      val byDApp = Seq.fill(5)(
-        utils.Signed.invokeScript(TxVersion.V1, invokeAccount, whitelistedDAppAccount.toAddress, None, Seq.empty, minInvokeFee, Waves, time)
-      )
-      Random.shuffle(bySender ++ byDApp)
+      val byDApp = (1 to 5).map { i =>
+          utils.Signed.invokeScript(TxVersion.V1, invokeAccount, whitelistedDAppAccount.toAddress, None, Seq.empty, minInvokeFee + i, Waves, time)
+      }
+      bySender ++ byDApp
     }
 
-    txs.foreach(tx => miner.signedBroadcast(tx.json()))
+    val startHeight = nodes.waitForHeightArise()
+    Random.shuffle(txs ++ whitelistedTxs).map(_.json()).foreach(AsyncHttpApi.NodeAsyncHttpApi(miner).signedBroadcast)
+    miner.waitForEmptyUtx()
+    val endHeight = miner.height
 
-    miner.utxSize should be > 0
-
-    whitelistedTxs.map(tx => miner.signedBroadcast(tx.json()).id).foreach(nodes.waitForTransaction)
-
-    miner.utxSize should be > 0
+    miner.blockSeq(startHeight, endHeight).flatMap(_.transactions).map(_.id).take(10) should contain theSameElementsAs whitelistedTxs.map(_.id().toString)
   }
 
   def txInBlockchain(txId: String, nodes: Seq[Node]): Boolean = {
@@ -214,6 +212,7 @@ object UtxSuite {
        |    generation-balance-depth-from-50-to-1000-after-height = 100
        |  }
        |  miner.quorum = 0
+       |  miner.max-transactions-in-micro-block = 1
        |}""".stripMargin
 
   private def notMinerConfigPredef(whitelist: Seq[String]) =

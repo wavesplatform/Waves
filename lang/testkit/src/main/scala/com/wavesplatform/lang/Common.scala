@@ -3,20 +3,21 @@ package com.wavesplatform.lang
 import cats.Id
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.CTX
-import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
-import com.wavesplatform.lang.v1.evaluator.ctx._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, _}
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1.*
+import com.wavesplatform.lang.v1.evaluator.ctx.*
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, *}
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import monix.eval.Coeval
+import shapeless.Coproduct
 
 import scala.annotation.tailrec
 import scala.util.{Left, Right, Try}
@@ -82,12 +83,12 @@ object Common {
     override def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo]                                         = ???
     override def lastBlockOpt(): Option[BlockInfo]                                                               = ???
     override def blockInfoByHeight(height: Int): Option[BlockInfo]                                               = ???
-    override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                        = ???
-    override def hasData(recipient: Recipient): Boolean                                                          = ???
+    override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                        = None
+    override def hasData(recipient: Recipient): Boolean                                                          = false
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
     override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails]    = ???
-    override def tthis: Environment.Tthis                                                                        = ???
+    override def tthis: Environment.Tthis                                                                        = Coproduct(Address(ByteStr.empty))
     override def multiPaymentAllowed: Boolean                                                                    =  true
     override def txId: ByteStr                                                                                   = ???
     override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
