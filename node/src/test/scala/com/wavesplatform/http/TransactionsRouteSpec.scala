@@ -1066,7 +1066,7 @@ class TransactionsRouteSpec
 
       val tx = TxHelpers
         .transfer()
-        .copy(attachment = ByteStr(Base58.decode(attachmentStr)))
+        .copy(attachment = ByteStr(Base58.decode(attachmentStr))) // to bypass a validation
         .signWith(defaultSigner.privateKey)
 
       Post(routePath("/broadcast"), tx.json()) ~> route should produce(
