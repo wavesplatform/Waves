@@ -1,19 +1,19 @@
 package com.wavesplatform.features
 
-import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
+import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.compiler.{Terms, TestCompiler}
-import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
+import com.wavesplatform.lang.v1.ContractLimits
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers.{defaultSigner, secondSigner}
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{Asset, Proofs, Transaction, TxHelpers, TxPositiveAmount, TxVersion}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers}
 import org.scalatest.OptionValues
 
 import java.nio.charset.StandardCharsets
@@ -22,11 +22,6 @@ import java.nio.charset.StandardCharsets
 class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
   private val chainId      = DomainPresets.SettingsFromDefaultConfig.blockchainSettings.addressSchemeCharacter.toByte
   private val otherChainId = (chainId + 1).toByte
-
-  private val secondSignedAddr = secondSigner.toAddress(chainId)
-
-  private val secondSignerAssetTx = TxHelpers.issue(issuer = secondSigner)
-  private val secondSignerAssetId = secondSignerAssetTx.id()
 
   private val regularAssetTx       = TxHelpers.issue(amount = Long.MaxValue - 1)
   private val notReIssuableAssetTx = TxHelpers.issue(amount = 100, reissuable = false)
@@ -43,6 +38,14 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
     )
   )
 
+  private val leasingTx = TxHelpers.lease()
+  private val leasingId = leasingTx.id()
+
+  private val secondSignedAddr = secondSigner.toAddress(chainId)
+
+  private val secondSignerAssetTx = TxHelpers.issue(issuer = secondSigner)
+  private val secondSignerAssetId = secondSignerAssetTx.id()
+
   private val secondSignerLeasingTx = TxHelpers.lease(sender = secondSigner, recipient = defaultSigner.toAddress(chainId))
   private val secondSignerLeasingId = secondSignerLeasingTx.id()
 
@@ -51,10 +54,10 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
       Case(
         "NODE-540 If a transaction exceeds the limit of writes number",
         "Stored data count limit is exceeded",
-        { complexity =>
+        { targetComplexity =>
           val baseComplexity = 101 + 101 // 101 on IntegerEntry and 101 on a list construction
           mkV6Script(
-            s""" let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
+            s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                | ${(1 to 101).map(i => s"""IntegerEntry("i$i", complexInt)""").mkString("[", ", ", "]")}
                | """.stripMargin
           )
@@ -63,12 +66,12 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
       Case(
         "NODE-542 If a transaction exceeds the limit of writes size",
         "WriteSet size can't exceed 5120 bytes, actual: 5121 bytes",
-        { complexity =>
+        { targetComplexity =>
           val baseComplexity = 2 + 2 // 2 on BinaryEntry and IntegerEntry and 101 on a list construction
           // See DataTxValidator.realUserPayloadSize: IntegerDataEntry - 8, "b" and "i" keys - 2
           val limitedBinaryEntrySize = ContractLimits.MaxWriteSetSizeInBytes - 8 - 2
           mkV6Script(
-            s""" let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
+            s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                | [
                |   BinaryEntry("b", base64'${Base64.encode(Array.fill[Byte](limitedBinaryEntrySize + 1)(0))}'),
                |   IntegerEntry("i", complexInt)
@@ -79,10 +82,10 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
       Case(
         "NODE-544 If a transaction exceeds the limit of writes number through WriteSet",
         "Stored data count limit is exceeded",
-        { complexity =>
+        { targetComplexity =>
           val baseComplexity = 2 * 101 + 101 + 1 // 2*101 on DataEntry and 101 on a list construction and 1 for WriteSet
           mkV3Script(
-            s""" let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
+            s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                | ${(1 to 101).map(i => s"""DataEntry("i$i", complexInt)""").mkString("WriteSet([", ", ", "])")}
                | """.stripMargin
           )
@@ -99,11 +102,11 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         Case(
           s"NODE-546 If a transaction tries to write an empty $entryType key to the state",
           "Empty keys aren't allowed in tx version >= 2",
-          { complexity =>
+          { targetComplexity =>
             val baseComplexity = 1 + 1 + 2 // 1 on IntegerEntry, 1 on other entry and 2 on a list construction
             mkV6Script(
               s"""
-                 | let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
+                 | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | [ IntegerEntry("k", complexInt), $entry ]
                  |""".stripMargin
             )
@@ -118,13 +121,13 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         Case(
           s"NODE-548 If a transaction exceeds the limit of $actionType actions",
           "ScriptTransfer, Lease, LeaseCancel actions count limit is exceeded",
-          { complexity =>
+          { targetComplexity =>
             // 1 for Address, 101 on actions, 101 on a list construction, 10 on getInteger,
             // 2 on valueOrElse, and 1 on "+" and 1 for what? TODO
             val baseComplexity = 1 + 101 + 101 + 10 + 2 + 1 + 1
             mkV6Script(
               s""" let to = Address(base58'$secondSignedAddr')
-                 | let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
+                 | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | (
                  |   [ ${(1 to 101).map(_ => v).mkString(", ")} ],
                  |   # otherwise a script with LeaseCancel will be with a different complexity
@@ -139,11 +142,11 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         Case(
           "NODE-548 If a transaction exceeds the limit of mixed non-data actions",
           "ScriptTransfer, Lease, LeaseCancel actions count limit is exceeded",
-          { complexity =>
+          { targetComplexity =>
             val baseComplexity = 1 + 101 + 101 // 1 for Address, 101 on actions and 101 on a list construction
             mkV6Script(
               s""" let to = Address(base58'$secondSignedAddr')
-                 | let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
+                 | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | [
                  |   ${(1 to 34).map(_ => s"""ScriptTransfer(to, complexInt, unit)""").mkString(", ")},
                  |   ${(1 to 34).map(_ => s"""Lease(to, 1)""").mkString(", ")},
@@ -167,12 +170,12 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         Case(
           "NODE-554 If a transaction sends a ScriptTransfer with negative amount",
           "Negative transfer amount",
-          { complexity =>
+          { targetComplexity =>
             // 1 on Address, 1 on ScriptTransfer, 1 on a list construction and 1 for "-complexInt"
             val baseComplexity = 1 + 1 + 1 + 1
             mkV6Script(
               s""" let to = Address(base58'$secondSignedAddr')
-                 | let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
+                 | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | [ ScriptTransfer(to, -complexInt, unit) ]
                  | """.stripMargin
             )
@@ -219,12 +222,12 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         Case(
           "NODE-566 If a transaction sends a ScriptTransfer with invalid assetId",
           "invalid asset ID",
-          { complexity =>
+          { targetComplexity =>
             // 1 on Address, 1 on ScriptTransfer, 1 on a list construction
             val baseComplexity = 1 + 1 + 1
             mkV6Script(
               s""" let to = Address(base58'$secondSignedAddr')
-                 | let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
+                 | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | [ ScriptTransfer(to, complexInt, base58'${Base58.encode("test".getBytes(StandardCharsets.UTF_8))}') ]
                  | """.stripMargin
             )
@@ -234,12 +237,12 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         // Case(
         //   "NODE-566 If a transaction contains a payment with invalid assetId",
         //   "invalid asset ID",
-        //   { complexity =>
+        //   { targetComplexity =>
         //     // 1 on Address, 1 on ScriptTransfer, 1 on a list construction
         //     val baseComplexity = 1 + 1 + 1
         //     mkV6Script(
         //       s""" let to = Address(base58'$secondSignedAddr')
-        //          | let x = ${mkIntExprWithComplexity(complexity - baseComplexity)}
+        //          | let x = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
         //          | [ ScriptTransfer(to, x, unit) ]
         //          | """.stripMargin
         //     )
@@ -248,12 +251,12 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         Case(
           "NODE-568 If a transaction sends a ScriptTransfer with unknown assetId",
           s"Transfer error: asset '$secondSignerAssetId' is not found on the blockchain",
-          { complexity =>
+          { targetComplexity =>
             // 1 on Address, 1 on ScriptTransfer, 1 on a list construction
             val baseComplexity = 1 + 1 + 1
             mkV6Script(
               s""" let to = Address(base58'$secondSignedAddr')
-                 | let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
+                 | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | [ ScriptTransfer(to, complexInt, base58'$secondSignerAssetId') ]
                  | """.stripMargin
             )
@@ -262,7 +265,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         Case(
           "NODE-568 If a transaction sends an inner invoke with a payment with unknown assetId",
           s"Transfer error: asset '$secondSignerAssetId' is not found on the blockchain",
-          { complexity =>
+          { targetComplexity =>
             // 1 on Address, 1 on ScriptTransfer, 1 on a list construction, 75 on invoke, 1 on throw (exactAs)
             val baseComplexity = 1 + 1 + 1 + 75 + 1
             TestCompiler(V6).compileContract(
@@ -279,13 +282,12 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
                  | @Callable(inv)
                  | func bar() = {
                  |   let to = Address(base58'$secondSignedAddr')
-                 |   let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
+                 |   let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  |   ([ ScriptTransfer(to, complexInt, base58'$secondSignerAssetId') ], 1)
                  | }
                  | """.stripMargin
             )
-          },
-          invokeTx
+          }
         ),
         Case(
           "NODE-570 If a script tries to overflow the amount of assets through Reissue",
@@ -351,12 +353,12 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         Case(
           s"NODE-578 If a transaction sends a $actionType with address of another network",
           "Address belongs to another network",
-          { complexity =>
+          { targetComplexity =>
             // 1 on Address, 1 on action, 1 on a list construction
             val baseComplexity = 1 + 1 + 1
             mkV6Script(
               s""" let to = Address(base58'${secondSigner.toAddress(otherChainId)}')
-                 | let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
+                 | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | [ $actionSrc ]
                  | """.stripMargin
             )
@@ -366,12 +368,12 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         Case(
           "NODE-578 If a transaction sends an invoke with address of another network",
           "Address belongs to another network",
-          { complexity =>
+          { targetComplexity =>
             // 1 on Address, 75 on invoke, 1 on throw (exactAs)
             val baseComplexity = 1 + 75 + 1
             mkV6Script(
               s""" let to = Address(base58'${secondSigner.toAddress(otherChainId)}')
-                 | let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
+                 | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | strict res = invoke(to, "bar", [complexInt], [])
                  | ([], res.exactAs[Int])
                  | """.stripMargin
@@ -381,12 +383,12 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         Case(
           "NODE-580 If a transaction invokes a script with invalid address",
           "Wrong addressBytes length",
-          { complexity =>
+          { targetComplexity =>
             // 1 on Address, 1 on tuple, 1 on a list construction, 1 on ScriptTransfer
             val baseComplexity = 1 + 1 + 1 + 1
             mkV6Script(
               s""" let to = Address(base58'${secondSignedAddr.toString.take(5)}')
-                 | let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
+                 | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | ([ScriptTransfer(to, 1, unit)], complexInt)
                  | """.stripMargin
             )
@@ -399,12 +401,12 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         Case(
           s"NODE-584 If a transaction does a $tpe leasing",
           rejectError,
-          { complexity =>
+          { targetComplexity =>
             // 1 on Address, 1 on tuple, 1 on a list construction, 1 on Lease
             val baseComplexity = 1 + 1 + 1 + 1
             mkV6Script(
               s""" let to = Address(base58'$secondSignedAddr')
-                 | let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
+                 | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | ([Lease(to, $leaseAmount)], complexInt)
                  | """.stripMargin
             )
@@ -414,11 +416,11 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         Case(
           "NODE-586 If a transaction does a self-leasing",
           "Cannot lease to self",
-          { complexity =>
+          { targetComplexity =>
             // 1 on tuple, 1 on a list construction, 1 on Lease
             val baseComplexity = 1 + 1 + 1
             mkV6Script(
-              s""" let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
+              s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | ([Lease(this, 1)], complexInt)
                  | """.stripMargin
             )
@@ -427,25 +429,53 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         Case(
           "NODE-588 If a transaction does same leasing multiple times",
           "is already in the state",
-          { complexity =>
+          { targetComplexity =>
             // 1 on Address, 1 on tuple, 1+1 on a list construction, 1+1 on Lease
             val baseComplexity = 1 + 1 + 1 + 1 + 1 + 1
             mkV6Script(
               s""" let to = Address(base58'$secondSignedAddr')
-                 | let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
+                 | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | ([Lease(to, 1, 3), Lease(to, 1, 3)], complexInt) # Leasing id is a hash of its data and invoke tx id
                  | """.stripMargin
             )
           }
         ),
         Case(
-          "NODE-598 If a transaction tries to cancel another account leasing",
-          "LeaseTransaction was leased by other sender and time",
-          { complexity =>
+          "NODE-596 If a transaction tries to cancel a leasing twice in a script",
+          "Duplicate LeaseCancel id(s)",
+          { targetComplexity =>
+            // 1 on tuple, 1+1 on a list construction, 1+1 on LeaseCancel
+            val baseComplexity = 1 + 1 + 1 + 1 + 1
+            mkV6Script(
+              s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 | ([LeaseCancel(base58'$leasingId'), LeaseCancel(base58'$leasingId')], complexInt)
+                 | """.stripMargin
+            )
+          },
+          knownTxs = Seq(leasingTx)
+        ),
+        Case(
+          "NODE-596 If a transaction in a script tries to cancel already cancelled leasing",
+          "Cannot cancel already cancelled lease",
+          { targetComplexity =>
             // 1 on tuple, 1 on a list construction, 1 on LeaseCancel
             val baseComplexity = 1 + 1 + 1
             mkV6Script(
-              s""" let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
+              s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 | ([LeaseCancel(base58'$leasingId')], complexInt)
+                 | """.stripMargin
+            )
+          },
+          knownTxs = Seq(leasingTx, TxHelpers.leaseCancel(leasingId))
+        ),
+        Case(
+          "NODE-598 If a transaction tries to cancel another account leasing",
+          "LeaseTransaction was leased by other sender and time",
+          { targetComplexity =>
+            // 1 on tuple, 1 on a list construction, 1 on LeaseCancel
+            val baseComplexity = 1 + 1 + 1
+            mkV6Script(
+              s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | ([LeaseCancel(base58'$secondSignerLeasingId')], complexInt)
                  | """.stripMargin
             )
@@ -456,12 +486,12 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           "NODE-590 If a transaction does a leasing with nonexistent funds",
           "Cannot lease more than own",
           // TODO ENOUGH_AMT + 1
-          { complexity =>
+          { targetComplexity =>
             // 1 on Address, 1 on tuple, 1 on a list construction, 1 on Lease
             val baseComplexity = 1 + 1 + 1 + 1
             mkV6Script(
               s""" let to = Address(base58'$secondSignedAddr')
-                 | let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
+                 | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | ([Lease(to, ${ENOUGH_AMT * 2})], complexInt)
                  | """.stripMargin
             )
@@ -470,11 +500,11 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         Case(
           "NODE-592 If a transaction cancels a leasing with wrong lease id",
           s"Lease id=${secondSignerLeasingId.toString.take(5)} has invalid length",
-          { complexity =>
+          { targetComplexity =>
             // 1 on tuple, 1 on a list construction, 1 on LeaseCancel
             val baseComplexity = 1 + 1 + 1
             mkV6Script(
-              s""" let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
+              s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | ([LeaseCancel(base58'${secondSignerLeasingId.toString.take(5)}')], complexInt)
                  | """.stripMargin
             )
@@ -483,11 +513,11 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         Case(
           "NODE-594 If a transaction cancels an unknown leasing",
           s"Lease with id=$secondSignerLeasingId not found",
-          { complexity =>
+          { targetComplexity =>
             // 1 on tuple, 1 on a list construction, 1 on LeaseCancel
             val baseComplexity = 1 + 1 + 1
             mkV6Script(
-              s""" let complexInt = ${mkIntExprWithComplexity(complexity - baseComplexity)}
+              s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | ([LeaseCancel(base58'$secondSignerLeasingId')], complexInt)
                  | """.stripMargin
             )
@@ -510,6 +540,68 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
                  | """.stripMargin
             )
           }
+        ),
+        Case(
+          "NODE-608 If a script tries to issue the same asset multiple times",
+          "is already issued",
+          { targetComplexity =>
+            // 1 on tuple, 1+1 on Issue, 1+1 on list
+            val baseComplexity = 1 + 1 + 1 + 1 + 1
+            mkV6Script(
+              s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 | ([Issue("bucks", "Test token", 1, 2, true), Issue("bucks", "Test token", 1, 2, true)], complexInt)
+                 | """.stripMargin
+            )
+          }
+        ),
+        Case(
+          "NODE-620 If a negative balance happens during invoke",
+          "negative waves balance",
+          { targetComplexity =>
+            // 75 for invoke, 1 for Address, 1 for list, 500 for secondSigner.foo() call
+            val baseComplexity = 75 + 1 + 1 + 500
+            TestCompiler(V6).compileContract(
+              s""" {-#STDLIB_VERSION 6 #-}
+                 | {-#SCRIPT_TYPE ACCOUNT #-}
+                 | {-#CONTENT_TYPE DAPP #-}
+                 |
+                 | @Callable(inv)
+                 | func foo() = {
+                 |   let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 |   strict res = invoke(
+                 |     Address(base58'$secondSignedAddr'), 
+                 |     "bar",
+                 |     [ complexInt ],
+                 |     [ ]
+                 |   )
+                 |   ([], res.exactAs[Int])
+                 | }
+                 | """.stripMargin
+            )
+          },
+          knownTxs = Seq(
+            TxHelpers.setScript(
+              secondSigner, {
+                // 1 for Address, 1 for tuple, 1 for a list construction 1 for ScriptTransfer
+                val baseComplexity = 1 + 1 + 1 + 1
+                TestCompiler(V6).compileContract(
+                  s""" {-#STDLIB_VERSION 6 #-}
+                     | {-#SCRIPT_TYPE ACCOUNT #-}
+                     | {-#CONTENT_TYPE DAPP #-}
+                     |
+                     | @Callable(inv)
+                     | func bar(n: Int) = {
+                     |   let to = Address(base58'${defaultSigner.toAddress(chainId)}')
+                     |   (
+                     |     [ScriptTransfer(to, ${ENOUGH_AMT + 100}, unit)],
+                     |     ${mkIntExprWithComplexity(500 - baseComplexity)}
+                     |   )
+                     | }
+                     | """.stripMargin
+                )
+              }
+            )
+          )
         )
       )
 
@@ -517,19 +609,15 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
       testCase.title - {
         "<=1000 complexity - rejected" - Seq(110, ContractLimits.FailFreeInvokeComplexity).foreach { complexity =>
           s"complexity = $complexity" in withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(defaultSigner, secondSigner)) { d =>
-            val setScriptTx = SetScriptTransaction
-              .selfSigned(TxVersion.V3, defaultSigner, Some(testCase.mkDApp(complexity)), 1.waves, System.currentTimeMillis())
-              .explicitGet()
+            val setScriptTx = TxHelpers.setScript(defaultSigner, testCase.mkDApp(complexity), 1.waves)
             d.appendBlock((testCase.knownTxs :+ setScriptTx)*)
             d.createDiffE(testCase.invokeTx) should produce(testCase.rejectError)
           }
         }
         ">1000 complexity - failed" in {
           withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(defaultSigner, secondSigner)) { d =>
-            val complexity = ContractLimits.FailFreeInvokeComplexity + 1
-            val setScriptTx = SetScriptTransaction
-              .selfSigned(TxVersion.V3, defaultSigner, Some(testCase.mkDApp(complexity)), 1.waves, System.currentTimeMillis())
-              .explicitGet()
+            val complexity  = ContractLimits.FailFreeInvokeComplexity + 1
+            val setScriptTx = TxHelpers.setScript(defaultSigner, testCase.mkDApp(complexity), 1.waves)
             d.appendBlock((testCase.knownTxs :+ setScriptTx)*)
             d.appendBlock(testCase.invokeTx)
             val invokeTxMeta = d.transactionsApi.transactionById(testCase.invokeTx.id()).value
@@ -559,9 +647,9 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
     )
   }
 
-  private def mkV3Script(funBody: String): Script = mkScript(V3, funBody)
-  private def mkV6Script(funBody: String): Script = mkScript(V6, funBody)
-  private def mkScript(v: StdLibVersion, funBody: String): Script =
+  private def mkV3Script(fooBody: String): Script = mkScript(V3, fooBody)
+  private def mkV6Script(fooBody: String): Script = mkScript(V6, fooBody)
+  private def mkScript(v: StdLibVersion, fooBody: String): Script =
     TestCompiler(v).compileContract(
       s""" {-#STDLIB_VERSION ${v.id} #-}
          | {-#SCRIPT_TYPE ACCOUNT #-}
@@ -569,25 +657,18 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
          |
          | @Callable(inv)
          | func foo() = {
-         |   $funBody
+         |   $fooBody
          | }
       """.stripMargin
     )
 
   private def mkIntExprWithComplexity(targetComplexity: Int): String = s"1${" + 1" * targetComplexity}"
 
-  private lazy val invokeTx = InvokeScriptTransaction(
-    chainId = chainId,
-    version = TxVersion.V3,
-    sender = defaultSigner.publicKey,
-    fee = TxPositiveAmount.unsafeFrom(1000000L),
-    feeAssetId = Waves,
+  private lazy val invokeTx = TxHelpers.invoke(
     dApp = defaultSigner.toAddress(chainId),
-    funcCallOpt = Some(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), Nil)),
-    payments = Seq.empty,
-    timestamp = System.currentTimeMillis(),
-    proofs = Proofs.empty
-  ).signWith(defaultSigner.privateKey)
+    func = Some("foo"),
+    fee = 3.waves
+  )
 
   private def invokeTxWithPayment(amount: Long, assetId: Asset): InvokeScriptTransaction =
     invokeTx
