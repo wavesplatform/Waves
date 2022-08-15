@@ -4,17 +4,24 @@ import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.{InterferableDB, WithDomain}
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{Constants, GenesisSettings, GenesisTransactionSettings}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TransactionType, TxHelpers, TxVersion}
 import com.wavesplatform.BlockGen
+import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.test.DomainPresets.RideV5
 import com.wavesplatform.test.FreeSpec
+import com.wavesplatform.transaction.TxHelpers.{defaultAddress, issue, secondSigner}
 import org.scalactic.source.Position
 
+import java.util.concurrent.locks.ReentrantLock
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.*
+import scala.concurrent.duration.Duration.Inf
 
 class TransactionsByAddressSpec extends FreeSpec with BlockGen with WithDomain {
   def transfers(sender: KeyPair, rs: AddressOrAlias, amount: Long): Seq[TransferTransaction] =
@@ -104,6 +111,17 @@ class TransactionsByAddressSpec extends FreeSpec with BlockGen with WithDomain {
     }
     "all transactions" in test { (sender, blocks, d) =>
       collectTransactions(sender, blocks) shouldEqual d.addressTransactions(sender).map { case (h, tx) => h -> tx.id() }
+    }
+    "distinct result avoiding inconsistent state" in {
+      val startRead = new ReentrantLock()
+      withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner), InterferableDB(_, startRead)) { d =>
+        d.appendMicroBlock(issue())
+        startRead.lock()
+        val txs = Future { d.addressTransactions(defaultAddress).map(_._2.tpe) }
+        d.blockchain.bestLiquidDiff.synchronized(d.appendKeyBlock())
+        startRead.unlock()
+        Await.result(txs, Inf).map(_.tpe) shouldBe List(TransactionType.Issue)
+      }
     }
   }
 }
