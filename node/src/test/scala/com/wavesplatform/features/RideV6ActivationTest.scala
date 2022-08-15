@@ -8,7 +8,6 @@ import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -474,14 +473,14 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         Case(
           "NODE-590 If a transaction does a leasing with nonexistent funds",
           "Cannot lease more than own",
-          // TODO ENOUGH_AMT + 1
           { targetComplexity =>
-            val baseComplexity = 1 + 1 + 1 + 1 // 1 for Address, 1 for tuple, 1 for list, 1 for Lease
+            // 1 for Address(bob), 1 for tuple, 1 for list, 1 for Lease, 10 for wavesBalance, 1 for Address(alice),
+            // and 1 for "+"
+            val baseComplexity = 1 + 1 + 1 + 1 + 10 + 1 + 1
             mkV6Script(
               s""" let to = Address(base58'$bobAddr')
                  | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
-                 | # 1 WAVES spent for SetScript, 6 waves * 2 for two blocks
-                 | ([Lease(to, ${ENOUGH_AMT + 6.waves * 2})], complexInt)
+                 | ([Lease(to, wavesBalance(Address(base58'$aliceAddr')).available + 1)], complexInt)
                  | """.stripMargin
             )
           }
@@ -567,8 +566,9 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           knownTxs = Seq(
             TxHelpers.setScript(
               bob, {
-                // 1 for Address, 1 for tuple, 1 for list, 1 for ScriptTransfer
-                val baseComplexity = 1 + 1 + 1 + 1
+                // 1 for Address(alice), 1 for tuple, 1 for list, 1 for ScriptTransfer, 10 for wavesBalance,
+                // 1 for Address(bob) and 1 for "+"
+                val baseComplexity = 1 + 1 + 1 + 1 + 10 + 1 + 1
                 TestCompiler(V6).compileContract(
                   s""" {-#STDLIB_VERSION 6 #-}
                      | {-#SCRIPT_TYPE ACCOUNT #-}
@@ -578,7 +578,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
                      | func bar(n: Int) = {
                      |   let to = Address(base58'$aliceAddr')
                      |   (
-                     |     [ScriptTransfer(to, ${ENOUGH_AMT + 100}, unit)],
+                     |     [ScriptTransfer(to, wavesBalance(Address(base58'$bobAddr')).available + 1, unit)],
                      |     ${mkIntExprWithComplexity(500 - baseComplexity)}
                      |   )
                      | }
@@ -659,6 +659,9 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
     )
   )
 
+  /** @param mkDApp
+    *   Int is the targetComplexity of the script
+    */
   private case class Case(
       title: String,
       rejectError: String,
