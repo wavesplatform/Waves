@@ -13,7 +13,7 @@ import com.wavesplatform.common.utils.{Base58, *}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures as BF
-import com.wavesplatform.history.{Domain, settingsWithFeatures}
+import com.wavesplatform.history.{Domain, defaultSigner, settingsWithFeatures}
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL}
@@ -30,6 +30,7 @@ import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.{EthEncoding, EthHelpers}
@@ -1057,6 +1058,43 @@ class TransactionsRouteSpec
           (dappTrace \ "vars" \\ "name").map(_.as[String]) should contain theSameElementsAs Seq("leaseToAddress", "leaseToAlias", "leaseId")
         }
       }
+    }
+
+    "checks the length of base58 attachment in symbols" in {
+      val attachmentSizeInSymbols = TransferTransaction.MaxAttachmentStringSize + 1
+      val attachmentStr           = "1" * attachmentSizeInSymbols
+
+      val tx = TxHelpers
+        .transfer()
+        .copy(attachment = ByteStr(Base58.decode(attachmentStr))) // to bypass a validation
+        .signWith(defaultSigner.privateKey)
+
+      Post(routePath("/broadcast"), tx.json()) ~> route should produce(
+        WrongJson(errors =
+          Seq(
+            JsPath \ "attachment" -> Seq(
+              JsonValidationError(s"base58-encoded string length ($attachmentSizeInSymbols) exceeds maximum length of 192")
+            )
+          )
+        )
+      )
+    }
+
+    "checks the length of base58 attachment in bytes" in {
+      val attachmentSizeInSymbols = TransferTransaction.MaxAttachmentSize + 1
+      val attachmentStr           = "1" * attachmentSizeInSymbols
+      val attachment              = ByteStr(Base58.decode(attachmentStr))
+
+      val tx = TxHelpers
+        .transfer()
+        .copy(attachment = attachment)
+        .signWith(defaultSigner.privateKey)
+
+      Post(routePath("/broadcast"), tx.json()) ~> route should produce(
+        TooBigInBytes(
+          s"Invalid attachment. Length ${attachment.size} bytes exceeds maximum of ${TransferTransaction.MaxAttachmentSize} bytes."
+        )
+      )
     }
   }
 
