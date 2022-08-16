@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.transactions
 
 import com.google.common.primitives.Longs
 import com.typesafe.config.Config
-import com.wavesplatform.api.http.ApiError.{ScriptExecutionError, TransactionNotAllowedByAssetScript}
+import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAssetScript
 import com.wavesplatform.api.http.DebugMessage
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -117,38 +117,6 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
 
     val script = ScriptCompiler.compile(scriptTextV4, ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64
     sender.setScript(contract, Some(script), setScriptFee, waitForTx = true).id
-  }
-
-  test("InvokeScriptTransaction: dApp error propagates failed transaction") {
-    val invokeFee    = 0.005.waves
-    val priorityData = List(StringDataEntry("crash", "yes"))
-    val putDataFee   = calcDataFee(priorityData, 1)
-    val priorityFee  = putDataFee + invokeFee
-
-    val prevBalance = sender.balance(caller.toAddress.toString).balance
-
-    overflowBlock()
-    sendTxsAndThenPriorityTx(
-      _ => sender.invokeScript(caller, contractAddress, Some("canThrow"), fee = invokeFee)._1.id,
-      () => sender.putData(contract, priorityData, priorityFee).id
-    ) { (txs, priorityTx) =>
-      logPriorityTx(priorityTx)
-      waitForHeightArise()
-      val failed = assertFailedTxs(txs)
-
-      sender.balance(caller.toAddress.toString).balance shouldBe prevBalance - txs.size * invokeFee
-
-      failed.foreach { s =>
-        checkStateChange(sender.stateChanges(s.id), 1, "Crashed by dApp", strict = true)
-      }
-
-      assertApiError(
-        sender.invokeScript(caller, contractAddress, Some("canThrow"), fee = invokeFee),
-        AssertiveApiError(ScriptExecutionError.Id, "Error while executing account-script: Crashed by dApp")
-      )
-
-      failed
-    }
   }
 
   test("InvokeScriptTransaction: insufficient action fees propagates failed transaction") {
