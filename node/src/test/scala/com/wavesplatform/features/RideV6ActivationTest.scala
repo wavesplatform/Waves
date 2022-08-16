@@ -1,13 +1,16 @@
 package com.wavesplatform.features
 
+import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -60,10 +63,15 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
   private val bobLeasingTx = TxHelpers.lease(sender = bob, recipient = aliceAddr)
   private val bobLeasingId = bobLeasingTx.id()
 
+  private val defaultInitBalances = Map(
+    aliceAddr -> ENOUGH_AMT,
+    bobAddr   -> ENOUGH_AMT
+  )
+
   "After RideV6 activation" - {
     val cases = Seq(
       Case(
-        "NODE-540 If a transaction exceeds the limit of writes number",
+        "NODE-540 If an invocation exceeds the limit of writes",
         "Stored data count limit is exceeded",
         { targetComplexity =>
           val baseComplexity = 101 + 101 // 101 for list, 101 for IntegerEntry
@@ -194,6 +202,28 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           }
         ),
         Case(
+          "NODE-556 If an invoke leads to overflow in ScriptTransfer",
+          "Waves balance sum overflow",
+          { targetComplexity =>
+            // 1 for Address, 1 for tuple, 1 for list, 1 for ScriptTransfer, 10 for wavesBalance, 1 for Address(alice),
+            //   and 1 for "+"
+            val baseComplexity = 1 + 1 + 1 + 1 + 10 + 1 + 1
+            mkV6Script(
+              s""" let to = Address(base58'$bobAddr')
+                 | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 | (
+                 |   [ScriptTransfer(to, wavesBalance(Address(base58'$aliceAddr')).available - ${aliceInvokeTx.fee}, unit)],
+                 |   complexInt
+                 | )
+                 | """.stripMargin
+            )
+          },
+          initBalances = Map(
+            aliceAddr -> Long.MaxValue,
+            bobAddr   -> ENOUGH_AMT
+          )
+        ),
+        Case(
           "NODE-558 If a transaction issues a token with invalid name",
           "Invalid asset name",
           mkScriptWithOneAction("""Issue("n", "Test token", 1, 2, true)""")
@@ -243,7 +273,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           }
         ),
         mkInnerPayment(
-          "NODE-566 If a transaction contains an inner payment with invalid assetId",
+          "NODE-761 If an invocation contains an inner payment with invalid assetId",
           s"invalid asset ID '$invalidAssetId'",
           s"AttachedPayment(base58'$invalidAssetId', 1)"
         ),
@@ -261,7 +291,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           }
         ),
         Case(
-          "NODE-568 If a transaction sends an inner invoke with a payment with unknown assetId",
+          "NODE-760 If a transaction sends an inner invoke with a payment with unknown assetId",
           s"Transfer error: asset '$bobAssetId' is not found on the blockchain",
           { targetComplexity =>
             // bar: 1 for Address, 1 for tuple, 1 for list, 1 for ScriptTransfer
@@ -535,10 +565,11 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           "NODE-608 If a script tries to issue the same asset multiple times",
           "is already issued",
           { targetComplexity =>
-            val baseComplexity = 1 + 2 + 1 + 1 // 1 for tuple, 2 for list, 1+1 for Issue
+            val baseComplexity = 1 + 1 + 2 // 1 for Issue, 1 for tuple, 2 for list
             mkV6Script(
-              s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
-                 | ([Issue("bucks", "Test token", 1, 2, true), Issue("bucks", "Test token", 1, 2, true)], complexInt)
+              s""" let issue = Issue("bucks", "Test token", 1, 2, true)
+                 | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 | ([issue, issue], complexInt)
                  | """.stripMargin
             )
           }
@@ -593,23 +624,29 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
     cases.foreach { testCase =>
       testCase.title - {
         "<=1000 complexity - rejected" - Seq(110, ContractLimits.FailFreeInvokeComplexity).foreach { complexity =>
-          s"complexity = $complexity" in withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(alice, bob)) { d =>
-            val setScriptTx = TxHelpers.setScript(alice, testCase.mkDApp(complexity), 1.waves)
-            d.appendBlock((testCase.knownTxs :+ setScriptTx)*)
+          s"complexity = $complexity" in test(complexity) { d =>
             d.createDiffE(testCase.invokeTx) should produce(testCase.rejectError)
           }
         }
         ">1000 complexity - failed" in {
-          withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(alice, bob)) { d =>
-            val complexity  = ContractLimits.FailFreeInvokeComplexity + 1
-            val setScriptTx = TxHelpers.setScript(alice, testCase.mkDApp(complexity), 1.waves)
-            d.appendBlock((testCase.knownTxs :+ setScriptTx)*)
+          val complexity = ContractLimits.FailFreeInvokeComplexity + 1
+          test(complexity) { d =>
             d.appendBlock(testCase.invokeTx)
             val invokeTxMeta = d.transactionsApi.transactionById(testCase.invokeTx.id()).value
             invokeTxMeta.spentComplexity shouldBe complexity
             invokeTxMeta.succeeded shouldBe false
           }
         }
+
+        def test(complexity: Int)(f: Domain => Unit): Unit =
+          withDomain(
+            DomainPresets.RideV6,
+            testCase.initBalances.map(Function.tupled(AddrWithBalance.apply)).toSeq
+          ) { d =>
+            val setScriptTx = TxHelpers.setScript(alice, testCase.mkDApp(complexity), 1.waves)
+            d.appendBlock((testCase.knownTxs :+ setScriptTx)*)
+            f(d)
+          }
       }
     }
   }
@@ -667,7 +704,8 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
       rejectError: String,
       mkDApp: Int => Script,
       invokeTx: InvokeScriptTransaction = aliceInvokeTx,
-      knownTxs: Seq[Transaction] = Seq.empty
+      knownTxs: Seq[Transaction] = Seq.empty,
+      initBalances: Map[Address, Long] = defaultInitBalances
   )
 
   private def mkScriptWithOneAction(actionSrc: String): Int => Script = { targetComplexity =>
