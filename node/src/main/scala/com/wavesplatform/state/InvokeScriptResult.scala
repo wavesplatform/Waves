@@ -85,12 +85,6 @@ object InvokeScriptResult {
     implicit val jsonWrites = Json.writes[Lease]
   }
 
-  def paymentsFromPortfolio(addr: Address, portfolio: Portfolio): Seq[Payment] = {
-    val waves  = InvokeScriptResult.Payment(addr, Waves, portfolio.balance)
-    val assets = portfolio.assets.map { case (assetId, amount) => InvokeScriptResult.Payment(addr, assetId, amount) }
-    (assets.toVector ++ Some(waves)).filter(_.amount != 0)
-  }
-
   implicit val issueFormat = Writes[Issue] { iss =>
     Json.obj(
       "assetId"        -> iss.id,
