@@ -119,7 +119,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         "String"  -> """StringEntry("", "lie")"""
       ).map { case (entryType, entry) =>
         Case(
-          s"NODE-546 If an invoke tries to write an empty $entryType key to the state",
+          s"NODE-546 If an invoke writes an empty $entryType key to the state",
           "Empty keys aren't allowed in tx version >= 2",
           { targetComplexity =>
             val baseComplexity = 2 + 1 + 1 // 2 for list (two elements), 1 for IntegerEntry, 1 for test entry
@@ -255,17 +255,17 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           knownTxs = Seq(aliceRegularAssetTx)
         ),
         Case(
-          "NODE-558 If a transaction issues a token with invalid name",
+          "NODE-558 If an invoke issues a token with an invalid name",
           "Invalid asset name",
           mkScriptWithOneAction("""Issue("n", "Test token", 1, 2, true)""")
         ),
         Case(
-          "NODE-560 If a transaction issues a token with invalid description",
+          "NODE-560 If an invoke issues a token with an invalid description",
           "Invalid asset description",
           mkScriptWithOneAction(s"""Issue("Token", "${"a" * (IssueTransaction.MaxAssetDescriptionLength + 1)}", 1, 2, true)""")
         ),
         Case(
-          "NODE-562 If a script tries to set a sponsor fee for another's account asset",
+          "NODE-562 If an invoke sets a sponsorship for another's account asset",
           "was not issued from address of current dApp",
           { targetComplexity =>
             val baseComplexity = 1 + 1 + 1 // 1 for tuple, 1 for list, 1 for SponsorFee
@@ -278,7 +278,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           knownTxs = Seq(bobAssetTx)
         ),
         Case(
-          "NODE-564 If a script tries to set a sponsor fee for smart asset",
+          "NODE-564 If an invoke sets a sponsorship for a smart asset",
           "Sponsorship smart assets is disabled",
           { targetComplexity =>
             val baseComplexity = 1 + 1 + 1 // 1 for tuple, 1 for list, 1 for SponsorFee
@@ -291,7 +291,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           knownTxs = Seq(aliceSmartAssetTx)
         ),
         Case(
-          "NODE-566 If a transaction sends a ScriptTransfer with invalid assetId",
+          "NODE-566 If an invoke sends a ScriptTransfer with an invalid assetId",
           "invalid asset ID",
           { targetComplexity =>
             val baseComplexity = 1 + 1 + 1 // 1 for Address, 1 for list, 1 for ScriptTransfer
@@ -303,13 +303,8 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
             )
           }
         ),
-        mkInnerPayment(
-          "NODE-761 If an invocation contains an inner payment with invalid assetId",
-          s"invalid asset ID '$invalidAssetId'",
-          s"AttachedPayment(base58'$invalidAssetId', 1)"
-        ),
         Case(
-          "NODE-568 If a transaction sends a ScriptTransfer with unknown assetId",
+          "NODE-568 If an invoke sends a ScriptTransfer with an unknown assetId",
           s"Transfer error: asset '$bobAssetId' is not found on the blockchain",
           { targetComplexity =>
             val baseComplexity = 1 + 1 + 1 // 1 for Address, 1 for list, 1 for ScriptTransfer
@@ -322,35 +317,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           }
         ),
         Case(
-          "NODE-760 If a transaction sends an inner invoke with a payment with unknown assetId",
-          s"Transfer error: asset '$bobAssetId' is not found on the blockchain",
-          { targetComplexity =>
-            // bar: 1 for Address, 1 for tuple, 1 for list, 1 for ScriptTransfer
-            // foo: 75 for invoke
-            val baseComplexity = 1 + 1 + 1 + 1 + 75
-            TestCompiler(V6).compileContract(
-              s""" {-#STDLIB_VERSION 6 #-}
-                 | {-#SCRIPT_TYPE ACCOUNT #-}
-                 | {-#CONTENT_TYPE DAPP #-}
-                 | 
-                 | @Callable(inv)
-                 | func bar() = {
-                 |   let to = Address(base58'$bobAddr')
-                 |   let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
-                 |   ([ ScriptTransfer(to, complexInt, base58'$bobAssetId') ], 1)
-                 | }
-                 |
-                 | @Callable(inv)
-                 | func foo() = {
-                 |   strict res = invoke(this, "bar", [], [])
-                 |   ([], res.exactAs[Int])
-                 | }
-                 | """.stripMargin
-            )
-          }
-        ),
-        Case(
-          "NODE-570 If a script tries to overflow the amount of assets through Reissue",
+          "NODE-570 If an invoke tries to overflow the amount of assets through Reissue",
           "Asset total value overflow",
           { targetComplexity =>
             val baseComplexity = 1 + 1 + 1 // 1 for tuple, 1 for list, 1 for Reissue
@@ -363,7 +330,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           knownTxs = Seq(aliceRegularAssetTx)
         ),
         Case(
-          "NODE-572 If a script tries to reissue a not reissuable asset",
+          "NODE-572 If an invoke reissues a not reissuable asset",
           "Asset is not reissuable",
           { targetComplexity =>
             val baseComplexity = 1 + 1 + 1 // 1 for tuple, 1 for list, 1 for Reissue
@@ -376,7 +343,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           knownTxs = Seq(aliceNotReIssuableAssetTx)
         ),
         Case(
-          "NODE-574 If a script tries to reissue an asset issued by other address",
+          "NODE-574 If an invoke reissues an asset issued by other address",
           "Asset was issued by other address",
           { targetComplexity =>
             val baseComplexity = 1 + 1 + 1 // 1 for tuple, 1 for list, 1 for Reissue
@@ -387,19 +354,19 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
             )
           },
           knownTxs = Seq(bobAssetTx)
-        ),
+        )
+      ) ++ Seq(
+        "Burn"    -> s"Burn(base58'$bobAssetId', 1)",
+        "Reissue" -> s"Reissue(base58'$bobAssetId', 1, true)"
+      ).map { case (actionType, actionSrc) =>
         Case(
-          "NODE-576 If a transaction sends a Burn with unknown assetId",
+          s"NODE-576 If an invoke sends $actionType with an unknown assetId",
           "Referenced assetId not found",
-          mkScriptWithOneAction(s"Burn(base58'$bobAssetId', 1)")
-        ),
+          mkScriptWithOneAction(actionSrc)
+        )
+      } ++ Seq(
         Case(
-          "NODE-576 If a transaction sends a Reissue with unknown assetId",
-          "Referenced assetId not found",
-          mkScriptWithOneAction(s"Reissue(base58'$bobAssetId', 1, true)")
-        ),
-        Case(
-          "NODE-576 If a transaction sends a SponsorFee with unknown assetId",
+          "NODE-576 If an invoke sends SponsorFee with an unknown assetId",
           "was not issued from address of current dApp",
           mkScriptWithOneAction(s"SponsorFee(base58'$bobAssetId', 1)")
         )
@@ -408,7 +375,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         "Lease"          -> "Lease(to, complexInt)"
       ).map { case (actionType, actionSrc) =>
         Case(
-          s"NODE-578 If a transaction sends a $actionType with address of another network",
+          s"NODE-578 If an invoke sends $actionType with an address of another network",
           "Address belongs to another network",
           { targetComplexity =>
             val baseComplexity = 1 + 1 + 1 // 1 for Address, 1 for list, 1 for action
@@ -434,26 +401,30 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
                  | """.stripMargin
             )
           }
-        ),
+        )
+      ) ++ Seq(
+        "ScriptTransfer" -> "ScriptTransfer(to, 1, unit)",
+        "Lease"          -> "Lease(to, 1)"
+      ).map { case (actionType, actionSrc) =>
         Case(
-          "NODE-580 If a transaction invokes a script with invalid address",
+          s"NODE-580 If an invoke sends $actionType with an invalid address",
           "Wrong addressBytes length",
           { targetComplexity =>
-            val baseComplexity = 1 + 1 + 1 + 1 // 1 for Address, 1 for tuple, 1 for list, 1 for ScriptTransfer
+            val baseComplexity = 1 + 1 + 1 + 1 // 1 for Address, 1 for tuple, 1 for list, 1 for action
             mkV6Script(
               s""" let to = Address(base58'${bobAddr.toString.take(5)}')
                  | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
-                 | ([ScriptTransfer(to, 1, unit)], complexInt)
+                 | ([$actionSrc], complexInt)
                  | """.stripMargin
             )
           }
         )
-      ) ++ Seq(
+      } ++ Seq(
         ("negative", -1, "Negative lease amount = -1"),
         ("zero", 0, "NonPositiveAmount(0,waves)")
       ).map { case (tpe, leaseAmount, rejectError) =>
         Case(
-          s"NODE-584 If a transaction does a $tpe leasing",
+          s"NODE-584 If an invoke leases $tpe amount",
           rejectError,
           { targetComplexity =>
             val baseComplexity = 1 + 1 + 1 + 1 // 1 for Address, 1 for tuple, 1 for list, 1 for Lease
@@ -649,6 +620,39 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
               }
             )
           )
+        ),
+        Case(
+          "NODE-760 If a transaction sends an inner invoke with a payment with unknown assetId",
+          s"Transfer error: asset '$bobAssetId' is not found on the blockchain",
+          { targetComplexity =>
+            // bar: 1 for Address, 1 for tuple, 1 for list, 1 for ScriptTransfer
+            // foo: 75 for invoke
+            val baseComplexity = 1 + 1 + 1 + 1 + 75
+            TestCompiler(V6).compileContract(
+              s""" {-#STDLIB_VERSION 6 #-}
+                 | {-#SCRIPT_TYPE ACCOUNT #-}
+                 | {-#CONTENT_TYPE DAPP #-}
+                 | 
+                 | @Callable(inv)
+                 | func bar() = {
+                 |   let to = Address(base58'$bobAddr')
+                 |   let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 |   ([ ScriptTransfer(to, complexInt, base58'$bobAssetId') ], 1)
+                 | }
+                 |
+                 | @Callable(inv)
+                 | func foo() = {
+                 |   strict res = invoke(this, "bar", [], [])
+                 |   ([], res.exactAs[Int])
+                 | }
+                 | """.stripMargin
+            )
+          }
+        ),
+        mkInnerPayment(
+          "NODE-761 If an invocation contains an inner payment with invalid assetId",
+          s"invalid asset ID '$invalidAssetId'",
+          s"AttachedPayment(base58'$invalidAssetId', 1)"
         )
       )
 
