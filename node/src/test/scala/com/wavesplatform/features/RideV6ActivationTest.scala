@@ -35,6 +35,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
   private val bobOtherChainAddr = bob.toAddress(otherChainId)
 
   private val aliceRegularAssetTx       = TxHelpers.issue(issuer = alice, amount = Long.MaxValue - 1)
+  private val aliceRegularAssetId       = aliceRegularAssetTx.id()
   private val aliceNotReIssuableAssetTx = TxHelpers.issue(issuer = alice, amount = 100, reissuable = false)
   private val aliceSmartAssetTx = TxHelpers.issue(
     issuer = alice,
@@ -246,7 +247,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
             val baseComplexity = 1 + 1 + 1 + 2
             mkV6Script(
               s""" let to = Address(base58'$bobAddr')
-                 | let transfer = ScriptTransfer(to, ${Long.MaxValue - 1}, base58'${aliceRegularAssetTx.id()}')
+                 | let transfer = ScriptTransfer(to, ${Long.MaxValue - 1}, base58'$aliceRegularAssetId')
                  | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | ([transfer, transfer], complexInt)
                  | """.stripMargin
@@ -265,7 +266,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           mkScriptWithOneAction(s"""Issue("Token", "${"a" * (IssueTransaction.MaxAssetDescriptionLength + 1)}", 1, 2, true)""")
         ),
         Case(
-          "NODE-562 If an invoke sets a sponsorship for another's account asset",
+          "NODE-562 If an invoke sets a sponsorship for another account asset",
           "was not issued from address of current dApp",
           { targetComplexity =>
             val baseComplexity = 1 + 1 + 1 // 1 for tuple, 1 for list, 1 for SponsorFee
@@ -323,7 +324,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
             val baseComplexity = 1 + 1 + 1 // 1 for tuple, 1 for list, 1 for Reissue
             mkV6Script(
               s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
-                 | ([Reissue(base58'${aliceRegularAssetTx.id()}', 2, true)], complexInt) # Amount will be (Long.MaxValue - 1) + 2
+                 | ([Reissue(base58'$aliceRegularAssetId', 2, true)], complexInt) # Amount will be (Long.MaxValue - 1) + 2
                  | """.stripMargin
             )
           },
@@ -438,7 +439,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         )
       } ++ Seq(
         Case(
-          "NODE-586 If a transaction does a self-leasing",
+          "NODE-586 If an invoke does a self-leasing",
           "Cannot lease to self",
           { targetComplexity =>
             val baseComplexity = 1 + 1 + 1 // 1 for tuple, 1 for list, 1 for Lease
@@ -450,7 +451,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           }
         ),
         Case(
-          "NODE-588 If a transaction does same leasing multiple times",
+          "NODE-588 If an invoke does the same leasing multiple times",
           "is already in the state",
           { targetComplexity =>
             val baseComplexity = 1 + 1 + 2 + 1 + 1 // 1 for Address, 1 for tuple, 2 for list, 1+1 for Lease
@@ -463,7 +464,46 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           }
         ),
         Case(
-          "NODE-596 If a transaction tries to cancel a leasing twice in a script",
+          "NODE-590 If an invoke leases the nonexistent funds",
+          "Cannot lease more than own",
+          { targetComplexity =>
+            // 1 for Address(bob), 10 for wavesBalance, 1 for Address(alice), 1 for tuple, 2 for list, 1+1 for Lease
+            val baseComplexity = 1 + 10 + 1 + 1 + 2 + 1 + 1
+            mkV6Script(
+              s""" let to = Address(base58'$bobAddr')
+                 | let available = wavesBalance(Address(base58'$aliceAddr')).available
+                 | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 | ([Lease(to, available, 1), Lease(to, available, 2)], complexInt)
+                 | """.stripMargin
+            )
+          }
+        ),
+        Case(
+          "NODE-592 If an invoke cancels a leasing with a wrong lease id",
+          s"Lease id=${bobLeasingId.toString.take(5)} has invalid length",
+          { targetComplexity =>
+            val baseComplexity = 1 + 1 + 1 // 1 for tuple, 1 for list, 1 for LeaseCancel
+            mkV6Script(
+              s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 | ([LeaseCancel(base58'${bobLeasingId.toString.take(5)}')], complexInt)
+                 | """.stripMargin
+            )
+          }
+        ),
+        Case(
+          "NODE-594 If an invoke cancels an unknown leasing",
+          s"Lease with id=$bobLeasingId not found",
+          { targetComplexity =>
+            val baseComplexity = 1 + 1 + 1 // 1 for tuple, 1 for list, 1 for LeaseCancel
+            mkV6Script(
+              s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 | ([LeaseCancel(base58'$bobLeasingId')], complexInt)
+                 | """.stripMargin
+            )
+          }
+        ),
+        Case(
+          "NODE-596 If an invoke cancels the same leasing twice",
           "Duplicate LeaseCancel id(s)",
           { targetComplexity =>
             val baseComplexity = 1 + 2 + 1 // 1 for tuple, 2 for list, 1 for LeaseCancel
@@ -477,7 +517,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           knownTxs = Seq(aliceLeasingTx)
         ),
         Case(
-          "NODE-596 If a transaction in a script tries to cancel already cancelled leasing",
+          "NODE-596 If an invoke cancels the already cancelled leasing",
           "Cannot cancel already cancelled lease",
           { targetComplexity =>
             val baseComplexity = 1 + 1 + 1 // 1 for tuple, 1 for list, 1 for LeaseCancel
@@ -490,7 +530,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           knownTxs = Seq(aliceLeasingTx, TxHelpers.leaseCancel(aliceLeasingId, sender = alice))
         ),
         Case(
-          "NODE-598 If a transaction tries to cancel another account leasing",
+          "NODE-598 If an invoke cancels another account leasing",
           "LeaseTransaction was leased by other sender and time",
           { targetComplexity =>
             val baseComplexity = 1 + 1 + 1 // 1 for tuple, 1 for list, 1 for LeaseCancel
@@ -503,46 +543,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           knownTxs = Seq(bobLeasingTx)
         ),
         Case(
-          "NODE-590 If a transaction does a leasing with nonexistent funds",
-          "Cannot lease more than own",
-          { targetComplexity =>
-            // 1 for Address(bob), 1 for tuple, 1 for list, 1 for Lease, 10 for wavesBalance, 1 for Address(alice),
-            // and 1 for "+"
-            val baseComplexity = 1 + 1 + 1 + 1 + 10 + 1 + 1
-            mkV6Script(
-              s""" let to = Address(base58'$bobAddr')
-                 | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
-                 | ([Lease(to, wavesBalance(Address(base58'$aliceAddr')).available + 1)], complexInt)
-                 | """.stripMargin
-            )
-          }
-        ),
-        Case(
-          "NODE-592 If a transaction cancels a leasing with wrong lease id",
-          s"Lease id=${bobLeasingId.toString.take(5)} has invalid length",
-          { targetComplexity =>
-            val baseComplexity = 1 + 1 + 1 // 1 for tuple, 1 for list, 1 for LeaseCancel
-            mkV6Script(
-              s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
-                 | ([LeaseCancel(base58'${bobLeasingId.toString.take(5)}')], complexInt)
-                 | """.stripMargin
-            )
-          }
-        ),
-        Case(
-          "NODE-594 If a transaction cancels an unknown leasing",
-          s"Lease with id=$bobLeasingId not found",
-          { targetComplexity =>
-            val baseComplexity = 1 + 1 + 1 // 1 for tuple, 1 for list, 1 for LeaseCancel
-            mkV6Script(
-              s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
-                 | ([LeaseCancel(base58'$bobLeasingId')], complexInt)
-                 | """.stripMargin
-            )
-          }
-        ),
-        Case(
-          "NODE-604 If a transaction failed by a script",
+          "NODE-604 If an invoke failed by the script",
           "test error",
           { targetComplexity =>
             val baseComplexity = 1 + 1 // 1 for compare, 1 for tuple / throw
@@ -559,12 +560,17 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           }
         ),
         mkInnerPayment(
-          "NODE-606 If an inner invoke contains a negative payment",
+          "NODE-606 If an inner invoke contains a negative Waves payment",
           "with attached WAVES amount = -1",
           "AttachedPayment(unit, -1)"
         ),
+        mkInnerPayment(
+          "NODE-606 If an inner invoke contains a negative asset payment",
+          s"with attached token $aliceRegularAssetId amount = -1",
+          s"AttachedPayment(base58'$aliceRegularAssetId', -1)"
+        ),
         Case(
-          "NODE-608 If a script tries to issue the same asset multiple times",
+          "NODE-608 If an invoke issues the same asset multiple times",
           "is already issued",
           { targetComplexity =>
             val baseComplexity = 1 + 1 + 2 // 1 for Issue, 1 for tuple, 2 for list
@@ -712,6 +718,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
       )
     },
     knownTxs = Seq(
+      aliceRegularAssetTx,
       TxHelpers.setScript(
         bob, {
           val baseComplexity = 1 // 1 for tuple
