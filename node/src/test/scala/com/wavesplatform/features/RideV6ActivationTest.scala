@@ -71,7 +71,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
   "After RideV6 activation" - {
     val cases = Seq(
       Case(
-        "NODE-540 If an invocation exceeds the limit of writes",
+        "NODE-540 If an invoke exceeds the limit of writes",
         "Stored data count limit is exceeded",
         { targetComplexity =>
           val baseComplexity = 101 + 101 // 101 for list, 101 for IntegerEntry
@@ -83,7 +83,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         }
       ),
       Case(
-        "NODE-542 If a transaction exceeds the limit of writes size",
+        "NODE-542 If an invoke exceeds the limit of writes size",
         "WriteSet size can't exceed 5120 bytes, actual: 5121 bytes",
         { targetComplexity =>
           val baseComplexity = 2 + 1 + 1 // 2 for list, 1 for BinaryEntry, 1 for IntegerEntry
@@ -99,7 +99,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         }
       ),
       Case(
-        "NODE-544 If a transaction exceeds the limit of writes number through WriteSet",
+        "NODE-544 If an invoke exceeds the limit of writes number through a WriteSet",
         "Stored data count limit is exceeded",
         { targetComplexity =>
           val baseComplexity = 101 + 2 * 101 + 1 // 101 for list, 2 * 101 for DataEntry, 1 for WriteSet
@@ -119,7 +119,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         "String"  -> """StringEntry("", "lie")"""
       ).map { case (entryType, entry) =>
         Case(
-          s"NODE-546 If a transaction tries to write an empty $entryType key to the state",
+          s"NODE-546 If an invoke tries to write an empty $entryType key to the state",
           "Empty keys aren't allowed in tx version >= 2",
           { targetComplexity =>
             val baseComplexity = 2 + 1 + 1 // 2 for list (two elements), 1 for IntegerEntry, 1 for test entry
@@ -138,7 +138,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         "LeaseCancel"    -> s"LeaseCancel(base58'$bobLeasingId')"
       ).map { case (actionType, v) =>
         Case(
-          s"NODE-548 If a transaction exceeds the limit of $actionType actions",
+          s"NODE-548 If an invoke exceeds the limit of $actionType actions",
           "ScriptTransfer, Lease, LeaseCancel actions count limit is exceeded",
           { targetComplexity =>
             // 1 for Address, 1 for tuple, 101 for list, 101 for actions, 10 for getInteger, 2 for valueOrElse, 1 for "+"
@@ -158,7 +158,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
       } ++
       Seq(
         Case(
-          "NODE-548 If a transaction exceeds the limit of mixed non-data actions",
+          "NODE-548 If an invoke exceeds the limit of mixed non-data actions",
           "ScriptTransfer, Lease, LeaseCancel actions count limit is exceeded",
           { targetComplexity =>
             val baseComplexity = 1 + 101 + 101 // 1 for Address, 101 for list, 101 for actions
@@ -175,21 +175,20 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           }
         ),
         Case(
-          "NODE-550 If a transaction has a self-payment",
+          "NODE-550 If an invoke sends a self-payment",
           "DApp self-payment is forbidden since V4",
           mkScriptWithOneAction("""IntegerEntry("i", 1)"""),
-          // self-payment, because this is a self-invoke
-          invokeTx = aliceInvokeTx
+          invokeTx = aliceInvokeTx // self-payment, because this is a self-invoke
             .copy(payments = Seq(InvokeScriptTransaction.Payment(1, Waves)))
             .signWith(alice.privateKey)
         ),
         Case(
-          "NODE-552 If a sender sends a ScriptTransfer himself in a transaction",
+          "NODE-552 If an invoke sends a ScriptTransfer for himself",
           "DApp self-transfer is forbidden since V4",
           mkScriptWithOneAction("ScriptTransfer(this, 1, unit)")
         ),
         Case(
-          "NODE-554 If a transaction sends a ScriptTransfer with negative amount",
+          "NODE-554 If an invoke sends a ScriptTransfer with a negative amount",
           "Negative transfer amount",
           { targetComplexity =>
             val baseComplexity = 1 + 1 + 1 + 1 // 1 for Address, 1 for list, 1 for ScriptTransfer, 1 for "-complexInt"
@@ -202,11 +201,11 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           }
         ),
         Case(
-          "NODE-556 If an invoke leads to overflow in ScriptTransfer",
+          "NODE-556 If an invoke leads to a Waves overflow with a ScriptTransfer (initial balances)",
           "Waves balance sum overflow",
           { targetComplexity =>
             // 1 for Address, 1 for tuple, 1 for list, 1 for ScriptTransfer, 10 for wavesBalance, 1 for Address(alice),
-            //   and 1 for "+"
+            //   and 1 for "-"
             val baseComplexity = 1 + 1 + 1 + 1 + 10 + 1 + 1
             mkV6Script(
               s""" let to = Address(base58'$bobAddr')
@@ -222,6 +221,38 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
             aliceAddr -> Long.MaxValue,
             bobAddr   -> ENOUGH_AMT
           )
+        ),
+        Case(
+          "NODE-556 If an invoke leads to a Waves overflow with a ScriptTransfer (multiple transfers)",
+          "negative waves balance",
+          { targetComplexity =>
+            // 1 for Address, 1 for ScriptTransfer, 10 for wavesBalance, 1 for Address(alice), 1 for "-",
+            // 1 for tuple, 2 for list
+            val baseComplexity = 1 + 1 + 10 + 1 + 1 + 1 + 2
+            mkV6Script(
+              s""" let to = Address(base58'$bobAddr')
+                 | let transfer = ScriptTransfer(to, wavesBalance(Address(base58'$aliceAddr')).available - ${aliceInvokeTx.fee}, unit)
+                 | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 | ([transfer, transfer], complexInt)
+                 | """.stripMargin
+            )
+          }
+        ),
+        Case(
+          "NODE-556 If an invoke leads to an asset overflow with a ScriptTransfer",
+          "ScriptTransfer overflow",
+          { targetComplexity =>
+            // 1 for Address, 1 for ScriptTransfer, 1 for tuple, 2 for list
+            val baseComplexity = 1 + 1 + 1 + 2
+            mkV6Script(
+              s""" let to = Address(base58'$bobAddr')
+                 | let transfer = ScriptTransfer(to, ${Long.MaxValue - 1}, base58'${aliceRegularAssetTx.id()}')
+                 | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 | ([transfer, transfer], complexInt)
+                 | """.stripMargin
+            )
+          },
+          knownTxs = Seq(aliceRegularAssetTx)
         ),
         Case(
           "NODE-558 If a transaction issues a token with invalid name",
