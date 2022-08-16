@@ -1,13 +1,11 @@
 FROM openjdk:11-jre-slim
 
-ARG WAVES_LOG_LEVEL
-ARG WAVES_HEAP_SIZE
-ARG WAVES_NETWORK=mainnet
-ARG ENABLE_GRPC
+ARG INCLUDE_GRPC
 
-ENV WAVES_LOG_LEVEL=${WAVES_LOG_LEVEL:-INFO}
-ENV WAVES_HEAP_SIZE=${WAVES_HEAP_SIZE:-2g}
-ENV ENABLE_GRPC=${ENABLE_GRPC:-true}
+ENV INCLUDE_GRPC=${INCLUDE_GRPC:-true}
+ENV WAVES_LOG_LEVEL=INFO
+ENV WAVES_HEAP_SIZE=2g
+ENV WAVES_NETWORK=mainnet
 
 COPY build-scripts /tmp/
 
@@ -20,7 +18,7 @@ ENV WVLOG=/var/log/waves
 ENV WAVES_INSTALL_PATH=/usr/share/waves
 ENV WAVES_CONFIG=/etc/waves/waves.conf
 COPY target /tmp/
-COPY waves.conf.template /tmp/waves.conf.template
+COPY waves.conf.template $WAVES_CONFIG
 RUN /bin/bash /tmp/setup-node.sh
 
 EXPOSE 6869 6868 6863 6862 6870

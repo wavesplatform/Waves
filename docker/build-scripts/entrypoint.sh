@@ -5,9 +5,10 @@ logEcho() {
   echo $1 | gosu waves tee -a /var/log/waves/waves.log
 }
 
+cp $WAVES_INSTALL_PATH/lib/plugins/* $WAVES_INSTALL_PATH/lib/
+
 [ -n "${WAVES_WALLET_PASSWORD}" ] && JAVA_OPTS="${JAVA_OPTS} -Dwaves.wallet.password=${WAVES_WALLET_PASSWORD}"
 [ -n "${WAVES_WALLET_SEED}" ] && JAVA_OPTS="${JAVA_OPTS} -Dwaves.wallet.seed=${WAVES_WALLET_SEED}"
-JAVA_OPTS="${JAVA_OPTS} -Dwaves.directory=$WVDATA"
 
 logEcho "Node is starting..."
 logEcho "WAVES_HEAP_SIZE='${WAVES_HEAP_SIZE}'"

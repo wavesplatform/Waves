@@ -58,7 +58,7 @@ package object settings {
 
   def loadConfig(maybeUserConfig: Option[Config]): Config = {
     val sysProps = ConfigFactory.defaultOverrides()
-    val external = maybeUserConfig.fold(sysProps)(sysProps.withFallback)
+    val external = maybeUserConfig.fold(sysProps)(sysProps.withFallback).resolve()
 
     val cmdDefaults =
       Try(external.getConfig("waves.defaults"))
@@ -86,7 +86,7 @@ package object settings {
     def osxDefaultDirectory: String =
       s"$${user.home}/Library/Application Support"
 
-    //noinspection SpellCheckingInspection
+    // noinspection SpellCheckingInspection
     def winDefaultDirectory: String =
       s"$${LOCALAPPDATA}"
 
