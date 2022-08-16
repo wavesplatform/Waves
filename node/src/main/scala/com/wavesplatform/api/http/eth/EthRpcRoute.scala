@@ -20,6 +20,7 @@ import com.wavesplatform.transaction.{ABIConverter, ERC20Address, EthereumTransa
 import com.wavesplatform.utils.EthEncoding.*
 import com.wavesplatform.utils.{EthEncoding, Time}
 import org.web3j.abi.*
+import org.web3j.abi.datatypes.Bool
 import org.web3j.abi.datatypes.generated.{Uint256, Uint8}
 import org.web3j.crypto.*
 import play.api.libs.json.*
@@ -143,25 +144,25 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
           val dataString      = (call \ "data").as[String]
           val contractAddress = (call \ "to").as[String]
 
-          log.info(s"balance: contract address = $contractAddress, assetId = ${assetId(contractAddress)}") // TODO remove logging
-
           cleanHexPrefix(dataString).take(8) match {
-            case "95d89b41" =>
-              resp(id, encodeResponse(assetDescription(contractAddress).get.name.toStringUtf8))
-            case "313ce567" =>
-              resp(id, encodeResponse(new Uint8(assetDescription(contractAddress).get.decimals)))
-            case "70a08231" =>
+            case "95d89b41" => // symbol()
+              resp(id, encodeResponse(assetDescription(contractAddress).fold("")(_.name.toStringUtf8)))
+            case "313ce567" => // decimals()
+              resp(id, encodeResponse(new Uint8(assetDescription(contractAddress).fold(0)(_.decimals))))
+            case "70a08231" => // balanceOf(address)
               resp(
                 id,
                 encodeResponse(
                   new Uint256(
-                    blockchain.balance(Address.fromHexString(dataString.takeRight(40)), assetId(contractAddress).get)
+                    assetId(contractAddress).fold(0L)(ia => blockchain.balance(Address.fromHexString(dataString.takeRight(40)), ia))
                   )
                 )
               )
+            case "01ffc9a7" => // supportsInterface() https://eips.ethereum.org/EIPS/eip-165
+              resp(id, encodeResponse(new Bool(false)))
             case _ =>
-              log.info(s"Unexpected call $dataString at $contractAddress")
-              resp(id, "")
+              log.debug(s"Unexpected call $dataString at $contractAddress")
+              resp(id, "0x")
           }
         case "eth_estimateGas" =>
           val txParams = param1.as[JsObject]
@@ -169,7 +170,8 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
             BigInteger.valueOf(System.currentTimeMillis()),
             EthereumTransaction.GasPrice,
             BigInteger.ONE,
-            (txParams \ "to").as[String],
+            // "to" may be missing when estimating base currency transfer
+            (txParams \ "to").asOpt[String].getOrElse("0x0000000000000000000000000000000000000000"),
             (txParams \ "value").asOpt[String].fold(BigInteger.ZERO)(s => new BigInteger(cleanHexPrefix(s), 16)),
             (txParams \ "data").asOpt[String].getOrElse("0x")
           )
@@ -210,7 +212,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
   private[this] def assetId(contractAddress: String): Option[IssuedAsset] =
     blockchain.resolveERC20Address(ERC20Address(ByteStr(toBytes(contractAddress))))
 
-  private[this] def encodeResponse(values: Type*): String = FunctionEncoder.encodeConstructor(values.map(Type.unwrap).asJava)
+  private[this] def encodeResponse(values: Type*): String = "0x" + FunctionEncoder.encodeConstructor(values.map(Type.unwrap).asJava)
 
   private[this] def extractTransaction(transactionHex: String) = TransactionDecoder.decode(transactionHex) match {
     case srt: SignedRawTransaction => EthereumTransaction(srt)

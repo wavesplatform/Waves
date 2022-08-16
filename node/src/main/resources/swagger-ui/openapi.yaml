@@ -1273,7 +1273,9 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Transaction'
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Transaction'
   /transactions/unconfirmed/size:
     get:
       tags:

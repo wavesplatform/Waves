@@ -80,6 +80,11 @@ object Types {
 
   case class CASETYPEREF(override val name: String, override val fields: List[(String, FINAL)], hideConstructor: Boolean = false) extends REAL {
     override def typeList: List[REAL] = List(this)
+    override def equals(obj: Any): Boolean =
+      obj match {
+        case CASETYPEREF(`name`, _, _) => true
+        case _                         => false
+      }
   }
 
   def toFinal(resultType: TYPE, resolvedPlaceholders: Map[TYPEPARAM, FINAL]): FINAL = {

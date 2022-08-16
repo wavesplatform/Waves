@@ -363,7 +363,7 @@ object Parser {
       }
 
   def accessorName(implicit c: fastparse.P[Any]): P[PART[String]] = {
-    def nameP(implicit c: fastparse.P[Any]) = (char | "_") ~~ (digit | char).repX()
+    def nameP(implicit c: fastparse.P[Any]) = (char | "_") ~~ ("_".? ~~ (digit | char)).repX()
     genericVarName(nameP(_))
   }
 
