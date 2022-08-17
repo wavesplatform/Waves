@@ -4,7 +4,6 @@ import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import cats.instances.either.*
 import cats.instances.list.*
-import cats.instances.try_.*
 import cats.syntax.alternative.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
@@ -32,7 +31,6 @@ import monix.execution.Scheduler
 import play.api.libs.json.*
 
 import scala.concurrent.Future
-import scala.util.Success
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta.Payload
 import com.wavesplatform.lang.v1.serialization.SerdeV1
 
@@ -180,18 +178,21 @@ case class TransactionsApiRoute(
 
   def merkleProof: Route = path("merkleProof") {
     anyParam("id", limit = settings.transactionsByAddressLimit) { ids =>
-      complete(merkleProof(ids.toList))
+      val result = Either
+        .cond(ids.nonEmpty, (), InvalidTransactionId("Transaction ID was not specified"))
+        .map(_ => merkleProof(ids.toList))
+      complete(result)
     }
   }
 
   private def merkleProof(encodedIds: List[String]): ToResponseMarshallable =
-    encodedIds.traverse(ByteStr.decodeBase58) match {
-      case Success(txIds) =>
+    encodedIds.map(id => ByteStr.decodeBase58(id).toEither.leftMap(_ => id)).separate match {
+      case (Nil, txIds) =>
         commonApi.transactionProofs(txIds) match {
           case Nil    => CustomValidationError(s"transactions do not exist or block version < ${Block.ProtoBlockVersion}")
           case proofs => proofs
         }
-      case _ => InvalidSignature
+      case (errors, _) => InvalidIds(errors)
     }
 
   def transactionsByAddress(address: Address, limitParam: Int, maybeAfter: Option[ByteStr])(implicit sc: Scheduler): Future[List[JsObject]] = {
@@ -206,7 +207,7 @@ case class TransactionsApiRoute(
     /** Produces compact representation for large transactions by stripping unnecessary data. Currently implemented for MassTransfer transaction only.
       */
     def compactJson(address: Address, meta: TransactionMeta): Task[JsObject] = {
-      import com.wavesplatform.transaction.transfer._
+      import com.wavesplatform.transaction.transfer.*
       meta.transaction match {
         case mtt: MassTransferTransaction if mtt.sender.toAddress != address =>
           (if (

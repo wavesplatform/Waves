@@ -11,7 +11,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.AddressApiRoute
-import com.wavesplatform.api.http.ApiError.{ApiKeyNotValid, TooBigArrayAllocation}
+import com.wavesplatform.api.http.ApiError.{ApiKeyNotValid, DataKeysNotSpecified, TooBigArrayAllocation}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.db.WithDomain
@@ -421,9 +421,12 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
   }
 
   routePath(s"/data/{address} - handles keys limit") in {
-    def checkErrorResponse(): Unit = {
+    val inputLimitErrMsg = TooBigArrayAllocation(addressApiRoute.settings.dataKeysRequestLimit).message
+    val emptyInputErrMsg = DataKeysNotSpecified.message
+
+    def checkErrorResponse(errMsg: String): Unit = {
       response.status shouldBe StatusCodes.BadRequest
-      (responseAs[JsObject] \ "message").as[String] shouldBe TooBigArrayAllocation(addressApiRoute.settings.transactionsByAddressLimit).message
+      (responseAs[JsObject] \ "message").as[String] shouldBe errMsg
     }
 
     def checkResponse(key: String, value: String, idsCount: Int): Unit = {
@@ -454,18 +457,24 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
           .copy(blockchain = d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(() => d.liquidDiff, d.db, d.blockchainUpdater))
           .route
 
-      val maxLimitKeys      = Seq.fill(addressApiRoute.settings.transactionsByAddressLimit)(key)
+      val maxLimitKeys      = Seq.fill(addressApiRoute.settings.dataKeysRequestLimit)(key)
       val moreThanLimitKeys = key +: maxLimitKeys
 
       Get(routePath(s"/data/${account.toAddress}?${maxLimitKeys.map("key=" + _).mkString("&")}")) ~> route ~> check(
         checkResponse(key, value, maxLimitKeys.size)
       )
-      Get(routePath(s"/data/${account.toAddress}?${moreThanLimitKeys.map("key=" + _).mkString("&")}")) ~> route ~> check(checkErrorResponse())
+      Get(routePath(s"/data/${account.toAddress}?${moreThanLimitKeys.map("key=" + _).mkString("&")}")) ~> route ~> check(
+        checkErrorResponse(inputLimitErrMsg)
+      )
+      Get(routePath(s"/data/${account.toAddress}")) ~> route ~> check(checkErrorResponse(emptyInputErrMsg))
 
       Post(routePath(s"/data/${account.toAddress}"), FormData(maxLimitKeys.map("key" -> _)*)) ~> route ~> check(
         checkResponse(key, value, maxLimitKeys.size)
       )
-      Post(routePath(s"/data/${account.toAddress}"), FormData(moreThanLimitKeys.map("key" -> _)*)) ~> route ~> check(checkErrorResponse())
+      Post(routePath(s"/data/${account.toAddress}"), FormData(moreThanLimitKeys.map("key" -> _)*)) ~> route ~> check(
+        checkErrorResponse(inputLimitErrMsg)
+      )
+      Post(routePath(s"/data/${account.toAddress}"), FormData()) ~> route ~> check(checkErrorResponse(emptyInputErrMsg))
 
       Post(
         routePath(s"/data/${account.toAddress}"),
@@ -474,7 +483,11 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
       Post(
         routePath(s"/data/${account.toAddress}"),
         HttpEntity(ContentTypes.`application/json`, Json.obj("keys" -> Json.arr(moreThanLimitKeys.map(key => key: JsValueWrapper)*)).toString())
-      ) ~> route ~> check(checkErrorResponse())
+      ) ~> route ~> check(checkErrorResponse(inputLimitErrMsg))
+      Post(
+        routePath(s"/data/${account.toAddress}"),
+        HttpEntity(ContentTypes.`application/json`, Json.obj("keys" -> JsArray.empty).toString())
+      ) ~> route ~> check(checkErrorResponse(emptyInputErrMsg))
     }
   }
 }

@@ -210,8 +210,12 @@ case class AddressApiRoute(
                 },
                 _ => complete(accountData(address, matches))
               )
-          } ~ anyParam("key", limit = settings.transactionsByAddressLimit).filter(_.nonEmpty) { keys =>
-            complete(accountDataList(address, keys.toSeq*))
+          } ~ anyParam("key", limit = settings.dataKeysRequestLimit) { keys =>
+            val result = Either
+              .cond(keys.nonEmpty, (), DataKeysNotSpecified)
+              .map(_ => accountDataList(address, keys.toSeq*))
+
+            complete(result)
           } ~ get {
             complete(accountData(address))
           }

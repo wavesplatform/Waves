@@ -16,7 +16,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.api.http.*
-import com.wavesplatform.api.http.assets.AssetsApiRoute.{AssetsLimit, DistributionParams}
+import com.wavesplatform.api.http.assets.AssetsApiRoute.DistributionParams
 import com.wavesplatform.api.http.requests.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
@@ -92,7 +92,7 @@ case class AssetsApiRoute(
   override lazy val route: Route =
     pathPrefix("assets") {
       pathPrefix("balance" / AddrSegment) { address =>
-        anyParam("id", limit = AssetsLimit) { assetIds =>
+        anyParam("id", limit = settings.assetDetailsLimit) { assetIds =>
           val assetIdsValidated = assetIds.toList
             .map(assetId => ByteStr.decodeBase58(assetId).fold(_ => Left(assetId), bs => Right(IssuedAsset(bs))).toValidatedNel)
             .sequence
@@ -108,8 +108,12 @@ case class AssetsApiRoute(
           balance(address, assetId)
         }
       } ~ pathPrefix("details") {
-        (anyParam("id", nonEmpty = true, limit = AssetsLimit) & parameter("full".as[Boolean] ? false)) { (ids, full) =>
-          complete(multipleDetails(ids.toList, full))
+        (anyParam("id", limit = settings.assetDetailsLimit) & parameter("full".as[Boolean] ? false)) { (ids, full) =>
+          val result = Either
+            .cond(ids.nonEmpty, (), AssetIdNotSpecified)
+            .map(_ => multipleDetails(ids.toList, full))
+
+          complete(result)
         } ~ (get & path(AssetId) & parameter("full".as[Boolean] ? false)) { (assetId, full) =>
           singleDetails(assetId, full)
         }
@@ -125,13 +129,20 @@ case class AssetsApiRoute(
       } ~ deprecatedRoute
     }
 
-  def multipleDetailsGet(ids: Seq[String], full: Boolean): Route =
-    complete(ids.toList.map(id => assetDetails(IssuedAsset(ByteStr.decodeBase58(id).get), full).fold(_.json, identity)))
-
   private def multipleDetails(ids: List[String], full: Boolean): ToResponseMarshallable =
     ids.map(id => ByteStr.decodeBase58(id).toEither.leftMap(_ => id)).separate match {
-      case (Nil, assetIds) => assetIds.map(id => assetDetails(IssuedAsset(id), full).fold(_.json, identity))
-      case (errors, _)     => InvalidIds(errors)
+      case (Nil, assetIds) =>
+        assetIds.map(id => assetDetails(IssuedAsset(id), full)).separate match {
+          case (Nil, details) => details
+          case (errors, _) =>
+            val notFoundErrors = errors.collect { case AssetDoesNotExist(assetId) => assetId }
+            if (notFoundErrors.isEmpty) {
+              errors.head
+            } else {
+              AssetsDoesNotExist(notFoundErrors)
+            }
+        }
+      case (errors, _) => InvalidIds(errors)
     }
 
   def fullAssetInfoJson(asset: IssuedAsset): JsObject = commonAssetsApi.fullInfo(asset) match {
@@ -269,7 +280,6 @@ case class AssetsApiRoute(
 
 object AssetsApiRoute {
   val MAX_DISTRIBUTION_TASKS = 5
-  val AssetsLimit            = 100
 
   type DistributionParams = (Int, Int, Option[Address])
 
