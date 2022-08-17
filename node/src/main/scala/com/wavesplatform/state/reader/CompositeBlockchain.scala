@@ -95,7 +95,7 @@ final class CompositeBlockchain private (
     }
 
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] =
-    if (maybeDiff.isEmpty || to.exists(id => inner.heightOf(id).isDefined)) {
+    if (maybeDiff.isEmpty || to.exists(id => inner.heightOf(id).exists(_ != height))) {
       inner.balanceSnapshots(address, from, to)
     } else {
       val balance    = this.balance(address)
@@ -184,6 +184,14 @@ object CompositeBlockchain {
       case cb: CompositeBlockchain => cb.appendDiff(diff)
       case _                       => new CompositeBlockchain(inner, Some(diff))
     }
+
+  def apply(inner: Blockchain, diff: Seq[Diff]): CompositeBlockchain = {
+    val acc = inner match {
+      case cb: CompositeBlockchain => cb
+      case _                       => new CompositeBlockchain(inner, None)
+    }
+    diff.foldLeft(acc)(_.appendDiff(_))
+  }
 
   def apply(
       inner: Blockchain,

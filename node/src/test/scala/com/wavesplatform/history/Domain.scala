@@ -17,6 +17,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.TransactionDiffer
+import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{BlockchainUpdater, *}
@@ -390,7 +391,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   val accountsApi: CommonAccountsApi = CommonAccountsApi(
     () => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty),
     db,
-    blockchain
+    CompositeBlockchain(blockchainUpdater, utxPool.priorityPool.validPriorityDiffs)
   )
 
   val assetsApi: CommonAssetsApi = CommonAssetsApi(
