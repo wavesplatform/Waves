@@ -11,7 +11,7 @@ import net.ceedubs.ficus.readers.namemappers.HyphenNameMapper
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 import org.apache.commons.lang3.SystemUtils
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
 package object settings {
@@ -58,7 +58,7 @@ package object settings {
 
   def loadConfig(maybeUserConfig: Option[Config]): Config = {
     val sysProps = ConfigFactory.defaultOverrides()
-    val external = maybeUserConfig.fold(sysProps)(sysProps.withFallback).resolve()
+    val external = maybeUserConfig.fold(sysProps)(sysProps.withFallback)
 
     val cmdDefaults =
       Try(external.getConfig("waves.defaults"))

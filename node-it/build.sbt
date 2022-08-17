@@ -7,11 +7,7 @@ inTask(docker)(
   Seq(
     imageNames   := Seq(ImageName("com.wavesplatform/node-it")),
     dockerfile   := NativeDockerfile(baseDirectory.value.getParentFile / "docker" / "Dockerfile"),
-    buildOptions := BuildOptions(),
-    dockerBuildArguments := Map(
-      "INCLUDE_GRPC"  -> "true",
-      "WAVES_NETWORK" -> "custom"
-    )
+    buildOptions := BuildOptions()
   )
 )
 

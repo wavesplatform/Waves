@@ -10,7 +10,7 @@ useradd -r -g waves --uid=999 --home-dir=$WVDATA --shell=/bin/bash waves
 # Unpack tgz packages
 mkdir -p $WAVES_INSTALL_PATH
 tar zxvf /tmp/waves.tgz -C $WAVES_INSTALL_PATH --strip-components=1
-if [[ $INCLUDE_GRPC == true ]]; then
+if [[ $1 == true ]]; then
   echo "Unpacking gRPC server"
   tar zxvf /tmp/waves-grpc-server.tgz -C $WAVES_INSTALL_PATH --strip-components=1
 fi
