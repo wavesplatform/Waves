@@ -64,10 +64,12 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
   private val bobLeasingTx = TxHelpers.lease(sender = bob, recipient = aliceAddr)
   private val bobLeasingId = bobLeasingTx.id()
 
-  private val defaultInitBalances = Map(
+  private val defaultInitWavesBalances = Map(
     aliceAddr -> ENOUGH_AMT,
     bobAddr   -> ENOUGH_AMT
   )
+
+  private val defaultScript = mkScriptWithOneAction("""IntegerEntry("i", 1)""")
 
   "After RideV6 activation" - {
     val cases = Seq(
@@ -178,7 +180,6 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
         Case(
           "NODE-550 If an invoke sends a self-payment",
           "DApp self-payment is forbidden since V4",
-          mkScriptWithOneAction("""IntegerEntry("i", 1)"""),
           invokeTx = aliceInvokeTx // self-payment, because this is a self-invoke
             .copy(payments = Seq(InvokeScriptTransaction.Payment(1, Waves)))
             .signWith(alice.privateKey)
@@ -583,7 +584,33 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           }
         ),
         Case(
-          "NODE-620 If a negative balance happens during invoke",
+          "NODE-610 If an invoke reissues an asset with a negative quantity",
+          "Negative reissue quantity",
+          mkScriptWithOneAction(s"Reissue(base58'$aliceRegularAssetId', -1, true)"),
+          knownTxs = Seq(aliceRegularAssetTx)
+        ),
+        Case(
+          "NODE-612 If an invoke burns an asset with a negative quantity",
+          "Negative burn quantity",
+          mkScriptWithOneAction(s"Burn(base58'$aliceRegularAssetId', -1)"),
+          knownTxs = Seq(aliceRegularAssetTx)
+        ),
+        Case(
+          "NODE-618 If an invoke sets a sponsorship with a negative quantity",
+          "Negative sponsor amount",
+          mkScriptWithOneAction(s"SponsorFee(base58'$aliceRegularAssetId', -1)"),
+          knownTxs = Seq(aliceRegularAssetTx)
+        ),
+        // TODO Rejects anyway
+        // Case(
+        //   "NODE-620 If an invoke contains a too big payment",
+        //   "temporary negative state",
+        //   invokeTx = aliceInvokeTx
+        //     .copy(payments = Seq(InvokeScriptTransaction.Payment(defaultInitWavesBalances(aliceAddr), Waves)))
+        //     .signWith(alice.privateKey)
+        // ),
+        Case(
+          "NODE-620 If a negative balance happens during the invoke",
           "negative waves balance",
           { targetComplexity =>
             // 75 for invoke, 1 for Address, 1 for list, 500 for bob.foo() body
@@ -627,8 +654,14 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
             )
           )
         ),
+        // TODO Rejects anyway
+        // Case(
+        //   "NODE-698 If an invoke to an account without a script",
+        //   "No contract at address",
+        //   hasDApp = false
+        // ),
         Case(
-          "NODE-760 If a transaction sends an inner invoke with a payment with unknown assetId",
+          "NODE-760 If an inner invoke has a payment with an unknown assetId",
           s"Transfer error: asset '$bobAssetId' is not found on the blockchain",
           { targetComplexity =>
             // bar: 1 for Address, 1 for tuple, 1 for list, 1 for ScriptTransfer
@@ -656,7 +689,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
           }
         ),
         mkInnerPayment(
-          "NODE-761 If an invocation contains an inner payment with invalid assetId",
+          "NODE-761 If an inner payment has with an invalid assetId",
           s"invalid asset ID '$invalidAssetId'",
           s"AttachedPayment(base58'$invalidAssetId', 1)"
         )
@@ -684,8 +717,10 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
             DomainPresets.RideV6,
             testCase.initBalances.map(Function.tupled(AddrWithBalance.apply)).toSeq
           ) { d =>
-            val setScriptTx = TxHelpers.setScript(alice, testCase.mkDApp(complexity), 1.waves)
-            d.appendBlock((testCase.knownTxs :+ setScriptTx)*)
+            if (testCase.hasDApp) {
+              val setScriptTx = TxHelpers.setScript(alice, testCase.mkDApp(complexity), 1.waves)
+              d.appendBlock((testCase.knownTxs :+ setScriptTx) *)
+            }
             f(d)
           }
       }
@@ -744,10 +779,11 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues {
   private case class Case(
       title: String,
       rejectError: String,
-      mkDApp: Int => Script,
+      mkDApp: Int => Script = defaultScript,
       invokeTx: InvokeScriptTransaction = aliceInvokeTx,
       knownTxs: Seq[Transaction] = Seq.empty,
-      initBalances: Map[Address, Long] = defaultInitBalances
+      initBalances: Map[Address, Long] = defaultInitWavesBalances,
+      hasDApp: Boolean = true // This is better than Option[Int => Script] or Int => Option[Script], because doesn't affect 99% of tests
   )
 
   private def mkScriptWithOneAction(actionSrc: String): Int => Script = { targetComplexity =>
