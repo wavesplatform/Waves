@@ -1041,7 +1041,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     }
   }
 
-  property("ExchangeTransaction invalid if price > buyOrder.price or price < sellOrder.price") {
+  property("ExchangeTransaction invalid if exchange.price > buyOrder.price or exchange.price < sellOrder.price") {
     val buyer   = TxHelpers.signer(1)
     val seller  = TxHelpers.signer(2)
     val matcher = TxHelpers.signer(3)
@@ -1085,14 +1085,14 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
             12_500_000L,
             mkTestOrder(OrderType.BUY, 12_400_000L, buyOrderVersion, OrderPriceMode.Default),
             mkTestOrder(OrderType.SELL, 12_500_000L, sellOrderVersion, OrderPriceMode.Default),
-            "price=12500000 should be <= buyOrder.price=12400000"
+            "exchange.price = 12_500_000 should be <= buyOrder.price = 12_400_000"
           ),
           (
             txVersion,
             12_500_000L,
             mkTestOrder(OrderType.BUY, 12_500_000L, buyOrderVersion, OrderPriceMode.Default),
             mkTestOrder(OrderType.SELL, 12_600_000L, sellOrderVersion, OrderPriceMode.Default),
-            "price=12500000 should be >= sellOrder.price=12600000"
+            "exchange.price = 12_500_000 should be >= sellOrder.price = 12_600_000"
           )
         )
       } yield r
@@ -1104,14 +1104,14 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
           1_250_000_000L,
           mkTestOrder(OrderType.BUY, 12_400_000L, 4, OrderPriceMode.AssetDecimals),
           mkTestOrder(OrderType.SELL, 12_500_000L, 4, OrderPriceMode.AssetDecimals),
-          "price=1250000000 should be <= buyOrder.price=1240000000"
+          "exchange.price = 1_250_000_000 should be <= buyOrder.price = 1_240_000_000 (assetDecimals price = 12_400_000)"
         ),
         (
           3,
           1_250_000_000L,
           mkTestOrder(OrderType.BUY, 12_500_000L, 4, OrderPriceMode.AssetDecimals),
           mkTestOrder(OrderType.SELL, 12_600_000L, 4, OrderPriceMode.AssetDecimals),
-          "price=1250000000 should be >= sellOrder.price=1260000000"
+          "exchange.price = 1_250_000_000 should be >= sellOrder.price = 1_260_000_000 (assetDecimals price = 12_600_000)"
         )
       )
 
@@ -1122,14 +1122,14 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
           1_250_000_000L,
           mkTestOrder(OrderType.BUY, 1_240_000_000L, 4, OrderPriceMode.FixedDecimals),
           mkTestOrder(OrderType.SELL, 1_250_000_000L, 4, OrderPriceMode.FixedDecimals),
-          "price=1250000000 should be <= buyOrder.price=1240000000"
+          "exchange.price = 1_250_000_000 should be <= buyOrder.price = 1_240_000_000"
         ),
         (
           3,
           1_250_000_000L,
           mkTestOrder(OrderType.BUY, 1_250_000_000L, 4, OrderPriceMode.FixedDecimals),
           mkTestOrder(OrderType.SELL, 1_260_000_000L, 4, OrderPriceMode.FixedDecimals),
-          "price=1250000000 should be >= sellOrder.price=1260000000"
+          "exchange.price = 1_250_000_000 should be >= sellOrder.price = 1_260_000_000"
         )
       )
 
@@ -1139,20 +1139,20 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
           1_250_000_000L,
           mkTestOrder(OrderType.BUY, 12_400_000L, 2, OrderPriceMode.Default),
           mkTestOrder(OrderType.SELL, 1_250_000_000L, 4, OrderPriceMode.FixedDecimals),
-          "price=1250000000 should be <= buyOrder.price=1240000000"
+          "exchange.price = 1_250_000_000 should be <= buyOrder.price = 1_240_000_000 (assetDecimals price = 12_400_000)"
         ),
         (
           3,
           1_250_000_000L,
           mkTestOrder(OrderType.BUY, 1_250_000_000L, 4, OrderPriceMode.FixedDecimals),
           mkTestOrder(OrderType.SELL, 12_600_000L, 4, OrderPriceMode.AssetDecimals),
-          "price=1250000000 should be >= sellOrder.price=1260000000"
+          "exchange.price = 1_250_000_000 should be >= sellOrder.price = 1_260_000_000 (assetDecimals price = 12_600_000)"
         )
       )
 
       Table(
         ("txVersion", "txPrice", "buyOrder", "sellOrder", "expectedError"),
-        (case1OldTxs ++ case2 ++ case1NewTxs ++ mixedCase) *
+        (case1OldTxs ++ case2 ++ case1NewTxs ++ mixedCase)*
       )
     }
 

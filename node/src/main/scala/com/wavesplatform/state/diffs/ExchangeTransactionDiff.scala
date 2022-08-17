@@ -12,9 +12,16 @@ import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.AssetDecimal
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderPriceMode, OrderType}
 import com.wavesplatform.transaction.{Asset, TxVersion}
 
+import java.text.{DecimalFormat, DecimalFormatSymbols}
 import scala.util.{Right, Try}
 
 object ExchangeTransactionDiff {
+
+  private val formatter = {
+    val symbols = DecimalFormatSymbols.getInstance
+    symbols.setGroupingSeparator('_')
+    new DecimalFormat("###,###.##", symbols)
+  }
 
   def apply(blockchain: Blockchain)(tx: ExchangeTransaction): Either[ValidationError, Diff] = {
     val buyer  = tx.buyOrder.senderAddress
@@ -99,18 +106,27 @@ object ExchangeTransactionDiff {
         else
           Right(order.price.value)
 
+      def formatTxPrice: String = formatter.format(tx.price.value)
+
+      def formatOrderPrice(order: Order, convertedPrice: Long): String = {
+        val rawPriceStr =
+          if (order.price.value == convertedPrice) ""
+          else s" (assetDecimals price = ${formatter.format(order.price.value)})"
+        s"${formatter.format(convertedPrice)}$rawPriceStr"
+      }
+
       for {
         buyOrderPrice  <- orderPrice(tx.buyOrder, amountDecimals, priceDecimals)
         sellOrderPrice <- orderPrice(tx.sellOrder, amountDecimals, priceDecimals)
         _ <- Either.cond(
           tx.price.value <= buyOrderPrice,
           (),
-          GenericError(s"price=${tx.price.value} should be <= buyOrder.price=$buyOrderPrice")
+          GenericError(s"exchange.price = $formatTxPrice should be <= buyOrder.price = ${formatOrderPrice(tx.buyOrder, buyOrderPrice)}")
         )
         _ <- Either.cond(
           tx.price.value >= sellOrderPrice,
           (),
-          GenericError(s"price=${tx.price.value} should be >= sellOrder.price=$sellOrderPrice")
+          GenericError(s"exchange.price = $formatTxPrice should be >= sellOrder.price = ${formatOrderPrice(tx.sellOrder, sellOrderPrice)}")
         )
       } yield ()
     }
