@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidSignature}
+import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidIds}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.Blake2b256
@@ -54,14 +54,14 @@ class MerkleRootTestSuite extends BaseFreeSpec with ActivationStatusRequest with
       CustomValidationError(s"transactions do not exist or block version < ${Block.ProtoBlockVersion}")
     )
 
-    val invalidId = "FCym43ddiKKT000kznawWasoMbWd1LWyX8DUrwAAbcUA" //id is invalid because base58 cannot contain "0"
+    val invalidId = "FCym43ddiKKT000kznawWasoMbWd1LWyX8DUrwAAbcUA" // id is invalid because base58 cannot contain "0"
     assertApiError(
       nodes.head.getMerkleProof(invalidId),
-      InvalidSignature
+      InvalidIds(Seq(invalidId))
     )
     assertApiError(
       nodes.head.getMerkleProofPost(invalidId),
-      InvalidSignature
+      InvalidIds(Seq(invalidId))
     )
   }
   "merkle proof api returns only existent txs when existent and inexistent ids passed" in {
@@ -73,9 +73,8 @@ class MerkleRootTestSuite extends BaseFreeSpec with ActivationStatusRequest with
   }
   "merkle proof api can handle transactionsRoot changes caused by miner settings" in {
 
-    /**
-      * In this case we check that when some of generated microblocks connected to one keyblock transfers to next keyblock
-      * due to miner setting "min-micro-block-age" it causes transactionsRoot and merkleProof recalculation
+    /** In this case we check that when some of generated microblocks connected to one keyblock transfers to next keyblock due to miner setting
+      * "min-micro-block-age" it causes transactionsRoot and merkleProof recalculation
       */
     nodes.waitForHeightArise()
     val currentHeight               = nodes.head.height

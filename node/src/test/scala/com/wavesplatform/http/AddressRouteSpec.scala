@@ -421,12 +421,9 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
   }
 
   routePath(s"/data/{address} - handles keys limit") in {
-    val inputLimitErrMsg = TooBigArrayAllocation(addressApiRoute.settings.dataKeysRequestLimit).message
-    val emptyInputErrMsg = DataKeysNotSpecified.message
-
-    def checkErrorResponse(errMsg: String): Unit = {
+    def checkErrorResponse(): Unit = {
       response.status shouldBe StatusCodes.BadRequest
-      (responseAs[JsObject] \ "message").as[String] shouldBe errMsg
+      (responseAs[JsObject] \ "message").as[String] shouldBe TooBigArrayAllocation(addressApiRoute.settings.dataKeysRequestLimit).message
     }
 
     def checkResponse(key: String, value: String, idsCount: Int): Unit = {
@@ -464,17 +461,15 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
         checkResponse(key, value, maxLimitKeys.size)
       )
       Get(routePath(s"/data/${account.toAddress}?${moreThanLimitKeys.map("key=" + _).mkString("&")}")) ~> route ~> check(
-        checkErrorResponse(inputLimitErrMsg)
+        checkErrorResponse()
       )
-      Get(routePath(s"/data/${account.toAddress}")) ~> route ~> check(checkErrorResponse(emptyInputErrMsg))
 
       Post(routePath(s"/data/${account.toAddress}"), FormData(maxLimitKeys.map("key" -> _)*)) ~> route ~> check(
         checkResponse(key, value, maxLimitKeys.size)
       )
       Post(routePath(s"/data/${account.toAddress}"), FormData(moreThanLimitKeys.map("key" -> _)*)) ~> route ~> check(
-        checkErrorResponse(inputLimitErrMsg)
+        checkErrorResponse()
       )
-      Post(routePath(s"/data/${account.toAddress}"), FormData()) ~> route ~> check(checkErrorResponse(emptyInputErrMsg))
 
       Post(
         routePath(s"/data/${account.toAddress}"),
@@ -483,11 +478,23 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
       Post(
         routePath(s"/data/${account.toAddress}"),
         HttpEntity(ContentTypes.`application/json`, Json.obj("keys" -> Json.arr(moreThanLimitKeys.map(key => key: JsValueWrapper)*)).toString())
-      ) ~> route ~> check(checkErrorResponse(inputLimitErrMsg))
-      Post(
-        routePath(s"/data/${account.toAddress}"),
-        HttpEntity(ContentTypes.`application/json`, Json.obj("keys" -> JsArray.empty).toString())
-      ) ~> route ~> check(checkErrorResponse(emptyInputErrMsg))
+      ) ~> route ~> check(checkErrorResponse())
     }
+  }
+
+  routePath(s"/data/{address} - handles empty keys input in POST") in {
+    def checkErrorResponse(): Unit = {
+      response.status shouldBe StatusCodes.BadRequest
+      (responseAs[JsObject] \ "message").as[String] shouldBe DataKeysNotSpecified.message
+    }
+
+    val account = TxHelpers.signer(1)
+
+    Post(routePath(s"/data/${account.toAddress}"), FormData()) ~> route ~> check(checkErrorResponse())
+
+    Post(
+      routePath(s"/data/${account.toAddress}"),
+      HttpEntity(ContentTypes.`application/json`, Json.obj("keys" -> JsArray.empty).toString())
+    ) ~> route ~> check(checkErrorResponse())
   }
 }

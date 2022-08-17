@@ -2,6 +2,7 @@ package com.wavesplatform.api.http
 
 import akka.NotUsed
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
+import akka.http.scaladsl.model.HttpMethods
 import akka.http.scaladsl.server.{Directive0, Route}
 import akka.stream.scaladsl.Source
 import cats.instances.option.*
@@ -211,11 +212,13 @@ case class AddressApiRoute(
                 _ => complete(accountData(address, matches))
               )
           } ~ anyParam("key", limit = settings.dataKeysRequestLimit) { keys =>
-            val result = Either
-              .cond(keys.nonEmpty, (), DataKeysNotSpecified)
-              .map(_ => accountDataList(address, keys.toSeq*))
+            extractMethod.filter(_ != HttpMethods.GET || keys.nonEmpty) { _ =>
+              val result = Either
+                .cond(keys.nonEmpty, (), DataKeysNotSpecified)
+                .map(_ => accountDataList(address, keys.toSeq*))
 
-            complete(result)
+              complete(result)
+            }
           } ~ get {
             complete(accountData(address))
           }
