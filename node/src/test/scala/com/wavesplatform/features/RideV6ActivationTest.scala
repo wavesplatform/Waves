@@ -295,16 +295,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
         ), {
           val aliceApprovingSmartAssetTx = TxHelpers.issue(
             issuer = alice,
-            script = Some(
-              // TODO mkAssetScript
-              TestCompiler(V5).compileAsset(
-                s""" {-# STDLIB_VERSION 5 #-}
-                   | {-# CONTENT_TYPE EXPRESSION #-}
-                   | {-# SCRIPT_TYPE ASSET #-}
-                   | true
-                   |""".stripMargin
-              )
-            )
+            script = Some(mkAssetScript("true"))
           )
           Case(
             "NODE-564 If an invoke sets a sponsorship for a smart asset",
@@ -512,21 +503,13 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
         ("false", 0, "Transaction is not allowed by script of the asset"),
         ("""throw("test error")""", 1, "test error")
       ).map {
-        case (assetScriptResult, assetScriptComplexity, expectingError) => {
+        case (assetScriptBody, assetScriptComplexity, expectingError) => {
           val aliceRejectingSmartAssetTx = TxHelpers.issue(
             issuer = alice,
-            script = Some(
-              TestCompiler(V5).compileAsset(
-                s""" {-# STDLIB_VERSION 5 #-}
-                   | {-# CONTENT_TYPE EXPRESSION #-}
-                   | {-# SCRIPT_TYPE ASSET #-}
-                   | $assetScriptResult
-                   |""".stripMargin
-              )
-            )
+            script = Some(mkAssetScript(assetScriptBody))
           )
           Case(
-            s"NODE-604 If an invoke failed by a asset script ($assetScriptResult)",
+            s"NODE-604 If an invoke failed by a asset script ($assetScriptBody)",
             expectingError,
             { targetComplexity =>
               // 1 for Address(bob), 1 for tuple, 1 for list, 1 for ScriptTransfer
@@ -773,14 +756,21 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
     )
 
   private def mkV6Script(scriptBody: String): Script = mkScript(V6, scriptBody)
-  private def mkScript(v: StdLibVersion, scriptBody: String): Script =
-    TestCompiler(v).compileContract(
-      s""" {-#STDLIB_VERSION ${v.id} #-}
-         | {-#SCRIPT_TYPE ACCOUNT #-}
-         | {-#CONTENT_TYPE DAPP #-}
-         | $scriptBody
-         | """.stripMargin
-    )
+  private def mkScript(v: StdLibVersion, scriptBody: String): Script = TestCompiler(v).compileContract(
+    s""" {-#STDLIB_VERSION ${v.id} #-}
+       | {-#SCRIPT_TYPE ACCOUNT #-}
+       | {-#CONTENT_TYPE DAPP #-}
+       | $scriptBody
+       | """.stripMargin
+  )
+
+  private def mkAssetScript(scriptBody: String): Script = TestCompiler(V5).compileAsset(
+    s""" {-# STDLIB_VERSION 5 #-}
+       | {-# CONTENT_TYPE EXPRESSION #-}
+       | {-# SCRIPT_TYPE ASSET #-}
+       | $scriptBody
+       | """.stripMargin
+  )
 
   private def mkIntExprWithComplexity(targetComplexity: Int): String = s"1${" + 1" * targetComplexity}"
 }
