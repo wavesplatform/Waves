@@ -21,7 +21,6 @@ import org.scalatest.{EitherValues, OptionValues}
 import java.nio.charset.StandardCharsets
 
 // TODO Version of contracts
-// TODO estimate compiled expr
 class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues with EitherValues {
   private val chainId      = DomainPresets.SettingsFromDefaultConfig.blockchainSettings.addressSchemeCharacter.toByte
   private val otherChainId = (chainId + 1).toByte
@@ -395,17 +394,20 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
             )
           }
         )
-      ) ++ Seq(
-        "ScriptTransfer" -> "ScriptTransfer(to, 1, unit)",
-        "Lease"          -> "Lease(to, 1)"
-      ).map { case (actionType, actionSrc) =>
-        Case(
-          s"NODE-580 If an invoke sends $actionType with an invalid address",
+      ) ++ {
+        for {
+          (actionType, actionSrc) <- Seq(
+            "ScriptTransfer" -> "ScriptTransfer(to, 1, unit)",
+            "Lease"          -> "Lease(to, 1)"
+          )
+          addrLen <- Seq(0, Address.AddressLength - 1, Address.AddressLength + 1)
+        } yield Case(
+          s"NODE-580 If an invoke sends $actionType with an invalid address (len=$addrLen)",
           "Wrong addressBytes length",
           { targetComplexity =>
             val baseComplexity = 1 + 1 + 1 + 1 // 1 for Address, 1 for tuple, 1 for list, 1 for action
             mkV6FooScript(
-              s""" let to = Address(base58'${bobAddr.toString.take(5)}')
+              s""" let to = Address(base58'${"1" * addrLen}')
                  | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | ([$actionSrc], complexInt)
                  | """.stripMargin
@@ -642,6 +644,23 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
           "NODE-761 If an inner payment has with an invalid assetId",
           s"invalid asset ID '$invalidAssetId'",
           s"AttachedPayment(base58'$invalidAssetId', 1)"
+        ),
+        Case(
+          "NODE-762 If an invoke failed by a throw in the script",
+          "test error",
+          { targetComplexity =>
+            val baseComplexity = 1 + 1 // 1 for compare, 1 for tuple / throw
+            mkV6FooScript(
+              s""" let to = Address(base58'$bobAddr')
+                 | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 | if (complexInt > 0) then {
+                 |   throw("test error")
+                 | } else {
+                 |   ([], 1)
+                 | }
+                 | """.stripMargin
+            )
+          }
         )
       )
 
