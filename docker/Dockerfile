@@ -4,10 +4,15 @@ ENV WAVES_LOG_LEVEL=INFO
 ENV WAVES_HEAP_SIZE=2g
 ENV WAVES_NETWORK=mainnet
 
-COPY build-scripts /tmp/
+SHELL ["/bin/bash", "-c"]
 
 # Additional dependencies
-RUN /bin/bash /tmp/setup-deps.sh
+RUN mkdir -p /usr/share/man/man1; \
+    apt-get update && apt-get install -y wget unzip gosu || exit 1; \
+    export YOURKIT_ARCHIVE="YourKit-JavaProfiler-2021.3-docker.zip"; \
+    wget --quiet "https://www.yourkit.com/download/docker/$YOURKIT_ARCHIVE" -P /tmp/ && unzip /tmp/$YOURKIT_ARCHIVE -d /usr/local; \
+    # Clean
+    apt-get remove -y wget unzip && apt-get autoremove -y && apt-get autoclean && rm -rf /var/lib/apt/lists/*
 
 # Node files
 ENV WVDATA=/var/lib/waves
@@ -17,8 +22,23 @@ ENV WAVES_CONFIG=/etc/waves/waves.conf
 COPY target /tmp/
 COPY waves.conf.template $WAVES_CONFIG
 
+# Setup node
+COPY entrypoint.sh $WAVES_INSTALL_PATH/bin/entrypoint.sh
 ARG INCLUDE_GRPC=true
-RUN /bin/bash /tmp/setup-node.sh $INCLUDE_GRPC
+RUN mkdir -p $WVDATA $WVLOG; \
+    # Create user
+    groupadd -r waves --gid=999; \
+    useradd -r -g waves --uid=999 --home-dir=$WVDATA --shell=/bin/bash waves; \
+    # Unpack tgz packages
+    tar zxvf /tmp/waves.tgz -C $WAVES_INSTALL_PATH --strip-components=1; \
+    if [[ $INCLUDE_GRPC == true ]]; then \
+      echo "Unpacking gRPC server"; \
+      tar zxvf /tmp/waves-grpc-server.tgz -C $WAVES_INSTALL_PATH --strip-components=1; \
+    fi; \
+    # Set permissions
+    chown -R waves:waves $WVDATA $WVLOG $WAVES_INSTALL_PATH && chmod 755 $WVDATA $WVLOG; \
+    # Cleanup
+    rm -rf /tmp/*
 
 EXPOSE 6869 6868 6863 6862 6870
 VOLUME $WVDATA

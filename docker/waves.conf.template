@@ -1,5 +1,9 @@
 waves {
   directory = ${WVDATA}
+  wallet {
+    seed = ${?WAVES_WALLET_SEED}
+    password = ${?WAVES_WALLET_PASSWORD}
+  }
   rest-api.bind-address = "0.0.0.0"
 }
 
