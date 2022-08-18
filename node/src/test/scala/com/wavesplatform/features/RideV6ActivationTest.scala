@@ -66,7 +66,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
         "Stored data count limit is exceeded",
         { targetComplexity =>
           val baseComplexity = 101 + 101 // 101 for list, 101 for IntegerEntry
-          mkV6Script(
+          mkV6FooScript(
             s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                | ${(1 to 101).map(i => s"""IntegerEntry("i$i", complexInt)""").mkString("[", ", ", "]")}
                | """.stripMargin
@@ -80,17 +80,10 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
           // 1 for strict, 75 for invoke, 1 for Address, 500 for bob.foo() body, 1 for tuple, 1 for list,
           // 1 for IntegerEntry, 1 for throw
           val baseComplexity = 1 + 75 + 1 + 500 + 1 + 1 + 1 + 1
-          TestCompiler(V6).compileContract(
-            s""" {-#STDLIB_VERSION 6 #-}
-               | {-#SCRIPT_TYPE ACCOUNT #-}
-               | {-#CONTENT_TYPE DAPP #-}
-               |
-               | @Callable(inv)
-               | func foo() = {
-               |   let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
-               |   strict res = invoke(Address(base58'$bobAddr'), "bar", [], [])
-               |   ([IntegerEntry("i", complexInt)], res.exactAs[Int])
-               | }
+          mkV6FooScript(
+            s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+               | strict res = invoke(Address(base58'$bobAddr'), "bar", [], [])
+               | ([IntegerEntry("i", complexInt)], res.exactAs[Int])
                | """.stripMargin
           )
         },
@@ -99,12 +92,8 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
           TxHelpers.setScript(
             bob, {
               val baseComplexity = 1 + 100 + 100 // 1 for tuple, 100 for list, 100 for IntegerEntry
-              TestCompiler(V6).compileContract(
-                s""" {-#STDLIB_VERSION 6 #-}
-                   | {-#SCRIPT_TYPE ACCOUNT #-}
-                   | {-#CONTENT_TYPE DAPP #-}
-                   |
-                   | @Callable(inv)
+              mkV6Script(
+                s""" @Callable(inv)
                    | func bar() = {
                    |   (
                    |     ${(1 to 100).map(i => s"""IntegerEntry("i$i", 1)""").mkString("[", ", ", "]")},
@@ -124,7 +113,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
           val baseComplexity = 2 + 1 + 1 // 2 for list, 1 for BinaryEntry, 1 for IntegerEntry
           // See DataTxValidator.realUserPayloadSize: IntegerDataEntry - 8, "b" and "i" keys - 2
           val limitedBinaryEntrySize = ContractLimits.MaxWriteSetSizeInBytes - 8 - 2
-          mkV6Script(
+          mkV6FooScript(
             s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                | [
                |   BinaryEntry("b", base64'${Base64.encode(Array.fill[Byte](limitedBinaryEntrySize + 1)(0))}'),
@@ -138,7 +127,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
         "Stored data count limit is exceeded",
         { targetComplexity =>
           val baseComplexity = 101 + 2 * 101 + 1 // 101 for list, 2 * 101 for DataEntry, 1 for WriteSet
-          mkV3Script(
+          mkV3FooScript(
             s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                | ${(1 to 101).map(i => s"""DataEntry("i$i", complexInt)""").mkString("WriteSet([", ", ", "])")}
                | """.stripMargin
@@ -158,7 +147,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
           "Empty keys aren't allowed in tx version >= 2",
           { targetComplexity =>
             val baseComplexity = 2 + 1 + 1 // 2 for list (two elements), 1 for IntegerEntry, 1 for test entry
-            mkV6Script(
+            mkV6FooScript(
               s"""
                  | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | [ IntegerEntry("k", complexInt), $entry ]
@@ -178,7 +167,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
           { targetComplexity =>
             // 1 for Address, 1 for tuple, 101 for list, 101 for actions, 10 for getInteger, 2 for valueOrElse, 1 for "+"
             val baseComplexity = 1 + 1 + 101 + 101 + 10 + 2 + 1
-            mkV6Script(
+            mkV6FooScript(
               s""" let to = Address(base58'$bobAddr')
                  | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | (
@@ -197,7 +186,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
           "ScriptTransfer, Lease, LeaseCancel actions count limit is exceeded",
           { targetComplexity =>
             val baseComplexity = 1 + 101 + 101 // 1 for Address, 101 for list, 101 for actions
-            mkV6Script(
+            mkV6FooScript(
               s""" let to = Address(base58'$bobAddr')
                  | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | [
@@ -226,7 +215,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
           "Negative transfer amount",
           { targetComplexity =>
             val baseComplexity = 1 + 1 + 1 + 1 // 1 for Address, 1 for list, 1 for ScriptTransfer, 1 for "-complexInt"
-            mkV6Script(
+            mkV6FooScript(
               s""" let to = Address(base58'$bobAddr')
                  | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | [ ScriptTransfer(to, -complexInt, unit) ]
@@ -241,7 +230,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
             // 1 for Address, 1 for tuple, 1 for list, 1 for ScriptTransfer, 10 for wavesBalance, 1 for Address(alice),
             //   and 1 for "-"
             val baseComplexity = 1 + 1 + 1 + 1 + 10 + 1 + 1
-            mkV6Script(
+            mkV6FooScript(
               s""" let to = Address(base58'$bobAddr')
                  | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | (
@@ -263,7 +252,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
             // 1 for Address, 1 for ScriptTransfer, 10 for wavesBalance, 1 for Address(alice), 1 for "-",
             // 1 for tuple, 2 for list
             val baseComplexity = 1 + 1 + 10 + 1 + 1 + 1 + 2
-            mkV6Script(
+            mkV6FooScript(
               s""" let to = Address(base58'$bobAddr')
                  | let transfer = ScriptTransfer(to, wavesBalance(Address(base58'$aliceAddr')).available - ${aliceInvokeTx.fee}, unit)
                  | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
@@ -278,7 +267,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
           { targetComplexity =>
             // 1 for Address, 1 for ScriptTransfer, 1 for tuple, 2 for list
             val baseComplexity = 1 + 1 + 1 + 2
-            mkV6Script(
+            mkV6FooScript(
               s""" let to = Address(base58'$bobAddr')
                  | let transfer = ScriptTransfer(to, ${Long.MaxValue - 1}, base58'$aliceRegularAssetId')
                  | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
@@ -307,6 +296,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
           val aliceApprovingSmartAssetTx = TxHelpers.issue(
             issuer = alice,
             script = Some(
+              // TODO mkAssetScript
               TestCompiler(V5).compileAsset(
                 s""" {-# STDLIB_VERSION 5 #-}
                    | {-# CONTENT_TYPE EXPRESSION #-}
@@ -328,7 +318,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
           "invalid asset ID",
           { targetComplexity =>
             val baseComplexity = 1 + 1 + 1 // 1 for Address, 1 for list, 1 for ScriptTransfer
-            mkV6Script(
+            mkV6FooScript(
               s""" let to = Address(base58'$bobAddr')
                  | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | [ ScriptTransfer(to, complexInt, base58'$invalidAssetId') ]
@@ -341,7 +331,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
           s"Transfer error: asset '$bobAssetId' is not found on the blockchain",
           { targetComplexity =>
             val baseComplexity = 1 + 1 + 1 // 1 for Address, 1 for list, 1 for ScriptTransfer
-            mkV6Script(
+            mkV6FooScript(
               s""" let to = Address(base58'$bobAddr')
                  | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | [ ScriptTransfer(to, complexInt, base58'$bobAssetId') ]
@@ -391,7 +381,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
           "Address belongs to another network",
           { targetComplexity =>
             val baseComplexity = 1 + 1 + 1 // 1 for Address, 1 for list, 1 for action
-            mkV6Script(
+            mkV6FooScript(
               s""" let to = Address(base58'$bobOtherChainAddr')
                  | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | [ $actionSrc ]
@@ -405,7 +395,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
           "Address belongs to another network",
           { targetComplexity =>
             val baseComplexity = 1 + 75 + 1 // 1 for Address, 75 for invoke, 1 for list ([complexInt])
-            mkV6Script(
+            mkV6FooScript(
               s""" let to = Address(base58'$bobOtherChainAddr')
                  | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | strict res = invoke(to, "bar", [complexInt], [])
@@ -423,7 +413,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
           "Wrong addressBytes length",
           { targetComplexity =>
             val baseComplexity = 1 + 1 + 1 + 1 // 1 for Address, 1 for tuple, 1 for list, 1 for action
-            mkV6Script(
+            mkV6FooScript(
               s""" let to = Address(base58'${bobAddr.toString.take(5)}')
                  | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | ([$actionSrc], complexInt)
@@ -440,7 +430,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
           rejectError,
           { targetComplexity =>
             val baseComplexity = 1 + 1 + 1 + 1 // 1 for Address, 1 for tuple, 1 for list, 1 for Lease
-            mkV6Script(
+            mkV6FooScript(
               s""" let to = Address(base58'$bobAddr')
                  | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | ([Lease(to, $leaseAmount)], complexInt)
@@ -459,7 +449,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
           "is already in the state",
           { targetComplexity =>
             val baseComplexity = 1 + 1 + 2 + 1 + 1 // 1 for Address, 1 for tuple, 2 for list, 1+1 for Lease
-            mkV6Script(
+            mkV6FooScript(
               s""" let to = Address(base58'$bobAddr')
                  | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | ([Lease(to, 1, 3), Lease(to, 1, 3)], complexInt) # Leasing id is a hash of its data and invoke tx id
@@ -473,7 +463,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
           { targetComplexity =>
             // 1 for Address(bob), 10 for wavesBalance, 1 for Address(alice), 1 for tuple, 2 for list, 1+1 for Lease
             val baseComplexity = 1 + 10 + 1 + 1 + 2 + 1 + 1
-            mkV6Script(
+            mkV6FooScript(
               s""" let to = Address(base58'$bobAddr')
                  | let available = wavesBalance(Address(base58'$aliceAddr')).available
                  | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
@@ -497,7 +487,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
           "Duplicate LeaseCancel id(s)",
           { targetComplexity =>
             val baseComplexity = 1 + 2 + 1 // 1 for tuple, 2 for list, 1 for LeaseCancel
-            mkV6Script(
+            mkV6FooScript(
               s""" let cancel = LeaseCancel(base58'$aliceLeasingId')
                  | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | ([cancel, cancel], complexInt)
@@ -541,7 +531,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
             { targetComplexity =>
               // 1 for Address(bob), 1 for tuple, 1 for list, 1 for ScriptTransfer
               val baseComplexity = 1 + 1 + 1 + 1 + assetScriptComplexity
-              mkV6Script(
+              mkV6FooScript(
                 s""" let to = Address(base58'$bobAddr')
                    | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                    | ([ScriptTransfer(to, 1, base58'${aliceRejectingSmartAssetTx.id()}')], complexInt)
@@ -567,7 +557,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
           "is already issued",
           { targetComplexity =>
             val baseComplexity = 1 + 1 + 2 // 1 for Issue, 1 for tuple, 2 for list
-            mkV6Script(
+            mkV6FooScript(
               s""" let issue = Issue("bucks", "Test token", 1, 2, true)
                  | let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
                  | ([issue, issue], complexInt)
@@ -599,17 +589,10 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
           { targetComplexity =>
             // 75 for invoke, 1 for Address, 1 for list, 500 for bob.foo() body
             val baseComplexity = 75 + 1 + 1 + 500
-            TestCompiler(V6).compileContract(
-              s""" {-#STDLIB_VERSION 6 #-}
-                 | {-#SCRIPT_TYPE ACCOUNT #-}
-                 | {-#CONTENT_TYPE DAPP #-}
-                 |
-                 | @Callable(inv)
-                 | func foo() = {
-                 |   let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
-                 |   strict res = invoke(Address(base58'$bobAddr'), "bar", [ complexInt ], [])
-                 |   ([], res.exactAs[Int])
-                 | }
+            mkV6FooScript(
+              s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 | strict res = invoke(Address(base58'$bobAddr'), "bar", [ complexInt ], [])
+                 | ([], res.exactAs[Int])
                  | """.stripMargin
             )
           },
@@ -619,12 +602,8 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
                 // 1 for Address(alice), 1 for tuple, 1 for list, 1 for ScriptTransfer, 10 for wavesBalance,
                 // 1 for Address(bob) and 1 for "+"
                 val baseComplexity = 1 + 1 + 1 + 1 + 10 + 1 + 1
-                TestCompiler(V6).compileContract(
-                  s""" {-#STDLIB_VERSION 6 #-}
-                     | {-#SCRIPT_TYPE ACCOUNT #-}
-                     | {-#CONTENT_TYPE DAPP #-}
-                     |
-                     | @Callable(inv)
+                mkV6Script(
+                  s""" @Callable(inv)
                      | func bar(n: Int) = {
                      |   let to = Address(base58'$aliceAddr')
                      |   (
@@ -638,27 +617,20 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
             )
           )
         ),
-         Case(
-           "NODE-698 If an inner invoke to an account without a script",
-           "No contract at address",
-           { targetComplexity =>
-             // 75 for invoke, 1 for Address, 1 for list
-             val baseComplexity = 75 + 1 + 1
-             TestCompiler(V6).compileContract(
-               s""" {-#STDLIB_VERSION 6 #-}
-                  | {-#SCRIPT_TYPE ACCOUNT #-}
-                  | {-#CONTENT_TYPE DAPP #-}
-                  |
-                  | @Callable(inv)
-                  | func foo() = {
-                  |   let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
-                  |   strict res = invoke(Address(base58'$bobAddr'), "bar", [ complexInt ], [])
-                  |   ([], res.exactAs[Int])
-                  | }
-                  | """.stripMargin
-             )
-           }
-         ),
+        Case(
+          "NODE-698 If an inner invoke to an account without a script",
+          "No contract at address",
+          { targetComplexity =>
+            // 75 for invoke, 1 for Address, 1 for list
+            val baseComplexity = 75 + 1 + 1
+            mkV6FooScript(
+              s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 | strict res = invoke(Address(base58'$bobAddr'), "bar", [ complexInt ], [])
+                 | ([], res.exactAs[Int])
+                 | """.stripMargin
+            )
+          }
+        ),
         Case(
           "NODE-760 If an inner invoke has a payment with an unknown assetId",
           s"Transfer error: asset '$bobAssetId' is not found on the blockchain",
@@ -666,12 +638,8 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
             // bar: 1 for Address, 1 for tuple, 1 for list, 1 for ScriptTransfer
             // foo: 75 for invoke
             val baseComplexity = 1 + 1 + 1 + 1 + 75
-            TestCompiler(V6).compileContract(
-              s""" {-#STDLIB_VERSION 6 #-}
-                 | {-#SCRIPT_TYPE ACCOUNT #-}
-                 | {-#CONTENT_TYPE DAPP #-}
-                 | 
-                 | @Callable(inv)
+            mkV6Script(
+              s""" @Callable(inv)
                  | func bar() = {
                  |   let to = Address(base58'$bobAddr')
                  |   let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
@@ -704,7 +672,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
         ">1000 complexity - failed" in {
           val complexity = ContractLimits.FailFreeInvokeComplexity + 1
           test(complexity) { d =>
-            val diff = d.createDiffE(testCase.invokeTx).value
+            val diff              = d.createDiffE(testCase.invokeTx).value
             val (_, scriptResult) = diff.scriptResults.headOption.value
             scriptResult.error.value.text should include(testCase.rejectError)
 
@@ -750,12 +718,8 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
       { targetComplexity =>
         // 75 for invoke, 1 for Address, 1+1 for lists, 1 for payment
         val baseComplexity = 75 + 1 + 1 + 1 + 1
-        TestCompiler(V6).compileContract(
-          s""" {-#STDLIB_VERSION 6 #-}
-             | {-#SCRIPT_TYPE ACCOUNT #-}
-             | {-#CONTENT_TYPE DAPP #-}
-             |
-             | @Callable(inv)
+        mkV6Script(
+          s""" @Callable(inv)
              | func foo() = {
              |   let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
              |   strict res = invoke(
@@ -774,12 +738,8 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
         TxHelpers.setScript(
           bob, {
             val baseComplexity = 1 // 1 for tuple
-            TestCompiler(V6).compileContract(
-              s""" {-#STDLIB_VERSION 6 #-}
-                 | {-#SCRIPT_TYPE ACCOUNT #-}
-                 | {-#CONTENT_TYPE DAPP #-}
-                 |
-                 | @Callable(inv)
+            mkV6Script(
+              s""" @Callable(inv)
                  | func bar(n: Int) = {
                  |   ([], ${mkIntExprWithComplexity(500 - baseComplexity)})
                  | }
@@ -793,27 +753,33 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
 
   private def mkScriptWithOneAction(actionSrc: String): Int => Script = { targetComplexity =>
     val baseComplexity = 1 + 1 + 1 // 1 for tuple, 1 for list, 1 for action
-    mkV6Script(
+    mkV6FooScript(
       s""" let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
          | ([$actionSrc], complexInt)
          | """.stripMargin
     )
   }
 
-  // TODO func with included headers
-  private def mkV3Script(fooBody: String): Script = mkScript(V3, fooBody)
-  private def mkV6Script(fooBody: String): Script = mkScript(V6, fooBody)
-  private def mkScript(v: StdLibVersion, fooBody: String): Script =
+  private def mkV3FooScript(fooBody: String): Script = mkFooScript(V3, fooBody)
+  private def mkV6FooScript(fooBody: String): Script = mkFooScript(V6, fooBody)
+  private def mkFooScript(v: StdLibVersion, fooBody: String): Script =
+    mkScript(
+      v,
+      s""" @Callable(inv)
+         | func foo() = {
+         |   $fooBody
+         | }
+         | """.stripMargin
+    )
+
+  private def mkV6Script(scriptBody: String): Script = mkScript(V6, scriptBody)
+  private def mkScript(v: StdLibVersion, scriptBody: String): Script =
     TestCompiler(v).compileContract(
       s""" {-#STDLIB_VERSION ${v.id} #-}
          | {-#SCRIPT_TYPE ACCOUNT #-}
          | {-#CONTENT_TYPE DAPP #-}
-         |
-         | @Callable(inv)
-         | func foo() = {
-         |   $fooBody
-         | }
-      """.stripMargin
+         | $scriptBody
+         | """.stripMargin
     )
 
   private def mkIntExprWithComplexity(targetComplexity: Int): String = s"1${" + 1" * targetComplexity}"
