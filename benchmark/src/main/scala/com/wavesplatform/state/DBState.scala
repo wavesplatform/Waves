@@ -5,7 +5,7 @@ import java.io.File
 import com.wavesplatform.Application
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.{LevelDBWriter, openDB}
+import com.wavesplatform.database.{RocksDBWriter, openDB}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.transaction.smart.WavesEnvironment
@@ -23,8 +23,8 @@ abstract class DBState extends ScorexLogging {
 
   lazy val db: DB = openDB(settings.dbSettings.directory)
 
-  lazy val levelDBWriter: LevelDBWriter =
-    LevelDBWriter.readOnly(
+  lazy val levelDBWriter: RocksDBWriter =
+    RocksDBWriter.readOnly(
       db,
       settings.copy(dbSettings = settings.dbSettings.copy(maxCacheSize = 1))
     )

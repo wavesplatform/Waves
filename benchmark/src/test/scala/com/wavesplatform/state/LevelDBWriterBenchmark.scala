@@ -10,7 +10,7 @@ import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.database
-import com.wavesplatform.database.{DBExt, Keys, LevelDBFactory, LevelDBWriter}
+import com.wavesplatform.database.{DBExt, Keys, LevelDBFactory, RocksDBWriter}
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.LevelDBWriterBenchmark._
 import com.wavesplatform.transaction.Transaction
@@ -20,13 +20,10 @@ import org.openjdk.jmh.infra.Blackhole
 
 import scala.io.Codec
 
-/**
-  * Tests over real database. How to test:
-  * 1. Download a database
-  * 2. Import it: https://github.com/wavesplatform/Waves/wiki/Export-and-import-of-the-blockchain#import-blocks-from-the-binary-file
-  * 3. Run ExtractInfo to collect queries for tests
-  * 4. Make Caches.MaxSize = 1
-  * 5. Run this test
+/** Tests over real database. How to test:
+  *   1. Download a database 2. Import it:
+  *      https://github.com/wavesplatform/Waves/wiki/Export-and-import-of-the-blockchain#import-blocks-from-the-binary-file 3. Run ExtractInfo to
+  *      collect queries for tests 4. Make Caches.MaxSize = 1 5. Run this test
   */
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -91,7 +88,7 @@ object LevelDBWriterBenchmark {
       LevelDBFactory.factory.open(dir, new Options)
     }
 
-    val db = LevelDBWriter.readOnly(rawDB, wavesSettings)
+    val db = RocksDBWriter.readOnly(rawDB, wavesSettings)
 
     def loadBlockInfoAt(height: Int): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
       loadBlockMetaAt(height).map { meta =>

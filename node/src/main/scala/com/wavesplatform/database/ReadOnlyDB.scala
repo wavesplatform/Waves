@@ -23,9 +23,9 @@ class ReadOnlyDB(db: RocksDB, readOptions: ReadOptions) {
 
   def newIterator: RocksIterator = db.newIterator(readOptions)
 
-  def iterateOver(tag: KeyTags.KeyTag)(f: DBEntry => Unit): Unit = iterateOver(tag.prefixBytes)(f)
+  def iterateOverPrefix(tag: KeyTags.KeyTag)(f: DBEntry => Unit): Unit = iterateOverPrefix(tag.prefixBytes)(f)
 
-  def iterateOver(prefix: Array[Byte])(f: DBEntry => Unit): Unit = {
+  def iterateOverPrefix(prefix: Array[Byte])(f: DBEntry => Unit): Unit = {
     @tailrec
     def loop(iter: RocksIterator): Unit = {
       val key = iter.key()
@@ -41,6 +41,15 @@ class ReadOnlyDB(db: RocksDB, readOptions: ReadOptions) {
       loop(iter)
     }
   }
+
+  def iterateOver(prefix: Array[Byte])(f: DBEntry => Unit): Unit =
+    Using.resource(db.newIterator(readOptions.setTotalOrderSeek(true))) { iter =>
+      iter.seek(prefix)
+      while (iter.isValid && iter.key().startsWith(prefix)) {
+        f(Maps.immutableEntry(iter.key(), iter.value()))
+        iter.next()
+      }
+    }
 
   def prefixExists(prefix: Array[Byte]): Boolean = Using.resource(db.newIterator(readOptions.setTotalOrderSeek(false).setPrefixSameAsStart(true))) {
     iter =>

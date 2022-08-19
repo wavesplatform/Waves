@@ -14,6 +14,7 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, GenesisTransaction, TransactionType, TxHelpers, TxVersion}
+import monix.execution.Scheduler.Implicits.global
 
 class CreateAliasTransactionDiffTest extends PropSpec with WithState {
 

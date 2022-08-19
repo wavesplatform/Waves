@@ -54,7 +54,7 @@ import scala.util.Using
 package object database {
   private lazy val logger: Logger = Logger(LoggerFactory.getLogger(getClass.getName))
 
-  def openDB(path: String, recreate: Boolean = false): RocksDB = {
+  def openDB(path: String): RocksDB = {
     logger.debug(s"Open DB at $path")
     val file = new File(path)
     val options = new DBOptions()

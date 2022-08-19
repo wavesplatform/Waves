@@ -20,7 +20,7 @@ object DBResource {
 
     override lazy val prefixIterator: RocksIterator = db.newIterator(readOptions.setTotalOrderSeek(false).setPrefixSameAsStart(true))
 
-    override lazy val fullIterator: RocksIterator = db.newIterator(readOptions)
+    override lazy val fullIterator: RocksIterator = db.newIterator(readOptions.setTotalOrderSeek(true))
 
     override def close(): Unit = {
       prefixIterator.close()

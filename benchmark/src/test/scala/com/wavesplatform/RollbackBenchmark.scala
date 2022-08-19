@@ -8,7 +8,7 @@ import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
-import com.wavesplatform.database.{openDB, LevelDBWriter}
+import com.wavesplatform.database.{openDB, RocksDBWriter}
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.{Diff, Portfolio}
 import com.wavesplatform.transaction.{GenesisTransaction, Proofs}
@@ -22,7 +22,7 @@ object RollbackBenchmark extends ScorexLogging {
     val settings      = Application.loadApplicationConfig(Some(new File(args(0))))
     val db            = openDB(settings.dbSettings.directory)
     val time          = new NTP(settings.ntpServer)
-    val levelDBWriter = LevelDBWriter(db, Observer.stopped, settings)
+    val levelDBWriter = RocksDBWriter(db, Observer.stopped, settings)
 
     val issuer = KeyPair(new Array[Byte](32))
 

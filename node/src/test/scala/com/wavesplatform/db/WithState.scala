@@ -1,11 +1,10 @@
 package com.wavesplatform.db
 
 import java.nio.file.Files
-
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter, TestStorageFactory, loadActiveLeases}
+import com.wavesplatform.database.{RocksDBWriter, TestStorageFactory, loadActiveLeases}
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
@@ -23,10 +22,10 @@ import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Portfol
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers}
-import com.wavesplatform.{NTPTime, TestHelpers}
+import com.wavesplatform.{NTPTime, TestHelpers, database}
 import monix.reactive.Observer
 import monix.reactive.subjects.{PublishSubject, Subject}
-import org.iq80.leveldb.{DB, Options}
+import org.rocksdb.RocksDB
 import org.scalatest.Suite
 import org.scalatest.matchers.should.Matchers
 
@@ -34,12 +33,12 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
   protected val ignoreSpendableBalanceChanged: Subject[(Address, Asset), (Address, Asset)] = PublishSubject()
   protected val ignoreBlockchainUpdateTriggers: BlockchainUpdateTriggers                   = BlockchainUpdateTriggers.noop
 
-  private[this] val currentDbInstance = new ThreadLocal[DB]
-  protected def db: DB                = currentDbInstance.get()
+  private[this] val currentDbInstance = new ThreadLocal[RocksDB]
+  protected def db: RocksDB           = currentDbInstance.get()
 
-  protected def tempDb[A](f: DB => A): A = {
-    val path = Files.createTempDirectory("lvl-temp").toAbsolutePath
-    val db   = LevelDBFactory.factory.open(path.toFile, new Options().createIfMissing(true))
+  protected def tempDb[A](f: RocksDB => A): A = {
+    val path = Files.createTempDirectory("rocks-temp").toAbsolutePath
+    val db   = database.openDB(path.toAbsolutePath.toString)
     currentDbInstance.set(db)
     try {
       f(db)
@@ -50,7 +49,7 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
     }
   }
 
-  protected def withLevelDBWriter[A](ws: WavesSettings)(test: LevelDBWriter => A): A = tempDb { db =>
+  protected def withLevelDBWriter[A](ws: WavesSettings)(test: RocksDBWriter => A): A = tempDb { db =>
     val (_, ldb) = TestStorageFactory(
       ws,
       db,
@@ -61,10 +60,10 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
     test(ldb)
   }
 
-  protected def withLevelDBWriter[A](bs: BlockchainSettings)(test: LevelDBWriter => A): A =
+  protected def withLevelDBWriter[A](bs: BlockchainSettings)(test: RocksDBWriter => A): A =
     withLevelDBWriter(TestSettings.Default.copy(blockchainSettings = bs))(test)
 
-  def withLevelDBWriter[A](fs: FunctionalitySettings)(test: LevelDBWriter => A): A =
+  def withLevelDBWriter[A](fs: FunctionalitySettings)(test: RocksDBWriter => A): A =
     withLevelDBWriter(TestLevelDB.createTestBlockchainSettings(fs))(test)
 
   def assertDiffEi(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)(
@@ -73,7 +72,7 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
     assertDiffEi(preconditions, block, state)(assertion)
   }
 
-  def assertDiffEi(preconditions: Seq[Block], block: Block, state: LevelDBWriter)(
+  def assertDiffEi(preconditions: Seq[Block], block: Block, state: RocksDBWriter)(
       assertion: Either[ValidationError, Diff] => Unit
   ): Unit = {
     def differ(blockchain: Blockchain, b: Block) =
@@ -140,8 +139,8 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
         val nextHeight = state.height + 1
         val isProto    = state.activatedFeatures.get(BlockchainFeatures.BlockV5.id).exists(nextHeight > 1 && nextHeight >= _)
         val block      = TestBlock.create(txs, if (isProto) Block.ProtoBlockVersion else Block.PlainBlockVersion)
-        differ(state, block).map(
-          diff => state.append(diff.diff, diff.carry, diff.totalFee, None, block.header.generationSignature.take(Block.HitSourceLength), block)
+        differ(state, block).map(diff =>
+          state.append(diff.diff, diff.carry, diff.totalFee, None, block.header.generationSignature.take(Block.HitSourceLength), block)
         )
       })
     }
@@ -165,7 +164,8 @@ trait WithDomain extends WithState { _: Suite =>
     DomainPresets.domainSettingsWithFS(fs)
 
   def withDomain[A](
-      settings: WavesSettings = DomainPresets.SettingsFromDefaultConfig.addFeatures(BlockchainFeatures.SmartAccounts), // SmartAccounts to allow V2 transfers by default
+      settings: WavesSettings =
+        DomainPresets.SettingsFromDefaultConfig.addFeatures(BlockchainFeatures.SmartAccounts), // SmartAccounts to allow V2 transfers by default
       balances: Seq[AddrWithBalance] = Seq.empty
   )(test: Domain => A): A =
     withLevelDBWriter(settings) { blockchain =>
@@ -179,9 +179,8 @@ trait WithDomain extends WithState { _: Suite =>
         loadActiveLeases(db, _, _)
       )
       domain = Domain(db, bcu, blockchain, settings)
-      val genesis = balances.map {
-        case AddrWithBalance(address, amount) =>
-          TxHelpers.genesis(address, amount)
+      val genesis = balances.map { case AddrWithBalance(address, amount) =>
+        TxHelpers.genesis(address, amount)
       }
       if (genesis.nonEmpty) {
         domain.appendBlock(genesis*)

@@ -38,32 +38,31 @@ class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransacti
         (block3, mbs3) = UnsafeBlocks.unsafeChainBaseAndMicro(mbs2.last.totalResBlockSig, Seq(data4), Seq(Seq(data5)), acc, 3, ts)
       } yield (acc, block1, mbs1.head, block2, mbs2.head, block3, mbs3.head)
 
-      forAll(preconditions) {
-        case (acc, block1, mb1, block2, mb2, block3, mb3) =>
-          withDomain(
-            domainSettingsWithFS(
-              TestFunctionalitySettings.withFeatures(
-                BlockchainFeatures.NG,
-                BlockchainFeatures.DataTransaction,
-                BlockchainFeatures.BlockV5
-              )
+      forAll(preconditions) { case (acc, block1, mb1, block2, mb2, block3, mb3) =>
+        withDomain(
+          domainSettingsWithFS(
+            TestFunctionalitySettings.withFeatures(
+              BlockchainFeatures.NG,
+              BlockchainFeatures.DataTransaction,
+              BlockchainFeatures.BlockV5
             )
-          ) { d =>
-            val commonAccountsApi             = CommonAccountsApi(() => d.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), d.db, d.blockchainUpdater)
-            def dataList(): Set[DataEntry[_]] = commonAccountsApi.dataStream(acc.toAddress, None).toListL.runSyncUnsafe().toSet
+          )
+        ) { d =>
+          val commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), d.db, d.blockchainUpdater)
+          def dataList(): Set[DataEntry[?]] = commonAccountsApi.dataStream(acc.toAddress, None).toListL.runSyncUnsafe().toSet
 
-            d.appendBlock(block1)
-            d.appendMicroBlock(mb1)
-            dataList() shouldBe Set(entry1)
-            d.appendBlock(block2)
-            dataList() shouldBe Set(entry1, entry2)
-            d.appendMicroBlock(mb2)
-            dataList() shouldBe Set(entry1, entry2, entry3)
-            d.appendBlock(block3)
-            dataList() shouldBe Set(entry3)
-            d.appendMicroBlock(mb3)
-            dataList() shouldBe Set(entry1, entry2)
-          }
+          d.appendBlock(block1)
+          d.appendMicroBlock(mb1)
+          dataList() shouldBe Set(entry1)
+          d.appendBlock(block2)
+          dataList() shouldBe Set(entry1, entry2)
+          d.appendMicroBlock(mb2)
+          dataList() shouldBe Set(entry1, entry2, entry3)
+          d.appendBlock(block3)
+          dataList() shouldBe Set(entry3)
+          d.appendMicroBlock(mb3)
+          dataList() shouldBe Set(entry1, entry2)
+        }
       }
     }
 
@@ -84,21 +83,20 @@ class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransacti
         (block2, mbs2) = UnsafeBlocks.unsafeChainBaseAndMicro(mbs1.last.totalResBlockSig, Seq(data2), Seq(Seq(data3)), acc, 3, ts)
       } yield (acc, block1, mbs1.head, block2, mbs2.head)
 
-      forAll(preconditions) {
-        case (acc, block1, mb1, block2, mb2) =>
-          withDomain(domainSettingsWithFS(TestFunctionalitySettings.withFeatures(BlockchainFeatures.NG, BlockchainFeatures.DataTransaction))) { d =>
-            val commonAccountsApi             = CommonAccountsApi(() => d.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), d.db, d.blockchainUpdater)
-            def dataList(): Set[DataEntry[_]] = commonAccountsApi.dataStream(acc.toAddress, Some("test_.*")).toListL.runSyncUnsafe().toSet
+      forAll(preconditions) { case (acc, block1, mb1, block2, mb2) =>
+        withDomain(domainSettingsWithFS(TestFunctionalitySettings.withFeatures(BlockchainFeatures.NG, BlockchainFeatures.DataTransaction))) { d =>
+          val commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), d.db, d.blockchainUpdater)
+          def dataList(): Set[DataEntry[_]] = commonAccountsApi.dataStream(acc.toAddress, Some("test_.*")).toListL.runSyncUnsafe().toSet
 
-            d.appendBlock(block1)
-            dataList() shouldBe empty
-            d.appendMicroBlock(mb1)
-            dataList() shouldBe Set(entry1)
-            d.appendBlock(block2)
-            dataList() shouldBe Set(entry1)
-            d.appendMicroBlock(mb2)
-            dataList() shouldBe Set(entry1, entry3)
-          }
+          d.appendBlock(block1)
+          dataList() shouldBe empty
+          d.appendMicroBlock(mb1)
+          dataList() shouldBe Set(entry1)
+          d.appendBlock(block2)
+          dataList() shouldBe Set(entry1)
+          d.appendMicroBlock(mb2)
+          dataList() shouldBe Set(entry1, entry3)
+        }
       }
     }
   }

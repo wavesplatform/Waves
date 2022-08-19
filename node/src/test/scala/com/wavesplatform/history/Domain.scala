@@ -9,7 +9,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.consensus.{PoSCalculator, PoSSelector}
-import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
+import com.wavesplatform.database.{DBExt, Keys, RocksDBWriter}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
@@ -25,7 +25,7 @@ import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{Application, TestValues, database}
 import monix.execution.Scheduler.Implicits.global
-import org.iq80.leveldb.DB
+import org.rocksdb.RocksDB
 import org.scalatest.matchers.should.Matchers.*
 import play.api.libs.json.{JsNull, JsValue, Json}
 
@@ -35,7 +35,7 @@ import scala.concurrent.duration.*
 import scala.util.Try
 import scala.util.control.NonFatal
 
-case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter, settings: WavesSettings) {
+case class Domain(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: RocksDBWriter, settings: WavesSettings) {
   import Domain.*
 
   val blockchain: BlockchainUpdaterImpl = blockchainUpdater
@@ -52,7 +52,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   def createDiff(tx: Transaction): Diff                           = createDiffE(tx).explicitGet()
 
   lazy val utxPool: UtxPoolImpl = new UtxPoolImpl(SystemTime, blockchain, settings.utxSettings, settings.minerSettings.enable)
-  lazy val wallet: Wallet = Wallet(settings.walletSettings.copy(file = None))
+  lazy val wallet: Wallet       = Wallet(settings.walletSettings.copy(file = None))
 
   object commonApi {
 
@@ -173,7 +173,8 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
         from
       )
       .map { case (m, tx) => m.height -> tx }
-      .toSeq
+      .toListL
+      .runSyncUnsafe()
 
   def portfolio(address: Address): Seq[(IssuedAsset, Long)] = Domain.portfolio(address, db, blockchainUpdater)
 
@@ -227,7 +228,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   }
 
   def appendKeyBlock(ref: Option[ByteStr] = None): Block = {
-    val block = createBlock(Block.NgBlockVersion, Nil, ref.orElse(Some(lastBlockId)))
+    val block          = createBlock(Block.NgBlockVersion, Nil, ref.orElse(Some(lastBlockId)))
     val discardedDiffs = appendBlock(block)
     utxPool.setPriorityDiffs(discardedDiffs)
     utxPool.cleanUnconfirmed()
@@ -321,10 +322,10 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   }
 
   val blocksApi: CommonBlocksApi = {
-    def loadBlockMetaAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] =
+    def loadBlockMetaAt(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] =
       blockchainUpdater.liquidBlockMeta.filter(_ => blockchainUpdater.height == height).orElse(db.get(Keys.blockMetaAt(Height(height))))
 
-    def loadBlockInfoAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(
+    def loadBlockInfoAt(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl)(
         height: Int
     ): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
       loadBlockMetaAt(db, blockchainUpdater)(height).map { meta =>
@@ -403,7 +404,7 @@ object Domain {
       bcu.processBlock(block, block.header.generationSignature)
   }
 
-  def portfolio(address: Address, db: DB, blockchainUpdater: BlockchainUpdaterImpl): Seq[(IssuedAsset, Long)] = db.withResource { resource =>
+  def portfolio(address: Address, db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl): Seq[(IssuedAsset, Long)] = db.withResource { resource =>
     AddressPortfolio
       .assetBalanceIterator(
         resource,

@@ -6,7 +6,7 @@ import java.nio.file.Files
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter}
+import com.wavesplatform.database.{LevelDBFactory, RocksDBWriter}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.FunctionalitySettings
@@ -31,7 +31,7 @@ trait BaseState {
   }
 
   private val portfolioChanges = Observer.empty(UncaughtExceptionReporter.default)
-  val state: LevelDBWriter     = TestLevelDB.withFunctionalitySettings(db, portfolioChanges, fsSettings)
+  val state: RocksDBWriter     = TestLevelDB.withFunctionalitySettings(db, portfolioChanges, fsSettings)
 
   private var _richAccount: KeyPair = _
   def richAccount: KeyPair          = _richAccount
@@ -52,12 +52,11 @@ trait BaseState {
       transferTxs <- Gen.sequence[Vector[Transaction], Transaction]((1 to TxsInBlock).map { i =>
         txGenP(sender, base.header.timestamp + i)
       })
-    } yield
-      TestBlock.create(
-        time = transferTxs.last.timestamp,
-        ref = base.id(),
-        txs = transferTxs
-      )
+    } yield TestBlock.create(
+      time = transferTxs.last.timestamp,
+      ref = base.id(),
+      txs = transferTxs
+    )
 
   private val initGen: Gen[(KeyPair, Block)] = for {
     rich <- accountGen

@@ -1,7 +1,7 @@
 package com.wavesplatform.state
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.{Keys, LevelDBWriter}
+import com.wavesplatform.database.{Keys, RocksDBWriter}
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.smart.Verifier
 import org.openjdk.jmh.annotations._
@@ -47,24 +47,23 @@ object BloomFilterBenchmark {
         if (txCount == 0)
           Seq.empty[ExchangeTransaction]
         else
-          (0 until txCount).flatMap(
-            txNum =>
-              db.get(Keys.transactionAt(Height(h), TxNum(txNum.toShort)))
-                .collect { case (m, tx: ExchangeTransaction) if m.succeeded => tx }
+          (0 until txCount).flatMap(txNum =>
+            db.get(Keys.transactionAt(Height(h), TxNum(txNum.toShort)))
+              .collect { case (m, tx: ExchangeTransaction) if m.succeeded => tx }
           )
       }
 
       txs.take(1000).toList
     }
 
-    lazy val levelDBWriterWithBloomFilter: LevelDBWriter =
-      LevelDBWriter.readOnly(
+    lazy val levelDBWriterWithBloomFilter: RocksDBWriter =
+      RocksDBWriter.readOnly(
         db,
         settings.copy(dbSettings = settings.dbSettings.copy(maxCacheSize = 1, useBloomFilter = true))
       )
 
-    lazy val levelDBWriterWithoutBloomFilter: LevelDBWriter =
-      LevelDBWriter.readOnly(
+    lazy val levelDBWriterWithoutBloomFilter: RocksDBWriter =
+      RocksDBWriter.readOnly(
         db,
         settings.copy(dbSettings = settings.dbSettings.copy(maxCacheSize = 1, useBloomFilter = false))
       )

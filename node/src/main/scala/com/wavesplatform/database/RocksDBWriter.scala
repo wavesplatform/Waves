@@ -42,7 +42,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
 
-object LevelDBWriter extends ScorexLogging {
+object RocksDBWriter extends ScorexLogging {
 
   /** {{{
     * ([10, 7, 4], 5, 11) => [10, 7, 4]
@@ -106,7 +106,7 @@ object LevelDBWriter extends ScorexLogging {
     recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty).toSeq
   }
 
-  def apply(db: RocksDB, spendableBalanceChanged: Observer[(Address, Asset)], settings: WavesSettings): LevelDBWriter & AutoCloseable = {
+  def apply(db: RocksDB, spendableBalanceChanged: Observer[(Address, Asset)], settings: WavesSettings): RocksDBWriter & AutoCloseable = {
     val expectedHeight = loadHeight(db)
     def load(name: String, key: KeyTags.KeyTag): Option[BloomFilterImpl] = {
       if (settings.dbSettings.useBloomFilter)
@@ -119,7 +119,7 @@ object LevelDBWriter extends ScorexLogging {
     val _dataKeyFilter      = load("account-data", KeyTags.DataHistory)
     val _wavesBalanceFilter = load("waves-balances", KeyTags.WavesBalanceHistory)
     val _assetBalanceFilter = load("asset-balances", KeyTags.AssetBalanceHistory)
-    new LevelDBWriter(db, spendableBalanceChanged, settings.blockchainSettings, settings.dbSettings) with AutoCloseable {
+    new RocksDBWriter(db, spendableBalanceChanged, settings.blockchainSettings, settings.dbSettings) with AutoCloseable {
 
       override val orderFilter: BloomFilter        = _orderFilter.getOrElse(BloomFilter.AlwaysEmpty)
       override val dataKeyFilter: BloomFilter      = _dataKeyFilter.getOrElse(BloomFilter.AlwaysEmpty)
@@ -128,7 +128,7 @@ object LevelDBWriter extends ScorexLogging {
 
       override def close(): Unit = {
         log.debug("Shutting down LevelDBWriter")
-        val lastHeight = LevelDBWriter.loadHeight(db)
+        val lastHeight = RocksDBWriter.loadHeight(db)
         _orderFilter.foreach(_.save(lastHeight))
         _dataKeyFilter.foreach(_.save(lastHeight))
         _wavesBalanceFilter.foreach(_.save(lastHeight))
@@ -137,7 +137,7 @@ object LevelDBWriter extends ScorexLogging {
     }
   }
 
-  def readOnly(db: RocksDB, settings: WavesSettings): LevelDBWriter = {
+  def readOnly(db: RocksDB, settings: WavesSettings): RocksDBWriter = {
     val expectedHeight = loadHeight(db)
     def loadFilter(filterName: String) =
       if (settings.dbSettings.useBloomFilter)
@@ -147,7 +147,7 @@ object LevelDBWriter extends ScorexLogging {
       else
         BloomFilter.AlwaysEmpty
 
-    new LevelDBWriter(db, Observer.stopped, settings.blockchainSettings, settings.dbSettings) {
+    new RocksDBWriter(db, Observer.stopped, settings.blockchainSettings, settings.dbSettings) {
       override val orderFilter: BloomFilter        = loadFilter("orders")
       override val dataKeyFilter: BloomFilter      = loadFilter("account-data")
       override val wavesBalanceFilter: BloomFilter = loadFilter("waves-balances")
@@ -157,14 +157,14 @@ object LevelDBWriter extends ScorexLogging {
 }
 
 //noinspection UnstableApiUsage
-abstract class LevelDBWriter private[database] (
+abstract class RocksDBWriter private[database] (
     writableDB: RocksDB,
     spendableBalanceChanged: Observer[(Address, Asset)],
     val settings: BlockchainSettings,
     val dbSettings: DBSettings
 ) extends Caches(spendableBalanceChanged) {
 
-  private[this] val log = LoggerFacade(LoggerFactory.getLogger(classOf[LevelDBWriter]))
+  private[this] val log = LoggerFacade(LoggerFactory.getLogger(classOf[RocksDBWriter]))
 
   def orderFilter: BloomFilter
   def dataKeyFilter: BloomFilter
@@ -174,7 +174,7 @@ abstract class LevelDBWriter private[database] (
   private[this] var disabledAliases = writableDB.get(Keys.disabledAliases)
 
   private[this] val balanceSnapshotMaxRollbackDepth: Int = dbSettings.maxRollbackDepth + 1000
-  import LevelDBWriter.*
+  import RocksDBWriter.*
 
   private[database] def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
 
@@ -190,7 +190,7 @@ abstract class LevelDBWriter private[database] (
 
   override protected def loadAddressId(address: Address): Option[AddressId] = readOnly(db => db.get(Keys.addressId(address)))
 
-  override protected def loadHeight(): Int = LevelDBWriter.loadHeight(writableDB)
+  override protected def loadHeight(): Int = RocksDBWriter.loadHeight(writableDB)
 
   override def safeRollbackHeight: Int = readOnly(_.get(Keys.safeRollbackHeight))
 
@@ -625,7 +625,6 @@ abstract class LevelDBWriter private[database] (
             addressId <- rw.get(Keys.changedAddresses(currentHeight))
           } yield addressId -> rw.get(Keys.idToAddress(addressId))
 
-          // FIXME: use iterator correctly
           rw.iterateOver(KeyTags.ChangedAssetBalances.prefixBytes ++ Ints.toByteArray(currentHeight)) { e =>
             val assetId = IssuedAsset(ByteStr(e.getKey.takeRight(32)))
             for ((addressId, address) <- changedAddresses) {

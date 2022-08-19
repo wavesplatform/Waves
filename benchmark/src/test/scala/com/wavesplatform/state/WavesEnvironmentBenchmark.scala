@@ -8,7 +8,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter}
+import com.wavesplatform.database.{LevelDBFactory, RocksDBWriter}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
@@ -24,13 +24,10 @@ import scodec.bits.BitVector
 
 import scala.io.Codec
 
-/**
-  * Tests over real database. How to test:
-  * 1. Download a database
-  * 2. Import it: https://github.com/wavesplatform/Waves/wiki/Export-and-import-of-the-blockchain#import-blocks-from-the-binary-file
-  * 3. Run ExtractInfo to collect queries for tests
-  * 4. Make Caches.MaxSize = 1
-  * 5. Run this test
+/** Tests over real database. How to test:
+  *   1. Download a database 2. Import it:
+  *      https://github.com/wavesplatform/Waves/wiki/Export-and-import-of-the-blockchain#import-blocks-from-the-binary-file 3. Run ExtractInfo to
+  *      collect queries for tests 4. Make Caches.MaxSize = 1 5. Run this test
   */
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -140,7 +137,7 @@ object WavesEnvironmentBenchmark {
     }
 
     val environment: Environment[Id] = {
-      val state = LevelDBWriter.readOnly(db, wavesSettings)
+      val state = RocksDBWriter.readOnly(db, wavesSettings)
       new WavesEnvironment(
         AddressScheme.current.chainId,
         Coeval.raiseError(new NotImplementedError("`tx` is not implemented")),

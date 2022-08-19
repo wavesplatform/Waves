@@ -110,7 +110,7 @@ object CommonAccountsApi {
         ro.get(Keys.addressId(address)).fold(Seq.empty[DataEntry[?]]) { addressId =>
           val filteredKeys = Set.newBuilder[String]
 
-          ro.iterateOver(KeyTags.ChangedDataKeys.prefixBytes ++ addressId.toByteArray) { e =>
+          ro.iterateOverPrefix(KeyTags.ChangedDataKeys.prefixBytes ++ addressId.toByteArray) { e =>
             for (key <- database.readStrings(e.getValue) if !entriesFromDiff.contains(key) && pattern.forall(_.matcher(key).matches()))
               filteredKeys += key
           }
