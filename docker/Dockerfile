@@ -4,11 +4,13 @@ ENV WAVES_LOG_LEVEL=INFO
 ENV WAVES_HEAP_SIZE=2g
 ENV WAVES_NETWORK=mainnet
 
+ENV YOURKIT_VERSION=2021.3
+
 SHELL ["/bin/bash", "-c"]
 
 # Additional dependencies
 RUN apt-get update && apt-get install -y wget unzip gosu || exit 1; \
-    export YOURKIT_ARCHIVE="YourKit-JavaProfiler-2021.3-docker.zip"; \
+    export YOURKIT_ARCHIVE="YourKit-JavaProfiler-$YOURKIT_VERSION-docker.zip"; \
     wget --quiet "https://www.yourkit.com/download/docker/$YOURKIT_ARCHIVE" -P /tmp/ && unzip /tmp/$YOURKIT_ARCHIVE -d /usr/local; \
     # Clean
     apt-get remove -y wget unzip && apt-get autoremove -y && apt-get autoclean && rm -rf /var/lib/apt/lists/*
