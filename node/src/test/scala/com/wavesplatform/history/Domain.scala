@@ -89,7 +89,6 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       db,
       blockchain,
       utxPool,
-      wallet,
       tx => Future.successful(utxPool.putIfNew(tx)),
       Application.loadBlockAt(db, blockchain)
     )
@@ -97,7 +96,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def liquidState: Option[NgState] = {
     val cls   = classOf[BlockchainUpdaterImpl]
-    val field = cls.getDeclaredField("ngState")
+    val field = cls.getDeclaredFields.find(_.getName.endsWith("ngState")).get
     field.setAccessible(true)
     field.get(blockchain).asInstanceOf[Option[NgState]]
   }
@@ -383,7 +382,6 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     db,
     blockchain,
     utxPool,
-    wallet,
     _ => Future.successful(TracedResult(Right(true))),
     h => blocksApi.blockAtHeight(h)
   )
