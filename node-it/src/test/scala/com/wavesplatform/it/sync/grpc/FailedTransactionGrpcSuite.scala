@@ -124,25 +124,6 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
     sender.setScript(contract, Right(Some(script)), setScriptFee, waitForTx = true)
   }
 
-  test("InvokeScriptTransaction: dApp error propagates failed transaction") {
-    val invokeFee    = 0.005.waves
-    val priorityData = List(DataEntry("crash", DataEntry.Value.StringValue("yes")))
-    val putDataFee   = calcDataFee(priorityData)
-    val priorityFee  = putDataFee + invokeFee
-
-    sendTxsAndThenPriorityTx(
-      _ =>
-        sender
-          .broadcastInvokeScript(
-            caller,
-            Recipient().withPublicKeyHash(contractAddr),
-            Some(FUNCTION_CALL(FunctionHeader.User("canThrow"), List.empty)),
-            fee = invokeFee
-          ),
-      () => sender.putData(contract, priorityData, priorityFee, waitForTx = true)
-    )((txs, _) => assertFailedTxs(txs))
-  }
-
   test("InvokeScriptTransaction: insufficient action fees propagates failed transaction") {
     val invokeFee            = 0.005.waves
     val setAssetScriptMinFee = setAssetScriptFee + smartFee * 2
