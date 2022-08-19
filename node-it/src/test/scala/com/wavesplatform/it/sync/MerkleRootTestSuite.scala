@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidSignature}
+import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidIds}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.Blake2b256
@@ -59,11 +59,11 @@ class MerkleRootTestSuite extends BaseFreeSpec with ActivationStatusRequest with
     val invalidId = "FCym43ddiKKT000kznawWasoMbWd1LWyX8DUrwAAbcUA" // id is invalid because base58 cannot contain "0"
     assertApiError(
       miner.getMerkleProof(invalidId),
-      InvalidSignature
+      InvalidIds(Seq(invalidId))
     )
     assertApiError(
       miner.getMerkleProofPost(invalidId),
-      InvalidSignature
+      InvalidIds(Seq(invalidId))
     )
   }
 

@@ -2,6 +2,7 @@ package com.wavesplatform.api.http
 
 import akka.NotUsed
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
+import akka.http.scaladsl.model.HttpMethods
 import akka.http.scaladsl.server.{Directive0, Route}
 import akka.stream.scaladsl.Source
 import cats.instances.option.*
@@ -137,7 +138,8 @@ case class AddressApiRoute(
     commonAccountsApi
       .balanceDetails(address)
       .fold(
-        e => complete(CustomValidationError(e)), { details =>
+        e => complete(CustomValidationError(e)),
+        { details =>
           import details.*
           complete(
             Json.obj(
@@ -153,11 +155,10 @@ case class AddressApiRoute(
   }
 
   def balanceWithConfirmations: Route = {
-    (path("balance" / AddrSegment / IntNumber) & get) {
-      case (address, confirmations) =>
-        validateBalanceDepth(blockchain.height - confirmations)(
-          complete(balanceJson(address, confirmations))
-        )
+    (path("balance" / AddrSegment / IntNumber) & get) { case (address, confirmations) =>
+      validateBalanceDepth(blockchain.height - confirmations)(
+        complete(balanceJson(address, confirmations))
+      )
     }
   }
 
@@ -199,24 +200,29 @@ case class AddressApiRoute(
 
       (path(Segment) & get) { key =>
         complete(accountDataEntry(address, key))
-      } ~ extractScheduler(
-        implicit sc =>
-          strictEntity {
-            (formField("matches") | parameter("matches")) { matches =>
-              Try(matches.r)
-                .fold(
-                  { e =>
-                    log.trace(s"Error compiling regex $matches: ${e.getMessage}")
-                    complete(ApiError.fromValidationError(GenericError(s"Cannot compile regex")))
-                  },
-                  _ => complete(accountData(address, matches))
-                )
-            } ~ anyParam("key").filter(_.nonEmpty) { keys =>
-              complete(accountDataList(address, keys.toSeq*))
-            } ~ get {
-              complete(accountData(address))
+      } ~ extractScheduler(implicit sc =>
+        strictEntity {
+          (formField("matches") | parameter("matches")) { matches =>
+            Try(matches.r)
+              .fold(
+                { e =>
+                  log.trace(s"Error compiling regex $matches: ${e.getMessage}")
+                  complete(ApiError.fromValidationError(GenericError(s"Cannot compile regex")))
+                },
+                _ => complete(accountData(address, matches))
+              )
+          } ~ anyParam("key", limit = settings.dataKeysRequestLimit) { keys =>
+            extractMethod.filter(_ != HttpMethods.GET || keys.nonEmpty) { _ =>
+              val result = Either
+                .cond(keys.nonEmpty, (), DataKeysNotSpecified)
+                .map(_ => accountDataList(address, keys.toSeq*))
+
+              complete(result)
             }
+          } ~ get {
+            complete(accountData(address))
           }
+        }
       )
     }
 
@@ -225,11 +231,10 @@ case class AddressApiRoute(
   }
 
   def seq: Route = {
-    (path("seq" / IntNumber / IntNumber) & get) {
-      case (start, end) =>
-        if (start < 0 || end < 0 || start > end) complete(GenericError("Invalid sequence"))
-        else if (end - start >= MaxAddressesPerRequest) complete(TooBigArrayAllocation(MaxAddressesPerRequest))
-        else complete(wallet.privateKeyAccounts.map(_.toAddress).slice(start, end))
+    (path("seq" / IntNumber / IntNumber) & get) { case (start, end) =>
+      if (start < 0 || end < 0 || start > end) complete(GenericError("Invalid sequence"))
+      else if (end - start >= MaxAddressesPerRequest) complete(TooBigArrayAllocation(MaxAddressesPerRequest))
+      else complete(wallet.privateKeyAccounts.map(_.toAddress).slice(start, end))
     }
   }
 
@@ -294,13 +299,13 @@ case class AddressApiRoute(
       .dataStream(addr, Some(regex))
       .toListL
       .runAsyncLogErr
-      .map(data => Source.fromIterator(() => data.sortBy(_.key).iterator.map(Json.toJson[DataEntry[_]])))
+      .map(data => Source.fromIterator(() => data.sortBy(_.key).iterator.map(Json.toJson[DataEntry[?]])))
 
   private def accountDataEntry(address: Address, key: String): ToResponseMarshallable =
     commonAccountsApi.data(address, key).toRight(DataKeyDoesNotExist)
 
   private def accountDataList(address: Address, keys: String*) =
-    Source.fromIterator(() => keys.flatMap(commonAccountsApi.data(address, _)).iterator.map(Json.toJson[DataEntry[_]]))
+    Source.fromIterator(() => keys.flatMap(commonAccountsApi.data(address, _)).iterator.map(Json.toJson[DataEntry[?]]))
 
   private def signPath(address: Address, encode: Boolean): Route = (post & entity(as[String])) { message =>
     withAuth {
