@@ -40,17 +40,19 @@ object AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Iterator[(TxMeta, Transaction)] =
-    transactionsFromDiff(maybeDiff, subject, sender, types, fromId) ++
-      transactionsFromDB(
-        db,
-        subject,
-        sender,
-        types,
-        fromId.filter(id => maybeDiff.exists { case (_, diff) => !diff.transactions.contains(id) })
-      )
+  ): Iterator[(TxMeta, Transaction)] = {
+    val diffTxs = transactionsFromDiff(maybeDiff, subject, sender, types, fromId)
+    val dbTxs = transactionsFromDB(
+      db,
+      subject,
+      sender,
+      types,
+      fromId.filter(id => maybeDiff.exists { case (_, diff) => !diff.transactions.contains(id) })
+    )
+    diffTxs.iterator ++ dbTxs.filterNot(diffTxs.contains)
+  }
 
-  def transactionsFromDB(
+  private def transactionsFromDB(
       db: DB,
       subject: Address,
       sender: Option[Address],
@@ -77,13 +79,13 @@ object AddressTransactions {
       }
       .iterator
 
-  def transactionsFromDiff(
+  private def transactionsFromDiff(
       maybeDiff: Option[(Height, Diff)],
       subject: Address,
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Iterator[(TxMeta, Transaction)] =
+  ): Seq[(TxMeta, Transaction)] =
     (for {
       (height, diff) <- maybeDiff.toSeq
       nti            <- diff.transactions.values.toSeq.reverse
@@ -93,5 +95,4 @@ object AddressTransactions {
       .dropWhile { case (_, tx) => fromId.contains(tx.id()) }
       .filter { case (_, tx) => types.isEmpty || types.contains(tx.tpe) }
       .collect { case v @ (_, tx: Authorized) if sender.forall(_ == tx.sender.toAddress) => v }
-      .iterator
 }
