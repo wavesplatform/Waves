@@ -56,8 +56,6 @@ docker run -v /docker/waves/waves-data:/var/lib/waves -v /docker/waves/waves-con
 
 **Note: Environment variables override values in the configuration file.** 
 
-**Note: `WAVES_WALLET_SEED` and `WAVES_WALLET_PASSWORD` override options `waves.wallet.seed` and `waves.wallet.password` specified in `JAVA_OPTS`.**
-
 ### Managing data
 We recommend to store the blockchain state as well as Waves configuration on the host side. As such, consider using Docker volumes mapping to map host directories inside the container:
 
