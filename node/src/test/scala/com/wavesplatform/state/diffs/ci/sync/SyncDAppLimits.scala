@@ -13,15 +13,11 @@ class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with Eit
   private val alice     = TxHelpers.signer(1) // signer(0) forges blocks and this affects the balance
   private val aliceAddr = alice.toAddress
 
-  private val bob     = TxHelpers.signer(2)
-  private val bobAddr = bob.toAddress
-
   complexityLimitTest("NODE-521 A limit of complexity is 52000 if the first script is V6", V6, 52000)
   complexityLimitTest("NODE-527 A limit of complexity is 26000 if the first script is V6", V5, 26000)
-
   private def complexityLimitTest(title: String, v: StdLibVersion, complexityLimit: Int): Unit = {
     property(title) {
-      withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(alice, bob)) { d =>
+      withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(alice)) { d =>
         d.appendBlock(
           TxHelpers.setScript(
             alice,
@@ -55,6 +51,44 @@ class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with Eit
         invokeTxMeta.spentComplexity shouldBe complexityLimit
         invokeTxMeta.succeeded shouldBe false
       }
+    }
+  }
+
+  property("NODE-726 A limit of inner invokes is 100 before the ContinuationTransaction(id=18) feature activation") {
+    // 160 calls, 52000/325 = 160
+    withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(alice)) { d =>
+      d.appendBlock(
+        TxHelpers.setScript(
+          alice,
+          TestCompiler(V6).compileContract(
+            // 1 for ">", 1+1 for strict, 75 for invoke, 1 for Address, 1 for "-", 1 for list
+            s""" @Callable(inv)
+               | func foo(n: Int) = {
+               |   if (n > 0) then {
+               |
+               |     strict res = invoke(Address(base58'$aliceAddr'), "foo", [n - 1], [])
+               |     ([], 0)
+               |   } else {
+               |     ([], 1 + 1)
+               |   }
+               | }
+               | """.stripMargin
+          ),
+          fee = 1.waves
+        )
+      )
+
+      val calls    = 101 //52000 / 2000 + 1
+      val invokeTx = TxHelpers.invoke(aliceAddr, Some("foo"), Seq(CONST_LONG(calls)), invoker = alice)
+
+      val diff              = d.createDiffE(invokeTx).value
+      val (_, scriptResult) = diff.scriptResults.headOption.value
+      scriptResult.error.value.text should include("DApp calls limit = 100 is exceeded")
+
+      d.appendBlock(invokeTx)
+      val invokeTxMeta = d.transactionsApi.transactionById(invokeTx.id()).value
+      //invokeTxMeta.spentComplexity shouldBe complexityLimit
+      invokeTxMeta.succeeded shouldBe false
     }
   }
 
