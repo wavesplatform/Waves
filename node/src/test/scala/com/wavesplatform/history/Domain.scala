@@ -10,6 +10,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.consensus.{PoSCalculator, PoSSelector}
 import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
+import com.wavesplatform.db.TestUtxPool
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
@@ -22,7 +23,6 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{BlockchainUpdater, *}
 import com.wavesplatform.utils.{EthEncoding, SystemTime}
-import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{Application, TestValues, database}
 import monix.execution.Scheduler.Implicits.global
@@ -36,7 +36,13 @@ import scala.concurrent.duration.*
 import scala.util.Try
 import scala.util.control.NonFatal
 
-case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter, settings: WavesSettings) {
+case class Domain(
+    db: DB,
+    blockchainUpdater: BlockchainUpdaterImpl,
+    levelDBWriter: LevelDBWriter,
+    settings: WavesSettings,
+    beforeSetPriorityDiffs: () => Unit = () => ()
+) {
   import Domain.*
 
   val blockchain: BlockchainUpdaterImpl = blockchainUpdater
@@ -52,7 +58,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   def createDiffE(tx: Transaction): Either[ValidationError, Diff] = transactionDiffer(tx).resultE
   def createDiff(tx: Transaction): Diff                           = createDiffE(tx).explicitGet()
 
-  lazy val utxPool: UtxPoolImpl = new UtxPoolImpl(SystemTime, blockchain, settings.utxSettings, settings.minerSettings.enable)
+  lazy val utxPool        = new TestUtxPool(SystemTime, blockchain, settings.utxSettings, settings.minerSettings.enable, beforeSetPriorityDiffs)
   lazy val wallet: Wallet = Wallet(settings.walletSettings.copy(file = None))
 
   object commonApi {
@@ -227,7 +233,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   }
 
   def appendKeyBlock(ref: Option[ByteStr] = None): Block = {
-    val block = createBlock(Block.NgBlockVersion, Nil, ref.orElse(Some(lastBlockId)))
+    val block          = createBlock(Block.NgBlockVersion, Nil, ref.orElse(Some(lastBlockId)))
     val discardedDiffs = appendBlock(block)
     utxPool.setPriorityDiffs(discardedDiffs)
     utxPool.cleanUnconfirmed()
@@ -271,7 +277,13 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     blockchainUpdater.removeAfter(blockId).explicitGet()
   }
 
-  def createBlock(version: Byte, txs: Seq[Transaction], ref: Option[ByteStr] = blockchainUpdater.lastBlockId, strictTime: Boolean = false, generator: KeyPair = defaultSigner): Block = {
+  def createBlock(
+      version: Byte,
+      txs: Seq[Transaction],
+      ref: Option[ByteStr] = blockchainUpdater.lastBlockId,
+      strictTime: Boolean = false,
+      generator: KeyPair = defaultSigner
+  ): Block = {
     val reference = ref.getOrElse(randomSig)
     val parent = ref
       .flatMap { bs =>
@@ -389,7 +401,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   val accountsApi: CommonAccountsApi = CommonAccountsApi(
     () => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty),
     db,
-    CompositeBlockchain(blockchainUpdater, utxPool.priorityPool.validPriorityDiffs)
+    utxPool.priorityPool.optimisticRead(CompositeBlockchain(blockchainUpdater, utxPool.priorityPool.validPriorityDiffs))(_ => true)
   )
 
   val assetsApi: CommonAssetsApi = CommonAssetsApi(

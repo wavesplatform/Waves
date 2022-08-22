@@ -123,11 +123,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels            = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-    val utxStorage =
-      new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.minerSettings.enable, utxEvents.onNext)
+    val utxStorage             = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.minerSettings.enable, utxEvents.onNext)
     maybeUtx = Some(utxStorage)
 
-    def blockchainWithDiscardedDiffs = CompositeBlockchain(blockchainUpdater, utxStorage.priorityPool.validPriorityDiffs)
+    def blockchainWithDiscardedDiffs =
+      utxStorage.priorityPool.optimisticRead(CompositeBlockchain(blockchainUpdater, utxStorage.priorityPool.validPriorityDiffs))(_ => true)
 
     val timer                 = new HashedWheelTimer()
     val utxSynchronizerLogger = LoggerFacade(LoggerFactory.getLogger(classOf[TransactionPublisher]))
@@ -145,10 +145,20 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val pos = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
 
     if (settings.minerSettings.enable)
-      miner =
-        new MinerImpl(allChannels, blockchainUpdater, settings, time, utxStorage, wallet, pos, minerScheduler, appenderScheduler, utxEvents.collect {
-          case _: UtxEvent.TxAdded => ()
-        })
+      miner = new MinerImpl(
+        allChannels,
+        blockchainUpdater,
+        settings,
+        time,
+        utxStorage,
+        wallet,
+        pos,
+        minerScheduler,
+        appenderScheduler,
+        utxEvents.collect { case _: UtxEvent.TxAdded =>
+          ()
+        }
+      )
 
     val processBlock =
       BlockAppender(blockchainUpdater, time, utxStorage, pos, allChannels, peerDatabase, appenderScheduler) _
@@ -287,12 +297,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       syncWithChannelClosed,
       extensionLoaderScheduler,
       timeoutSubject
-    ) {
-      case (c, b) =>
-        processFork(c, b).doOnFinish {
-          case None    => Task.now(())
-          case Some(e) => Task(stopOnAppendError.reportFailure(e))
-        }
+    ) { case (c, b) =>
+      processFork(c, b).doOnFinish {
+        case None    => Task.now(())
+        case Some(e) => Task(stopOnAppendError.reportFailure(e))
+      }
     }
 
     TransactionSynchronizer(
