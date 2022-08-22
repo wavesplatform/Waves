@@ -3,7 +3,7 @@ package com.wavesplatform.api.http
 import scala.annotation.tailrec
 import scala.util.Try
 import akka.http.scaladsl.server.{Route, StandardRoute}
-import cats.syntax.either._
+import cats.syntax.either.*
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.http.ApiError.{BlockDoesNotExist, TooBigArrayAllocation}
@@ -15,11 +15,10 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.Time
-import play.api.libs.json._
+import play.api.libs.json.*
 
 case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi, time: Time) extends ApiRoute {
-  import BlocksApiRoute._
-  private[this] val MaxBlocksPerRequest = 100 // todo: make this configurable and fix integration tests
+  import BlocksApiRoute.*
 
   override lazy val route: Route = (pathPrefix("blocks") & get) {
     path("at" / IntNumber) { height =>
@@ -33,12 +32,16 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
     } ~ path("height") {
       complete(Json.obj("height" -> commonApi.currentHeight))
     } ~ path("delay" / BlockId / IntNumber) { (blockId, count) =>
-      complete(
-        commonApi
-          .blockDelay(blockId, count)
-          .map(delay => Json.obj("delay" -> delay))
-          .toRight(BlockDoesNotExist)
-      )
+      if (count > MaxBlocksForDelay) {
+        complete(TooBigArrayAllocation(MaxBlocksForDelay))
+      } else {
+        complete(
+          commonApi
+            .blockDelay(blockId, count)
+            .map(delay => Json.obj("delay" -> delay))
+            .toRight(BlockDoesNotExist)
+        )
+      }
     } ~ path("height" / BlockId) { signature =>
       complete(for {
         meta <- commonApi.meta(signature).toRight(BlockDoesNotExist)
@@ -54,7 +57,8 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
             .toListL
             .runToFuture
         )
-      } else {
+      }
+      else {
         complete(TooBigArrayAllocation)
       }
     } ~ pathPrefix("headers") {
@@ -148,6 +152,9 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
 }
 
 object BlocksApiRoute {
+  val MaxBlocksPerRequest = 100 // todo: make this configurable and fix integration tests
+  val MaxBlocksForDelay   = 10000
+
   private def toJson(v: (BlockMeta, Seq[(TxMeta, Transaction)])): JsObject = v match {
     case (meta, transactions) =>
       meta.json() ++ transactionField(meta.header.version, transactions)
@@ -155,9 +162,8 @@ object BlocksApiRoute {
 
   private def transactionField(blockVersion: Byte, transactions: Seq[(TxMeta, Transaction)]): JsObject = Json.obj(
     "fee" -> transactions.map(_._2.assetFee).collect { case (Waves, feeAmt) => feeAmt }.sum,
-    "transactions" -> JsArray(transactions.map {
-      case (tm, transaction) =>
-        transaction.json() ++ TransactionJsonSerializer.applicationStatus(blockVersion >= Block.ProtoBlockVersion, tm.succeeded)
+    "transactions" -> JsArray(transactions.map { case (tm, transaction) =>
+      transaction.json() ++ TransactionJsonSerializer.applicationStatus(blockVersion >= Block.ProtoBlockVersion, tm.succeeded)
     })
   )
 }

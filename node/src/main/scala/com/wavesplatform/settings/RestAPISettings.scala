@@ -8,6 +8,8 @@ case class RestAPISettings(
     corsHeaders: CorsHeaders,
     transactionsByAddressLimit: Int,
     distributionAddressLimit: Int,
+    dataKeysRequestLimit: Int,
+    assetDetailsLimit: Int,
     evaluateScriptComplexityLimit: Int,
     limitedPoolThreads: Int,
     heavyRequestProcessorPoolThreads: Option[Int],
