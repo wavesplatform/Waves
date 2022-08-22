@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs.ci.sync
 
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.lang.directives.values.V6
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V5, V6}
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.test.*
@@ -16,40 +16,45 @@ class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with Eit
   private val bob     = TxHelpers.signer(2)
   private val bobAddr = bob.toAddress
 
-  property("NODE-521 A limit of complexity is 52000 if the first script is V6") {
-    withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(alice, bob)) { d =>
-      d.appendBlock(
-        TxHelpers.setScript(
-          alice,
-          TestCompiler(V6).compileContract(
-            // 1 for ">", 1+1 for strict, 75 for invoke, 1 for Address, 1 for "-", 1 for list
-            s""" @Callable(inv)
-               | func foo(n: Int) = {
-               |   if (n > 0) then {
-               |     strict complexInt = ${mkIntExprWithComplexity(2000 - 81)}
-               |     strict res = invoke(Address(base58'$aliceAddr'), "foo", [n - 1], [])
-               |     ([], 0)
-               |   } else {
-               |     ([], 1 + 1 + 1)
-               |   }
-               | }
-               | """.stripMargin
-          ),
-          fee = 1.waves
+  complexityLimitTest("NODE-521 A limit of complexity is 52000 if the first script is V6", V6, 52000)
+  complexityLimitTest("NODE-527 A limit of complexity is 26000 if the first script is V6", V5, 26000)
+
+  private def complexityLimitTest(title: String, v: StdLibVersion, complexityLimit: Int): Unit = {
+    property(title) {
+      withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(alice, bob)) { d =>
+        d.appendBlock(
+          TxHelpers.setScript(
+            alice,
+            TestCompiler(v).compileContract(
+              // 1 for ">", 1+1 for strict, 75 for invoke, 1 for Address, 1 for "-", 1 for list
+              s""" @Callable(inv)
+                 | func foo(n: Int) = {
+                 |   if (n > 0) then {
+                 |     strict complexInt = ${mkIntExprWithComplexity(2000 - 81)}
+                 |     strict res = invoke(Address(base58'$aliceAddr'), "foo", [n - 1], [])
+                 |     ([], 0)
+                 |   } else {
+                 |     ([], 1 + 1)
+                 |   }
+                 | }
+                 | """.stripMargin
+            ),
+            fee = 1.waves
+          )
         )
-      )
 
-      val calls    = 52000 / 2000 + 1
-      val invokeTx = TxHelpers.invoke(aliceAddr, Some("foo"), Seq(CONST_LONG(calls)), invoker = alice)
+        val calls    = complexityLimit / 2000 + 1
+        val invokeTx = TxHelpers.invoke(aliceAddr, Some("foo"), Seq(CONST_LONG(calls)), invoker = alice)
 
-      val diff              = d.createDiffE(invokeTx).value
-      val (_, scriptResult) = diff.scriptResults.headOption.value
-      scriptResult.error.value.text should include("Invoke complexity limit = 52000 is exceeded")
+        val diff              = d.createDiffE(invokeTx).value
+        val (_, scriptResult) = diff.scriptResults.headOption.value
+        scriptResult.error.value.text should include(s"Invoke complexity limit = $complexityLimit is exceeded")
 
-      d.appendBlock(invokeTx)
-      val invokeTxMeta = d.transactionsApi.transactionById(invokeTx.id()).value
-      invokeTxMeta.spentComplexity shouldBe 52000
-      invokeTxMeta.succeeded shouldBe false
+        d.appendBlock(invokeTx)
+        val invokeTxMeta = d.transactionsApi.transactionById(invokeTx.id()).value
+        invokeTxMeta.spentComplexity shouldBe complexityLimit
+        invokeTxMeta.succeeded shouldBe false
+      }
     }
   }
 
