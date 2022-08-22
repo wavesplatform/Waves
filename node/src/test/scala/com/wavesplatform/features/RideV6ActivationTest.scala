@@ -1,6 +1,6 @@
 package com.wavesplatform.features
 
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.db.WithDomain
@@ -19,18 +19,17 @@ import com.wavesplatform.transaction.{Transaction, TxHelpers}
 import org.scalatest.{EitherValues, OptionValues}
 
 import java.nio.charset.StandardCharsets
--
+
 class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues with EitherValues {
-  private val chainId      = DomainPresets.SettingsFromDefaultConfig.blockchainSettings.addressSchemeCharacter.toByte
-  private val otherChainId = (chainId + 1).toByte
+  private val otherChainId = (AddressScheme.current.chainId + 1).toByte
 
   private val invalidAssetId = IssuedAsset(ByteStr(("1" * 5).getBytes(StandardCharsets.UTF_8)))
 
   private val alice     = TxHelpers.signer(1) // signer(0) forges blocks and this affects the balance
-  private val aliceAddr = alice.toAddress(chainId)
+  private val aliceAddr = alice.toAddress
 
   private val bob               = TxHelpers.signer(2)
-  private val bobAddr           = bob.toAddress(chainId)
+  private val bobAddr           = bob.toAddress
   private val bobOtherChainAddr = bob.toAddress(otherChainId)
 
   private val aliceRegularAssetTx       = TxHelpers.issue(issuer = alice, amount = Long.MaxValue - 1)
@@ -788,22 +787,10 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
   )
 
   private def mkScript(scriptBody: String): StdLibVersion => Script = { v =>
-    TestCompiler(v).compileContract(
-      s""" {-#STDLIB_VERSION ${v.id} #-}
-         | {-#SCRIPT_TYPE ACCOUNT #-}
-         | {-#CONTENT_TYPE DAPP #-}
-         | $scriptBody
-         | """.stripMargin
-    )
+    TestCompiler(v).compileContract(scriptBody)
   }
 
-  private def mkAssetScript(scriptBody: String): Script = TestCompiler(V5).compileAsset(
-    s""" {-# STDLIB_VERSION 5 #-}
-       | {-# CONTENT_TYPE EXPRESSION #-}
-       | {-# SCRIPT_TYPE ASSET #-}
-       | $scriptBody
-       | """.stripMargin
-  )
+  private def mkAssetScript(scriptBody: String): Script = TestCompiler(V5).compileAsset(scriptBody)
 
   private def mkIntExprWithComplexity(targetComplexity: Int): String = s"1${" + 1" * targetComplexity}"
 }
