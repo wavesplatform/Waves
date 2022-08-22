@@ -9,6 +9,8 @@ import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxHelpers
 import org.scalatest.{EitherValues, OptionValues}
 
+import scala.collection.Seq
+
 class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with EitherValues {
   private val alice     = TxHelpers.signer(1) // signer(0) forges blocks and this affects the balance
   private val aliceAddr = alice.toAddress
@@ -65,7 +67,6 @@ class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with Eit
             s""" @Callable(inv)
                | func foo(n: Int) = {
                |   if (n > 0) then {
-               |
                |     strict res = invoke(Address(base58'$aliceAddr'), "foo", [n - 1], [])
                |     ([], 0)
                |   } else {
@@ -78,7 +79,7 @@ class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with Eit
         )
       )
 
-      val calls    = 101 //52000 / 2000 + 1
+      val calls    = 101 // 52000 / 2000 + 1
       val invokeTx = TxHelpers.invoke(aliceAddr, Some("foo"), Seq(CONST_LONG(calls)), invoker = alice)
 
       val diff              = d.createDiffE(invokeTx).value
@@ -87,7 +88,44 @@ class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with Eit
 
       d.appendBlock(invokeTx)
       val invokeTxMeta = d.transactionsApi.transactionById(invokeTx.id()).value
-      //invokeTxMeta.spentComplexity shouldBe complexityLimit
+      // invokeTxMeta.spentComplexity shouldBe complexityLimit
+      invokeTxMeta.succeeded shouldBe false
+    }
+  }
+
+  // TODO
+  property("NODE-727 A number of inner invokes is unlimited after the ContinuationTransaction(id=18) feature activation") {
+    // 160 calls, 52000/325 = 160
+    withDomain(DomainPresets.ContinuationTransaction, AddrWithBalance.enoughBalances(alice)) { d =>
+      d.appendBlock(
+        TxHelpers.setScript(
+          alice,
+          TestCompiler(V6).compileContract(
+            s""" @Callable(inv)
+               | func foo(n: Int) = {
+               |   if (n > 0) then {
+               |     strict res = invoke(Address(base58'$aliceAddr'), "foo", [n - 1], [])
+               |     ([], 0)
+               |   } else {
+               |     ([], 0)
+               |   }
+               | }
+               | """.stripMargin
+          ),
+          fee = 1.waves
+        )
+      )
+
+      val calls    = 120 // 52000 / 2000 + 1
+      val invokeTx = TxHelpers.invoke(aliceAddr, Some("foo"), Seq(CONST_LONG(calls)), invoker = alice)
+
+      val diff              = d.createDiffE(invokeTx).value
+      val (_, scriptResult) = diff.scriptResults.headOption.value
+      scriptResult.error.value.text should include("????")
+
+      d.appendBlock(invokeTx)
+      val invokeTxMeta = d.transactionsApi.transactionById(invokeTx.id()).value
+      // invokeTxMeta.spentComplexity shouldBe complexityLimit
       invokeTxMeta.succeeded shouldBe false
     }
   }
