@@ -2,6 +2,8 @@ package com.wavesplatform.mining
 
 import com.wavesplatform.block.Block.ProtoBlockVersion
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.state.IntegerDataEntry
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.test.DomainPresets.RideV6
 import com.wavesplatform.test.{PropSpec, TestTime}
@@ -55,6 +57,39 @@ class DiscardedMicroBlocksDiffTest extends PropSpec with WithDomain {
         Await.result(appendKeyBlock, Inf)
         balanceDiff() shouldBe 123
       }
+    }
+  }
+
+  property("consistent interim account data") {
+    val waitInterimState     = new CountDownLatch(1)
+    val getOutOfInterimState = new CountDownLatch(1)
+    withDomain(
+      RideV6,
+      AddrWithBalance.enoughBalances(defaultSigner),
+      beforeSetPriorityDiffs = { () =>
+        waitInterimState.countDown()
+        getOutOfInterimState.await()
+      }
+    ) { d =>
+      val appendBlock = BlockAppender(d.blockchain, TestTime(), d.utxPool, d.posSelector, Scheduler.global, verify = false) _
+
+      val dataTx = dataEntry(defaultSigner, IntegerDataEntry("key", 1))
+      def data() = d.accountsApi.data(defaultAddress, "key").map(_.value)
+
+      val previousBlockId = d.appendBlock().id()
+      d.appendMicroBlock(dataTx)
+      data() shouldBe Some(1)
+
+      val keyBlock       = d.createBlock(ProtoBlockVersion, Nil, Some(previousBlockId))
+      val appendKeyBlock = appendBlock(keyBlock).runToFuture
+
+      waitInterimState.await()
+      val check = Future(data() shouldBe Some(1))
+      getOutOfInterimState.countDown()
+
+      Await.result(check, Inf)
+      Await.result(appendKeyBlock, Inf)
+      data() shouldBe Some(1)
     }
   }
 }
