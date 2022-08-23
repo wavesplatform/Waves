@@ -3,6 +3,8 @@ package com.wavesplatform.mining
 import com.wavesplatform.block.Block.ProtoBlockVersion
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.lang.directives.values.V6
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.IntegerDataEntry
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.test.DomainPresets.RideV6
@@ -90,6 +92,39 @@ class DiscardedMicroBlocksDiffTest extends PropSpec with WithDomain {
       Await.result(check, Inf)
       Await.result(appendKeyBlock, Inf)
       data() shouldBe Some(1)
+    }
+  }
+
+  property("consistent interim account script") {
+    val waitInterimState     = new CountDownLatch(1)
+    val getOutOfInterimState = new CountDownLatch(1)
+    withDomain(
+      RideV6,
+      AddrWithBalance.enoughBalances(defaultSigner),
+      beforeSetPriorityDiffs = { () =>
+        waitInterimState.countDown()
+        getOutOfInterimState.await()
+      }
+    ) { d =>
+      val appendBlock = BlockAppender(d.blockchain, TestTime(), d.utxPool, d.posSelector, Scheduler.global, verify = false) _
+
+      val setScriptTx = setScript(defaultSigner, TestCompiler(V6).compileExpression("true"))
+      def hasScript() = d.accountsApi.script(defaultAddress).nonEmpty
+
+      val previousBlockId = d.appendBlock().id()
+      d.appendMicroBlock(setScriptTx)
+      hasScript() shouldBe true
+
+      val keyBlock       = d.createBlock(ProtoBlockVersion, Nil, Some(previousBlockId))
+      val appendKeyBlock = appendBlock(keyBlock).runToFuture
+
+      waitInterimState.await()
+      val check = Future(hasScript() shouldBe true)
+      getOutOfInterimState.countDown()
+
+      Await.result(check, Inf)
+      Await.result(appendKeyBlock, Inf)
+      hasScript() shouldBe true
     }
   }
 }
