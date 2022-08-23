@@ -227,7 +227,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(
         blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
         db,
-        blockchainWithDiscardedDiffs,
+        () => blockchainWithDiscardedDiffs(),
         utxStorage,
         tx => transactionPublisher.validateAndBroadcast(tx, None),
         loadBlockAt(db, blockchainUpdater)
@@ -235,8 +235,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override val blocksApi: CommonBlocksApi =
         CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockInfoAt(db, blockchainUpdater))
       override val accountsApi: CommonAccountsApi =
-        CommonAccountsApi(() => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainWithDiscardedDiffs)
-      override val assetsApi: CommonAssetsApi = CommonAssetsApi(() => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainWithDiscardedDiffs)
+        CommonAccountsApi(() => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, () => blockchainWithDiscardedDiffs())
+      override val assetsApi: CommonAssetsApi =
+        CommonAssetsApi(() => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, () => blockchainWithDiscardedDiffs())
     }
 
     extensions = settings.extensions.map { extensionClassName =>
@@ -340,14 +341,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         )
 
       val apiRoutes = Seq(
-        EthRpcRoute(blockchainWithDiscardedDiffs, extensionContext.transactionsApi, time),
+        EthRpcRoute(() => blockchainWithDiscardedDiffs(), extensionContext.transactionsApi, time),
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => shutdown()),
         BlocksApiRoute(settings.restAPISettings, extensionContext.blocksApi, time),
         TransactionsApiRoute(
           settings.restAPISettings,
           extensionContext.transactionsApi,
           wallet,
-          blockchainWithDiscardedDiffs,
+          () => blockchainWithDiscardedDiffs(),
           () => utxStorage.size,
           transactionPublisher,
           time
@@ -364,7 +365,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         AddressApiRoute(
           settings.restAPISettings,
           wallet,
-          blockchainWithDiscardedDiffs,
+          () => blockchainWithDiscardedDiffs(),
           transactionPublisher,
           time,
           limitedScheduler,
@@ -397,7 +398,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           settings.restAPISettings,
           wallet,
           transactionPublisher,
-          blockchainWithDiscardedDiffs,
+          () => blockchainWithDiscardedDiffs(),
           time,
           extensionContext.accountsApi,
           extensionContext.assetsApi,
@@ -405,7 +406,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         ),
         ActivationApiRoute(settings.restAPISettings, settings.featuresSettings, blockchainUpdater),
         LeaseApiRoute(settings.restAPISettings, wallet, transactionPublisher, time, extensionContext.accountsApi),
-        AliasApiRoute(settings.restAPISettings, extensionContext.transactionsApi, wallet, transactionPublisher, time, blockchainWithDiscardedDiffs),
+        AliasApiRoute(
+          settings.restAPISettings,
+          extensionContext.transactionsApi,
+          wallet,
+          transactionPublisher,
+          time,
+          () => blockchainWithDiscardedDiffs()
+        ),
         RewardApiRoute(blockchainUpdater)
       )
 
