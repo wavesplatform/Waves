@@ -127,4 +127,37 @@ class DiscardedMicroBlocksDiffTest extends PropSpec with WithDomain {
       hasScript() shouldBe true
     }
   }
+
+  property("consistent interim active leases") {
+    val waitInterimState = new CountDownLatch(1)
+    val endInterimState  = new CountDownLatch(1)
+    withDomain(
+      RideV6,
+      AddrWithBalance.enoughBalances(defaultSigner),
+      beforeSetPriorityDiffs = { () =>
+        waitInterimState.countDown()
+        endInterimState.await()
+      }
+    ) { d =>
+      val appendBlock = BlockAppender(d.blockchain, TestTime(), d.utxPool, d.posSelector, Scheduler.global, verify = false) _
+
+      val leaseTx        = lease()
+      def activeLeases() = Await.result(d.accountsApi.activeLeases(defaultAddress).toListL.runToFuture, Inf)
+
+      val previousBlockId = d.appendBlock().id()
+      d.appendMicroBlock(leaseTx)
+      activeLeases().size shouldBe 1
+
+      val keyBlock       = d.createBlock(ProtoBlockVersion, Nil, Some(previousBlockId))
+      val appendKeyBlock = appendBlock(keyBlock).runToFuture
+
+      waitInterimState.await()
+      val check = Future(activeLeases().size shouldBe 1)
+      endInterimState.countDown()
+
+      Await.result(check, Inf)
+      Await.result(appendKeyBlock, Inf)
+      activeLeases().size shouldBe 1
+    }
+  }
 }
