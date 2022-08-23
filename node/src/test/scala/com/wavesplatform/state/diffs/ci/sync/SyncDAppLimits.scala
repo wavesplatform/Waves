@@ -26,15 +26,16 @@ class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with Eit
         // One call of foo has 2000 complexity
         s""" @Callable(inv)
            | func foo(n: Int) = {
-           |   # 81 = 1 for strict, 1 for ">", 1 for strict, 75 for invoke, 1 for Address, 1 for list, 1 for "-"
-           |   strict complexInt1 = ${mkIntExprWithComplexity(2000 - 81)}
-           |   if (n > 1) then {
-           |     strict res = invoke(Address(base58'$aliceAddr'), "foo", [n - 1], [])
-           |     []
+           |   let complexInt1 = ${mkIntExprWithComplexity(2000 - 82 - 2)} # 1916
+           |   # 82 = 1 for "n > 1", 81 for branches
+           |   let complexInt2 = if (n > 1) then {
+           |     # 81 = 2 for valueOrElse, 75 for invoke, 1 for Address, 1 for "n - 1", 1 for list, 1 for as
+           |     valueOrElse(invoke(Address(base58'$aliceAddr'), "foo", [n - 1], []).as[Int], 0)
            |   } else {
-           |     strict complexInt2 = ${mkIntExprWithComplexity(79 - 1)} # 1 for strict
-           |     []
+           |     ${mkIntExprWithComplexity(81)} ${if (overflow) "+ 1 # 82" else "# 81"}
            |   }
+           |   # 2 = 1 for tuple, 1 for "+"
+           |   ([], complexInt1 + complexInt2)
            | }
            | """.stripMargin.tap(println)
       ),
@@ -47,11 +48,6 @@ class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with Eit
 
         val calls    = complexityLimit / 2000
         val invokeTx = TxHelpers.invoke(aliceAddr, Some("foo"), Seq(CONST_LONG(calls)), invoker = alice)
-
-        val diff = d.createDiffE(invokeTx).value
-        println(diff.scriptsComplexity)
-        val (_, scriptResult) = diff.scriptResults.headOption.value
-        println(scriptResult.error)
 
         d.appendBlock(invokeTx)
         val invokeTxMeta = d.transactionsApi.transactionById(invokeTx.id()).value
