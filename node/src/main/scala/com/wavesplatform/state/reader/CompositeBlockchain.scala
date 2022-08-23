@@ -185,14 +185,6 @@ object CompositeBlockchain {
       case _                       => new CompositeBlockchain(inner, Some(diff))
     }
 
-  def apply(inner: Blockchain, diff: Seq[Diff]): CompositeBlockchain = {
-    val acc = inner match {
-      case cb: CompositeBlockchain => cb
-      case _                       => new CompositeBlockchain(inner, None)
-    }
-    diff.foldLeft(acc)(_.appendDiff(_))
-  }
-
   def apply(
       inner: Blockchain,
       diff: Diff,

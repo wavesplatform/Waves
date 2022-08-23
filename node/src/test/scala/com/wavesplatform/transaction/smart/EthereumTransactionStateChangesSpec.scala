@@ -77,7 +77,7 @@ class EthereumTransactionStateChangesSpec extends FlatSpec with WithDomain with 
     d.appendBlock(invoke)
 
     d.liquidAndSolidAssert { () =>
-      d.commonApi.transactions.transactionById(invoke.id()) match {
+      d.transactionsApi.transactionById(invoke.id()) match {
         case Some(meta: TransactionMeta.Ethereum) =>
           assert(!meta.succeeded, "should fail")
           Json.toJson(meta.invokeScriptResult) should matchJson("""
@@ -130,7 +130,7 @@ class EthereumTransactionStateChangesSpec extends FlatSpec with WithDomain with 
 
     d.liquidAndSolidAssert { () =>
       d.blockchain.accountData(dApp.toAddress, "test") shouldBe Some(StringDataEntry("test", "foo"))
-      d.commonApi.transactions.transactionById(invoke.id()) match {
+      d.transactionsApi.transactionById(invoke.id()) match {
         case Some(meta: TransactionMeta.Ethereum) =>
           assert(meta.succeeded, "should succeed")
           Json.toJson(meta.invokeScriptResult) should matchJson("""{
@@ -191,7 +191,7 @@ class EthereumTransactionStateChangesSpec extends FlatSpec with WithDomain with 
 
     d.appendBlock(invoke)
     d.liquidAndSolidAssert { () =>
-      d.commonApi.transactions.transactionById(invoke.id()) match {
+      d.transactionsApi.transactionById(invoke.id()) match {
         case Some(meta: TransactionMeta.Ethereum) =>
           assert(!meta.succeeded, "should fail")
           Json.toJson(meta.invokeScriptResult) should matchJson("""
@@ -283,7 +283,7 @@ class EthereumTransactionStateChangesSpec extends FlatSpec with WithDomain with 
       d.blockchain.accountData(dApp.toAddress, "test") shouldBe Some(StringDataEntry("test", "foo"))
       d.blockchain.accountData(nestedDApp.toAddress, "test1") shouldBe Some(StringDataEntry("test1", "bar"))
 
-      d.commonApi.transactions.transactionById(invoke.id()) match {
+      d.transactionsApi.transactionById(invoke.id()) match {
         case Some(meta: TransactionMeta.Ethereum) =>
           assert(meta.succeeded, "should succeed")
           Json.toJson(meta.invokeScriptResult) should matchJson("""{

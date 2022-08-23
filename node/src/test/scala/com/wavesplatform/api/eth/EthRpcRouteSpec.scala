@@ -25,7 +25,7 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
     Post(
       routePath(""),
       Json.obj("method" -> method, "params" -> Json.arr(params*), "id" -> "test")
-    ) ~> EthRpcRoute(() => d.blockchain, d.commonApi.transactions, ntpTime).route ~> check(body)
+    ) ~> EthRpcRoute(() => d.blockchain, d.transactionsApi, ntpTime).route ~> check(body)
   }
 
   "eth_chainId" in withDomain(DefaultWavesSettings) { d =>
@@ -195,7 +195,7 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
 
     val issue3 = d.blockchain.accountData(randomKP.toAddress, "assetId").get.asInstanceOf[BinaryDataEntry].value
 
-    EthRpcRoute(() => d.blockchain, d.commonApi.transactions, ntpTime).route
+    EthRpcRoute(() => d.blockchain, d.transactionsApi, ntpTime).route
       .anyParamTest(routePath("/assets"), "id")(
         EthEncoding.toHexString(issue1.id().arr.take(20)),
         EthEncoding.toHexString(issue2.id().arr.take(20)),

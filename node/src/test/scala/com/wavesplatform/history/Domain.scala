@@ -24,7 +24,7 @@ import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{BlockchainUpdater, *}
 import com.wavesplatform.utils.{EthEncoding, SystemTime}
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{Application, TestValues, database}
+import com.wavesplatform.{TestValues, database}
 import monix.execution.Scheduler.Implicits.global
 import org.iq80.leveldb.DB
 import org.scalatest.matchers.should.Matchers.*
@@ -61,6 +61,11 @@ case class Domain(
   lazy val utxPool        = new TestUtxPool(SystemTime, blockchain, settings.utxSettings, settings.minerSettings.enable, beforeSetPriorityDiffs)
   lazy val wallet: Wallet = Wallet(settings.walletSettings.copy(file = None))
 
+  def blockchainWithDiscardedDiffs(): CompositeBlockchain = {
+    def bc = CompositeBlockchain(blockchain, utxPool.discardedMicrosDiff())
+    utxPool.priorityPool.optimisticRead(bc)(_ => true)
+  }
+
   object commonApi {
 
     /** @return
@@ -69,7 +74,7 @@ case class Domain(
       *   [[com.wavesplatform.state.diffs.FeeValidation#getMinFee(com.wavesplatform.state.Blockchain, com.wavesplatform.transaction.Transaction)]]
       */
     def calculateFee(tx: Transaction): (Asset, Long, Long) =
-      transactions.calculateFee(tx).explicitGet()
+      transactionsApi.calculateFee(tx).explicitGet()
 
     def calculateWavesFee(tx: Transaction): Long = {
       val (Waves, _, feeInWaves) = calculateFee(tx): @unchecked
@@ -77,7 +82,7 @@ case class Domain(
     }
 
     def transactionMeta(transactionId: ByteStr): TransactionMeta =
-      transactions
+      transactionsApi
         .transactionById(transactionId)
         .getOrElse(throw new NoSuchElementException(s"No meta for $transactionId"))
 
@@ -88,16 +93,7 @@ case class Domain(
       }
 
     def addressTransactions(address: Address): Seq[TransactionMeta] =
-      transactions.transactionsByAddress(address, None, Set.empty, None).toListL.runSyncUnsafe()
-
-    lazy val transactions: CommonTransactionsApi = CommonTransactionsApi(
-      blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
-      db,
-      () => blockchain,
-      utxPool,
-      tx => Future.successful(utxPool.putIfNew(tx)),
-      Application.loadBlockAt(db, blockchain)
-    )
+      transactionsApi.transactionsByAddress(address, None, Set.empty, None).toListL.runSyncUnsafe()
   }
 
   def liquidState: Option[NgState] = {
@@ -140,8 +136,10 @@ case class Domain(
       .getOrElse(TestBlock.create(Nil))
   }
 
-  def liquidDiff: Diff =
-    blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty)
+  def liquidDiff: Diff = {
+    val liquidDiff = blockchainUpdater.bestLiquidDiff.getOrElse(Diff())
+    liquidDiff.combineE(utxPool.discardedMicrosDiff()).explicitGet()
+  }
 
   def microBlocks: Vector[MicroBlock] = blockchain.microblockIds.reverseIterator.flatMap(blockchain.microBlock).to(Vector)
 
@@ -164,24 +162,28 @@ case class Domain(
 
   def nftList(address: Address): Seq[(IssuedAsset, AssetDescription)] = db.withResource { resource =>
     AddressPortfolio
-      .nftIterator(resource, address, blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), None, blockchainUpdater.assetDescription)
+      .nftIterator(resource, address, liquidDiff, None, blockchainUpdater.assetDescription)
       .toSeq
   }
 
   def addressTransactions(address: Address, from: Option[ByteStr] = None): Seq[(Height, Transaction)] =
-    AddressTransactions
-      .allAddressTransactions(
-        db,
-        blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
-        address,
-        None,
-        Set.empty,
-        from
-      )
-      .map { case (m, tx) => m.height -> tx }
-      .toSeq
+    transactionsApi
+      .transactionsByAddress(address, None, Set(), from)
+      .map(meta => (meta.height, meta.transaction))
+      .toListL
+      .runSyncUnsafe()
 
-  def portfolio(address: Address): Seq[(IssuedAsset, Long)] = Domain.portfolio(address, db, blockchainUpdater)
+  def portfolio(address: Address): Seq[(IssuedAsset, Long)] =
+    db.withResource { resource =>
+      AddressPortfolio
+        .assetBalanceIterator(
+          resource,
+          address,
+          liquidDiff,
+          id => blockchainUpdater.assetDescription(id).exists(!_.nft)
+        )
+        .toSeq
+    }
 
   def appendAndAssertSucceed(txs: Transaction*): Block = {
     val block = createBlock(Block.PlainBlockVersion, txs)
@@ -390,24 +392,24 @@ case class Domain(
   }
 
   val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(
-    blockchainUpdater.bestLiquidDiff.map(Height(blockchainUpdater.height) -> _),
+    Some(Height(blockchainUpdater.height) -> liquidDiff),
     db,
-    () => blockchain,
+    () => blockchainWithDiscardedDiffs(),
     utxPool,
-    _ => Future.successful(TracedResult(Right(true))),
+    tx => Future.successful(utxPool.putIfNew(tx)),
     h => blocksApi.blockAtHeight(h)
   )
 
   val accountsApi: CommonAccountsApi = CommonAccountsApi(
-    () => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty),
+    () => liquidDiff,
     db,
-    () => utxPool.priorityPool.optimisticRead(CompositeBlockchain(blockchainUpdater, utxPool.priorityPool.validPriorityDiffs))(_ => true)
+    () => blockchainWithDiscardedDiffs()
   )
 
   val assetsApi: CommonAssetsApi = CommonAssetsApi(
-    () => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty),
+    () => liquidDiff,
     db,
-    () => blockchain
+    () => blockchainWithDiscardedDiffs()
   )
 }
 
@@ -415,16 +417,5 @@ object Domain {
   implicit class BlockchainUpdaterExt[A <: BlockchainUpdater](bcu: A) {
     def processBlock(block: Block): Either[ValidationError, Seq[Diff]] =
       bcu.processBlock(block, block.header.generationSignature)
-  }
-
-  def portfolio(address: Address, db: DB, blockchainUpdater: BlockchainUpdaterImpl): Seq[(IssuedAsset, Long)] = db.withResource { resource =>
-    AddressPortfolio
-      .assetBalanceIterator(
-        resource,
-        address,
-        blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty),
-        id => blockchainUpdater.assetDescription(id).exists(!_.nft)
-      )
-      .toSeq
   }
 }

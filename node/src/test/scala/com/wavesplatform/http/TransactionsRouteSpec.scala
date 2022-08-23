@@ -121,11 +121,11 @@ class TransactionsRouteSpec
     seal(
       new TransactionsApiRoute(
         restAPISettings,
-        d.commonApi.transactions,
+        d.transactionsApi,
         testWallet,
         () => d.blockchain,
         () => 0,
-        (t, _) => d.commonApi.transactions.broadcastTransaction(t),
+        (t, _) => d.transactionsApi.broadcastTransaction(t),
         ntpTime
       ).route
     )
