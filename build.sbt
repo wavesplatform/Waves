@@ -163,13 +163,16 @@ inScope(Global)(
     testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports"),
     testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true"),
     network := Network.default(),
-    resolvers ++= Seq(
-      Resolver.sonatypeRepo("snapshots"),
-      Resolver.mavenLocal
-    ),
+    resolvers ++= Resolver.sonatypeOssRepos("snapshots") ++ Seq(Resolver.mavenLocal),
     Compile / doc / sources                := Seq.empty,
     Compile / packageDoc / publishArtifact := false,
-    concurrentRestrictions                 := Seq(Tags.limit(Tags.Test, math.min(EvaluateTask.SystemProcessors, 8)))
+    concurrentRestrictions                 := Seq(Tags.limit(Tags.Test, math.min(EvaluateTask.SystemProcessors, 8))),
+    excludeLintKeys ++= Set(
+      node / Universal / configuration,
+      node / Linux / configuration,
+      node / Debian / configuration,
+      Global / maxParallelSuites
+    )
   )
 )
 
