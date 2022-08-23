@@ -1243,15 +1243,4 @@ class EvaluatorV2Test extends PropSpec with Inside {
     evalOld(script2, 100) shouldBe ((TRUE, "true", 5)) // 3 conditions + ref twice
     evalNew(script2, 100) shouldBe ((TRUE, "true", 3)) // 3 function call
   }
-
-  property("test") {
-    val expr = BLOCK(
-      LET("n", CONST_LONG(26)),
-      LET_BLOCK(
-        LET("complexInt1", CONST_LONG(1973)),
-        LET_BLOCK(LET("res", CONST_STRING("Unit").explicitGet()), IF(CONST_BOOLEAN(true), REF("nil"), FUNCTION_CALL(Native(2), List(CONST_STRING("Strict value is not equal to itself.").explicitGet()))))
-      )
-    )
-    evalOld(expr, 1) shouldBe 1
-  }
 }
