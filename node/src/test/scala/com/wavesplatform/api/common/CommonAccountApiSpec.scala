@@ -50,7 +50,7 @@ class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransacti
             )
           )
         ) { d =>
-          val commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), d.db, d.blockchainUpdater)
+          val commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), d.db, () => d.blockchainUpdater)
           def dataList(): Set[DataEntry[_]] = commonAccountsApi.dataStream(acc.toAddress, None).toListL.runSyncUnsafe().toSet
 
           d.appendBlock(block1)
@@ -87,7 +87,7 @@ class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransacti
 
       forAll(preconditions) { case (acc, block1, mb1, block2, mb2) =>
         withDomain(domainSettingsWithFS(TestFunctionalitySettings.withFeatures(BlockchainFeatures.NG, BlockchainFeatures.DataTransaction))) { d =>
-          val commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), d.db, d.blockchainUpdater)
+          val commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), d.db, () => d.blockchainUpdater)
           def dataList(): Set[DataEntry[_]] = commonAccountsApi.dataStream(acc.toAddress, Some("test_.*")).toListL.runSyncUnsafe().toSet
 
           d.appendBlock(block1)
@@ -161,7 +161,7 @@ class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransacti
           invoke
         )
 
-        val api = CommonAccountsApi(() => Diff.empty, d.db, d.blockchain)
+        val api = CommonAccountsApi(() => Diff.empty, d.db, () => d.blockchain)
         val leaseId = Lease.calculateId(
           Lease(
             Recipient.Address(ByteStr(TxHelpers.defaultAddress.bytes)),

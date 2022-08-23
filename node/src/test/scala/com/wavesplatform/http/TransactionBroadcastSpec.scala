@@ -38,7 +38,7 @@ class TransactionBroadcastSpec
     restAPISettings,
     stub[CommonTransactionsApi],
     stub[Wallet],
-    blockchain,
+    () => blockchain,
     mockFunction[Int],
     transactionPublisher,
     testTime
@@ -60,7 +60,7 @@ class TransactionBroadcastSpec
 
       val transactionPublisher = blockchain.stub.transactionPublisher(testTime)
 
-      val route = transactionsApiRoute.copy(blockchain = blockchain, transactionPublisher = transactionPublisher).route
+      val route = transactionsApiRoute.copy(blockchain = () => blockchain, transactionPublisher = transactionPublisher).route
 
       val transaction = TxHelpers.exchange(
         ethBuyOrder,
@@ -269,7 +269,7 @@ class TransactionBroadcastSpec
         (blockchain.hasAccountScript _).when(*).returns(true)
       }
       val publisher = createTxPublisherStub(blockchain)
-      val route     = transactionsApiRoute.copy(blockchain = blockchain, transactionPublisher = publisher).route
+      val route     = transactionsApiRoute.copy(blockchain = () => blockchain, transactionPublisher = publisher).route
 
       Post(routePath("/broadcast?trace=true"), invoke.json()) ~> route ~> check {
         responseAs[JsObject] should matchJson(

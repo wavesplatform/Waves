@@ -40,7 +40,7 @@ case class TransactionsApiRoute(
     settings: RestAPISettings,
     commonApi: CommonTransactionsApi,
     wallet: Wallet,
-    blockchain: Blockchain,
+    blockchain: () => Blockchain,
     utxPoolSize: () => Int,
     transactionPublisher: TransactionPublisher,
     time: Time
@@ -49,7 +49,7 @@ case class TransactionsApiRoute(
     with AuthRoute {
   import TransactionsApiRoute._
 
-  private[this] val serializer                     = TransactionJsonSerializer(blockchain, commonApi)
+  private[this] val serializer                     = TransactionJsonSerializer(blockchain(), commonApi)
   private[this] implicit val transactionMetaWrites = OWrites[TransactionMeta](serializer.transactionWithMetaJson)
 
   override lazy val route: Route =
@@ -89,12 +89,13 @@ case class TransactionsApiRoute(
 
   private[this] def loadTransactionStatus(id: ByteStr): JsObject = {
     import Status._
-    val statusJson = blockchain.transactionInfo(id) match {
+    val bc = blockchain()
+    val statusJson = bc.transactionInfo(id) match {
       case Some((tm, tx)) =>
         Json.obj(
           "status"        -> Confirmed,
           "height"        -> JsNumber(tm.height),
-          "confirmations" -> (blockchain.height - tm.height).max(0)
+          "confirmations" -> (bc.height - tm.height).max(0)
         ) ++ serializer.metaJson(tm)
       case None =>
         commonApi.unconfirmedTransactionById(id) match {

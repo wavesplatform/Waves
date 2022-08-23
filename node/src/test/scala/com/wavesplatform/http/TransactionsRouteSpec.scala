@@ -67,7 +67,7 @@ class TransactionsRouteSpec
     restAPISettings,
     addressTransactions,
     testWallet,
-    blockchain,
+    () => blockchain,
     utxPoolSize,
     utxPoolSynchronizer,
     testTime
@@ -123,7 +123,7 @@ class TransactionsRouteSpec
         restAPISettings,
         d.commonApi.transactions,
         testWallet,
-        d.blockchain,
+        () => d.blockchain,
         () => 0,
         (t, _) => d.commonApi.transactions.broadcastTransaction(t),
         ntpTime
@@ -397,7 +397,7 @@ class TransactionsRouteSpec
           )
         )
 
-      val route = seal(transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route)
+      val route = seal(transactionsApiRoute.copy(blockchain = () => blockchain, commonApi = transactionsApi).route)
       Get(routePath(s"/info/${transaction.id()}")) ~> route ~> check {
         responseAs[JsObject] should matchJson(s"""{
                                                  |  "type" : 18,
@@ -451,7 +451,7 @@ class TransactionsRouteSpec
           )
         )
 
-      val route = seal(transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route)
+      val route = seal(transactionsApiRoute.copy(blockchain = () => blockchain, commonApi = transactionsApi).route)
       Get(routePath(s"/info/${transaction.id()}")) ~> route ~> check {
         responseAs[JsObject] should matchJson(s"""{
                                                  |  "type" : 18,
@@ -510,7 +510,7 @@ class TransactionsRouteSpec
           Some(LeaseDetails(lease.sender, lease.recipient, lease.amount.value, LeaseDetails.Status.Cancelled(2, Some(leaseCancel.id())), lease.id(), 1))
         )
 
-      val route = transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route
+      val route = transactionsApiRoute.copy(blockchain = () => blockchain, commonApi = transactionsApi).route
       Get(routePath(s"/info/${leaseCancel.id()}")) ~> route ~> check {
         val json = responseAs[JsObject]
         json shouldBe Json.parse(s"""{

@@ -36,7 +36,7 @@ import scala.util.{Success, Try}
 case class AddressApiRoute(
     settings: RestAPISettings,
     wallet: Wallet,
-    blockchain: Blockchain,
+    blockchain: () => Blockchain,
     transactionPublisher: TransactionPublisher,
     time: Time,
     limitedScheduler: Scheduler,
@@ -59,7 +59,8 @@ case class AddressApiRoute(
 
   def scriptInfo: Route = (path("scriptInfo" / AddrSegment) & get) { address =>
     completeLimited {
-      val scriptInfoOpt = blockchain.accountScript(address)
+      val bc            = blockchain()
+      val scriptInfoOpt = bc.accountScript(address)
       val callableComplexitiesOpt =
         for {
           scriptInfo <- scriptInfoOpt
@@ -67,7 +68,7 @@ case class AddressApiRoute(
             case ContractScriptImpl(_, DApp(_, _, _, Some(vf))) => Some(vf.u.name)
             case _                                              => None
           }
-          complexities <- scriptInfo.complexitiesByEstimator.get(blockchain.estimator.version)
+          complexities <- scriptInfo.complexitiesByEstimator.get(bc.estimator.version)
         } yield verifierName.fold(complexities)(complexities - _)
 
       val callableComplexities = callableComplexitiesOpt.getOrElse(Map[String, Long]())
@@ -82,7 +83,7 @@ case class AddressApiRoute(
         "complexity"           -> maxComplexity,
         "verifierComplexity"   -> verifierComplexity,
         "callableComplexities" -> callableComplexities,
-        "extraFee"             -> (if (blockchain.hasPaidVerifier(address)) FeeValidation.ScriptExtraFee else 0L)
+        "extraFee"             -> (if (bc.hasPaidVerifier(address)) FeeValidation.ScriptExtraFee else 0L)
       )
     }
   }
@@ -118,7 +119,7 @@ case class AddressApiRoute(
 
   def balances: Route = (path("balance") & get & parameters("height".as[Int].?, "address".as[String].*, "asset".?)) {
     (maybeHeight, addresses, assetId) =>
-      val height = maybeHeight.getOrElse(blockchain.height)
+      val height = maybeHeight.getOrElse(blockchain().height)
       validateBalanceDepth(height)(
         complete(
           balancesJson(height, addresses.toSeq, assetId.fold(Waves: Asset)(a => IssuedAsset(ByteStr.decodeBase58(a).get)))
@@ -127,7 +128,7 @@ case class AddressApiRoute(
   }
 
   def balancesPost: Route = (path("balance") & (post & entity(as[JsObject]))) { request =>
-    val height    = (request \ "height").asOpt[Int].getOrElse(blockchain.height)
+    val height    = (request \ "height").asOpt[Int].getOrElse(blockchain().height)
     val addresses = (request \ "addresses").as[Seq[String]]
     val assetId   = (request \ "asset").asOpt[String]
     validateBalanceDepth(height)(complete(balancesJson(height, addresses, assetId.fold(Waves: Asset)(a => IssuedAsset(ByteStr.decodeBase58(a).get)))))
@@ -137,7 +138,8 @@ case class AddressApiRoute(
     commonAccountsApi
       .balanceDetails(address)
       .fold(
-        e => complete(CustomValidationError(e)), { details =>
+        e => complete(CustomValidationError(e)),
+        { details =>
           import details.*
           complete(
             Json.obj(
@@ -153,11 +155,10 @@ case class AddressApiRoute(
   }
 
   def balanceWithConfirmations: Route = {
-    (path("balance" / AddrSegment / IntNumber) & get) {
-      case (address, confirmations) =>
-        validateBalanceDepth(blockchain.height - confirmations)(
-          complete(balanceJson(address, confirmations))
-        )
+    (path("balance" / AddrSegment / IntNumber) & get) { case (address, confirmations) =>
+      validateBalanceDepth(blockchain().height - confirmations)(
+        complete(balanceJson(address, confirmations))
+      )
     }
   }
 
@@ -169,7 +170,7 @@ case class AddressApiRoute(
 
   def effectiveBalanceWithConfirmations: Route = {
     path("effectiveBalance" / AddrSegment / IntNumber) { (address, confirmations) =>
-      validateBalanceDepth(blockchain.height - confirmations)(
+      validateBalanceDepth(blockchain().height - confirmations)(
         complete(effectiveBalanceJson(address, confirmations))
       )
     }
@@ -199,24 +200,23 @@ case class AddressApiRoute(
 
       (path(Segment) & get) { key =>
         complete(accountDataEntry(address, key))
-      } ~ extractScheduler(
-        implicit sc =>
-          strictEntity {
-            (formField("matches") | parameter("matches")) { matches =>
-              Try(matches.r)
-                .fold(
-                  { e =>
-                    log.trace(s"Error compiling regex $matches: ${e.getMessage}")
-                    complete(ApiError.fromValidationError(GenericError(s"Cannot compile regex")))
-                  },
-                  _ => complete(accountData(address, matches))
-                )
-            } ~ anyParam("key").filter(_.nonEmpty) { keys =>
-              complete(accountDataList(address, keys.toSeq*))
-            } ~ get {
-              complete(accountData(address))
-            }
+      } ~ extractScheduler(implicit sc =>
+        strictEntity {
+          (formField("matches") | parameter("matches")) { matches =>
+            Try(matches.r)
+              .fold(
+                { e =>
+                  log.trace(s"Error compiling regex $matches: ${e.getMessage}")
+                  complete(ApiError.fromValidationError(GenericError(s"Cannot compile regex")))
+                },
+                _ => complete(accountData(address, matches))
+              )
+          } ~ anyParam("key").filter(_.nonEmpty) { keys =>
+            complete(accountDataList(address, keys.toSeq*))
+          } ~ get {
+            complete(accountData(address))
           }
+        }
       )
     }
 
@@ -225,11 +225,10 @@ case class AddressApiRoute(
   }
 
   def seq: Route = {
-    (path("seq" / IntNumber / IntNumber) & get) {
-      case (start, end) =>
-        if (start < 0 || end < 0 || start > end) complete(GenericError("Invalid sequence"))
-        else if (end - start >= MaxAddressesPerRequest) complete(TooBigArrayAllocation(MaxAddressesPerRequest))
-        else complete(wallet.privateKeyAccounts.map(_.toAddress).slice(start, end))
+    (path("seq" / IntNumber / IntNumber) & get) { case (start, end) =>
+      if (start < 0 || end < 0 || start > end) complete(GenericError("Invalid sequence"))
+      else if (end - start >= MaxAddressesPerRequest) complete(TooBigArrayAllocation(MaxAddressesPerRequest))
+      else complete(wallet.privateKeyAccounts.map(_.toAddress).slice(start, end))
     }
   }
 
@@ -240,9 +239,10 @@ case class AddressApiRoute(
     }
   }
 
-  private def balancesJson(height: Int, addresses: Seq[String], assetId: Asset): ToResponseMarshallable =
+  private def balancesJson(height: Int, addresses: Seq[String], assetId: Asset): ToResponseMarshallable = {
+    val bc = blockchain()
     if (addresses.length > settings.transactionsByAddressLimit) TooBigArrayAllocation
-    else if (height < 1 || height > blockchain.height) CustomValidationError(s"Illegal height: $height")
+    else if (height < 1 || height > bc.height) CustomValidationError(s"Illegal height: $height")
     else {
       implicit val balancesWrites: Writes[(String, Long)] = Writes[(String, Long)] { b =>
         Json.obj("id" -> b._1, "balance" -> b._2)
@@ -251,10 +251,11 @@ case class AddressApiRoute(
       val balances = for {
         addressStr <- addresses.toSet[String]
         address    <- Address.fromString(addressStr).toOption
-      } yield blockchain.balanceAtHeight(address, height, assetId).fold(addressStr -> 0L)(addressStr -> _._2)
+      } yield bc.balanceAtHeight(address, height, assetId).fold(addressStr -> 0L)(addressStr -> _._2)
 
       ToResponseMarshallable(balances)
     }
+  }
 
   private def balanceJson(acc: Address, confirmations: Int) = {
     Balance(acc.toString, confirmations, commonAccountsApi.balance(acc, confirmations))
@@ -263,7 +264,7 @@ case class AddressApiRoute(
   private def balanceJson(acc: Address) = Balance(acc.toString, 0, commonAccountsApi.balance(acc))
 
   private def scriptMetaJson(account: Address): Either[ValidationError.ScriptParseError, AccountScriptMeta] = {
-    val accountScript = blockchain.accountScript(account)
+    val accountScript = blockchain().accountScript(account)
 
     accountScript
       .map(_.script)
@@ -276,8 +277,9 @@ case class AddressApiRoute(
   }
 
   private[this] def validateBalanceDepth(height: Int): Directive0 = {
-    if (height < blockchain.height - maxBalanceDepth)
-      complete(CustomValidationError(s"Unable to get balance past height ${blockchain.height - maxBalanceDepth}"))
+    val bc = blockchain()
+    if (height < bc.height - maxBalanceDepth)
+      complete(CustomValidationError(s"Unable to get balance past height ${bc.height - maxBalanceDepth}"))
     else
       pass
   }
@@ -330,7 +332,7 @@ case class AddressApiRoute(
       case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
         val account = PublicKey(pubKeyBytes)
         val isValid = account.toAddress == address &&
-          crypto.verify(signatureBytes, msgBytes, PublicKey(pubKeyBytes), blockchain.isFeatureActivated(BlockchainFeatures.RideV6))
+          crypto.verify(signatureBytes, msgBytes, PublicKey(pubKeyBytes), blockchain().isFeatureActivated(BlockchainFeatures.RideV6))
         Right(Json.obj("valid" -> isValid))
       case _ => Left(InvalidMessage)
     }

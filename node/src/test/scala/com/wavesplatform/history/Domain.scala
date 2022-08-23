@@ -93,7 +93,7 @@ case class Domain(
     lazy val transactions: CommonTransactionsApi = CommonTransactionsApi(
       blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
       db,
-      blockchain,
+      () => blockchain,
       utxPool,
       tx => Future.successful(utxPool.putIfNew(tx)),
       Application.loadBlockAt(db, blockchain)
@@ -392,7 +392,7 @@ case class Domain(
   val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(
     blockchainUpdater.bestLiquidDiff.map(Height(blockchainUpdater.height) -> _),
     db,
-    blockchain,
+    () => blockchain,
     utxPool,
     _ => Future.successful(TracedResult(Right(true))),
     h => blocksApi.blockAtHeight(h)
@@ -401,13 +401,13 @@ case class Domain(
   val accountsApi: CommonAccountsApi = CommonAccountsApi(
     () => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty),
     db,
-    utxPool.priorityPool.optimisticRead(CompositeBlockchain(blockchainUpdater, utxPool.priorityPool.validPriorityDiffs))(_ => true)
+    () => utxPool.priorityPool.optimisticRead(CompositeBlockchain(blockchainUpdater, utxPool.priorityPool.validPriorityDiffs))(_ => true)
   )
 
   val assetsApi: CommonAssetsApi = CommonAssetsApi(
     () => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty),
     db,
-    blockchain
+    () => blockchain
   )
 }
 

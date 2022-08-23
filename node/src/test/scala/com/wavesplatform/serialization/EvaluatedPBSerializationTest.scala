@@ -114,7 +114,7 @@ class EvaluatedPBSerializationTest
     restAPISettings,
     d.transactionsApi,
     d.wallet,
-    d.blockchain,
+    () => d.blockchain,
     () => d.utxPool.size,
     (_, _) => Future.successful(TracedResult(Right(true))),
     ntpTime

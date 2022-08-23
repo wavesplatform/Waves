@@ -49,10 +49,9 @@ class LeaseRouteSpec
     LeaseApiRoute(
       restAPISettings,
       testWallet,
-      domain.blockchain,
       (_, _) => Future.successful(TracedResult(Right(true))),
       ntpTime,
-      CommonAccountsApi(() => domain.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), domain.db, domain.blockchain)
+      CommonAccountsApi(() => domain.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), domain.db, () => domain.blockchain)
     )
 
   private def withRoute(balances: Seq[AddrWithBalance], settings: WavesSettings = mostRecent)(f: (Domain, Route) => Unit): Unit =
@@ -519,7 +518,7 @@ class LeaseRouteSpec
     val blockchain = stub[Blockchain]
     val commonApi  = stub[CommonAccountsApi]
 
-    val route = LeaseApiRoute(restAPISettings, stub[Wallet], blockchain, stub[TransactionPublisher], SystemTime, commonApi).route
+    val route = LeaseApiRoute(restAPISettings, stub[Wallet], stub[TransactionPublisher], SystemTime, commonApi).route
 
     val lease       = TxHelpers.lease()
     val leaseCancel = TxHelpers.leaseCancel(lease.id())

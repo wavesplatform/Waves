@@ -64,7 +64,7 @@ class SpentComplexitySpec
 
   private def route(d: Domain) =
     seal(
-      TransactionsApiRoute(restAPISettings, d.transactionsApi, testWallet, d.blockchain, () => 0, DummyTransactionPublisher.accepting, ntpTime).route
+      TransactionsApiRoute(restAPISettings, d.transactionsApi, testWallet, () => d.blockchain, () => 0, DummyTransactionPublisher.accepting, ntpTime).route
     )
 
   "Invocation" - {

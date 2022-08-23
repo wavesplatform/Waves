@@ -2,31 +2,29 @@ package com.wavesplatform.api.http.leasing
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.api.common.{CommonAccountsApi, LeaseInfo}
-import com.wavesplatform.api.http.{BroadcastRoute, _}
-import com.wavesplatform.api.http.requests.{LeaseCancelRequest, LeaseRequest}
+import com.wavesplatform.api.http.*
 import com.wavesplatform.api.http.ApiError.{InvalidIds, TooBigArrayAllocation, TransactionDoesNotExist}
+import com.wavesplatform.api.http.requests.{LeaseCancelRequest, LeaseRequest}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.*
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
+import play.api.libs.json.*
 import play.api.libs.json.JsonConfiguration.Aux
-import play.api.libs.json._
 
 case class LeaseApiRoute(
     settings: RestAPISettings,
     wallet: Wallet,
-    blockchain: Blockchain,
     transactionPublisher: TransactionPublisher,
     time: Time,
     commonAccountApi: CommonAccountsApi
 ) extends ApiRoute
     with BroadcastRoute
     with AuthRoute {
-  import LeaseApiRoute._
+  import LeaseApiRoute.*
 
   override val route: Route = pathPrefix("leasing") {
     active ~ deprecatedRoute
@@ -68,18 +66,17 @@ case class LeaseApiRoute(
     }
 
   private[this] def leasingInfosMap(ids: Iterable[String]): Either[InvalidIds, Map[String, LeaseInfo]] = {
-    val infos = ids.map(
-      id =>
-        (for {
-          id <- Base58.tryDecodeWithLimit(id).toOption
-          li <- commonAccountApi.leaseInfo(ByteStr(id))
-        } yield li).toRight(id)
+    val infos = ids.map(id =>
+      (for {
+        id <- Base58.tryDecodeWithLimit(id).toOption
+        li <- commonAccountApi.leaseInfo(ByteStr(id))
+      } yield li).toRight(id)
     )
     val failed = infos.flatMap(_.left.toOption)
 
     if (failed.isEmpty) {
-      Right(infos.collect {
-        case Right(li) => li.id.toString -> li
+      Right(infos.collect { case Right(li) =>
+        li.id.toString -> li
       }.toMap)
     } else {
       Left(InvalidIds(failed.toVector))

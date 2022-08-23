@@ -46,7 +46,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
 
   private val transactionsApi = mock[CommonTransactionsApi]
   private val route: Route =
-    TransactionsApiRoute(restAPISettings, transactionsApi, testWallet, blockchain, () => utx.size, DummyTransactionPublisher.accepting, ntpTime).route
+    TransactionsApiRoute(restAPISettings, transactionsApi, testWallet, () => blockchain, () => utx.size, DummyTransactionPublisher.accepting, ntpTime).route
 
   "Proto transactions should be able to broadcast " - {
     "CreateAliasTransaction" in {
