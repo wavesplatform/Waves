@@ -21,13 +21,13 @@ import scala.concurrent.{Await, Future}
 class DiscardedMicroBlocksDiffTest extends PropSpec with WithDomain {
   property("consistent interim balance") {
     Seq(true, false).foreach { useAsset =>
-      val waitInterimState     = new CountDownLatch(1)
-      val getOutOfInterimState = new CountDownLatch(1)
+      val waitInterimState = new CountDownLatch(1)
+      val endInterimState  = new CountDownLatch(1)
       withDomain(
         RideV6,
         beforeSetPriorityDiffs = { () =>
           waitInterimState.countDown()
-          getOutOfInterimState.await()
+          endInterimState.await()
         }
       ) { d =>
         val appendBlock = BlockAppender(d.blockchain, TestTime(), d.utxPool, d.posSelector, Scheduler.global, verify = false) _
@@ -53,7 +53,7 @@ class DiscardedMicroBlocksDiffTest extends PropSpec with WithDomain {
 
         waitInterimState.await()
         val check = Future(balanceDiff() shouldBe 123)
-        getOutOfInterimState.countDown()
+        endInterimState.countDown()
 
         Await.result(check, Inf)
         Await.result(appendKeyBlock, Inf)
@@ -63,14 +63,14 @@ class DiscardedMicroBlocksDiffTest extends PropSpec with WithDomain {
   }
 
   property("consistent interim account data") {
-    val waitInterimState     = new CountDownLatch(1)
-    val getOutOfInterimState = new CountDownLatch(1)
+    val waitInterimState = new CountDownLatch(1)
+    val endInterimState  = new CountDownLatch(1)
     withDomain(
       RideV6,
       AddrWithBalance.enoughBalances(defaultSigner),
       beforeSetPriorityDiffs = { () =>
         waitInterimState.countDown()
-        getOutOfInterimState.await()
+        endInterimState.await()
       }
     ) { d =>
       val appendBlock = BlockAppender(d.blockchain, TestTime(), d.utxPool, d.posSelector, Scheduler.global, verify = false) _
@@ -87,7 +87,7 @@ class DiscardedMicroBlocksDiffTest extends PropSpec with WithDomain {
 
       waitInterimState.await()
       val check = Future(data() shouldBe Some(1))
-      getOutOfInterimState.countDown()
+      endInterimState.countDown()
 
       Await.result(check, Inf)
       Await.result(appendKeyBlock, Inf)
@@ -96,14 +96,14 @@ class DiscardedMicroBlocksDiffTest extends PropSpec with WithDomain {
   }
 
   property("consistent interim account script") {
-    val waitInterimState     = new CountDownLatch(1)
-    val getOutOfInterimState = new CountDownLatch(1)
+    val waitInterimState = new CountDownLatch(1)
+    val endInterimState  = new CountDownLatch(1)
     withDomain(
       RideV6,
       AddrWithBalance.enoughBalances(defaultSigner),
       beforeSetPriorityDiffs = { () =>
         waitInterimState.countDown()
-        getOutOfInterimState.await()
+        endInterimState.await()
       }
     ) { d =>
       val appendBlock = BlockAppender(d.blockchain, TestTime(), d.utxPool, d.posSelector, Scheduler.global, verify = false) _
@@ -120,7 +120,7 @@ class DiscardedMicroBlocksDiffTest extends PropSpec with WithDomain {
 
       waitInterimState.await()
       val check = Future(hasScript() shouldBe true)
-      getOutOfInterimState.countDown()
+      endInterimState.countDown()
 
       Await.result(check, Inf)
       Await.result(appendKeyBlock, Inf)
