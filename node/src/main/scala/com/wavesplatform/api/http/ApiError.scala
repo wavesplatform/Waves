@@ -303,6 +303,13 @@ object ApiError {
     val code: StatusCode = StatusCodes.NotFound
   }
 
+  case class AssetsDoesNotExist(ids: Seq[IssuedAsset]) extends ApiError {
+    val id: Int                      = 314
+    val message: String              = s"Asset does not exist. ${ids.map(_.id.toString).mkString(", ")}"
+    val code: StatusCode             = StatusCodes.BadRequest
+    override lazy val json: JsObject = Json.obj("error" -> id, "message" -> message, "ids" -> ids)
+  }
+
   final case class NegativeAmount(msg: String) extends ApiError {
     override val id: Int          = NegativeAmount.Id
     override val message: String  = s"negative amount: $msg"
@@ -412,6 +419,18 @@ object ApiError {
   case object InvalidAssetId extends ApiError {
     override val id      = 4007
     override val message = "Invalid asset id"
+    override val code    = StatusCodes.BadRequest
+  }
+
+  case object DataKeysNotSpecified extends ApiError {
+    override val id      = 4008
+    override val message = "Key was not specified"
+    override val code    = StatusCodes.BadRequest
+  }
+
+  case object AssetIdNotSpecified extends ApiError {
+    override val id      = 4009
+    override val message = "Asset ID was not specified"
     override val code    = StatusCodes.BadRequest
   }
 }

@@ -2,6 +2,7 @@ package com.wavesplatform.api.http
 
 import akka.NotUsed
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
+import akka.http.scaladsl.model.HttpMethods
 import akka.http.scaladsl.server.{Directive0, Route}
 import akka.stream.scaladsl.Source
 import cats.instances.option.*
@@ -211,8 +212,14 @@ case class AddressApiRoute(
                 },
                 _ => complete(accountData(address, matches))
               )
-          } ~ anyParam("key").filter(_.nonEmpty) { keys =>
-            complete(accountDataList(address, keys.toSeq*))
+          } ~ anyParam("key", limit = settings.dataKeysRequestLimit) { keys =>
+            extractMethod.filter(_ != HttpMethods.GET || keys.nonEmpty) { _ =>
+              val result = Either
+                .cond(keys.nonEmpty, (), DataKeysNotSpecified)
+            .map(_ => accountDataList(address, keys.toSeq*))
+
+              complete(result)
+            }
           } ~ get {
             complete(accountData(address))
           }
@@ -296,13 +303,13 @@ case class AddressApiRoute(
       .dataStream(addr, Some(regex))
       .toListL
       .runAsyncLogErr
-      .map(data => Source.fromIterator(() => data.sortBy(_.key).iterator.map(Json.toJson[DataEntry[_]])))
+      .map(data => Source.fromIterator(() => data.sortBy(_.key).iterator.map(Json.toJson[DataEntry[?]])))
 
   private def accountDataEntry(address: Address, key: String): ToResponseMarshallable =
     commonAccountsApi.data(address, key).toRight(DataKeyDoesNotExist)
 
   private def accountDataList(address: Address, keys: String*) =
-    Source.fromIterator(() => keys.flatMap(commonAccountsApi.data(address, _)).iterator.map(Json.toJson[DataEntry[_]]))
+    Source.fromIterator(() => keys.flatMap(commonAccountsApi.data(address, _)).iterator.map(Json.toJson[DataEntry[?]]))
 
   private def signPath(address: Address, encode: Boolean): Route = (post & entity(as[String])) { message =>
     withAuth {
