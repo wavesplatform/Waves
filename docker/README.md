@@ -134,11 +134,11 @@ http://localhost:6870/api-docs/index.html
 ### Extensions
 You can run custom extensions in this way:
 1. Copy all lib/*.jar files from extension to any directory, lets say `plugins`
-2. Add extension class to configuration file, lets say `local.conf`:
+2. Add extension class to configuration file, lets say `local.conf`, located in `config` directory containing also `waves.conf`:
 ```hocon
 waves.extensions += com.johndoe.WavesExtension
 ```
-3. Run `docker run -v "$(pwd)/plugins:/usr/share/waves/lib/plugins" -v "$(pwd)/local.conf:/etc/waves/local.conf" -i wavesplatform/wavesnode`
+3. Run `docker run -v "$(pwd)/plugins:/usr/share/waves/lib/plugins" -v "$(pwd)/config:/etc/waves" -i wavesplatform/wavesnode`
 
 ## Waves private node
 
