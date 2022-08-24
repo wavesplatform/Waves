@@ -1,16 +1,17 @@
+import java.io.File
+import java.nio.file.{Files, Paths}
+
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.scala.{DefaultScalaModule, ScalaObjectMapper}
+import com.fasterxml.jackson.module.scala.{ClassTagExtensions, DefaultScalaModule}
 import org.hjson.JsonValue
 import sbt.Keys.{baseDirectory, sourceManaged}
 import sbt.{Def, IO, _}
 
-import java.io.File
-import java.nio.file.{Files, Paths}
 import scala.collection.JavaConverters._
 
 object Tasks {
   lazy val docSource = Def.task {
-    val mapper = new ObjectMapper() with ScalaObjectMapper
+    val mapper = new ObjectMapper() with ClassTagExtensions
     mapper.registerModule(DefaultScalaModule)
 
     val baseLangDir = baseDirectory.value.getParentFile.getAbsolutePath

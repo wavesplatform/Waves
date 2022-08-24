@@ -1,6 +1,7 @@
 #!/bin/bash
 
 NETWORK="Mainnet"
+TARGET=/src/target
 
 if [[ -n $1 ]]; then
   NETWORK=$1
@@ -8,11 +9,14 @@ fi
 
 echo "Building with network: $NETWORK"
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-USER=$(id -u)
-GROUP=$(id -g)
 
-docker run --mount type=bind,source="$DIR",target=/src -it --rm wavesplatform/sbt:8u302-b08_1.5.5_2.13.6 /bin/sh -c "
-  cd /src &&
-  sbt --mem 2048 -J-XX:+UseG1GC -Dcoursier.cache=/src/target/docker/coursier -Dsbt.boot.directory=/src/target/docker/sbt_cache \"set ThisBuild/network := $NETWORK\" packageAll &&
-  chown -R $USER:$GROUP .
-"
+docker run \
+  -u $(id -u ${USER}):$(id -g ${USER}) \
+  -v "$DIR":/src \
+  -e HOME=$TARGET \
+  -e XDG_CONFIG_HOME=$TARGET/.config \
+  -e XDG_CACHE_HOME=$TARGET/.cache \
+  -e SBT_OPTS="-XX:+UseG1GC -Dsbt.ivy.home=$TARGET/.ivy2 -Dsbt.global.base=$TARGET/.sbt/1.0" \
+  -w /src \
+  --rm -it wavesplatform/sbt:8u345-b01_1.7.1_2.13.8 \
+  /bin/sh -c "sbt --batch --mem 2048 \"set ThisBuild/network := $NETWORK\" packageAll"

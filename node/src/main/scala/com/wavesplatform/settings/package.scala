@@ -11,7 +11,7 @@ import net.ceedubs.ficus.readers.namemappers.HyphenNameMapper
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 import org.apache.commons.lang3.SystemUtils
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
 package object settings {
@@ -86,7 +86,7 @@ package object settings {
     def osxDefaultDirectory: String =
       s"$${user.home}/Library/Application Support"
 
-    //noinspection SpellCheckingInspection
+    // noinspection SpellCheckingInspection
     def winDefaultDirectory: String =
       s"$${LOCALAPPDATA}"
 
