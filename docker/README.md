@@ -5,8 +5,8 @@ Waves is a decentralized platform that allows any user to issue, transfer, swap 
 
 
 ## About the image
-The image is focused on fast and convenient deployment of Waves Node.
-This Docker image contains scripts and configs to run Waves Node for `mainnet`, `testnet` or `stagenet` networks.
+This Docker image is focused on fast and convenient deployment of Waves Node.
+The image contains scripts and configs to run Waves Node for `mainnet`, `testnet` or `stagenet` networks.
 If you need to run node in private network, see [Waves private node](https://github.com/wavesplatform/Waves/tree/master/docker#waves-private-node) section.
 
 GitHub repository: https://github.com/wavesplatform/Waves/tree/master/docker
