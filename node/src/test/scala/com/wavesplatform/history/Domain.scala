@@ -137,8 +137,8 @@ case class Domain(
   }
 
   def liquidDiff: Diff = {
-    val liquidDiff = blockchainUpdater.bestLiquidDiff.getOrElse(Diff())
-    val totalDiff  = liquidDiff.combineE(utxPool.discardedMicrosDiff()).explicitGet()
+    def liquidDiff = blockchainUpdater.bestLiquidDiff.getOrElse(Diff())
+    def totalDiff  = liquidDiff.combineE(utxPool.discardedMicrosDiff()).explicitGet()
     utxPool.priorityPool.optimisticRead(totalDiff)(_ => true)
   }
 

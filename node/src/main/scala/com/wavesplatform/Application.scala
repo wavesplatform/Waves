@@ -133,8 +133,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     }
 
     def totalLiquidDiff(): Diff = {
-      val liquidDiff = blockchainUpdater.bestLiquidDiff.getOrElse(Diff())
-      val totalDiff  = liquidDiff.combineE(utxStorage.discardedMicrosDiff()).explicitGet()
+      def liquidDiff = blockchainUpdater.bestLiquidDiff.getOrElse(Diff())
+      def totalDiff  = liquidDiff.combineE(utxStorage.discardedMicrosDiff()).explicitGet()
       utxStorage.priorityPool.optimisticRead(totalDiff)(_ => true)
     }
 
