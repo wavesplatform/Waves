@@ -56,7 +56,7 @@ class DiscardedMicroBlocksDiffTest extends PropSpec with WithDomain {
   property("interim active leases") {
     testInterimState(
       lease(),
-      d => Await.result(d.accountsApi.activeLeases(defaultAddress).toListL.runToFuture, Inf) should not be empty
+      _.accountsApi.activeLeases(defaultAddress).toListL.runSyncUnsafe() should not be empty
     )
   }
 
