@@ -12,6 +12,7 @@ import com.wavesplatform.test.DomainPresets.RideV6
 import com.wavesplatform.test.{PropSpec, TestTime}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.TransactionType.{Lease, Transfer}
 import com.wavesplatform.transaction.TxHelpers.*
 import monix.execution.Scheduler
 import monix.execution.Scheduler.Implicits.global
@@ -57,6 +58,18 @@ class DiscardedMicroBlocksDiffTest extends PropSpec with WithDomain {
     testInterimState(
       lease(),
       _.accountsApi.activeLeases(defaultAddress).toListL.runSyncUnsafe() should not be empty
+    )
+  }
+
+  property("interim transaction") {
+    val tx = transfer()
+    testInterimState(
+      tx,
+      _.transactionsApi.transactionsByAddress(defaultAddress, None, Set(Transfer)).toListL.runSyncUnsafe().map(_.transaction) shouldBe Seq(tx)
+    )
+    testInterimState(
+      tx,
+      _.transactionsApi.transactionById(tx.id()).map(_.transaction) shouldBe Some(tx)
     )
   }
 
