@@ -12,7 +12,7 @@ import com.wavesplatform.test.DomainPresets.RideV6
 import com.wavesplatform.test.{PropSpec, TestTime}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.TransactionType.{Lease, Transfer}
+import com.wavesplatform.transaction.TransactionType.Transfer
 import com.wavesplatform.transaction.TxHelpers.*
 import monix.execution.Scheduler
 import monix.execution.Scheduler.Implicits.global
@@ -31,11 +31,11 @@ class DiscardedMicroBlocksDiffTest extends PropSpec with WithDomain {
   }
 
   property("interim asset balance") {
-    val issueTx     = issue()
-    val issuedAsset = IssuedAsset(issueTx.id())
+    val issueTx = issue()
+    val asset   = IssuedAsset(issueTx.id())
     testInterimState(
-      transfer(amount = 123, asset = issuedAsset),
-      _.accountsApi.assetBalance(secondAddress, issuedAsset) shouldBe 123,
+      transfer(amount = 123, asset = asset),
+      _.accountsApi.assetBalance(secondAddress, asset) shouldBe 123,
       preconditions = Seq(issueTx)
     )
   }
@@ -70,6 +70,20 @@ class DiscardedMicroBlocksDiffTest extends PropSpec with WithDomain {
     testInterimState(
       tx,
       _.transactionsApi.transactionById(tx.id()).map(_.transaction) shouldBe Some(tx)
+    )
+  }
+
+  property("interim asset description") {
+    val issueTx = issue()
+    val asset   = IssuedAsset(issueTx.id())
+    testInterimState(
+      issueTx,
+      _.assetsApi.description(asset) should not be empty
+    )
+    testInterimState(
+      reissue(asset, amount = 1),
+      _.assetsApi.description(asset).get.totalVolume shouldBe issueTx.quantity.value + 1,
+      preconditions = Seq(issueTx)
     )
   }
 
