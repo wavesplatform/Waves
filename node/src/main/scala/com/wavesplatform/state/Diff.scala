@@ -6,7 +6,7 @@ import cats.implicits.{catsSyntaxSemigroup, toFlatMapOps, toFunctorOps}
 import cats.kernel.{Monoid, Semigroup}
 import cats.syntax.either.*
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.features.BlockchainFeatures
