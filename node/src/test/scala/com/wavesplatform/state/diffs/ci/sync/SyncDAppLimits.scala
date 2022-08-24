@@ -20,7 +20,7 @@ class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with Eit
   complexityLimitTests("NODE-521 A limit of complexity is 52000 if the first script is V6", V6, 52000)
   complexityLimitTests("NODE-527 A limit of complexity is 26000 if the first script is V5", V5, 26000)
   private def complexityLimitTests(title: String, v: StdLibVersion, complexityLimit: Int): Unit = {
-    def mkSetScriptTx(overflow: Boolean): SetScriptTransaction = TxHelpers.setScript(
+    val mkSetScriptTx: SetScriptTransaction = TxHelpers.setScript(
       alice,
       TestCompiler(v).compileContract(
         // One call of foo has 2000 complexity
@@ -32,7 +32,7 @@ class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with Eit
            |     # 81 = 2 for valueOrElse, 75 for invoke, 1 for Address, 1 for "n - 1", 1 for list, 1 for as
            |     valueOrElse(invoke(Address(base58'$aliceAddr'), "foo", [n - 1], []).as[Int], 0)
            |   } else {
-           |     ${mkIntExprWithComplexity(81)} ${if (overflow) "+ 1 # 82" else "# 81"}
+           |     ${mkIntExprWithComplexity(81)} # 81
            |   }
            |   # 2 = 1 for tuple, 1 for "+"
            |   ([], complexInt1 + complexInt2)
@@ -44,7 +44,7 @@ class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with Eit
 
     property(s"$title - positive") {
       withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(alice)) { d =>
-        d.appendBlock(mkSetScriptTx(overflow = false))
+        d.appendBlock(mkSetScriptTx)
 
         val calls    = complexityLimit / 2000
         val invokeTx = TxHelpers.invoke(aliceAddr, Some("foo"), Seq(CONST_LONG(calls)), invoker = alice)
@@ -59,7 +59,7 @@ class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with Eit
 
     property(s"$title - negative") {
       withDomain(DomainPresets.RideV6, AddrWithBalance.enoughBalances(alice)) { d =>
-        d.appendBlock(mkSetScriptTx(overflow = true))
+        d.appendBlock(mkSetScriptTx)
 
         val calls    = complexityLimit / 2000 + 1
         val invokeTx = TxHelpers.invoke(aliceAddr, Some("foo"), Seq(CONST_LONG(calls)), invoker = alice)
@@ -141,7 +141,7 @@ class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with Eit
     }
   }
 
-  private val complexityExamples = Seq(
+  private lazy val complexityExamples = Seq(
     // 1 for toInt, 200 for log, 65+65 for parseBigInt
     331 -> s"""toInt(log(parseBigIntValue("1625"), 2, parseBigIntValue("27"), 1, 2, HALFUP))""",
     100 -> s"""log(1625, 2, 27, 1, 2, HALFUP)""",
