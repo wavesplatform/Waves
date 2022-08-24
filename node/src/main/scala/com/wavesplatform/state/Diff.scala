@@ -145,8 +145,6 @@ case class NewTransactionInfo(transaction: Transaction, affected: Set[Address], 
 
 case class NewAssetInfo(static: AssetStaticInfo, dynamic: AssetInfo, volume: AssetVolumeInfo)
 
-case class LeaseActionInfo(invokeId: ByteStr, dAppPublicKey: PublicKey, recipient: AddressOrAlias, amount: Long)
-
 case class Diff(
     transactions: collection.Map[ByteStr, NewTransactionInfo] = VectorMap.empty,
     portfolios: Map[Address, Portfolio] = Map.empty,
