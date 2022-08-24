@@ -340,7 +340,7 @@ object TxHelpers {
   }
 
   def setAssetScript(
-      acc: KeyPair,
+      acc: KeyPair = defaultSigner,
       asset: IssuedAsset,
       script: Script,
       fee: Long = FeeConstants(TransactionType.SetAssetScript) * FeeUnit,

@@ -1,5 +1,6 @@
 package com.wavesplatform.mining
 
+import com.wavesplatform.account.Alias
 import com.wavesplatform.block.Block.ProtoBlockVersion
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
@@ -9,7 +10,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.IntegerDataEntry
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.test.DomainPresets.RideV6
-import com.wavesplatform.test.{PropSpec, TestTime}
+import com.wavesplatform.test.{NumericExt, PropSpec, TestTime}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TransactionType.Transfer
@@ -65,24 +66,60 @@ class DiscardedMicroBlocksDiffTest extends PropSpec with WithDomain {
     val tx = transfer()
     testInterimState(
       tx,
-      _.transactionsApi.transactionsByAddress(defaultAddress, None, Set(Transfer)).toListL.runSyncUnsafe().map(_.transaction) shouldBe Seq(tx)
-    )
-    testInterimState(
-      tx,
-      _.transactionsApi.transactionById(tx.id()).map(_.transaction) shouldBe Some(tx)
+      { d =>
+        d.transactionsApi.transactionsByAddress(defaultAddress, None, Set(Transfer)).toListL.runSyncUnsafe().map(_.transaction) shouldBe Seq(tx)
+        d.transactionsApi.transactionById(tx.id()).map(_.transaction) shouldBe Some(tx)
+      }
     )
   }
 
-  property("interim asset description") {
+  property("interim asset issue") {
     val issueTx = issue()
     val asset   = IssuedAsset(issueTx.id())
     testInterimState(
       issueTx,
       _.assetsApi.description(asset) should not be empty
     )
+  }
+
+  property("interim asset reissue") {
+    val issueTx = issue()
+    val asset   = IssuedAsset(issueTx.id())
     testInterimState(
       reissue(asset, amount = 1),
       _.assetsApi.description(asset).get.totalVolume shouldBe issueTx.quantity.value + 1,
+      preconditions = Seq(issueTx)
+    )
+  }
+
+  property("interim asset script") {
+    val exprTrue  = TestCompiler(V6).compileExpression("true")
+    val exprFalse = TestCompiler(V6).compileExpression("false")
+    val issueTx   = issue(script = Some(exprTrue))
+    val asset     = IssuedAsset(issueTx.id())
+    testInterimState(
+      setAssetScript(asset = asset, script = exprFalse, fee = 1.waves),
+      _.assetsApi.description(asset).flatMap(_.script).map(_.script) shouldBe Some(exprFalse),
+      preconditions = Seq(issueTx)
+    )
+  }
+
+  property("interim alias") {
+    testInterimState(
+      createAlias("alias"),
+      { d =>
+        d.accountsApi.resolveAlias(Alias('T', "alias")) shouldBe Right(defaultAddress)
+        d.transactionsApi.aliasesOfAddress(defaultAddress).toListL.runSyncUnsafe().map(_._2.aliasName) shouldBe Seq("alias")
+      }
+    )
+  }
+
+  property("interim sponsorship") {
+    val issueTx = issue()
+    val asset   = IssuedAsset(issueTx.id())
+    testInterimState(
+      sponsor(asset, Some(123)),
+      _.assetsApi.description(asset).map(_.sponsorship) shouldBe Some(123),
       preconditions = Seq(issueTx)
     )
   }
