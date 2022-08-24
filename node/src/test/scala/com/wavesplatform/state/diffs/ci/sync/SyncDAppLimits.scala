@@ -141,7 +141,7 @@ class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with Eit
     }
   }
 
-  private lazy val complexityExamples = Seq(
+  private lazy val complexityExamples = List(
     // 1 for toInt, 200 for log, 65+65 for parseBigInt
     331 -> s"""toInt(log(parseBigIntValue("1625"), 2, parseBigIntValue("27"), 1, 2, HALFUP))""",
     100 -> s"""log(1625, 2, 27, 1, 2, HALFUP)""",
@@ -150,18 +150,17 @@ class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with Eit
 
   private def mkIntExprWithComplexity(targetComplexity: Int): String = {
     @tailrec
-    def loop(restComplexity: Int, restComplexityExamples: Seq[(Int, String)], acc: String): String =
+    def loop(restComplexity: Int, restComplexityExamples: List[(Int, String)], acc: String): String =
       if (restComplexity == 0) acc
       else
         restComplexityExamples match {
-          case (exprComplexity, expr) +: restXs =>
+          case Nil => loop(0, Nil, acc + " + 1" * restComplexity)
+          case (exprComplexity, expr) :: restXs =>
             if (restComplexity >= exprComplexity) {
               val uncompletedExprComplexity = exprComplexity + 1 // 1 for "+"
               val times                     = restComplexity / uncompletedExprComplexity
               loop(restComplexity % uncompletedExprComplexity, restXs, acc + s" + $expr" * times)
             } else loop(restComplexity, restXs, acc)
-
-          case Nil => loop(0, Nil, acc + " + 1" * restComplexity)
         }
 
     loop(targetComplexity, complexityExamples, "1")
