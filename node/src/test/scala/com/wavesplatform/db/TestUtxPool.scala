@@ -6,6 +6,7 @@ import com.wavesplatform.utx.UtxPoolImpl
 
 class TestUtxPool(time: Time, blockchain: Blockchain, utxSettings: UtxSettings, isMiningEnabled: Boolean, beforeSetPriorityDiffs: () => Unit)
     extends UtxPoolImpl(time, blockchain, utxSettings, isMiningEnabled) {
+
   override def setPriorityDiffs(discDiffs: Seq[Diff]): Unit = {
     beforeSetPriorityDiffs()
     super.setPriorityDiffs(discDiffs)

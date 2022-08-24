@@ -138,7 +138,8 @@ case class Domain(
 
   def liquidDiff: Diff = {
     val liquidDiff = blockchainUpdater.bestLiquidDiff.getOrElse(Diff())
-    liquidDiff.combineE(utxPool.discardedMicrosDiff()).explicitGet()
+    val totalDiff  = liquidDiff.combineE(utxPool.discardedMicrosDiff()).explicitGet()
+    utxPool.priorityPool.optimisticRead(totalDiff)(_ => true)
   }
 
   def microBlocks: Vector[MicroBlock] = blockchain.microblockIds.reverseIterator.flatMap(blockchain.microBlock).to(Vector)
