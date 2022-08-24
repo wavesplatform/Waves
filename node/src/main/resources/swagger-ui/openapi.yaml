@@ -1273,7 +1273,9 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Transaction'
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Transaction'
   /transactions/unconfirmed/size:
     get:
       tags:
@@ -1475,6 +1477,18 @@ paths:
                   type: array
                   items:
                     type: string
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: array
+                  items:
+                    type: string
+            encoding:
+              key:
+                style: form
+                explode: true
         required: false
       responses:
         '200':

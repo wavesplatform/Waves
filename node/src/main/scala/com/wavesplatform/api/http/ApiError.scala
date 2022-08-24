@@ -7,8 +7,8 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.{Transaction, _}
-import play.api.libs.json._
+import com.wavesplatform.transaction.{Transaction, *}
+import play.api.libs.json.*
 
 case class ApiErrorResponse(error: Int, message: String)
 
@@ -38,6 +38,7 @@ object ApiError {
       case TxValidationError.InvalidSignature(_, _)          => InvalidSignature
       case TxValidationError.InvalidRequestSignature         => InvalidSignature
       case TxValidationError.TooBigArray                     => TooBigArrayAllocation
+      case TxValidationError.TooBigInBytes(err)              => TooBigInBytes(err)
       case TxValidationError.OverflowError                   => OverflowError
       case TxValidationError.ToSelf                          => ToSelfError
       case TxValidationError.MissingSenderPrivateKey         => MissingSenderPrivateKey
@@ -121,6 +122,11 @@ object ApiError {
     override val id      = 102
     override val code    = StatusCodes.BadRequest
     override val message = "invalid address"
+  }
+
+  case class TooBigInBytes(message: String) extends ApiError {
+    override val id   = 107
+    override val code = StatusCodes.BadRequest
   }
 
   case object InvalidPublicKey extends ApiError {
@@ -297,6 +303,13 @@ object ApiError {
     val code: StatusCode = StatusCodes.NotFound
   }
 
+  case class AssetsDoesNotExist(ids: Seq[IssuedAsset]) extends ApiError {
+    val id: Int                      = 314
+    val message: String              = s"Asset does not exist. ${ids.map(_.id.toString).mkString(", ")}"
+    val code: StatusCode             = StatusCodes.BadRequest
+    override lazy val json: JsObject = Json.obj("error" -> id, "message" -> message, "ids" -> ids)
+  }
+
   final case class NegativeAmount(msg: String) extends ApiError {
     override val id: Int          = NegativeAmount.Id
     override val message: String  = s"negative amount: $msg"
@@ -357,13 +370,7 @@ object ApiError {
       Json.obj(
         "error"   -> id,
         "message" -> message,
-        "details" -> Json
-          .toJson(
-            errs
-              .map { case (addr, err) =>
-                addr.toString -> err
-              }
-          )
+        "details" -> Json.toJson(errs.map { case (addr, err) => addr.toString -> err })
       )
   }
 
@@ -419,5 +426,16 @@ object ApiError {
     override val id: Int         = 5031
     override val code            = StatusCodes.ServiceUnavailable
     override val message: String = "The server was not able to produce a timely response to request"
+
+  case object DataKeysNotSpecified extends ApiError {
+    override val id      = 4008
+    override val message = "Key was not specified"
+    override val code    = StatusCodes.BadRequest
+  }
+
+  case object AssetIdNotSpecified extends ApiError {
+    override val id      = 4009
+    override val message = "Asset ID was not specified"
+    override val code    = StatusCodes.BadRequest
   }
 }

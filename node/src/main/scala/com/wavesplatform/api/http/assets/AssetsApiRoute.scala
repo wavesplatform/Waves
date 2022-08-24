@@ -65,33 +65,36 @@ case class AssetsApiRoute(
     )
   )
 
-  private def deprecatedRoute: Route =
-    (path("transfer") & withAuth) {
-      broadcast[TransferRequest](TransactionFactory.transferAsset(_, wallet, time))
-    } ~ (path("masstransfer") & withAuth) {
-      broadcast[MassTransferRequest](TransactionFactory.massTransferAsset(_, wallet, time))
-    } ~ (path("issue") & withAuth) {
-      broadcast[IssueRequest](TransactionFactory.issue(_, wallet, time))
-    } ~ (path("reissue") & withAuth) {
-      broadcast[ReissueRequest](TransactionFactory.reissue(_, wallet, time))
-    } ~ (path("burn") & withAuth) {
-      broadcast[BurnRequest](TransactionFactory.burn(_, wallet, time))
-    } ~ (path("sponsor") & withAuth) {
-      broadcast[SponsorFeeRequest](TransactionFactory.sponsor(_, wallet, time))
-    } ~ (path("order") & withAuth)(jsonPost[Order] { order =>
-      wallet.privateKeyAccount(order.senderPublicKey.toAddress).map(pk => Order.sign(order, pk.privateKey))
-    }) ~ pathPrefix("broadcast")(
-      path("issue")(broadcast[IssueRequest](_.toTx)) ~
-        path("reissue")(broadcast[ReissueRequest](_.toTx)) ~
-        path("burn")(broadcast[BurnRequest](_.toTx)) ~
-        path("exchange")(broadcast[ExchangeRequest](_.toTx)) ~
-        path("transfer")(broadcast[TransferRequest](_.toTx))
-    )
+  private def deprecatedRoute: Route = {
+    post {
+      (path("transfer") & withAuth) {
+        broadcast[TransferRequest](TransactionFactory.transferAsset(_, wallet, time))
+      } ~ (path("masstransfer") & withAuth) {
+        broadcast[MassTransferRequest](TransactionFactory.massTransferAsset(_, wallet, time))
+      } ~ (path("issue") & withAuth) {
+        broadcast[IssueRequest](TransactionFactory.issue(_, wallet, time))
+      } ~ (path("reissue") & withAuth) {
+        broadcast[ReissueRequest](TransactionFactory.reissue(_, wallet, time))
+      } ~ (path("burn") & withAuth) {
+        broadcast[BurnRequest](TransactionFactory.burn(_, wallet, time))
+      } ~ (path("sponsor") & withAuth) {
+        broadcast[SponsorFeeRequest](TransactionFactory.sponsor(_, wallet, time))
+      } ~ (path("order") & withAuth)(jsonPost[Order] { order =>
+        wallet.privateKeyAccount(order.senderPublicKey.toAddress).map(pk => Order.sign(order, pk.privateKey))
+      }) ~ pathPrefix("broadcast")(
+        path("issue")(broadcast[IssueRequest](_.toTx)) ~
+          path("reissue")(broadcast[ReissueRequest](_.toTx)) ~
+          path("burn")(broadcast[BurnRequest](_.toTx)) ~
+          path("exchange")(broadcast[ExchangeRequest](_.toTx)) ~
+          path("transfer")(broadcast[TransferRequest](_.toTx))
+      )
+    }
+  }
 
   override lazy val route: Route =
     pathPrefix("assets") {
       pathPrefix("balance" / AddrSegment) { address =>
-        anyParam("id", limit = 100) { assetIds =>
+        anyParam("id", limit = settings.assetDetailsLimit) { assetIds =>
           val assetIdsValidated = assetIds.toList
             .map(assetId => ByteStr.decodeBase58(assetId).fold(_ => Left(assetId), bs => Right(IssuedAsset(bs))).toValidatedNel)
             .sequence
@@ -106,14 +109,18 @@ case class AssetsApiRoute(
         } ~ (get & path(AssetId)) { assetId =>
           balance(address, assetId)
         }
+      } ~ pathPrefix("details") {
+        (anyParam("id", limit = settings.assetDetailsLimit) & parameter("full".as[Boolean] ? false)) { (ids, full) =>
+          val result = Either
+            .cond(ids.nonEmpty, (), AssetIdNotSpecified)
+            .map(_ => multipleDetails(ids.toList, full))
+
+          complete(result)
+        } ~ (get & path(AssetId) & parameter("full".as[Boolean] ? false)) { (assetId, full) =>
+          singleDetails(assetId, full)
+        }
       } ~ get {
-        pathPrefix("details") {
-          (pathEndOrSingleSlash & parameters("id".as[String].*, "full".as[Boolean] ? false)) { (ids, full) =>
-            multipleDetailsGet(ids.toSeq.reverse, full)
-          } ~ (path(AssetId) & parameter("full".as[Boolean] ? false)) { (assetId, full) =>
-            singleDetails(assetId, full)
-          }
-        } ~ (path("nft" / AddrSegment / "limit" / IntNumber) & parameter("after".as[String].?)) { (address, limit, maybeAfter) =>
+        (path("nft" / AddrSegment / "limit" / IntNumber) & parameter("after".as[String].?)) { (address, limit, maybeAfter) =>
           nft(address, limit, maybeAfter)
         } ~ pathPrefix(AssetId / "distribution") { assetId =>
           pathEndOrSingleSlash(balanceDistribution(assetId)) ~
@@ -121,27 +128,23 @@ case class AssetsApiRoute(
               balanceDistributionAtHeight(assetId, height, limit, maybeAfter)
             }
         }
-      } ~ post {
-        (path("details") & parameter("full".as[Boolean] ? false)) { full =>
-          formField("id".as[String].*) { ids =>
-            complete(multipleDetails(ids.toList, full))
-          } ~
-            jsonPost[JsObject] { jsv =>
-              (jsv \ "ids").validate[List[String]] match {
-                case JsSuccess(ids, _) =>
-                  multipleDetails(ids, full)
-                case JsError(err) => WrongJson(errors = err)
-              }
-            }
-        } ~ deprecatedRoute
-      }
+      } ~ deprecatedRoute
     }
 
   private def multipleDetails(ids: List[String], full: Boolean): ToResponseMarshallable =
     ids.map(id => ByteStr.decodeBase58(id).toEither.leftMap(_ => id)).separate match {
-      case (Nil, Nil)      => CustomValidationError("Empty request")
-      case (Nil, assetIds) => assetIds.map(id => assetDetails(IssuedAsset(id), full).fold(_.json, identity))
-      case (errors, _)     => InvalidIds(errors)
+      case (Nil, assetIds) =>
+        assetIds.map(id => assetDetails(IssuedAsset(id), full)).separate match {
+          case (Nil, details) => details
+          case (errors, _) =>
+            val notFoundErrors = errors.collect { case AssetDoesNotExist(assetId) => assetId }
+            if (notFoundErrors.isEmpty) {
+              errors.head
+            } else {
+              AssetsDoesNotExist(notFoundErrors)
+            }
+        }
+      case (errors, _) => InvalidIds(errors)
     }
 
   def fullAssetInfoJson(asset: IssuedAsset): JsObject = commonAssetsApi.fullInfo(asset) match {
@@ -233,19 +236,6 @@ case class AssetsApiRoute(
     }
 
   def singleDetails(assetId: IssuedAsset, full: Boolean): Route = complete(assetDetails(assetId, full))
-
-  def multipleDetailsGet(ids: Seq[String], full: Boolean): Route =
-    complete(ids.toList.map(id => assetDetails(IssuedAsset(ByteStr.decodeBase58(id).get), full).fold(_.json, identity)))
-
-  def multipleDetailsPost(full: Boolean): Route =
-    entity(as[JsObject]) { jsv =>
-      complete(
-        (jsv \ "ids").validate[List[ByteStr]] match {
-          case JsSuccess(ids, _) => Json.arr(ids.map(id => assetDetails(IssuedAsset(id), full).fold(_.json, identity)))
-          case JsError(err)      => WrongJson(errors = err)
-        }
-      )
-    }
 
   def nft(address: Address, limit: Int, maybeAfter: Option[String]): Route = {
     val after = maybeAfter.collect { case s if s.nonEmpty => IssuedAsset(ByteStr.decodeBase58(s).getOrElse(throw ApiException(InvalidAssetId))) }

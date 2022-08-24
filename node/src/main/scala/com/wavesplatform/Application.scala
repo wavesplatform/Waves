@@ -227,7 +227,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         db,
         blockchainUpdater,
         utxStorage,
-        wallet,
         tx => transactionPublisher.validateAndBroadcast(tx, None),
         loadBlockAt(db, blockchainUpdater)
       )

@@ -6,7 +6,7 @@ import com.wavesplatform.mining.{MinerDebugInfo, MiningConstraint}
 import com.wavesplatform.settings.MinerSettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.BlockchainUpdater
-import com.wavesplatform.utx.UtxPool
+import com.wavesplatform.utx.UtxPoolImpl
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
@@ -26,7 +26,7 @@ object MicroBlockMiner {
       setDebugState: MinerDebugInfo.State => Unit,
       allChannels: ChannelGroup,
       blockchainUpdater: BlockchainUpdater with Blockchain,
-      utx: UtxPool,
+      utx: UtxPoolImpl,
       settings: MinerSettings,
       minerScheduler: SchedulerService,
       appenderScheduler: SchedulerService,

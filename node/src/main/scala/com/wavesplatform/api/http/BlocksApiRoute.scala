@@ -33,12 +33,16 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
     } ~ path("height") {
       complete(Json.obj("height" -> commonApi.currentHeight))
     } ~ path("delay" / BlockId / IntNumber) { (blockId, count) =>
-      complete(
-        commonApi
-          .blockDelay(blockId, count)
-          .map(delay => Json.obj("delay" -> delay))
-          .toRight(BlockDoesNotExist)
-      )
+      if (count > MaxBlocksForDelay) {
+        complete(TooBigArrayAllocation(MaxBlocksForDelay))
+      } else {
+        complete(
+          commonApi
+            .blockDelay(blockId, count)
+            .map(delay => Json.obj("delay" -> delay))
+            .toRight(BlockDoesNotExist)
+        )
+      }
     } ~ path("height" / BlockId) { signature =>
       complete(for {
         meta <- commonApi.meta(signature).toRight(BlockDoesNotExist)
@@ -148,6 +152,9 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
 }
 
 object BlocksApiRoute {
+  val MaxBlocksPerRequest = 100 // todo: make this configurable and fix integration tests
+  val MaxBlocksForDelay   = 10000
+
   private def toJson(v: (BlockMeta, Seq[(TxMeta, Transaction)])): JsObject = v match {
     case (meta, transactions) =>
       meta.json() ++ transactionField(meta.header.version, transactions)

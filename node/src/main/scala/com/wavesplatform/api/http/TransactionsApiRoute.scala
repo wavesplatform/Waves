@@ -15,7 +15,9 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, *}
+import com.wavesplatform.database.protobuf.EthereumTransactionMeta.Payload
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.settings.RestAPISettings
@@ -29,10 +31,6 @@ import com.wavesplatform.utils.{EthEncoding, Time}
 import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
 import play.api.libs.json.*
-
-import scala.util.Success
-import com.wavesplatform.database.protobuf.EthereumTransactionMeta.Payload
-import com.wavesplatform.lang.v1.serialization.SerdeV1
 
 case class TransactionsApiRoute(
     settings: RestAPISettings,
@@ -77,7 +75,7 @@ case class TransactionsApiRoute(
   def info: Route = pathPrefix("info") {
     (get & path(TransactionId)) { id =>
       complete(commonApi.transactionById(id).toRight(ApiError.TransactionDoesNotExist))
-    } ~ (pathEndOrSingleSlash & anyParam("id")) { ids =>
+    } ~ (pathEndOrSingleSlash & anyParam("id", limit = settings.transactionsByAddressLimit)) { ids =>
       val result = for {
         _    <- Either.cond(ids.nonEmpty, (), InvalidTransactionId("Transaction ID was not specified"))
         meta <- ids.map(readTransactionMeta).toList.sequence
@@ -179,23 +177,22 @@ case class TransactionsApiRoute(
   def signedBroadcast: Route = path("broadcast")(broadcast[JsValue](TransactionFactory.fromSignedRequest))
 
   def merkleProof: Route = path("merkleProof") {
-    (get & parameters("id".as[String].*))(ids => complete(merkleProof(ids.toList.reverse))) ~
-      jsonPost[JsObject](jsv =>
-        (jsv \ "ids").validate[List[String]] match {
-          case JsSuccess(ids, _) => merkleProof(ids)
-          case JsError(err)      => WrongJson(errors = err.toSeq)
-        }
-      )
+    anyParam("id", limit = settings.transactionsByAddressLimit) { ids =>
+      val result = Either
+        .cond(ids.nonEmpty, (), InvalidTransactionId("Transaction ID was not specified"))
+        .map(_ => merkleProof(ids.toList))
+      complete(result)
+    }
   }
 
   private def merkleProof(encodedIds: List[String]): ToResponseMarshallable =
-    encodedIds.traverse(ByteStr.decodeBase58) match {
-      case Success(txIds) =>
+    encodedIds.map(id => ByteStr.decodeBase58(id).toEither.leftMap(_ => id)).separate match {
+      case (Nil, txIds) =>
         commonApi.transactionProofs(txIds) match {
           case Nil    => CustomValidationError(s"transactions do not exist or block version < ${Block.ProtoBlockVersion}")
           case proofs => proofs
         }
-      case _ => InvalidSignature
+      case (errors, _) => InvalidIds(errors)
     }
 
   def transactionsByAddress(address: Address, limitParam: Int, maybeAfter: Option[ByteStr]): Task[List[JsObject]] = {

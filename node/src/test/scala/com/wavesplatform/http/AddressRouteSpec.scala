@@ -1,7 +1,7 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model.HttpEntity.{Chunk, LastChunk}
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpHeader, MediaTypes, TransferEncodings}
+import akka.http.scaladsl.model.{ContentTypes, FormData, HttpEntity, HttpHeader, MediaTypes, StatusCodes, TransferEncodings}
 import akka.http.scaladsl.model.headers.{Accept, `Content-Type`, `Transfer-Encoding`}
 import akka.http.scaladsl.testkit.RouteTestTimeout
 import akka.stream.scaladsl.Source
@@ -11,7 +11,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.{AddressApiRoute, RouteTimeout}
-import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
+import com.wavesplatform.api.http.ApiError.{ApiKeyNotValid, DataKeysNotSpecified, TooBigArrayAllocation}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.db.WithDomain
@@ -36,6 +36,7 @@ import io.netty.util.HashedWheelTimer
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.*
+import play.api.libs.json.Json.JsValueWrapper
 
 import scala.concurrent.duration.*
 
@@ -420,4 +421,81 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
     }
   }
 
+  routePath(s"/data/{address} - handles keys limit") in {
+    def checkErrorResponse(): Unit = {
+      response.status shouldBe StatusCodes.BadRequest
+      (responseAs[JsObject] \ "message").as[String] shouldBe TooBigArrayAllocation(addressApiRoute.settings.dataKeysRequestLimit).message
+    }
+
+    def checkResponse(key: String, value: String, idsCount: Int): Unit = {
+      response.status shouldBe StatusCodes.OK
+
+      val result = responseAs[JsArray].value
+      result.size shouldBe idsCount
+      (1 to idsCount).zip(responseAs[JsArray].value) foreach { case (_, json) =>
+        json should matchJson(s"""
+                                 |{
+                                 |  "key" : "$key",
+                                 |  "type" : "string",
+                                 |  "value" : "$value"
+                                 |}
+                                 |""".stripMargin)
+      }
+    }
+
+    val account = TxHelpers.signer(1)
+    val key     = "testKey"
+    val value   = "testValue"
+
+    withDomain(DomainPresets.RideV5, balances = AddrWithBalance.enoughBalances(account)) { d =>
+      d.appendBlock(TxHelpers.dataSingle(account, key = key, value = value))
+
+      val route =
+        addressApiRoute
+          .copy(blockchain = d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(() => d.liquidDiff, d.db, d.blockchainUpdater))
+          .route
+
+      val maxLimitKeys      = Seq.fill(addressApiRoute.settings.dataKeysRequestLimit)(key)
+      val moreThanLimitKeys = key +: maxLimitKeys
+
+      Get(routePath(s"/data/${account.toAddress}?${maxLimitKeys.map("key=" + _).mkString("&")}")) ~> route ~> check(
+        checkResponse(key, value, maxLimitKeys.size)
+      )
+      Get(routePath(s"/data/${account.toAddress}?${moreThanLimitKeys.map("key=" + _).mkString("&")}")) ~> route ~> check(
+        checkErrorResponse()
+      )
+
+      Post(routePath(s"/data/${account.toAddress}"), FormData(maxLimitKeys.map("key" -> _)*)) ~> route ~> check(
+        checkResponse(key, value, maxLimitKeys.size)
+      )
+      Post(routePath(s"/data/${account.toAddress}"), FormData(moreThanLimitKeys.map("key" -> _)*)) ~> route ~> check(
+        checkErrorResponse()
+      )
+
+      Post(
+        routePath(s"/data/${account.toAddress}"),
+        HttpEntity(ContentTypes.`application/json`, Json.obj("keys" -> Json.arr(maxLimitKeys.map(key => key: JsValueWrapper)*)).toString())
+      ) ~> route ~> check(checkResponse(key, value, maxLimitKeys.size))
+      Post(
+        routePath(s"/data/${account.toAddress}"),
+        HttpEntity(ContentTypes.`application/json`, Json.obj("keys" -> Json.arr(moreThanLimitKeys.map(key => key: JsValueWrapper)*)).toString())
+      ) ~> route ~> check(checkErrorResponse())
+    }
+  }
+
+  routePath(s"/data/{address} - handles empty keys input in POST") in {
+    def checkErrorResponse(): Unit = {
+      response.status shouldBe StatusCodes.BadRequest
+      (responseAs[JsObject] \ "message").as[String] shouldBe DataKeysNotSpecified.message
+    }
+
+    val account = TxHelpers.signer(1)
+
+    Post(routePath(s"/data/${account.toAddress}"), FormData()) ~> route ~> check(checkErrorResponse())
+
+    Post(
+      routePath(s"/data/${account.toAddress}"),
+      HttpEntity(ContentTypes.`application/json`, Json.obj("keys" -> JsArray.empty).toString())
+    ) ~> route ~> check(checkErrorResponse())
+  }
 }

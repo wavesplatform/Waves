@@ -1,18 +1,15 @@
 package com.wavesplatform
 
-import scala.concurrent.duration.*
-import scala.util.Random
-
 import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values.V3
-import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
+import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.testing.{ScriptGen, TypedScriptGen}
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.*
 import com.wavesplatform.transaction.*
@@ -20,17 +17,19 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.transaction.lease.*
-import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.*
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, ParsedTransfer}
-import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
 import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.transaction.utils.EthTxGenerator.Arg
-import org.scalacheck.{Arbitrary, Gen}
+import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
 import org.scalacheck.Gen.{alphaLowerChar, alphaUpperChar, frequency, numChar}
+import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.Suite
 import org.web3j.crypto.ECKeyPair
+
+import scala.concurrent.duration.*
+import scala.util.Random
 
 trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _: Suite =>
 
@@ -143,18 +142,16 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       script2                                                     <- scriptGen
       issue = IssueTransaction
         .selfSigned(
-        TxVersion.V2,
-        sender,
-          new String(
-        assetName),
-        new String(description),
-        quantity,
-        decimals,
-        reissuable = true,
-        Some(script1),
-        iFee,
-        timestamp
-
+          TxVersion.V2,
+          sender,
+          new String(assetName),
+          new String(description),
+          quantity,
+          decimals,
+          reissuable = true,
+          Some(script1),
+          iFee,
+          timestamp
         )
         .explicitGet()
       setAssetScript = SetAssetScriptTransaction
@@ -276,32 +273,11 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
   val transferV2Gen: Gen[TransferTransaction] = (for {
     (assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment) <- transferParamGen
     proofs                                                                             <- proofsGen
-  } yield TransferTransaction.selfSigned(
-    2.toByte,
-    sender,
-    recipient,
-    assetId,
-    amount,
-    feeAssetId,
-    feeAmount,
-    attachment,
-    timestamp).explicitGet(
-  ))
+  } yield TransferTransaction
+    .selfSigned(2.toByte, sender, recipient, assetId, amount, feeAssetId, feeAmount, attachment, timestamp)
+    .explicitGet(
+    ))
     .label("VersionedTransferTransaction")
-
-  val massTransferGen: Gen[MassTransferTransaction] = massTransferGen(MaxTransferCount)
-
-  def massTransferGen(maxTransfersCount: Int): Gen[MassTransferTransaction] = {
-    for {
-      (assetId, sender, _, _, timestamp, _, feeAmount, attachment) <- transferParamGen
-      transferCount                                                <- Gen.choose(0, maxTransfersCount)
-      transferGen = for {
-        recipient <- accountOrAliasGen
-        amount    <- Gen.choose(1L, Long.MaxValue / maxTransfersCount)
-      } yield ParsedTransfer(recipient, TxNonNegativeAmount.unsafeFrom(amount))
-      recipients <- Gen.listOfN(transferCount, transferGen)
-    } yield MassTransferTransaction.selfSigned(1.toByte, sender, assetId, recipients, feeAmount, timestamp, attachment).explicitGet()
-  }
 
   val createAliasGen: Gen[CreateAliasTransaction] =
     for {
@@ -367,10 +343,12 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     } yield tx
   }
 
-  /**
-    * @param issueQuantity must be positive
-    * @param reissueQuantity must be positive
-    * @param burnQuantity must be positive
+  /** @param issueQuantity
+    *   must be positive
+    * @param reissueQuantity
+    *   must be positive
+    * @param burnQuantity
+    *   must be positive
     */
   def issueReissueBurnGeneratorP(
       issueQuantity: Long,
@@ -555,19 +533,23 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       val matcherFee = fixedMatcherFee.getOrElse(genMatcherFee)
       val matcher    = fixedMatcher.getOrElse(genMatcher)
       val o1 =
-        Order.buy(1: Byte, buyer, matcher.publicKey, assetPair, amount1, price, timestamp, expiration, matcherFee, priceMode = OrderPriceMode.Default).explicitGet()
-      val o2 = Order.sell(
-        1: Byte,
-        seller,
-        matcher.publicKey,
-        assetPair,
-        amount2,
-        price,
-        timestamp,
-        expiration,
-        matcherFee,
-        priceMode = OrderPriceMode.Default
-      ).explicitGet()
+        Order
+          .buy(1: Byte, buyer, matcher.publicKey, assetPair, amount1, price, timestamp, expiration, matcherFee, priceMode = OrderPriceMode.Default)
+          .explicitGet()
+      val o2 = Order
+        .sell(
+          1: Byte,
+          seller,
+          matcher.publicKey,
+          assetPair,
+          amount2,
+          price,
+          timestamp,
+          expiration,
+          matcherFee,
+          priceMode = OrderPriceMode.Default
+        )
+        .explicitGet()
       val buyFee  = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue
       val sellFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue
       val trans =

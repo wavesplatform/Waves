@@ -24,6 +24,8 @@ class RestAPISettingsSpecification extends FlatSpec {
         |    }
         |    transactions-by-address-limit = 10000
         |    distribution-address-limit = 10000
+        |    data-keys-request-limit = 10000
+        |    asset-details-limit = 10000
         |    evaluate-script-complexity-limit = 4000
         |    limited-pool-threads = 2
         |    heavy-request-processor-pool-threads = 7
@@ -40,6 +42,8 @@ class RestAPISettingsSpecification extends FlatSpec {
     settings.apiKeyHash should be("BASE58APIKEYHASH")
     settings.transactionsByAddressLimit shouldBe 10000
     settings.distributionAddressLimit shouldBe 10000
+    settings.dataKeysRequestLimit shouldBe 10000
+    settings.assetDetailsLimit shouldBe 10000
     settings.evaluateScriptComplexityLimit shouldBe 4000
     settings.limitedPoolThreads shouldBe 2
     settings.heavyRequestProcessorPoolThreads shouldBe Some(7)

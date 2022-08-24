@@ -19,7 +19,7 @@ class BrokenConnectionDetectorSpec extends FreeSpec with MockFactory {
   }
 
   "should not close a connection when messages are keep going" in {
-    val handler = new BrokenConnectionDetector(100.millis)
+    val handler = new BrokenConnectionDetector(200.millis)
     val ch      = new EmbeddedChannel(handler)
 
     (1 to 3).foreach { _ =>

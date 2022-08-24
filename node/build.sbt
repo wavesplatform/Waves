@@ -1,5 +1,4 @@
 name       := "waves"
-maintainer := "com.wavesplatform"
 
 enablePlugins(
   RunApplicationSettings,
@@ -153,6 +152,7 @@ linuxPackageSymlinks := linuxPackageSymlinks.value.map { lsl =>
 
 inConfig(Debian)(
   Seq(
+    maintainer := "com.wavesplatform",
     packageSource            := sourceDirectory.value / "package",
     linuxStartScriptTemplate := (packageSource.value / "systemd.service").toURI.toURL,
     debianPackageDependencies += "java8-runtime-headless",

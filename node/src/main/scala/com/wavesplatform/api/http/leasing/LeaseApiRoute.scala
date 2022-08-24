@@ -4,7 +4,7 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.api.common.{CommonAccountsApi, LeaseInfo}
 import com.wavesplatform.api.http.{BroadcastRoute, *}
 import com.wavesplatform.api.http.requests.{LeaseCancelRequest, LeaseRequest}
-import com.wavesplatform.api.http.ApiError.{InvalidIds, TooBigArrayAllocation, TransactionDoesNotExist}
+import com.wavesplatform.api.http.ApiError.{InvalidIds, TransactionDoesNotExist}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.network.TransactionPublisher
@@ -58,16 +58,13 @@ case class LeaseApiRoute(
         .toRight(TransactionDoesNotExist)
 
       complete(result)
-    } ~ anyParam("id") { ids =>
-      if (ids.size > settings.transactionsByAddressLimit)
-        complete(TooBigArrayAllocation(settings.transactionsByAddressLimit))
-      else
-        leasingInfosMap(ids) match {
-          case Left(err) => complete(err)
-          case Right(leaseInfoByIdMap) =>
-            val results = ids.map(leaseInfoByIdMap).toVector
-            complete(results)
-        }
+    } ~ anyParam("id", limit = settings.transactionsByAddressLimit) { ids =>
+      leasingInfosMap(ids) match {
+        case Left(err) => complete(err)
+        case Right(leaseInfoByIdMap) =>
+          val results = ids.map(leaseInfoByIdMap).toVector
+          complete(results)
+      }
     }
 
   private[this] def leasingInfosMap(ids: Iterable[String]): Either[InvalidIds, Map[String, LeaseInfo]] = {

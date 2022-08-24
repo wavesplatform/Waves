@@ -303,11 +303,11 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     ): Transaction =
       maybeWaitForTransaction(sync(async(n).reissue(sender, assetId, quantity, reissuable, fee, version)), waitForTx)
 
-    def debugStateChanges(transactionId: String, amountsAsStrings: Boolean = false): DebugStateChanges = {
-      sync(async(n).debugStateChanges(transactionId, amountsAsStrings))
+    def stateChanges(transactionId: String, amountsAsStrings: Boolean = false): StateChanges = {
+      sync(async(n).stateChanges(transactionId, amountsAsStrings))
     }
 
-    def debugStateChangesByAddress(address: String, limit: Int, after: Option[String] = None): Seq[DebugStateChanges] = {
+    def debugStateChangesByAddress(address: String, limit: Int, after: Option[String] = None): Seq[StateChanges] = {
       sync(async(n).debugStateChangesByAddress(address, limit, after))
     }
 

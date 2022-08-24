@@ -5,6 +5,7 @@ import com.wavesplatform.TestWallet
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.http.{BlocksApiRoute, RouteTimeout}
+import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
 import com.wavesplatform.block.serialization.BlockHeaderSerializer
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -250,6 +251,17 @@ class BlocksApiRouteSpec extends RouteSpec("/blocks") with PathMockFactory with 
     Get(routePath(s"/delay/${blocks.last.id()}/1")) ~> route ~> check {
       val delay = (responseAs[JsObject] \ "delay").as[Int]
       delay shouldBe 1000
+    }
+
+    Get(routePath(s"/delay/${blocks.last.id()}/${BlocksApiRoute.MaxBlocksForDelay}")) ~> route ~> check {
+      response.status shouldBe StatusCodes.OK
+      val delay = (responseAs[JsObject] \ "delay").as[Int]
+      delay shouldBe 1000
+    }
+
+    Get(routePath(s"/delay/${blocks.last.id()}/${BlocksApiRoute.MaxBlocksForDelay + 1}")) ~> route ~> check {
+      response.status shouldBe StatusCodes.BadRequest
+      (responseAs[JsObject] \ "message").as[String] shouldBe TooBigArrayAllocation(BlocksApiRoute.MaxBlocksForDelay).message
     }
   }
 

@@ -5,29 +5,31 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.BlockV5
-import com.wavesplatform.lagonaki.mocks.TestBlock.*
+import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Testing.*
-import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.directives.values.*
+import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils.*
 import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompiler, TestCompiler}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.{TxHelpers, TxVersion}
+import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.{TxHelpers, TxVersion}
 import com.wavesplatform.utils.*
 import shapeless.Coproduct
 
@@ -191,7 +193,7 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
     outOfBounds shouldBe Left(s"Index $badIndex out of bounds for length ${tx.data.size}")
   }
 
-  property("base64 amplification") {
+  ignore("base64 amplification") {
     val script =
       """
         |let a = base58'7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy7kPFrHDiGw1rCm7LPszuECwWYL3dMf6iMifLRDJQZMzy'
@@ -370,10 +372,10 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
                |
                | let lastBlockBaseTarget = lastBlock.baseTarget == 2
                | let lastBlockGenerationSignature = lastBlock.generationSignature == base58'${ByteStr(
-                 Array.fill(Block.GenerationSignatureLength)(0: Byte)
-               )}'
-               | let lastBlockGenerator = lastBlock.generator.bytes == base58'${defaultSigner.publicKey.toAddress}'
-               | let lastBlockGeneratorPublicKey = lastBlock.generatorPublicKey == base58'${defaultSigner.publicKey}'
+              Array.fill(Block.GenerationSignatureLength)(0: Byte)
+            )}'
+               | let lastBlockGenerator = lastBlock.generator.bytes == base58'${TestBlock.defaultSigner.publicKey.toAddress}'
+               | let lastBlockGeneratorPublicKey = lastBlock.generatorPublicKey == base58'${TestBlock.defaultSigner.publicKey}'
                |
                | lastBlockBaseTarget && lastBlockGenerationSignature && lastBlockGenerator && lastBlockGeneratorPublicKey
                |
@@ -435,8 +437,8 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
                    | let checkHeight = block.height == 3
                    | let checkBaseTarget = block.baseTarget == 2
                    | let checkGenSignature = block.generationSignature == base58'$generationSignature'
-                   | let checkGenerator = block.generator.bytes == base58'${defaultSigner.publicKey.toAddress}'
-                   | let checkGeneratorPublicKey = block.generatorPublicKey == base58'${defaultSigner.publicKey}'
+                   | let checkGenerator = block.generator.bytes == base58'${TestBlock.defaultSigner.publicKey.toAddress}'
+                   | let checkGeneratorPublicKey = block.generatorPublicKey == base58'${TestBlock.defaultSigner.publicKey}'
                    | $v4DeclOpt
                    |
                    | nonExistedBlockNeg && nonExistedBlockZero && nonExistedBlockNextPlus && checkHeight && checkBaseTarget && checkGenSignature && checkGenerator && checkGeneratorPublicKey
@@ -684,12 +686,12 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
       .filter(_ >= V5)
       .foreach { version =>
         val (masterAcc, recipient, genesis, _, dataTransaction, transferTx, _) = preconditionsAndPayments
-        val fs = settingsForRide(version).blockchainSettings.functionalitySettings
+        val fs                                                                 = settingsForRide(version).blockchainSettings.functionalitySettings
         assertDiffAndState(fs) { append =>
           val (intKey, intValue)         = dataTransaction.data.collectFirst { case IntegerDataEntry(key, value) => (key, value) }.get
           val (booleanKey, booleanValue) = dataTransaction.data.collectFirst { case BooleanDataEntry(key, value) => (key, value) }.get
-          val (binaryKey, binaryValue)   = dataTransaction.data.collectFirst { case BinaryDataEntry(key, value)  => (key, value) }.get
-          val (stringKey, stringValue)   = dataTransaction.data.collectFirst { case StringDataEntry(key, value)  => (key, value) }.get
+          val (binaryKey, binaryValue)   = dataTransaction.data.collectFirst { case BinaryDataEntry(key, value) => (key, value) }.get
+          val (stringKey, stringValue)   = dataTransaction.data.collectFirst { case StringDataEntry(key, value) => (key, value) }.get
 
           val script =
             s"""
@@ -760,6 +762,35 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
         append(Seq(setScriptTx)).explicitGet()
         append(Seq(transfer2)).explicitGet()
       }
+    }
+  }
+
+  property("transactionHeightById and transactionById returns only succeed transactions") {
+    withDomain(RideV6, AddrWithBalance.enoughBalances(secondSigner, signer(2), signer(3))) { d =>
+      val failingDApp = TestCompiler(V6).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = {
+           |   strict c = ${(1 to 6).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}
+           |   if (true) then throw() else []
+           | }
+         """.stripMargin
+      )
+      d.appendBlock(setScript(secondSigner, failingDApp))
+      val failedInvoke = invoke()
+
+      val checkTransactionHeightById = TestCompiler(V6).compileExpression(s"transactionHeightById(base58'${failedInvoke.id().toString}').isDefined()")
+      val checkTransactionById       = TestCompiler(V2).compileExpression(s"transactionById(base58'${failedInvoke.id().toString}').isDefined()")
+
+      d.appendBlock(setScript(signer(2), checkTransactionHeightById))
+      d.appendBlock(setScript(signer(3), checkTransactionById))
+
+      d.appendMicroBlock(failedInvoke)
+      d.appendMicroBlockE(transfer(signer(2))) should produce("TransactionNotAllowedByScript")
+      d.appendMicroBlockE(transfer(signer(3))) should produce("TransactionNotAllowedByScript")
+      d.appendKeyBlock()
+      d.appendBlockE(transfer(signer(2))) should produce("TransactionNotAllowedByScript")
+      d.appendBlockE(transfer(signer(3))) should produce("TransactionNotAllowedByScript")
     }
   }
 }

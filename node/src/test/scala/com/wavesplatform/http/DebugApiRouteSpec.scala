@@ -1,17 +1,21 @@
 package com.wavesplatform.http
 
+import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import com.typesafe.config.ConfigObject
+import com.wavesplatform.*
 import com.wavesplatform.account.Alias
-import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
+import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
 import com.wavesplatform.api.http.{DebugApiRoute, RouteTimeout}
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
+import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -19,13 +23,13 @@ import com.wavesplatform.lang.v1.compiler.Terms.TRUE
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, LeaseCancel, Recipient}
+import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
 import com.wavesplatform.network.PeerDatabase
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, InvokeScriptResult, NG, StateHash, TxMeta}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Height, NG, StateHash, TxMeta}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -37,7 +41,7 @@ import com.wavesplatform.utils.Schedulers
 import com.wavesplatform.{BlockchainStubHelpers, NTPTime, TestValues, TestWallet}
 import monix.eval.Task
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.Assertion
+import org.scalatest.{Assertion, OptionValues}
 import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
 
 import scala.concurrent.duration.*
@@ -51,7 +55,8 @@ class DebugApiRouteSpec
     with NTPTime
     with PathMockFactory
     with BlockchainStubHelpers
-    with WithDomain {
+    with WithDomain
+    with OptionValues {
   import DomainPresets.*
 
   val wavesSettings: WavesSettings = WavesSettings.default()
@@ -104,23 +109,43 @@ class DebugApiRouteSpec
   }
 
   routePath("/stateHash") - {
-    "works" in {
-      (blockchain.blockHeader(_: Int)).when(*).returning(Some(SignedBlockHeader(block.header, block.signature)))
-      Get(routePath("/stateHash/2")) ~> route ~> check {
-        status shouldBe StatusCodes.OK
-        responseAs[JsObject] shouldBe (Json.toJson(testStateHash).as[JsObject] ++ Json.obj("blockId" -> block.id().toString))
+    "works" - {
+      val settingsWithStateHashes = DomainPresets.SettingsFromDefaultConfig.copy(
+        dbSettings = DomainPresets.SettingsFromDefaultConfig.dbSettings.copy(storeStateHashes = true)
+      )
+
+      "at nonexistent height" in withDomain(settingsWithStateHashes) { d =>
+        d.appendBlock(TestBlock.create(Nil))
+        Get(routePath("/stateHash/2")) ~> routeWithBlockchain(d) ~> check {
+          status shouldBe StatusCodes.NotFound
+        }
       }
 
-      Get(routePath("/stateHash/3")) ~> route ~> check {
-        status shouldBe StatusCodes.NotFound
+      "at existing height" in expectStateHashAt2("2")
+      "last" in expectStateHashAt2("last")
+
+      def expectStateHashAt2(suffix: String): Assertion = withDomain(settingsWithStateHashes) { d =>
+        val genesisBlock = TestBlock.create(Nil)
+        d.appendBlock(genesisBlock)
+
+        val blockAt2 = TestBlock.create(0, genesisBlock.id(), Nil)
+        d.appendBlock(blockAt2)
+        d.appendBlock(TestBlock.create(0, blockAt2.id(), Nil))
+
+        val stateHashAt2 = d.levelDBWriter.loadStateHash(2).value
+        Get(routePath(s"/stateHash/$suffix")) ~> routeWithBlockchain(d) ~> check {
+          status shouldBe StatusCodes.OK
+          responseAs[JsObject] shouldBe (Json.toJson(stateHashAt2).as[JsObject] ++ Json.obj(
+            "blockId" -> blockAt2.id().toString,
+            "height"  -> 2,
+            "version" -> Version.VersionString
+          ))
+        }
       }
     }
   }
 
   routePath("/validate") - {
-    def routeWithBlockchain(blockchain: Blockchain & NG) =
-      debugApiRoute.copy(blockchain = blockchain, priorityPoolBlockchain = () => blockchain).route
-
     def validatePost(tx: TransferTransaction) =
       Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, tx.json().toString()))
 
@@ -1091,84 +1116,26 @@ class DebugApiRouteSpec
   }
 
   routePath("/stateChanges/info/") - {
-    "provides lease and lease cancel actions stateChanges" in {
-      val invokeAddress    = accountGen.sample.get.toAddress
-      val leaseId1         = ByteStr(bytes32gen.sample.get)
-      val leaseId2         = ByteStr(bytes32gen.sample.get)
-      val leaseCancelId    = ByteStr(bytes32gen.sample.get)
-      val recipientAddress = accountGen.sample.get.toAddress
-      val recipientAlias   = aliasGen.sample.get
-      val invoke           = TxHelpers.invoke(invokeAddress)
-      val scriptResult = InvokeScriptResult(
-        leases = Seq(InvokeScriptResult.Lease(recipientAddress, 100, 1, leaseId1), InvokeScriptResult.Lease(recipientAlias, 200, 3, leaseId2)),
-        leaseCancels = Seq(LeaseCancel(leaseCancelId))
-      )
-
-      (() => blockchain.activatedFeatures).when().returning(Map.empty).anyNumberOfTimes()
-      (transactionsApi.transactionById _)
-        .when(invoke.id())
-        .returning(Some(TransactionMeta.Invoke(Height(1), invoke, succeeded = true, 0L, Some(scriptResult))))
-        .once()
-
-      (blockchain.leaseDetails _)
-        .when(leaseId1)
-        .returning(Some(LeaseDetails(invoke.sender, recipientAddress, 100, LeaseDetails.Status.Active, invoke.id(), 1)))
-      (blockchain.leaseDetails _)
-        .when(leaseId2)
-        .returning(Some(LeaseDetails(invoke.sender, recipientAddress, 100, LeaseDetails.Status.Active, invoke.id(), 1)))
-      (blockchain.leaseDetails _)
-        .when(leaseCancelId)
-        .returning(Some(LeaseDetails(invoke.sender, recipientAddress, 100, LeaseDetails.Status.Cancelled(2, Some(leaseCancelId)), invoke.id(), 1)))
-      (blockchain.transactionMeta _).when(invoke.id()).returning(Some(TxMeta(Height(1), true, 1L)))
-
-      Get(routePath(s"/stateChanges/info/${invoke.id()}")) ~> route ~> check {
-        status shouldEqual StatusCodes.OK
-        val json = (responseAs[JsObject] \ "stateChanges").as[JsObject]
-        json should matchJson(s"""
-                                 |{
-                                 |  "data" : [ ],
-                                 |  "transfers" : [ ],
-                                 |  "issues" : [ ],
-                                 |  "reissues" : [ ],
-                                 |  "burns" : [ ],
-                                 |  "sponsorFees" : [ ],
-                                 |  "leases" : [ {
-                                 |    "id" : "$leaseId1",
-                                 |    "originTransactionId" : "${invoke.id()}",
-                                 |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                 |    "recipient" : "$recipientAddress",
-                                 |    "amount" : 100,
-                                 |    "height" : 1,
-                                 |    "status" : "active",
-                                 |    "cancelHeight" : null,
-                                 |    "cancelTransactionId" : null
-                                 |  }, {
-                                 |    "id" : "$leaseId2",
-                                 |    "originTransactionId" : "${invoke.id()}",
-                                 |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                 |    "recipient" : "$recipientAddress",
-                                 |    "amount" : 100,
-                                 |    "height" : 1,
-                                 |    "status" : "active",
-                                 |    "cancelHeight" : null,
-                                 |    "cancelTransactionId" : null
-                                 |  } ],
-                                 |  "leaseCancels" : [ {
-                                 |    "id" : "$leaseCancelId",
-                                 |    "originTransactionId" : "${invoke.id()}",
-                                 |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                                 |    "recipient" : "$recipientAddress",
-                                 |    "amount" : 100,
-                                 |    "height" : 1,
-                                 |    "status" : "canceled",
-                                 |    "cancelHeight" : 2,
-                                 |    "cancelTransactionId" : "$leaseCancelId"
-                                 |  } ],
-                                 |  "invokes" : [ ]
-                                 |}""".stripMargin)
+    "redirects to /transactions/info method" in {
+      val txId = ByteStr.fill(DigestLength)(1)
+      Get(routePath(s"/stateChanges/info/$txId")) ~> route ~> check {
+        status shouldBe StatusCodes.MovedPermanently
+        header(Location.name).map(_.value) shouldBe Some(s"/transactions/info/$txId")
       }
     }
   }
+
+  private def routeWithBlockchain(blockchain: Blockchain & NG) =
+    debugApiRoute.copy(blockchain = blockchain, priorityPoolBlockchain = () => blockchain).route
+
+  private def routeWithBlockchain(d: Domain) =
+    debugApiRoute
+      .copy(
+        blockchain = d.blockchain,
+        priorityPoolBlockchain = () => d.blockchain,
+        loadStateHash = d.levelDBWriter.loadStateHash
+      )
+      .route
 
   private[this] def jsonPost(path: String, json: JsValue) = {
     Post(path, HttpEntity(ContentTypes.`application/json`, json.toString()))

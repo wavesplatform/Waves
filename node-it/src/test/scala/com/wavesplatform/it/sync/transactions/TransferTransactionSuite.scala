@@ -3,17 +3,20 @@ package com.wavesplatform.it.sync.transactions
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncHttpApi.*
 import com.wavesplatform.it.api.TransferTransactionInfo
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.transfer.*
+import com.wavesplatform.transaction.transfer.TransferTransaction.MaxAttachmentSize
+import com.wavesplatform.transaction.{Proofs, TxPositiveAmount, TxVersion}
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.Json
 
-import scala.concurrent.duration._
+import java.nio.charset.StandardCharsets
+import scala.concurrent.duration.*
 
 class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
   test("transfer with empty string assetId") {
@@ -65,17 +68,43 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
   }
 
   test("invalid signed waves transfer should not be in UTX or blockchain") {
-    def invalidTx(timestamp: Long = System.currentTimeMillis, fee: Long = 100000): TransferTransaction =
-      TransferTransaction
-        .selfSigned(1.toByte, sender.keyPair, AddressOrAlias.fromString(sender.address).explicitGet(), Waves, 1, Waves, fee, ByteStr.empty, timestamp)
-        .explicitGet()
+    def invalidTx(
+        version: TxVersion,
+        timestamp: Long = System.currentTimeMillis,
+        fee: Long = 100000,
+        attachment: Array[Byte] = Array.emptyByteArray
+    ): TransferTransaction = {
+      val tx = TransferTransaction(
+        version = version,
+        sender = sender.keyPair.publicKey,
+        recipient = AddressOrAlias.fromString(sender.address).explicitGet(),
+        assetId = Waves,
+        amount = TxPositiveAmount.unsafeFrom(1),
+        feeAssetId = Waves,
+        fee = TxPositiveAmount.unsafeFrom(fee),
+        attachment = ByteStr(attachment),
+        timestamp = timestamp,
+        proofs = Proofs.empty,
+        chainId = AddressScheme.current.chainId
+      )
+
+      tx.signWith(sender.keyPair.privateKey)
+    }
 
     val (balance1, eff1) = miner.accountBalances(firstAddress)
 
-    val invalidTxs = Seq(
-      (invalidTx(timestamp = System.currentTimeMillis + 1.day.toMillis), "Transaction timestamp .* is more than .*ms in the future"),
-      (invalidTx(fee = 99999), "Fee .* does not exceed minimal value")
-    )
+    val invalidTxs = for {
+      v <- transferTxSupportedVersions
+      x <- Seq(
+        (invalidTx(v, timestamp = System.currentTimeMillis + 1.day.toMillis), "Transaction timestamp .* is more than .*ms in the future"),
+        (invalidTx(v, fee = 99999), "Fee .* does not exceed minimal value"),
+        (invalidTx(v, attachment = ("1" * (MaxAttachmentSize + 1)).getBytes(StandardCharsets.UTF_8)), "exceeds maximum length"),
+        (
+          invalidTx(v, attachment = Array.fill(MaxAttachmentSize + 1)(1)),
+          "Invalid attachment. Length \\d+ bytes exceeds maximum of \\d+ bytes."
+        )
+      )
+    } yield x
 
     for ((tx, diag) <- invalidTxs) {
       assertBadRequestAndResponse(sender.broadcastRequest(tx.json()), diag)
