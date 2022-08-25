@@ -11,7 +11,6 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import org.scalatest.{EitherValues, OptionValues}
 
 import scala.annotation.tailrec
-import scala.util.chaining.scalaUtilChainingOps
 
 class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with EitherValues {
   private val alice     = TxHelpers.signer(1) // signer(0) forges blocks and this affects the balance
@@ -37,7 +36,7 @@ class SyncDAppLimits extends PropSpec with WithDomain with OptionValues with Eit
            |   # 2 = 1 for tuple, 1 for "+"
            |   ([], complexInt1 + complexInt2)
            | }
-           | """.stripMargin.tap(println)
+           | """.stripMargin
       ),
       fee = 1.waves
     )
