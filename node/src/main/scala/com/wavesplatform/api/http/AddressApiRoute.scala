@@ -209,16 +209,16 @@ case class AddressApiRoute(
                 log.trace(s"Error compiling regex $matches: ${e.getMessage}")
                 complete(ApiError.fromValidationError(GenericError(s"Cannot compile regex")))
               },
-              _ => accountData(address, matches)
+              _ => accountData(address, Some(matches))
             )
         } ~ anyParam("key", limit = settings.dataKeysRequestLimit) { keys =>
-            extractMethod.filter(_ != HttpMethods.GET || keys.nonEmpty) { _ =>
-              val result = Either
-                .cond(keys.nonEmpty, (), DataKeysNotSpecified)
-                .map(_ => accountDataList(address, keys.toSeq*))
+          extractMethod.filter(_ != HttpMethods.GET || keys.nonEmpty) { _ =>
+            val result = Either
+              .cond(keys.nonEmpty, (), DataKeysNotSpecified)
+              .map(_ => accountDataList(address, keys.toSeq*))
 
-              complete(result)
-            }
+            complete(result)
+          }
         } ~ get {
           accountData(address)
         }
@@ -286,22 +286,14 @@ case class AddressApiRoute(
       pass
   }
 
-  private def accountData(address: Address)(implicit m: ToResponseMarshaller[Source[JsValue, NotUsed]]) = {
+  private def accountData(address: Address, regex: Option[String] = None)(implicit m: ToResponseMarshaller[Source[JsValue, NotUsed]]) = {
     routeTimeout.execute(
       commonAccountsApi
-        .dataStream(address, None)
+        .dataStream(address, regex)
         .toListL
         .map(data => Source.fromIterator(() => data.sortBy(_.key).iterator.map(Json.toJson[DataEntry[?]])))
     )(_.runAsyncLogErr(_))
   }
-
-  private def accountData(addr: Address, regex: String)(implicit m: ToResponseMarshaller[Source[JsValue, NotUsed]]) =
-    routeTimeout.execute(
-      commonAccountsApi
-        .dataStream(addr, Some(regex))
-        .toListL
-        .map(data => Source.fromIterator(() => data.sortBy(_.key).iterator.map(Json.toJson[DataEntry[?]])))
-    )(_.runAsyncLogErr(_))
 
   private def accountDataEntry(address: Address, key: String): ToResponseMarshallable =
     commonAccountsApi.data(address, key).toRight(DataKeyDoesNotExist)

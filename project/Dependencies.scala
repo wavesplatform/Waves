@@ -203,4 +203,7 @@ object Dependencies {
       "io.circe" %%% "circe-parser"
     ).map(_ % circeVersion)
   }
+
+  lazy val kanela =
+    Seq("io.kamon" % "kanela-agent" % "1.0.14")
 }

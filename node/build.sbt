@@ -1,4 +1,4 @@
-name       := "waves"
+name := "waves"
 
 enablePlugins(
   RunApplicationSettings,
@@ -15,7 +15,7 @@ libraryDependencies ++= Dependencies.node.value
 
 javaAgents ++= {
   if (instrumentation.value) {
-    Seq("io.kamon" % "kanela-agent" % "1.0.14")
+    Dependencies.kanela
   } else {
     Seq.empty
   }
@@ -152,7 +152,7 @@ linuxPackageSymlinks := linuxPackageSymlinks.value.map { lsl =>
 
 inConfig(Debian)(
   Seq(
-    maintainer := "com.wavesplatform",
+    maintainer               := "com.wavesplatform",
     packageSource            := sourceDirectory.value / "package",
     linuxStartScriptTemplate := (packageSource.value / "systemd.service").toURI.toURL,
     debianPackageDependencies += "java8-runtime-headless",

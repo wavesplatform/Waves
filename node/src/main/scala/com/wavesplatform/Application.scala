@@ -341,8 +341,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       val heavyRequestExecutor = new ThreadPoolExecutor(
         heavyRequestProcessorPoolThreads,
         heavyRequestProcessorPoolThreads,
-        60,
-        TimeUnit.SECONDS,
+        0,
+        TimeUnit.MILLISECONDS,
         new LinkedBlockingQueue[Runnable],
         new DefaultThreadFactory("rest-heavy-request-processor", true),
         { (r: Runnable, executor: ThreadPoolExecutor) =>
