@@ -1,7 +1,5 @@
 package com.wavesplatform.api.http.eth
 
-import java.math.BigInteger
-
 import akka.http.scaladsl.server.*
 import cats.data.Validated
 import cats.instances.vector.*
@@ -26,6 +24,7 @@ import org.web3j.crypto.*
 import play.api.libs.json.*
 import play.api.libs.json.Json.JsValueWrapper
 
+import java.math.BigInteger
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
@@ -69,12 +68,14 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
         case "eth_getTransactionCount" =>
           resp(id, quantity(time.getTimestamp()))
         case "eth_getBlockByNumber" =>
-          resp(
-            id,
-            Json.obj(
-              "number" -> quantity(Integer.parseInt(param1Str.drop(2), 16))
-            )
-          )
+          val blockNumber = param1Str match {
+            case "earliest" => Some(1)
+            case "latest"   => Some(blockchain.height)
+            case "pending"  => None
+            case _          => Some(Integer.parseInt(param1Str.drop(2), 16))
+          }
+          val result = blockNumber.map(n => JsString(quantity(n))).getOrElse(JsNull)
+          resp(id, Json.obj("number" -> result))
 
         case "eth_getBlockByHash" =>
           val blockId = ByteStr(toBytes(param1Str))
