@@ -58,7 +58,7 @@ object CommonAccountsApi {
   def apply(diff: () => Diff, db: DB, blockchain: Blockchain): CommonAccountsApi = new CommonAccountsApi {
 
     override def balance(address: Address, confirmations: Int = 0): Long =
-      blockchain.balance(address)
+      blockchain.balance(address, blockchain.height, confirmations)
 
     override def effectiveBalance(address: Address, confirmations: Int = 0): Long = {
       blockchain.effectiveBalance(address, confirmations)
