@@ -4,7 +4,6 @@ import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import cats.instances.either.*
 import cats.instances.list.*
-import cats.instances.try_.*
 import cats.syntax.alternative.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*

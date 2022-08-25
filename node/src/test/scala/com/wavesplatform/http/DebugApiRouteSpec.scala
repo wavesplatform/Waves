@@ -8,7 +8,7 @@ import com.wavesplatform.account.Alias
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
 import com.wavesplatform.api.http.{DebugApiRoute, RouteTimeout}
-import com.wavesplatform.block.{Block, SignedBlockHeader}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.crypto.DigestLength

@@ -426,6 +426,7 @@ object ApiError {
     override val id: Int         = 5031
     override val code            = StatusCodes.ServiceUnavailable
     override val message: String = "The server was not able to produce a timely response to request"
+  }
 
   case object DataKeysNotSpecified extends ApiError {
     override val id      = 4008
