@@ -120,6 +120,49 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
         }
       ),
       Case(
+        "NODE-542 If an inner invoke exceeds the limit of writes size",
+        "Storing data size should not exceed 15360, actual: 15361 bytes",
+        { targetComplexity =>
+          // qux: 4 = 2 for list, 1 for BinaryEntry, 1 for IntegerEntry
+          // baz: 78 = 1 for strict, 75 for invoke, 1 for list, 1 for BinaryEntry
+          // bar: 78 = 1 for strict, 75 for invoke, 1 for list, 1 for BinaryEntry
+          // foo: 78 = 1 for strict, 75 for invoke, 1 for list, 1 for BinaryEntry
+          val baseComplexity = 4 + 78 * 3
+          // See DataTxValidator.realUserPayloadSize: 8 for IntegerDataEntry, 4 for 4 binary keys.
+          // Also we have 1 integer key, that exceeds the limit.
+          val oneEntrySize   = (ContractLimits.MaxTotalWriteSetSizeInBytes - 8 - 4) / 4 // % 4 == 0
+          val binaryEntrySrc = s"""BinaryEntry("b", base64'${Base64.encode(Array.fill[Byte](oneEntrySize)(0))}')"""
+
+          mkScript(
+            s""" @Callable(inv)
+               | func qux() = {
+               |   let complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+               |   [$binaryEntrySrc, IntegerEntry("i", complexInt)]
+               | }
+               |
+               | @Callable(inv)
+               | func baz() = {
+               |   strict res = invoke(this, "qux", [], [])
+               |   [$binaryEntrySrc]
+               | }
+               |
+               | @Callable(inv)
+               | func bar() = {
+               |   strict res = invoke(this, "baz", [], [])
+               |   [$binaryEntrySrc]
+               | }
+               |
+               | @Callable(inv)
+               | func foo() = {
+               |   strict res = invoke(this, "bar", [], [])
+               |   [$binaryEntrySrc]
+               | }
+               | """.stripMargin
+          )
+        },
+        supportedVersions = inV5V6
+      ),
+      Case(
         "NODE-544 If an invoke exceeds the limit of writes number through a WriteSet",
         "Stored data count limit is exceeded",
         { targetComplexity =>
