@@ -192,7 +192,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
           resp(id, toHexString(EthereumTransaction.GasPrice))
         case "eth_getCode" =>
           val address = Address.fromHexString(param1Str)
-          resp(id, if (blockchain.hasDApp(address)) "0xff" else "0x")
+          resp(id, if (blockchain.hasDApp(address) || assetDescription(param1Str).isDefined) "0xff" else "0x")
         case _ =>
           log.trace(s"Unexpected call: ${Json.stringify(jso)}")
           complete(Json.obj())
