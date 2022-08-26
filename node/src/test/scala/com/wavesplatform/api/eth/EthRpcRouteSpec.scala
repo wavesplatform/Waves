@@ -11,6 +11,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.state.BinaryDataEntry
 import com.wavesplatform.test.*
 import com.wavesplatform.test.node.{randomAddress, randomKeyPair}
+import com.wavesplatform.transaction.TxHelpers.issue
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
@@ -86,6 +87,19 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
         )
       )
       routeTest(d, "eth_getCode", testKP.toAddress.toEthAddress)(result shouldBe "0xff")
+    }
+
+    "has asset" in withDomain(
+      settingsWithFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.SynchronousCalls, BlockchainFeatures.Ride4DApps)
+    ) { d =>
+      val testKP  = randomKeyPair()
+      val issueTx = issue(testKP)
+      val asset   = EthEncoding.toHexString(issueTx.id().arr.take(20))
+      d.appendBlock(
+        GenesisTransaction.create(testKP.toAddress, 1.waves, ntpTime.getTimestamp()).explicitGet(),
+        issueTx
+      )
+      routeTest(d, "eth_getCode", asset)(result shouldBe "0xff")
     }
   }
 
