@@ -92,13 +92,9 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
     "has asset" in withDomain(
       settingsWithFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.SynchronousCalls, BlockchainFeatures.Ride4DApps)
     ) { d =>
-      val testKP  = randomKeyPair()
-      val issueTx = issue(testKP)
+      val issueTx = issue()
       val asset   = EthEncoding.toHexString(issueTx.id().arr.take(20))
-      d.appendBlock(
-        GenesisTransaction.create(testKP.toAddress, 1.waves, ntpTime.getTimestamp()).explicitGet(),
-        issueTx
-      )
+      d.appendBlock(issueTx)
       routeTest(d, "eth_getCode", asset)(result shouldBe "0xff")
     }
   }
