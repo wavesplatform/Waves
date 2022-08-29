@@ -45,7 +45,7 @@ object NetworkServer extends ScorexLogging {
       peerDatabase: PeerDatabase,
       allChannels: ChannelGroup,
       peerInfo: ConcurrentHashMap[Channel, PeerInfo],
-      blockV5Activated: () => Boolean
+      forceProtobuf: Boolean
   ): NS = {
     @volatile var shutdownInitiated = false
 
@@ -104,7 +104,7 @@ object NetworkServer extends ScorexLogging {
     def pipelineTail: Seq[ChannelHandlerAdapter] = Seq(
       lengthFieldPrepender,
       new LengthFieldBasedFrameDecoder(MaxFrameLength, 0, LengthFieldSize, 0, LengthFieldSize),
-      new LegacyFrameCodec(peerDatabase, settings.networkSettings.receivedTxsCacheTimeout, blockV5Activated),
+      new LegacyFrameCodec(peerDatabase, settings.networkSettings.receivedTxsCacheTimeout, forceProtobuf),
       channelClosedHandler,
       trafficWatcher,
       discardingHandler,
