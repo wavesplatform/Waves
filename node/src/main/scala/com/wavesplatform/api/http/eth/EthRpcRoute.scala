@@ -137,8 +137,6 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
           param1StrE
             .map { transactionHex =>
               val txId = ByteStr(toBytes(transactionHex))
-              log.info(s"Get receipt for $transactionHex/$txId") // TODO remove logging
-
               resp(
                 id,
                 transactionsApi.transactionById(txId).fold[JsValue](JsNull) { tm =>
@@ -189,7 +187,6 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
                 case "01ffc9a7" => // supportsInterface() https://eips.ethereum.org/EIPS/eip-165
                   resp(id, encodeResponse(new Bool(false)))
                 case _ =>
-                  log.debug(s"Unexpected call $dataString at $contractAddress")
                   resp(id, "0x")
               }
             }
@@ -231,7 +228,6 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
             }
             .fold(identity, identity)
         case _ =>
-          log.trace(s"Unexpected call: ${Json.stringify(jso)}")
           complete(Json.obj())
       }
     }
