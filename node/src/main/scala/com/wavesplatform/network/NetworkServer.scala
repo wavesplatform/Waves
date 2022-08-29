@@ -104,7 +104,7 @@ object NetworkServer extends ScorexLogging {
     def pipelineTail: Seq[ChannelHandlerAdapter] = Seq(
       lengthFieldPrepender,
       new LengthFieldBasedFrameDecoder(MaxFrameLength, 0, LengthFieldSize, 0, LengthFieldSize),
-      new LegacyFrameCodec(peerDatabase, settings.networkSettings.receivedTxsCacheTimeout, forceProtobuf),
+      new LegacyFrameCodec(peerDatabase, settings.networkSettings.receivedTxsCacheTimeout),
       channelClosedHandler,
       trafficWatcher,
       discardingHandler,
