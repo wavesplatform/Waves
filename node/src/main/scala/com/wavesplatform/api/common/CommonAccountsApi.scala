@@ -57,9 +57,8 @@ object CommonAccountsApi {
 
   def apply(diff: () => Diff, db: DB, blockchain: Blockchain): CommonAccountsApi = new CommonAccountsApi {
 
-    override def balance(address: Address, confirmations: Int = 0): Long = {
+    override def balance(address: Address, confirmations: Int = 0): Long =
       blockchain.balance(address, blockchain.height, confirmations)
-    }
 
     override def effectiveBalance(address: Address, confirmations: Int = 0): Long = {
       blockchain.effectiveBalance(address, confirmations)
@@ -150,7 +149,7 @@ object CommonAccountsApi {
           )
         case TransactionMeta.Invoke(invokeHeight, originTransaction, true, _, Some(scriptResult)) =>
           extractLeases(address, scriptResult, originTransaction.id(), invokeHeight)
-        case Ethereum(height, tx @ EthereumTransaction(inv: Invocation, _, _, _), true, _, _, Some(scriptResult)) =>
+        case Ethereum(height, tx @ EthereumTransaction(_: Invocation, _, _, _), true, _, _, Some(scriptResult)) =>
           extractLeases(address, scriptResult, tx.id(), height)
         case _ => Seq()
       }

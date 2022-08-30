@@ -1,21 +1,19 @@
 package com.wavesplatform.api.http.alias
 
-import akka.NotUsed
 import akka.http.scaladsl.common.{EntityStreamingSupport, JsonEntityStreamingSupport}
 import akka.http.scaladsl.server.Route
-import akka.stream.scaladsl.Source
-import cats.syntax.either._
+import cats.syntax.either.*
 import com.wavesplatform.account.Alias
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.requests.CreateAliasRequest
-import com.wavesplatform.api.http.{BroadcastRoute, _}
+import com.wavesplatform.api.http.{BroadcastRoute, *}
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.*
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
-import play.api.libs.json.{JsString, JsValue, Json}
+import play.api.libs.json.{JsString, Json}
 
 case class AliasApiRoute(
     settings: RestAPISettings,
@@ -23,7 +21,8 @@ case class AliasApiRoute(
     wallet: Wallet,
     transactionPublisher: TransactionPublisher,
     time: Time,
-    blockchain: Blockchain
+    blockchain: Blockchain,
+    routeTimeout: RouteTimeout
 ) extends ApiRoute
     with BroadcastRoute
     with AuthRoute {
@@ -52,18 +51,11 @@ case class AliasApiRoute(
   private implicit val ess: JsonEntityStreamingSupport = EntityStreamingSupport.json()
 
   def aliasOfAddress: Route = (get & path("by-address" / AddrSegment)) { address =>
-    extractScheduler { implicit s =>
-      val value: Source[JsValue, NotUsed] =
-        Source
-          .future(
-            commonApi
-              .aliasesOfAddress(address)
-              .map { case (_, tx) => JsString(tx.alias.toString) }
-              .toListL
-              .runToFuture
-          )
-          .mapConcat(identity)
-      complete(value)
-    }
+    routeTimeout.executeStreamed {
+      commonApi
+        .aliasesOfAddress(address)
+        .map { case (_, tx) => JsString(tx.alias.toString) }
+        .toListL
+    }(identity)
   }
 }
