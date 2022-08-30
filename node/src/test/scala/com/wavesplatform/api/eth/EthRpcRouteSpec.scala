@@ -164,11 +164,11 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
     }
 
     "parameter absence" in withDomain() { d =>
-      routeTest(d, "eth_getTransactionReceipt")(errorMessage shouldBe "Expected parameter not found")
+      routeTest(d, "eth_getTransactionReceipt")(errorMessage shouldBe "Error extracting required parameter")
     }
 
     "non-string parameter" in withDomain() { d =>
-      routeTest(d, "eth_getTransactionReceipt", 123)(errorMessage shouldBe "Expected string parameter, but 123 found")
+      routeTest(d, "eth_getTransactionReceipt", 123)(errorMessage shouldBe "Error extracting required parameter")
     }
   }
 
