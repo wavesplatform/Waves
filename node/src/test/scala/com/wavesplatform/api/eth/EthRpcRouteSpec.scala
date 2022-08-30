@@ -48,7 +48,7 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
     routeTest(d, "eth_getBlockByNumber", "earliest")((resultJson \ "number").as[String] shouldBe "0x1")
     routeTest(d, "eth_getBlockByNumber", "latest")((resultJson \ "number").as[String] shouldBe "0x5")
     routeTest(d, "eth_getBlockByNumber", "pending")((resultJson \ "number").as[JsValue] shouldBe JsNull)
-    routeTest(d, "eth_getBlockByNumber", "abc")(errorMessage shouldBe "Request parameter is not number nor supported tag")
+    routeTest(d, "eth_getBlockByNumber", "xxx")(errorMessage shouldBe "Request parameter is not number nor supported tag")
   }
 
   "eth_getBalance" in withDomain() { d =>
