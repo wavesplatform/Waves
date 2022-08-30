@@ -17,7 +17,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.Time
 import play.api.libs.json.*
 
-case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi, time: Time) extends ApiRoute {
+case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi, time: Time, routeTimeout: RouteTimeout) extends ApiRoute {
   import BlocksApiRoute.*
 
   override lazy val route: Route = (pathPrefix("blocks") & get) {
@@ -49,16 +49,14 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
     } ~ path("signature" / BlockId) { signature => // TODO: Delete
       complete(commonApi.block(signature).map(toJson).toRight(BlockDoesNotExist))
     } ~ path("address" / AddrSegment / IntNumber / IntNumber) { (address, start, end) =>
-      if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) extractScheduler { implicit ec =>
-        complete(
+      if (end >= 0 && start >= 0 && end - start >= 0 && end - start < settings.blocksRequestLimit) {
+        routeTimeout.executeToFuture {
           commonApi
             .blocksRange(start, end, address)
             .map(toJson)
             .toListL
-            .runToFuture
-        )
-      }
-      else {
+        }
+      } else {
         complete(TooBigArrayAllocation)
       }
     } ~ pathPrefix("headers") {
@@ -96,18 +94,19 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
   }
 
   private def seq(start: Int, end: Int, includeTransactions: Boolean): Route = {
-    if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
-      val blocks = if (includeTransactions) {
-        commonApi
-          .blocksRange(start, end)
-          .map(toJson)
-      } else {
-        commonApi
-          .metaRange(start, end)
-          .map(_.json())
+    if (end >= 0 && start >= 0 && end - start >= 0 && end - start < settings.blocksRequestLimit) {
+      routeTimeout.executeToFuture {
+        val blocks = if (includeTransactions) {
+          commonApi
+            .blocksRange(start, end)
+            .map(toJson)
+        } else {
+          commonApi
+            .metaRange(start, end)
+            .map(_.json())
+        }
+        blocks.toListL.map(JsArray(_))
       }
-
-      extractScheduler(implicit sc => complete(blocks.toListL.map(JsArray(_)).runToFuture))
     } else {
       complete(TooBigArrayAllocation)
     }
@@ -152,8 +151,7 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
 }
 
 object BlocksApiRoute {
-  val MaxBlocksPerRequest = 100 // todo: make this configurable and fix integration tests
-  val MaxBlocksForDelay   = 10000
+  val MaxBlocksForDelay = 10000
 
   private def toJson(v: (BlockMeta, Seq[(TxMeta, Transaction)])): JsObject = v match {
     case (meta, transactions) =>

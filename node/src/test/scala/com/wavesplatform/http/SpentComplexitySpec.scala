@@ -1,6 +1,6 @@
 package com.wavesplatform.http
 
-import com.wavesplatform.api.http.{ApiMarshallers, TransactionsApiRoute}
+import com.wavesplatform.api.http.{ApiMarshallers, RouteTimeout, TransactionsApiRoute}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
@@ -14,10 +14,13 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.Signed
+import com.wavesplatform.utils.Schedulers
 import com.wavesplatform.{BlockGen, TestWallet}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.OptionValues
 import play.api.libs.json.JsObject
+
+import scala.concurrent.duration.*
 
 class SpentComplexitySpec
     extends RouteSpec("/transactions")
@@ -30,33 +33,33 @@ class SpentComplexitySpec
     with ApiMarshallers {
   private val contract = TestCompiler(V5)
     .compileContract("""{-# STDLIB_VERSION 5 #-}
-      |{-# CONTENT_TYPE DAPP #-}
-      |{-# SCRIPT_TYPE ACCOUNT #-}
-      |
-      |@Verifier(tx)
-      |func verify() = {
-      |  let i1 = if (sigVerify(tx.bodyBytes, tx.proofs[1], tx.senderPublicKey)) then 1 else 0
-      |  let i2 = if (sigVerify(tx.bodyBytes, tx.proofs[2], tx.senderPublicKey)) then 1 else 0
-      |  let i3 = if (sigVerify(tx.bodyBytes, tx.proofs[3], tx.senderPublicKey)) then 1 else 0
-      |  i1 + i2 + i3 < 10
-      |}
-      |
-      |@Callable(i)
-      |func default() = {
-      |  [StringEntry("a", "b")]
-      |}
-      |""".stripMargin)
+                       |{-# CONTENT_TYPE DAPP #-}
+                       |{-# SCRIPT_TYPE ACCOUNT #-}
+                       |
+                       |@Verifier(tx)
+                       |func verify() = {
+                       |  let i1 = if (sigVerify(tx.bodyBytes, tx.proofs[1], tx.senderPublicKey)) then 1 else 0
+                       |  let i2 = if (sigVerify(tx.bodyBytes, tx.proofs[2], tx.senderPublicKey)) then 1 else 0
+                       |  let i3 = if (sigVerify(tx.bodyBytes, tx.proofs[3], tx.senderPublicKey)) then 1 else 0
+                       |  i1 + i2 + i3 < 10
+                       |}
+                       |
+                       |@Callable(i)
+                       |func default() = {
+                       |  [StringEntry("a", "b")]
+                       |}
+                       |""".stripMargin)
 
   private val assetScript = TestCompiler(V5)
     .compileAsset("""{-# STDLIB_VERSION 5 #-}
-      |{-# CONTENT_TYPE EXPRESSION #-}
-      |{-# SCRIPT_TYPE ASSET #-}
-      |
-      |let i1 = if (sigVerify(tx.bodyBytes, tx.bodyBytes, tx.senderPublicKey)) then 1 else 0
-      |let i2 = if (sigVerify(tx.bodyBytes, tx.bodyBytes, tx.senderPublicKey)) then 1 else 0
-      |
-      |i1 + i2 < 10
-      |""".stripMargin)
+                    |{-# CONTENT_TYPE EXPRESSION #-}
+                    |{-# SCRIPT_TYPE ASSET #-}
+                    |
+                    |let i1 = if (sigVerify(tx.bodyBytes, tx.bodyBytes, tx.senderPublicKey)) then 1 else 0
+                    |let i2 = if (sigVerify(tx.bodyBytes, tx.bodyBytes, tx.senderPublicKey)) then 1 else 0
+                    |
+                    |i1 + i2 < 10
+                    |""".stripMargin)
 
   private val settings = DomainPresets.RideV5
 
@@ -64,7 +67,16 @@ class SpentComplexitySpec
 
   private def route(d: Domain) =
     seal(
-      TransactionsApiRoute(restAPISettings, d.transactionsApi, testWallet, d.blockchain, () => 0, DummyTransactionPublisher.accepting, ntpTime).route
+      TransactionsApiRoute(
+        restAPISettings,
+        d.transactionsApi,
+        testWallet,
+        d.blockchain,
+        () => 0,
+        DummyTransactionPublisher.accepting,
+        ntpTime,
+        new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+      ).route
     )
 
   "Invocation" - {

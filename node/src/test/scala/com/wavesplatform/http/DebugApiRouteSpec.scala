@@ -7,7 +7,7 @@ import com.wavesplatform.*
 import com.wavesplatform.account.Alias
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
-import com.wavesplatform.api.http.DebugApiRoute
+import com.wavesplatform.api.http.{DebugApiRoute, RouteTimeout}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
@@ -37,11 +37,14 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{ERC20Address, TxHelpers, TxVersion}
+import com.wavesplatform.utils.Schedulers
+import com.wavesplatform.{BlockchainStubHelpers, NTPTime, TestValues, TestWallet}
 import monix.eval.Task
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{Assertion, OptionValues}
 import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
 
+import scala.concurrent.duration.*
 import scala.util.Random
 
 //noinspection ScalaStyle
@@ -67,6 +70,7 @@ class DebugApiRouteSpec
     StateHash(randomHash, hashes)
   }
 
+  val scheduler = Schedulers.fixedPool(1, "heavy-request-scheduler")
   val debugApiRoute: DebugApiRoute =
     DebugApiRoute(
       wavesSettings,
@@ -91,7 +95,9 @@ class DebugApiRouteSpec
         case 2 => Some(testStateHash)
         case _ => None
       },
-      () => blockchain
+      () => blockchain,
+      new RouteTimeout(60.seconds)(scheduler),
+      scheduler
     )
   import debugApiRoute.*
 
