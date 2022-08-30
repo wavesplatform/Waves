@@ -231,6 +231,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
         case None =>
           complete(GenericError("RPC method should be specified"))
         case _ =>
+          log.trace(s"Unexpected call: ${Json.stringify(jso)}")
           complete(Json.obj())
       }
     }
