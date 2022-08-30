@@ -228,8 +228,6 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
               resp(id, if (blockchain.hasDApp(address) || assetDescription(str).isDefined) "0xff" else "0x")
             }
             .merge
-        case None =>
-          complete(GenericError("RPC method should be specified"))
         case _ =>
           log.trace(s"Unexpected call: ${Json.stringify(jso)}")
           complete(Json.obj())

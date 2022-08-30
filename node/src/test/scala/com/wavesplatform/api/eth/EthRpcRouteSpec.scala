@@ -298,7 +298,7 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
   "absence of method" in withDomain() { d =>
       Post(routePath(""), Json.obj())
         ~> new EthRpcRoute(d.blockchain, d.commonApi.transactions, ntpTime).route
-        ~> check { errorMessage shouldBe "RPC method should be specified" }
+        ~> check { responseAs[JsObject] shouldBe Json.obj() }
   }
 
   def resultJson: JsObject = (responseAs[JsObject] \ "result").as[JsObject]
