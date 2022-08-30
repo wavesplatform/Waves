@@ -23,12 +23,13 @@ import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.DataTransactionData.DataEntry
 import com.wavesplatform.protobuf.transaction.InvokeScriptResult
-import com.wavesplatform.protobuf.transaction.InvokeScriptResult.{Call, Invocation}
+import com.wavesplatform.protobuf.transaction.InvokeScriptResult.{Call, Invocation, Payment}
 import com.wavesplatform.settings.{Constants, WavesSettings}
 import com.wavesplatform.state.{AssetDescription, EmptyDataEntry, Height, LeaseBalance, StringDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.assets.exchange.OrderType
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.utils.Signed
@@ -625,6 +626,36 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       )
       subscribeAndCheckResult(0, d => { (1 to 249).foreach(_ => d.appendMicroBlock(TxHelpers.transfer(amount = 1))) }, (1 to 4) ++ Seq.fill(250)(5))
       subscribeAndCheckResult(0, d => { (1 to 250).foreach(_ => d.appendMicroBlock(TxHelpers.transfer(amount = 1))) }, 1 to 4, isStreamClosed = true)
+    }
+
+    "should return address for invoke transfer recipient" in {
+      val dApp1 = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = {
+           |   strict r = invoke(Address(base58'$secondAddress'), "default", [], [])
+           |   [ScriptTransfer(Address(base58'$secondAddress'), 1, unit)]
+           | }
+        """.stripMargin
+      )
+      val dApp2 = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = {
+           |   [ScriptTransfer(Address(base58'${signer(2).toAddress}'), 1, unit)]
+           | }
+        """.stripMargin
+      )
+      withGenerateSubscription(settings = currentSettings) { d =>
+        d.appendBlock(transfer)
+        d.appendBlock(setScript(defaultSigner, dApp1), setScript(secondSigner, dApp2))
+        d.appendAndAssertSucceed(invoke(defaultAddress))
+      } { events =>
+        val invokeResult              = events.last.getAppend.transactionsMetadata.head.getInvokeScript.getResult
+        def payment(address: Address) = Seq(Payment(ByteString.copyFrom(address.bytes), Some(Amount.of(ByteString.EMPTY, 1))))
+        invokeResult.transfers shouldBe payment(secondAddress)
+        invokeResult.invokes.head.stateChanges.get.transfers shouldBe payment(signer(2).toAddress)
+      }
     }
   }
 
