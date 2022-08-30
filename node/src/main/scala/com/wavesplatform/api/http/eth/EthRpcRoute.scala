@@ -61,14 +61,14 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
       lazy val param1E    = params.headOption.toRight(complete(GenericError("Expected parameter not found")))
       lazy val param1StrE = param1E.flatMap(p => p.asOpt[String].toRight(complete(GenericError(s"Expected string parameter, but $p found"))))
 
-      (jso \ "method").as[String] match {
-        case "eth_chainId" | "net_version" =>
+      (jso \ "method").asOpt[String] match {
+        case Some("eth_chainId" | "net_version") =>
           resp(id, quantity(blockchain.settings.addressSchemeCharacter.toInt))
-        case "eth_blockNumber" =>
+        case Some("eth_blockNumber") =>
           resp(id, quantity(blockchain.height))
-        case "eth_getTransactionCount" =>
+        case Some("eth_getTransactionCount") =>
           resp(id, quantity(time.getTimestamp()))
-        case "eth_getBlockByNumber" =>
+        case Some("eth_getBlockByNumber") =>
           param1StrE
             .map { str =>
               val blockNumber = str match {
@@ -82,7 +82,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
             }
             .fold(identity, identity)
 
-        case "eth_getBlockByHash" =>
+        case Some("eth_getBlockByHash") =>
           param1StrE
             .map { str =>
               val blockId = ByteStr(toBytes(str))
@@ -96,7 +96,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
               )
             }
             .fold(identity, identity)
-        case "eth_getBalance" =>
+        case Some("eth_getBalance") =>
           param1StrE
             .map { str =>
               val address = Address.fromHexString(str)
@@ -109,7 +109,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
 
             }
             .fold(identity, identity)
-        case "eth_sendRawTransaction" =>
+        case Some("eth_sendRawTransaction") =>
           param1StrE
             .map { str =>
               extractTransaction(str) match {
@@ -128,7 +128,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
             }
             .fold(identity, identity)
 
-        case "eth_getTransactionReceipt" =>
+        case Some("eth_getTransactionReceipt") =>
           param1StrE
             .map { transactionHex =>
               val txId = ByteStr(toBytes(transactionHex))
@@ -158,7 +158,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
               )
             }
             .fold(identity, identity)
-        case "eth_call" =>
+        case Some("eth_call") =>
           param1E
             .map { param =>
               val call            = param.as[JsObject]
@@ -186,7 +186,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
               }
             }
             .fold(identity, identity)
-        case "eth_estimateGas" =>
+        case Some("eth_estimateGas") =>
           param1E
             .map { param =>
               val txParams = param.as[JsObject]
@@ -213,15 +213,17 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
             }
             .fold(identity, identity)
 
-        case "eth_gasPrice" =>
+        case Some("eth_gasPrice") =>
           resp(id, toHexString(EthereumTransaction.GasPrice))
-        case "eth_getCode" =>
+        case Some("eth_getCode") =>
           param1StrE
             .map { str =>
               val address = Address.fromHexString(str)
               resp(id, if (blockchain.hasDApp(address) || assetDescription(str).isDefined) "0xff" else "0x")
             }
             .fold(identity, identity)
+        case None =>
+          complete(GenericError("RPC method should be specified"))
         case _ =>
           complete(Json.obj())
       }
