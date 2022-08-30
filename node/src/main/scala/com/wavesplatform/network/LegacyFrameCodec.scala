@@ -75,7 +75,7 @@ class LegacyFrameCodec(peerDatabase: PeerDatabase, receivedTxsCacheTimeout: Fini
   override def encode(ctx: ChannelHandlerContext, msg1: Any, out: ByteBuf): Unit = {
     val msg = (msg1: @unchecked) match {
       case rb: RawBytes           => rb
-      case tx: Transaction        => RawBytes.fromTransaction(tx, forceProtobuf = true)
+      case tx: Transaction        => RawBytes.fromTransaction(tx)
       case block: Block           => RawBytes.fromBlock(block)
       case mb: MicroBlockResponse => RawBytes.fromMicroBlock(mb)
     }

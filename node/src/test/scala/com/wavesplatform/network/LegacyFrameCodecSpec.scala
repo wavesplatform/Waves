@@ -89,7 +89,7 @@ class LegacyFrameCodecSpec extends FreeSpec with MockFactory {
     val tx = UpdateAssetInfoTransaction
       .selfSigned(1, TestValues.keyPair, TestValues.asset.id, "bomz", "", System.currentTimeMillis(), TestValues.fee, Waves)
       .explicitGet()
-    RawBytes.fromTransaction(tx, false) shouldBe RawBytes(PBTransactionSpec.messageCode, PBTransactionSpec.serializeData(tx))
+    RawBytes.fromTransaction(tx) shouldBe RawBytes(PBTransactionSpec.messageCode, PBTransactionSpec.serializeData(tx))
   }
 
   private def write[T <: AnyRef](buff: ByteBuf, msg: T, spec: MessageSpec[T]): Unit = {

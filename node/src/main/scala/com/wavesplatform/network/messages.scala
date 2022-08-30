@@ -39,7 +39,7 @@ case class RawBytes(code: Byte, data: Array[Byte]) extends Message {
 }
 
 object RawBytes {
-  def fromTransaction(tx: Transaction, forceProtobuf: Boolean): RawBytes =
+  def fromTransaction(tx: Transaction): RawBytes =
     RawBytes(PBTransactionSpec.messageCode, PBTransactionSpec.serializeData(tx))
 
   def fromBlock(b: Block): RawBytes =
