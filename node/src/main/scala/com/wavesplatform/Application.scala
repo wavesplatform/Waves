@@ -642,7 +642,6 @@ object Application extends ScorexLogging {
     def dumpMinerConfig(): Unit = {
       import settings.minerSettings as miner
       import settings.synchronizationSettings.microBlockSynchronizer
-      import settings.minerSettings as miner
 
       Metrics.write(
         Point
