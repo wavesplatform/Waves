@@ -14,7 +14,9 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, *}
+import com.wavesplatform.database.protobuf.EthereumTransactionMeta.Payload
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.settings.RestAPISettings
@@ -27,12 +29,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.utils.{EthEncoding, Time}
 import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
-import monix.execution.Scheduler
 import play.api.libs.json.*
-
-import scala.concurrent.Future
-import com.wavesplatform.database.protobuf.EthereumTransactionMeta.Payload
-import com.wavesplatform.lang.v1.serialization.SerdeV1
 
 case class TransactionsApiRoute(
     settings: RestAPISettings,
@@ -41,7 +38,8 @@ case class TransactionsApiRoute(
     blockchain: Blockchain,
     utxPoolSize: () => Int,
     transactionPublisher: TransactionPublisher,
-    time: Time
+    time: Time,
+    routeTimeout: RouteTimeout
 ) extends ApiRoute
     with BroadcastRoute
     with AuthRoute {
@@ -57,11 +55,12 @@ case class TransactionsApiRoute(
 
   def addressWithLimit: Route = {
     (get & path("address" / AddrSegment / "limit" / IntNumber) & parameter("after".?)) { (address, limit, maybeAfter) =>
-      val after =
-        maybeAfter.map(s => ByteStr.decodeBase58(s).getOrElse(throw ApiException(CustomValidationError(s"Unable to decode transaction id $s"))))
-      if (limit > settings.transactionsByAddressLimit) throw ApiException(TooBigArrayAllocation)
-      extractScheduler { implicit sc =>
-        complete(transactionsByAddress(address, limit, after).map(txs => List(txs))) // Double list - [ [tx1, tx2, ...] ]
+      routeTimeout.executeToFuture {
+        val after =
+          maybeAfter.map(s => ByteStr.decodeBase58(s).getOrElse(throw ApiException(CustomValidationError(s"Unable to decode transaction id $s"))))
+        if (limit > settings.transactionsByAddressLimit) throw ApiException(TooBigArrayAllocation)
+
+        transactionsByAddress(address, limit, after).map(txs => List(txs)) // Double list - [ [tx1, tx2, ...] ]
       }
     }
   }
@@ -195,7 +194,7 @@ case class TransactionsApiRoute(
       case (errors, _) => InvalidIds(errors)
     }
 
-  def transactionsByAddress(address: Address, limitParam: Int, maybeAfter: Option[ByteStr])(implicit sc: Scheduler): Future[List[JsObject]] = {
+  def transactionsByAddress(address: Address, limitParam: Int, maybeAfter: Option[ByteStr]): Task[List[JsObject]] = {
     val aliasesOfAddress: Task[Set[Alias]] =
       commonApi
         .aliasesOfAddress(address)
@@ -229,7 +228,6 @@ case class TransactionsApiRoute(
       .take(limitParam)
       .mapEval(compactJson(address, _))
       .toListL
-      .runToFuture
   }
 }
 

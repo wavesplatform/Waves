@@ -22,10 +22,11 @@ class RestAPISettingsSpecification extends FlatSpec {
         |      access-control-allow-methods = ["OPTIONS", "POST", "PUT", "GET", "DELETE"]
         |      access-control-allow-credentials = yes
         |    }
-        |    transactions-by-address-limit = 10000
-        |    distribution-address-limit = 10000
-        |    data-keys-request-limit = 10000
-        |    asset-details-limit = 10000
+        |    transactions-by-address-limit = 1000
+        |    distribution-address-limit = 1000
+        |    data-keys-request-limit = 1000
+        |    asset-details-limit = 100
+        |    blocks-request-limit  = 100
         |    evaluate-script-complexity-limit = 4000
         |    limited-pool-threads = 2
         |    heavy-request-processor-pool-threads = 7
@@ -40,10 +41,11 @@ class RestAPISettingsSpecification extends FlatSpec {
     settings.bindAddress should be("127.0.0.1")
     settings.port should be(6869)
     settings.apiKeyHash should be("BASE58APIKEYHASH")
-    settings.transactionsByAddressLimit shouldBe 10000
-    settings.distributionAddressLimit shouldBe 10000
-    settings.dataKeysRequestLimit shouldBe 10000
-    settings.assetDetailsLimit shouldBe 10000
+    settings.transactionsByAddressLimit shouldBe 1000
+    settings.distributionAddressLimit shouldBe 1000
+    settings.dataKeysRequestLimit shouldBe 1000
+    settings.assetDetailsLimit shouldBe 100
+    settings.blocksRequestLimit shouldBe 100
     settings.evaluateScriptComplexityLimit shouldBe 4000
     settings.limitedPoolThreads shouldBe 2
     settings.heavyRequestProcessorPoolThreads shouldBe Some(7)

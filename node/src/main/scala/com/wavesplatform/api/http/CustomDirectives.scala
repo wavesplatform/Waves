@@ -6,7 +6,6 @@ import cats.instances.vector.*
 import cats.syntax.traverse.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.utils.{EthEncoding, ScorexLogging}
-import monix.execution.{Scheduler, UncaughtExceptionReporter}
 import play.api.libs.json.JsObject
 
 import scala.concurrent.duration.DurationInt
@@ -49,7 +48,4 @@ trait CustomDirectives extends Directives with ApiMarshallers with ScorexLogging
         case Validated.Invalid(e) => complete(ApiError.InvalidIds(e.toList))
       }
   }
-
-  def extractScheduler: Directive1[Scheduler] =
-    extractExecutionContext.map(ec => Scheduler(ec, UncaughtExceptionReporter((t: Throwable) => log.debug("Error processing request", t))))
 }

@@ -4,7 +4,6 @@ import akka.http.scaladsl.common.{EntityStreamingSupport, JsonEntityStreamingSup
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
-import akka.stream.scaladsl.Source
 import cats.syntax.either.*
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.Version
@@ -36,7 +35,7 @@ import play.api.libs.json.Json.JsValueWrapper
 import java.net.{InetAddress, InetSocketAddress, URI}
 import java.util.concurrent.ConcurrentMap
 import scala.concurrent.duration.*
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
@@ -60,7 +59,9 @@ case class DebugApiRoute(
     configRoot: ConfigObject,
     loadBalanceHistory: Address => Seq[(Int, Long)],
     loadStateHash: Int => Option[StateHash],
-    priorityPoolBlockchain: () => Blockchain
+    priorityPoolBlockchain: () => Blockchain,
+    routeTimeout: RouteTimeout,
+    heavyRequestScheduler: Scheduler
 ) extends ApiRoute
     with AuthRoute
     with ScorexLogging {
@@ -95,19 +96,16 @@ case class DebugApiRoute(
   }
 
   private def distribution(height: Int): Route = optionalHeaderValueByType(Accept) { accept =>
-    extractScheduler { implicit s =>
-      complete(
-        assetsApi
-          .wavesDistribution(height, None)
-          .toListL
-          .runToFuture
-          .map {
-            case l if accept.exists(_.mediaRanges.exists(CustomJson.acceptsNumbersAsStrings)) =>
-              Json.obj(l.map { case (address, balance) => address.toString -> (balance.toString: JsValueWrapper) }*)
-            case l =>
-              Json.obj(l.map { case (address, balance) => address.toString -> (balance: JsValueWrapper) }*)
-          }
-      )
+    routeTimeout.executeToFuture {
+      assetsApi
+        .wavesDistribution(height, None)
+        .toListL
+        .map {
+          case l if accept.exists(_.mediaRanges.exists(CustomJson.acceptsNumbersAsStrings)) =>
+            Json.obj(l.map { case (address, balance) => address.toString -> (balance.toString: JsValueWrapper) }*)
+          case l =>
+            Json.obj(l.map { case (address, balance) => address.toString -> (balance: JsValueWrapper) }*)
+        }
     }
   }
 
@@ -119,15 +117,14 @@ case class DebugApiRoute(
     distribution(height)
   }
 
-  private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean)(implicit
-      ec: ExecutionContext
-  ): Future[Either[ValidationError, JsObject]] = {
+  private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean): Future[Either[ValidationError, JsObject]] = {
+    implicit val sc: Scheduler = heavyRequestScheduler
     rollbackTask(blockId, returnTransactionsToUtx)
       .map(_.map(_ => Json.obj("BlockId" -> blockId.toString)))
-      .runAsyncLogErr(Scheduler(ec))
+      .runAsyncLogErr
   }
 
-  def rollback: Route = (path("rollback") & withRequestTimeout(15.minutes) & extractScheduler) { implicit sc =>
+  def rollback: Route = (path("rollback") & withRequestTimeout(15.minutes)) {
     jsonPost[RollbackParams] { params =>
       blockchain.blockHeader(params.rollbackTo) match {
         case Some(sh) =>
@@ -177,7 +174,7 @@ case class DebugApiRoute(
   }
 
   def rollbackTo: Route = path("rollback-to" / Segment) { signature =>
-    (delete & extractScheduler) { implicit sc =>
+    delete {
       val signatureEi: Either[ValidationError, ByteStr] =
         ByteStr
           .decodeBase58(signature)
@@ -277,21 +274,13 @@ case class DebugApiRoute(
   def stateChangesByAddress: Route =
     (get & path("stateChanges" / "address" / AddrSegment / "limit" / IntNumber) & parameter("after".as[ByteStr].?)) { (address, limit, afterOpt) =>
       validate(limit <= settings.transactionsByAddressLimit, s"Max limit is ${settings.transactionsByAddressLimit}") {
-        extractScheduler { implicit s =>
-          complete {
-            implicit val ss: JsonEntityStreamingSupport = EntityStreamingSupport.json()
-
-            Source
-              .future(
-                transactionsApi
-                  .transactionsByAddress(address, None, Set.empty, afterOpt)
-                  .take(limit)
-                  .toListL
-                  .runToFuture
-              )
-              .mapConcat(_.map(Json.toJsObject(_)))
-          }
-        }
+        implicit val ss: JsonEntityStreamingSupport = EntityStreamingSupport.json()
+        routeTimeout.executeStreamed {
+          transactionsApi
+            .transactionsByAddress(address, None, Set.empty, afterOpt)
+            .take(limit)
+            .toListL
+        }(Json.toJsObject(_))
       }
     }
 
