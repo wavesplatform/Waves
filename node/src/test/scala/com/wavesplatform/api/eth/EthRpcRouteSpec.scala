@@ -288,6 +288,12 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
       }
   }
 
+  "absence of id" in withDomain() { d =>
+      Post(routePath(""), Json.obj("method" -> "eth_chainId"))
+        ~> new EthRpcRoute(d.blockchain, d.commonApi.transactions, ntpTime).route
+        ~> check { responseAs[JsObject] shouldBe Json.obj("id" -> null, "jsonrpc" -> "2.0", "result" -> "0x54") }
+  }
+
   def resultJson: JsObject = (responseAs[JsObject] \ "result").as[JsObject]
   def result: String       = (responseAs[JsObject] \ "result").as[String]
   def resultInt: Long      = java.lang.Long.valueOf((responseAs[JsObject] \ "result").as[String].drop(2), 16)
