@@ -80,7 +80,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
               val result = blockNumber.map(n => JsString(quantity(n))).getOrElse(JsNull)
               resp(id, Json.obj("number" -> result))
             }
-            .fold(identity, identity)
+            .merge
 
         case Some("eth_getBlockByHash") =>
           param1StrE
@@ -95,7 +95,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
                 }
               )
             }
-            .fold(identity, identity)
+            .merge
         case Some("eth_getBalance") =>
           param1StrE
             .map { str =>
@@ -108,7 +108,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
               )
 
             }
-            .fold(identity, identity)
+            .merge
         case Some("eth_sendRawTransaction") =>
           param1StrE
             .map { str =>
@@ -126,7 +126,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
                   )
               }
             }
-            .fold(identity, identity)
+            .merge
 
         case Some("eth_getTransactionReceipt") =>
           param1StrE
@@ -157,7 +157,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
                 }
               )
             }
-            .fold(identity, identity)
+            .merge
         case Some("eth_call") =>
           param1E
             .map { param =>
@@ -185,7 +185,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
                   resp(id, "0x")
               }
             }
-            .fold(identity, identity)
+            .merge
         case Some("eth_estimateGas") =>
           param1E
             .map { param =>
@@ -211,7 +211,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
                   .fold[JsValueWrapper](e => ApiError.fromValidationError(e).json, fee => toHexString(BigInteger.valueOf(fee)))
               )
             }
-            .fold(identity, identity)
+            .merge
 
         case Some("eth_gasPrice") =>
           resp(id, toHexString(EthereumTransaction.GasPrice))
@@ -221,7 +221,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
               val address = Address.fromHexString(str)
               resp(id, if (blockchain.hasDApp(address) || assetDescription(str).isDefined) "0xff" else "0x")
             }
-            .fold(identity, identity)
+            .merge
         case None =>
           complete(GenericError("RPC method should be specified"))
         case _ =>
