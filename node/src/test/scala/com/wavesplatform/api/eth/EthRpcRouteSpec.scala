@@ -48,6 +48,7 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
     routeTest(d, "eth_getBlockByNumber", "earliest")((resultJson \ "number").as[String] shouldBe "0x1")
     routeTest(d, "eth_getBlockByNumber", "latest")((resultJson \ "number").as[String] shouldBe "0x5")
     routeTest(d, "eth_getBlockByNumber", "pending")((resultJson \ "number").as[JsValue] shouldBe JsNull)
+    routeTest(d, "eth_getBlockByNumber", "abc")(errorMessage shouldBe "Request parameter is not number nor supported tag")
   }
 
   "eth_getBalance" in withDomain() { d =>
@@ -163,11 +164,11 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
     }
 
     "parameter absence" in withDomain() { d =>
-      routeTest(d, "eth_getTransactionReceipt")((responseAs[JsObject] \ "message").as[String] shouldBe "Expected parameter not found")
+      routeTest(d, "eth_getTransactionReceipt")(errorMessage shouldBe "Expected parameter not found")
     }
 
     "non-string parameter" in withDomain() { d =>
-      routeTest(d, "eth_getTransactionReceipt", 123)((responseAs[JsObject] \ "message").as[String] shouldBe "Expected string parameter, but 123 found")
+      routeTest(d, "eth_getTransactionReceipt", 123)(errorMessage shouldBe "Expected string parameter, but 123 found")
     }
   }
 
@@ -297,10 +298,11 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
   "absence of method" in withDomain() { d =>
       Post(routePath(""), Json.obj())
         ~> new EthRpcRoute(d.blockchain, d.commonApi.transactions, ntpTime).route
-        ~> check { (responseAs[JsObject] \ "message").as[String] shouldBe "RPC method should be specified" }
+        ~> check { errorMessage shouldBe "RPC method should be specified" }
   }
 
   def resultJson: JsObject = (responseAs[JsObject] \ "result").as[JsObject]
   def result: String       = (responseAs[JsObject] \ "result").as[String]
   def resultInt: Long      = java.lang.Long.valueOf((responseAs[JsObject] \ "result").as[String].drop(2), 16)
+  def errorMessage: String = (responseAs[JsObject] \ "message").as[String]
 }

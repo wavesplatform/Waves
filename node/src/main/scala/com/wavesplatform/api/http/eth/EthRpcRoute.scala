@@ -29,6 +29,7 @@ import java.math.BigInteger
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
+import scala.util.Try
 
 class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi, time: Time) extends ApiRoute {
   val route: Route = pathPrefix("eth") {
@@ -70,15 +71,20 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
           resp(id, quantity(time.getTimestamp()))
         case Some("eth_getBlockByNumber") =>
           param1StrE
-            .map { str =>
+            .flatMap { str =>
               val blockNumber = str match {
-                case "earliest" => Some(1)
-                case "latest"   => Some(blockchain.height)
-                case "pending"  => None
-                case _          => Some(Integer.parseInt(str.drop(2), 16))
+                case "earliest" => Some(1).asRight
+                case "latest"   => Some(blockchain.height).asRight
+                case "pending"  => None.asRight
+                case _          =>
+                  Try(Some(Integer.parseInt(str.drop(2), 16)))
+                    .toEither
+                    .leftMap(_ => complete(GenericError("Request parameter is not number nor supported tag")))
               }
-              val result = blockNumber.map(n => JsString(quantity(n))).getOrElse(JsNull)
-              resp(id, Json.obj("number" -> result))
+              blockNumber.map { numberOpt =>
+                val result = numberOpt.map(n => JsString(quantity(n))).getOrElse(JsNull)
+                resp(id, Json.obj("number" -> result))
+              }
             }
             .merge
 
