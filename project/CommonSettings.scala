@@ -12,6 +12,7 @@ object CommonSettings extends AutoPlugin {
 }
 
 trait CommonKeys {
-  val network       = settingKey[Network]("The network for artifacts")
-  val packageSource = settingKey[File]("Additional files for DEB")
+  val network         = settingKey[Network]("The network for artifacts")
+  val packageSource   = settingKey[File]("Additional files for DEB")
+  val instrumentation = settingKey[Boolean]("Include kanela java agent in start script")
 }

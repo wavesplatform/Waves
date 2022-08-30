@@ -5,7 +5,7 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.TestWallet
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.common.CommonTransactionsApi
-import com.wavesplatform.api.http.TransactionsApiRoute
+import com.wavesplatform.api.http.{RouteTimeout, TransactionsApiRoute}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.lang.v1.FunctionHeader.User
@@ -21,12 +21,24 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxNonNegativeAmount, TxVersion, VersionedTransaction}
+import com.wavesplatform.transaction.{
+  Asset,
+  CreateAliasTransaction,
+  DataTransaction,
+  Proofs,
+  Transaction,
+  TxNonNegativeAmount,
+  TxVersion,
+  VersionedTransaction
+}
+import com.wavesplatform.utils.Schedulers
 import com.wavesplatform.utx.UtxPool
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.OptionValues
 import play.api.libs.json.*
+
+import scala.concurrent.duration.*
 
 class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestAPISettingsHelper with MockFactory with OptionValues with TestWallet {
 
@@ -46,7 +58,16 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
 
   private val transactionsApi = mock[CommonTransactionsApi]
   private val route: Route =
-    TransactionsApiRoute(restAPISettings, transactionsApi, testWallet, blockchain, () => utx.size, DummyTransactionPublisher.accepting, ntpTime).route
+    TransactionsApiRoute(
+      restAPISettings,
+      transactionsApi,
+      testWallet,
+      blockchain,
+      () => utx.size,
+      DummyTransactionPublisher.accepting,
+      ntpTime,
+      new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+    ).route
 
   "Proto transactions should be able to broadcast " - {
     "CreateAliasTransaction" in {
@@ -419,7 +440,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       }
 
       val updateAssetInfoTx = updateAssetInfoTxUnsigned.copy(proofs = proofs)
-      val base64Str = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(updateAssetInfoTx)))
+      val base64Str         = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(updateAssetInfoTx)))
 
       Post(routePath("/broadcast"), updateAssetInfoTx.json()) ~> ApiKeyHeader ~> route ~> check {
         responseAs[JsObject] shouldBe updateAssetInfoTx.json()
