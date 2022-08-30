@@ -57,9 +57,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
     } ~ (get & path("abi" / AddrSegment)) { addr =>
       complete(blockchain.accountScript(addr).map(as => ABIConverter(as.script).jsonABI))
     } ~ (pathEndOrSingleSlash & post & entity(as[JsObject])) { jso =>
-      val id     = (jso \ "id").getOrElse(JsNull)
-      val params = (jso \ "params").asOpt[IndexedSeq[JsValue]].getOrElse(Nil)
-
+      val id = (jso \ "id").getOrElse(JsNull)
       (jso \ "method").asOpt[String] match {
         case Some("eth_chainId" | "net_version") =>
           resp(id, quantity(blockchain.settings.addressSchemeCharacter.toInt))
@@ -74,7 +72,8 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
               case "latest"   => Some(blockchain.height).asRight
               case "pending"  => None.asRight
               case _ =>
-                Try(Some(Integer.parseInt(str.drop(2), 16))).toEither
+                Try(Some(Integer.parseInt(str.drop(2), 16)))
+                  .toEither
                   .leftMap(_ => GenericError("Request parameter is not number nor supported tag"))
             }
             blockNumberOpt.fold(
