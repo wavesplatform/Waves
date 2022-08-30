@@ -57,7 +57,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
     } ~ (get & path("abi" / AddrSegment)) { addr =>
       complete(blockchain.accountScript(addr).map(as => ABIConverter(as.script).jsonABI))
     } ~ (pathEndOrSingleSlash & post & entity(as[JsObject])) { jso =>
-      val id              = (jso \ "id").asOpt[JsValue].getOrElse(JsNull)
+      val id              = (jso \ "id").getOrElse(JsNull)
       val params          = (jso \ "params").asOpt[IndexedSeq[JsValue]].getOrElse(Nil)
       lazy val param1E    = params.headOption.toRight(complete(GenericError("Expected parameter not found")))
       lazy val param1StrE = param1E.flatMap(p => p.asOpt[String].toRight(complete(GenericError(s"Expected string parameter, but $p found"))))
