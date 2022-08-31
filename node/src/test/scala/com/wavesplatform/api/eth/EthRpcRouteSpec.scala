@@ -190,14 +190,14 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
            |  "transactionIndex" : "0x1",
            |  "from" : "0xf1f6bdabc1b48e7d75957b361881be9c40e4b424",
            |  "to" : "0x3d3ad884fa042927b9d6c37df70af5c0bd9516c5",
-           |  "value" : "0x0",
+           |  "value" : "0x10",
            |  "gasPrice" : "0x186a0",
            |  "gas" : "0x186a0",
-           |  "input" : "0x0",
-           |  "v" : "0x0",
-           |  "standardV" : "0x0",
-           |  "r" : "0x0",
-           |  "raw" : "0x0",
+           |  "input" : "0x20",
+           |  "v" : "0x30",
+           |  "standardV" : "0x40",
+           |  "r" : "0x50",
+           |  "raw" : "0x60",
            |  "publickey" : "0xf69531bdb61b48f8cd4963291d07773d09b07081795dae2a43931a5c3cd86e15018836e653bc7c1e6a2718c9b28a9f299d4b86d956488b432ab719d5cc962d2e"
            |}
          """.stripMargin

@@ -165,14 +165,14 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
                       "transactionIndex" -> "0x1",
                       "from"             -> toHexString(tx.senderAddress().publicKeyHash),
                       "to"               -> tx.underlying.getTo,
-                      "value"            -> "0x0",
+                      "value"            -> "0x10",
                       "gasPrice"         -> toHexString(tx.fee),
                       "gas"              -> toHexString(tx.fee),
-                      "input"            -> "0x0",
-                      "v"                -> "0x0",
-                      "standardV"        -> "0x0",
-                      "r"                -> "0x0",
-                      "raw"              -> "0x0",
+                      "input"            -> "0x20",
+                      "v"                -> "0x30",
+                      "standardV"        -> "0x40",
+                      "r"                -> "0x50",
+                      "raw"              -> "0x60",
                       "publickey"        -> toHexString(tx.signerPublicKey().arr)
                     )
                   case _ => JsNull
