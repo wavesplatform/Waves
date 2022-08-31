@@ -16,6 +16,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
 import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxHelpers}
+import com.wavesplatform.utils.EthEncoding.toHexString
 import com.wavesplatform.utils.{EthEncoding, EthHelpers}
 import play.api.libs.json.*
 import play.api.libs.json.Json.JsValueWrapper
@@ -170,6 +171,38 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
     "non-string parameter" in withDomain() { d =>
       routeTest(d, "eth_getTransactionReceipt", 123)(errorMessage shouldBe "Error extracting required parameter")
     }
+  }
+
+  "eth_getTransactionByHash" in withDomain(settingsWithFeatures(BlockchainFeatures.BlockV5, BlockchainFeatures.RideV6)) { d =>
+    val transaction = EthTxGenerator.generateEthTransfer(TxHelpers.defaultSigner.toEthKeyPair, TxHelpers.secondAddress, 10L, Asset.Waves)
+
+    d.appendBlock(GenesisTransaction.create(transaction.senderAddress(), 50.waves, ntpTime.getTimestamp()).explicitGet())
+    d.appendBlock(transaction)
+
+    routeTest(d, "eth_getTransactionByHash", transaction.id().toHexString)(
+      resultJson should matchJson(
+        s"""
+           |{
+           |  "hash" : "${toHexString(transaction.id().arr)}",
+           |  "nonce" : "0x1",
+           |  "blockHash" : "${toHexString(d.lastBlockId.arr)}",
+           |  "blockNumber" : "0x2",
+           |  "transactionIndex" : "0x1",
+           |  "from" : "0xf1f6bdabc1b48e7d75957b361881be9c40e4b424",
+           |  "to" : "0x3d3ad884fa042927b9d6c37df70af5c0bd9516c5",
+           |  "value" : "0x0",
+           |  "gasPrice" : "0x186a0",
+           |  "gas" : "0x186a0",
+           |  "input" : "0x0",
+           |  "v" : "0x0",
+           |  "standardV" : "0x0",
+           |  "r" : "0x0",
+           |  "raw" : "0x0",
+           |  "publickey" : "0xf69531bdb61b48f8cd4963291d07773d09b07081795dae2a43931a5c3cd86e15018836e653bc7c1e6a2718c9b28a9f299d4b86d956488b432ab719d5cc962d2e"
+           |}
+         """.stripMargin
+      )
+    )
   }
 
   "eth_sendRawTransaction" in withDomain(settingsWithFeatures(BlockchainFeatures.RideV6, BlockchainFeatures.BlockV5)) { d =>
