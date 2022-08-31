@@ -1060,10 +1060,25 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       (responseAs[JsValue] \ "result" \ "value").as[String] shouldBe "abc123\nvalue\n"
     }
 
-    val compactedDApp = TestCompiler(V5).compileContract("func call() = []", compact = true)
+    val compactedDApp = TestCompiler(V5).compileContract(
+      """
+        | func user1() = 1
+        | func user2() = 2
+        |
+        | @Callable(i)
+        | func call() = ([], user1() + user2())
+      """.stripMargin,
+      compact = true
+    )
     d.helpers.setScript(dAppAccount, compactedDApp)
+    evalScript("user1()")  ~> route ~> check {
+      (responseAs[JsValue] \ "result" \ "value").as[Int] shouldBe 1
+    }
+    evalScript("user2()")  ~> route ~> check {
+      (responseAs[JsValue] \ "result" \ "value").as[Int] shouldBe 2
+    }
     evalScript("call()")  ~> route ~> check {
-      (responseAs[JsValue] \ "result" \ "value").as[JsArray].value shouldBe Seq()
+      (responseAs[JsValue] \ "result" \ "value" \ "_2" \ "value").as[Int] shouldBe 3
     }
   }
 
