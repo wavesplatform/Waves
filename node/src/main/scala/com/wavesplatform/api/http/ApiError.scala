@@ -58,10 +58,10 @@ object ApiError {
             if (e.isAssetScript) TransactionNotAllowedByAssetScript(tx)
             else TransactionNotAllowedByAccountScript(tx)
           case TxValidationError.Mistiming(errorMessage)                         => Mistiming(errorMessage)
-          case e: TxValidationError.ScriptExecutionError                         => ScriptExecutionError(tx, e.error, e.isAssetScript)
+          case e: TxValidationError.ScriptExecutionError                         => ScriptExecutionError(tx, e.message, e.isAssetScript)
           case e: TxValidationError.FailedTransactionError if e.isAssetExecution => ScriptExecutionError(tx, e.message, isTokenScript = true)
           case e: TxValidationError.FailedTransactionError if e.isDAppExecution  => InvokeExecutionError(tx, e.message)
-          case e: TxValidationError.InvokeRejectError                            => InvokeExecutionError(tx, e.error)
+          case e: TxValidationError.InvokeRejectError                            => InvokeExecutionError(tx, e.message)
           case _: TxValidationError.FailedTransactionError                       => TransactionNotAllowedByAssetScript(tx)
           case err                                                               => StateCheckFailed(tx, fromValidationError(err))
         }

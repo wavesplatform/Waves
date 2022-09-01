@@ -35,7 +35,7 @@ import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.TransactionType.TransactionType
-import com.wavesplatform.transaction.TxValidationError.{GenericError, InvokeRejectError, ScriptExecutionError}
+import com.wavesplatform.transaction.TxValidationError.{GenericError, InvokeRejectError}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{BlockchainContext, DAppEnvironment, InvokeScriptTransaction}
 import com.wavesplatform.transaction.{Asset, TransactionType}
@@ -298,7 +298,7 @@ case class UtilsApiRoute(
       val requestData = obj ++ Json.obj("address" -> address.toString)
       val responseJson = result
         .recover {
-          case e: InvokeRejectError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.error)
+          case e: InvokeRejectError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.message)
           case other                => ApiError.fromValidationError(other).json
         }
         .explicitGet() ++ requestData

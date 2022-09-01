@@ -132,18 +132,18 @@ object TxValidationError {
     }
   }
 
-  case class ScriptExecutionError(error: String, log: Log[Id], assetId: Option[ByteStr]) extends ValidationError with WithLog {
+  case class ScriptExecutionError(message: String, log: Log[Id], assetId: Option[ByteStr]) extends ValidationError with WithLog {
     def isAssetScript: Boolean = assetId.isDefined
     private val target: String = assetId.fold("Account")(_ => "Asset")
     override def toString: String =
-      if (String.valueOf(error).startsWith("ScriptExecutionError"))
-        error
+      if (String.valueOf(message).startsWith("ScriptExecutionError"))
+        message
       else
-        s"ScriptExecutionError(error = $error, type = $target, log = ${logToString(log)})"
+        s"ScriptExecutionError(error = $message, type = $target, log = ${logToString(log)})"
   }
 
-  case class InvokeRejectError(error: String, log: Log[Id]) extends ValidationError with WithLog {
-    override def toString: String = s"InvokeRejectError(error = $error, log = ${logToString(log)})"
+  case class InvokeRejectError(message: String, log: Log[Id]) extends ValidationError with WithLog {
+    override def toString: String = s"InvokeRejectError(error = $message, log = ${logToString(log)})"
   }
 
   case class TransactionNotAllowedByScript(log: Log[Id], assetId: Option[ByteStr]) extends ValidationError {
