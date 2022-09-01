@@ -122,7 +122,6 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
                 )
             }
           }
-
         case Some("eth_getTransactionReceipt") =>
           extractParam1[String](jso) { transactionHex =>
             val txId = ByteStr(toBytes(transactionHex))
@@ -147,7 +146,37 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
                     )
                   case _ => JsNull
                 }
-
+              }
+            )
+          }
+        case Some("eth_getTransactionByHash") =>
+          extractParam1[String](jso) { transactionHex =>
+            val txId = ByteStr(toBytes(transactionHex))
+            resp(
+              id,
+              transactionsApi.transactionById(txId).fold[JsValue](JsNull) { tm =>
+                tm.transaction match {
+                  case tx: EthereumTransaction =>
+                    Json.obj(
+                      "hash"             -> toHexString(tm.transaction.id().arr),
+                      "nonce"            -> "0x1",
+                      "blockHash"        -> toHexString(blockchain.lastBlockId.get.arr),
+                      "blockNumber"      -> toHexString(BigInteger.valueOf(tm.height)),
+                      "transactionIndex" -> "0x1",
+                      "from"             -> toHexString(tx.senderAddress().publicKeyHash),
+                      "to"               -> tx.underlying.getTo,
+                      "value"            -> "0x10",
+                      "gasPrice"         -> toHexString(tx.fee),
+                      "gas"              -> toHexString(tx.fee),
+                      "input"            -> "0x20",
+                      "v"                -> "0x30",
+                      "standardV"        -> "0x40",
+                      "r"                -> "0x50",
+                      "raw"              -> "0x60",
+                      "publickey"        -> toHexString(tx.signerPublicKey().arr)
+                    )
+                  case _ => JsNull
+                }
               }
             )
           }
