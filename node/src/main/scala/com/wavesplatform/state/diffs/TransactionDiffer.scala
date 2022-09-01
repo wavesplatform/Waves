@@ -89,7 +89,10 @@ object TransactionDiffer {
       // Force reject
       case fte: FailedTransactionError
           if fte.spentComplexity <= ContractLimits.FailFreeInvokeComplexity && blockchain.isFeatureActivated(BlockchainFeatures.RideV6) =>
-        TransactionValidationError(ScriptExecutionError(fte.message, fte.log, fte.assetId), tx)
+        if (tx.isInstanceOf[InvokeScriptTransaction])
+          InvokeRejectError(fte.message, fte.log)
+        else
+          TransactionValidationError(ScriptExecutionError(fte.message, fte.log, fte.assetId), tx)
 
       case err => TransactionValidationError(err, tx)
     }

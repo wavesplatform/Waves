@@ -1,7 +1,5 @@
 package com.wavesplatform.api.http
 
-import java.security.SecureRandom
-
 import akka.http.scaladsl.server.{PathMatcher1, Route}
 import cats.syntax.either.*
 import cats.syntax.semigroup.*
@@ -37,7 +35,7 @@ import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.TransactionType.TransactionType
-import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError}
+import com.wavesplatform.transaction.TxValidationError.{GenericError, InvokeRejectError, ScriptExecutionError}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{BlockchainContext, DAppEnvironment, InvokeScriptTransaction}
 import com.wavesplatform.transaction.{Asset, TransactionType}
@@ -46,6 +44,8 @@ import monix.eval.Coeval
 import monix.execution.Scheduler
 import play.api.libs.json.*
 import shapeless.Coproduct
+
+import java.security.SecureRandom
 
 case class UtilsApiRoute(
     timeService: Time,
@@ -405,10 +405,10 @@ object UtilsApiRoute {
             checkConstructorArgsTypes = true
           )
           .value()
-          .leftMap { case (err, _, log) => ScriptExecutionError.dAppExecution(err.message, log) }
+          .leftMap { case (err, _, log) => InvokeRejectError(err.message, log) }
         result <- limitedResult match {
           case (eval: EVALUATED, unusedComplexity, _) => Right((eval, limit - unusedComplexity))
-          case (_: EXPR, _, log)                      => Left(ScriptExecutionError.dAppExecution(s"Calculation complexity limit exceeded", log))
+          case (_: EXPR, _, log)                      => Left(InvokeRejectError(s"Calculation complexity limit exceeded", log))
         }
       } yield result
     }

@@ -70,8 +70,8 @@ object TxValidationError {
       case Cause.AssetScriptInAction | Cause.AssetScript => assetScriptError(assetId.get, error)
     }
 
-    def isAssetScript: Boolean    = assetId.isDefined
-    def isExecutionError: Boolean = error.nonEmpty
+    def isDAppExecution: Boolean  = assetId.isEmpty && error.nonEmpty
+    def isAssetExecution: Boolean = assetId.nonEmpty && error.nonEmpty
 
     def addComplexity(complexity: Long): FailedTransactionError = copy(spentComplexity = spentComplexity + complexity)
 
@@ -140,8 +140,8 @@ object TxValidationError {
         s"ScriptExecutionError(error = $error, type = $target, log = ${logToString(log)})"
   }
 
-  object ScriptExecutionError {
-    def dAppExecution(error: String, log: Log[Id]): ScriptExecutionError = ScriptExecutionError(error, log, None)
+  case class InvokeRejectError(error: String, log: Log[Id]) extends ValidationError with WithLog {
+    override def toString: String = s"InvokeRejectError(error = $error, log = ${logToString(log)})"
   }
 
   case class TransactionNotAllowedByScript(log: Log[Id], assetId: Option[ByteStr]) extends ValidationError {
