@@ -298,8 +298,8 @@ case class UtilsApiRoute(
       val requestData = obj ++ Json.obj("address" -> address.toString)
       val responseJson = result
         .recover {
-          case e: ScriptExecutionError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.error)
-          case other                   => ApiError.fromValidationError(other).json
+          case e: InvokeRejectError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.error)
+          case other                => ApiError.fromValidationError(other).json
         }
         .explicitGet() ++ requestData
 
