@@ -60,8 +60,8 @@ object ApiError {
           case TxValidationError.Mistiming(errorMessage)                         => Mistiming(errorMessage)
           case e: TxValidationError.ScriptExecutionError                         => ScriptExecutionError(tx, e.error, e.isAssetScript)
           case e: TxValidationError.FailedTransactionError if e.isAssetExecution => ScriptExecutionError(tx, e.message, isTokenScript = true)
-          case e: TxValidationError.FailedTransactionError if e.isDAppExecution  => InvokeExecutionError(tx, e.message, reject = false)
-          case e: TxValidationError.InvokeRejectError                            => InvokeExecutionError(tx, e.error, reject = true)
+          case e: TxValidationError.FailedTransactionError if e.isDAppExecution  => InvokeExecutionError(tx, e.message)
+          case e: TxValidationError.InvokeRejectError                            => InvokeExecutionError(tx, e.error)
           case _: TxValidationError.FailedTransactionError                       => TransactionNotAllowedByAssetScript(tx)
           case err                                                               => StateCheckFailed(tx, fromValidationError(err))
         }
@@ -258,10 +258,10 @@ object ApiError {
     override lazy val json: JsObject = ScriptErrorJson(id, tx, message)
   }
 
-  final case class InvokeExecutionError(tx: Transaction, error: String, reject: Boolean) extends ApiError {
+  final case class InvokeExecutionError(tx: Transaction, error: String) extends ApiError {
     override val id: Int             = ScriptExecutionError.Id
     override val code: StatusCode    = StatusCodes.BadRequest
-    override val message: String     = s"${if (reject) "Rejected" else "Failed"} dApp execution: $error"
+    override val message: String     = s"Error while executing dApp: $error"
     override lazy val json: JsObject = ScriptErrorJson(id, tx, message)
   }
 
