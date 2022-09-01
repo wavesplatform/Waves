@@ -87,7 +87,7 @@ class RideBlockInfoSuite extends BaseTransactionSuite {
   test("not able to retrieve vrf from block V4") {
     assertBadRequestAndMessage(
       sender.invokeScript(caller, dAppAddress, func = Some("blockInfoV5"), args = List(CONST_LONG(activationHeight - 1))),
-      "Error while executing account-script"
+      "Error while executing dApp"
     )
   }
 

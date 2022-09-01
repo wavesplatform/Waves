@@ -90,7 +90,7 @@ class TransferNFTSuite extends BaseTransactionSuite with NTPTime {
 
     assertApiError(
       invokeTransfer(caller, "nftTransferToDapp", payment = nftPayment),
-      AssertiveApiError(ScriptExecutionError.Id, "Error while executing account-script: DApp self-transfer is forbidden since V4")
+      AssertiveApiError(ScriptExecutionError.Id, "Error while executing dApp: DApp self-transfer is forbidden since V4")
     )
 
     sender.transfer(caller, dAppAddress, 1, assetId = Some(nftAsset), waitForTx = true)

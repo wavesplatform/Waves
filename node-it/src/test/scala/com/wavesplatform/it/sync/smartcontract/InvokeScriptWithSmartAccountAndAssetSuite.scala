@@ -54,7 +54,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
         ),
       AssertiveApiError(
         ScriptExecutionError.Id,
-        "Error while executing account-script: Fee in WAVES for InvokeScriptTransaction (5299999 in WAVES) with 12 total scripts invoked does not exceed minimal value of 5300000 WAVES."
+        "Error while executing dApp: Fee in WAVES for InvokeScriptTransaction (5299999 in WAVES) with 12 total scripts invoked does not exceed minimal value of 5300000 WAVES."
       )
     )
 
