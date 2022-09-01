@@ -7,7 +7,7 @@ import cats.syntax.functor.*
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.BlockchainFeatures.BlockV5
+import com.wavesplatform.features.BlockchainFeatures.{BlockV5, RideV6}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.metrics.TxProcessingStats
@@ -85,17 +85,16 @@ object TransactionDiffer {
       diff <- assetsVerifierDiff(blockchain, tx, runVerifiers, transactionDiff, remainingComplexity)
     } yield diff
 
-    result.leftMap {
-      // Force reject
-      case fte: FailedTransactionError
-          if fte.spentComplexity <= ContractLimits.FailFreeInvokeComplexity && blockchain.isFeatureActivated(BlockchainFeatures.RideV6) =>
-        if (tx.isInstanceOf[InvokeScriptTransaction])
+    result
+      .leftMap {
+        // Force reject
+        case fte: FailedTransactionError if fte.isFailFree && blockchain.isFeatureActivated(RideV6) && fte.isDAppExecution =>
           InvokeRejectError(fte.message, fte.log)
-        else
-          TransactionValidationError(ScriptExecutionError(fte.message, fte.log, fte.assetId), tx)
-
-      case err => TransactionValidationError(err, tx)
-    }
+        case fte: FailedTransactionError if fte.isFailFree && blockchain.isFeatureActivated(RideV6) =>
+          ScriptExecutionError(fte.message, fte.log, fte.assetId)
+        case err => err
+      }
+      .leftMap(TransactionValidationError(_, tx))
   }
 
   // validation related

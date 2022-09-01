@@ -1278,7 +1278,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       inside(_) {
         case Right(diff) =>
           diff.scriptResults(invoke.id()).error.get.text should include("is already issued")
-        case Left(InvokeRejectError(error, _)) => error should include("is already issued")
+        case Left(TransactionValidationError(InvokeRejectError(error, _), _)) => error should include("is already issued")
       }
     }
   }

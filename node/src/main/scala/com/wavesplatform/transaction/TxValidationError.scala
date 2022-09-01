@@ -5,6 +5,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.v1.ContractLimits.FailFreeInvokeComplexity
 import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.state.InvokeScriptResult
 import com.wavesplatform.transaction.TxValidationError.FailedTransactionError.Cause
@@ -72,6 +73,7 @@ object TxValidationError {
 
     def isDAppExecution: Boolean  = assetId.isEmpty && error.nonEmpty
     def isAssetExecution: Boolean = assetId.nonEmpty && error.nonEmpty
+    def isFailFree: Boolean       = spentComplexity <= FailFreeInvokeComplexity
 
     def addComplexity(complexity: Long): FailedTransactionError = copy(spentComplexity = spentComplexity + complexity)
 
