@@ -1,8 +1,25 @@
-name       := "waves"
+name := "waves"
 
-enablePlugins(RunApplicationSettings, JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, GitVersioning, VersionObject)
+enablePlugins(
+  RunApplicationSettings,
+  JavaServerAppPackaging,
+  UniversalDeployPlugin,
+  JDebPackaging,
+  SystemdPlugin,
+  GitVersioning,
+  VersionObject,
+  JavaAgent
+)
 
 libraryDependencies ++= Dependencies.node.value
+
+javaAgents ++= {
+  if (instrumentation.value) {
+    Dependencies.kanela
+  } else {
+    Seq.empty
+  }
+}
 
 inConfig(Compile)(
   Seq(
@@ -135,7 +152,7 @@ linuxPackageSymlinks := linuxPackageSymlinks.value.map { lsl =>
 
 inConfig(Debian)(
   Seq(
-    maintainer := "com.wavesplatform",
+    maintainer               := "com.wavesplatform",
     packageSource            := sourceDirectory.value / "package",
     linuxStartScriptTemplate := (packageSource.value / "systemd.service").toURI.toURL,
     debianPackageDependencies += "java8-runtime-headless",

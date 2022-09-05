@@ -26,14 +26,14 @@ object Dependencies {
 
   val akkaHttp           = akkaHttpModule("akka-http")
   val jacksonModuleScala = jacksonModule("module", "module-scala").withCrossVersion(CrossVersion.Binary())
-  val googleGuava        = "com.google.guava" % "guava" % "31.1-jre"
+  val googleGuava        = "com.google.guava"    % "guava"             % "31.1-jre"
   val kamonCore          = kamonModule("core")
-  val machinist          = "org.typelevel" %% "machinist" % "0.6.8"
-  val logback            = "ch.qos.logback" % "logback-classic" % "1.2.11"
-  val janino             = "org.codehaus.janino" % "janino" % "3.1.7"
+  val machinist          = "org.typelevel"      %% "machinist"         % "0.6.8"
+  val logback            = "ch.qos.logback"      % "logback-classic"   % "1.2.11"
+  val janino             = "org.codehaus.janino" % "janino"            % "3.1.7"
   val asyncHttpClient    = "org.asynchttpclient" % "async-http-client" % "2.12.3"
-  val curve25519         = "com.wavesplatform" % "curve25519-java" % "0.6.4"
-  val nettyHandler       = "io.netty" % "netty-handler" % "4.1.79.Final"
+  val curve25519         = "com.wavesplatform"   % "curve25519-java"   % "0.6.4"
+  val nettyHandler       = "io.netty"            % "netty-handler"     % "4.1.79.Final"
 
   val catsEffect = catsModule("effect", "2.1.3")
   val catsCore   = catsModule("core", "2.7.0")
@@ -64,9 +64,9 @@ object Dependencies {
       kamonCore,
       "com.typesafe" % "config" % "1.4.1",
       machinist,
-      "com.squareup.okhttp3" % "okhttp"      % "4.9.1",
-      "com.squareup.okio"    % "okio"        % "2.10.0",
-      "com.lihaoyi"          %% "sourcecode" % "0.2.7",
+      "com.squareup.okhttp3" % "okhttp"     % "4.9.1",
+      "com.squareup.okio"    % "okio"       % "2.10.0",
+      "com.lihaoyi"         %% "sourcecode" % "0.2.7",
       nettyHandler,
       bouncyCastleProvider,
       "org.apache.httpcomponents" % "httpcore"         % "4.4.14",
@@ -101,7 +101,7 @@ object Dependencies {
       ("org.parboiled" %%% "parboiled" % "2.4.0").exclude("org.scala-js", "scalajs-library_2.13"),
       shapeless.value.exclude("org.scala-js", "scalajs-library_2.13"),
       ("org.typelevel" %% "cats-mtl-core" % "0.7.1").exclude("org.scalacheck", "scalacheck_2.13"),
-      "ch.obermuhlner" % "big-math" % "2.3.0",
+      "ch.obermuhlner"  % "big-math"      % "2.3.0",
       curve25519,
       bouncyCastleProvider,
       "com.wavesplatform" % "zwaves"       % "0.1.0-SNAPSHOT",
@@ -124,7 +124,7 @@ object Dependencies {
     logback,
     "org.scalatestplus" %% "scalacheck-1-16" % "3.2.13.0",
     "org.scalacheck"    %% "scalacheck"      % "1.16.0",
-    "org.mockito"       % "mockito-all"      % "1.10.19",
+    "org.mockito"        % "mockito-all"     % "1.10.19",
     "org.scalamock"     %% "scalamock"       % "5.2.0"
   ).map(_ % Test)
 
@@ -147,18 +147,20 @@ object Dependencies {
 
   lazy val node = Def.setting(
     Seq(
-      ("org.rudogma" %%% "supertagged" % "2.0-RC2").exclude("org.scala-js", "scalajs-library_2.13"),
+      ("org.rudogma"       %%% "supertagged"              % "2.0-RC2").exclude("org.scala-js", "scalajs-library_2.13"),
       "commons-net"          % "commons-net"              % "3.8.0",
       "org.apache.commons"   % "commons-lang3"            % "3.12.0",
-      "com.iheart"           %% "ficus"                   % "1.5.2",
+      "com.iheart"          %% "ficus"                    % "1.5.2",
       "net.logstash.logback" % "logstash-logback-encoder" % "7.2" % Runtime,
       kamonCore,
       kamonModule("system-metrics"),
       kamonModule("influxdb"),
+      kamonModule("akka-http"),
+      kamonModule("executors"),
       "org.influxdb" % "influxdb-java" % "2.23",
       googleGuava,
-      "com.google.code.findbugs" % "jsr305"     % "3.0.2" % Compile, // javax.annotation stubs
-      "com.typesafe.play"        %% "play-json" % "2.9.2",
+      "com.google.code.findbugs" % "jsr305"    % "3.0.2" % Compile, // javax.annotation stubs
+      "com.typesafe.play"       %% "play-json" % "2.9.2",
       akkaModule("actor"),
       akkaModule("stream"),
       akkaHttp,
@@ -166,9 +168,9 @@ object Dependencies {
       kindProjector,
       monixModule("reactive").value,
       nettyHandler,
-      "com.typesafe.scala-logging"                       %% "scala-logging" % "3.9.5",
-      "eu.timepit"                                       %% "refined" % "0.10.1" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
-      "eu.timepit"                                       %% "refined-cats" % "0.10.1" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
+      "com.typesafe.scala-logging"                      %% "scala-logging" % "3.9.5",
+      "eu.timepit"                                      %% "refined"       % "0.10.1" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
+      "eu.timepit"                                      %% "refined-cats"  % "0.10.1" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
       akkaModule("testkit")                              % Test,
       akkaHttpModule("akka-http-testkit")                % Test,
       leveldbJava().exclude("com.google.guava", "guava") % Test
@@ -188,9 +190,9 @@ object Dependencies {
   }
 
   lazy val grpc: Seq[ModuleID] = Seq(
-    "io.grpc"              % "grpc-netty" % scalapb.compiler.Version.grpcJavaVersion,
+    "io.grpc"               % "grpc-netty"           % scalapb.compiler.Version.grpcJavaVersion,
     "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion,
-    protoSchemasLib        % "protobuf"
+    protoSchemasLib         % "protobuf"
   )
 
   lazy val circe = Def.setting {
@@ -201,4 +203,7 @@ object Dependencies {
       "io.circe" %%% "circe-parser"
     ).map(_ % circeVersion)
   }
+
+  lazy val kanela =
+    Seq("io.kamon" % "kanela-agent" % "1.0.14")
 }
