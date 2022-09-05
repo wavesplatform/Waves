@@ -30,7 +30,7 @@ object Dependencies {
   val kamonCore          = kamonModule("core")
   val machinist          = "org.typelevel"      %% "machinist"         % "0.6.8"
   val logback            = "ch.qos.logback"      % "logback-classic"   % "1.3.0"
-  val janino             = "org.codehaus.janino" % "janino"            % "3.1.7"
+  val janino             = "org.codehaus.janino" % "janino"            % "3.1.8"
   val asyncHttpClient    = "org.asynchttpclient" % "async-http-client" % "2.12.3"
   val curve25519         = "com.wavesplatform"   % "curve25519-java"   % "0.6.4"
   val nettyHandler       = "io.netty"            % "netty-handler"     % "4.1.79.Final"
@@ -53,7 +53,7 @@ object Dependencies {
       jacksonModuleScala,
       scalaTest,
       googleGuava,
-      "org.slf4j" % "slf4j-api" % "1.7.32",
+      "org.slf4j" % "slf4j-api" % "2.0.0",
       jacksonModule("core", "core"),
       jacksonModule("core", "annotations"),
       jacksonModule("core", "databind"),
