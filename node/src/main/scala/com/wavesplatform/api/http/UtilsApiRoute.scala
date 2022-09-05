@@ -1,8 +1,7 @@
 package com.wavesplatform.api.http
 
-import java.security.SecureRandom
-
 import akka.http.scaladsl.server.{PathMatcher1, Route}
+import cats.Id
 import cats.syntax.either.*
 import cats.syntax.semigroup.*
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, PublicKey}
@@ -25,7 +24,7 @@ import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2}
+import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2, Log}
 import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
@@ -39,6 +38,7 @@ import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.TransactionType.TransactionType
 import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.smart.script.trace.TraceStep
 import com.wavesplatform.transaction.smart.{BlockchainContext, DAppEnvironment, InvokeScriptTransaction}
 import com.wavesplatform.transaction.{Asset, TransactionType}
 import com.wavesplatform.utils.Time
@@ -46,6 +46,8 @@ import monix.eval.Coeval
 import monix.execution.Scheduler
 import play.api.libs.json.*
 import shapeless.Coproduct
+
+import java.security.SecureRandom
 
 case class UtilsApiRoute(
     timeService: Time,
@@ -270,7 +272,7 @@ case class UtilsApiRoute(
     })
 
   def evaluate: Route =
-    (path("script" / "evaluate" / ScriptedAddress) & jsonPostD[JsObject]) { (address, obj) =>
+    (path("script" / "evaluate" / ScriptedAddress) & jsonPostD[JsObject] & parameter("trace".as[Boolean] ? false)) { (address, obj, trace) =>
       val scriptInfo = blockchain.accountScript(address).get
       val pk         = scriptInfo.publicKey
       val script     = scriptInfo.script
@@ -291,9 +293,13 @@ case class UtilsApiRoute(
 
       val result =
         for {
-          expr                 <- parseCall(obj \ "expr")
-          (result, complexity) <- ScriptCallEvaluator.executeExpression(blockchain, script, address, pk, settings.evaluateScriptComplexityLimit)(expr)
-        } yield Json.obj("result" -> ScriptValuesJson.serializeValue(result), "complexity" -> complexity)
+          expr <- parseCall(obj \ "expr")
+          limit = settings.evaluateScriptComplexityLimit
+          (result, complexity, log) <- ScriptCallEvaluator.executeExpression(blockchain, script, address, pk, limit)(expr)
+        } yield Json.obj(
+          "result"     -> ScriptValuesJson.serializeValue(result),
+          "complexity" -> complexity
+        ) ++ (if (trace) Json.obj(TraceStep.logJson(log)) else Json.obj())
 
       val requestData = obj ++ Json.obj("address" -> address.toString)
       val responseJson = result
@@ -339,7 +345,7 @@ object UtilsApiRoute {
 
     def executeExpression(blockchain: Blockchain, script: Script, address: Address, pk: PublicKey, limit: Int)(
         expr: EXPR
-    ): Either[ValidationError, (EVALUATED, Int)] = {
+    ): Either[ValidationError, (EVALUATED, Int, Log[Id])] = {
       for {
         ds <- DirectiveSet(script.stdLibVersion, Account, DAppType).leftMap(GenericError(_))
         ctx = BlockchainContext
@@ -407,8 +413,8 @@ object UtilsApiRoute {
           .value()
           .leftMap { case (err, _, log) => ScriptExecutionError.dAppExecution(err.message, log) }
         result <- limitedResult match {
-          case (eval: EVALUATED, unusedComplexity, _) => Right((eval, limit - unusedComplexity))
-          case (_: EXPR, _, log)                      => Left(ScriptExecutionError.dAppExecution(s"Calculation complexity limit exceeded", log))
+          case (eval: EVALUATED, unusedComplexity, log) => Right((eval, limit - unusedComplexity, log))
+          case (_: EXPR, _, log)                        => Left(ScriptExecutionError.dAppExecution(s"Calculation complexity limit exceeded", log))
         }
       } yield result
     }

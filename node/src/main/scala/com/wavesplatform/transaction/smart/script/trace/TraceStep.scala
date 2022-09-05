@@ -115,7 +115,7 @@ object TraceStep {
     case a                                  => Json.obj("error"                   -> a.toString)
   }
 
-  private[trace] def logJson(l: Log[Id]): (String, JsValueWrapper) =
+  def logJson(l: Log[Id]): (String, JsValueWrapper) =
     "vars" -> l.map {
       case (k, Right(v))  => Json.obj("name" -> k) ++ ScriptValuesJson.serializeValue(v)
       case (k, Left(err)) => Json.obj("name" -> k, "error" -> err.message)
