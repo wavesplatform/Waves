@@ -12,7 +12,7 @@ import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, DecompilerContext}
-import com.wavesplatform.lang.v1.evaluator.FunctionIds
+import com.wavesplatform.lang.v1.evaluator.{FunctionIds, LogItem}
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -60,7 +60,7 @@ package object utils {
         payments: Seq[(Option[Array[Byte]], Long)],
         availableComplexity: Int,
         reentrant: Boolean
-    ): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
+    ): Coeval[(Either[ValidationError, (EVALUATED, LogItem[Id])], Int)] = ???
   }
 
   val lazyContexts: Map[(DirectiveSet, Boolean), Coeval[CTX[Environment]]] =

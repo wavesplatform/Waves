@@ -1,7 +1,6 @@
 package com.wavesplatform.api.http
 
 import java.security.SecureRandom
-
 import akka.http.scaladsl.server.{PathMatcher1, Route}
 import cats.syntax.either.*
 import cats.syntax.semigroup.*
@@ -23,6 +22,7 @@ import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.LogExtraInfo
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2}
@@ -397,6 +397,7 @@ object UtilsApiRoute {
         limitedResult <- EvaluatorV2
           .applyLimitedCoeval(
             call,
+            LogExtraInfo(),
             limit,
             ctx,
             script.stdLibVersion,

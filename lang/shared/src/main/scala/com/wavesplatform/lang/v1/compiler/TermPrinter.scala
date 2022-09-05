@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1.compiler
 
 import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CaseObj, EVALUATED}
 
-object TermPrinter {
+case class TermPrinter(fixArrIndentation: Boolean = false) {
   def string(e: EVALUATED): String = {
     val sb = new StringBuilder()
     print(s => sb.append(s), e)
@@ -15,12 +15,40 @@ object TermPrinter {
     sb.mkString
   }
 
+  def indentArrString(e: ARR, depth: Int): String = {
+    val sb = new StringBuilder()
+    if (fixArrIndentation) printArr(s => sb.append(s), e, depth) else printArr(s => sb.append(s), e)
+    sb.mkString
+  }
+
   def print(toDest: String => Unit, e: EVALUATED, depth: Int = 0): Unit =
     e match {
       case obj: CaseObj => printObj(toDest, obj, depth)
-      case arr: ARR     => printArr(toDest, arr)
-      case a            => toDest(a.prettyString(depth))
+      case arr: ARR     => if (fixArrIndentation) printArr(toDest, arr, depth) else printArr(toDest, arr)
+      case a            => toDest(a.prettyString(depth, fixArrIndentation))
     }
+
+  private def printArr(toDest: String => Unit, arr: ARR, depth: Int): Unit = {
+    toDest("[")
+    val length = arr.xs.length
+    if (length > 0) {
+      var i = 0
+      toDest("\n")
+      while (i < length - 1) {
+        indent(toDest, depth + 1)
+        print(toDest, arr.xs(i), depth + 1)
+        toDest(",\n")
+        i = i + 1
+      }
+      indent(toDest, depth + 1)
+      print(toDest, arr.xs(length - 1), depth + 1)
+      toDest("\n")
+      indent(toDest, depth)
+      toDest("]")
+    } else {
+      toDest("]")
+    }
+  }
 
   private def printArr(toDest: String => Unit, arr: ARR): Unit = {
     toDest("[")

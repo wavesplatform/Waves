@@ -11,12 +11,12 @@ import shapeless.{Lens, lens}
 import java.util
 
 case class EvaluationContext[C[_[_]], F[_]](
-   environment: C[F],
-   typeDefs : Map[String, FINAL],
-   letDefs  : Map[String, LazyVal[F]],
-   functions: Map[FunctionHeader, BaseFunction[C]]
+    environment: C[F],
+    typeDefs: Map[String, FINAL],
+    letDefs: Map[String, LazyVal[F]],
+    functions: Map[FunctionHeader, BaseFunction[C]]
 ) {
-  def mapK[G[_] : Monad](f: F ~> G): EvaluationContext[C, G] =
+  def mapK[G[_]: Monad](f: F ~> G): EvaluationContext[C, G] =
     EvaluationContext(
       environment.asInstanceOf[C[G]],
       typeDefs,
@@ -34,9 +34,10 @@ case class LoggedEvaluationContext[C[_[_]], F[_]](l: LetLogCallback[F], ec: Eval
 
 object LoggedEvaluationContext {
   class Lenses[F[_], C[_[_]]] {
-    val types: Lens[LoggedEvaluationContext[C, F], Map[String, FINAL]]                   = lens[LoggedEvaluationContext[C, F]] >> Symbol("ec") >> Symbol("typeDefs")
-    val lets: Lens[LoggedEvaluationContext[C, F], Map[String, LazyVal[F]]]               = lens[LoggedEvaluationContext[C, F]] >> Symbol("ec") >> Symbol("letDefs")
-    val funcs: Lens[LoggedEvaluationContext[C, F], Map[FunctionHeader, BaseFunction[C]]] = lens[LoggedEvaluationContext[C, F]] >> Symbol("ec") >> Symbol("functions")
+    val types: Lens[LoggedEvaluationContext[C, F], Map[String, FINAL]]     = lens[LoggedEvaluationContext[C, F]] >> Symbol("ec") >> Symbol("typeDefs")
+    val lets: Lens[LoggedEvaluationContext[C, F], Map[String, LazyVal[F]]] = lens[LoggedEvaluationContext[C, F]] >> Symbol("ec") >> Symbol("letDefs")
+    val funcs: Lens[LoggedEvaluationContext[C, F], Map[FunctionHeader, BaseFunction[C]]] =
+      lens[LoggedEvaluationContext[C, F]] >> Symbol("ec") >> Symbol("functions")
   }
 }
 
@@ -57,10 +58,10 @@ object EvaluationContext {
   }
 
   def build[F[_], C[_[_]]](
-    environment: C[F],
-    typeDefs:    Map[String, FINAL],
-    letDefs:     Map[String, LazyVal[F]],
-    functions:   Seq[BaseFunction[C]]
+      environment: C[F],
+      typeDefs: Map[String, FINAL],
+      letDefs: Map[String, LazyVal[F]],
+      functions: Seq[BaseFunction[C]]
   ): EvaluationContext[C, F] = {
     if (functions.distinct.size != functions.size) {
       val dups = functions.groupBy(_.header).filter(_._2.size != 1)
@@ -70,9 +71,9 @@ object EvaluationContext {
   }
 
   def build(
-    typeDefs:    Map[String, FINAL],
-    letDefs:     Map[String, LazyVal[Id]],
-    functions:   Seq[BaseFunction[NoContext]] = Seq()
+      typeDefs: Map[String, FINAL],
+      letDefs: Map[String, LazyVal[Id]],
+      functions: Seq[BaseFunction[NoContext]] = Seq()
   ): EvaluationContext[NoContext, Id] = {
     if (functions.distinct.size != functions.size) {
       val dups = functions.groupBy(_.header).filter(_._2.size != 1)

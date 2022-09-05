@@ -75,6 +75,8 @@ object TxValidationError {
 
     def addComplexity(complexity: Long): FailedTransactionError = copy(spentComplexity = spentComplexity + complexity)
 
+    def withLog(log: Log[Id]): FailedTransactionError = copy(log = log)
+
     private def assetScriptError(assetId: ByteStr, error: Option[String]): String =
       s"Transaction is not allowed by script of the asset $assetId" + error.fold("")(e => s": $e")
 
@@ -89,8 +91,8 @@ object TxValidationError {
     def dAppExecution(error: String, spentComplexity: Long, log: Log[Id] = List.empty): FailedTransactionError =
       FailedTransactionError(Cause.DAppExecution, spentComplexity, log, Some(error), None)
 
-    def feeForActions(error: String, spentComplexity: Long): FailedTransactionError =
-      FailedTransactionError(Cause.FeeForActions, spentComplexity, List.empty, Some(error), None)
+    def feeForActions(error: String, spentComplexity: Long, log: Log[Id]): FailedTransactionError =
+      FailedTransactionError(Cause.FeeForActions, spentComplexity, log, Some(error), None)
 
     def assetExecutionInAction(error: String, spentComplexity: Long, log: Log[Id], assetId: ByteStr): FailedTransactionError =
       FailedTransactionError(Cause.AssetScriptInAction, spentComplexity, log, Some(error), Some(assetId))
@@ -155,8 +157,8 @@ object TxValidationError {
     else {
       log
         .map {
-          case (name, Right(v))    => s"$name = ${v.prettyString(1)}"
-          case (name, l @ Left(_)) => s"$name = $l"
+          case (name, Right(v))    => s"$name = ${v.prettyString(1, fixArrIndentation = true)}"
+          case (name, l @ Left(_)) => s"$name = ${l.toString.replace("\n\t", "\n\t\t")}"
         }
         .map("\t" + _)
         .mkString("\n", "\n", "\n")

@@ -15,6 +15,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, FINAL, LONG}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
+import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.LogExtraInfo
 import com.wavesplatform.lang.v1.evaluator.ctx.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
@@ -93,7 +94,10 @@ class IntegrationTest extends PropSpec with Inside {
     val compiled = ExpressionCompiler(ctx.compilerContext, untyped)
     val evalCtx  = ctx.evaluationContext(env).asInstanceOf[EvaluationContext[Environment, Id]]
     compiled.flatMap(v =>
-      EvaluatorV2.applyCompleted(evalCtx, v._1, version, correctFunctionCallScope = true, newMode = true)._3.bimap(_.message, _.asInstanceOf[T])
+      EvaluatorV2
+        .applyCompleted(evalCtx, v._1, LogExtraInfo(), version, correctFunctionCallScope = true, newMode = true)
+        ._3
+        .bimap(_.message, _.asInstanceOf[T])
     )
   }
 

@@ -9,6 +9,8 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ContextfulNativeFunction.{Extended, Simple}
+import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.LogExtraInfo
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext, NativeFunction, UserFunction}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{CommonError, ExecutionError}
@@ -82,8 +84,14 @@ class EvaluatorV2(
     def doEvaluateNativeFunction(fc: FUNCTION_CALL, function: NativeFunction[Environment], limit: Int, cost: Int): EvaluationResult[Int] = {
       val args = fc.args.asInstanceOf[List[EVALUATED]]
       val evaluation = function.ev match {
-        case f: Extended[Environment] => f.evaluate[Id](ctx.ec.environment, args, limit - cost)
-        case f: Simple[Environment]   => Coeval((f.evaluate(ctx.ec.environment, args), limit - cost))
+        case f: Extended[Environment] =>
+          f.evaluate[Id](ctx.ec.environment, args, limit - cost).map { case (result, unusedComplexity) =>
+            result.map { case (evaluated, (logItemName, logItemValue)) =>
+              logItemValue.foreach(value => ctx.log(LET(logItemName, value), logItemValue))
+              evaluated
+            } -> unusedComplexity
+          }
+        case f: Simple[Environment] => Coeval((f.evaluate(ctx.ec.environment, args), limit - cost))
       }
       for {
         (result, unusedComplexity) <- EvaluationResult(
@@ -209,7 +217,7 @@ class EvaluatorV2(
                     update = update,
                     limit = unused - overheadCost,
                     parentBlocks = parentBlocks
-                    )
+                  )
                 )
               case FALSE if unused > 0 =>
                 update(i.ifFalse).flatMap(_ =>
@@ -218,7 +226,7 @@ class EvaluatorV2(
                     update = update,
                     limit = unused - overheadCost,
                     parentBlocks = parentBlocks
-                    )
+                  )
                 )
               case _: EVALUATED => EvaluationResult("Non-boolean result in cond", unused)
               case _            => EvaluationResult(unused)
@@ -238,9 +246,12 @@ class EvaluatorV2(
         evaluateFunctionArgs(fc)
           .flatMap { unusedArgsComplexity =>
             val argsEvaluated = fc.args.forall(_.isInstanceOf[EVALUATED])
-            if (argsEvaluated && unusedArgsComplexity > 0)
+            if (argsEvaluated && unusedArgsComplexity > 0) {
+              val funcName = ctx.ec.functions.get(fc.function).map(_.name).getOrElse(fc.function.funcName)
+              val argsArr  = ARR(fc.args.collect { case arg: EVALUATED => arg }.toIndexedSeq, false)
+              argsArr.foreach(arr => ctx.log(LET(s"$funcName.@args", arr), argsArr))
               evaluateFunction(fc, startArgs, unusedArgsComplexity)
-            else
+            } else
               EvaluationResult(unusedArgsComplexity)
           }
 
@@ -324,6 +335,7 @@ class EvaluatorV2(
 object EvaluatorV2 {
   def applyLimitedCoeval(
       expr: EXPR,
+      logExtraInfo: LogExtraInfo,
       limit: Int,
       ctx: EvaluationContext[Environment, Id],
       stdLibVersion: StdLibVersion,
@@ -334,6 +346,7 @@ object EvaluatorV2 {
     val log       = ListBuffer[LogItem[Id]]()
     val loggedCtx = LoggedEvaluationContext[Environment, Id](name => value => log.append((name, value)), ctx)
     var ref       = expr.deepCopy.value
+    enrichLog(loggedCtx, logExtraInfo, ref)
     new EvaluatorV2(loggedCtx, stdLibVersion, correctFunctionCallScope, newMode, checkConstructorArgsTypes)
       .root(ref, v => EvaluationResult { ref = v }, limit, Nil)
       .map((ref, _))
@@ -347,6 +360,7 @@ object EvaluatorV2 {
   def applyOrDefault(
       ctx: EvaluationContext[Environment, Id],
       expr: EXPR,
+      logExtraInfo: LogExtraInfo,
       stdLibVersion: StdLibVersion,
       complexityLimit: Int,
       correctFunctionCallScope: Boolean,
@@ -354,7 +368,7 @@ object EvaluatorV2 {
       handleExpr: EXPR => Either[ExecutionError, EVALUATED]
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
     EvaluatorV2
-      .applyLimitedCoeval(expr, complexityLimit, ctx, stdLibVersion, correctFunctionCallScope, newMode)
+      .applyLimitedCoeval(expr, logExtraInfo, complexityLimit, ctx, stdLibVersion, correctFunctionCallScope, newMode)
       .value()
       .fold(
         { case (error, complexity, log) => (log, complexity, Left(error)) },
@@ -369,6 +383,7 @@ object EvaluatorV2 {
   def applyCompleted(
       ctx: EvaluationContext[Environment, Id],
       expr: EXPR,
+      logExtraInfo: LogExtraInfo,
       stdLibVersion: StdLibVersion,
       correctFunctionCallScope: Boolean,
       newMode: Boolean
@@ -376,10 +391,36 @@ object EvaluatorV2 {
     applyOrDefault(
       ctx,
       expr,
+      logExtraInfo,
       stdLibVersion,
       Int.MaxValue,
       correctFunctionCallScope,
       newMode,
       expr => Left(s"Unexpected incomplete evaluation result $expr")
     )
+
+  private def enrichLog(loggedCtx: LoggedEvaluationContext[Environment, Id], logExtraInfo: LogExtraInfo, exprCopy: EXPR) = {
+    @tailrec
+    def findInvArgLet(expr: EXPR, let: LET): Option[LET] = {
+      expr match {
+        case BLOCK(res @ LET(let.name, value), _) if value == let.value => Some(res)
+        case BLOCK(_, body)                                             => findInvArgLet(body, let)
+        case _                                                          => None
+      }
+    }
+    logExtraInfo.dAppAddress.foreach { addr =>
+      val addrObj = Bindings.senderObject(addr)
+      loggedCtx.log(LET("@invokedDApp", addrObj), addrObj.asRight[ExecutionError])
+    }
+
+    logExtraInfo.invokedFuncName.foreach { funcName =>
+      val invokedFuncName = CONST_STRING(funcName)
+      invokedFuncName.foreach(name => loggedCtx.log(LET("@invokedFuncName", name), invokedFuncName))
+    }
+
+    logExtraInfo.invArg.flatMap(findInvArgLet(exprCopy, _)).foreach {
+      case let @ LET(_, obj: CaseObj) => loggedCtx.log(let, obj.asRight[ExecutionError])
+      case _                          =>
+    }
+  }
 }

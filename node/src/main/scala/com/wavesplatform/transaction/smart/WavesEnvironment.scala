@@ -13,7 +13,7 @@ import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
-import com.wavesplatform.lang.v1.evaluator.{Log, ScriptResult}
+import com.wavesplatform.lang.v1.evaluator.{Log, LogItem, ScriptResult}
 import com.wavesplatform.lang.v1.traits.*
 import com.wavesplatform.lang.v1.traits.domain.*
 import com.wavesplatform.lang.v1.traits.domain.Recipient.*
@@ -28,7 +28,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
 import com.wavesplatform.transaction.smart.script.trace.InvokeScriptTrace
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, TransactionBase, TransactionType}
+import com.wavesplatform.transaction.{Asset, DiffToLogConverter, TransactionBase, TransactionType}
 import monix.eval.Coeval
 import shapeless.*
 
@@ -240,7 +240,7 @@ class WavesEnvironment(
       payments: Seq[(Option[Array[Byte]], Long)],
       availableComplexity: Int,
       reentrant: Boolean
-  ): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
+  ): Coeval[(Either[ValidationError, (EVALUATED, LogItem[Id])], Int)] = ???
 }
 
 object DAppEnvironment {
@@ -337,7 +337,7 @@ class DAppEnvironment(
       payments: Seq[(Option[Array[Byte]], Long)],
       availableComplexity: Int,
       reentrant: Boolean
-  ): Coeval[(Either[ValidationError, EVALUATED], Int)] = {
+  ): Coeval[(Either[ValidationError, (EVALUATED, LogItem[Id])], Int)] = {
 
     val r = for {
       address <- traced(
@@ -399,14 +399,14 @@ class DAppEnvironment(
       availablePayments = remainingPayments
       availableData = remainingData
       availableDataSize = remainingDataSize
-      (evaluated, diff.scriptsComplexity.toInt)
+      (evaluated, diff.scriptsComplexity.toInt, DiffToLogConverter.convert(diff, tx.id(), func))
     }
 
     r.v.map {
       _.resultE match {
-        case Left(fte: FailedTransactionError) => (Left(fte), fte.spentComplexity.toInt)
-        case Left(e)                           => (Left(e), 0)
-        case Right((evaluated, complexity))    => (Right(evaluated), complexity)
+        case Left(fte: FailedTransactionError)       => (Left(fte), fte.spentComplexity.toInt)
+        case Left(e)                                 => (Left(e), 0)
+        case Right((evaluated, complexity, diffLog)) => (Right((evaluated, diffLog)), complexity)
       }
     }
   }

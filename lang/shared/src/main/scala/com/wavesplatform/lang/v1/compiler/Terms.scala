@@ -15,9 +15,9 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import monix.eval.Coeval
 
 object Terms {
-  val DataTxMaxBytes: Int       = 150 * 1024     // should be the same as DataTransaction.MaxBytes
-  val DataTxMaxProtoBytes: Int  = 165947         // depends from DataTransaction.MaxProtoBytes
-  val DataEntryValueMax: Int    = Short.MaxValue // should be the same as DataEntry.MaxValueSize
+  val DataTxMaxBytes: Int      = 150 * 1024     // should be the same as DataTransaction.MaxBytes
+  val DataTxMaxProtoBytes: Int = 165947         // depends from DataTransaction.MaxProtoBytes
+  val DataEntryValueMax: Int   = Short.MaxValue // should be the same as DataEntry.MaxValueSize
 
   sealed abstract class DECLARATION {
     def name: String
@@ -147,8 +147,8 @@ object Terms {
   }
 
   sealed trait EVALUATED extends EXPR {
-    def prettyString(level: Int): String = toString
-    def toStr: Coeval[String]            = Coeval.now(toString)
+    def prettyString(level: Int, fixArrIndentation: Boolean = false): String = toString
+    def toStr: Coeval[String]                                                = Coeval.now(toString)
     def weight: Long
     val getType: REAL // used for _isInstanceOf and therefore for match
 
@@ -159,17 +159,17 @@ object Terms {
   case class CONST_LONG(t: Long) extends EVALUATED {
     override def toString: String = t.toString
     override val weight: Long     = 8L
-    override val getType: REAL = LONG
+    override val getType: REAL    = LONG
   }
   case class CONST_BIGINT(t: BigInt) extends EVALUATED {
     override def toString: String = t.toString
     override val weight: Long     = 64L
-    override val getType: REAL = BIGINT
+    override val getType: REAL    = BIGINT
   }
 
   class CONST_BYTESTR private (val bs: ByteStr) extends EVALUATED {
     override def toString: String = bs.toString
-    override def prettyString(level: Int): String = {
+    override def prettyString(level: Int, fixArrIndentation: Boolean = false): String = {
       if (bs.size > 1024) {
         "base64'" ++ Base64.encode(bs.arr) ++ "'"
       } else {
@@ -191,9 +191,9 @@ object Terms {
 
   object CONST_BYTESTR {
     sealed abstract class Limit(val value: Int)
-    case object DataEntrySize   extends Limit(DataEntryValueMax)
-    case object DataTxSize      extends Limit(DataTxMaxBytes)
-    case object NoLimit         extends Limit(Int.MaxValue)
+    case object DataEntrySize extends Limit(DataEntryValueMax)
+    case object DataTxSize    extends Limit(DataTxMaxBytes)
+    case object NoLimit       extends Limit(Int.MaxValue)
 
     def apply(bs: ByteStr, limit: Limit = DataEntrySize): Either[CommonError, EVALUATED] =
       Either.cond(
@@ -207,9 +207,9 @@ object Terms {
   }
 
   class CONST_STRING private (val s: String, bytesLength: Int) extends EVALUATED {
-    override def toString: String                 = s
-    override def prettyString(level: Int): String = "\"" ++ escape(s) ++ "\""
-    override lazy val weight: Long                = bytesLength
+    override def toString: String                                                     = s
+    override def prettyString(level: Int, fixArrIndentation: Boolean = false): String = "\"" ++ escape(s) ++ "\""
+    override lazy val weight: Long                                                    = bytesLength
 
     override val getType: REAL = STRING
 
@@ -270,9 +270,9 @@ object Terms {
   lazy val FALSE: CONST_BOOLEAN = CONST_BOOLEAN(false)
 
   case class CaseObj private (caseType: CASETYPEREF, fields: Map[String, EVALUATED]) extends EVALUATED {
-    override def toString: String = TermPrinter.string(this)
+    override def toString: String = TermPrinter().string(this)
 
-    override def prettyString(depth: Int): String = TermPrinter.indentObjString(this, depth)
+    override def prettyString(depth: Int, fixArrIndentation: Boolean = false): String = TermPrinter(fixArrIndentation).indentObjString(this, depth)
 
     override val weight: Long = OBJ_WEIGHT + FIELD_WEIGHT * fields.size + fields.map(_._2.weight).sum
 
@@ -295,7 +295,9 @@ object Terms {
   }
 
   abstract case class ARR private (xs: IndexedSeq[EVALUATED]) extends EVALUATED {
-    override def toString: String = TermPrinter.string(this)
+    override def toString: String = TermPrinter().string(this)
+
+    override def prettyString(depth: Int, fixArrIndentation: Boolean = false): String = TermPrinter(fixArrIndentation).indentArrString(this, depth)
 
     lazy val elementsWeightSum: Long =
       weight - EMPTYARR_WEIGHT - ELEM_WEIGHT * xs.size
@@ -323,8 +325,8 @@ object Terms {
 
   case class FAIL(reason: String) extends EVALUATED {
     override def toString: String = "Evaluation failed: " ++ reason
-    def weight: Long = 0
-    override val getType: REAL = NOTHING
+    def weight: Long              = 0
+    override val getType: REAL    = NOTHING
   }
 
   val runtimeTupleType: CASETYPEREF = CASETYPEREF("Tuple", Nil)
