@@ -439,4 +439,10 @@ object ApiError {
     override val message = "Asset ID was not specified"
     override val code    = StatusCodes.BadRequest
   }
+
+  case object ConflictedRequestStructure extends ApiError {
+    override val id      = 198
+    override val message = "Conflicted request structure. Used first and second request versions"
+    override val code    = StatusCodes.BadRequest
+  }
 }
