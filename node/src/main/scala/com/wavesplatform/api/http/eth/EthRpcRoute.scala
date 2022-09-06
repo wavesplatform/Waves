@@ -121,7 +121,13 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
                   id,
                   transactionsApi.broadcastTransaction(et).map[JsValueWrapper] { result =>
                     result.resultE match {
-                      case Left(error) => ApiError.fromValidationError(error).json
+                      case Left(error) =>
+                        Json.obj(
+                          "-32003" -> Json.obj(
+                            "standard" -> "EIP-1474",
+                            "message"  -> "Transaction rejected."
+                          )
+                        )
                       case Right(_)    => toHexString(et.id().arr)
                     }
                   }
