@@ -10,6 +10,7 @@ case class RestAPISettings(
     distributionAddressLimit: Int,
     dataKeysRequestLimit: Int,
     assetDetailsLimit: Int,
+    blocksRequestLimit: Int,
     evaluateScriptComplexityLimit: Int,
     limitedPoolThreads: Int,
     heavyRequestProcessorPoolThreads: Option[Int],

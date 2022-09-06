@@ -5,13 +5,9 @@ libraryDependencies ++= Dependencies.it
 
 inTask(docker)(
   Seq(
-    imageNames := Seq(ImageName("com.wavesplatform/node-it")),
-    dockerfile := NativeDockerfile(baseDirectory.value.getParentFile / "docker" / "Dockerfile"),
-    buildOptions := BuildOptions(),
-    dockerBuildArguments := Map(
-      "ENABLE_GRPC"   -> "true",
-      "WAVES_NETWORK" -> "custom"
-    )
+    imageNames   := Seq(ImageName("com.wavesplatform/node-it")),
+    dockerfile   := NativeDockerfile(baseDirectory.value.getParentFile / "docker" / "Dockerfile"),
+    buildOptions := BuildOptions()
   )
 )
 

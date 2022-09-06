@@ -162,14 +162,18 @@ inScope(Global)(
      */
     testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports"),
     testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true"),
-    network := Network.default(),
-    resolvers ++= Seq(
-      Resolver.sonatypeRepo("snapshots"),
-      Resolver.mavenLocal
-    ),
+    network         := Network.default(),
+    instrumentation := false,
+    resolvers ++= Resolver.sonatypeOssRepos("snapshots") ++ Seq(Resolver.mavenLocal),
     Compile / doc / sources                := Seq.empty,
     Compile / packageDoc / publishArtifact := false,
-    concurrentRestrictions                 := Seq(Tags.limit(Tags.Test, math.min(EvaluateTask.SystemProcessors, 8)))
+    concurrentRestrictions                 := Seq(Tags.limit(Tags.Test, math.min(EvaluateTask.SystemProcessors, 8))),
+    excludeLintKeys ++= Set(
+      node / Universal / configuration,
+      node / Linux / configuration,
+      node / Debian / configuration,
+      Global / maxParallelSuites
+    )
   )
 )
 
@@ -180,10 +184,9 @@ git.uncommittedSignifier := Some("DIRTY")
 lazy val packageAll = taskKey[Unit]("Package all artifacts")
 packageAll := {
   (node / assembly).value
-  (`grpc-server` / Universal / packageZipTarball).value
 
-  IO.copyFile((node / Debian / packageBin).value, new File(baseDirectory.value, "docker/target/waves.deb"))
-  IO.copyFile((`grpc-server` / Debian / packageBin).value, new File(baseDirectory.value, "docker/target/waves-grpc-server.deb"))
+  IO.copyFile((node / Universal / packageZipTarball).value, new File(baseDirectory.value, "docker/target/waves.tgz"))
+  IO.copyFile((`grpc-server` / Universal / packageZipTarball).value, new File(baseDirectory.value, "docker/target/waves-grpc-server.tgz"))
 }
 
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")

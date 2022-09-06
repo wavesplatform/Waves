@@ -1,22 +1,13 @@
 package com.wavesplatform.network
 
-import java.net.{InetSocketAddress, NetworkInterface}
-import java.nio.channels.ClosedChannelException
-import java.util.concurrent.ConcurrentHashMap
-
-import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
-import scala.util.Random
-
 import com.wavesplatform.Version
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.network.MessageObserver.Messages
-import com.wavesplatform.settings._
-import com.wavesplatform.transaction._
+import com.wavesplatform.settings.*
+import com.wavesplatform.transaction.*
 import com.wavesplatform.utils.ScorexLogging
-import com.wavesplatform.utx.UtxPool
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
-import io.netty.channel._
+import io.netty.channel.*
 import io.netty.channel.group.ChannelGroup
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
@@ -24,6 +15,13 @@ import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepende
 import io.netty.util.concurrent.DefaultThreadFactory
 import monix.reactive.Observable
 import org.influxdb.dto.Point
+
+import java.net.{InetSocketAddress, NetworkInterface}
+import java.nio.channels.ClosedChannelException
+import java.util.concurrent.ConcurrentHashMap
+import scala.concurrent.duration.*
+import scala.jdk.CollectionConverters.*
+import scala.util.Random
 
 trait NS {
   def connect(remoteAddress: InetSocketAddress): Unit
@@ -41,11 +39,9 @@ object NetworkServer extends ScorexLogging {
       settings: WavesSettings,
       lastBlockInfos: Observable[LastBlockInfo],
       historyReplier: HistoryReplier,
-      utxPool: UtxPool,
       peerDatabase: PeerDatabase,
       allChannels: ChannelGroup,
-      peerInfo: ConcurrentHashMap[Channel, PeerInfo],
-      blockV5Activated: () => Boolean
+      peerInfo: ConcurrentHashMap[Channel, PeerInfo]
   ): NS = {
     @volatile var shutdownInitiated = false
 
@@ -104,7 +100,7 @@ object NetworkServer extends ScorexLogging {
     def pipelineTail: Seq[ChannelHandlerAdapter] = Seq(
       lengthFieldPrepender,
       new LengthFieldBasedFrameDecoder(MaxFrameLength, 0, LengthFieldSize, 0, LengthFieldSize),
-      new LegacyFrameCodec(peerDatabase, settings.networkSettings.receivedTxsCacheTimeout, blockV5Activated),
+      new LegacyFrameCodec(peerDatabase, settings.networkSettings.receivedTxsCacheTimeout),
       channelClosedHandler,
       trafficWatcher,
       discardingHandler,

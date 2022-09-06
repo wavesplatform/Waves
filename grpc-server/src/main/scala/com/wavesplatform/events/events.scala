@@ -417,7 +417,7 @@ object StateUpdate {
         ist.funcCall.function.funcName,
         ist.funcCall.args.map(x => PBInvokeScriptResult.Call.Argument(argumentToPB(x))),
         ist.payments.map(p => Amount(PBAmounts.toPBAssetId(p.assetId), p.amount)),
-        diff.scriptResults.get(ist.id()).map(InvokeScriptResult.toPB)
+        diff.scriptResults.get(ist.id()).map(InvokeScriptResult.toPB(_, addressForTransfer = true))
       )
     }
 

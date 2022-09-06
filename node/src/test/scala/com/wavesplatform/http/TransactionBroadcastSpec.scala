@@ -3,7 +3,7 @@ package com.wavesplatform.http
 import com.wavesplatform.BlockchainStubHelpers
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.common.CommonTransactionsApi
-import com.wavesplatform.api.http.TransactionsApiRoute
+import com.wavesplatform.api.http.{RouteTimeout, TransactionsApiRoute}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
@@ -16,11 +16,12 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.{Asset, Proofs, TxHelpers, TxPositiveAmount, TxVersion}
-import com.wavesplatform.utils.{EthEncoding, EthHelpers}
+import com.wavesplatform.utils.{EthEncoding, EthHelpers, Schedulers}
 import com.wavesplatform.wallet.Wallet
 import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.{JsObject, JsValue, Json}
 
+import scala.concurrent.duration.*
 import scala.concurrent.Future
 import scala.util.Random
 
@@ -41,7 +42,8 @@ class TransactionBroadcastSpec
     blockchain,
     mockFunction[Int],
     transactionPublisher,
-    testTime
+    testTime,
+    new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
   )
 
   private val route = seal(transactionsApiRoute.route)
