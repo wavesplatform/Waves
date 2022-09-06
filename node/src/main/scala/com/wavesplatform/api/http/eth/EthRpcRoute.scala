@@ -123,7 +123,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
             }
           }
         case Some("eth_getTransactionReceipt") =>
-          extractParam1[String](jso) { transactionHex =>
+          (jso \ "params" \ 0).asOpt[String].fold(complete(JsNull)) { transactionHex =>
             val txId = ByteStr(toBytes(transactionHex))
             resp(
               id,
