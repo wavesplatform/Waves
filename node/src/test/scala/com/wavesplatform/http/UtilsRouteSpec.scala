@@ -1081,8 +1081,23 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
              |     i.fee                   == 123456                                      &&
              |     i.payments              == [AttachedPayment(unit, 1)]                  &&
              |     i.transactionId         == base58'3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8' &&
-             |     i.feeAssetId            == unit                                        &&
+             |     i.feeAssetId            == base58'abcd'                                &&
              |     arg1 == 123 && arg2 == "abc"
+             |   if (check) then [] else throw("wrong")
+             | }
+             |
+             | @Callable(i)
+             | func default() = {
+             |   let check =
+             |     this                    == Address(base58'$defaultAddress')            &&
+             |     i.caller                == Address(base58'${"1" * 26}')                &&
+             |     i.originCaller          == Address(base58'${"1" * 26}')                &&
+             |     i.callerPublicKey       == base58'${"1" * 32}'                         &&
+             |     i.originCallerPublicKey == base58'${"1" * 32}'                         &&
+             |     i.fee                   == 0                                           &&
+             |     i.payments              == []                                          &&
+             |     i.transactionId         == base58'${"1" * 32}'                         &&
+             |     i.feeAssetId            == unit
              |   if (check) then [] else throw("wrong")
              | }
            """.stripMargin
@@ -1110,7 +1125,8 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
                  |  },
                  |  "id": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8",
                  |  "fee": 123456,
-                 |  "feeAssetId": null,
+                 |  "feeAssetId": "abcd",
+                 |  "sender": "$secondAddress",
                  |  "senderPublicKey": "${secondSigner.publicKey}",
                  |  "payment": [
                  |    {
@@ -1119,11 +1135,11 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
                  |    }
                  |  ]
                  | }
-             """.stripMargin
+               """.stripMargin
             )
             .as[JsObject]
 
-        val trace =
+        val expectedTrace =
           Json.parse(
             s"""
                |[
@@ -1163,8 +1179,8 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
                |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
                |      },
                |      "feeAssetId": {
-               |        "type": "Unit",
-               |        "value": {}
+               |        "type": "ByteVector",
+               |        "value": "abcd"
                |      },
                |      "originCallerPublicKey": {
                |        "type": "ByteVector",
@@ -1223,7 +1239,15 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
             val json = responseAs[JsValue]
             (json \ "complexity").as[Int] shouldBe 16
             (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
-            (json \ "vars").as[JsArray] shouldBe trace
+            (json \ "vars").as[JsArray] shouldBe expectedTrace
+          }
+        }
+
+        "all fields are empty (empty request body)" in {
+          Post(routePath(s"/script/evaluate/$defaultAddress"), Json.obj()) ~> route ~> check {
+            val json = responseAs[JsValue]
+            (json \ "complexity").as[Int] shouldBe 12
+            (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
           }
         }
 
