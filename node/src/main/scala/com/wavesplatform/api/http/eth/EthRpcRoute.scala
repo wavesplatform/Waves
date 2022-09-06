@@ -109,9 +109,11 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
         case Some("eth_sendRawTransaction") =>
           extractParam1[String](jso) { str =>
             extractTransaction(str) match {
-              case Left(error) =>
-                complete(Json.obj(
-                  "-32003" -> Json.obj(
+              case Left(_) =>
+                complete(error(
+                  id,
+                  Json.obj(
+                    "code"-> -32003,
                     "standard" -> "EIP-1474",
                     "message"  -> "Transaction rejected."
                   )
@@ -121,9 +123,11 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
                   id,
                   transactionsApi.broadcastTransaction(et).map[JsValueWrapper] { result =>
                     result.resultE match {
-                      case Left(error) =>
-                        Json.obj(
-                          "-32003" -> Json.obj(
+                      case Left(_) =>
+                        error(
+                          id,
+                          Json.obj(
+                            "code"-> -32003,
                             "standard" -> "EIP-1474",
                             "message"  -> "Transaction rejected."
                           )
@@ -267,6 +271,8 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
   private[this] def resp(id: JsValue, resp: JsValueWrapper) = complete(Json.obj("id" -> id, "jsonrpc" -> "2.0", "result" -> resp))
 
   private[this] def resp(id: JsValue, resp: Future[JsValueWrapper]) = complete(resp.map(r => Json.obj("id" -> id, "jsonrpc" -> "2.0", "result" -> r)))
+
+  private[this] def error(id: JsValue, resp: JsValueWrapper) = Json.obj("id" -> id, "jsonrpc" -> "2.0", "error" -> resp)
 
   private[this] def assetDescription(contractAddress: String) =
     assetId(contractAddress).flatMap(blockchain.assetDescription)
