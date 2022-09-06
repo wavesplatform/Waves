@@ -119,9 +119,8 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
                   )
                 ))
               case Right(et) =>
-                resp(
-                  id,
-                  transactionsApi.broadcastTransaction(et).map[JsValueWrapper] { result =>
+                complete(
+                  transactionsApi.broadcastTransaction(et).map { result =>
                     result.resultE match {
                       case Left(_) =>
                         error(
@@ -132,7 +131,8 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
                             "message"  -> "Transaction rejected."
                           )
                         )
-                      case Right(_)    => toHexString(et.id().arr)
+                      case Right(_) =>
+                        respValue(id, toHexString(et.id().arr))
                     }
                   }
                 )
@@ -269,6 +269,8 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
   private[this] def quantity(v: Long) = "0x" + java.lang.Long.toString(v, 16)
 
   private[this] def resp(id: JsValue, resp: JsValueWrapper) = complete(Json.obj("id" -> id, "jsonrpc" -> "2.0", "result" -> resp))
+
+  private[this] def respValue(id: JsValue, resp: JsValueWrapper) = Json.obj("id" -> id, "jsonrpc" -> "2.0", "result" -> resp)
 
   private[this] def resp(id: JsValue, resp: Future[JsValueWrapper]) = complete(resp.map(r => Json.obj("id" -> id, "jsonrpc" -> "2.0", "result" -> r)))
 
