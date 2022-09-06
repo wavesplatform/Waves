@@ -109,7 +109,13 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
         case Some("eth_sendRawTransaction") =>
           extractParam1[String](jso) { str =>
             extractTransaction(str) match {
-              case Left(value) => resp(id, ApiError.fromValidationError(value).json)
+              case Left(error) =>
+                complete(Json.obj(
+                  "-32003" -> Json.obj(
+                    "standard" -> "EIP-1474",
+                    "message"  -> "Transaction rejected."
+                  )
+                ))
               case Right(et) =>
                 resp(
                   id,
