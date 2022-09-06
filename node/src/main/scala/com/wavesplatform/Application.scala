@@ -1,9 +1,5 @@
 package com.wavesplatform
 
-import java.io.File
-import java.security.Security
-import java.util.concurrent.{ConcurrentHashMap, LinkedBlockingQueue, RejectedExecutionException, ThreadPoolExecutor, TimeUnit}
-import java.util.concurrent.atomic.AtomicBoolean
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
@@ -25,7 +21,6 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.{DBExt, Keys, openDB}
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.{History, StorageFactory}
@@ -39,8 +34,8 @@ import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height,
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
-import com.wavesplatform.utils.Schedulers.*
 import com.wavesplatform.utils.*
+import com.wavesplatform.utils.Schedulers.*
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
@@ -50,14 +45,18 @@ import io.netty.util.concurrent.{DefaultThreadFactory, GlobalEventExecutor}
 import kamon.Kamon
 import kamon.instrumentation.executor.ExecutorInstrumentation
 import monix.eval.{Coeval, Task}
-import monix.execution.{ExecutionModel, Scheduler, UncaughtExceptionReporter}
 import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
+import monix.execution.{ExecutionModel, Scheduler, UncaughtExceptionReporter}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import org.influxdb.dto.Point
 import org.iq80.leveldb.DB
 import org.slf4j.LoggerFactory
 
+import java.io.File
+import java.security.Security
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.{TimeUnit, *}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
@@ -256,11 +255,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         settings,
         lastBlockInfo,
         historyReplier,
-        utxStorage,
         peerDatabase,
         allChannels,
-        establishedConnections,
-        () => blockchainUpdater.isFeatureActivated(BlockchainFeatures.BlockV5)
+        establishedConnections
       )
     maybeNetworkServer = Some(networkServer)
     val (signatures, blocks, blockchainScores, microblockInvs, microblockResponses, transactions) = networkServer.messages
@@ -637,8 +634,8 @@ object Application extends ScorexLogging {
     Metrics.start(settings.metrics, time)
 
     def dumpMinerConfig(): Unit = {
-      import settings.synchronizationSettings.microBlockSynchronizer
       import settings.minerSettings as miner
+      import settings.synchronizationSettings.microBlockSynchronizer
 
       Metrics.write(
         Point
