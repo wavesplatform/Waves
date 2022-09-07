@@ -149,30 +149,6 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
     }
   }
 
-  test("InvokeScriptTransaction: invoking asset script error in action asset propagates failed transaction") {
-    val invokeFee            = 0.005.waves + smartFee
-    val setAssetScriptMinFee = setAssetScriptFee + smartFee * 2
-    val priorityFee          = setAssetScriptMinFee + invokeFee
-
-    for (funcName <- Seq("transfer", "reissue", "burn")) {
-      updateTikTok(funcName, setAssetScriptMinFee)
-      updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
-      overflowBlock()
-
-      sendTxsAndThenPriorityTx(
-        _ =>
-          sender
-            .broadcastInvokeScript(
-              caller,
-              Recipient().withPublicKeyHash(contractAddr),
-              Some(FUNCTION_CALL(FunctionHeader.User("tikTok"), List.empty)),
-              fee = invokeFee
-            ),
-        () => updateAssetScript(result = false, smartAsset, contract, priorityFee, waitForTx = false)
-      )((txs, _) => assertFailedTxs(txs))
-    }
-  }
-
   test("InvokeScriptTransaction: invoke script error in payment asset propagates failed transaction") {
     val invokeFee            = 0.005.waves + smartFee
     val setAssetScriptMinFee = setAssetScriptFee + smartFee
