@@ -1,5 +1,6 @@
 package com.wavesplatform.api.http.eth
 
+import akka.http.scaladsl.model.headers.`User-Agent`
 import akka.http.scaladsl.server.*
 import cats.data.Validated
 import cats.instances.vector.*
@@ -56,7 +57,12 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
       }
     } ~ (get & path("abi" / AddrSegment)) { addr =>
       complete(blockchain.accountScript(addr).map(as => ABIConverter(as.script).jsonABI))
-    } ~ (pathEndOrSingleSlash & post & entity(as[JsObject])) { jso =>
+    } ~ (
+      pathEndOrSingleSlash &
+        post &
+        entity(as[JsObject]) &
+        optionalHeaderValuePF { case ua: `User-Agent` => ua.value() }
+    ) { case (jso, userAgent) =>
       val id = (jso \ "id").getOrElse(JsNull)
 
       (jso \ "method").asOpt[String] match {
@@ -73,8 +79,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
               case "latest"   => Some(blockchain.height).asRight
               case "pending"  => None.asRight
               case _ =>
-                Try(Some(Integer.parseInt(str.drop(2), 16)))
-                  .toEither
+                Try(Some(Integer.parseInt(str.drop(2), 16))).toEither
                   .leftMap(_ => GenericError("Request parameter is not number nor supported tag"))
             }
             blockNumberOpt.fold(
@@ -109,29 +114,16 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
           }
         case Some("eth_sendRawTransaction") =>
           extractParam1[String](jso) { str =>
+            val fromMobile = userAgent.exists(_.contains("okhttp"))
             extractTransaction(str) match {
-              case Left(_) =>
-                complete(error(
-                  id,
-                  Json.obj(
-                    "code"-> -32003,
-                    "standard" -> "EIP-1474",
-                    "message"  -> "Transaction rejected."
-                  )
-                ))
+              case Left(value) =>
+                if (fromMobile) complete(error(id)) else resp(id, ApiError.fromValidationError(value).json)
               case Right(et) =>
                 complete(
                   transactionsApi.broadcastTransaction(et).map { result =>
                     result.resultE match {
-                      case Left(_) =>
-                        error(
-                          id,
-                          Json.obj(
-                            "code"-> -32003,
-                            "standard" -> "EIP-1474",
-                            "message"  -> "Transaction rejected."
-                          )
-                        )
+                      case Left(value) =>
+                        if (fromMobile) error(id) else respValue(id, ApiError.fromValidationError(value).json)
                       case Right(_) =>
                         respValue(id, toHexString(et.id().arr))
                     }
@@ -275,7 +267,15 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
 
   private[this] def resp(id: JsValue, resp: Future[JsValueWrapper]) = complete(resp.map(r => Json.obj("id" -> id, "jsonrpc" -> "2.0", "result" -> r)))
 
-  private[this] def error(id: JsValue, resp: JsValueWrapper) = Json.obj("id" -> id, "jsonrpc" -> "2.0", "error" -> resp)
+  private[this] def error(id: JsValue) = Json.obj(
+    "id"      -> id,
+    "jsonrpc" -> "2.0",
+    "error" -> Json.obj(
+      "code"     -> -32003,
+      "standard" -> "EIP-1474",
+      "message"  -> "Transaction rejected."
+    )
+  )
 
   private[this] def assetDescription(contractAddress: String) =
     assetId(contractAddress).flatMap(blockchain.assetDescription)

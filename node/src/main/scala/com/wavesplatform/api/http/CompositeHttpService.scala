@@ -40,7 +40,6 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
 
   private def logRequestResponse(req: HttpRequest)(res: RouteResult): Unit = res match {
     case Complete(resp) =>
-      req.headers.collectFirst { case ua: `User-Agent` => log.info(s"User-Agent: ${ua.value()}")}
       val msg = s"HTTP ${resp.status.value} from ${req.method.value} ${req.uri}"
       if (resp.status == StatusCodes.OK) log.info(msg) else log.warn(msg)
     case _ =>
