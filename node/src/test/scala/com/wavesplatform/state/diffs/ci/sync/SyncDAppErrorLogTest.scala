@@ -407,7 +407,7 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
 
   private def createTestCase(
       funcName: String,
-      args: Seq[EXPR] = Seq.empty
+      args: Seq[EXPR]
   )(expectedResult: (InvokeScriptTransaction, ByteStr, ByteStr) => String): Unit =
     withDomain(settings, balances) { d =>
       val invoke = TxHelpers.invoke(dApp1.toAddress, func = Some(funcName), args = args, invoker = invoker)
