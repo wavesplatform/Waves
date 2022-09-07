@@ -9,8 +9,6 @@
 import sbt.Def
 import sbt.Keys.{concurrentRestrictions, _}
 
-import scala.collection.Seq
-
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
 lazy val lang =
@@ -181,10 +179,14 @@ inScope(Global)(
 git.useGitDescribe       := true
 git.uncommittedSignifier := Some("DIRTY")
 
-lazy val packageAll = taskKey[Unit]("Package all artifacts")
+lazy val packageAll = taskKey[Unit]("Package DEB packages and the fat JAR")
 packageAll := {
   (node / assembly).value
+  buildDebPackages.value
+}
 
+lazy val buildTarballsForDocker = taskKey[Unit]("Package node and grpc-server tarballs and copy them to docker/target")
+buildTarballsForDocker := {
   IO.copyFile((node / Universal / packageZipTarball).value, new File(baseDirectory.value, "docker/target/waves.tgz"))
   IO.copyFile((`grpc-server` / Universal / packageZipTarball).value, new File(baseDirectory.value, "docker/target/waves-grpc-server.tgz"))
 }
