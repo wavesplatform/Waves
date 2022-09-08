@@ -270,6 +270,7 @@ object Terms {
   lazy val FALSE: CONST_BOOLEAN = CONST_BOOLEAN(false)
 
   case class CaseObj private (caseType: CASETYPEREF, fields: Map[String, EVALUATED]) extends EVALUATED {
+    // must be with fixArrIndentation = false, because of makeString behavior before RideV6 (NODE-2370)
     override def toString: String = TermPrinter().string(this)
 
     override def prettyString(depth: Int, fixArrIndentation: Boolean = false): String = TermPrinter(fixArrIndentation).indentObjString(this, depth)
@@ -295,6 +296,7 @@ object Terms {
   }
 
   abstract case class ARR private (xs: IndexedSeq[EVALUATED]) extends EVALUATED {
+    // must be with fixArrIndentation = false, because of makeString behavior before RideV6 (NODE-2370)
     override def toString: String = TermPrinter().string(this)
 
     override def prettyString(depth: Int, fixArrIndentation: Boolean = false): String = TermPrinter(fixArrIndentation).indentArrString(this, depth)
