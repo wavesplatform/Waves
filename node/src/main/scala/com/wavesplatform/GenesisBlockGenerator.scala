@@ -223,12 +223,13 @@ object GenesisBlockGenerator {
       def inverseCalculateDelay(balance: Long, hitRate: Double): Int =
         posCalculator match {
           case FairPoSCalculator(minBlockTime, _) =>
-            if (settings.averageBlockDelay.toMillis <= minBlockTime)
+            val averageBlockDelay = settings.averageBlockDelay.toMillis
+            if (averageBlockDelay <= minBlockTime)
               throw new RuntimeException(
-                s"average-block-delay: ${settings.averageBlockDelay.toMillis}ms should be > min-block-time: ${minBlockTime}ms"
+                s"average-block-delay: ${averageBlockDelay}ms should be > min-block-time: ${minBlockTime}ms"
               )
             else {
-              val z = (1 - Math.exp((settings.averageBlockDelay.toMillis - minBlockTime) / 70000.0)) * balance
+              val z = (1 - Math.exp((averageBlockDelay - minBlockTime) / 70000.0)) * balance
               (5e17 * (Math.log(hitRate) / z)).toInt
             }
           case NxtPoSCalculator =>
