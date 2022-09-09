@@ -1,4 +1,4 @@
-package com.wavesplatform.lang.v1.estimator
+package com.wavesplatform.lang.doc
 
 import com.wavesplatform.DocSource
 import com.wavesplatform.common.utils.EitherExt2
@@ -14,7 +14,7 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.test.PropSpec
 import org.scalatest.exceptions.TestFailedException
 
-class FunctionComplexityTest extends PropSpec {
+class FunctionComplexityDocTest extends PropSpec {
   private val directives: Iterable[DirectiveSet] =
     DirectiveDictionary[StdLibVersion].all
       .flatMap(version =>
@@ -83,7 +83,7 @@ class FunctionComplexityTest extends PropSpec {
     val checkedUnusedDocCosts = onlyDApp(onlyAccount(unusedDocCosts))
     if (checkedUnusedDocCosts.nonEmpty)
       throw new TestFailedException(
-        s"For RIDE ${ds.stdLibVersion} documented functions is unused: ${checkedUnusedDocCosts.map(_._1).mkString(", ")}",
+        s"For RIDE ${ds.stdLibVersion} documented functions is unused: ${checkedUnusedDocCosts.keys.mkString(", ")}",
         0
       )
   }
