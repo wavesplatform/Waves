@@ -20,7 +20,8 @@ case class LeaseApiRoute(
     wallet: Wallet,
     transactionPublisher: TransactionPublisher,
     time: Time,
-    commonAccountApi: CommonAccountsApi
+    commonAccountApi: CommonAccountsApi,
+    routeTimeout: RouteTimeout
 ) extends ApiRoute
     with BroadcastRoute
     with AuthRoute {
@@ -40,9 +41,11 @@ case class LeaseApiRoute(
         path("cancel")(broadcast[LeaseCancelRequest](_.toTx))
     } ~ pathPrefix("info")(leaseInfo)
 
-  private[this] def active: Route = (pathPrefix("active") & get & extractScheduler) { implicit sc =>
+  private[this] def active: Route = (pathPrefix("active") & get) {
     path(AddrSegment) { address =>
-      complete(commonAccountApi.activeLeases(address).map(Json.toJson(_)).toListL.runToFuture)
+      routeTimeout.executeToFuture(
+        commonAccountApi.activeLeases(address).map(Json.toJson(_)).toListL
+      )
     }
   }
 

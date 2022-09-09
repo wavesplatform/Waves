@@ -22,7 +22,6 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.{DBExt, Keys, openDB}
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.{History, StorageFactory}
@@ -44,11 +43,12 @@ import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.HashedWheelTimer
-import io.netty.util.concurrent.GlobalEventExecutor
+import io.netty.util.concurrent.{DefaultThreadFactory, GlobalEventExecutor}
 import kamon.Kamon
+import kamon.instrumentation.executor.ExecutorInstrumentation
 import monix.eval.{Coeval, Task}
-import monix.execution.UncaughtExceptionReporter
 import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
+import monix.execution.{ExecutionModel, Scheduler, UncaughtExceptionReporter}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import org.influxdb.dto.Point
@@ -57,8 +57,8 @@ import org.slf4j.LoggerFactory
 
 import java.io.File
 import java.security.Security
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.{TimeUnit, *}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
@@ -102,7 +102,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private var triggers = Seq.empty[BlockchainUpdateTriggers]
 
-  private[this] var miner: Miner with MinerDebugInfo = Miner.Disabled
+  private[this] var miner: Miner & MinerDebugInfo = Miner.Disabled
   private[this] val (blockchainUpdater, levelDB) =
     StorageFactory(settings, db, time, spendableBalanceChanged, BlockchainUpdateTriggers.combined(triggers), bc => miner.scheduleMining(bc))
 
@@ -266,11 +266,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         settings,
         lastBlockInfo,
         historyReplier,
-        utxStorage,
         peerDatabase,
         allChannels,
-        establishedConnections,
-        () => blockchainUpdater.isFeatureActivated(BlockchainFeatures.BlockV5)
+        establishedConnections
       )
     maybeNetworkServer = Some(networkServer)
     val (signatures, blocks, blockchainScores, microblockInvs, microblockResponses, transactions) = networkServer.messages
@@ -346,11 +344,36 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           "rest-time-limited",
           reporter = log.trace("Uncaught exception in time limited pool", _)
         )
+      val heavyRequestProcessorPoolThreads =
+        settings.restAPISettings.heavyRequestProcessorPoolThreads.getOrElse((Runtime.getRuntime.availableProcessors() * 2).min(4))
+      val heavyRequestExecutor = new ThreadPoolExecutor(
+        heavyRequestProcessorPoolThreads,
+        heavyRequestProcessorPoolThreads,
+        0,
+        TimeUnit.MILLISECONDS,
+        new LinkedBlockingQueue[Runnable],
+        new DefaultThreadFactory("rest-heavy-request-processor", true),
+        { (r: Runnable, executor: ThreadPoolExecutor) =>
+          log.error(s"$r has been rejected from $executor")
+          throw new RejectedExecutionException
+        }
+      )
+
+      val heavyRequestScheduler = Scheduler(
+        if (settings.config.getBoolean("kamon.enable"))
+          ExecutorInstrumentation.instrument(heavyRequestExecutor, "heavy-request-executor")
+        else heavyRequestExecutor,
+        ExecutionModel.AlwaysAsyncExecution
+      )
+
+      val routeTimeout = new RouteTimeout(
+        FiniteDuration(settings.config.getDuration("akka.http.server.request-timeout").getSeconds, TimeUnit.SECONDS)
+      )(heavyRequestScheduler)
 
       val apiRoutes = Seq(
         EthRpcRoute(() => blockchainWithDiscardedDiffs(), extensionContext.transactionsApi, time),
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => shutdown()),
-        BlocksApiRoute(settings.restAPISettings, extensionContext.blocksApi, time),
+        BlocksApiRoute(settings.restAPISettings, extensionContext.blocksApi, time, routeTimeout),
         TransactionsApiRoute(
           settings.restAPISettings,
           extensionContext.transactionsApi,
@@ -358,7 +381,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           () => blockchainWithDiscardedDiffs(),
           () => utxStorage.size,
           transactionPublisher,
-          time
+          time,
+          routeTimeout
         ),
         WalletApiRoute(settings.restAPISettings, wallet),
         UtilsApiRoute(
@@ -376,6 +400,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           transactionPublisher,
           time,
           limitedScheduler,
+          routeTimeout,
           extensionContext.accountsApi,
           settings.dbSettings.maxRollbackDepth
         ),
@@ -399,7 +424,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           configRoot,
           loadBalanceHistory,
           levelDB.loadStateHash,
-          () => utxStorage.priorityPool.compositeBlockchain
+          () => utxStorage.priorityPool.compositeBlockchain,
+          routeTimeout,
+          heavyRequestScheduler
         ),
         AssetsApiRoute(
           settings.restAPISettings,
@@ -409,17 +436,26 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           time,
           extensionContext.accountsApi,
           extensionContext.assetsApi,
-          settings.dbSettings.maxRollbackDepth
+          settings.dbSettings.maxRollbackDepth,
+          routeTimeout
         ),
         ActivationApiRoute(settings.restAPISettings, settings.featuresSettings, blockchainUpdater),
-        LeaseApiRoute(settings.restAPISettings, wallet, transactionPublisher, time, extensionContext.accountsApi),
+        LeaseApiRoute(
+          settings.restAPISettings,
+          wallet,
+          transactionPublisher,
+          time,
+          extensionContext.accountsApi,
+          routeTimeout
+        ),
         AliasApiRoute(
           settings.restAPISettings,
           extensionContext.transactionsApi,
           wallet,
           transactionPublisher,
           time,
-          () => blockchainWithDiscardedDiffs()
+          () => blockchainWithDiscardedDiffs(),
+          routeTimeout
         ),
         RewardApiRoute(blockchainUpdater)
       )
@@ -428,7 +464,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       val httpFuture =
         Http().newServerAt(settings.restAPISettings.bindAddress, settings.restAPISettings.port).bindFlow(httpService.loggingCompositeRoute)
       serverBinding = Await.result(httpFuture, 20.seconds)
-      serverBinding.whenTerminated.foreach(_ => httpService.scheduler.shutdown())
+      serverBinding.whenTerminated.foreach(_ => heavyRequestScheduler.shutdown())
       log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
     }
 

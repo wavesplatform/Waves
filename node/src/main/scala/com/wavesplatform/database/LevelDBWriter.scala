@@ -610,7 +610,7 @@ abstract class LevelDBWriter private[database] (
         val scriptsToDiscard        = Seq.newBuilder[Address]
         val assetScriptsToDiscard   = Seq.newBuilder[IssuedAsset]
         val accountDataToInvalidate = Seq.newBuilder[(Address, String)]
-        val aliasesToInvalidate = Seq.newBuilder[Alias]
+        val aliasesToInvalidate     = Seq.newBuilder[Alias]
 
         val discardedBlock = readWrite { rw =>
           rw.put(Keys.height, currentHeight - 1)

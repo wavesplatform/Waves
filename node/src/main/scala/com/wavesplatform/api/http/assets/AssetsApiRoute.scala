@@ -33,6 +33,7 @@ import com.wavesplatform.transaction.{EthereumTransaction, TransactionFactory}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import io.netty.util.concurrent.DefaultThreadFactory
+import monix.eval.Task
 import monix.execution.Scheduler
 import play.api.libs.json.*
 
@@ -47,7 +48,8 @@ case class AssetsApiRoute(
     time: Time,
     commonAccountApi: CommonAccountsApi,
     commonAssetsApi: CommonAssetsApi,
-    maxDistributionDepth: Int
+    maxDistributionDepth: Int,
+    routeTimeout: RouteTimeout
 ) extends ApiRoute
     with BroadcastRoute
     with AuthRoute {
@@ -166,26 +168,24 @@ case class AssetsApiRoute(
   /** @param assets
     *   Some(assets) for specific asset balances, None for a full portfolio
     */
-  def balances(address: Address, assets: Option[Seq[IssuedAsset]] = None): Route = extractScheduler { implicit s =>
+  def balances(address: Address, assets: Option[Seq[IssuedAsset]] = None): Route = {
     implicit val jsonStreamingSupport: ToResponseMarshaller[Source[JsObject, NotUsed]] =
       jsonStreamMarshaller(s"""{"address":"$address","balances":[""", ",", "]}")
 
-    val assetBalances = assets match {
-      case Some(assets) =>
-        Source(assets)
-          .map(asset => asset -> blockchain().balance(address, asset))
-
-      case None =>
-        Source
-          .future(commonAccountApi.portfolio(address).toListL.runToFuture) // FIXME: Strict loading because of segfault in leveldb
-          .mapConcat(identity)
-    }
-
-    val jsonStream = assetBalances.map { case (assetId, balance) =>
+    routeTimeout.executeStreamed {
+      assets match {
+        case Some(assets) =>
+          Task {
+            assets.map(asset => asset -> blockchain().balance(address, asset))
+          }
+        case None =>
+          commonAccountApi
+            .portfolio(address)
+            .toListL // FIXME: Strict loading because of segfault in leveldb
+      }
+    } { case (assetId, balance) =>
       fullAssetInfoJson(assetId) ++ Json.obj("balance" -> balance)
     }
-
-    complete(jsonStream)
   }
 
   def balance(address: Address, assetId: IssuedAsset): Route = complete(balanceJson(address, assetId))
@@ -240,27 +240,21 @@ case class AssetsApiRoute(
   def nft(address: Address, limit: Int, maybeAfter: Option[String]): Route = {
     val after = maybeAfter.collect { case s if s.nonEmpty => IssuedAsset(ByteStr.decodeBase58(s).getOrElse(throw ApiException(InvalidAssetId))) }
     if (limit > settings.transactionsByAddressLimit) complete(TooBigArrayAllocation)
-    else
-      extractScheduler { implicit sc =>
-        import cats.syntax.either.*
-        implicit val jsonStreamingSupport: ToResponseMarshaller[Source[JsValue, NotUsed]] = jsonStreamMarshaller()
-        complete {
-          Source
-            .future(
-              commonAccountApi
-                .nftList(address, after)
-                .take(limit)
-                .toListL
-                .runToFuture
-            )
-            .mapConcat(identity)
-            .map { case (assetId, assetDesc) =>
-              AssetsApiRoute
-                .jsonDetails(blockchain())(assetId, assetDesc, full = true)
-                .valueOr(err => throw new IllegalArgumentException(err))
-            }
-        }
+    else {
+      import cats.syntax.either.*
+      implicit val jsonStreamingSupport: ToResponseMarshaller[Source[JsValue, NotUsed]] = jsonStreamMarshaller()
+
+      routeTimeout.executeStreamed {
+        commonAccountApi
+          .nftList(address, after)
+          .take(limit)
+          .toListL
+      } { case (assetId, assetDesc) =>
+        AssetsApiRoute
+          .jsonDetails(blockchain())(assetId, assetDesc, full = true)
+          .valueOr(err => throw new IllegalArgumentException(err))
       }
+    }
   }
 
   private def balanceJson(address: Address, assetId: IssuedAsset): JsObject =

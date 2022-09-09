@@ -5,7 +5,7 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.http.ApiError.{InvalidIds, *}
-import com.wavesplatform.api.http.TransactionsApiRoute
+import com.wavesplatform.api.http.{RouteTimeout, TransactionsApiRoute}
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
@@ -33,7 +33,7 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
 import com.wavesplatform.transaction.{Asset, AssetIdLength, CreateAliasTransaction, TxHelpers, TxVersion}
-import com.wavesplatform.utils.{EthEncoding, EthHelpers}
+import com.wavesplatform.utils.{EthEncoding, EthHelpers, Schedulers}
 import com.wavesplatform.{BlockGen, BlockchainStubHelpers, TestValues, TestWallet}
 import monix.reactive.Observable
 import org.scalacheck.Gen.*
@@ -43,6 +43,7 @@ import org.scalatest.OptionValues
 import play.api.libs.json.*
 import play.api.libs.json.Json.JsValueWrapper
 
+import scala.concurrent.duration.*
 import scala.concurrent.Future
 import scala.util.Random
 
@@ -70,7 +71,8 @@ class TransactionsRouteSpec
     () => blockchain,
     utxPoolSize,
     utxPoolSynchronizer,
-    testTime
+    testTime,
+    new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
   )
 
   private val route = seal(transactionsApiRoute.route)
@@ -126,7 +128,8 @@ class TransactionsRouteSpec
         () => d.blockchain,
         () => 0,
         (t, _) => d.transactionsApi.broadcastTransaction(t),
-        ntpTime
+        ntpTime,
+        new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
       ).route
     )
 

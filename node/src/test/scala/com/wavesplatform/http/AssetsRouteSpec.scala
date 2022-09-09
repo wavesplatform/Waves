@@ -6,6 +6,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.TestWallet
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.http.ApiError.{AssetIdNotSpecified, AssetsDoesNotExist, InvalidIds, TooBigArrayAllocation}
+import com.wavesplatform.api.http.RouteTimeout
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.api.http.requests.{TransferV1Request, TransferV2Request}
 import com.wavesplatform.common.state.ByteStr
@@ -30,9 +31,12 @@ import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.utils.EthTxGenerator
 import com.wavesplatform.transaction.utils.EthTxGenerator.Arg
 import com.wavesplatform.transaction.{AssetIdLength, GenesisTransaction, Transaction, TxHelpers, TxNonNegativeAmount, TxVersion}
+import com.wavesplatform.utils.Schedulers
 import org.scalatest.concurrent.Eventually
 import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json.{JsArray, JsObject, JsValue, Json, Writes}
+
+import scala.concurrent.duration.*
 
 class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPISettingsHelper with WithDomain with TestWallet {
 
@@ -51,7 +55,8 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
             TestTime(),
             d.accountsApi,
             d.assetsApi,
-            MaxDistributionDepth
+            MaxDistributionDepth,
+            new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
           ).route
         )
       )

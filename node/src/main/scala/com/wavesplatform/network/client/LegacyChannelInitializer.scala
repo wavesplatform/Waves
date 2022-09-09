@@ -55,7 +55,7 @@ class LegacyChannelInitializer(trafficLoggerSettings: TrafficLogger.Settings, ha
         new ClientHandshakeHandler(handshake, promise),
         new LengthFieldPrepender(lengthFieldLength),
         new LengthFieldBasedFrameDecoder(maxFieldLength, 0, lengthFieldLength, 0, lengthFieldLength),
-        new LegacyFrameCodec(PeerDatabase.NoOp, 3.minutes, () => false),
+        new LegacyFrameCodec(PeerDatabase.NoOp, 3.minutes),
         new TrafficLogger(trafficLoggerSettings)
       )
 }

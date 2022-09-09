@@ -4,6 +4,7 @@ import akka.http.scaladsl.model.{ContentTypes, FormData, HttpEntity}
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
 import com.wavesplatform.api.common.{CommonAccountsApi, LeaseInfo}
+import com.wavesplatform.api.http.RouteTimeout
 import com.wavesplatform.api.http.leasing.LeaseApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -28,13 +29,14 @@ import com.wavesplatform.transaction.utils.EthConverters.*
 import com.wavesplatform.transaction.utils.EthTxGenerator.Arg
 import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
 import com.wavesplatform.transaction.{Asset, Authorized, Transaction, TxHelpers, TxVersion}
-import com.wavesplatform.utils.SystemTime
+import com.wavesplatform.utils.{Schedulers, SystemTime}
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{NTPTime, TestWallet, TransactionGen}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.{JsArray, JsObject, Json}
 
+import scala.concurrent.duration.*
 import scala.concurrent.Future
 
 class LeaseRouteSpec
@@ -51,7 +53,8 @@ class LeaseRouteSpec
       testWallet,
       (_, _) => Future.successful(TracedResult(Right(true))),
       ntpTime,
-      CommonAccountsApi(() => domain.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), domain.db, () => domain.blockchain)
+      CommonAccountsApi(() => domain.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), domain.db, () => domain.blockchain),
+      new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
     )
 
   private def withRoute(balances: Seq[AddrWithBalance], settings: WavesSettings = mostRecent)(f: (Domain, Route) => Unit): Unit =
@@ -518,7 +521,12 @@ class LeaseRouteSpec
     val blockchain = stub[Blockchain]
     val commonApi  = stub[CommonAccountsApi]
 
-    val route = LeaseApiRoute(restAPISettings, stub[Wallet], stub[TransactionPublisher], SystemTime, commonApi).route
+    val route = LeaseApiRoute(restAPISettings, stub[Wallet],
+      stub[TransactionPublisher],
+      SystemTime,
+      commonApi,
+      new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
+    ).route
 
     val lease       = TxHelpers.lease()
     val leaseCancel = TxHelpers.leaseCancel(lease.id())

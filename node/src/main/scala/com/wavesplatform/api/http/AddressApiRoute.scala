@@ -41,6 +41,7 @@ case class AddressApiRoute(
     transactionPublisher: TransactionPublisher,
     time: Time,
     limitedScheduler: Scheduler,
+    routeTimeout: RouteTimeout,
     commonAccountsApi: CommonAccountsApi,
     maxBalanceDepth: Int
 ) extends ApiRoute
@@ -201,16 +202,15 @@ case class AddressApiRoute(
 
       (path(Segment) & get) { key =>
         complete(accountDataEntry(address, key))
-      } ~ extractScheduler(implicit sc =>
-        strictEntity {
-          (formField("matches") | parameter("matches")) { matches =>
-            Try(matches.r)
-              .fold(
-                { e =>
-                  log.trace(s"Error compiling regex $matches: ${e.getMessage}")
-                  complete(ApiError.fromValidationError(GenericError(s"Cannot compile regex")))
-                },
-                _ => complete(accountData(address, matches))
+      } ~ strictEntity {
+        (formField("matches") | parameter("matches")) { matches =>
+          Try(matches.r)
+            .fold(
+              { e =>
+                log.trace(s"Error compiling regex $matches: ${e.getMessage}")
+                complete(ApiError.fromValidationError(GenericError(s"Cannot compile regex")))
+              },
+              _ => accountData(address, Some(matches))
               )
           } ~ anyParam("key", limit = settings.dataKeysRequestLimit) { keys =>
             extractMethod.filter(_ != HttpMethods.GET || keys.nonEmpty) { _ =>
@@ -218,13 +218,12 @@ case class AddressApiRoute(
                 .cond(keys.nonEmpty, (), DataKeysNotSpecified)
             .map(_ => accountDataList(address, keys.toSeq*))
 
-              complete(result)
-            }
-          } ~ get {
-            complete(accountData(address))
+            complete(result)
           }
+        } ~ get {
+          accountData(address)
         }
-      )
+      }
     }
 
   def root: Route = (path("addresses") & get) {
@@ -291,19 +290,14 @@ case class AddressApiRoute(
       pass
   }
 
-  private def accountData(address: Address)(implicit sc: Scheduler) =
-    commonAccountsApi
-      .dataStream(address, None)
-      .toListL
-      .runAsyncLogErr
-      .map(data => Source.fromIterator(() => data.sortBy(_.key).iterator.map(Json.toJson[DataEntry[_]])))
-
-  private def accountData(addr: Address, regex: String)(implicit sc: Scheduler) =
-    commonAccountsApi
-      .dataStream(addr, Some(regex))
-      .toListL
-      .runAsyncLogErr
-      .map(data => Source.fromIterator(() => data.sortBy(_.key).iterator.map(Json.toJson[DataEntry[?]])))
+  private def accountData(address: Address, regex: Option[String] = None)(implicit m: ToResponseMarshaller[Source[JsValue, NotUsed]]) = {
+    routeTimeout.execute(
+      commonAccountsApi
+        .dataStream(address, regex)
+        .toListL
+        .map(data => Source.fromIterator(() => data.sortBy(_.key).iterator.map(Json.toJson[DataEntry[?]])))
+    )(_.runAsyncLogErr(_))
+  }
 
   private def accountDataEntry(address: Address, key: String): ToResponseMarshallable =
     commonAccountsApi.data(address, key).toRight(DataKeyDoesNotExist)

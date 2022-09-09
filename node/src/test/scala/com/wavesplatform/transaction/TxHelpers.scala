@@ -227,6 +227,16 @@ object TxHelpers {
       fee: Long = TestValues.fee,
       version: TxVersion = TxVersion.V2,
       chainId: Byte = AddressScheme.current.chainId
+  ): ExchangeTransaction = exchangeFromOrders(order1, order2, order1.price.value, matcher, fee, version, chainId)
+
+  def exchangeFromOrders(
+      order1: Order,
+      order2: Order,
+      price: Long,
+      matcher: KeyPair,
+      fee: Long,
+      version: TxVersion,
+      chainId: Byte
   ): ExchangeTransaction =
     ExchangeTransaction
       .signed(
@@ -235,7 +245,7 @@ object TxHelpers {
         order1,
         order2,
         order1.amount.value,
-        order1.price.value,
+        price,
         order1.matcherFee.value,
         order2.matcherFee.value,
         fee,
