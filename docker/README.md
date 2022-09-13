@@ -17,6 +17,8 @@ It is highly recommended to read more about [Waves Node configuration](https://d
 ## Building Docker image
 `./build-with-docker.sh && docker build -t wavesplatform/wavesnode docker` (from the repository root) - builds an image with the current local repository
 
+**Known issue**: Building with `build-with-docker.sh` on macOS produces tarball with executable permissions set for all the archive contents.
+
 **You can specify following arguments when building the image:**
 
 
@@ -24,7 +26,7 @@ It is highly recommended to read more about [Waves Node configuration](https://d
 |-------------------|---------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `INCLUDE_GRPC`    | `true`        | Whether to include gRPC server files in the image.                                                                                                                                                                                                                                            |
 
-**Note: All build arguments are optional.**  
+**Note: All build arguments are optional.**
 
 ## Running Docker image
 
