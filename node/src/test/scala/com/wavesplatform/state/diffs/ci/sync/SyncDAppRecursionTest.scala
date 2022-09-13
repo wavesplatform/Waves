@@ -32,7 +32,7 @@ class SyncDAppRecursionTest extends PropSpec with WithDomain {
           ): Script = {
     val func    = if (reentrant) "reentrantInvoke" else "invoke"
     val args    = s"[sendEnd, $sendChangeDApp, $sendForceInvoke, $sendForceReentrant]"
-    val compile = if (invokeExpression) TestCompiler(V5).compileFreeCall(_) else TestCompiler(V5).compileContract(_, allowIllFormedStrings = false)
+    val compile = if (invokeExpression) TestCompiler(V5).compileFreeCall(_) else TestCompiler(V5).compileContract(_, allowIllFormedStrings = false, compact = false)
     val prefix =
       if (invokeExpression)
         "let (end, useSecondAddress, forceInvoke, forceReentrant) = (false, false, false, false)"
