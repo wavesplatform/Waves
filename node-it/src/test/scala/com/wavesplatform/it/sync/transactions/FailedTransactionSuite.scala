@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.transactions
 
-import com.google.common.primitives.Longs
 import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAssetScript
 import com.wavesplatform.api.http.DebugMessage
@@ -12,7 +11,7 @@ import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.state.{BooleanDataEntry, StringDataEntry}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -28,8 +27,8 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
   private lazy val contract = sender.createKeyPair()
   private def caller        = thirdKeyPair
 
-  private val assetAmount    = 1000000000L
-  private var smartAsset     = ""
+  private val assetAmount = 1000000000L
+  private var smartAsset  = ""
 
   private def seller  = firstKeyPair
   private def buyer   = secondKeyPair
@@ -162,55 +161,6 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
 
         failed
       }
-    }
-  }
-
-  test("InvokeScriptTransaction: account state should not be changed after accepting failed transaction") {
-    val invokeFee            = 0.005.waves + smartFee
-    val setAssetScriptMinFee = setAssetScriptFee + smartFee
-    val priorityFee          = setAssetScriptMinFee + invokeFee
-
-    val initialEntries = List(
-      IntegerDataEntry("n", -1),
-      BooleanDataEntry("b", value = false),
-      BinaryDataEntry("bn", ByteStr(Longs.toByteArray(-1))),
-      StringDataEntry("s", "-1")
-    )
-    sender.broadcastData(contract, initialEntries, minFee + smartFee, waitForTx = true)
-    updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
-
-    sendTxsAndThenPriorityTx(
-      i => sender.invokeScript(caller, contractAddress, Some("transferAndWrite"), args = List(Terms.CONST_LONG(i)), fee = invokeFee)._1.id,
-      () => updateAssetScript(result = false, smartAsset, contract, priorityFee)
-    ) { (txs, priorityTx) =>
-      logPriorityTx(priorityTx)
-
-      val failed              = assertFailedTxs(txs)
-      val lastSuccessEndArg   = txs.size - failed.size
-      val lastSuccessStartArg = (lastSuccessEndArg - 3).max(1)
-
-      val lastSuccessWrites =
-        Range
-          .inclusive(lastSuccessStartArg, lastSuccessEndArg)
-          .map {
-            case i if i % 4 == 0 => "n"  -> IntegerDataEntry("n", i)
-            case i if i % 4 == 1 => "b"  -> BooleanDataEntry("b", i % 2 == 0)
-            case i if i % 4 == 2 => "bn" -> BinaryDataEntry("bn", ByteStr(Longs.toByteArray(i)))
-            case i if i % 4 == 3 => "s"  -> StringDataEntry("s", i.toString)
-          }
-          .toMap
-      initialEntries.map(entry => entry.key -> entry).toMap.foreach { case (key, initial) =>
-        sender.getDataByKey(contractAddress, key) shouldBe lastSuccessWrites.getOrElse(key, initial)
-      }
-
-      failed.foreach(s => checkStateChange(sender.stateChanges(s.id), 3, "Transaction is not allowed by script of the asset"))
-
-      val failedIds             = failed.map(_.id).toSet
-      val stateChangesByAddress = sender.debugStateChangesByAddress(contractAddress, 10).takeWhile(sc => failedIds.contains(sc.id))
-      stateChangesByAddress.size should be > 0
-      stateChangesByAddress.foreach(info => checkStateChange(info, 3, "Transaction is not allowed by script of the asset"))
-
-      failed
     }
   }
 
