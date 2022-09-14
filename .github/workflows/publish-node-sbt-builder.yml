@@ -1,7 +1,6 @@
 name: Build SBT docker builder for node
 
 on:
-  pull_request:
   release:
     types: [published]
 

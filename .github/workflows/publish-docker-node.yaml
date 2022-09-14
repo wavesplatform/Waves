@@ -50,7 +50,7 @@ jobs:
           flavor: |
             latest=false
           tags: |
-            type=ref,event=tag
+            type=match,pattern=v(.*),group=1
             type=raw,value=latest,enable=${{ github.event.release.prerelease == false }}
 
       - name: Extract Docker private node metadata
