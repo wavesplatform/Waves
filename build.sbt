@@ -179,10 +179,11 @@ inScope(Global)(
 git.useGitDescribe       := true
 git.uncommittedSignifier := Some("DIRTY")
 
-lazy val packageAll = taskKey[Unit]("Package DEB packages and the fat JAR")
+lazy val packageAll = taskKey[Unit]("Package all artifacts")
 packageAll := {
   (node / assembly).value
   buildDebPackages.value
+  buildTarballsForDocker.value
 }
 
 lazy val buildTarballsForDocker = taskKey[Unit]("Package node and grpc-server tarballs and copy them to docker/target")

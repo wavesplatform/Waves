@@ -4,7 +4,7 @@ SBT_VERSION=$(cut -d= -f2 ../project/build.properties)
 WAVES_VERSION=$(cut -d\" -f2 ../version.sbt)
 JAVA_VERSION=8u345-b01
 
-docker build -t node-sbt-builder:$WAVES_VERSION - <<EOF
+docker build -t wavesplatform/node-sbt-builder:$WAVES_VERSION - <<EOF
 FROM eclipse-temurin:$JAVA_VERSION-jdk-jammy
 
 ENV PATH="/opt/sbt/bin:\$PATH"
