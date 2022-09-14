@@ -1,0 +1,30 @@
+name: Build SBT docker builder for node
+
+on:
+  pull_request:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - id: extract-versions
+        run: |
+          echo "::set-output name=waves-version::$(cut -d\" -f2 version.sbt)"
+          echo "::set-output name=sbt-version::$(cut -d= -f2 project/build.properties)"
+      - uses: docker/setup-buildx-action@v2
+      - uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USER }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+      - uses: docker/build-push-action@v3
+        with:
+          context: ./docker
+          file: ./docker/node-sbt-builder.Dockerfile
+          push: true
+          tags: wavesplatform/node-sbt-builder:${{ steps.extract-versions.outputs.waves-version }}
+          build-args: |
+            WAVES_VERSION=${{ steps.extract-versions.outputs.waves-version }}
+            SBT_VERSION=${{ steps.extract-versions.outputs.sbt-version }}
