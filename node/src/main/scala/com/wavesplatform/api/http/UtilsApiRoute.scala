@@ -20,7 +20,7 @@ import com.wavesplatform.lang.directives.values.{DApp as DAppType, *}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
-import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
+import com.wavesplatform.lang.v1.compiler.{ContractScriptCompactor, ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.LogExtraInfo
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
@@ -393,7 +393,7 @@ object UtilsApiRoute {
             fixUnicodeFunctions = true,
             useNewPowPrecision = true
           )
-        call = ContractEvaluator.buildSyntheticCall(script.expr.asInstanceOf[DApp], expr)
+        call = ContractEvaluator.buildSyntheticCall(ContractScriptCompactor.decompact(script.expr.asInstanceOf[DApp]), expr)
         limitedResult <- EvaluatorV2
           .applyLimitedCoeval(
             call,
