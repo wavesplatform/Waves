@@ -30,14 +30,14 @@ import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
-import com.wavesplatform.lang.{API, CompileResult, Global, ValidationError}
+import com.wavesplatform.lang.{API, CommonError, CompileResult, Global, ValidationError}
 import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.TransactionType.TransactionType
-import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError}
+import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError, ScriptExecutionError}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{BlockchainContext, DAppEnvironment, InvokeScriptTransaction}
 import com.wavesplatform.transaction.{Asset, TransactionType}
@@ -298,7 +298,7 @@ case class UtilsApiRoute(
       val requestData = obj ++ Json.obj("address" -> address.toString)
       val responseJson = result
         .recover {
-          case e: ScriptExecutionError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.error)
+          case e: ScriptExecutionError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.toString)
           case other                   => ApiError.fromValidationError(other).json
         }
         .explicitGet() ++ requestData
@@ -406,7 +406,13 @@ object UtilsApiRoute {
             checkConstructorArgsTypes = true
           )
           .value()
-          .leftMap { case (err, _, log) => ScriptExecutionError.dAppExecution(err.message, log) }
+          .leftMap { case (err, _, log) =>
+            val msg = err match {
+              case CommonError(message, Some(fte: FailedTransactionError)) => fte.error.getOrElse(message)
+              case _                                                       => err.message
+            }
+            ScriptExecutionError.dAppExecution(msg, log)
+          }
         result <- limitedResult match {
           case (eval: EVALUATED, unusedComplexity, _) => Right((eval, limit - unusedComplexity))
           case (_: EXPR, _, log)                      => Left(ScriptExecutionError.dAppExecution(s"Calculation complexity limit exceeded", log))

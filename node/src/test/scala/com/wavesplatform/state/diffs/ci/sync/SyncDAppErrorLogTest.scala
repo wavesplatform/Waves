@@ -64,6 +64,8 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |		[],
          |		[]
          |	]
+         |	invoke.@complexity = 75
+         |	@complexityLimit = 51925
          |	nested11.@stateChanges = StateChanges(
          |		leases = [
          |			Lease(
@@ -160,17 +162,23 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |			)
          |		]
          |	)
+         |	nested11.@complexity = 111
+         |	@complexityLimit = 51814
          |	nested11 = 5
          |	==.@args = [
          |		5,
          |		5
          |	]
+         |	==.@complexity = 1
+         |	@complexityLimit = 51813
          |	Address.@args = [
          |		base58'3N4DiVEiZHzcjEhoBx2kmoKKCH7GBZMim3L'
          |	]
          |	dapp2 = Address(
          |		bytes = base58'3N4DiVEiZHzcjEhoBx2kmoKKCH7GBZMim3L'
          |	)
+         |	Address.@complexity = 1
+         |	@complexityLimit = 51812
          |	shouldFail = true
          |	message = base58'emsY'
          |	sig = base58'4uXfw7162zaopAkTNa7eo6YK2mJsTiHGJL3dCtRRH63z1nrdoHBHyhbvrfZovkxf2jKsi2vPsaP2XykfZmUiwPeg'
@@ -180,30 +188,42 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |		base58'4uXfw7162zaopAkTNa7eo6YK2mJsTiHGJL3dCtRRH63z1nrdoHBHyhbvrfZovkxf2jKsi2vPsaP2XykfZmUiwPeg',
          |		base58'HnU9jfhpMcQNaG5yQ46eR43RnkWKGxerw2zVrbpnbGof'
          |	]
+         |	sigVerify.@complexity = 180
+         |	@complexityLimit = 51632
          |	sigVerify.@args = [
          |		base58'emsY',
          |		base58'4uXfw7162zaopAkTNa7eo6YK2mJsTiHGJL3dCtRRH63z1nrdoHBHyhbvrfZovkxf2jKsi2vPsaP2XykfZmUiwPeg',
          |		base58'HnU9jfhpMcQNaG5yQ46eR43RnkWKGxerw2zVrbpnbGof'
          |	]
+         |	sigVerify.@complexity = 180
+         |	@complexityLimit = 51452
          |	sigVerify.@args = [
          |		base58'emsY',
          |		base58'4uXfw7162zaopAkTNa7eo6YK2mJsTiHGJL3dCtRRH63z1nrdoHBHyhbvrfZovkxf2jKsi2vPsaP2XykfZmUiwPeg',
          |		base58'HnU9jfhpMcQNaG5yQ46eR43RnkWKGxerw2zVrbpnbGof'
          |	]
+         |	sigVerify.@complexity = 180
+         |	@complexityLimit = 51272
          |	sigVerify_64Kb.@args = [
          |		base58'emsY',
          |		base58'4uXfw7162zaopAkTNa7eo6YK2mJsTiHGJL3dCtRRH63z1nrdoHBHyhbvrfZovkxf2jKsi2vPsaP2XykfZmUiwPeg',
          |		base58'HnU9jfhpMcQNaG5yQ46eR43RnkWKGxerw2zVrbpnbGof'
          |	]
+         |	sigVerify_64Kb.@complexity = 93
+         |	@complexityLimit = 51179
          |	complex = true
          |	identityBool.@args = [
          |		true
          |	]
          |	t = true
+         |	identityBool.@complexity = 1
+         |	@complexityLimit = 51178
          |	cons.@args = [
          |		true,
          |		[]
          |	]
+         |	cons.@complexity = 1
+         |	@complexityLimit = 51177
          |	invoke.@args = [
          |		Address(
          |			bytes = base58'3N4DiVEiZHzcjEhoBx2kmoKKCH7GBZMim3L'
@@ -214,6 +234,8 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |		],
          |		[]
          |	]
+         |	invoke.@complexity = 75
+         |	@complexityLimit = 51102
          |	inv = Left(CommonError(FailedTransactionError(code = 1, error = AccountBalanceError(Map(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log =
          |		@invokedDApp = Address(
          |			bytes = base58'3N4DiVEiZHzcjEhoBx2kmoKKCH7GBZMim3L'
@@ -242,14 +264,20 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |		dapp3 = Address(
          |			bytes = base58'3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM'
          |		)
+         |		Address.@complexity = 1
+         |		@complexityLimit = 51101
          |		cons.@args = [
          |			true,
          |			[]
          |		]
+         |		cons.@complexity = 1
+         |		@complexityLimit = 51100
          |		AttachedPayment.@args = [
          |			Unit,
          |			10
          |		]
+         |		AttachedPayment.@complexity = 1
+         |		@complexityLimit = 51099
          |		cons.@args = [
          |			AttachedPayment(
          |				assetId = Unit
@@ -257,6 +285,8 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |			),
          |			[]
          |		]
+         |		cons.@complexity = 1
+         |		@complexityLimit = 51098
          |		invoke.@args = [
          |			Address(
          |				bytes = base58'3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM'
@@ -272,6 +302,8 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |				)
          |			]
          |		]
+         |		invoke.@complexity = 75
+         |		@complexityLimit = 51023
          |		nested31.@stateChanges = StateChanges(
          |			leases = []
          |			reissues = []
@@ -288,11 +320,15 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |			burns = []
          |			invokes = []
          |		)
+         |		nested31.@complexity = 2
+         |		@complexityLimit = 51021
          |		nested31 = Unit
          |		==.@args = [
          |			Unit,
          |			Unit
          |		]
+         |		==.@complexity = 1
+         |		@complexityLimit = 51020
          |		shouldFail = true
          |		message = base58'emsY'
          |		sig = base58'4uXfw7162zaopAkTNa7eo6YK2mJsTiHGJL3dCtRRH63z1nrdoHBHyhbvrfZovkxf2jKsi2vPsaP2XykfZmUiwPeg'
@@ -302,11 +338,15 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |			base58'4uXfw7162zaopAkTNa7eo6YK2mJsTiHGJL3dCtRRH63z1nrdoHBHyhbvrfZovkxf2jKsi2vPsaP2XykfZmUiwPeg',
          |			base58'HnU9jfhpMcQNaG5yQ46eR43RnkWKGxerw2zVrbpnbGof'
          |		]
+         |		sigVerify_8Kb.@complexity = 43
+         |		@complexityLimit = 50977
          |		complexCase1 = true
          |		cons.@args = [
          |			true,
          |			[]
          |		]
+         |		cons.@complexity = 1
+         |		@complexityLimit = 50976
          |		invoke.@args = [
          |			Address(
          |				bytes = base58'3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM'
@@ -317,6 +357,8 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |			],
          |			[]
          |		]
+         |		invoke.@complexity = 75
+         |		@complexityLimit = 50901
          |		inv = Left(CommonError(FailedTransactionError(code = 1, error = AccountBalanceError(Map(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log =
          |			@invokedDApp = Address(
          |				bytes = base58'3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM'
@@ -343,6 +385,8 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |				base58'aaa',
          |				[]
          |			]
+         |			cons.@complexity = 1
+         |			@complexityLimit = 50900
          |			invoke.@args = [
          |				Address(
          |					bytes = base58'3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM'
@@ -353,6 +397,8 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |				],
          |				[]
          |			]
+         |			invoke.@complexity = 75
+         |			@complexityLimit = 50825
          |			nested32.@stateChanges = StateChanges(
          |				leases = []
          |				reissues = []
@@ -369,11 +415,15 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |				burns = []
          |				invokes = []
          |			)
+         |			nested32.@complexity = 2
+         |			@complexityLimit = 50823
          |			nested32 = Unit
          |			==.@args = [
          |				Unit,
          |				Unit
          |			]
+         |			==.@complexity = 1
+         |			@complexityLimit = 50822
          |			message = base58'emsY'
          |			sig = base58'4uXfw7162zaopAkTNa7eo6YK2mJsTiHGJL3dCtRRH63z1nrdoHBHyhbvrfZovkxf2jKsi2vPsaP2XykfZmUiwPeg'
          |			pub = base58'HnU9jfhpMcQNaG5yQ46eR43RnkWKGxerw2zVrbpnbGof'
@@ -382,6 +432,8 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |				base58'4uXfw7162zaopAkTNa7eo6YK2mJsTiHGJL3dCtRRH63z1nrdoHBHyhbvrfZovkxf2jKsi2vPsaP2XykfZmUiwPeg',
          |				base58'HnU9jfhpMcQNaG5yQ46eR43RnkWKGxerw2zVrbpnbGof'
          |			]
+         |			sigVerify.@complexity = 180
+         |			@complexityLimit = 50642
          |			ScriptTransfer.@args = [
          |				Address(
          |					bytes = base58'3N4DiVEiZHzcjEhoBx2kmoKKCH7GBZMim3L'
@@ -389,6 +441,8 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |				99900000000,
          |				Unit
          |			]
+         |			ScriptTransfer.@complexity = 1
+         |			@complexityLimit = 50641
          |			cons.@args = [
          |				ScriptTransfer(
          |					recipient = Address(
@@ -399,6 +453,8 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |				),
          |				[]
          |			]
+         |			cons.@complexity = 1
+         |			@complexityLimit = 50640
          |)))
          |)))
          |))""".stripMargin
@@ -461,6 +517,8 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |		[],
          |		[]
          |	]
+         |	invoke.@complexity = 75
+         |	@complexityLimit = 51925
          |	nested11.@stateChanges = StateChanges(
          |		leases = [
          |			Lease(
@@ -557,22 +615,30 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |			)
          |		]
          |	)
+         |	nested11.@complexity = 111
+         |	@complexityLimit = 51814
          |	nested11 = 5
          |	==.@args = [
          |		5,
          |		5
          |	]
+         |	==.@complexity = 1
+         |	@complexityLimit = 51813
          |	Address.@args = [
          |		base58'3N4DiVEiZHzcjEhoBx2kmoKKCH7GBZMim3L'
          |	]
          |	dapp2 = Address(
          |		bytes = base58'3N4DiVEiZHzcjEhoBx2kmoKKCH7GBZMim3L'
          |	)
+         |	Address.@complexity = 1
+         |	@complexityLimit = 51812
          |	shouldFail = false
          |	cons.@args = [
          |		false,
          |		[]
          |	]
+         |	cons.@complexity = 1
+         |	@complexityLimit = 51811
          |	invoke.@args = [
          |		Address(
          |			bytes = base58'3N4DiVEiZHzcjEhoBx2kmoKKCH7GBZMim3L'
@@ -583,6 +649,8 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |		],
          |		[]
          |	]
+         |	invoke.@complexity = 75
+         |	@complexityLimit = 51736
          |	inv = Left(CommonError(FailedTransactionError(code = 1, error = AccountBalanceError(Map(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log =
          |		@invokedDApp = Address(
          |			bytes = base58'3N4DiVEiZHzcjEhoBx2kmoKKCH7GBZMim3L'
@@ -611,14 +679,20 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |		dapp3 = Address(
          |			bytes = base58'3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM'
          |		)
+         |		Address.@complexity = 1
+         |		@complexityLimit = 51735
          |		cons.@args = [
          |			true,
          |			[]
          |		]
+         |		cons.@complexity = 1
+         |		@complexityLimit = 51734
          |		AttachedPayment.@args = [
          |			Unit,
          |			10
          |		]
+         |		AttachedPayment.@complexity = 1
+         |		@complexityLimit = 51733
          |		cons.@args = [
          |			AttachedPayment(
          |				assetId = Unit
@@ -626,6 +700,8 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |			),
          |			[]
          |		]
+         |		cons.@complexity = 1
+         |		@complexityLimit = 51732
          |		invoke.@args = [
          |			Address(
          |				bytes = base58'3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM'
@@ -641,6 +717,8 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |				)
          |			]
          |		]
+         |		invoke.@complexity = 75
+         |		@complexityLimit = 51657
          |		nested31.@stateChanges = StateChanges(
          |			leases = []
          |			reissues = []
@@ -657,16 +735,22 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |			burns = []
          |			invokes = []
          |		)
+         |		nested31.@complexity = 2
+         |		@complexityLimit = 51655
          |		nested31 = Unit
          |		==.@args = [
          |			Unit,
          |			Unit
          |		]
+         |		==.@complexity = 1
+         |		@complexityLimit = 51654
          |		shouldFail = false
          |		cons.@args = [
          |			false,
          |			[]
          |		]
+         |		cons.@complexity = 1
+         |		@complexityLimit = 51653
          |		invoke.@args = [
          |			Address(
          |				bytes = base58'3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM'
@@ -677,6 +761,8 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |			],
          |			[]
          |		]
+         |		invoke.@complexity = 75
+         |		@complexityLimit = 51578
          |		inv = Left(CommonError(FailedTransactionError(code = 1, error = AccountBalanceError(Map(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log =
          |			@invokedDApp = Address(
          |				bytes = base58'3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM'
@@ -703,6 +789,8 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |				base58'aaa',
          |				[]
          |			]
+         |			cons.@complexity = 1
+         |			@complexityLimit = 51577
          |			invoke.@args = [
          |				Address(
          |					bytes = base58'3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM'
@@ -713,6 +801,8 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |				],
          |				[]
          |			]
+         |			invoke.@complexity = 75
+         |			@complexityLimit = 51502
          |			nested32.@stateChanges = StateChanges(
          |				leases = []
          |				reissues = []
@@ -729,11 +819,15 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |				burns = []
          |				invokes = []
          |			)
+         |			nested32.@complexity = 2
+         |			@complexityLimit = 51500
          |			nested32 = Unit
          |			==.@args = [
          |				Unit,
          |				Unit
          |			]
+         |			==.@complexity = 1
+         |			@complexityLimit = 51499
          |			message = base58'emsY'
          |			sig = base58'4uXfw7162zaopAkTNa7eo6YK2mJsTiHGJL3dCtRRH63z1nrdoHBHyhbvrfZovkxf2jKsi2vPsaP2XykfZmUiwPeg'
          |			pub = base58'HnU9jfhpMcQNaG5yQ46eR43RnkWKGxerw2zVrbpnbGof'
@@ -742,6 +836,8 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |				base58'4uXfw7162zaopAkTNa7eo6YK2mJsTiHGJL3dCtRRH63z1nrdoHBHyhbvrfZovkxf2jKsi2vPsaP2XykfZmUiwPeg',
          |				base58'HnU9jfhpMcQNaG5yQ46eR43RnkWKGxerw2zVrbpnbGof'
          |			]
+         |			sigVerify.@complexity = 180
+         |			@complexityLimit = 51319
          |			ScriptTransfer.@args = [
          |				Address(
          |					bytes = base58'3N4DiVEiZHzcjEhoBx2kmoKKCH7GBZMim3L'
@@ -749,6 +845,8 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |				99900000000,
          |				Unit
          |			]
+         |			ScriptTransfer.@complexity = 1
+         |			@complexityLimit = 51318
          |			cons.@args = [
          |				ScriptTransfer(
          |					recipient = Address(
@@ -759,6 +857,8 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |				),
          |				[]
          |			]
+         |			cons.@complexity = 1
+         |			@complexityLimit = 51317
          |)))
          |)))
          |))""".stripMargin

@@ -16,7 +16,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings.{scriptTransf
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, notImplemented, unit}
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, NativeFunction, UserFunction}
-import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction, FunctionIds, LogItem}
+import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction, FunctionIds, Log}
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader}
@@ -593,7 +593,7 @@ object Functions {
             env: Environment[F],
             args: List[EVALUATED],
             availableComplexity: Int
-        )(implicit m: Monad[CoevalF[F, *]]): Coeval[F[(Either[ExecutionError, (EVALUATED, LogItem[F])], Int)]] = {
+        )(implicit m: Monad[CoevalF[F, *]]): Coeval[F[(Either[ExecutionError, (EVALUATED, Log[F])], Int)]] = {
           val dAppBytes = args match {
             case (dApp: CaseObj) :: _ if dApp.caseType == addressType =>
               dApp.fields("bytes") match {
@@ -638,7 +638,7 @@ object Functions {
                 })
             case xs =>
               val err =
-                notImplemented[F, (EVALUATED, LogItem[F])](s"invoke(dApp: Address, function: String, args: List[Any], payments: List[Payment])", xs)
+                notImplemented[F, (EVALUATED, Log[F])](s"invoke(dApp: Address, function: String, args: List[Any], payments: List[Payment])", xs)
               Coeval.now(err.map((_, 0)))
           }
         }

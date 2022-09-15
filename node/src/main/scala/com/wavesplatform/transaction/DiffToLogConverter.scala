@@ -7,7 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.{CommonError, ExecutionError}
 import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_BOOLEAN, CONST_BYTESTR, CONST_LONG, CONST_STRING, CaseObj, EVALUATED}
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, UNIT}
-import com.wavesplatform.lang.v1.evaluator.LogItem
+import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{Bindings, Types}
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
@@ -16,7 +16,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 
 object DiffToLogConverter {
 
-  def convert(diff: Diff, txId: ByteStr, funcName: String): LogItem[Id] = {
+  def convert(diff: Diff, txId: ByteStr, funcName: String, complexityLimit: Int): Log[Id] = {
     def strToMap(str: String, fieldName: String)          = CONST_STRING(str).map(s => Map(fieldName -> s)).getOrElse(Map.empty)
     def byteStrToMap(byteStr: ByteStr, fieldName: String) = CONST_BYTESTR(byteStr).map(bs => Map(fieldName -> bs)).getOrElse(Map.empty)
     def assetToMap(asset: Asset, fieldName: String) = (asset match {
@@ -151,6 +151,10 @@ object DiffToLogConverter {
       )
     }
 
-    s"$funcName.@stateChanges" -> scriptResultsToObj(diff.scriptResults.getOrElse(txId, InvokeScriptResult.empty)).asRight[ExecutionError]
+    List(
+      s"$funcName.@stateChanges" -> scriptResultsToObj(diff.scriptResults.getOrElse(txId, InvokeScriptResult.empty)).asRight[ExecutionError],
+      s"$funcName.@complexity"   -> CONST_LONG(diff.scriptsComplexity).asRight[ExecutionError],
+      "@complexityLimit"         -> CONST_LONG(complexityLimit - diff.scriptsComplexity).asRight[ExecutionError]
+    )
   }
 }

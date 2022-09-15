@@ -1,8 +1,25 @@
 package com.wavesplatform.lang.v1.compiler
 
-import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CaseObj, EVALUATED}
+import com.wavesplatform.common.utils.{Base58, Base64}
+import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_BYTESTR, CONST_STRING, CaseObj, EVALUATED}
 
 case class TermPrinter(fixArrIndentation: Boolean = false) {
+  def prettyString(e: EVALUATED, depth: Int): String = {
+    e match {
+      case obj: CaseObj => indentObjString(obj, depth)
+      case arr: ARR     => indentArrString(arr, depth)
+      case CONST_BYTESTR(bs) =>
+        if (bs.size > 1024) {
+          "base64'" ++ Base64.encode(bs.arr) ++ "'"
+        } else {
+          "base58'" ++ Base58.encode(bs.arr) ++ "'"
+        }
+      case CONST_STRING(s) =>
+        "\"" ++ escape(s) ++ "\""
+      case other => other.toString
+    }
+  }
+
   def string(e: EVALUATED): String = {
     val sb = new StringBuilder()
     print(s => sb.append(s), e)
@@ -25,7 +42,7 @@ case class TermPrinter(fixArrIndentation: Boolean = false) {
     e match {
       case obj: CaseObj => printObj(toDest, obj, depth)
       case arr: ARR     => if (fixArrIndentation) printArr(toDest, arr, depth) else printArr(toDest, arr)
-      case a            => toDest(a.prettyString(depth, fixArrIndentation))
+      case a            => toDest(prettyString(a, depth))
     }
 
   private def printArr(toDest: String => Unit, arr: ARR, depth: Int): Unit = {
@@ -88,5 +105,23 @@ case class TermPrinter(fixArrIndentation: Boolean = false) {
       toDest("\t")
       i = i - 1
     }
+  }
+
+  private def escape(s: String): String = {
+    // Simple and very naive implementation based on
+    // https://github.com/linkedin/dustjs/blob/3fc12efd153433a21fd79ac81e8c5f5d6f273a1c/dist/dust-core.js#L1099
+
+    // Note this might not be the most efficient since Scala.js compiles this to a bunch of .split and .join calls
+    s.replace("\\", "\\\\")
+      .replace("/", "\\/")
+      .replace("'", "\\'")
+      .replace("\"", "\\\"")
+      .replace("\n", "\\n")
+      .replace("\r", "\\r")
+      .replace("\t", "\\t")
+      .replace("\b", "\\b")
+      .replace("\f", "\\f")
+      .replace("\u2028", "\\u2028")
+      .replace("\u2029", "\\u2029")
   }
 }

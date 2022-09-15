@@ -7,7 +7,7 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
-import com.wavesplatform.lang.v1.evaluator.LogItem
+import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.lang.v1.repl.node.http.NodeClient.*
 import com.wavesplatform.lang.v1.repl.node.http.response.ImplicitMappings
 import com.wavesplatform.lang.v1.repl.node.http.response.model.*
@@ -153,7 +153,7 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings, client
       payments: Seq[(Option[Array[Byte]], Long)],
       availableComplexity: Int,
       reentrant: Boolean
-  ): Coeval[Future[(Either[ValidationError, (EVALUATED, LogItem[Future])], Int)]] = ???
+  ): Coeval[Future[(Either[ValidationError, (EVALUATED, Log[Future])], Int)]] = ???
 }
 
 object WebEnvironment {

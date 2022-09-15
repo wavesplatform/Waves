@@ -3,14 +3,13 @@ package com.wavesplatform.lang.v1.compiler
 import java.nio.charset.StandardCharsets
 
 import cats.Eval
-import cats.instances.list._
-import cats.syntax.traverse._
+import cats.instances.list.*
+import cats.syntax.traverse.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.{ExecutionError, CommonError}
-import com.wavesplatform.lang.v1.ContractLimits._
+import com.wavesplatform.lang.v1.ContractLimits.*
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import monix.eval.Coeval
 
@@ -147,8 +146,7 @@ object Terms {
   }
 
   sealed trait EVALUATED extends EXPR {
-    def prettyString(level: Int, fixArrIndentation: Boolean = false): String = toString
-    def toStr: Coeval[String]                                                = Coeval.now(toString)
+    def toStr: Coeval[String] = Coeval.now(toString)
     def weight: Long
     val getType: REAL // used for _isInstanceOf and therefore for match
 
@@ -169,13 +167,7 @@ object Terms {
 
   class CONST_BYTESTR private (val bs: ByteStr) extends EVALUATED {
     override def toString: String = bs.toString
-    override def prettyString(level: Int, fixArrIndentation: Boolean = false): String = {
-      if (bs.size > 1024) {
-        "base64'" ++ Base64.encode(bs.arr) ++ "'"
-      } else {
-        "base58'" ++ Base58.encode(bs.arr) ++ "'"
-      }
-    }
+
     override val weight: Long = bs.size
 
     override val getType: REAL = BYTESTR
@@ -207,9 +199,8 @@ object Terms {
   }
 
   class CONST_STRING private (val s: String, bytesLength: Int) extends EVALUATED {
-    override def toString: String                                                     = s
-    override def prettyString(level: Int, fixArrIndentation: Boolean = false): String = "\"" ++ escape(s) ++ "\""
-    override lazy val weight: Long                                                    = bytesLength
+    override def toString: String  = s
+    override lazy val weight: Long = bytesLength
 
     override val getType: REAL = STRING
 
@@ -241,24 +232,6 @@ object Terms {
       Some(arg.s)
   }
 
-  private def escape(s: String): String = {
-    // Simple and very naive implementation based on
-    // https://github.com/linkedin/dustjs/blob/3fc12efd153433a21fd79ac81e8c5f5d6f273a1c/dist/dust-core.js#L1099
-
-    // Note this might not be the most efficient since Scala.js compiles this to a bunch of .split and .join calls
-    s.replace("\\", "\\\\")
-      .replace("/", "\\/")
-      .replace("'", "\\'")
-      .replace("\"", "\\\"")
-      .replace("\n", "\\n")
-      .replace("\r", "\\r")
-      .replace("\t", "\\t")
-      .replace("\b", "\\b")
-      .replace("\f", "\\f")
-      .replace("\u2028", "\\u2028")
-      .replace("\u2029", "\\u2029")
-  }
-
   case class CONST_BOOLEAN(b: Boolean) extends EVALUATED {
     override def toString: String = b.toString
     override val weight: Long     = 1L
@@ -272,8 +245,6 @@ object Terms {
   case class CaseObj private (caseType: CASETYPEREF, fields: Map[String, EVALUATED]) extends EVALUATED {
     // must be with fixArrIndentation = false, because of makeString behavior before RideV6 (NODE-2370)
     override def toString: String = TermPrinter().string(this)
-
-    override def prettyString(depth: Int, fixArrIndentation: Boolean = false): String = TermPrinter(fixArrIndentation).indentObjString(this, depth)
 
     override val weight: Long = OBJ_WEIGHT + FIELD_WEIGHT * fields.size + fields.map(_._2.weight).sum
 
@@ -298,8 +269,6 @@ object Terms {
   abstract case class ARR private (xs: IndexedSeq[EVALUATED]) extends EVALUATED {
     // must be with fixArrIndentation = false, because of makeString behavior before RideV6 (NODE-2370)
     override def toString: String = TermPrinter().string(this)
-
-    override def prettyString(depth: Int, fixArrIndentation: Boolean = false): String = TermPrinter(fixArrIndentation).indentArrString(this, depth)
 
     lazy val elementsWeightSum: Long =
       weight - EMPTYARR_WEIGHT - ELEM_WEIGHT * xs.size

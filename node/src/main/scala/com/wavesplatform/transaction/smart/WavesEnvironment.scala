@@ -13,7 +13,7 @@ import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FUNCTION_CALL}
-import com.wavesplatform.lang.v1.evaluator.{Log, LogItem, ScriptResult}
+import com.wavesplatform.lang.v1.evaluator.{Log, ScriptResult}
 import com.wavesplatform.lang.v1.traits.*
 import com.wavesplatform.lang.v1.traits.domain.*
 import com.wavesplatform.lang.v1.traits.domain.Recipient.*
@@ -240,7 +240,7 @@ class WavesEnvironment(
       payments: Seq[(Option[Array[Byte]], Long)],
       availableComplexity: Int,
       reentrant: Boolean
-  ): Coeval[(Either[ValidationError, (EVALUATED, LogItem[Id])], Int)] = ???
+  ): Coeval[(Either[ValidationError, (EVALUATED, Log[Id])], Int)] = ???
 }
 
 object DAppEnvironment {
@@ -337,7 +337,7 @@ class DAppEnvironment(
       payments: Seq[(Option[Array[Byte]], Long)],
       availableComplexity: Int,
       reentrant: Boolean
-  ): Coeval[(Either[ValidationError, (EVALUATED, LogItem[Id])], Int)] = {
+  ): Coeval[(Either[ValidationError, (EVALUATED, Log[Id])], Int)] = {
 
     val r = for {
       address <- traced(
@@ -399,7 +399,7 @@ class DAppEnvironment(
       availablePayments = remainingPayments
       availableData = remainingData
       availableDataSize = remainingDataSize
-      (evaluated, diff.scriptsComplexity.toInt, DiffToLogConverter.convert(diff, tx.id(), func))
+      (evaluated, diff.scriptsComplexity.toInt, DiffToLogConverter.convert(diff, tx.id(), func, availableComplexity))
     }
 
     r.v.map {

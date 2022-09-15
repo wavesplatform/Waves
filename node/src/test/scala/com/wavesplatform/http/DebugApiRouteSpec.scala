@@ -216,6 +216,7 @@ class DebugApiRouteSpec
               )
             )
           )
+        blockchain.stub.activateAllFeatures()
       }
 
       val route = routeWithBlockchain(blockchain)
@@ -226,7 +227,7 @@ class DebugApiRouteSpec
         (json \ "validationTime").as[Int] shouldBe 1000 +- 1000
         (json \ "error").as[String] should include("not allowed by script of the asset")
         (json \ "trace").as[JsArray] shouldBe Json.parse(
-          "[{\"type\":\"asset\",\"context\":\"orderAmount\",\"id\":\"5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx\",\"result\":\"failure\",\"vars\":[{\"name\":\"throw.@args\",\"type\":\"Array\",\"value\":[{\"type\":\"String\",\"value\":\"error\"}]}],\"error\":\"error\"}]"
+          "[{\"type\":\"asset\",\"context\":\"orderAmount\",\"id\":\"5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx\",\"result\":\"failure\",\"vars\":[{\"name\":\"throw.@args\",\"type\":\"Array\",\"value\":[{\"type\":\"String\",\"value\":\"error\"}]},{\"name\":\"throw.@complexity\",\"type\":\"Int\",\"value\":1},{\"name\":\"@complexityLimit\",\"type\":\"Int\",\"value\":2147483646}],\"error\":\"error\"}]"
         )
       }
     }
@@ -318,6 +319,7 @@ class DebugApiRouteSpec
           )
 
         (blockchain.hasAccountScript _).when(*).returns(true)
+        blockchain.stub.activateAllFeatures()
       }
 
       val route = routeWithBlockchain(blockchain)
@@ -437,6 +439,14 @@ class DebugApiRouteSpec
                            |    "name" : "default.@args",
                            |    "type" : "Array",
                            |    "value" : [ ]
+                           |  }, {
+                           |    "name" : "default.@complexity",
+                           |    "type" : "Int",
+                           |    "value" : 1
+                           |  }, {
+                           |    "name" : "@complexityLimit",
+                           |    "type" : "Int",
+                           |    "value" : 51994
                            |  } ]
                            |}, {
                            |  "type" : "asset",
@@ -454,6 +464,14 @@ class DebugApiRouteSpec
                            |      "type" : "String",
                            |      "value" : "error"
                            |    } ]
+                           |  }, {
+                           |    "name" : "throw.@complexity",
+                           |    "type" : "Int",
+                           |    "value" : 1
+                           |  }, {
+                           |    "name" : "@complexityLimit",
+                           |    "type" : "Int",
+                           |    "value" : 2147483646
                            |  } ],
                            |  "error" : "error"
                            |} ]""".stripMargin)
@@ -568,6 +586,14 @@ class DebugApiRouteSpec
                  |      "value" : 1
                  |    } ]
                  |  }, {
+                 |    "name" : "IntegerEntry.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51999
+                 |  }, {
                  |    "name" : "BooleanEntry.@args",
                  |    "type" : "Array",
                  |    "value" : [ {
@@ -577,6 +603,14 @@ class DebugApiRouteSpec
                  |      "type" : "Boolean",
                  |      "value" : true
                  |    } ]
+                 |  }, {
+                 |    "name" : "BooleanEntry.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51998
                  |  }, {
                  |    "name" : "StringEntry.@args",
                  |    "type" : "Array",
@@ -588,6 +622,14 @@ class DebugApiRouteSpec
                  |      "value" : "str"
                  |    } ]
                  |  }, {
+                 |    "name" : "StringEntry.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51997
+                 |  }, {
                  |    "name" : "BinaryEntry.@args",
                  |    "type" : "Array",
                  |    "value" : [ {
@@ -598,6 +640,14 @@ class DebugApiRouteSpec
                  |      "value" : ""
                  |    } ]
                  |  }, {
+                 |    "name" : "BinaryEntry.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51996
+                 |  }, {
                  |    "name" : "DeleteEntry.@args",
                  |    "type" : "Array",
                  |    "value" : [ {
@@ -605,12 +655,28 @@ class DebugApiRouteSpec
                  |      "value" : "key"
                  |    } ]
                  |  }, {
+                 |    "name" : "DeleteEntry.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51995
+                 |  }, {
                  |    "name" : "Address.@args",
                  |    "type" : "Array",
                  |    "value" : [ {
                  |      "type" : "ByteVector",
                  |      "value" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
                  |    } ]
+                 |  }, {
+                 |    "name" : "Address.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51994
                  |  }, {
                  |    "name" : "ScriptTransfer.@args",
                  |    "type" : "Array",
@@ -629,6 +695,14 @@ class DebugApiRouteSpec
                  |      "type" : "ByteVector",
                  |      "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
                  |    } ]
+                 |  }, {
+                 |    "name" : "ScriptTransfer.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51993
                  |  }, {
                  |    "name" : "cons.@args",
                  |    "type" : "Array",
@@ -657,6 +731,14 @@ class DebugApiRouteSpec
                  |      "type" : "Array",
                  |      "value" : [ ]
                  |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51992
                  |  }, {
                  |    "name" : "cons.@args",
                  |    "type" : "Array",
@@ -693,6 +775,14 @@ class DebugApiRouteSpec
                  |        }
                  |      } ]
                  |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51991
                  |  }, {
                  |    "name" : "cons.@args",
                  |    "type" : "Array",
@@ -741,6 +831,14 @@ class DebugApiRouteSpec
                  |        }
                  |      } ]
                  |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51990
                  |  }, {
                  |    "name" : "cons.@args",
                  |    "type" : "Array",
@@ -801,6 +899,14 @@ class DebugApiRouteSpec
                  |        }
                  |      } ]
                  |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51989
                  |  }, {
                  |    "name" : "cons.@args",
                  |    "type" : "Array",
@@ -873,6 +979,14 @@ class DebugApiRouteSpec
                  |        }
                  |      } ]
                  |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51988
                  |  }, {
                  |    "name" : "cons.@args",
                  |    "type" : "Array",
@@ -957,6 +1071,14 @@ class DebugApiRouteSpec
                  |        }
                  |      } ]
                  |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51987
                  |  } ]
                  |}, {
                  |  "type" : "asset",
@@ -974,6 +1096,14 @@ class DebugApiRouteSpec
                  |      "type" : "String",
                  |      "value" : "error"
                  |    } ]
+                 |  }, {
+                 |    "name" : "throw.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 2147483646
                  |  } ],
                  |  "error" : "error"
                  |} ]""".stripMargin
@@ -1094,6 +1224,14 @@ class DebugApiRouteSpec
                  |      "value" : 0
                  |    } ]
                  |  }, {
+                 |    "name" : "Issue.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51999
+                 |  }, {
                  |    "name" : "cons.@args",
                  |    "type" : "Array",
                  |    "value" : [ {
@@ -1132,6 +1270,14 @@ class DebugApiRouteSpec
                  |      "type" : "Array",
                  |      "value" : [ ]
                  |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51998
                  |  } ]
                  |} ]""".stripMargin
       )
@@ -1230,6 +1376,14 @@ class DebugApiRouteSpec
                  |      "value" : false
                  |    } ]
                  |  }, {
+                 |    "name" : "Reissue.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51999
+                 |  }, {
                  |    "name" : "cons.@args",
                  |    "type" : "Array",
                  |    "value" : [ {
@@ -1252,6 +1406,14 @@ class DebugApiRouteSpec
                  |      "type" : "Array",
                  |      "value" : [ ]
                  |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51998
                  |  } ]
                  |}, {
                  |  "type" : "asset",
@@ -1269,6 +1431,14 @@ class DebugApiRouteSpec
                  |      "type" : "String",
                  |      "value" : "error"
                  |    } ]
+                 |  }, {
+                 |    "name" : "throw.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 2147483646
                  |  } ],
                  |  "error" : "error"
                  |} ]""".stripMargin
@@ -1364,6 +1534,14 @@ class DebugApiRouteSpec
                  |      "value" : 1
                  |    } ]
                  |  }, {
+                 |    "name" : "Burn.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51999
+                 |  }, {
                  |    "name" : "cons.@args",
                  |    "type" : "Array",
                  |    "value" : [ {
@@ -1382,6 +1560,14 @@ class DebugApiRouteSpec
                  |      "type" : "Array",
                  |      "value" : [ ]
                  |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51998
                  |  } ]
                  |}, {
                  |  "type" : "asset",
@@ -1399,6 +1585,14 @@ class DebugApiRouteSpec
                  |      "type" : "String",
                  |      "value" : "error"
                  |    } ]
+                 |  }, {
+                 |    "name" : "throw.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 2147483646
                  |  } ],
                  |  "error" : "error"
                  |} ]""".stripMargin
@@ -1426,6 +1620,8 @@ class DebugApiRouteSpec
         (blockchain.balance _).when(*, *).returns(Long.MaxValue)
 
         (blockchain.resolveAlias _).when(Alias.create(recipient2.name).explicitGet()).returning(Right(TxHelpers.secondAddress))
+
+        blockchain.stub.activateAllFeatures()
 
         val (dAppScript, _) = ScriptCompiler
           .compile(
@@ -1665,6 +1861,14 @@ class DebugApiRouteSpec
              |      "value" : "6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042047"
              |    } ]
              |  }, {
+             |    "name" : "parseBigIntValue.@complexity",
+             |    "type" : "Int",
+             |    "value" : 65
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25935
+             |  }, {
              |    "name" : "a",
              |    "type" : "BigInt",
              |    "value" : 6.703903964971298549787012499102923E+153
@@ -1678,6 +1882,14 @@ class DebugApiRouteSpec
              |      "type" : "BigInt",
              |      "value" : 6.703903964971298549787012499102923E+153
              |    } ]
+             |  }, {
+             |    "name" : "==.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25934
              |  }, {
              |    "name" : "test",
              |    "type" : "Int",
@@ -1693,12 +1905,28 @@ class DebugApiRouteSpec
              |      "value" : 1
              |    } ]
              |  }, {
+             |    "name" : "==.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25933
+             |  }, {
              |    "name" : "Address.@args",
              |    "type" : "Array",
              |    "value" : [ {
              |      "type" : "ByteVector",
              |      "value" : "3NAgxLPGnw3RGv9JT6NTDaG5D1iLUehg2xd"
              |    } ]
+             |  }, {
+             |    "name" : "Address.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25932
              |  }, {
              |    "name" : "Lease.@args",
              |    "type" : "Array",
@@ -1718,12 +1946,28 @@ class DebugApiRouteSpec
              |      "value" : 0
              |    } ]
              |  }, {
+             |    "name" : "Lease.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25931
+             |  }, {
              |    "name" : "Alias.@args",
              |    "type" : "Array",
              |    "value" : [ {
              |      "type" : "String",
              |      "value" : "some_alias"
              |    } ]
+             |  }, {
+             |    "name" : "Alias.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25930
              |  }, {
              |    "name" : "Lease.@args",
              |    "type" : "Array",
@@ -1743,12 +1987,28 @@ class DebugApiRouteSpec
              |      "value" : 2
              |    } ]
              |  }, {
+             |    "name" : "Lease.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25929
+             |  }, {
              |    "name" : "LeaseCancel.@args",
              |    "type" : "Array",
              |    "value" : [ {
              |      "type" : "ByteVector",
              |      "value" : "$leaseCancelId"
              |    } ]
+             |  }, {
+             |    "name" : "LeaseCancel.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25928
              |  }, {
              |    "name" : "cons.@args",
              |    "type" : "Array",
@@ -1764,6 +2024,14 @@ class DebugApiRouteSpec
              |      "type" : "Array",
              |      "value" : [ ]
              |    } ]
+             |  }, {
+             |    "name" : "cons.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25927
              |  }, {
              |    "name" : "cons.@args",
              |    "type" : "Array",
@@ -1800,6 +2068,14 @@ class DebugApiRouteSpec
              |        }
              |      } ]
              |    } ]
+             |  }, {
+             |    "name" : "cons.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25926
              |  }, {
              |    "name" : "cons.@args",
              |    "type" : "Array",
@@ -1857,6 +2133,14 @@ class DebugApiRouteSpec
              |        }
              |      } ]
              |    } ]
+             |  }, {
+             |    "name" : "cons.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25925
              |  } ]
              |} ]
              |
@@ -1873,6 +2157,7 @@ class DebugApiRouteSpec
 
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(*, *).returns(Long.MaxValue)
+        blockchain.stub.activateAllFeatures()
 
         val (dAppScript, _) = ScriptCompiler
           .compile(
@@ -2065,6 +2350,14 @@ class DebugApiRouteSpec
              |        "value" : "6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042047"
              |      } ]
              |    }, {
+             |      "name" : "parseBigIntValue.@complexity",
+             |      "type" : "Int",
+             |      "value" : 65
+             |    }, {
+             |      "name" : "@complexityLimit",
+             |      "type" : "Int",
+             |      "value" : 25860
+             |    }, {
              |      "name" : "a",
              |      "type" : "BigInt",
              |      "value" : 6.703903964971298549787012499102923E+153
@@ -2078,6 +2371,14 @@ class DebugApiRouteSpec
              |        "type" : "BigInt",
              |        "value" : 6.703903964971298549787012499102923E+153
              |      } ]
+             |    }, {
+             |      "name" : "==.@complexity",
+             |      "type" : "Int",
+             |      "value" : 1
+             |    }, {
+             |      "name" : "@complexityLimit",
+             |      "type" : "Int",
+             |      "value" : 25859
              |    }, {
              |      "name" : "test",
              |      "type" : "Int",
@@ -2093,6 +2394,14 @@ class DebugApiRouteSpec
              |        "value" : 1
              |      } ]
              |    }, {
+             |      "name" : "==.@complexity",
+             |      "type" : "Int",
+             |      "value" : 1
+             |    }, {
+             |      "name" : "@complexityLimit",
+             |      "type" : "Int",
+             |      "value" : 25858
+             |    }, {
              |      "name" : "IntegerEntry.@args",
              |      "type" : "Array",
              |      "value" : [ {
@@ -2102,6 +2411,14 @@ class DebugApiRouteSpec
              |        "type" : "Int",
              |        "value" : 1
              |      } ]
+             |    }, {
+             |      "name" : "IntegerEntry.@complexity",
+             |      "type" : "Int",
+             |      "value" : 1
+             |    }, {
+             |      "name" : "@complexityLimit",
+             |      "type" : "Int",
+             |      "value" : 25857
              |    }, {
              |      "name" : "cons.@args",
              |      "type" : "Array",
@@ -2121,6 +2438,14 @@ class DebugApiRouteSpec
              |        "type" : "Array",
              |        "value" : [ ]
              |      } ]
+             |    }, {
+             |      "name" : "cons.@complexity",
+             |      "type" : "Int",
+             |      "value" : 1
+             |    }, {
+             |      "name" : "@complexityLimit",
+             |      "type" : "Int",
+             |      "value" : 25856
              |    } ]
              |  } ],
              |  "result" : {
@@ -2221,6 +2546,14 @@ class DebugApiRouteSpec
              |      "value" : [ ]
              |    } ]
              |  }, {
+             |    "name" : "reentrantInvoke.@complexity",
+             |    "type" : "Int",
+             |    "value" : 75
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25925
+             |  }, {
              |    "name" : "test.@stateChanges",
              |    "type" : "StateChanges",
              |    "value" : {
@@ -2274,6 +2607,14 @@ class DebugApiRouteSpec
              |      }
              |    }
              |  }, {
+             |    "name" : "test.@complexity",
+             |    "type" : "Int",
+             |    "value" : 69
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25856
+             |  }, {
              |    "name" : "result",
              |    "type" : "Unit",
              |    "value" : { }
@@ -2288,6 +2629,14 @@ class DebugApiRouteSpec
              |      "value" : { }
              |    } ]
              |  }, {
+             |    "name" : "==.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25855
+             |  }, {
              |    "name" : "==.@args",
              |    "type" : "Array",
              |    "value" : [ {
@@ -2297,6 +2646,14 @@ class DebugApiRouteSpec
              |      "type" : "Unit",
              |      "value" : { }
              |    } ]
+             |  }, {
+             |    "name" : "==.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25854
              |  } ]
              |} ]
           """.stripMargin
@@ -2531,6 +2888,14 @@ class DebugApiRouteSpec
                |      "value" : true
                |    } ]
                |  }, {
+               |    "name" : "Reissue.@complexity",
+               |    "type" : "Int",
+               |    "value" : 1
+               |  }, {
+               |    "name" : "@complexityLimit",
+               |    "type" : "Int",
+               |    "value" : 51999
+               |  }, {
                |    "name" : "cons.@args",
                |    "type" : "Array",
                |    "value" : [ {
@@ -2553,6 +2918,14 @@ class DebugApiRouteSpec
                |      "type" : "Array",
                |      "value" : [ ]
                |    } ]
+               |  }, {
+               |    "name" : "cons.@complexity",
+               |    "type" : "Int",
+               |    "value" : 1
+               |  }, {
+               |    "name" : "@complexityLimit",
+               |    "type" : "Int",
+               |    "value" : 51998
                |  } ]
                |} ]
                |

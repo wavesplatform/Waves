@@ -5,6 +5,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.v1.compiler.TermPrinter
 import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.state.InvokeScriptResult
 import com.wavesplatform.transaction.TxValidationError.FailedTransactionError.Cause
@@ -157,7 +158,7 @@ object TxValidationError {
     else {
       log
         .map {
-          case (name, Right(v))    => s"$name = ${v.prettyString(1, fixArrIndentation = true)}"
+          case (name, Right(v))    => s"$name = ${TermPrinter(true).prettyString(v, 1)}"
           case (name, l @ Left(_)) => s"$name = ${l.toString.replace("\n\t", "\n\t\t")}"
         }
         .map("\t" + _)

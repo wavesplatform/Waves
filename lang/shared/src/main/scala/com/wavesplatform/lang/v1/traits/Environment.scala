@@ -4,7 +4,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
-import com.wavesplatform.lang.v1.evaluator.LogItem
+import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.*
 import monix.eval.Coeval
@@ -49,5 +49,5 @@ trait Environment[F[_]] {
       payments: Seq[(Option[Array[Byte]], Long)],
       availableComplexity: Int,
       reentrant: Boolean
-  ): Coeval[F[(Either[ValidationError, (EVALUATED, LogItem[F])], Int)]]
+  ): Coeval[F[(Either[ValidationError, (EVALUATED, Log[F])], Int)]]
 }

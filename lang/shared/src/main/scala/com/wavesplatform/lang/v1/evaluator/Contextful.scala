@@ -38,7 +38,7 @@ object ContextfulNativeFunction {
         env: C[F],
         evaluatedArgs: List[EVALUATED],
         availableComplexity: Int
-    )(implicit m: Monad[CoevalF[F, *]]): Coeval[F[(Either[ExecutionError, (EVALUATED, LogItem[F])], Int)]]
+    )(implicit m: Monad[CoevalF[F, *]]): Coeval[F[(Either[ExecutionError, (EVALUATED, Log[F])], Int)]]
   }
 }
 

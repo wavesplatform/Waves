@@ -223,6 +223,8 @@ class TransactionBroadcastSpec
       val leaseId2   = Lease.calculateId(Lease(recipient2, amount2, nonce2), invoke.id())
 
       val blockchain = createBlockchainStub { blockchain =>
+        blockchain.stub.activateAllFeatures()
+
         val (dAppScript, _) = ScriptCompiler
           .compile(
             s"""
@@ -276,20 +278,24 @@ class TransactionBroadcastSpec
       Post(routePath("/broadcast?trace=true"), invoke.json()) ~> route ~> check {
         responseAs[JsObject] should matchJson(
           s"""{
-             |  "type" : 16,
-             |  "id" : "${invoke.id()}",
-             |  "fee" : 500000,
-             |  "feeAssetId" : null,
-             |  "timestamp" : ${invoke.timestamp},
-             |  "version" : 1,
-             |  "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-             |  "senderPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
-             |  "proofs" : [ "${invoke.signature}" ],
-             |  "dApp" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-             |  "payment" : [ ],
-             |  "call" : {
-             |    "function" : "test",
-             |    "args" : [ ]
+             |  "error" : 306,
+             |  "message" : "Error while executing account-script: Lease with id=$leaseCancelId not found",
+             |  "transaction" : {
+             |    "type" : 16,
+             |    "id" : "${invoke.id()}",
+             |    "fee" : 500000,
+             |    "feeAssetId" : null,
+             |    "timestamp" : ${invoke.timestamp},
+             |    "version" : 1,
+             |    "sender" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+             |    "senderPublicKey" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ",
+             |    "proofs" : [ "${invoke.signature}" ],
+             |    "dApp" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+             |    "payment" : [ ],
+             |    "call" : {
+             |      "function" : "test",
+             |      "args" : [ ]
+             |    }
              |  },
              |  "trace" : [ {
              |    "type" : "verifier",
@@ -405,12 +411,28 @@ class TransactionBroadcastSpec
              |        "value" : 1
              |      } ]
              |    }, {
+             |      "name" : "==.@complexity",
+             |      "type" : "Int",
+             |      "value" : 1
+             |    }, {
+             |      "name" : "@complexityLimit",
+             |      "type" : "Int",
+             |      "value" : 25999
+             |    }, {
              |      "name" : "Address.@args",
              |      "type" : "Array",
              |      "value" : [ {
              |        "type" : "ByteVector",
              |        "value" : "3NAgxLPGnw3RGv9JT6NTDaG5D1iLUehg2xd"
              |      } ]
+             |    }, {
+             |      "name" : "Address.@complexity",
+             |      "type" : "Int",
+             |      "value" : 1
+             |    }, {
+             |      "name" : "@complexityLimit",
+             |      "type" : "Int",
+             |      "value" : 25998
              |    }, {
              |      "name" : "Lease.@args",
              |      "type" : "Array",
@@ -430,12 +452,28 @@ class TransactionBroadcastSpec
              |        "value" : 0
              |      } ]
              |    }, {
+             |      "name" : "Lease.@complexity",
+             |      "type" : "Int",
+             |      "value" : 1
+             |    }, {
+             |      "name" : "@complexityLimit",
+             |      "type" : "Int",
+             |      "value" : 25997
+             |    }, {
              |      "name" : "Alias.@args",
              |      "type" : "Array",
              |      "value" : [ {
              |        "type" : "String",
              |        "value" : "some_alias"
              |      } ]
+             |    }, {
+             |      "name" : "Alias.@complexity",
+             |      "type" : "Int",
+             |      "value" : 1
+             |    }, {
+             |      "name" : "@complexityLimit",
+             |      "type" : "Int",
+             |      "value" : 25996
              |    }, {
              |      "name" : "Lease.@args",
              |      "type" : "Array",
@@ -455,12 +493,28 @@ class TransactionBroadcastSpec
              |        "value" : 2
              |      } ]
              |    }, {
+             |      "name" : "Lease.@complexity",
+             |      "type" : "Int",
+             |      "value" : 1
+             |    }, {
+             |      "name" : "@complexityLimit",
+             |      "type" : "Int",
+             |      "value" : 25995
+             |    }, {
              |      "name" : "LeaseCancel.@args",
              |      "type" : "Array",
              |      "value" : [ {
              |        "type" : "ByteVector",
              |        "value" : "$leaseCancelId"
              |      } ]
+             |    }, {
+             |      "name" : "LeaseCancel.@complexity",
+             |      "type" : "Int",
+             |      "value" : 1
+             |    }, {
+             |      "name" : "@complexityLimit",
+             |      "type" : "Int",
+             |      "value" : 25994
              |    }, {
              |      "name" : "cons.@args",
              |      "type" : "Array",
@@ -476,6 +530,14 @@ class TransactionBroadcastSpec
              |        "type" : "Array",
              |        "value" : [ ]
              |      } ]
+             |    }, {
+             |      "name" : "cons.@complexity",
+             |      "type" : "Int",
+             |      "value" : 1
+             |    }, {
+             |      "name" : "@complexityLimit",
+             |      "type" : "Int",
+             |      "value" : 25993
              |    }, {
              |      "name" : "cons.@args",
              |      "type" : "Array",
@@ -512,6 +574,14 @@ class TransactionBroadcastSpec
              |          }
              |        } ]
              |      } ]
+             |    }, {
+             |      "name" : "cons.@complexity",
+             |      "type" : "Int",
+             |      "value" : 1
+             |    }, {
+             |      "name" : "@complexityLimit",
+             |      "type" : "Int",
+             |      "value" : 25992
              |    }, {
              |      "name" : "cons.@args",
              |      "type" : "Array",
@@ -569,6 +639,14 @@ class TransactionBroadcastSpec
              |          }
              |        } ]
              |      } ]
+             |    }, {
+             |      "name" : "cons.@complexity",
+             |      "type" : "Int",
+             |      "value" : 1
+             |    }, {
+             |      "name" : "@complexityLimit",
+             |      "type" : "Int",
+             |      "value" : 25991
              |    } ]
              |  } ]
              |}

@@ -9,7 +9,7 @@ import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
-import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, LogItem}
+import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, Log}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1.*
 import com.wavesplatform.lang.v1.evaluator.ctx.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, *}
@@ -103,7 +103,7 @@ object Common {
           payments: Seq[(Option[Array[Byte]], Long)],
           remainingComplexity: Int,
           reentrant: Boolean
-      ): Coeval[(Either[ValidationError, (EVALUATED, LogItem[Id])], Int)] = ???
+      ): Coeval[(Either[ValidationError, (EVALUATED, Log[Id])], Int)] = ???
     }
 
   def addressFromPublicKey(chainId: Byte, pk: Array[Byte], addressVersion: Byte = EnvironmentFunctions.AddressVersion): Array[Byte] = {

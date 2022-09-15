@@ -10,6 +10,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ContextfulNativeFunction.{Extended, Simple}
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.LogExtraInfo
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.{logFuncArgs, logFuncComplexity}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext, NativeFunction, UserFunction}
 import com.wavesplatform.lang.v1.traits.Environment
@@ -57,16 +58,26 @@ class EvaluatorV2(
         case FunctionHeader.Native(_) =>
           evaluateNativeFunction(fc, limit)
         case FunctionHeader.User(_, name) =>
-          evaluateUserFunction(fc, limit, name, startArgs)
-            .getOrElse(evaluateConstructor(fc, limit, name))
+          (evaluateUserFunction(fc, limit, name, startArgs)
+            .getOrElse(evaluateConstructor(fc, limit, name)))
+            .map(_ -> true)
       }
-      if (newMode)
-        r.map(unused => if (unused == limit) unused - 1 else unused)
-      else
-        r
+
+      if (newMode) {
+        r.map { case (unused, notExceededLimit) =>
+          if (unused == limit) {
+            if (notExceededLimit) {
+              ctx.log(LET(s"${fc.function.funcName}.@complexity", TRUE), CONST_LONG(1).asRight[ExecutionError])
+              ctx.log(LET("@complexityLimit", TRUE), CONST_LONG(unused - 1).asRight[ExecutionError])
+            }
+            unused - 1
+          } else unused
+        }
+      } else
+        r.map(_._1)
     }
 
-    def evaluateNativeFunction(fc: FUNCTION_CALL, limit: Int): EvaluationResult[Int] =
+    def evaluateNativeFunction(fc: FUNCTION_CALL, limit: Int): EvaluationResult[(Int, Boolean)] =
       for {
         function <- EvaluationResult(Coeval {
           ctx.ec.functions
@@ -75,10 +86,10 @@ class EvaluatorV2(
         })
         cost = function.costByLibVersion(stdLibVersion).toInt
         result <-
-          if (limit < cost)
-            EvaluationResult(limit)
-          else
-            doEvaluateNativeFunction(fc, function.asInstanceOf[NativeFunction[Environment]], limit, cost)
+          if (limit < cost) {
+            EvaluationResult(limit -> false)
+          } else
+            doEvaluateNativeFunction(fc, function.asInstanceOf[NativeFunction[Environment]], limit, cost).map(_ -> true)
       } yield result
 
     def doEvaluateNativeFunction(fc: FUNCTION_CALL, function: NativeFunction[Environment], limit: Int, cost: Int): EvaluationResult[Int] = {
@@ -86,8 +97,8 @@ class EvaluatorV2(
       val evaluation = function.ev match {
         case f: Extended[Environment] =>
           f.evaluate[Id](ctx.ec.environment, args, limit - cost).map { case (result, unusedComplexity) =>
-            result.map { case (evaluated, (logItemName, logItemValue)) =>
-              logItemValue.foreach(value => ctx.log(LET(logItemName, value), logItemValue))
+            result.map { case (evaluated, log) =>
+              log.foreach { case (logItemName, logItemValue) => ctx.log(LET(logItemName, TRUE), logItemValue) }
               evaluated
             } -> unusedComplexity
           }
@@ -247,9 +258,8 @@ class EvaluatorV2(
           .flatMap { unusedArgsComplexity =>
             val argsEvaluated = fc.args.forall(_.isInstanceOf[EVALUATED])
             if (argsEvaluated && unusedArgsComplexity > 0) {
-              val funcName = ctx.ec.functions.get(fc.function).map(_.name).getOrElse(fc.function.funcName)
-              val argsArr  = ARR(fc.args.collect { case arg: EVALUATED => arg }.toIndexedSeq, false)
-              argsArr.foreach(arr => ctx.log(LET(s"$funcName.@args", arr), argsArr))
+              logFuncArgs(fc, ctx)
+              logFuncComplexity(fc, ctx, stdLibVersion, unusedArgsComplexity)
               evaluateFunction(fc, startArgs, unusedArgsComplexity)
             } else
               EvaluationResult(unusedArgsComplexity)
@@ -346,7 +356,7 @@ object EvaluatorV2 {
     val log       = ListBuffer[LogItem[Id]]()
     val loggedCtx = LoggedEvaluationContext[Environment, Id](name => value => log.append((name, value)), ctx)
     var ref       = expr.deepCopy.value
-    enrichLog(loggedCtx, logExtraInfo, ref)
+    logCall(loggedCtx, logExtraInfo, ref)
     new EvaluatorV2(loggedCtx, stdLibVersion, correctFunctionCallScope, newMode, checkConstructorArgsTypes)
       .root(ref, v => EvaluationResult { ref = v }, limit, Nil)
       .map((ref, _))
@@ -399,7 +409,7 @@ object EvaluatorV2 {
       expr => Left(s"Unexpected incomplete evaluation result $expr")
     )
 
-  private def enrichLog(loggedCtx: LoggedEvaluationContext[Environment, Id], logExtraInfo: LogExtraInfo, exprCopy: EXPR) = {
+  private def logCall(loggedCtx: LoggedEvaluationContext[Environment, Id], logExtraInfo: LogExtraInfo, exprCopy: EXPR): Unit = {
     @tailrec
     def findInvArgLet(expr: EXPR, let: LET): Option[LET] = {
       expr match {
@@ -422,5 +432,21 @@ object EvaluatorV2 {
       case let @ LET(_, obj: CaseObj) => loggedCtx.log(let, obj.asRight[ExecutionError])
       case _                          =>
     }
+  }
+
+  private def logFuncComplexity(fc: FUNCTION_CALL, ctx: LoggedEvaluationContext[Environment, Id], stdLibVersion: StdLibVersion, limit: Int): Unit = {
+    val func     = ctx.ec.functions.get(fc.function)
+    val funcName = func.map(_.name).getOrElse(fc.function.funcName)
+    func.foreach { f =>
+      val cost = f.costByLibVersion(stdLibVersion)
+      ctx.log(LET(s"$funcName.@complexity", TRUE), CONST_LONG(cost).asRight[ExecutionError])
+      ctx.log(LET("@complexityLimit", TRUE), CONST_LONG(limit - cost).asRight[ExecutionError])
+    }
+  }
+
+  private def logFuncArgs(fc: FUNCTION_CALL, ctx: LoggedEvaluationContext[Environment, Id]): Unit = {
+    val funcName = ctx.ec.functions.get(fc.function).map(_.name).getOrElse(fc.function.funcName)
+    val argsArr  = ARR(fc.args.collect { case arg: EVALUATED => arg }.toIndexedSeq, false)
+    argsArr.foreach(_ => ctx.log(LET(s"$funcName.@args", TRUE), argsArr))
   }
 }
