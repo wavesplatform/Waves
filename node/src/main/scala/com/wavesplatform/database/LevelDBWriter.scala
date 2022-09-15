@@ -7,7 +7,7 @@ import cats.syntax.option.*
 import cats.syntax.semigroup.*
 import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
-import com.google.common.primitives.{Bytes, Ints}
+import com.google.common.primitives.Bytes
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
@@ -239,19 +239,13 @@ abstract class LevelDBWriter private[database] (
     }
   }
 
-  protected override def loadBalance(req: (Address, Asset)): Long =
-    addressId(req._1).fold(0L) { addressId =>
+  protected override def loadBalance(req: (Address, Asset)): CurrentBalance =
+    addressId(req._1).fold(CurrentBalance.Unavailable) { addressId =>
       req._2 match {
         case asset @ IssuedAsset(_) =>
-          val kabh = Keys.assetBalanceHistory(addressId, asset)
-          if (assetBalanceFilter.mightContain(kabh.suffix))
-            writableDB.readOnly(_.fromHistory(kabh, Keys.assetBalance(addressId, asset))).getOrElse(0L)
-          else 0L
+          writableDB.readOnly(_.get(Keys.assetBalance(addressId, asset)))
         case Waves =>
-          val kwbh = Keys.wavesBalanceHistory(addressId)
-          if (wavesBalanceFilter.mightContain(kwbh.suffix))
-            writableDB.readOnly(_.fromHistory(kwbh, Keys.wavesBalance(addressId))).getOrElse(0L)
-          else 0L
+          writableDB.readOnly(_.get(Keys.wavesBalance(addressId)))
       }
     }
 
@@ -263,7 +257,7 @@ abstract class LevelDBWriter private[database] (
   }
 
   private[database] def loadLposPortfolio(db: ReadOnlyDB, addressId: AddressId) = Portfolio(
-    db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId)).getOrElse(0L),
+    db.get(Keys.wavesBalance(addressId)).balance,
     loadLeaseBalance(db, addressId)
   )
 
@@ -303,45 +297,29 @@ abstract class LevelDBWriter private[database] (
   }
 
   private def appendBalances(
-      balances: Map[AddressId, Map[Asset, Long]],
+      balances: Map[(AddressId, Asset), (CurrentBalance, BalanceNode)],
       issuedAssets: Map[IssuedAsset, NewAssetInfo],
-      rw: RW,
-      threshold: Int,
-      balanceThreshold: Int
+      rw: RW
   ): Unit = {
     val changedAssetBalances = MultimapBuilder.hashKeys().hashSetValues().build[IssuedAsset, java.lang.Long]()
     val updatedNftLists      = MultimapBuilder.hashKeys().hashSetValues().build[java.lang.Long, IssuedAsset]()
 
-    for ((addressId, updatedBalances) <- balances) {
-      for ((asset, balance) <- updatedBalances) {
-        asset match {
-          case Waves =>
-            rw.put(Keys.wavesBalance(addressId)(height), balance)
-            val kwbh = Keys.wavesBalanceHistory(addressId)
-            if (wavesBalanceFilter.mightContain(kwbh.suffix))
-              updateHistory(rw, kwbh, balanceThreshold, Keys.wavesBalance(addressId)).foreach(rw.delete)
-            else {
-              rw.put(kwbh, Seq(height))
-              wavesBalanceFilter.put(kwbh.suffix)
-            }
-          case a: IssuedAsset =>
-            changedAssetBalances.put(a, addressId.toLong)
-            rw.put(Keys.assetBalance(addressId, a)(height), balance)
-            val kabh = Keys.assetBalanceHistory(addressId, a)
-            val isNFT = balance > 0 && issuedAssets
-              .get(a)
-              .map(_.static.nft)
-              .orElse(assetDescription(a).map(_.nft))
-              .getOrElse(false)
-            if (assetBalanceFilter.mightContain(kabh.suffix)) {
-              if (rw.get(kabh).isEmpty && isNFT) updatedNftLists.put(addressId.toLong, a)
-              updateHistory(rw, kabh, threshold, Keys.assetBalance(addressId, a)).foreach(rw.delete)
-            } else {
-              rw.put(kabh, Seq(height))
-              assetBalanceFilter.put(kabh.suffix)
-              if (isNFT) updatedNftLists.put(addressId.toLong, a)
-            }
-        }
+    for (((addressId, asset), (currentBalance, balanceNode)) <- balances) {
+      asset match {
+        case Waves =>
+          rw.put(Keys.wavesBalance(addressId), currentBalance)
+          rw.put(Keys.wavesBalanceAt(addressId, currentBalance.height), balanceNode)
+        case a: IssuedAsset =>
+          changedAssetBalances.put(a, addressId.toLong)
+          rw.put(Keys.assetBalance(addressId, a), currentBalance)
+          rw.put(Keys.assetBalanceAt(addressId, a, currentBalance.height), balanceNode)
+
+          val isNFT = currentBalance.balance > 0 && issuedAssets
+            .get(a)
+            .map(_.static.nft)
+            .orElse(assetDescription(a).map(_.nft))
+            .getOrElse(false)
+          if (currentBalance.prevHeight == Height(0) && isNFT) updatedNftLists.put(addressId.toLong, a)
       }
     }
 
@@ -364,7 +342,7 @@ abstract class LevelDBWriter private[database] (
       block: Block,
       carry: Long,
       newAddresses: Map[Address, AddressId],
-      balances: Map[AddressId, Map[Asset, Long]],
+      balances: Map[(AddressId, Asset), (CurrentBalance, BalanceNode)],
       leaseBalances: Map[AddressId, LeaseBalance],
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       leaseStates: Map[ByteStr, LeaseDetails],
@@ -422,9 +400,9 @@ abstract class LevelDBWriter private[database] (
       val threshold        = newSafeRollbackHeight
       val balanceThreshold = height - balanceSnapshotMaxRollbackDepth
 
-      appendBalances(balances, issuedAssets, rw, threshold, balanceThreshold)
+      appendBalances(balances, issuedAssets, rw)
 
-      val changedAddresses = (addressTransactions.asScala.keys ++ balances.keys).toSet
+      val changedAddresses = (addressTransactions.asScala.keys ++ balances.keys.map(_._1)).toSet
       rw.put(Keys.changedAddresses(height), changedAddresses.toSeq)
 
       // leases
@@ -625,19 +603,19 @@ abstract class LevelDBWriter private[database] (
             addressId <- rw.get(Keys.changedAddresses(currentHeight))
           } yield addressId -> rw.get(Keys.idToAddress(addressId))
 
-          rw.iterateOver(KeyTags.ChangedAssetBalances.prefixBytes ++ Ints.toByteArray(currentHeight)) { e =>
-            val assetId = IssuedAsset(ByteStr(e.getKey.takeRight(32)))
-            for ((addressId, address) <- changedAddresses) {
-              val kabh    = Keys.assetBalanceHistory(addressId, assetId)
-              val history = rw.get(kabh)
-              if (history.nonEmpty && history.head == currentHeight) {
-                log.trace(s"Discarding ${assetId.id} balance for $address at $currentHeight")
-                balancesToInvalidate += address -> assetId
-                rw.delete(Keys.assetBalance(addressId, assetId)(history.head))
-                rw.put(kabh.keyBytes, writeIntSeq(history.tail))
-              }
-            }
-          }
+//          rw.iterateOver(KeyTags.ChangedAssetBalances.prefixBytes ++ Ints.toByteArray(currentHeight)) { e =>
+//            val assetId = IssuedAsset(ByteStr(e.getKey.takeRight(32)))
+//            for ((addressId, address) <- changedAddresses) {
+//              val kabh    = Keys.assetBalanceHistory(addressId, assetId)
+//              val history = rw.get(kabh)
+//              if (history.nonEmpty && history.head == currentHeight) {
+//                log.trace(s"Discarding ${assetId.id} balance for $address at $currentHeight")
+//                balancesToInvalidate += address -> assetId
+//                rw.delete(Keys.assetBalance(addressId, assetId)(history.head))
+//                rw.put(kabh.keyBytes, writeIntSeq(history.tail))
+//              }
+//            }
+//          }
 
           for ((addressId, address) <- changedAddresses) {
             for (k <- rw.get(Keys.changedDataKeys(currentHeight, addressId))) {
@@ -649,7 +627,7 @@ abstract class LevelDBWriter private[database] (
             rw.delete(Keys.changedDataKeys(currentHeight, addressId))
 
             balancesToInvalidate += (address -> Waves)
-            rw.delete(Keys.wavesBalance(addressId)(currentHeight))
+//            rw.delete(Keys.wavesBalance(addressId)(currentHeight))
             rw.filterHistory(Keys.wavesBalanceHistory(addressId), currentHeight)
 
             rw.delete(Keys.leaseBalance(addressId)(currentHeight))
@@ -870,7 +848,7 @@ abstract class LevelDBWriter private[database] (
     .newBuilder()
     .maximumSize(100000)
     .recordStats()
-    .build[(Int, AddressId), java.lang.Long]()
+    .build[(Int, AddressId), BalanceNode]()
 
   private val leaseBalanceAtHeightCache = CacheBuilder
     .newBuilder()
@@ -878,33 +856,31 @@ abstract class LevelDBWriter private[database] (
     .recordStats()
     .build[(Int, AddressId), LeaseBalance]()
 
-  override def balanceAtHeight(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)] = readOnly { db =>
-    db.get(Keys.addressId(address)).flatMap { addressId =>
-      assetId match {
-        case Waves =>
-          closest(db.get(Keys.wavesBalanceHistory(addressId)), height).map { wh =>
-            val b: Long = db.get(Keys.wavesBalance(addressId)(wh))
-            (wh, b)
-          }
-        case asset @ IssuedAsset(_) =>
-          closest(db.get(Keys.assetBalanceHistory(addressId, asset)), height).map { wh =>
-            val b: Long = db.get(Keys.assetBalance(addressId, asset)(wh))
-            (wh, b)
-          }
-      }
-    }
-  }
+  override def balanceAtHeight(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)] = None
 
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = readOnly { db =>
-    db.get(Keys.addressId(address)).fold(Seq(BalanceSnapshot(1, 0, 0, 0))) { addressId =>
-      val toHeigth = to.flatMap(this.heightOf).getOrElse(this.height)
-      val wbh      = slice(db.get(Keys.wavesBalanceHistory(addressId)), from, toHeigth)
-      val lbh      = slice(db.get(Keys.leaseBalanceHistory(addressId)), from, toHeigth)
+    addressId(address).fold(Seq(BalanceSnapshot(1, 0, 0, 0))) { addressId =>
+      val toHeight = to.flatMap(this.heightOf).getOrElse(this.height)
+
+      val lastBalance = balancesCache.get((address, Asset.Waves))
+
+      @tailrec
+      def collectBalanceHistory(acc: Vector[Int], hh: Int): Seq[Int] =
+        if (hh < from)
+          acc :+ hh
+        else {
+          val bn     = balanceAtHeightCache.get((hh, addressId), () => db.get(Keys.wavesBalanceAt(addressId, Height(hh))))
+          val newAcc = if (hh > toHeight) acc else acc :+ hh
+          collectBalanceHistory(newAcc, bn.prevHeight)
+        }
+
+      val wbh = slice(collectBalanceHistory(Vector.empty, lastBalance.height), from, toHeight)
+      val lbh = slice(db.get(Keys.leaseBalanceHistory(addressId)), from, toHeight)
       for {
         (wh, lh) <- merge(wbh, lbh)
-        wb = balanceAtHeightCache.get((wh, addressId), () => db.get(Keys.wavesBalance(addressId)(wh)))
+        wb = balanceAtHeightCache.get((wh, addressId), () => db.get(Keys.wavesBalanceAt(addressId, Height(wh))))
         lb = leaseBalanceAtHeightCache.get((lh, addressId), () => db.get(Keys.leaseBalance(addressId)(lh)))
-      } yield BalanceSnapshot(wh.max(lh), wb, lb.in, lb.out)
+      } yield BalanceSnapshot(wh.max(lh), wb.balance, lb.in, lb.out)
     }
   }
 

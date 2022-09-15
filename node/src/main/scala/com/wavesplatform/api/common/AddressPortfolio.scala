@@ -28,13 +28,7 @@ class NFTIterator(addressId: AddressId, maybeAfter: Option[IssuedAsset], resourc
     while (resource.iterator.hasNext && skipEntry(resource.iterator.next().getKey)) {}
   }
 
-  override def computeNext(): (IssuedAsset, Long) =
-    if (resource.iterator.hasNext && resource.iterator.peekNext().getKey.startsWith(prefixBytes)) {
-      val assetId = IssuedAsset(ByteStr(resource.iterator.next().getKey.takeRight(crypto.DigestLength)))
-      assetId -> (for {
-        lastChange <- resource.get(Keys.assetBalanceHistory(addressId, assetId)).headOption
-      } yield resource.get(Keys.assetBalance(addressId, assetId)(lastChange))).getOrElse(0L)
-    } else endOfData()
+  override def computeNext(): (IssuedAsset, Long) = ???
 }
 
 class AssetBalanceIterator(addressId: AddressId, resource: DBResource) extends AbstractIterator[(IssuedAsset, Long)] {
@@ -45,14 +39,7 @@ class AssetBalanceIterator(addressId: AddressId, resource: DBResource) extends A
   private def stillSameAddress(k: Array[Byte]): Boolean =
     (k.length == (prefixBytes.length + crypto.DigestLength)) && k.startsWith(prefixBytes)
 
-  override def computeNext(): (IssuedAsset, Long) =
-    if (resource.iterator.hasNext && stillSameAddress(resource.iterator.peekNext().getKey)) {
-      val currentEntry = resource.iterator.next()
-      val assetId      = IssuedAsset(ByteStr(currentEntry.getKey.takeRight(crypto.DigestLength)))
-      val history      = readIntSeq(currentEntry.getValue)
-      val balance      = resource.get(Keys.assetBalance(addressId, assetId)(history.headOption.getOrElse(0)))
-      assetId -> balance
-    } else endOfData()
+  override def computeNext(): (IssuedAsset, Long) = ???
 }
 
 class BalanceIterator(

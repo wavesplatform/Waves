@@ -448,6 +448,20 @@ package object database {
       })
       .toByteArray
 
+  def readCurrentBalance(bs: Array[Byte]): CurrentBalance = if (bs != null && bs.length == 16)
+    CurrentBalance(Longs.fromByteArray(bs.take(8)), Height(Ints.fromByteArray(bs.slice(8, 12))), Height(Ints.fromByteArray(bs.takeRight(4))))
+  else CurrentBalance.Unavailable
+
+  def writeCurrentBalance(balance: CurrentBalance): Array[Byte] =
+    Longs.toByteArray(balance.balance) ++ Ints.toByteArray(balance.height) ++ Ints.toByteArray(balance.prevHeight)
+
+  def readBalanceNode(bs: Array[Byte]): BalanceNode = if (bs != null && bs.length == 12)
+    BalanceNode(Longs.fromByteArray(bs.take(8)), Height(Ints.fromByteArray(bs.takeRight(4))))
+  else BalanceNode.Empty
+
+  def writeBalanceNode(balance: BalanceNode): Array[Byte] =
+    Longs.toByteArray(balance.balance) ++ Ints.toByteArray(balance.prevHeight)
+
   implicit class EntryExt(val e: JMap.Entry[Array[Byte], Array[Byte]]) extends AnyVal {
     import com.wavesplatform.crypto.DigestLength
     def extractId(offset: Int = 2, length: Int = DigestLength): ByteStr = {

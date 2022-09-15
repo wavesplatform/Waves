@@ -317,13 +317,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     // API start
     if (settings.restAPISettings.enable) {
-      def loadBalanceHistory(address: Address): Seq[(Int, Long)] = db.readOnly { rdb =>
-        rdb.get(Keys.addressId(address)).fold(Seq.empty[(Int, Long)]) { aid =>
-          rdb.get(Keys.wavesBalanceHistory(aid)).map { h =>
-            h -> rdb.get(Keys.wavesBalance(aid)(h))
-          }
-        }
-      }
+      def loadBalanceHistory(address: Address): Seq[(Int, Long)] = Seq.empty
 
       val limitedScheduler =
         Schedulers.timeBoundedFixedPool(

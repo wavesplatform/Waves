@@ -152,11 +152,11 @@ object Explorer extends ScorexLogging {
           val kwbh = Keys.wavesBalanceHistory(addressId)
           val wbh  = kwbh.parse(db.get(kwbh.keyBytes))
 
-          val balances = wbh.map { h =>
-            val k = Keys.wavesBalance(addressId)(h)
-            h -> k.parse(db.get(k.keyBytes))
-          }
-          balances.foreach(b => log.info(s"h = ${b._1}: balance = ${b._2}"))
+//          val balances = wbh.map { h =>
+//            val k = Keys.wavesBalance(addressId)(h)
+//            h -> k.parse(db.get(k.keyBytes))
+//          }
+//          balances.foreach(b => log.info(s"h = ${b._1}: balance = ${b._2}"))
 
         case "AC" =>
           val lastAddressId = Keys.lastAddressId.parse(db.get(Keys.lastAddressId.keyBytes))
@@ -187,14 +187,14 @@ object Explorer extends ScorexLogging {
           val addressId = ai.parse(db.get(ai.keyBytes)).get
           log.info(s"Address ID = $addressId")
 
-          val kabh = Keys.assetBalanceHistory(addressId, asset)
-          val abh  = kabh.parse(db.get(kabh.keyBytes))
-
-          val balances = abh.map { h =>
-            val k = Keys.assetBalance(addressId, asset)(h)
-            h -> k.parse(db.get(k.keyBytes))
-          }
-          balances.foreach(b => log.info(s"h = ${b._1}: balance = ${b._2}"))
+//          val kabh = Keys.assetBalanceHistory(addressId, asset)
+//          val abh  = kabh.parse(db.get(kabh.keyBytes))
+//
+//          val balances = abh.map { h =>
+//            val k = Keys.assetBalance(addressId, asset)(h)
+//            h -> k.parse(db.get(k.keyBytes))
+//          }
+//          balances.foreach(b => log.info(s"h = ${b._1}: balance = ${b._2}"))
 
         case "S" =>
           log.info("Collecting DB stats")
