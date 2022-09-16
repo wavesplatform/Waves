@@ -63,6 +63,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
   private val bf = GBloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), 1_000_000)
 
+
+
   protected def forgetTransaction(id: ByteStr): Unit = transactionIds.remove(id)
   override def containsTransaction(tx: Transaction): Boolean = bf.mightContain(tx.id().arr) && transactionMeta(tx.id()).nonEmpty || {
     if (tx.timestamp - 2.hours.toMillis <= oldestStoredBlockTimestamp) {
@@ -297,11 +299,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       diff.ethereumTransactionMeta
     )
 
-    if (height % 1000 == 0) {
-      printCacheStats("balances", balancesCache.stats())
-      printCacheStats("addresses", addressIdCache.stats())
-    }
-
     val emptyData = Map.empty[(Address, String), Option[DataEntry[?]]]
 
     val newData =
@@ -333,9 +330,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
     forgetBlocks()
   }
-
-  def printCacheStats(tag: String, stats: CacheStats): Unit =
-    println(s">> Stats for $tag: ${stats.toString}")
 
   protected def doRollback(targetHeight: Int): Seq[(Block, ByteStr)]
 

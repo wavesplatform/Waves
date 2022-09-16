@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.assets.exchange
 
+import cats.implicits.toFlatMapOps
 import com.wavesplatform.account.{AddressScheme, PrivateKey, PublicKey}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
@@ -11,6 +12,7 @@ import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
 import scala.util.Try
+import scala.util.chaining.scalaUtilChainingOps
 
 case class ExchangeTransaction(
     version: TxVersion,
@@ -33,6 +35,13 @@ case class ExchangeTransaction(
     with PBSince.V3 {
 
   val (buyOrder, sellOrder) = if (order1.orderType == OrderType.BUY) (order1, order2) else (order2, order1)
+
+  override protected def verifyFirstProof(): Either[GenericError, Unit] =
+    super.verifyFirstProof().tap { _ =>
+      order1.firstProofIsValidSignature()
+      order2.firstProofIsValidSignature()
+    }
+
 
   override val sender: PublicKey = buyOrder.matcherPublicKey
 

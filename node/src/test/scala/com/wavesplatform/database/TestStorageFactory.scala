@@ -1,6 +1,6 @@
 package com.wavesplatform.database
 
-import com.google.common.hash.{Funnels, BloomFilter => GBloomFilter}
+import com.google.common.hash.{Funnels, BloomFilter as GBloomFilter}
 import com.wavesplatform.account.Address
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.settings.WavesSettings
@@ -23,10 +23,9 @@ object TestStorageFactory {
   ): (BlockchainUpdaterImpl, LevelDBWriter) = {
     val useBloomFilter = settings.dbSettings.useBloomFilter
     val levelDBWriter: LevelDBWriter = new LevelDBWriter(db, spendableBalanceChanged, settings.blockchainSettings, settings.dbSettings) {
-      override val orderFilter: BloomFilter        = wrappedFilter(useBloomFilter)
-      override val dataKeyFilter: BloomFilter      = wrappedFilter(useBloomFilter)
-      override val wavesBalanceFilter: BloomFilter = wrappedFilter(useBloomFilter)
-      override val assetBalanceFilter: BloomFilter = wrappedFilter(useBloomFilter)
+      override val orderFilter: BloomFilter   = wrappedFilter(useBloomFilter)
+      override val dataKeyFilter: BloomFilter = wrappedFilter(useBloomFilter)
+      override val addressFilter: BloomFilter = wrappedFilter(useBloomFilter)
     }
     (
       new BlockchainUpdaterImpl(levelDBWriter, spendableBalanceChanged, settings, time, blockchainUpdateTriggers, loadActiveLeases(db, _, _)),

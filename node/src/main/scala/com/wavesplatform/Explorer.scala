@@ -297,6 +297,13 @@ object Explorer extends ScorexLogging {
             prevAssetId = thisAssetId
           }
           log.info(s"Checked $assetCounter asset(s)")
+        case "DDD" =>
+          log.info(s"Collecting addresses")
+          var count = 0L
+          db.iterateOver(KeyTags.AddressId) { _ =>
+            count += 1
+          }
+          log.info(s"Found $count addresses")
       }
     } finally db.close()
   }

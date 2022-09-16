@@ -174,7 +174,8 @@ case class Diff(
   def combineF(newer: Diff): Either[String, Diff] =
     Diff
       .combine(portfolios, newer.portfolios)
-      .map(portfolios =>
+      .map { portfolios =>
+        val newFilter = transactionFilter.copy().tap(_.putAll(newer.transactionFilter))
         Diff(
           transactions = transactions ++ newer.transactions,
           portfolios = portfolios,
@@ -191,9 +192,9 @@ case class Diff(
           scriptResults = scriptResults.combine(newer.scriptResults),
           scriptsComplexity = scriptsComplexity + newer.scriptsComplexity,
           ethereumTransactionMeta = ethereumTransactionMeta ++ newer.ethereumTransactionMeta,
-          transactionFilter = transactionFilter.copy().tap(_.putAll(newer.transactionFilter))
+          transactionFilter = newFilter
         )
-      )
+      }
 }
 
 object Diff {
@@ -311,7 +312,11 @@ object Diff {
           None
       }
       val affectedAddresses = d.portfolios.keySet ++ d.accountData.keySet ++ calledScripts ++ maybeDApp
-      d.copy(transactions = Vector(NewTransactionInfo(tx, affectedAddresses, applied, d.scriptsComplexity)))
+
+      d.copy(
+        transactions = Vector(NewTransactionInfo(tx, affectedAddresses, applied, d.scriptsComplexity)),
+        transactionFilter = d.transactionFilter.copy().tap(_.put(tx.id().arr))
+      )
     }
   }
 }

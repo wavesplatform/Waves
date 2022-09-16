@@ -5,7 +5,7 @@ import java.util
 import cats.data.Ior
 import cats.syntax.option.*
 import cats.syntax.semigroup.*
-import com.google.common.cache.{Cache, CacheBuilder, CacheStats}
+import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
 import com.google.common.primitives.Bytes
 import com.wavesplatform.account.{Address, Alias}
@@ -117,22 +117,19 @@ object LevelDBWriter extends ScorexLogging {
 
     val _orderFilter        = load("orders", KeyTags.FilledVolumeAndFeeHistory)
     val _dataKeyFilter      = load("account-data", KeyTags.DataHistory)
-    val _wavesBalanceFilter = load("waves-balances", KeyTags.WavesBalanceHistory)
-    val _assetBalanceFilter = load("asset-balances", KeyTags.AssetBalanceHistory)
+    val _addressesKeyFilter = load("addresses", KeyTags.AddressId)
     new LevelDBWriter(db, spendableBalanceChanged, settings.blockchainSettings, settings.dbSettings) with AutoCloseable {
 
       override val orderFilter: BloomFilter        = _orderFilter.getOrElse(BloomFilter.AlwaysEmpty)
       override val dataKeyFilter: BloomFilter      = _dataKeyFilter.getOrElse(BloomFilter.AlwaysEmpty)
-      override val wavesBalanceFilter: BloomFilter = _wavesBalanceFilter.getOrElse(BloomFilter.AlwaysEmpty)
-      override val assetBalanceFilter: BloomFilter = _assetBalanceFilter.getOrElse(BloomFilter.AlwaysEmpty)
+      override val addressFilter: BloomFilter      = _addressesKeyFilter.getOrElse(BloomFilter.AlwaysEmpty)
 
       override def close(): Unit = {
         log.debug("Shutting down LevelDBWriter")
         val lastHeight = LevelDBWriter.loadHeight(db)
         _orderFilter.foreach(_.save(lastHeight))
         _dataKeyFilter.foreach(_.save(lastHeight))
-        _wavesBalanceFilter.foreach(_.save(lastHeight))
-        _assetBalanceFilter.foreach(_.save(lastHeight))
+        _addressesKeyFilter.foreach(_.save(lastHeight))
       }
     }
   }
@@ -150,8 +147,7 @@ object LevelDBWriter extends ScorexLogging {
     new LevelDBWriter(db, Observer.stopped, settings.blockchainSettings, settings.dbSettings) {
       override val orderFilter: BloomFilter        = loadFilter("orders")
       override val dataKeyFilter: BloomFilter      = loadFilter("account-data")
-      override val wavesBalanceFilter: BloomFilter = loadFilter("waves-balances")
-      override val assetBalanceFilter: BloomFilter = loadFilter("asset-balances")
+      override val addressFilter: BloomFilter      = loadFilter("addresses")
     }
   }
 }
@@ -168,8 +164,7 @@ abstract class LevelDBWriter private[database] (
 
   def orderFilter: BloomFilter
   def dataKeyFilter: BloomFilter
-  def wavesBalanceFilter: BloomFilter
-  def assetBalanceFilter: BloomFilter
+  def addressFilter: BloomFilter
 
   private[this] var disabledAliases = writableDB.get(Keys.disabledAliases)
 
@@ -188,7 +183,7 @@ abstract class LevelDBWriter private[database] (
 
   override protected def loadMaxAddressId(): Long = readOnly(db => db.get(Keys.lastAddressId).getOrElse(0L))
 
-  override protected def loadAddressId(address: Address): Option[AddressId] = readOnly(db => db.get(Keys.addressId(address)))
+  override protected def loadAddressId(address: Address): Option[AddressId] = loadWithFilter(addressFilter, Keys.addressId(address)) { (_, id) => id }
 
   override protected def loadHeight(): Int = LevelDBWriter.loadHeight(writableDB)
 
@@ -255,11 +250,6 @@ abstract class LevelDBWriter private[database] (
   override protected def loadLeaseBalance(address: Address): LeaseBalance = readOnly { db =>
     addressId(address).fold(LeaseBalance.empty)(loadLeaseBalance(db, _))
   }
-
-  private[database] def loadLposPortfolio(db: ReadOnlyDB, addressId: AddressId) = Portfolio(
-    db.get(Keys.wavesBalance(addressId)).balance,
-    loadLeaseBalance(db, addressId)
-  )
 
   override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] =
     writableDB.withResource(r => database.loadAssetDescription(r, asset))
@@ -393,8 +383,10 @@ abstract class LevelDBWriter private[database] (
       rw.put(Keys.score(height), rw.get(Keys.score(height - 1)) + block.blockScore())
 
       for ((address, id) <- newAddresses) {
-        rw.put(Keys.addressId(address), Some(id))
+        val kaid = Keys.addressId(address)
+        rw.put(kaid, Some(id))
         rw.put(Keys.idToAddress(id), address)
+        addressFilter.put(kaid.suffix)
       }
 
       val threshold = newSafeRollbackHeight

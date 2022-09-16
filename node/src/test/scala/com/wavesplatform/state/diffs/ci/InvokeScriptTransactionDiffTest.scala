@@ -494,7 +494,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
         newState.accountData(dAppAddress, "sender").get.value shouldBe ByteStr(ci.sender.toAddress.bytes)
         newState.accountData(dAppAddress, "argument").get.value shouldBe ci.funcCallOpt.get.args.head.asInstanceOf[CONST_BYTESTR].bs
 
-        blockDiff.transactions(ci.id()).affected.contains(setScript.sender.toAddress) shouldBe true
+        blockDiff.transactions.find(_.transaction.id() == ci.id()).get.affected.contains(setScript.sender.toAddress) shouldBe true
 
     }
   }
@@ -530,7 +530,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       blockDiff.scriptsRun shouldBe 1
       blockDiff.portfolios(thirdAddress).balance shouldBe amount
       blockDiff.portfolios(setScript.sender.toAddress).balance shouldBe -amount
-      blockDiff.transactions should contain key ci.id()
+      blockDiff.containsTransaction(ci.id()) shouldBe true
     }
   }
 
@@ -541,7 +541,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       blockDiff.scriptsRun shouldBe 1
       blockDiff.portfolios(thirdAddress).balance shouldBe amount
       blockDiff.portfolios(setScript.sender.toAddress).balance shouldBe -amount
-      blockDiff.transactions should contain key ci.id()
+      blockDiff.containsTransaction(ci.id()) shouldBe true
     }
   }
 
@@ -557,7 +557,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     ) { case (blockDiff, _) =>
       blockDiff.scriptsRun shouldBe 1
       blockDiff.portfolios(thirdAddress) shouldBe Portfolio.waves(amount)
-      blockDiff.transactions should contain key ci.id()
+      blockDiff.containsTransaction(ci.id()) shouldBe true
     }
   }
 
@@ -608,7 +608,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       case (blockDiff, newState) =>
         blockDiff.scriptsRun shouldBe 1
         newState.balance(thirdAddress, Waves) shouldBe amount
-        blockDiff.transactions should contain key ci.id()
+        blockDiff.containsTransaction(ci.id()) shouldBe true
     }
     testDiff(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(fakeCi), Block.ProtoBlockVersion)) {
       _ should produceRejectOrFailedDiff("does not exist")
