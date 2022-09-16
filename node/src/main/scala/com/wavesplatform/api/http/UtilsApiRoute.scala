@@ -1,7 +1,6 @@
 package com.wavesplatform.api.http
 
 import java.security.SecureRandom
-
 import akka.http.scaladsl.server.{PathMatcher1, Route}
 import cats.syntax.either.*
 import cats.syntax.semigroup.*
@@ -21,7 +20,7 @@ import com.wavesplatform.lang.directives.values.{DApp as DAppType, *}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
-import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
+import com.wavesplatform.lang.v1.compiler.{ContractScriptCompactor, ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -393,7 +392,7 @@ object UtilsApiRoute {
             fixUnicodeFunctions = true,
             useNewPowPrecision = true
           )
-        call = ContractEvaluator.buildSyntheticCall(script.expr.asInstanceOf[DApp], expr)
+        call = ContractEvaluator.buildSyntheticCall(ContractScriptCompactor.decompact(script.expr.asInstanceOf[DApp]), expr)
         limitedResult <- EvaluatorV2
           .applyLimitedCoeval(
             call,
