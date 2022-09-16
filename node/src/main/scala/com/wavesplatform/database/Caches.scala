@@ -189,7 +189,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
     val newAddresses = Set.newBuilder[Address]
     newAddresses ++= diff.portfolios.keys.filter(addressIdCache.get(_).isEmpty)
-    for (NewTransactionInfo(_, addresses, _, _) <- diff.transactions.values; address <- addresses if addressIdCache.get(address).isEmpty) {
+    for (NewTransactionInfo(_, addresses, _, _) <- diff.transactions; address <- addresses if addressIdCache.get(address).isEmpty) {
       newAddresses += address
     }
 
@@ -209,11 +209,11 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
     val transactionMeta     = Seq.newBuilder[(TxMeta, Transaction)]
     val addressTransactions = ArrayListMultimap.create[AddressId, TransactionId]()
-    for (((id, nti), _) <- diff.transactions.zipWithIndex) {
-      transactionIds.put(id, newHeight)
+    for (nti <- diff.transactions) {
+      transactionIds.put(nti.transaction.id(), newHeight)
       transactionMeta += (TxMeta(Height(newHeight), nti.applied, nti.spentComplexity) -> nti.transaction)
       for (addr <- nti.affected) {
-        addressTransactions.put(addressIdWithFallback(addr, newAddressIds), TransactionId(id))
+        addressTransactions.put(addressIdWithFallback(addr, newAddressIds), TransactionId(nti.transaction.id()))
       }
     }
 
@@ -294,6 +294,11 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       diff.ethereumTransactionMeta
     )
 
+    if (height % 1000 == 0) {
+      printCacheStats("balances", balancesCache.stats())
+      printCacheStats("addresses", addressIdCache.stats())
+    }
+
     val emptyData = Map.empty[(Address, String), Option[DataEntry[?]]]
 
     val newData =
@@ -326,6 +331,9 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     forgetBlocks()
   }
 
+  def printCacheStats(tag: String, stats: CacheStats): Unit =
+    println(s">> Stats for $tag: ${stats.toString}")
+
   protected def doRollback(targetHeight: Int): Seq[(Block, ByteStr)]
 
   override def rollbackTo(height: Int): Either[String, Seq[(Block, ByteStr)]] = {
@@ -352,6 +360,7 @@ object Caches {
     CacheBuilder
       .newBuilder()
       .maximumSize(maximumSize)
+      .recordStats()
       .build(new CacheLoader[K, V] {
         override def load(key: K): V = loader(key)
       })

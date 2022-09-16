@@ -5,7 +5,7 @@ import java.util
 import cats.data.Ior
 import cats.syntax.option.*
 import cats.syntax.semigroup.*
-import com.google.common.cache.CacheBuilder
+import com.google.common.cache.{Cache, CacheBuilder, CacheStats}
 import com.google.common.collect.MultimapBuilder
 import com.google.common.primitives.Bytes
 import com.wavesplatform.account.{Address, Alias}
@@ -369,7 +369,7 @@ abstract class LevelDBWriter private[database] (
       rw.put(Keys.height, height)
 
       val previousSafeRollbackHeight = rw.get(Keys.safeRollbackHeight)
-      val newSafeRollbackHeight      = height - dbSettings.maxRollbackDepth
+      val newSafeRollbackHeight = height - dbSettings.maxRollbackDepth
 
       if (previousSafeRollbackHeight < newSafeRollbackHeight) {
         rw.put(Keys.safeRollbackHeight, newSafeRollbackHeight)
@@ -397,7 +397,7 @@ abstract class LevelDBWriter private[database] (
         rw.put(Keys.idToAddress(id), address)
       }
 
-      val threshold        = newSafeRollbackHeight
+      val threshold = newSafeRollbackHeight
       val balanceThreshold = height - balanceSnapshotMaxRollbackDepth
 
       appendBalances(balances, issuedAssets, rw)
@@ -468,7 +468,7 @@ abstract class LevelDBWriter private[database] (
       }
 
       if (dbSettings.storeTransactionsByAddress) for ((addressId, txIds) <- addressTransactions.asScala) {
-        val kk        = Keys.addressTransactionSeqNr(addressId)
+        val kk = Keys.addressTransactionSeqNr(addressId)
         val nextSeqNr = rw.get(kk) + 1
         val txTypeNumSeq = txIds.asScala.map { txId =>
           val (_, tx, num) = transactions(txId)

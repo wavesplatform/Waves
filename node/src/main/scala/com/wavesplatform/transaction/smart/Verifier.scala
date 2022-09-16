@@ -276,12 +276,8 @@ object Verifier extends ScorexLogging {
       case _ => verifyAsEllipticCurveSignature(order, checkWeakPk)
     }
 
-  def verifyAsEllipticCurveSignature[T <: Proven & Authorized](pt: T, checkWeakPk: Boolean): Either[GenericError, T] =
-    pt.proofs.proofs match {
-      case p +: Nil =>
-        Either.cond(crypto.verify(p, pt.bodyBytes(), pt.sender, checkWeakPk), pt, GenericError(s"Proof doesn't validate as signature for $pt"))
-      case _ => Left(GenericError("Transactions from non-scripted accounts must have exactly 1 proof"))
-    }
+  def verifyAsEllipticCurveSignature[T <: Proven](pt: T, checkWeakPk: Boolean): Either[GenericError, T] =
+    Either.cond(pt.firstProofIsValidSignature(), pt, GenericError("invalid signature"))
 
   @VisibleForTesting
   private[smart] def buildLogs(
