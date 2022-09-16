@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ContextfulNativeFunction.{Extended, Simple}
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.LogExtraInfo
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.{logFuncArgs, logFuncComplexity}
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.logFunc
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext, NativeFunction, UserFunction}
 import com.wavesplatform.lang.v1.traits.Environment
@@ -58,15 +58,14 @@ class EvaluatorV2(
         case FunctionHeader.Native(_) =>
           evaluateNativeFunction(fc, limit)
         case FunctionHeader.User(_, name) =>
-          (evaluateUserFunction(fc, limit, name, startArgs)
-            .getOrElse(evaluateConstructor(fc, limit, name)))
-            .map(_ -> true)
+          evaluateUserFunction(fc, limit, name, startArgs)
+            .getOrElse(evaluateConstructor(fc, limit, name))
       }
 
       if (newMode) {
-        r.map { case (unused, notExceededLimit) =>
+        r.map { unused =>
           if (unused == limit) {
-            if (notExceededLimit) {
+            if (unused >= 1 && fc.function.isInstanceOf[FunctionHeader.User]) {
               ctx.log(LET(s"${fc.function.funcName}.@complexity", TRUE), CONST_LONG(1).asRight[ExecutionError])
               ctx.log(LET("@complexityLimit", TRUE), CONST_LONG(unused - 1).asRight[ExecutionError])
             }
@@ -74,10 +73,10 @@ class EvaluatorV2(
           } else unused
         }
       } else
-        r.map(_._1)
+        r
     }
 
-    def evaluateNativeFunction(fc: FUNCTION_CALL, limit: Int): EvaluationResult[(Int, Boolean)] =
+    def evaluateNativeFunction(fc: FUNCTION_CALL, limit: Int): EvaluationResult[Int] =
       for {
         function <- EvaluationResult(Coeval {
           ctx.ec.functions
@@ -87,9 +86,9 @@ class EvaluatorV2(
         cost = function.costByLibVersion(stdLibVersion).toInt
         result <-
           if (limit < cost) {
-            EvaluationResult(limit -> false)
+            EvaluationResult(limit)
           } else
-            doEvaluateNativeFunction(fc, function.asInstanceOf[NativeFunction[Environment]], limit, cost).map(_ -> true)
+            doEvaluateNativeFunction(fc, function.asInstanceOf[NativeFunction[Environment]], limit, cost)
       } yield result
 
     def doEvaluateNativeFunction(fc: FUNCTION_CALL, function: NativeFunction[Environment], limit: Int, cost: Int): EvaluationResult[Int] = {
@@ -258,8 +257,7 @@ class EvaluatorV2(
           .flatMap { unusedArgsComplexity =>
             val argsEvaluated = fc.args.forall(_.isInstanceOf[EVALUATED])
             if (argsEvaluated && unusedArgsComplexity > 0) {
-              logFuncArgs(fc, ctx)
-              logFuncComplexity(fc, ctx, stdLibVersion, unusedArgsComplexity)
+              logFunc(fc, ctx, stdLibVersion, unusedArgsComplexity)
               evaluateFunction(fc, startArgs, unusedArgsComplexity)
             } else
               EvaluationResult(unusedArgsComplexity)
@@ -434,19 +432,24 @@ object EvaluatorV2 {
     }
   }
 
-  private def logFuncComplexity(fc: FUNCTION_CALL, ctx: LoggedEvaluationContext[Environment, Id], stdLibVersion: StdLibVersion, limit: Int): Unit = {
+  private def logFunc(fc: FUNCTION_CALL, ctx: LoggedEvaluationContext[Environment, Id], stdLibVersion: StdLibVersion, limit: Int): Unit = {
     val func     = ctx.ec.functions.get(fc.function)
     val funcName = func.map(_.name).getOrElse(fc.function.funcName)
-    func.foreach { f =>
-      val cost = f.costByLibVersion(stdLibVersion)
-      ctx.log(LET(s"$funcName.@complexity", TRUE), CONST_LONG(cost).asRight[ExecutionError])
-      ctx.log(LET("@complexityLimit", TRUE), CONST_LONG(limit - cost).asRight[ExecutionError])
+    func match {
+      case Some(f) =>
+        val cost = f.costByLibVersion(stdLibVersion)
+        if (limit >= cost) {
+          logFuncArgs(fc, funcName, ctx)
+          ctx.log(LET(s"$funcName.@complexity", TRUE), CONST_LONG(cost).asRight[ExecutionError])
+          ctx.log(LET("@complexityLimit", TRUE), CONST_LONG(limit - cost).asRight[ExecutionError])
+        }
+      case None =>
+        logFuncArgs(fc, funcName, ctx)
     }
   }
 
-  private def logFuncArgs(fc: FUNCTION_CALL, ctx: LoggedEvaluationContext[Environment, Id]): Unit = {
-    val funcName = ctx.ec.functions.get(fc.function).map(_.name).getOrElse(fc.function.funcName)
-    val argsArr  = ARR(fc.args.collect { case arg: EVALUATED => arg }.toIndexedSeq, false)
-    argsArr.foreach(_ => ctx.log(LET(s"$funcName.@args", TRUE), argsArr))
+  private def logFuncArgs(fc: FUNCTION_CALL, name: String, ctx: LoggedEvaluationContext[Environment, Id]): Unit = {
+    val argsArr = ARR(fc.args.collect { case arg: EVALUATED => arg }.toIndexedSeq, false)
+    argsArr.foreach(_ => ctx.log(LET(s"$name.@args", TRUE), argsArr))
   }
 }

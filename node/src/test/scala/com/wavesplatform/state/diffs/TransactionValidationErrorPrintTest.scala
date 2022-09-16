@@ -4,7 +4,7 @@ import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.directives.values.{Expression, V1}
+import com.wavesplatform.lang.directives.values.{Expression, V6}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils.compilerContext
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
@@ -53,11 +53,11 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside with With
 
     val untypedScript = Parser.parseExpr(assetScript).get.value
 
-    val typedScript = ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedScript).explicitGet()._1)
+    val typedScript = ExprScript(V6, ExpressionCompiler(compilerContext(V6, Expression, isAssetScript = false), untypedScript).explicitGet()._1)
       .explicitGet()
 
     val preTypedScript =
-      ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), Parser.parseExpr("true").get.value).explicitGet()._1)
+      ExprScript(V6, ExpressionCompiler(compilerContext(V6, Expression, isAssetScript = false), Parser.parseExpr("true").get.value).explicitGet()._1)
         .explicitGet()
 
     val seed     = Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet()
@@ -107,12 +107,12 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside with With
              |			bytes = base58'3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu'
              |		)
              |		timestamp = 0
-             |		bodyBytes = base58'ZFDBCm7WGpX1zYwdAbbbk2XHyDz2urZGfPHjeiPWuGuemeZEu71BN278PNQPiyzi6gL8UbHjRNsNx6GFk7cgK1zojYtcejRLSeA1wrYD355SPPR5Tgbspjb3HtfgpFbvZ6YEHrmeJ8YgyW99tkQJYqBnQkQA4xxUxzK'
-             |		assetId = base58'FscsGe4DbjBzEoepVCtvUqTgtTvZsAxUemLF6LaBp7Lb'
+             |		bodyBytes = base58'ZFDBCm7WGpX1zYwdAbbbk2XHyDz2urZGfPHjeiPWuGuemeYsL5YvfH7Nf87ebWwX4AhbnuXaNDARaLnSTc42SZbKPXkcbs3ZHNsoF9bRQK5Aw7KjHg7P7Sinbq4wfQWhjbnQNJTQjkfZjX7BNZQ4LnquL9LVyPmXJBh'
+             |		assetId = base58'BG6TEE8VmtvkiVLwc4XmmW7yjiFWezGChTM2tFCNa69B'
              |		feeAssetId = Unit
              |		amount = 1
              |		version = 2
-             |		id = base58'2C5SiigFpTi26aFL7i2FJDDvM7Gahb1Fgbfa7CrwMEaq'
+             |		id = base58'H7eZ7bbbga3rhD6LaUiAiaDZrHGU9ibggsqC1HpZCQjj'
              |		senderPublicKey = base58'EbxDdqXBhj3TEd1UFoi1UE1vm1k7gM9EMYAuLr62iaZF'
              |		attachment = base58''
              |		sender = Address(
@@ -126,12 +126,12 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside with With
              |				bytes = base58'3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu'
              |			)
              |			timestamp = 0
-             |			bodyBytes = base58'ZFDBCm7WGpX1zYwdAbbbk2XHyDz2urZGfPHjeiPWuGuemeZEu71BN278PNQPiyzi6gL8UbHjRNsNx6GFk7cgK1zojYtcejRLSeA1wrYD355SPPR5Tgbspjb3HtfgpFbvZ6YEHrmeJ8YgyW99tkQJYqBnQkQA4xxUxzK'
-             |			assetId = base58'FscsGe4DbjBzEoepVCtvUqTgtTvZsAxUemLF6LaBp7Lb'
+             |			bodyBytes = base58'ZFDBCm7WGpX1zYwdAbbbk2XHyDz2urZGfPHjeiPWuGuemeYsL5YvfH7Nf87ebWwX4AhbnuXaNDARaLnSTc42SZbKPXkcbs3ZHNsoF9bRQK5Aw7KjHg7P7Sinbq4wfQWhjbnQNJTQjkfZjX7BNZQ4LnquL9LVyPmXJBh'
+             |			assetId = base58'BG6TEE8VmtvkiVLwc4XmmW7yjiFWezGChTM2tFCNa69B'
              |			feeAssetId = Unit
              |			amount = 1
              |			version = 2
-             |			id = base58'2C5SiigFpTi26aFL7i2FJDDvM7Gahb1Fgbfa7CrwMEaq'
+             |			id = base58'H7eZ7bbbga3rhD6LaUiAiaDZrHGU9ibggsqC1HpZCQjj'
              |			senderPublicKey = base58'EbxDdqXBhj3TEd1UFoi1UE1vm1k7gM9EMYAuLr62iaZF'
              |			attachment = base58''
              |			sender = Address(
@@ -159,75 +159,37 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside with With
              |		base58'11111112',
              |		1
              |	]
-             |	takeRight.@complexity = 19
-             |	@complexityLimit = 2147483625
-             |	@xs = base58'11111112'
-             |	size.@args = [
-             |		base58'11111112'
-             |	]
-             |	size.@complexity = 1
-             |	@complexityLimit = 2147483624
-             |	@number = 1
-             |	-.@args = [
-             |		8,
-             |		1
-             |	]
-             |	-.@complexity = 1
-             |	@complexityLimit = 2147483623
-             |	drop.@args = [
-             |		base58'11111112',
-             |		7
-             |	]
-             |	drop.@complexity = 1
-             |	@complexityLimit = 2147483622
+             |	takeRight.@complexity = 6
+             |	@complexityLimit = 2147483638
              |	toBytes.@args = [
              |		87
              |	]
              |	toBytes.@complexity = 1
-             |	@complexityLimit = 2147483624
+             |	@complexityLimit = 2147483637
              |	takeRight.@args = [
              |		base58'11111112W',
              |		1
              |	]
-             |	takeRight.@complexity = 19
-             |	@complexityLimit = 2147483605
-             |	@xs = base58'11111112W'
-             |	size.@args = [
-             |		base58'11111112W'
-             |	]
-             |	size.@complexity = 1
-             |	@complexityLimit = 2147483604
-             |	@number = 1
-             |	-.@args = [
-             |		8,
-             |		1
-             |	]
-             |	-.@complexity = 1
-             |	@complexityLimit = 2147483603
-             |	drop.@args = [
-             |		base58'11111112W',
-             |		7
-             |	]
-             |	drop.@complexity = 1
-             |	@complexityLimit = 2147483602
+             |	takeRight.@complexity = 6
+             |	@complexityLimit = 2147483631
              |	NETWORKBYTE = base58'2W'
              |	+.@args = [
              |		base58'2',
              |		base58'2W'
              |	]
-             |	+.@complexity = 10
-             |	@complexityLimit = 2147483595
+             |	+.@complexity = 2
+             |	@complexityLimit = 2147483629
              |	t = TransferTransaction(
              |		recipient = Address(
              |			bytes = base58'3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu'
              |		)
              |		timestamp = 0
-             |		bodyBytes = base58'ZFDBCm7WGpX1zYwdAbbbk2XHyDz2urZGfPHjeiPWuGuemeZEu71BN278PNQPiyzi6gL8UbHjRNsNx6GFk7cgK1zojYtcejRLSeA1wrYD355SPPR5Tgbspjb3HtfgpFbvZ6YEHrmeJ8YgyW99tkQJYqBnQkQA4xxUxzK'
-             |		assetId = base58'FscsGe4DbjBzEoepVCtvUqTgtTvZsAxUemLF6LaBp7Lb'
+             |		bodyBytes = base58'ZFDBCm7WGpX1zYwdAbbbk2XHyDz2urZGfPHjeiPWuGuemeYsL5YvfH7Nf87ebWwX4AhbnuXaNDARaLnSTc42SZbKPXkcbs3ZHNsoF9bRQK5Aw7KjHg7P7Sinbq4wfQWhjbnQNJTQjkfZjX7BNZQ4LnquL9LVyPmXJBh'
+             |		assetId = base58'BG6TEE8VmtvkiVLwc4XmmW7yjiFWezGChTM2tFCNa69B'
              |		feeAssetId = Unit
              |		amount = 1
              |		version = 2
-             |		id = base58'2C5SiigFpTi26aFL7i2FJDDvM7Gahb1Fgbfa7CrwMEaq'
+             |		id = base58'H7eZ7bbbga3rhD6LaUiAiaDZrHGU9ibggsqC1HpZCQjj'
              |		senderPublicKey = base58'EbxDdqXBhj3TEd1UFoi1UE1vm1k7gM9EMYAuLr62iaZF'
              |		attachment = base58''
              |		sender = Address(
@@ -240,71 +202,71 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside with With
              |		base58'',
              |		32
              |	]
-             |	take.@complexity = 1
-             |	@complexityLimit = 2147483594
+             |	take.@complexity = 6
+             |	@complexityLimit = 2147483623
              |	recipientPublicKey = base58''
              |	blake2b256.@args = [
              |		base58''
              |	]
-             |	blake2b256.@complexity = 10
-             |	@complexityLimit = 2147483584
+             |	blake2b256.@complexity = 136
+             |	@complexityLimit = 2147483487
              |	keccak256.@args = [
              |		base58'xyw95Bsby3s4mt6f4FmFDnFVpQBAeJxBFNGzu2cX4dM'
              |	]
-             |	keccak256.@complexity = 10
-             |	@complexityLimit = 2147483574
+             |	keccak256.@complexity = 195
+             |	@complexityLimit = 2147483292
              |	take.@args = [
              |		base58'DRtdYbxMg7YHw4acvDP6xQrvmsRAz3K7gSkH3xBJ5CTL',
              |		20
              |	]
-             |	take.@complexity = 1
-             |	@complexityLimit = 2147483573
+             |	take.@complexity = 6
+             |	@complexityLimit = 2147483286
              |	recipientPublicKeyHash = base58'3aDy5kHaDeXWfQwMrBCRvd6r7gzg'
              |	+.@args = [
              |		base58'6v',
              |		base58'3aDy5kHaDeXWfQwMrBCRvd6r7gzg'
              |	]
-             |	+.@complexity = 10
-             |	@complexityLimit = 2147483563
+             |	+.@complexity = 2
+             |	@complexityLimit = 2147483284
              |	rpkWithVersionAndByte = base58'N8tNz9vAHAwFpa4A8Rgk45q8tNjeC'
              |	blake2b256.@args = [
              |		base58'N8tNz9vAHAwFpa4A8Rgk45q8tNjeC'
              |	]
-             |	blake2b256.@complexity = 10
-             |	@complexityLimit = 2147483553
+             |	blake2b256.@complexity = 136
+             |	@complexityLimit = 2147483148
              |	keccak256.@args = [
              |		base58'CSJhGcnZPNCcHG5gCZuHKArEg8MUy9ridbKZsryV8FEw'
              |	]
-             |	keccak256.@complexity = 10
-             |	@complexityLimit = 2147483543
+             |	keccak256.@complexity = 195
+             |	@complexityLimit = 2147482953
              |	take.@args = [
              |		base58'4sAbTTxFgWFkHC5EutjwtRYgM3Q8V6aBD9EjDKVJ7byk',
              |		4
              |	]
-             |	take.@complexity = 1
-             |	@complexityLimit = 2147483542
+             |	take.@complexity = 6
+             |	@complexityLimit = 2147482947
              |	checksum = base58'2U8tZq'
              |	+.@args = [
              |		base58'N8tNz9vAHAwFpa4A8Rgk45q8tNjeC',
              |		base58'2U8tZq'
              |	]
-             |	+.@complexity = 10
-             |	@complexityLimit = 2147483532
+             |	+.@complexity = 2
+             |	@complexityLimit = 2147482945
              |	recipientAddressFromPublicKey = base58'3PJmMnHHVTTkzvF67HYFjrm5Vj96mM3UtLs'
              |	addressFromRecipient.@args = [
              |		Address(
              |			bytes = base58'3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu'
              |		)
              |	]
-             |	addressFromRecipient.@complexity = 100
-             |	@complexityLimit = 2147483432
+             |	addressFromRecipient.@complexity = 5
+             |	@complexityLimit = 2147482940
              |	recipientAddressFromTx = base58'3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu'
              |	!=.@args = [
              |		base58'3PJmMnHHVTTkzvF67HYFjrm5Vj96mM3UtLs',
              |		base58'3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu'
              |	]
-             |	!=.@complexity = 26
-             |	@complexityLimit = 2147483406
+             |	!=.@complexity = 1
+             |	@complexityLimit = 2147482939
              |	@a = base58'3PJmMnHHVTTkzvF67HYFjrm5Vj96mM3UtLs'
              |	@b = base58'3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu'
              |	==.@args = [
@@ -312,30 +274,30 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside with With
              |		base58'3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu'
              |	]
              |	==.@complexity = 1
-             |	@complexityLimit = 2147483405
+             |	@complexityLimit = 2147482938
              |	!.@args = [
              |		false
              |	]
-             |	!.@complexity = 11
-             |	@complexityLimit = 2147483394
+             |	!.@complexity = 1
+             |	@complexityLimit = 2147482937
              |	@p = false
              |	toBase58String.@args = [
              |		base58'3PJmMnHHVTTkzvF67HYFjrm5Vj96mM3UtLs'
              |	]
-             |	toBase58String.@complexity = 10
-             |	@complexityLimit = 2147483396
+             |	toBase58String.@complexity = 3
+             |	@complexityLimit = 2147482936
              |	recipientAddressStr = "3PJmMnHHVTTkzvF67HYFjrm5Vj96mM3UtLs"
              |	+.@args = [
              |		"Recipient address error:",
              |		"3PJmMnHHVTTkzvF67HYFjrm5Vj96mM3UtLs"
              |	]
-             |	+.@complexity = 10
-             |	@complexityLimit = 2147483386
+             |	+.@complexity = 1
+             |	@complexityLimit = 2147482935
              |	throw.@args = [
              |		"Recipient address error:3PJmMnHHVTTkzvF67HYFjrm5Vj96mM3UtLs"
              |	]
              |	throw.@complexity = 1
-             |	@complexityLimit = 2147483385
+             |	@complexityLimit = 2147482934
              |""".stripMargin
         TxValidationError.logToString(see.log) shouldBe expected
       }

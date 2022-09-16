@@ -1,6 +1,8 @@
 package com.wavesplatform.lang.v1.evaluator.ctx
 
-import cats._
+import cats.*
+import cats.syntax.functor.*
+import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.LET
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
@@ -25,15 +27,26 @@ case class EvaluationContext[C[_[_]], F[_]](
     )
 }
 
-case class LoggedEvaluationContext[C[_[_]], F[_]](l: LetLogCallback[F], ec: EvaluationContext[C, F]) {
-  val loggedLets: util.IdentityHashMap[LET, Unit] = new util.IdentityHashMap()
+case class LoggedEvaluationContext[C[_[_]], F[_]: Monad](l: LetLogCallback[F], ec: EvaluationContext[C, F]) {
+  val loggedLets: util.IdentityHashMap[LET, Unit]          = new util.IdentityHashMap()
+  val loggedErrors: collection.mutable.Set[ExecutionError] = collection.mutable.Set()
 
-  def log(let: LET, result: LetExecResult[F]): Unit =
+  def log(let: LET, result: LetExecResult[F]): F[Unit] = {
+    result.map {
+      case Left(err) if !loggedErrors.contains(err) =>
+        loggedErrors.addOne(err)
+        add(let, result)
+      case Left(err) => ()
+      case _         => add(let, result)
+    }
+  }
+
+  private def add(let: LET, result: LetExecResult[F]): Unit =
     loggedLets.computeIfAbsent(let, _ => l(let.name)(result))
 }
 
 object LoggedEvaluationContext {
-  class Lenses[F[_], C[_[_]]] {
+  class Lenses[F[_]: Monad, C[_[_]]] {
     val types: Lens[LoggedEvaluationContext[C, F], Map[String, FINAL]]     = lens[LoggedEvaluationContext[C, F]] >> Symbol("ec") >> Symbol("typeDefs")
     val lets: Lens[LoggedEvaluationContext[C, F], Map[String, LazyVal[F]]] = lens[LoggedEvaluationContext[C, F]] >> Symbol("ec") >> Symbol("letDefs")
     val funcs: Lens[LoggedEvaluationContext[C, F], Map[FunctionHeader, BaseFunction[C]]] =
