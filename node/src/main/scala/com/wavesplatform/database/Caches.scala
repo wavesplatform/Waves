@@ -7,6 +7,7 @@ import cats.syntax.monoid.*
 import cats.syntax.option.*
 import com.google.common.cache.*
 import com.google.common.collect.ArrayListMultimap
+import com.google.common.hash.{Funnels, BloomFilter as GBloomFilter}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -59,8 +60,11 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   private val blocksTs                               = new util.TreeMap[Int, Long]      // Height -> block timestamp, assume sorted by key.
   private var oldestStoredBlockTimestamp             = Long.MaxValue
   private val transactionIds                         = new util.HashMap[ByteStr, Int]() // TransactionId -> height
+
+  private val bf = GBloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), 1_000_000)
+
   protected def forgetTransaction(id: ByteStr): Unit = transactionIds.remove(id)
-  override def containsTransaction(tx: Transaction): Boolean = transactionIds.containsKey(tx.id()) || {
+  override def containsTransaction(tx: Transaction): Boolean = bf.mightContain(tx.id().arr) && transactionMeta(tx.id()).nonEmpty || {
     if (tx.timestamp - 2.hours.toMillis <= oldestStoredBlockTimestamp) {
       LevelDBStats.miss.record(1)
       transactionMeta(tx.id()).nonEmpty
@@ -79,7 +83,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     oldestStoredBlockTimestamp = oldestTs
     val bts = this.lastBlock.fold(0L)(_.header.timestamp) - dbSettings.rememberBlocks.toMillis
     blocksTs.entrySet().removeIf(_.getValue < bts)
-    transactionIds.entrySet().removeIf(_.getValue < oldestBlock)
   }
 
   private val leaseBalanceCache: LoadingCache[Address, LeaseBalance] = cache(dbSettings.maxCacheSize, loadLeaseBalance)
@@ -210,7 +213,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     val transactionMeta     = Seq.newBuilder[(TxMeta, Transaction)]
     val addressTransactions = ArrayListMultimap.create[AddressId, TransactionId]()
     for (nti <- diff.transactions) {
-      transactionIds.put(nti.transaction.id(), newHeight)
+      bf.put(nti.transaction.id().arr)
       transactionMeta += (TxMeta(Height(newHeight), nti.applied, nti.spentComplexity) -> nti.transaction)
       for (addr <- nti.affected) {
         addressTransactions.put(addressIdWithFallback(addr, newAddressIds), TransactionId(nti.transaction.id()))
