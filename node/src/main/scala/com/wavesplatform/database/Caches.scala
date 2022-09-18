@@ -61,9 +61,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   private var oldestStoredBlockTimestamp             = Long.MaxValue
   private val transactionIds                         = new util.HashMap[ByteStr, Int]() // TransactionId -> height
 
-  private val bf = GBloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), 1_000_000)
-
-
+  private val bf = GBloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), 200_000_000)
 
   protected def forgetTransaction(id: ByteStr): Unit = transactionIds.remove(id)
   override def containsTransaction(tx: Transaction): Boolean = bf.mightContain(tx.id().arr) && transactionMeta(tx.id()).nonEmpty || {

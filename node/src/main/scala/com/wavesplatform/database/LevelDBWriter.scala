@@ -475,7 +475,7 @@ abstract class LevelDBWriter private[database] (
       }
 
       for ((id, (txm, tx, num)) <- transactions) {
-        rw.put(Keys.transactionAt(Height(height), num), Some((txm, tx)))
+//        rw.put(Keys.transactionAt(Height(height), num), Some((txm, tx)))
         rw.put(Keys.transactionMetaById(id), Some(TransactionMeta(height, num, tx.tpe.id, !txm.succeeded)))
       }
 

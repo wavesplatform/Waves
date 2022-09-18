@@ -18,6 +18,7 @@ import com.wavesplatform.state.{Blockchain, Diff, Height, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB
+import com.google.common.hash.{Funnels, BloomFilter as GBloomFilter}
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -304,6 +305,15 @@ object Explorer extends ScorexLogging {
             count += 1
           }
           log.info(s"Found $count addresses")
+        case "TC" =>
+          val bf = GBloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), 200_000_000L)
+          log.info("Counting transactions")
+          var count = 0L
+          db.iterateOver(KeyTags.TransactionMetaById) { e =>
+            bf.put(e.getKey.drop(2))
+            count += 1
+          }
+          log.info(s"Found $count transactions")
       }
     } finally db.close()
   }
