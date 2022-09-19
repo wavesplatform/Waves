@@ -3,9 +3,12 @@ package com.wavesplatform.ride
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.state.AccountScriptInfo
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription}
 import com.wavesplatform.state.InvokeScriptResult.DataEntry
+import com.wavesplatform.transaction.Asset
 import play.api.libs.json.*
+
+import scala.util.Try
 
 case class RideRunnerInput(
     scriptAddress: Address,
@@ -16,7 +19,9 @@ case class RideRunnerInput(
     activatedFeatures: Map[Short, Int],
     accountData: Map[Address, Map[String, DataEntry]],
     hasData: Map[Address, Boolean],
-    resolveAlias: Map[Alias, Address]
+    resolveAlias: Map[Alias, Address],
+    balance: Map[Address, Map[Asset, Long]],
+    // assetDescription: Map[Asset, AssetDescription]
 )
 object RideRunnerInput {
 
@@ -39,6 +44,14 @@ object RideRunnerInput {
   implicit def aliasMapFormat[T: Format]: Format[Map[Alias, T]] = mapFormat[Alias, T](
     _.name,
     x => Alias.fromString(x).fold[JsResult[Alias]](e => JsError(s"Can't parse Alias '$x': $e"), JsSuccess(_))
+  )
+
+  implicit def assetMapFormat[T: Format]: Format[Map[Asset, T]] = mapFormat[Asset, T](
+    _.toString,
+    { str =>
+      val compatStr = if (str == "WAVES") None else Some(str)
+      Try(Asset.fromString(compatStr)).fold[JsResult[Asset]](e => JsError(s"Can't parse Asset '$str': ${e.getMessage}"), JsSuccess(_))
+    }
   )
 
   implicit val scriptFormat: Format[Script] = implicitly[Format[String]]

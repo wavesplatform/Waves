@@ -65,9 +65,16 @@ func foo(x: Int) = {
   let carl = addressFromRecipient(Alias("carl"))
   let bob = Address(base58'3PE7TH41wVuhn2SpAwWBBzeGxxzz8wXrb6L')
 
-  let a = getIntegerValue(alice, "a")
-  let b = if (isDataStorageUntouched(carl)) then 1 else 0
-  ([], x + a + b)
+  let asset = base58'8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS'
+
+  let x1 = getIntegerValue(alice, "a")
+  let x2 = if (isDataStorageUntouched(carl)) then 1 else 0
+  let x3 = assetBalance(bob, asset)
+  # let x4 = value(assetInfo(asset)).decimals
+  # let x5 = value(blockInfoByHeight(3296627)).height
+  # let x6 = value(transactionHeightById(base58'FCvZHNuwR2ZKjCFdSpVyNz1CusvfYHoNyUYbfSD2Kh4g'))
+  # let x7 = wavesBalance(carl).available
+  ([], x + x1 + x2 + x3) # + x4 + x5 + x6 + x7)
 }"""
     val estimator      = ScriptEstimatorV3(fixOverflow = true, overhead = false)
     val compiledScript = API.compile(input = scriptSrc, estimator).explicitGet()
@@ -135,7 +142,8 @@ func foo(x: Int) = {
 
       override def leaseBalance(address: Address): LeaseBalance = kill("leaseBalance")
 
-      override def balance(address: Address, mayBeAssetId: Asset): Long = kill("balance")
+      override def balance(address: Address, mayBeAssetId: Asset): Long =
+        input.balance.get(address).flatMap(_.get(mayBeAssetId)).getOrElse(0)
 
       override def transferById(id: BlockId): Option[(Int, TransferTransaction)] = kill("transferById")
 
