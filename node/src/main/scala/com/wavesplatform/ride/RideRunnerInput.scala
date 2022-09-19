@@ -4,6 +4,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.AccountScriptInfo
+import com.wavesplatform.state.InvokeScriptResult.DataEntry
 import play.api.libs.json.*
 
 case class RideRunnerInput(
@@ -12,7 +13,8 @@ case class RideRunnerInput(
     request: JsObject,
     accountScript: Map[Address, AccountScriptInfo],
     height: Int,
-    activatedFeatures: Map[Short, Int]
+    activatedFeatures: Map[Short, Int],
+    accountData: Map[Address, Map[String, DataEntry]]
 )
 object RideRunnerInput {
 
@@ -41,8 +43,7 @@ object RideRunnerInput {
 
   implicit val rideRunnerInputFormat: OFormat[RideRunnerInput] = Json.format
 
-  def mapFormat[K, V: Format](stringifyKey: K => String, parseKey: String => JsResult[K]): Format[Map[K, V]] = {
-    val vReads = implicitly[Reads[V]]
+  def mapFormat[K, V: Format](stringifyKey: K => String, parseKey: String => JsResult[K])(implicit vFormat: Format[V]): Format[Map[K, V]] = {
     Format(
       fjs = Reads {
         case JsObject(xs) =>
@@ -50,12 +51,12 @@ object RideRunnerInput {
             for {
               r <- r
               k <- parseKey(k)
-              v <- vReads.reads(v)
+              v <- vFormat.reads(v)
             } yield r.updated(k, v)
           }
         case x => JsError(s"Can't parse map: $x")
       },
-      tjs = Writes.map[V].contramap(_.map { case (k, v) => stringifyKey(k) -> v })
+      tjs = Writes.map[V](vFormat).contramap(_.map { case (k, v) => stringifyKey(k) -> v })
     )
   }
 }

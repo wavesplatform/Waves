@@ -30,6 +30,17 @@ import scala.io.Source
 import scala.util.{Try, Using}
 
 object RideRunner {
+  /*
+  seed: test
+
+  nonce 0:
+  Public key: Cq5itmx4wbYuogySAoUp58MimLLkQrFFLr1tpJy2BYp1
+  Address in 'W': 3PCH3sUqeiPFAhrKzEnSEXoE2B6G9YNromV
+
+  nonce 1:
+  Public key: BWfushcMzh4YhHUjaHAW4iPUJHtCZ6SrpkDXtEhAiRQn
+  Address in 'W': 3P6GhtTsABtYUgzhXTA4cDwbqqy7HqruiQQ
+   */
   def main(args: Array[String]): Unit = {
     val basePath     = args(0)
     val nodeSettings = Application.loadApplicationConfig(Some(new File(s"$basePath/node/waves.conf")))
@@ -47,7 +58,8 @@ object RideRunner {
 
 @Callable(inv)
 func foo(x: Int) = {
-  ([], x)
+  let address = Address(base58'3P6GhtTsABtYUgzhXTA4cDwbqqy7HqruiQQ')
+  ([], getIntegerValue(address, "integerkey") + x)
 }
     """
     val estimator      = ScriptEstimatorV3(fixOverflow = true, overhead = false)
@@ -108,7 +120,8 @@ func foo(x: Int) = {
       override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee = kill("filledVolumeAndFee")
 
       /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
-      override def accountData(acc: Address, key: String): Option[DataEntry[_]] = kill("accountData")
+      override def accountData(acc: Address, key: String): Option[DataEntry[_]] =
+        input.accountData(acc).get(key)
 
       override def leaseBalance(address: Address): LeaseBalance = kill("leaseBalance")
 
