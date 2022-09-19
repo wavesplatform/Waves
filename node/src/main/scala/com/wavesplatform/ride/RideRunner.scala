@@ -9,10 +9,12 @@ import com.wavesplatform.api.http.requests.byteStrFormat
 import com.wavesplatform.api.http.utils.{UtilsEvaluator, UtilsInvocationRequest}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.lang.directives.values.StdLibVersion
+import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.serialization.SerdeV1
+import com.wavesplatform.lang.{API, ValidationError}
 import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
@@ -37,6 +39,19 @@ object RideRunner {
     }
 
     val input = Json.parse(Using(Source.fromFile(new File(s"$basePath/input.json")))(_.getLines().mkString("\n")).get).as[RideRunnerInput]
+    val scriptSrc =
+      """
+{-#STDLIB_VERSION 6 #-}
+{-#SCRIPT_TYPE ACCOUNT #-}
+{-#CONTENT_TYPE DAPP #-}
+
+@Callable(inv)
+func foo(x: Int) = {
+  ([], x)
+}
+    """
+    val estimator      = ScriptEstimatorV3(fixOverflow = true, overhead = false)
+    val compiledScript = API.compile(input = scriptSrc, estimator).explicitGet()
 
     def kill(methodName: String) = throw new RuntimeException(methodName)
     val blockchain: Blockchain = new Blockchain {
@@ -46,17 +61,15 @@ object RideRunner {
 
       override def accountScript(address: Address): Option[AccountScriptInfo] = {
         // 3PCH3sUqeiPFAhrKzEnSEXoE2B6G9YNromV
-        /*
-          {-#STDLIB_VERSION 6 #-}
-          {-#SCRIPT_TYPE ACCOUNT #-}
-          {-#CONTENT_TYPE DAPP #-}
-
-          @Callable(inv)
-          func foo() = {
-            []
-          }
-         */
-        input.accountScript.get(address)
+        input.accountScript.get(address).map { input =>
+          input.copy(
+            script = Script.fromBase64String(Base64.encode(compiledScript.bytes)).explicitGet(),
+            verifierComplexity = compiledScript.verifierComplexity,
+            complexitiesByEstimator = Map(
+              estimator.version -> compiledScript.callableComplexities
+            )
+          )
+        }
       }
 
       override def blockHeader(height: Int) = kill("blockHeader")
@@ -142,7 +155,7 @@ object RideRunner {
     val apiResult = Try(exprE.flatMap { exprE =>
       val evaluated = for {
         expr <- exprE
-        limit = 1000 // Int.MaxValue // settings.evaluateScriptComplexityLimit
+        limit = Int.MaxValue // settings.evaluateScriptComplexityLimit
         (result, complexity, log) <- UtilsEvaluator.executeExpression(blockchain, script, scriptAddress, pk, limit)(expr)
       } yield {
         Json.obj(
@@ -157,7 +170,6 @@ object RideRunner {
     }.merge)
 
     println(s"apiResult: $apiResult")
-//    complete(apiResult ++ request ++ Json.obj("address" -> address.toString))
   }
 
   // UtilsApiRoute
