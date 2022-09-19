@@ -229,7 +229,7 @@ object Importer extends ScorexLogging {
 
             Task
               .parTraverse(block.transactionData) {
-                case p: Proven => Task(p.firstProofIsValidSignature())
+                case p: Proven => Task(p.firstProofIsValidSignature)
                 case s: Signed => Task(s.signaturesValid())
                 case _         => Task.unit
               }

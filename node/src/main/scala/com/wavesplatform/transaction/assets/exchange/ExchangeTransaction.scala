@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import cats.implicits.toFlatMapOps
 import com.wavesplatform.account.{AddressScheme, PrivateKey, PublicKey}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
@@ -38,8 +37,8 @@ case class ExchangeTransaction(
 
   override protected def verifyFirstProof(): Either[GenericError, Unit] =
     super.verifyFirstProof().tap { _ =>
-      order1.firstProofIsValidSignature()
-      order2.firstProofIsValidSignature()
+      order1.firstProofIsValidSignature
+      order2.firstProofIsValidSignature
     }
 
 

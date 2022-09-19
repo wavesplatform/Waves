@@ -29,7 +29,7 @@ object Keys {
 
   val version: Key[Int]               = intKey(Version, default = 1)
   val height: Key[Int]                = intKey(Height)
-  def score(height: Int): Key[BigInt] = Key(Score, h(height), Option(_).fold(BigInt(0))(BigInt(_)), _.toByteArray)
+  def score(height: Int): Key[BigInt] = Key(Score, h(height), v => if (v != null && v.length > 0) BigInt(v) else BigInt(0), _.toByteArray)
 
   def heightOf(blockId: ByteStr): Key[Option[Int]] = Key.opt[Int](HeightOf, blockId.arr, Ints.fromByteArray, Ints.toByteArray)
 

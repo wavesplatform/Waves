@@ -282,7 +282,7 @@ object Verifier extends ScorexLogging {
     }
 
   def verifyAsEllipticCurveSignature[T <: Proven](pt: T, checkWeakPk: Boolean): Either[GenericError, T] =
-    pt.firstProofIsValidSignature().map(_ => pt)
+    pt.firstProofIsValidSignature.map(_ => pt)
 
   @VisibleForTesting
   private[smart] def buildLogs(

@@ -12,7 +12,7 @@ trait Proven extends Authorized {
     if (proofs.size != 1) Left(GenericError("Transactions from non-scripted accounts must have exactly 1 proof"))
     else Either.cond(crypto.verify(proofs.proofs.head, bodyBytes(), sender), (), GenericError(s"Proof doesn't validate as signature for $this"))
 
-  val firstProofIsValidSignature: Coeval[Either[GenericError, Unit]] = Coeval.evalOnce(verifyFirstProof())
+  lazy val firstProofIsValidSignature: Either[GenericError, Unit] = verifyFirstProof()
 }
 
 object Proven {

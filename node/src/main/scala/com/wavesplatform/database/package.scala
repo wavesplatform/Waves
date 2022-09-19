@@ -55,7 +55,7 @@ package object database {
     }
 
     file.getAbsoluteFile.getParentFile.mkdirs()
-    LevelDBFactory.factory.open(file, options)
+    new InMemoryDB(LevelDBFactory.factory.open(file, options))
   }
 
   final type DBEntry = JMap.Entry[Array[Byte], Array[Byte]]

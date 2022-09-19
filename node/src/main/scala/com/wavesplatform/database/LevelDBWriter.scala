@@ -1,5 +1,6 @@
 package com.wavesplatform.database
 
+import java.io.File
 import java.util
 
 import cats.data.Ior
@@ -161,6 +162,8 @@ abstract class LevelDBWriter private[database] (
 ) extends Caches(spendableBalanceChanged) {
 
   private[this] val log = LoggerFacade(LoggerFactory.getLogger(classOf[LevelDBWriter]))
+
+  val txdb = new TXDB(new File(dbSettings.directory).getCanonicalPath + "/../transactions")
 
   def orderFilter: BloomFilter
   def dataKeyFilter: BloomFilter
@@ -475,7 +478,6 @@ abstract class LevelDBWriter private[database] (
       }
 
       for ((id, (txm, tx, num)) <- transactions) {
-//        rw.put(Keys.transactionAt(Height(height), num), Some((txm, tx)))
         rw.put(Keys.transactionMetaById(id), Some(TransactionMeta(height, num, tx.tpe.id, !txm.succeeded)))
       }
 
@@ -791,10 +793,7 @@ abstract class LevelDBWriter private[database] (
   override def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)] = readOnly(transactionInfo(id, _))
 
   protected def transactionInfo(id: ByteStr, db: ReadOnlyDB): Option[(TxMeta, Transaction)] =
-    for {
-      tm        <- db.get(Keys.transactionMetaById(TransactionId(id)))
-      (txm, tx) <- db.get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort)))
-    } yield (txm, tx)
+    transactionMeta(id).map(tm => tm -> txdb.load(id))
 
   override def transactionMeta(id: ByteStr): Option[TxMeta] = readOnly { db =>
     db.get(Keys.transactionMetaById(TransactionId(id))).map { tm =>

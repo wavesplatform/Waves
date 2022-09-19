@@ -175,7 +175,7 @@ case class Diff(
     Diff
       .combine(portfolios, newer.portfolios)
       .map { portfolios =>
-        val newFilter = transactionFilter.copy().tap(_.putAll(newer.transactionFilter))
+        newer.transactions.foreach(nti => transactionFilter.put(nti.transaction.id().arr))
         Diff(
           transactions = transactions ++ newer.transactions,
           portfolios = portfolios,
@@ -192,7 +192,7 @@ case class Diff(
           scriptResults = scriptResults.combine(newer.scriptResults),
           scriptsComplexity = scriptsComplexity + newer.scriptsComplexity,
           ethereumTransactionMeta = ethereumTransactionMeta ++ newer.ethereumTransactionMeta,
-          transactionFilter = newFilter
+          transactionFilter = transactionFilter
         )
       }
 }
@@ -266,7 +266,9 @@ object Diff {
       scriptsComplexity,
       scriptResults,
       ethereumTransactionMeta,
-      BloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), 10000, 0.01f).tap(_.put(nti.transaction.id().arr))
+      BloomFilter
+        .create[Array[Byte]](Funnels.byteArrayFunnel(), 10000, 0.01f)
+        .tap(_.put(nti.transaction.id().arr))
     )
 
   val empty: Diff = Diff()
