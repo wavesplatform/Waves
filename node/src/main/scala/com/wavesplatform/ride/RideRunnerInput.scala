@@ -1,6 +1,6 @@
 package com.wavesplatform.ride
 
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.AccountScriptInfo
@@ -14,7 +14,9 @@ case class RideRunnerInput(
     accountScript: Map[Address, AccountScriptInfo],
     height: Int,
     activatedFeatures: Map[Short, Int],
-    accountData: Map[Address, Map[String, DataEntry]]
+    accountData: Map[Address, Map[String, DataEntry]],
+    hasData: Map[Address, Boolean],
+    resolveAlias: Map[Alias, Address]
 )
 object RideRunnerInput {
 
@@ -34,12 +36,23 @@ object RideRunnerInput {
     x => Address.fromString(x).fold[JsResult[Address]](e => JsError(s"Can't parse Address '$x': $e"), JsSuccess(_))
   )
 
+  implicit def aliasMapFormat[T: Format]: Format[Map[Alias, T]] = mapFormat[Alias, T](
+    _.name,
+    x => Alias.fromString(x).fold[JsResult[Alias]](e => JsError(s"Can't parse Alias '$x': $e"), JsSuccess(_))
+  )
+
   implicit val scriptFormat: Format[Script] = implicitly[Format[String]]
     .bimap(
       Script.fromBase64String(_).explicitGet(), // TODO JsError instead
       _.bytes().base64Raw
     )
   implicit val accountScriptInfoFormat: OFormat[AccountScriptInfo] = Json.format
+
+  implicit val aliasFormat: Format[Alias] = implicitly[Format[String]]
+    .bimap(
+      Alias.fromString(_).explicitGet(), // TODO JsError instead
+      _.name
+    )
 
   implicit val rideRunnerInputFormat: OFormat[RideRunnerInput] = Json.format
 

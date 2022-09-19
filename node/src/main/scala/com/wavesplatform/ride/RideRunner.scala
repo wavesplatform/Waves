@@ -19,7 +19,7 @@ import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, DataEntry, LeaseBalance, TxMeta, VolumeAndFee}
-import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError}
+import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError, ScriptExecutionError}
 import com.wavesplatform.transaction.smart.script.trace.TraceStep
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
@@ -33,13 +33,17 @@ object RideRunner {
   /*
   seed: test
 
-  nonce 0:
+  Nonce is: 0
   Public key: Cq5itmx4wbYuogySAoUp58MimLLkQrFFLr1tpJy2BYp1
   Address in 'W': 3PCH3sUqeiPFAhrKzEnSEXoE2B6G9YNromV
 
-  nonce 1:
+  Nonce is: 1
   Public key: BWfushcMzh4YhHUjaHAW4iPUJHtCZ6SrpkDXtEhAiRQn
   Address in 'W': 3P6GhtTsABtYUgzhXTA4cDwbqqy7HqruiQQ
+
+  Nonce is: 2
+  Public key: 9K1Nu1udY4NAv77ktLqGAAxRtkL1epGA7tickpjDgPjP
+  Address in 'W': 3PE7TH41wVuhn2SpAwWBBzeGxxzz8wXrb6L
    */
   def main(args: Array[String]): Unit = {
     val basePath     = args(0)
@@ -49,25 +53,30 @@ object RideRunner {
       override val chainId: Byte = 'W'.toByte
     }
 
-    val input = Json.parse(Using(Source.fromFile(new File(s"$basePath/input.json")))(_.getLines().mkString("\n")).get).as[RideRunnerInput]
-    val scriptSrc =
-      """
+    val input          = Json.parse(Using(Source.fromFile(new File(s"$basePath/input.json")))(_.getLines().mkString("\n")).get).as[RideRunnerInput]
+    val scriptSrc      = """
 {-#STDLIB_VERSION 6 #-}
 {-#SCRIPT_TYPE ACCOUNT #-}
 {-#CONTENT_TYPE DAPP #-}
 
 @Callable(inv)
 func foo(x: Int) = {
-  let address = Address(base58'3P6GhtTsABtYUgzhXTA4cDwbqqy7HqruiQQ')
-  ([], getIntegerValue(address, "integerkey") + x)
-}
-    """
+  let alice = Address(base58'3P6GhtTsABtYUgzhXTA4cDwbqqy7HqruiQQ')
+  let carl = addressFromRecipient(Alias("carl"))
+  let bob = Address(base58'3PE7TH41wVuhn2SpAwWBBzeGxxzz8wXrb6L')
+
+  let a = getIntegerValue(alice, "a")
+  let b = if (isDataStorageUntouched(carl)) then 1 else 0
+  ([], x + a + b)
+}"""
     val estimator      = ScriptEstimatorV3(fixOverflow = true, overhead = false)
     val compiledScript = API.compile(input = scriptSrc, estimator).explicitGet()
 
     def kill(methodName: String) = throw new RuntimeException(methodName)
+    // TODO default values?
     val blockchain: Blockchain = new Blockchain {
-      override def hasData(address: Address): Boolean = kill("hasData")
+      // conflicts with accountData
+      override def hasData(address: Address): Boolean = input.hasData.getOrElse(address, throw new RuntimeException(s"hasData($address)"))
 
       override def transactionInfo(id: BlockId) = kill("transactionInfo")
 
@@ -113,7 +122,8 @@ func foo(x: Int) = {
 
       override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription] = kill("assetDescription")
 
-      override def resolveAlias(a: Alias): Either[ValidationError, Address] = kill("resolveAlias")
+      override def resolveAlias(a: Alias): Either[ValidationError, Address] =
+        input.resolveAlias.get(a).toRight(AliasDoesNotExist(a): ValidationError)
 
       override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = kill("leaseDetails")
 
