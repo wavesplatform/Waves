@@ -5,10 +5,11 @@ import com.google.protobuf.UnsafeByteOperations.unsafeWrap
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.InvokeScriptResult.DataEntry
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Height}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Height, TxMeta}
 import com.wavesplatform.transaction.Asset
 import play.api.libs.json.*
 
@@ -27,7 +28,8 @@ case class RideRunnerInput(
     balance: Map[Address, Map[Asset, Long]] = Map.empty,
     assetDescription: Map[Asset, AssetDescription] = Map.empty,
     blockHeader: Map[Int, SignedBlockHeader] = Map.empty,
-    hitSource: Map[Int, BlockId] = Map.empty // VRF
+    hitSource: Map[Int, BlockId] = Map.empty, // VRF
+    transactionMeta: Map[ByteStr, TxMeta] = Map.empty
 )
 object RideRunnerInput {
 
@@ -40,6 +42,11 @@ object RideRunnerInput {
   implicit def intMapFormat[T: Format]: Format[Map[Int, T]] = mapFormat[Int, T](
     _.toString,
     x => x.toIntOption.fold[JsResult[Int]](JsError(s"Can't parse int: $x"))(JsSuccess(_))
+  )
+
+  implicit def byteStrMapFormat[T: Format]: Format[Map[ByteStr, T]] = mapFormat[ByteStr, T](
+    _.base64,
+    x => Try(ByteStr(decodeBytesFromStr(x))).fold[JsResult[ByteStr]](e => JsError(s"Can't parse ByteStr '$x': ${e.getMessage}"), JsSuccess(_))
   )
 
   implicit def addressMapFormat[T: Format]: Format[Map[Address, T]] = mapFormat[Address, T](
@@ -75,12 +82,7 @@ object RideRunnerInput {
 
   implicit val byteStringFormat: Format[ByteString] = implicitly[Format[String]]
     .bimap(
-      str =>
-        unsafeWrap(
-          if (str.startsWith("base58:")) Base58.decode(str.substring(7))
-          else if (str.startsWith(Base64.Prefix)) Base64.decode(str)
-          else Base58.decode(str)
-        ),
+      str => unsafeWrap(decodeBytesFromStr(str)),
       x => s"${Base64.Prefix}${Base64.encode(x.toByteArray)}"
     )
 
@@ -95,6 +97,8 @@ object RideRunnerInput {
 
   implicit val blockHeaderFormat: OFormat[BlockHeader]             = Json.format
   implicit val signedBlockHeaderFormat: OFormat[SignedBlockHeader] = Json.format
+
+  implicit val txMetaFormat: OFormat[TxMeta] = Json.format
 
   implicit val rideRunnerInputFormat: OFormat[RideRunnerInput] = Json.using[Json.WithDefaultValues].format
 
@@ -114,4 +118,9 @@ object RideRunnerInput {
       tjs = Writes.map[V](vFormat).contramap(_.map { case (k, v) => stringifyKey(k) -> v })
     )
   }
+
+  def decodeBytesFromStr(str: String): Array[Byte] =
+    if (str.startsWith("base58:")) Base58.decode(str.substring(7))
+    else if (str.startsWith(Base64.Prefix)) Base64.decode(str)
+    else Base58.decode(str)
 }

@@ -72,15 +72,17 @@ func foo(x: Int) = {
   let jane = Address(base58'3P4xDBqzXgR8HyXoyNn1C8Bd88h4rsEBMHA')
 
   let asset = base58'8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS'
+  let txId = base58'FCvZHNuwR2ZKjCFdSpVyNz1CusvfYHoNyUYbfSD2Kh4g'
 
   let x1 = getIntegerValue(alice, "a")
   let x2 = if (isDataStorageUntouched(carl)) then 1 else 0
   let x3 = assetBalance(bob, asset)
   let x4 = value(assetInfo(asset)).decimals
   let x5 = value(blockInfoByHeight(3296627)).height
-  let x6 = value(transactionHeightById(base58'FCvZHNuwR2ZKjCFdSpVyNz1CusvfYHoNyUYbfSD2Kh4g'))
-  let x7 = wavesBalance(carl).available
-  ([], x + x1 + x2 + x3 + x4 + x5) # + x6 + x7)
+  let x6 = value(transactionHeightById(txId))
+  let x7 = value(transferTransactionById(txId))
+  let x8 = wavesBalance(carl).available
+  ([], x + x1 + x2 + x3 + x4 + x5 + x6) # + x7 + x8)
 }"""
     val estimator      = ScriptEstimatorV3(fixOverflow = true, overhead = false)
     val compiledScript = API.compile(input = scriptSrc, estimator).explicitGet()
@@ -160,7 +162,7 @@ func foo(x: Int) = {
 
       override def wavesAmount(height: Int): BigInt = kill("wavesAmount")
 
-      override def transactionMeta(id: BlockId): Option[TxMeta] = kill("transactionMeta")
+      override def transactionMeta(id: ByteStr): Option[TxMeta] = input.transactionMeta.get(id)
 
       override def balanceAtHeight(address: Address, height: Int, assetId: Asset): Option[(Int, Long)] = kill("balanceAtHeight")
 
