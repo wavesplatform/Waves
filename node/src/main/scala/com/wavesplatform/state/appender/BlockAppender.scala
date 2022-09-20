@@ -6,13 +6,13 @@ import cats.data.EitherT
 import com.wavesplatform.block.Block
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.metrics._
-import com.wavesplatform.network._
+import com.wavesplatform.metrics.*
+import com.wavesplatform.network.*
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, InvalidSignature}
 import com.wavesplatform.utils.{ScorexLogging, Time}
-import com.wavesplatform.utx.UtxPoolImpl
+import com.wavesplatform.utx.UtxForAppender
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
@@ -22,9 +22,9 @@ import monix.execution.Scheduler
 
 object BlockAppender extends ScorexLogging {
   def apply(
-      blockchainUpdater: BlockchainUpdater with Blockchain,
+      blockchainUpdater: BlockchainUpdater & Blockchain,
       time: Time,
-      utxStorage: UtxPoolImpl,
+      utxStorage: UtxForAppender,
       pos: PoSSelector,
       scheduler: Scheduler,
       verify: Boolean = true
@@ -39,15 +39,15 @@ object BlockAppender extends ScorexLogging {
     }.executeOn(scheduler)
 
   def apply(
-      blockchainUpdater: BlockchainUpdater with Blockchain,
+      blockchainUpdater: BlockchainUpdater & Blockchain,
       time: Time,
-      utxStorage: UtxPoolImpl,
+      utxStorage: UtxForAppender,
       pos: PoSSelector,
       allChannels: ChannelGroup,
       peerDatabase: PeerDatabase,
       scheduler: Scheduler
   )(ch: Channel, newBlock: Block): Task[Unit] = {
-    import metrics._
+    import metrics.*
     implicit val implicitTime: Time = time
 
     val span = createApplySpan(newBlock)
@@ -88,7 +88,7 @@ object BlockAppender extends ScorexLogging {
       .onErrorHandle(e => log.warn("Error happened after block appending", e))
   }
 
-  //noinspection TypeAnnotation,ScalaStyle
+  // noinspection TypeAnnotation,ScalaStyle
   private[this] object metrics {
     def createApplySpan(block: Block) = {
       Kamon
