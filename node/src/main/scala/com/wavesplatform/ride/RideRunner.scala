@@ -8,6 +8,7 @@ import com.wavesplatform.api.http.ApiError.{ConflictedRequestStructure, InvalidM
 import com.wavesplatform.api.http.requests.byteStrFormat
 import com.wavesplatform.api.http.utils.{UtilsEvaluator, UtilsInvocationRequest}
 import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.lang.directives.values.StdLibVersion
@@ -79,7 +80,7 @@ func foo(x: Int) = {
   let x5 = value(blockInfoByHeight(3296627)).height
   let x6 = value(transactionHeightById(base58'FCvZHNuwR2ZKjCFdSpVyNz1CusvfYHoNyUYbfSD2Kh4g'))
   let x7 = wavesBalance(carl).available
-  ([], x + x1 + x2 + x3 + x4) # + x5 + x6 + x7)
+  ([], x + x1 + x2 + x3 + x4 + x5) # + x6 + x7)
 }"""
     val estimator      = ScriptEstimatorV3(fixOverflow = true, overhead = false)
     val compiledScript = API.compile(input = scriptSrc, estimator).explicitGet()
@@ -105,9 +106,9 @@ func foo(x: Int) = {
         }
       }
 
-      override def blockHeader(height: Int) = kill("blockHeader")
+      override def blockHeader(height: Int): Option[SignedBlockHeader] = input.blockHeader.get(height)
 
-      override def hitSource(height: Int) = kill("hitSource")
+      override def hitSource(height: Int): Option[BlockId] = input.hitSource.get(height) // VRF
 
       override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]) = kill("balanceSnapshots")
 

@@ -3,6 +3,8 @@ package com.wavesplatform.ride
 import com.google.protobuf.ByteString
 import com.google.protobuf.UnsafeByteOperations.unsafeWrap
 import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.InvokeScriptResult.DataEntry
@@ -16,14 +18,16 @@ case class RideRunnerInput(
     scriptAddress: Address,
     trace: Boolean,
     request: JsObject,
-    accountScript: Map[Address, AccountScriptInfo],
+    accountScript: Map[Address, AccountScriptInfo] = Map.empty,
     height: Int,
-    activatedFeatures: Map[Short, Int],
-    accountData: Map[Address, Map[String, DataEntry]],
-    hasData: Map[Address, Boolean],
-    resolveAlias: Map[Alias, Address],
-    balance: Map[Address, Map[Asset, Long]],
-    assetDescription: Map[Asset, AssetDescription]
+    activatedFeatures: Map[Short, Int] = Map.empty,
+    accountData: Map[Address, Map[String, DataEntry]] = Map.empty,
+    hasData: Map[Address, Boolean] = Map.empty,
+    resolveAlias: Map[Alias, Address] = Map.empty,
+    balance: Map[Address, Map[Asset, Long]] = Map.empty,
+    assetDescription: Map[Asset, AssetDescription] = Map.empty,
+    blockHeader: Map[Int, SignedBlockHeader] = Map.empty,
+    hitSource: Map[Int, BlockId] = Map.empty // VRF
 )
 object RideRunnerInput {
 
@@ -89,7 +93,10 @@ object RideRunnerInput {
 
   implicit val assetDescriptionFormat: OFormat[AssetDescription] = Json.format
 
-  implicit val rideRunnerInputFormat: OFormat[RideRunnerInput] = Json.format
+  implicit val blockHeaderFormat: OFormat[BlockHeader]             = Json.format
+  implicit val signedBlockHeaderFormat: OFormat[SignedBlockHeader] = Json.format
+
+  implicit val rideRunnerInputFormat: OFormat[RideRunnerInput] = Json.using[Json.WithDefaultValues].format
 
   def mapFormat[K, V: Format](stringifyKey: K => String, parseKey: String => JsResult[K])(implicit vFormat: Format[V]): Format[Map[K, V]] = {
     Format(
