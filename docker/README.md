@@ -24,7 +24,7 @@ It is highly recommended to read more about [Waves Node configuration](https://d
 |-------------------|---------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `INCLUDE_GRPC`    | `true`        | Whether to include gRPC server files in the image.                                                                                                                                                                                                                                            |
 
-**Note: All build arguments are optional.**  
+**Note: All build arguments are optional.**
 
 ## Running Docker image
 
