@@ -589,10 +589,7 @@ object Application extends ScorexLogging {
     }
 
   private[wavesplatform] def loadBlockMetaAt(db: DB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] = {
-    val result = blockchainUpdater.liquidBlockMeta
-      .filter(_ => blockchainUpdater.height == height)
-      .orElse(db.get(Keys.blockMetaAt(Height(height))))
-    result
+    None
   }
 
   def main(args: Array[String]): Unit = {

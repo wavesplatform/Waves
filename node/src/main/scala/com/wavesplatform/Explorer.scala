@@ -236,12 +236,6 @@ object Explorer extends ScorexLogging {
             case (assetId, balance) => log.info(s"$assetId : $balance")
           }
 
-        case "HS" =>
-          val height       = argument(1, "height").toInt
-          val hitSourceKey = Keys.hitSource(height)
-          val hitSource    = db.get(hitSourceKey.keyBytes)
-          log.info(s"HitSource at height=$height: ${Base64.encode(hitSource)}")
-
         case "OC" =>
           log.info("Counting orders")
           var counter = 0L

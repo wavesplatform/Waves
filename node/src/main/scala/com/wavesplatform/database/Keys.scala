@@ -2,11 +2,11 @@ package com.wavesplatform.database
 
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, TransactionMeta}
+import com.wavesplatform.database.protobuf.{BlockMeta as PBBlockMeta, EthereumTransactionMeta, TransactionMeta}
 import com.wavesplatform.protobuf.transaction.PBRecipients
+import com.wavesplatform.state
 import com.wavesplatform.state.*
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -27,9 +27,9 @@ object Keys {
   import KeyHelpers.*
   import KeyTags.{AddressId as AddressIdTag, EthereumTransactionMeta as EthereumTransactionMetaTag, InvokeScriptResult as InvokeScriptResultTag, LeaseDetails as LeaseDetailsTag, *}
 
-  val version: Key[Int]               = intKey(Version, default = 1)
-  val height: Key[Int]                = intKey(Height)
-  def score(height: Int): Key[BigInt] = Key(Score, h(height), v => if (v != null && v.length > 0) BigInt(v) else BigInt(0), _.toByteArray)
+  val version: Key[Int] = intKey(Version, default = 1)
+  val height: Key[Height] =
+    Key(Height, Array.emptyByteArray, v => state.Height @@ (if (v != null && v.length >= Ints.BYTES) Ints.fromByteArray(v) else 0), Ints.toByteArray)
 
   def heightOf(blockId: ByteStr): Key[Option[Int]] = Key.opt[Int](HeightOf, blockId.arr, Ints.fromByteArray, Ints.toByteArray)
 
@@ -111,7 +111,7 @@ object Keys {
   def changedDataKeys(height: Int, addressId: AddressId): Key[Seq[String]] =
     Key(ChangedDataKeys, hBytes(addressId.toByteArray, height), readStrings, writeStrings)
 
-  def blockMetaAt(height: Height): Key[Option[BlockMeta]] =
+  def blockMetaAt(height: Height): Key[Option[PBBlockMeta]] =
     Key.opt(BlockInfoAtHeight, h(height), readBlockMeta, writeBlockMeta)
 
   def blockInfoBytesAt(height: Height): Key[Option[Array[Byte]]] =
@@ -159,13 +159,6 @@ object Keys {
 
   def invokeScriptResult(height: Int, txNum: TxNum): Key[Option[InvokeScriptResult]] =
     Key.opt(InvokeScriptResultTag, hNum(height, txNum), InvokeScriptResult.fromBytes, InvokeScriptResult.toBytes)
-
-  def blockReward(height: Int): Key[Option[Long]] =
-    Key.opt(BlockReward, h(height), Longs.fromByteArray, Longs.toByteArray)
-
-  def wavesAmount(height: Int): Key[BigInt] = Key(WavesAmount, h(height), Option(_).fold(BigInt(0))(BigInt(_)), _.toByteArray)
-
-  def hitSource(height: Int): Key[Option[ByteStr]] = Key.opt(HitSource, h(height), ByteStr(_), _.arr)
 
   val disabledAliases: Key[Set[Alias]] = Key(
     DisabledAliases,

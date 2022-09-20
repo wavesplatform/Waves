@@ -244,7 +244,7 @@ object Verifier extends ScorexLogging {
         }
         .getOrElse(
           stats.signatureVerification
-            .measureForType(typeId)(verifyAsEllipticCurveSignature(et, blockchain.isFeatureActivated(BlockchainFeatures.RideV6)).as(0))
+            .measureForType(typeId)(et.firstProofIsValidSignature.as(0))
         )
 
     def orderVerification(order: Order): TracedResult[ValidationError, Int] = {
@@ -259,7 +259,7 @@ object Verifier extends ScorexLogging {
         }
         .getOrElse(
           stats.signatureVerification
-            .measureForType(typeId)(verifyOrderSignature(order, blockchain.isFeatureActivated(BlockchainFeatures.RideV6)).as(0))
+            .measureForType(typeId)(order.firstProofIsValidSignature.as(0))
         )
 
       TracedResult(verificationResult)

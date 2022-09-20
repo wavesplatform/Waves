@@ -11,7 +11,6 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.Logger
 import com.wavesplatform.account.{AddressScheme, PublicKey}
-import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.validation.Validators
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -148,13 +147,11 @@ package object database {
 
   def writeTxIds(ids: Seq[ByteStr]): Array[Byte] =
     ids
-      .foldLeft(ByteBuffer.allocate(ids.map(_.arr.length + 1).sum)) {
-        case (b, id) =>
-          b.put((id.arr.length: @unchecked) match {
-              case crypto.DigestLength    => crypto.DigestLength.toByte
-              case crypto.SignatureLength => crypto.SignatureLength.toByte
-            })
-            .put(id.arr)
+      .foldLeft(ByteBuffer.allocate(ids.map(_.arr.length + 1).sum)) { case (b, id) =>
+        b.put((id.arr.length: @unchecked) match {
+          case crypto.DigestLength    => crypto.DigestLength.toByte
+          case crypto.SignatureLength => crypto.SignatureLength.toByte
+        }).put(id.arr)
       }
       .array()
 
@@ -163,7 +160,7 @@ package object database {
     val s = Seq.newBuilder[String]
 
     while (i < data.length) {
-      val len = ((data(i) << 8) | (data(i + 1) & 0xFF)).toShort // Optimization
+      val len = ((data(i) << 8) | (data(i + 1) & 0xff)).toShort // Optimization
       s += new String(data, i + 2, len, UTF_8)
       i += (2 + len)
     }
@@ -173,9 +170,8 @@ package object database {
   def writeStrings(strings: Seq[String]): Array[Byte] = {
     val utfBytes = strings.toVector.map(_.utf8Bytes)
     utfBytes
-      .foldLeft(ByteBuffer.allocate(utfBytes.map(_.length + 2).sum)) {
-        case (buf, bytes) =>
-          buf.putShort(bytes.length.toShort).put(bytes)
+      .foldLeft(ByteBuffer.allocate(utfBytes.map(_.length + 2).sum)) { case (buf, bytes) =>
+        buf.putShort(bytes.length.toShort).put(bytes)
       }
       .array()
   }
@@ -197,20 +193,19 @@ package object database {
       _ => throw new IllegalArgumentException("Can not write boolean flag instead of LeaseDetails"),
       ld =>
         pb.LeaseDetails(
-            ByteString.copyFrom(ld.sender.arr),
-            Some(PBRecipients.create(ld.recipient)),
-            ld.amount,
-            ByteString.copyFrom(ld.sourceId.arr),
-            ld.height,
-            ld.status match {
-              case LeaseDetails.Status.Active => pb.LeaseDetails.Status.Active(com.google.protobuf.empty.Empty())
-              case LeaseDetails.Status.Cancelled(height, cancelTxId) =>
-                pb.LeaseDetails.Status
-                  .Cancelled(pb.LeaseDetails.Cancelled(height, cancelTxId.fold(ByteString.EMPTY)(id => ByteString.copyFrom(id.arr))))
-              case LeaseDetails.Status.Expired(height) => pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height))
-            }
-          )
-          .toByteArray
+          ByteString.copyFrom(ld.sender.arr),
+          Some(PBRecipients.create(ld.recipient)),
+          ld.amount,
+          ByteString.copyFrom(ld.sourceId.arr),
+          ld.height,
+          ld.status match {
+            case LeaseDetails.Status.Active => pb.LeaseDetails.Status.Active(com.google.protobuf.empty.Empty())
+            case LeaseDetails.Status.Cancelled(height, cancelTxId) =>
+              pb.LeaseDetails.Status
+                .Cancelled(pb.LeaseDetails.Cancelled(height, cancelTxId.fold(ByteString.EMPTY)(id => ByteString.copyFrom(id.arr))))
+            case LeaseDetails.Status.Expired(height) => pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height))
+          }
+        ).toByteArray
     )
 
   def readLeaseDetails(data: Array[Byte]): Either[Boolean, LeaseDetails] =
@@ -317,23 +312,21 @@ package object database {
     val (info, volumeInfo) = ai
 
     pb.AssetDetails(
-        info.name,
-        info.description,
-        info.lastUpdatedAt,
-        volumeInfo.isReissuable,
-        ByteString.copyFrom(volumeInfo.volume.toByteArray)
-      )
-      .toByteArray
+      info.name,
+      info.description,
+      info.lastUpdatedAt,
+      volumeInfo.isReissuable,
+      ByteString.copyFrom(volumeInfo.volume.toByteArray)
+    ).toByteArray
   }
 
   def writeAssetStaticInfo(sai: AssetStaticInfo): Array[Byte] =
     pb.StaticAssetInfo(
-        ByteString.copyFrom(sai.source.arr),
-        ByteString.copyFrom(sai.issuer.arr),
-        sai.decimals,
-        sai.nft
-      )
-      .toByteArray
+      ByteString.copyFrom(sai.source.arr),
+      ByteString.copyFrom(sai.issuer.arr),
+      sai.decimals,
+      sai.nft
+    ).toByteArray
 
   def readAssetStaticInfo(bb: Array[Byte]): AssetStaticInfo = {
     val sai = pb.StaticAssetInfo.parseFrom(bb)
@@ -345,45 +338,23 @@ package object database {
     )
   }
 
-  def writeBlockMeta(data: BlockMeta): Array[Byte] =
-    pb.BlockMeta(
-        Some(PBBlocks.protobuf(data.header)),
-        ByteString.copyFrom(data.signature.arr),
-        data.headerHash.fold(ByteString.EMPTY)(hh => ByteString.copyFrom(hh.arr)),
-        data.height,
-        data.size,
-        data.transactionCount,
-        data.totalFeeInWaves,
-        data.reward.getOrElse(-1L),
-        data.vrf.fold(ByteString.EMPTY)(vrf => ByteString.copyFrom(vrf.arr))
-      )
-      .toByteArray
+  def writeBlockMeta(data: pb.BlockMeta): Array[Byte] = data.toByteArray
 
-  def readBlockMeta(bs: Array[Byte]): BlockMeta = {
-    val pbbm = pb.BlockMeta.parseFrom(bs)
-    BlockMeta(
-      PBBlocks.vanilla(pbbm.header.get),
-      pbbm.signature.toByteStr,
-      Option(pbbm.headerHash).collect { case bs if !bs.isEmpty => bs.toByteStr },
-      pbbm.height,
-      pbbm.size,
-      pbbm.transactionCount,
-      pbbm.totalFeeInWaves,
-      Option(pbbm.reward).filter(_ >= 0),
-      Option(pbbm.vrf).collect { case bs if !bs.isEmpty => bs.toByteStr }
-    )
-  }
+  def readBlockMeta(bs: Array[Byte]): pb.BlockMeta = pb.BlockMeta.parseFrom(bs)
 
   def readTransactionHNSeqAndType(bs: Array[Byte]): (Height, Seq[(Byte, TxNum)]) = {
     val ndi          = newDataInput(bs)
     val height       = Height(ndi.readInt())
     val numSeqLength = ndi.readInt()
 
-    (height, List.fill(numSeqLength) {
-      val tp  = ndi.readByte()
-      val num = TxNum(ndi.readShort())
-      (tp, num)
-    })
+    (
+      height,
+      List.fill(numSeqLength) {
+        val tp  = ndi.readByte()
+        val num = TxNum(ndi.readShort())
+        (tp, num)
+      }
+    )
   }
 
   def writeTransactionHNSeqAndType(v: (Height, Seq[(Byte, TxNum)])): Array[Byte] = {
@@ -395,10 +366,9 @@ package object database {
 
     ndo.writeInt(height)
     ndo.writeInt(numSeqLength)
-    numSeq.foreach {
-      case (tp, num) =>
-        ndo.writeByte(tp)
-        ndo.writeShort(num)
+    numSeq.foreach { case (tp, num) =>
+      ndo.writeByte(tp)
+      ndo.writeShort(num)
     }
 
     ndo.toByteArray
@@ -420,10 +390,9 @@ package object database {
     val sorted = sh.sectionHashes.toSeq.sortBy(_._1)
     val ndo    = newDataOutput(crypto.DigestLength + 1 + sorted.length * (1 + crypto.DigestLength))
     ndo.writeByte(sorted.length)
-    sorted.foreach {
-      case (sectionId, value) =>
-        ndo.writeByte(sectionId.id.toByte)
-        ndo.writeByteStr(value.ensuring(_.arr.length == DigestLength))
+    sorted.foreach { case (sectionId, value) =>
+      ndo.writeByte(sectionId.id.toByte)
+      ndo.writeByteStr(value.ensuring(_.arr.length == DigestLength))
     }
     ndo.writeByteStr(sh.totalHash.ensuring(_.arr.length == DigestLength))
     ndo.toByteArray
@@ -440,13 +409,12 @@ package object database {
 
   def writeDataEntry(e: DataEntry[?]): Array[Byte] =
     pb.DataEntry(e match {
-        case IntegerDataEntry(_, value) => pb.DataEntry.Value.IntValue(value)
-        case BooleanDataEntry(_, value) => pb.DataEntry.Value.BoolValue(value)
-        case BinaryDataEntry(_, value)  => pb.DataEntry.Value.BinaryValue(ByteString.copyFrom(value.arr))
-        case StringDataEntry(_, value)  => pb.DataEntry.Value.StringValue(value)
-        case _: EmptyDataEntry          => pb.DataEntry.Value.Empty
-      })
-      .toByteArray
+      case IntegerDataEntry(_, value) => pb.DataEntry.Value.IntValue(value)
+      case BooleanDataEntry(_, value) => pb.DataEntry.Value.BoolValue(value)
+      case BinaryDataEntry(_, value)  => pb.DataEntry.Value.BinaryValue(ByteString.copyFrom(value.arr))
+      case StringDataEntry(_, value)  => pb.DataEntry.Value.StringValue(value)
+      case _: EmptyDataEntry          => pb.DataEntry.Value.Empty
+    }).toByteArray
 
   def readCurrentBalance(bs: Array[Byte]): CurrentBalance = if (bs != null && bs.length == 16)
     CurrentBalance(Longs.fromByteArray(bs.take(8)), Height(Ints.fromByteArray(bs.slice(8, 12))), Height(Ints.fromByteArray(bs.takeRight(4))))
@@ -478,8 +446,8 @@ package object database {
       finally snapshot.close()
     }
 
-    /**
-      * @note Runs operations in batch, so keep in mind, that previous changes don't appear lately in f
+    /** @note
+      *   Runs operations in batch, so keep in mind, that previous changes don't appear lately in f
       */
     def readWrite[A](f: RW => A): A = {
       val snapshot    = db.getSnapshot
@@ -489,8 +457,8 @@ package object database {
       val nativeBatch = db.createWriteBatch()
       try {
         val r = f(rw)
-        batch.addedEntries.foreach { case (k, v) => nativeBatch.put(k.arr, v) }
-        batch.deletedEntries.foreach(k => nativeBatch.delete(k.arr))
+        batch.addedEntries.forEach { (k, v) => nativeBatch.put(k.arr, v) }
+        batch.deletedEntries.forEach(k => nativeBatch.delete(k.arr))
         db.write(nativeBatch, new WriteOptions().sync(false).snapshot(false))
         r
       } finally {
@@ -537,9 +505,8 @@ package object database {
         ByteString.copyFrom(scriptInfo.publicKey.arr),
         ByteString.copyFrom(scriptInfo.script.bytes().arr),
         scriptInfo.verifierComplexity,
-        scriptInfo.complexitiesByEstimator.map {
-          case (version, complexities) =>
-            pb.AccountScriptInfo.ComplexityByVersion(version, complexities)
+        scriptInfo.complexitiesByEstimator.map { case (version, complexities) =>
+          pb.AccountScriptInfo.ComplexityByVersion(version, complexities)
         }.toSeq
       )
     )
@@ -570,10 +537,10 @@ package object database {
     val (m, tx) = v
     val ptx = tx match {
       case lps: PBSince if !lps.isProtobufVersion => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
-      case _: GenesisTransaction                         => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
-      case _: PaymentTransaction                         => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
-      case et: EthereumTransaction                       => TD.EthereumTransaction(ByteString.copyFrom(et.bytes()))
-      case _                                             => TD.WavesTransaction(PBTransactions.protobuf(tx))
+      case _: GenesisTransaction                  => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
+      case _: PaymentTransaction                  => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
+      case et: EthereumTransaction                => TD.EthereumTransaction(ByteString.copyFrom(et.bytes()))
+      case _                                      => TD.WavesTransaction(PBTransactions.protobuf(tx))
     }
     pb.TransactionData(ptx, !m.succeeded, m.spentComplexity).toByteArray
   }
@@ -589,7 +556,7 @@ package object database {
   def loadBlock(height: Height, db: ReadOnlyDB): Option[Block] =
     for {
       meta  <- db.get(Keys.blockMetaAt(height))
-      block <- createBlock(meta.header, meta.signature, loadTransactions(height, db).map(_._2)).toOption
+      block <- createBlock(PBBlocks.vanilla(meta.getHeader), meta.signature.toByteStr, loadTransactions(height, db).map(_._2)).toOption
     } yield block
 
   def fromHistory[A](resource: DBResource, historyKey: Key[Seq[Int]], valueKey: Int => Key[A]): Option[A] =

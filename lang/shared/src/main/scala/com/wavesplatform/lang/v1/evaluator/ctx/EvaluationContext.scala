@@ -28,8 +28,8 @@ case class EvaluationContext[C[_[_]], F[_]](
 case class LoggedEvaluationContext[C[_[_]], F[_]](l: LetLogCallback[F], ec: EvaluationContext[C, F]) {
   val loggedLets: util.IdentityHashMap[LET, Unit] = new util.IdentityHashMap()
 
-  def log(let: LET, result: LetExecResult[F]): Unit =
-    loggedLets.computeIfAbsent(let, _ => l(let.name)(result))
+  def log(let: LET, result: LetExecResult[F]): Unit = {}
+//    loggedLets.computeIfAbsent(let, _ => l(let.name)(result))
 }
 
 object LoggedEvaluationContext {

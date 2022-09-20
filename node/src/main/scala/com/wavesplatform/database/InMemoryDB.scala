@@ -128,7 +128,11 @@ class InMemoryDB(underlying: DB) extends DB with LazyLogging {
 
   private def putAndCountBytes(key: KW, value: Array[Byte]): Unit = {
     toDelete.remove(key)
-    estimatedSize += (key.bs.length + value.length)
+    val entrySize = key.bs.length + value.length
+    estimatedSize += entrySize
+    if (entrySize > 10000) {
+      logger.info(s"size: $entrySize, prefix: ${key.bs.mkString("[",",","]")}")
+    }
     Option(entries.put(key, value)).foreach(bs => estimatedSize -= (key.bs.length + bs.length))
   }
 

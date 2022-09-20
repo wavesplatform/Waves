@@ -8,11 +8,14 @@ import cats.syntax.option.*
 import com.google.common.cache.*
 import com.google.common.collect.ArrayListMultimap
 import com.google.common.hash.{Funnels, BloomFilter as GBloomFilter}
+import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.protobuf.EthereumTransactionMeta
+import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, BlockMeta as PBBlockMeta}
 import com.wavesplatform.metrics.LevelDBStats
+import com.wavesplatform.protobuf.ByteStringExt
+import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
@@ -32,58 +35,35 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   val dbSettings: DBSettings
 
   @volatile
-  private var current = (loadHeight(), loadScore(), loadLastBlock())
+  private var current = loadCurrentBlock()
 
-  protected def loadHeight(): Int
-  override def height: Int = current._1
-
-  protected def loadScore(): BigInt
-  override def score: BigInt = current._2
-
-  protected def loadLastBlock(): Option[Block]
-  override def lastBlock: Option[Block] = current._3
-
-  def loadScoreOf(blockId: ByteStr): Option[BigInt]
-
-  def loadBlockInfo(height: Int): Option[SignedBlockHeader]
-  override def blockHeader(height: Int): Option[SignedBlockHeader] = current match {
-    case (`height`, _, maybeBlock) => maybeBlock.map(b => SignedBlockHeader(b.header, b.signature))
-    case _                         => loadBlockInfo(height)
+  private def loadCurrentBlock() = {
+    val height = loadHeight()
+    CurrentBlockInfo(height, loadBlockMeta(height), Seq.empty)
   }
+
+  protected def loadHeight(): Height
+  protected def loadBlockMeta(height: Height): Option[PBBlockMeta]
+
+  override def height: Int = current.height
+
+  override def score: BigInt = current.score
+
+  override def lastBlock: Option[Block] = current.block
+
+  override def blockHeader(height: Int): Option[SignedBlockHeader] =
+    if (current.height == height) current.signedHeader else loadBlockMeta(Height(height)).map(toSignedHeader)
+
+  override def hitSource(height: Int): Option[ByteStr] =
+    if (current.height == height) current.hitSource else loadBlockMeta(Height(height)).map(toHitSource)
 
   def loadHeightOf(blockId: ByteStr): Option[Int]
-  override def heightOf(blockId: ByteStr): Option[Int] = current match {
-    case (height, _, Some(block)) if block.id() == blockId => Some(height)
-    case _                                                 => loadHeightOf(blockId)
-  }
 
-  private val blocksTs                               = new util.TreeMap[Int, Long]      // Height -> block timestamp, assume sorted by key.
-  private var oldestStoredBlockTimestamp             = Long.MaxValue
-  private val transactionIds                         = new util.HashMap[ByteStr, Int]() // TransactionId -> height
+  override def heightOf(blockId: ByteStr): Option[Int] = if (current.id.contains(blockId)) Some(height) else loadHeightOf(blockId)
 
   private val bf = GBloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), 200_000_000)
 
-  protected def forgetTransaction(id: ByteStr): Unit = transactionIds.remove(id)
-  override def containsTransaction(tx: Transaction): Boolean = bf.mightContain(tx.id().arr) && transactionMeta(tx.id()).nonEmpty || {
-    if (tx.timestamp - 2.hours.toMillis <= oldestStoredBlockTimestamp) {
-      LevelDBStats.miss.record(1)
-      transactionMeta(tx.id()).nonEmpty
-    } else {
-      false
-    }
-  }
-  protected def forgetBlocks(): Unit = {
-    val iterator = blocksTs.entrySet().iterator()
-    val (oldestBlock, oldestTs) = if (iterator.hasNext) {
-      val e = iterator.next()
-      e.getKey -> e.getValue
-    } else {
-      0 -> Long.MaxValue
-    }
-    oldestStoredBlockTimestamp = oldestTs
-    val bts = this.lastBlock.fold(0L)(_.header.timestamp) - dbSettings.rememberBlocks.toMillis
-    blocksTs.entrySet().removeIf(_.getValue < bts)
-  }
+  override def containsTransaction(tx: Transaction): Boolean = bf.mightContain(tx.id().arr) && transactionMeta(tx.id()).nonEmpty
 
   private val leaseBalanceCache: LoadingCache[Address, LeaseBalance] = cache(dbSettings.maxCacheSize, loadLeaseBalance)
   protected def loadLeaseBalance(address: Address): LeaseBalance
@@ -161,7 +141,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
   // noinspection ScalaStyle
   protected def doAppend(
-      block: Block,
+      blockMeta: PBBlockMeta,
       carry: Long,
       newAddresses: Map[Address, AddressId],
       balances: Map[(AddressId, Asset), (CurrentBalance, BalanceNode)],
@@ -176,9 +156,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       data: Map[Address, AccountDataInfo],
       aliases: Map[Alias, AddressId],
       sponsorship: Map[IssuedAsset, Sponsorship],
-      totalFee: Long,
-      reward: Option[Long],
-      hitSource: ByteStr,
       scriptResults: Map[ByteStr, InvokeScriptResult],
       transactionMeta: Seq[(TxMeta, Transaction)],
       stateHash: StateHashBuilder.Result,
@@ -186,7 +163,21 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   ): Unit
 
   override def append(diff: Diff, carryFee: Long, totalFee: Long, reward: Option[Long], hitSource: ByteStr, block: Block): Unit = {
-    val newHeight = current._1 + 1
+    val newHeight = current.height + 1
+    val newScore = block.blockScore() + current.score
+    val newMeta = PBBlockMeta(
+      Some(PBBlocks.protobuf(block.header)),
+      ByteString.copyFrom(block.signature.arr),
+      if (block.header.version >= Block.ProtoBlockVersion) ByteString.copyFrom(block.id().arr) else ByteString.EMPTY,
+      newHeight,
+      block.bytes().length,
+      block.transactionData.size,
+      totalFee,
+      block.header.rewardVote,
+      if (block.header.version >= Block.ProtoBlockVersion) ByteString.copyFrom(hitSource.arr) else ByteString.EMPTY,
+      ByteString.copyFrom(newScore.toByteArray),
+      current.meta.fold(0L)(_.totalWavesAmount) + reward.getOrElse(0L)
+    )
 
     val stateHash = new StateHashBuilder
 
@@ -220,7 +211,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       }
     }
 
-    current = (newHeight, current._2 + block.blockScore(), Some(block))
+    current = CurrentBlockInfo(Height(newHeight), Some(newMeta), block.transactionData)
 
     val updatedBalanceNodes = for {
       (address, assets) <- updatedBalances
@@ -273,7 +264,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     }
 
     doAppend(
-      block,
+      newMeta,
       carryFee,
       newAddressIds,
       updatedBalanceNodes.map { case ((address, asset), v) => (addressIdWithFallback(address, newAddressIds), asset) -> v },
@@ -288,9 +279,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       diff.accountData,
       diff.aliases.map { case (a, address) => a -> addressIdWithFallback(address, newAddressIds) },
       diff.sponsorship,
-      totalFee,
-      reward,
-      hitSource,
       diff.scriptResults,
       transactionMeta.result(),
       stateHash.result(),
@@ -322,11 +310,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     leaseBalanceCache.putAll(updatedLeaseBalances.asJava)
     scriptCache.putAll(diff.scripts.asJava)
     assetScriptCache.putAll(diff.assetScripts.asJava)
-    blocksTs.put(newHeight, block.header.timestamp)
-
     accountDataCache.putAll(newData.asJava)
-
-    forgetBlocks()
   }
 
   protected def doRollback(targetHeight: Int): Seq[(Block, ByteStr)]
@@ -341,7 +325,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
         )
       discardedBlocks = doRollback(height)
     } yield {
-      current = (loadHeight(), loadScore(), loadLastBlock())
+      current = loadCurrentBlock()
 
       activatedFeaturesCache = loadActivatedFeatures()
       approvedFeaturesCache = loadApprovedFeatures()
@@ -351,6 +335,18 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 }
 
 object Caches {
+  case class CurrentBlockInfo(height: Height, meta: Option[PBBlockMeta], transactions: Seq[Transaction]) {
+    lazy val score: BigInt                           = meta.fold(BigInt(0))(m => BigInt(m.totalScore.toByteArray))
+    lazy val block: Option[Block]                    = signedHeader.map(h => Block(h.header, h.signature, transactions))
+    lazy val signedHeader: Option[SignedBlockHeader] = meta.map(toSignedHeader)
+    lazy val id: Option[ByteStr]                     = meta.map(_.id)
+    lazy val hitSource: Option[ByteStr]              = meta.map(toHitSource)
+  }
+
+  def toHitSource(m: PBBlockMeta): ByteStr = (if (m.vrf.isEmpty) m.getHeader.generationSignature else m.vrf).toByteStr
+
+  def toSignedHeader(m: PBBlockMeta): SignedBlockHeader = SignedBlockHeader(PBBlocks.vanilla(m.getHeader), m.signature.toByteStr)
+
   def cache[K <: AnyRef, V <: AnyRef](maximumSize: Int, loader: K => V): LoadingCache[K, V] =
     CacheBuilder
       .newBuilder()

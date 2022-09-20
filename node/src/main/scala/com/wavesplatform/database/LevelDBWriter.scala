@@ -10,20 +10,18 @@ import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
 import com.google.common.primitives.Bytes
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.api.BlockMeta
+import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.*
 import com.wavesplatform.database
 import com.wavesplatform.database.patch.DisableHijackedAliases
-import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, TransactionMeta}
+import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, TransactionMeta, BlockMeta as PBBlockMeta}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings, WavesSettings}
+import com.wavesplatform.state.*
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{TxNum, *}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.EthereumTransaction.Transfer
@@ -78,7 +76,7 @@ object LevelDBWriter extends ScorexLogging {
       } yield db.get(valueKey(lastChange))
   }
 
-  private def loadHeight(db: DB): Int = db.get(Keys.height)
+  private def loadHeight(db: DB): Height = db.get(Keys.height)
 
   private[database] def merge(wbh: Seq[Int], lbh: Seq[Int]): Seq[(Int, Int)] = {
 
@@ -188,14 +186,13 @@ abstract class LevelDBWriter private[database] (
 
   override protected def loadAddressId(address: Address): Option[AddressId] = loadWithFilter(addressFilter, Keys.addressId(address)) { (_, id) => id }
 
-  override protected def loadHeight(): Int = LevelDBWriter.loadHeight(writableDB)
+  override protected def loadHeight(): Height = LevelDBWriter.loadHeight(writableDB)
 
   override def safeRollbackHeight: Int = readOnly(_.get(Keys.safeRollbackHeight))
 
-  override protected def loadScore(): BigInt = readOnly(db => db.get(Keys.score(db.get(Keys.height))))
 
-  override protected def loadLastBlock(): Option[Block] = readOnly { db =>
-    loadBlock(Height(db.get(Keys.height)), db)
+  override protected def loadBlockMeta(height: Height): Option[PBBlockMeta] = readOnly {
+    db => db.get(Keys.blockMetaAt(height))
   }
 
   override protected def loadScript(address: Address): Option[AccountScriptInfo] = readOnly { db =>
@@ -271,14 +268,14 @@ abstract class LevelDBWriter private[database] (
     stateFeatures ++ settings.functionalitySettings.preActivatedFeatures
   }
 
-  override def wavesAmount(height: Int): BigInt = readOnly { db =>
-    val factHeight = height.min(this.height)
-    if (db.has(Keys.wavesAmount(factHeight))) db.get(Keys.wavesAmount(factHeight))
+  override def wavesAmount(height: Int): BigInt =
+    if (this.isFeatureActivated(BlockchainFeatures.BlockReward, height)) loadBlockMeta(Height(height)).fold(settings.genesisSettings.initialBalance)(_.totalWavesAmount)
     else settings.genesisSettings.initialBalance
-  }
 
   override def blockReward(height: Int): Option[Long] =
-    readOnly(_.db.get(Keys.blockReward(height)))
+    if (this.isFeatureActivated(BlockchainFeatures.BlockReward, height)) loadBlockMeta(Height(height)).map(_.reward)
+    else None
+
 
   private def updateHistory(rw: RW, key: Key[Seq[Int]], threshold: Int, kf: Int => Key[?]): Seq[Array[Byte]] =
     updateHistory(rw, rw.get(key), key, threshold, kf)
@@ -332,7 +329,7 @@ abstract class LevelDBWriter private[database] (
 
   // noinspection ScalaStyle
   override protected def doAppend(
-      block: Block,
+      blockMeta: PBBlockMeta,
       carry: Long,
       newAddresses: Map[Address, AddressId],
       balances: Map[(AddressId, Asset), (CurrentBalance, BalanceNode)],
@@ -347,19 +344,16 @@ abstract class LevelDBWriter private[database] (
       data: Map[Address, AccountDataInfo],
       aliases: Map[Alias, AddressId],
       sponsorship: Map[IssuedAsset, Sponsorship],
-      totalFee: Long,
-      reward: Option[Long],
-      hitSource: ByteStr,
       scriptResults: Map[ByteStr, InvokeScriptResult],
       transactionMeta: Seq[(TxMeta, Transaction)],
       stateHash: StateHashBuilder.Result,
       ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta]
   ): Unit = {
-    log.trace(s"Persisting block ${block.id()} at height $height")
+    log.trace(s"Persisting block ${blockMeta.id} at height $height")
     readWrite { rw =>
       val expiredKeys = new ArrayBuffer[Array[Byte]]
 
-      rw.put(Keys.height, height)
+      rw.put(Keys.height, Height(height))
 
       val previousSafeRollbackHeight = rw.get(Keys.safeRollbackHeight)
       val newSafeRollbackHeight = height - dbSettings.maxRollbackDepth
@@ -372,18 +366,12 @@ abstract class LevelDBWriter private[database] (
         TransactionId(tx.id()) -> ((tm, tx, TxNum(idx.toShort)))
       }.toMap
 
-      rw.put(
-        Keys.blockMetaAt(Height(height)),
-        Some(
-          BlockMeta.fromBlock(block, height, totalFee, reward, if (block.header.version >= Block.ProtoBlockVersion) Some(hitSource) else None)
-        )
-      )
-      rw.put(Keys.heightOf(block.id()), Some(height))
+      rw.put(Keys.blockMetaAt(Height(height)), Some(blockMeta))
+      rw.put(Keys.heightOf(blockMeta.id), Some(height))
 
       val lastAddressId = loadMaxAddressId() + newAddresses.size
 
       rw.put(Keys.lastAddressId, Some(lastAddressId))
-      rw.put(Keys.score(height), rw.get(Keys.score(height - 1)) + block.blockScore())
 
       for ((address, id) <- newAddresses) {
         val kaid = Keys.addressId(address)
@@ -487,7 +475,7 @@ abstract class LevelDBWriter private[database] (
         val newlyApprovedFeatures = featureVotes(height)
           .filterNot { case (featureId, _) => settings.functionalitySettings.preActivatedFeatures.contains(featureId) }
           .collect {
-            case (featureId, voteCount) if voteCount + (if (block.header.featureVotes.contains(featureId)) 1 else 0) >= minVotes =>
+            case (featureId, voteCount) if voteCount + (if (blockMeta.getHeader.featureVotes.contains(featureId)) 1 else 0) >= minVotes =>
               featureId -> height
           }
 
@@ -502,11 +490,6 @@ abstract class LevelDBWriter private[database] (
         }
       }
 
-      reward.foreach { lastReward =>
-        rw.put(Keys.blockReward(height), Some(lastReward))
-        rw.put(Keys.wavesAmount(height), wavesAmount(height - 1) + lastReward)
-      }
-
       for (case (asset, sp: SponsorshipValue) <- sponsorship) {
         rw.put(Keys.sponsorship(asset)(height), sp)
         expiredKeys ++= updateHistory(rw, Keys.sponsorshipHistory(asset), threshold, Keys.sponsorship(asset))
@@ -518,8 +501,6 @@ abstract class LevelDBWriter private[database] (
 
       rw.put(Keys.carryFee(height), carry)
       expiredKeys += Keys.carryFee(threshold - 1).keyBytes
-
-      rw.put(Keys.blockTransactionsFee(height), totalFee)
 
       if (dbSettings.storeInvokeScriptResults) scriptResults.foreach { case (txId, result) =>
         val (txHeight, txNum) = transactions
@@ -547,8 +528,6 @@ abstract class LevelDBWriter private[database] (
         disabledAliases = DisableHijackedAliases(rw)
       }
 
-      rw.put(Keys.hitSource(height), Some(hitSource))
-
       if (dbSettings.storeStateHashes) {
         val prevStateHash =
           if (height == 1) ByteStr.empty
@@ -565,7 +544,7 @@ abstract class LevelDBWriter private[database] (
       }
     }
 
-    log.trace(s"Finished persisting block ${block.id()} at height $height")
+    log.trace(s"Finished persisting block ${blockMeta.id} at height $height")
   }
 
   override protected def doRollback(targetHeight: Int): Seq[(Block, ByteStr)] = {
@@ -585,7 +564,7 @@ abstract class LevelDBWriter private[database] (
         val aliasesToInvalidate     = Seq.newBuilder[Alias]
 
         val discardedBlock = readWrite { rw =>
-          rw.put(Keys.height, currentHeight - 1)
+          rw.put(Keys.height, Height(currentHeight - 1))
 
           val discardedMeta = rw
             .get(Keys.blockMetaAt(currentHeight))
@@ -597,20 +576,6 @@ abstract class LevelDBWriter private[database] (
             addressId <- rw.get(Keys.changedAddresses(currentHeight))
           } yield addressId -> rw.get(Keys.idToAddress(addressId))
 
-//          rw.iterateOver(KeyTags.ChangedAssetBalances.prefixBytes ++ Ints.toByteArray(currentHeight)) { e =>
-//            val assetId = IssuedAsset(ByteStr(e.getKey.takeRight(32)))
-//            for ((addressId, address) <- changedAddresses) {
-//              val kabh    = Keys.assetBalanceHistory(addressId, assetId)
-//              val history = rw.get(kabh)
-//              if (history.nonEmpty && history.head == currentHeight) {
-//                log.trace(s"Discarding ${assetId.id} balance for $address at $currentHeight")
-//                balancesToInvalidate += address -> assetId
-//                rw.delete(Keys.assetBalance(addressId, assetId)(history.head))
-//                rw.put(kabh.keyBytes, writeIntSeq(history.tail))
-//              }
-//            }
-//          }
-
           for ((addressId, address) <- changedAddresses) {
             for (k <- rw.get(Keys.changedDataKeys(currentHeight, addressId))) {
               log.trace(s"Discarding $k for $address at $currentHeight")
@@ -621,7 +586,6 @@ abstract class LevelDBWriter private[database] (
             rw.delete(Keys.changedDataKeys(currentHeight, addressId))
 
             balancesToInvalidate += (address -> Waves)
-//            rw.delete(Keys.wavesBalance(addressId)(currentHeight))
             rw.filterHistory(Keys.wavesBalanceHistory(addressId), currentHeight)
 
             rw.delete(Keys.leaseBalance(addressId)(currentHeight))
@@ -651,7 +615,6 @@ abstract class LevelDBWriter private[database] (
 
           loadTransactions(currentHeight, rw).view.zipWithIndex.foreach { case ((_, tx), idx) =>
             val num = TxNum(idx.toShort)
-            forgetTransaction(tx.id())
             (tx: @unchecked) match {
               case _: GenesisTransaction                                                       => // genesis transaction can not be rolled back
               case _: PaymentTransaction | _: TransferTransaction | _: MassTransferTransaction =>
@@ -698,24 +661,17 @@ abstract class LevelDBWriter private[database] (
           }
 
           rw.delete(Keys.blockMetaAt(currentHeight))
-          rw.delete(Keys.score(currentHeight))
           rw.delete(Keys.changedAddresses(currentHeight))
           rw.delete(Keys.heightOf(discardedMeta.id))
           rw.delete(Keys.carryFee(currentHeight))
           rw.delete(Keys.blockTransactionsFee(currentHeight))
-          rw.delete(Keys.blockReward(currentHeight))
-          rw.delete(Keys.wavesAmount(currentHeight))
           rw.delete(Keys.stateHash(currentHeight))
-          rw.delete(Keys.hitSource(currentHeight))
 
           if (DisableHijackedAliases.height == currentHeight) {
             disabledAliases = DisableHijackedAliases.revert(rw)
           }
 
-          val hitSource = rw.get(Keys.hitSource(currentHeight)).get
-          val block     = createBlock(discardedMeta.header, discardedMeta.signature, loadTransactions(currentHeight, rw).map(_._2)).explicitGet()
-
-          (block, hitSource)
+          ???
         }
 
         balancesToInvalidate.result().foreach(discardBalance)
@@ -776,12 +732,10 @@ abstract class LevelDBWriter private[database] (
     for {
       tm <- db.get(Keys.transactionMetaById(TransactionId @@ id))
       if tm.`type` == TransferTransaction.typeId || tm.`type` == TransactionType.Ethereum.id
-      tx <- db
-        .get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort)))
-        .collect {
-          case (tm, t: TransferTransaction) if tm.succeeded => t
-          case (m, e @ EthereumTransaction(_: Transfer, _, _, _)) if m.succeeded =>
-            val meta     = db.get(Keys.ethereumTransactionMeta(m.height, TxNum(tm.num.toShort))).get
+      tx = txdb.load(id) match {
+          case t: TransferTransaction if !tm.failed => t
+          case e @ EthereumTransaction(_: Transfer, _, _, _) if !tm.failed =>
+            val meta     = db.get(Keys.ethereumTransactionMeta(Height(tm.height), TxNum(tm.num.toShort))).get
             val transfer = meta.payload.transfer.get
             val tAmount  = transfer.amount.get
             val asset    = PBAmounts.toVanillaAssetId(tAmount.assetId)
@@ -875,18 +829,6 @@ abstract class LevelDBWriter private[database] (
     }
   }
 
-  def loadScoreOf(blockId: ByteStr): Option[BigInt] = {
-    readOnly(db => db.get(Keys.heightOf(blockId)).map(h => db.get(Keys.score(h))))
-  }
-
-  override def loadBlockInfo(height: Int): Option[SignedBlockHeader] = {
-    writableDB.get(Keys.blockMetaAt(Height(height))).map(_.toSignedHeader)
-  }
-
-  def loadBlockInfo(height: Int, db: ReadOnlyDB): Option[SignedBlockHeader] = {
-    db.get(Keys.blockMetaAt(Height(height))).map(_.toSignedHeader)
-  }
-
   override def loadHeightOf(blockId: ByteStr): Option[Int] = {
     readOnly(_.get(Keys.heightOf(blockId)))
   }
@@ -897,8 +839,8 @@ abstract class LevelDBWriter private[database] (
       .flatMap { h =>
         val height = Height(h)
         db.get(Keys.blockMetaAt(height))
-          .map(_.header.featureVotes)
-          .getOrElse(Seq.empty)
+          .flatMap(_.header)
+          .fold(Seq.empty[Short])(_.featureVotes.map(_.toShort))
       }
       .groupBy(identity)
       .view
@@ -913,15 +855,11 @@ abstract class LevelDBWriter private[database] (
           .votingWindow(activatedAt, height)
           .flatMap { h =>
             db.get(Keys.blockMetaAt(Height(h)))
-              .map(_.header.rewardVote)
+              .flatMap(_.header)
+              .map(_.rewardVote)
           }
       case _ => Seq()
     }
-  }
-
-  override def hitSource(height: Int): Option[ByteStr] = readOnly { db =>
-    db.get(Keys.hitSource(height))
-      .filter(_.arr.length == Block.HitSourceLength)
   }
 
   def loadStateHash(height: Int): Option[StateHash] = readOnly { db =>
