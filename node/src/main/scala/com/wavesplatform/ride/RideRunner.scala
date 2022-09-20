@@ -92,7 +92,14 @@ func foo(x: Int) = {
   let x6 = value(transactionHeightById(txId))
   let x7 = value(transferTransactionById(txId)).amount
   let x8 = wavesBalance(carl).available
-  ([], x + x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8)
+  let x9 = invoke(this, "bar", [], []).exactAs[Int]
+  ([], x + x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8 + x9)
+}
+
+@Callable(inv)
+func bar() = {
+  let x1 = if (value(getBoolean("b"))) then 1 else 2
+  ([], x1)
 }"""
     val estimator      = ScriptEstimatorV3(fixOverflow = true, overhead = false)
     val compiledScript = API.compile(input = scriptSrc, estimator).explicitGet()
