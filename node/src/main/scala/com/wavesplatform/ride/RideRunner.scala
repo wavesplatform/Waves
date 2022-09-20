@@ -19,7 +19,17 @@ import com.wavesplatform.lang.{API, ValidationError}
 import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, DataEntry, LeaseBalance, TxMeta, VolumeAndFee}
+import com.wavesplatform.state.{
+  AccountScriptInfo,
+  AssetDescription,
+  AssetScriptInfo,
+  BalanceSnapshot,
+  Blockchain,
+  DataEntry,
+  LeaseBalance,
+  TxMeta,
+  VolumeAndFee
+}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError, ScriptExecutionError}
 import com.wavesplatform.transaction.smart.script.trace.TraceStep
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
@@ -82,7 +92,7 @@ func foo(x: Int) = {
   let x6 = value(transactionHeightById(txId))
   let x7 = value(transferTransactionById(txId)).amount
   let x8 = wavesBalance(carl).available
-  ([], x + x1 + x2 + x3 + x4 + x5 + x6 + x7) # + x8)
+  ([], x + x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8)
 }"""
     val estimator      = ScriptEstimatorV3(fixOverflow = true, overhead = false)
     val compiledScript = API.compile(input = scriptSrc, estimator).explicitGet()
@@ -112,7 +122,12 @@ func foo(x: Int) = {
 
       override def hitSource(height: Int): Option[BlockId] = input.hitSource.get(height) // VRF
 
-      override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]) = kill("balanceSnapshots")
+      /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
+      override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] =
+        input.balanceSnapshots
+          .getOrElse(address, throw new RuntimeException(s"address: $address")) // TODO Map.empty)
+          .getOrElse(from, throw new RuntimeException(s"from: $from"))          // Map.empty)
+          .getOrElse(to, throw new RuntimeException(s"to: $to"))                // Seq.empty)
 
       override def hasAccountScript(address: Address) = kill("hasAccountScript")
 
@@ -148,7 +163,7 @@ func foo(x: Int) = {
       override def accountData(acc: Address, key: String): Option[DataEntry[_]] =
         input.accountData(acc).get(key)
 
-      override def leaseBalance(address: Address): LeaseBalance = kill("leaseBalance")
+      override def leaseBalance(address: Address): LeaseBalance = input.leaseBalance.getOrElse(address, LeaseBalance(0, 0))
 
       override def balance(address: Address, mayBeAssetId: Asset): Long =
         input.balance.get(address).flatMap(_.get(mayBeAssetId)).getOrElse(0)

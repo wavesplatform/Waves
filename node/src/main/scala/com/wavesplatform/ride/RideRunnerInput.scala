@@ -3,13 +3,14 @@ package com.wavesplatform.ride
 import com.google.protobuf.ByteString
 import com.google.protobuf.UnsafeByteOperations.unsafeWrap
 import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.api.http.DebugApiRoute
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.InvokeScriptResult.DataEntry
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Height, TxMeta}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, Height, LeaseBalance, TxMeta}
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
 import com.wavesplatform.transaction.{Asset, TransactionFactory}
 import play.api.libs.json.*
@@ -31,7 +32,9 @@ case class RideRunnerInput(
     blockHeader: Map[Int, SignedBlockHeader] = Map.empty,
     hitSource: Map[Int, BlockId] = Map.empty, // VRF
     transactionMeta: Map[ByteStr, TxMeta] = Map.empty,
-    transferById: Map[ByteStr, TransferTransactionLike] = Map.empty
+    transferById: Map[ByteStr, TransferTransactionLike] = Map.empty,
+    leaseBalance: Map[Address, LeaseBalance] = Map.empty,
+    balanceSnapshots: Map[Address, Map[Int, Map[Option[BlockId], Seq[BalanceSnapshot]]]] = Map.empty
 )
 object RideRunnerInput {
 
@@ -67,6 +70,16 @@ object RideRunnerInput {
       val compatStr = if (str == "WAVES") None else Some(str)
       Try(Asset.fromString(compatStr)).fold[JsResult[Asset]](e => JsError(s"Can't parse Asset '$str': ${e.getMessage}"), JsSuccess(_))
     }
+  )
+
+  implicit def optBlockMapFormat[T: Format]: Format[Map[Option[BlockId], T]] = mapFormat[Option[BlockId], T](
+    _.fold("")(_.base64),
+    str =>
+      if (str.isEmpty) JsSuccess(None)
+      else
+        Try(decodeBytesFromStr(str))
+          .fold[JsResult[BlockId]](e => JsError(s"Can't parse BlockId '$str': ${e.getMessage}"), xs => JsSuccess(ByteStr(xs)))
+          .map(Some(_))
   )
 
   implicit val scriptFormat: Format[Script] = implicitly[Format[String]]
@@ -118,6 +131,10 @@ object RideRunnerInput {
       case tx                      => throw new RuntimeException(s"Impossible case: $tx")
     }
   )
+
+  implicit val leaseInfoFormat = DebugApiRoute.leaseInfoFormat
+
+  implicit val balanceSnapshotFormat: OFormat[BalanceSnapshot] = Json.format
 
   implicit val rideRunnerInputFormat: OFormat[RideRunnerInput] = Json.using[Json.WithDefaultValues].format
 
