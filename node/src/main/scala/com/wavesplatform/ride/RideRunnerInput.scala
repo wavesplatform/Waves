@@ -1,10 +1,12 @@
 package com.wavesplatform.ride
 
+import com.google.protobuf.ByteString
+import com.google.protobuf.UnsafeByteOperations.unsafeWrap
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription}
 import com.wavesplatform.state.InvokeScriptResult.DataEntry
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Height}
 import com.wavesplatform.transaction.Asset
 import play.api.libs.json.*
 
@@ -21,7 +23,7 @@ case class RideRunnerInput(
     hasData: Map[Address, Boolean],
     resolveAlias: Map[Alias, Address],
     balance: Map[Address, Map[Asset, Long]],
-    // assetDescription: Map[Asset, AssetDescription]
+    assetDescription: Map[Asset, AssetDescription]
 )
 object RideRunnerInput {
 
@@ -66,6 +68,26 @@ object RideRunnerInput {
       Alias.fromString(_).explicitGet(), // TODO JsError instead
       _.name
     )
+
+  implicit val byteStringFormat: Format[ByteString] = implicitly[Format[String]]
+    .bimap(
+      str =>
+        unsafeWrap(
+          if (str.startsWith("base58:")) Base58.decode(str.substring(7))
+          else if (str.startsWith(Base64.Prefix)) Base64.decode(str)
+          else Base58.decode(str)
+        ),
+      x => s"${Base64.Prefix}${Base64.encode(x.toByteArray)}"
+    )
+
+  // IDEA and the compiler don't know that it is used
+  implicit val byteStrFormat = com.wavesplatform.api.http.requests.byteStrFormat
+
+  implicit val heightFormat: Format[Height] = Height.lift
+
+  implicit val assetScriptInfoFormat: OFormat[AssetScriptInfo] = Json.format
+
+  implicit val assetDescriptionFormat: OFormat[AssetDescription] = Json.format
 
   implicit val rideRunnerInputFormat: OFormat[RideRunnerInput] = Json.format
 

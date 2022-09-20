@@ -44,6 +44,10 @@ object RideRunner {
   Nonce is: 2
   Public key: 9K1Nu1udY4NAv77ktLqGAAxRtkL1epGA7tickpjDgPjP
   Address in 'W': 3PE7TH41wVuhn2SpAwWBBzeGxxzz8wXrb6L
+
+  Nonce is: 3
+  Public key: 5gmbkRC62E4YMX5RAnotUtpqccna8wPaNqCqo5hZsTeo
+  Address in 'W': 3P4xDBqzXgR8HyXoyNn1C8Bd88h4rsEBMHA
    */
   def main(args: Array[String]): Unit = {
     val basePath     = args(0)
@@ -64,17 +68,18 @@ func foo(x: Int) = {
   let alice = Address(base58'3P6GhtTsABtYUgzhXTA4cDwbqqy7HqruiQQ')
   let carl = addressFromRecipient(Alias("carl"))
   let bob = Address(base58'3PE7TH41wVuhn2SpAwWBBzeGxxzz8wXrb6L')
+  let jane = Address(base58'3P4xDBqzXgR8HyXoyNn1C8Bd88h4rsEBMHA')
 
   let asset = base58'8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS'
 
   let x1 = getIntegerValue(alice, "a")
   let x2 = if (isDataStorageUntouched(carl)) then 1 else 0
   let x3 = assetBalance(bob, asset)
-  # let x4 = value(assetInfo(asset)).decimals
-  # let x5 = value(blockInfoByHeight(3296627)).height
-  # let x6 = value(transactionHeightById(base58'FCvZHNuwR2ZKjCFdSpVyNz1CusvfYHoNyUYbfSD2Kh4g'))
-  # let x7 = wavesBalance(carl).available
-  ([], x + x1 + x2 + x3) # + x4 + x5 + x6 + x7)
+  let x4 = value(assetInfo(asset)).decimals
+  let x5 = value(blockInfoByHeight(3296627)).height
+  let x6 = value(transactionHeightById(base58'FCvZHNuwR2ZKjCFdSpVyNz1CusvfYHoNyUYbfSD2Kh4g'))
+  let x7 = wavesBalance(carl).available
+  ([], x + x1 + x2 + x3 + x4) # + x5 + x6 + x7)
 }"""
     val estimator      = ScriptEstimatorV3(fixOverflow = true, overhead = false)
     val compiledScript = API.compile(input = scriptSrc, estimator).explicitGet()
@@ -127,7 +132,7 @@ func foo(x: Int) = {
 
       override def containsTransaction(tx: Transaction): Boolean = kill("containsTransaction")
 
-      override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription] = kill("assetDescription")
+      override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription] = input.assetDescription.get(id)
 
       override def resolveAlias(a: Alias): Either[ValidationError, Address] =
         input.resolveAlias.get(a).toRight(AliasDoesNotExist(a): ValidationError)
