@@ -36,8 +36,8 @@ case class LoggedEvaluationContext[C[_[_]], F[_]: Monad](l: LetLogCallback[F], e
       case Left(err) if !loggedErrors.contains(err) =>
         loggedErrors.addOne(err)
         add(let, result)
-      case Left(err) => ()
-      case _         => add(let, result)
+      case Left(_) => ()
+      case _       => add(let, result)
     }
   }
 

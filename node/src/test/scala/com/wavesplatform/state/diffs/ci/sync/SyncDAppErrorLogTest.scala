@@ -2,20 +2,26 @@ package com.wavesplatform.state.diffs.ci.sync
 
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, EXPR}
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_STRING, EXPR}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.transaction.{ErrorWithLogPrinter, TxHelpers, TxVersion}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.InvokeScriptTrace
+import org.scalatest.OptionValues
 
-class SyncDAppErrorLogTest extends PropSpec with WithDomain {
+import scala.io.Source
+import scala.util.Using
+
+class SyncDAppErrorLogTest extends PropSpec with WithDomain with OptionValues {
 
   val invoker: KeyPair = TxHelpers.signer(1)
   val dApp1: KeyPair   = TxHelpers.signer(2)
@@ -34,7 +40,7 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
       "testCase",
       Seq(CONST_BOOLEAN(true))
     )((tx, leaseId, assetId) =>
-      s"""Left(FailedTransactionError(code = 1, error = AccountBalanceError(Map(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log =
+      s"""Left(FailedTransactionError(code = 1, error = AccountBalanceError(Map(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log = 
          |	@invokedDApp = Address(
          |		bytes = base58'3MsY23LPQnvPZnBKpvs6YcnCvGjLVD42pSy'
          |	)
@@ -236,7 +242,7 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |	]
          |	invoke.@complexity = 75
          |	@complexityLimit = 51102
-         |	inv = Left(CommonError(FailedTransactionError(code = 1, error = AccountBalanceError(Map(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log =
+         |	inv = FailedTransactionError(code = 1, error = AccountBalanceError(Map(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log = 
          |		@invokedDApp = Address(
          |			bytes = base58'3N4DiVEiZHzcjEhoBx2kmoKKCH7GBZMim3L'
          |		)
@@ -359,7 +365,7 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |		]
          |		invoke.@complexity = 75
          |		@complexityLimit = 50901
-         |		inv = Left(CommonError(FailedTransactionError(code = 1, error = AccountBalanceError(Map(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log =
+         |		inv = FailedTransactionError(code = 1, error = AccountBalanceError(Map(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log = 
          |			@invokedDApp = Address(
          |				bytes = base58'3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM'
          |			)
@@ -455,30 +461,11 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |			]
          |			cons.@complexity = 1
          |			@complexityLimit = 50640
-         |)))
-         |)))
+         |		)
+         |	)
          |))""".stripMargin
     )
   }
-
-  private def createTestCase(
-      funcName: String,
-      args: Seq[EXPR]
-  )(expectedResult: (InvokeScriptTransaction, ByteStr, ByteStr) => String): Unit =
-    withDomain(settings, balances) { d =>
-      val invoke = TxHelpers.invoke(dApp1.toAddress, func = Some(funcName), args = args, invoker = invoker)
-      d.appendBlock(
-        TxHelpers.setScript(dApp1, dAppContract1(dApp2.toAddress)),
-        TxHelpers.setScript(dApp2, dAppContract2(dApp3.toAddress)),
-        TxHelpers.setScript(dApp3, dAppContract3)
-      )
-      d.transactionDiffer(invoke).trace.collectFirst { case invokeTrace: InvokeScriptTrace => invokeTrace.resultE.toString }.foreach { error =>
-        val leaseId = Lease.calculateId(Lease(Recipient.Address(ByteStr(dApp2.toAddress.bytes)), 2, 0), invoke.id())
-        val assetId = Issue.calculateId(0, "desc", isReissuable = true, "testAsset", 20, 0, invoke.id())
-
-        error shouldBe expectedResult(invoke, leaseId, assetId)
-      }
-    }
 
   property(
     "correct error log for ScriptExecutionError"
@@ -651,7 +638,7 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |	]
          |	invoke.@complexity = 75
          |	@complexityLimit = 51736
-         |	inv = Left(CommonError(FailedTransactionError(code = 1, error = AccountBalanceError(Map(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log =
+         |	inv = FailedTransactionError(code = 1, error = AccountBalanceError(Map(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log = 
          |		@invokedDApp = Address(
          |			bytes = base58'3N4DiVEiZHzcjEhoBx2kmoKKCH7GBZMim3L'
          |		)
@@ -763,7 +750,7 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |		]
          |		invoke.@complexity = 75
          |		@complexityLimit = 51578
-         |		inv = Left(CommonError(FailedTransactionError(code = 1, error = AccountBalanceError(Map(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log =
+         |		inv = FailedTransactionError(code = 1, error = AccountBalanceError(Map(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log = 
          |			@invokedDApp = Address(
          |				bytes = base58'3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM'
          |			)
@@ -859,10 +846,77 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain {
          |			]
          |			cons.@complexity = 1
          |			@complexityLimit = 51317
-         |)))
-         |)))
+         |		)
+         |	)
          |))""".stripMargin
     )
+  }
+
+  property(s"very big error logs are shortened correctly to ${ErrorWithLogPrinter.LogStrSizeLimit}") {
+    val dApp = TxHelpers.signer(0)
+
+    val setScript = TxHelpers.setScript(
+      dApp,
+      TestCompiler(V6).compileContract(
+        s"""
+           |@Callable(inv)
+           |func foo(str: String) = {
+           |  let str1 = "${"1" * 32767}"
+           |  let str2 = "${"1" * 32767}"
+           |  let str3 = "${"1" * 32767}"
+           |  let str4 = "${"1" * 32767}"
+           |  let str5 = "${"1" * 32475}"
+           |  strict a = str2.size() + str3.size() + str4.size() + str5.size()
+           |  strict res = invoke(this, "foo", [str1], [])
+           |  []
+           |}
+           | """.stripMargin
+      ),
+      fee = 1.waves,
+      version = TxVersion.V2,
+      timestamp = 0
+    )
+
+    val invoke = TxHelpers.invoke(dApp.toAddress, Some("foo"), Seq(CONST_STRING("1" * 5074).explicitGet()), invoker = dApp, timestamp = 0)
+
+    assertDiffEiTraced(
+      Seq(
+        TestBlock.create(Seq(TxHelpers.genesis(dApp.toAddress, timestamp = 0))),
+        TestBlock.create(Seq(setScript))
+      ),
+      TestBlock.create(Seq(invoke)),
+      settings.blockchainSettings.functionalitySettings
+    ) { result =>
+      result.trace
+        .collectFirst { case invokeTrace: InvokeScriptTrace => invokeTrace.resultE.toString }
+        .foreach { error =>
+          Using.resource(Source.fromResource("big-error-log-shortened")) { source =>
+            val expectedResult = source.getLines().toList
+            expectedResult.drop(1).init.mkString("\n").length shouldBe <(ErrorWithLogPrinter.LogStrSizeLimit + 4) // 4 for "\n..."
+            error shouldBe expectedResult.mkString("\n")
+          }
+        }
+    }
+  }
+
+  private def createTestCase(
+      funcName: String,
+      args: Seq[EXPR]
+  )(expectedResult: (InvokeScriptTransaction, ByteStr, ByteStr) => String): Unit = {
+    withDomain(settings, balances) { d =>
+      val invoke = TxHelpers.invoke(dApp1.toAddress, func = Some(funcName), args = args, invoker = invoker)
+      d.appendBlock(
+        TxHelpers.setScript(dApp1, dAppContract1(dApp2.toAddress)),
+        TxHelpers.setScript(dApp2, dAppContract2(dApp3.toAddress)),
+        TxHelpers.setScript(dApp3, dAppContract3)
+      )
+      d.transactionDiffer(invoke).trace.collectFirst { case invokeTrace: InvokeScriptTrace => invokeTrace.resultE.toString }.foreach { error =>
+        val leaseId = Lease.calculateId(Lease(Recipient.Address(ByteStr(dApp2.toAddress.bytes)), 2, 0), invoke.id())
+        val assetId = Issue.calculateId(0, "desc", isReissuable = true, "testAsset", 20, 0, invoke.id())
+
+        error shouldBe expectedResult(invoke, leaseId, assetId)
+      }
+    }
   }
 
   private def dAppContract1(dApp2: Address): Script =

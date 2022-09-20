@@ -632,7 +632,7 @@ object Functions {
                 .map(_.map { case (result, spentComplexity) =>
                   val mappedError = result.leftMap {
                     case reject: FailOrRejectError => reject
-                    case other                     => CommonError(other.toString, Some(other))
+                    case other                     => CommonError("Nested invoke error", Some(other))
                   }
                   (mappedError, availableComplexity - spentComplexity)
                 })

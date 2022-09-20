@@ -150,11 +150,7 @@ class SubInvokeStateChangesSpec extends FlatSpec with WithDomain with JsonMatche
           |            "text" : "boom"
           |          }
           |        }
-          |      } ],
-          |      "error" : {
-          |        "code" : 1,
-          |        "text" : "boom"
-          |      }
+          |      } ]
           |    }
           |  } ],
           |  "error" : {

@@ -81,11 +81,13 @@ object TxValidationError {
     private def assetScriptError(assetId: ByteStr, error: Option[String]): String =
       s"Transaction is not allowed by script of the asset $assetId" + error.fold("")(e => s": $e")
 
+    def errorDetails: String = s"FailedTransactionError(code = ${cause.code}, error = $message, log = "
+
     override def toString: String =
       if (message.startsWith("FailedTransactionError"))
         message
       else
-        s"FailedTransactionError(code = ${cause.code}, error = $message, log =${logToString(log)})"
+        s"$errorDetails${ErrorWithLogPrinter.logToString(log)})"
   }
 
   object FailedTransactionError {
@@ -140,7 +142,7 @@ object TxValidationError {
       if (String.valueOf(error).startsWith("ScriptExecutionError"))
         error
       else
-        s"ScriptExecutionError(error = $error, type = $target, log = ${logToString(log)})"
+        s"ScriptExecutionError(error = $error, type = $target, log = ${ErrorWithLogPrinter.logToString(log)})"
   }
 
   object ScriptExecutionError {
@@ -150,7 +152,7 @@ object TxValidationError {
   case class TransactionNotAllowedByScript(log: Log[Id], assetId: Option[ByteStr]) extends ValidationError {
     def isAssetScript: Boolean    = assetId.isDefined
     private val target: String    = assetId.fold("Account")(_ => "Asset")
-    override def toString: String = s"TransactionNotAllowedByScript(type = $target, log =${logToString(log)})"
+    override def toString: String = s"TransactionNotAllowedByScript(type = $target, log = ${ErrorWithLogPrinter.logToString(log)})"
   }
 
   def logToString(log: Log[Id]): String =

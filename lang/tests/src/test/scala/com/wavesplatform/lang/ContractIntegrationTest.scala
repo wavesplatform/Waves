@@ -122,8 +122,8 @@ class ContractIntegrationTest extends PropSpec with Inside {
       "foo",
       args = Nil
     )
-    inside(evalResult) { case Left((CommonError(error, _), log)) =>
-      error shouldBe "exception message"
+    inside(evalResult) { case Left((err @ CommonError(_, _), log)) =>
+      err.message shouldBe "exception message"
       log should contain.allOf(
         ("a", Right(CONST_LONG(1))),
         ("b", Right(CONST_LONG(2))),

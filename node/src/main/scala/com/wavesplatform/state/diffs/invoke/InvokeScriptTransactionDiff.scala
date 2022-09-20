@@ -386,8 +386,8 @@ object InvokeScriptTransactionDiff {
         case (error, unusedComplexity, log) =>
           val usedComplexity = startLimit - unusedComplexity.max(0)
           val msg = error match {
-            case CommonError(message, Some(fte: FailedTransactionError)) => fte.error.getOrElse(message)
-            case _                                                       => error.message
+            case CommonError(_, Some(fte: FailedTransactionError)) => fte.error.getOrElse(error.message)
+            case _                                                 => error.message
           }
           if (usedComplexity > failFreeLimit) {
             val storingComplexity = if (blockchain.storeEvaluatedComplexity) usedComplexity else estimatedComplexity

@@ -428,8 +428,8 @@ object InvokeScriptDiff {
           case (error, unusedComplexity, log) =>
             val usedComplexity = startComplexityLimit - unusedComplexity
             val msg = error match {
-              case CommonError(message, Some(fte: FailedTransactionError)) => fte.error.getOrElse(message)
-              case _                                                       => error.message
+              case CommonError(_, Some(fte: FailedTransactionError)) => fte.error.getOrElse(error.message)
+              case _                                                 => error.message
             }
             FailedTransactionError.dAppExecution(msg, usedComplexity, log)
         }.flatTap { case (r, log) =>

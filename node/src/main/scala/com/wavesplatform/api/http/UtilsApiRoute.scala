@@ -408,8 +408,8 @@ object UtilsApiRoute {
           .value()
           .leftMap { case (err, _, log) =>
             val msg = err match {
-              case CommonError(message, Some(fte: FailedTransactionError)) => fte.error.getOrElse(message)
-              case _                                                       => err.message
+              case CommonError(_, Some(fte: FailedTransactionError)) => fte.error.getOrElse(err.message)
+              case _                                                 => err.message
             }
             ScriptExecutionError.dAppExecution(msg, log)
           }

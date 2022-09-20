@@ -280,7 +280,13 @@ object DAppEnvironment {
       }
 
     def getErrorMessage: Option[InvokeScriptResult.ErrorMessage] = {
-      def isNestedError(ve: ValidationError) = invocations.exists(_.result.left.map(_.toString) == Left(ve.toString))
+      def isNestedError(ve: ValidationError) = invocations.exists { inv =>
+        (inv.result, ve) match {
+          case (Left(fte1: FailedTransactionError), fte2: FailedTransactionError) => fte1.error == fte2.error
+          case (Left(ve1), ve2)                                                   => ve1 == ve2
+          case _                                                                  => false
+        }
+      }
 
       this.result.left.toOption.collect {
         case ve if !isNestedError(ve) =>
