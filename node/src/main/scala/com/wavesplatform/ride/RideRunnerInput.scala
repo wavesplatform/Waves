@@ -10,7 +10,8 @@ import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.InvokeScriptResult.DataEntry
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Height, TxMeta}
-import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
+import com.wavesplatform.transaction.{Asset, TransactionFactory}
 import play.api.libs.json.*
 
 import scala.util.Try
@@ -29,7 +30,8 @@ case class RideRunnerInput(
     assetDescription: Map[Asset, AssetDescription] = Map.empty,
     blockHeader: Map[Int, SignedBlockHeader] = Map.empty,
     hitSource: Map[Int, BlockId] = Map.empty, // VRF
-    transactionMeta: Map[ByteStr, TxMeta] = Map.empty
+    transactionMeta: Map[ByteStr, TxMeta] = Map.empty,
+    transferById: Map[ByteStr, TransferTransactionLike] = Map.empty
 )
 object RideRunnerInput {
 
@@ -99,6 +101,23 @@ object RideRunnerInput {
   implicit val signedBlockHeaderFormat: OFormat[SignedBlockHeader] = Json.format
 
   implicit val txMetaFormat: OFormat[TxMeta] = Json.format
+
+  implicit val transferTransactionLikeFormat: OFormat[TransferTransactionLike] = OFormat(
+    r = Reads { js =>
+      TransactionFactory.fromSignedRequest(js) match {
+        case Left(e) => JsError(s"Can't parse a transaction: $e")
+        case Right(tx) =>
+          tx match {
+            case tx: TransferTransactionLike => JsSuccess(tx)
+            case _                           => JsError(s"Expected ${tx.id} to be a transfer-like transaction, but got: type=${tx.tpe}")
+          }
+      }
+    },
+    w = OWrites {
+      case tx: TransferTransaction => tx.json()
+      case tx                      => throw new RuntimeException(s"Impossible case: $tx")
+    }
+  )
 
   implicit val rideRunnerInputFormat: OFormat[RideRunnerInput] = Json.using[Json.WithDefaultValues].format
 

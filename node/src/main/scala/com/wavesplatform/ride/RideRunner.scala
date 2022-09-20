@@ -22,7 +22,7 @@ import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, DataEntry, LeaseBalance, TxMeta, VolumeAndFee}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError, ScriptExecutionError}
 import com.wavesplatform.transaction.smart.script.trace.TraceStep
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 import play.api.libs.json.*
 
@@ -72,7 +72,7 @@ func foo(x: Int) = {
   let jane = Address(base58'3P4xDBqzXgR8HyXoyNn1C8Bd88h4rsEBMHA')
 
   let asset = base58'8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS'
-  let txId = base58'FCvZHNuwR2ZKjCFdSpVyNz1CusvfYHoNyUYbfSD2Kh4g'
+  let txId = base58'8rc5Asw43qbq7LMZ6tu2aVbVkw72XmBt7tTnwMSNfaNq'
 
   let x1 = getIntegerValue(alice, "a")
   let x2 = if (isDataStorageUntouched(carl)) then 1 else 0
@@ -80,9 +80,9 @@ func foo(x: Int) = {
   let x4 = value(assetInfo(asset)).decimals
   let x5 = value(blockInfoByHeight(3296627)).height
   let x6 = value(transactionHeightById(txId))
-  let x7 = value(transferTransactionById(txId))
+  let x7 = value(transferTransactionById(txId)).amount
   let x8 = wavesBalance(carl).available
-  ([], x + x1 + x2 + x3 + x4 + x5 + x6) # + x7 + x8)
+  ([], x + x1 + x2 + x3 + x4 + x5 + x6 + x7) # + x8)
 }"""
     val estimator      = ScriptEstimatorV3(fixOverflow = true, overhead = false)
     val compiledScript = API.compile(input = scriptSrc, estimator).explicitGet()
@@ -153,7 +153,11 @@ func foo(x: Int) = {
       override def balance(address: Address, mayBeAssetId: Asset): Long =
         input.balance.get(address).flatMap(_.get(mayBeAssetId)).getOrElse(0)
 
-      override def transferById(id: BlockId): Option[(Int, TransferTransaction)] = kill("transferById")
+      override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =
+        input.transferById.get(id).map { tx =>
+          val meta = transactionMeta(id).getOrElse(throw new RuntimeException(s"Can't find a metadata of the transaction $id"))
+          (meta.height, tx)
+        }
 
       /** Block reward related */
       override def blockReward(height: Int): Option[Long] = kill("blockReward")
