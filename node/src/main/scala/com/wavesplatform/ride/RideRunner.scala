@@ -89,11 +89,12 @@ func foo(x: Int) = {
   let x3 = assetBalance(bob, asset)
   let x4 = value(assetInfo(asset)).decimals
   let x5 = value(blockInfoByHeight(3296627)).height
-  let x6 = value(transactionHeightById(txId))
-  let x7 = value(transferTransactionById(txId)).amount
-  let x8 = wavesBalance(carl).available
-  let x9 = invoke(this, "bar", [], []).exactAs[Int]
-  ([], x + x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8 + x9)
+  let x6 = size(value(scriptHash(this)))
+  let x7 = value(transactionHeightById(txId))
+  let x8 = value(transferTransactionById(txId)).amount
+  let x9 = wavesBalance(carl).available
+  let x10 = invoke(this, "bar", [], []).exactAs[Int]
+  ([], x + x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8 + x9 + x10)
 }
 
 @Callable(inv)
