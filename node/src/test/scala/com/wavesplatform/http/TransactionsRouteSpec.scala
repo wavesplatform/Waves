@@ -1091,8 +1091,6 @@ class TransactionsRouteSpec
 
           (dappTrace \ "error").get shouldEqual JsNull
           (dappTrace \ "vars" \\ "name").map(_.as[String]) should contain theSameElementsAs Seq(
-            "@invokedDApp",
-            "@invokedFuncName",
             "i",
             "default.@args",
             "Address.@args",

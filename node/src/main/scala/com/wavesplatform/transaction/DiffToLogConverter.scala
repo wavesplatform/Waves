@@ -9,6 +9,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_BOOLEAN, CONST_BYTES
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, UNIT}
 import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{Bindings, Types}
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.LogKeys.*
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, Diff, EmptyDataEntry, IntegerDataEntry, InvokeScriptResult, StringDataEntry}
@@ -152,9 +153,9 @@ object DiffToLogConverter {
     }
 
     List(
-      s"$funcName.@stateChanges" -> scriptResultsToObj(diff.scriptResults.getOrElse(txId, InvokeScriptResult.empty)).asRight[ExecutionError],
-      s"$funcName.@complexity"   -> CONST_LONG(diff.scriptsComplexity).asRight[ExecutionError],
-      "@complexityLimit"         -> CONST_LONG(complexityLimit - diff.scriptsComplexity).asRight[ExecutionError]
+      s"$funcName.$StateChanges" -> scriptResultsToObj(diff.scriptResults.getOrElse(txId, InvokeScriptResult.empty)).asRight[ExecutionError],
+      s"$funcName.$Complexity"   -> CONST_LONG(diff.scriptsComplexity).asRight[ExecutionError],
+      ComplexityLimit            -> CONST_LONG(complexityLimit - diff.scriptsComplexity).asRight[ExecutionError]
     )
   }
 }

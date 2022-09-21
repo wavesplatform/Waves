@@ -333,19 +333,6 @@ class TransactionBroadcastSpec
              |    },
              |    "error" : null,
              |    "vars" : [ {
-             |      "name" : "@invokedDApp",
-             |      "type" : "Address",
-             |      "value" : {
-             |        "bytes" : {
-             |          "type" : "ByteVector",
-             |          "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
-             |        }
-             |      }
-             |    }, {
-             |      "name" : "@invokedFuncName",
-             |      "type" : "String",
-             |      "value" : "test"
-             |    }, {
              |      "name" : "i",
              |      "type" : "Invocation",
              |      "value" : {

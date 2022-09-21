@@ -377,19 +377,6 @@ class DebugApiRouteSpec
                            |  },
                            |  "error" : null,
                            |  "vars" : [ {
-                           |    "name" : "@invokedDApp",
-                           |    "type" : "Address",
-                           |    "value" : {
-                           |      "bytes" : {
-                           |        "type" : "ByteVector",
-                           |        "value" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
-                           |      }
-                           |    }
-                           |  }, {
-                           |    "name" : "@invokedFuncName",
-                           |    "type" : "String",
-                           |    "value" : "default"
-                           |  }, {
                            |    "name" : "i",
                            |    "type" : "Invocation",
                            |    "value" : {
@@ -525,19 +512,6 @@ class DebugApiRouteSpec
                  |  },
                  |  "error" : null,
                  |  "vars" : [ {
-                 |    "name" : "@invokedDApp",
-                 |    "type" : "Address",
-                 |    "value" : {
-                 |      "bytes" : {
-                 |        "type" : "ByteVector",
-                 |        "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
-                 |      }
-                 |    }
-                 |  }, {
-                 |    "name" : "@invokedFuncName",
-                 |    "type" : "String",
-                 |    "value" : "dataAndTransfer"
-                 |  }, {
                  |    "name" : "i",
                  |    "type" : "Invocation",
                  |    "value" : {
@@ -1144,19 +1118,6 @@ class DebugApiRouteSpec
                  |  },
                  |  "error" : null,
                  |  "vars" : [ {
-                 |    "name" : "@invokedDApp",
-                 |    "type" : "Address",
-                 |    "value" : {
-                 |      "bytes" : {
-                 |        "type" : "ByteVector",
-                 |        "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
-                 |      }
-                 |    }
-                 |  }, {
-                 |    "name" : "@invokedFuncName",
-                 |    "type" : "String",
-                 |    "value" : "issue"
-                 |  }, {
                  |    "name" : "i",
                  |    "type" : "Invocation",
                  |    "value" : {
@@ -1312,19 +1273,6 @@ class DebugApiRouteSpec
                  |  },
                  |  "error" : null,
                  |  "vars" : [ {
-                 |    "name" : "@invokedDApp",
-                 |    "type" : "Address",
-                 |    "value" : {
-                 |      "bytes" : {
-                 |        "type" : "ByteVector",
-                 |        "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
-                 |      }
-                 |    }
-                 |  }, {
-                 |    "name" : "@invokedFuncName",
-                 |    "type" : "String",
-                 |    "value" : "reissue"
-                 |  }, {
                  |    "name" : "i",
                  |    "type" : "Invocation",
                  |    "value" : {
@@ -1473,19 +1421,6 @@ class DebugApiRouteSpec
                  |  },
                  |  "error" : null,
                  |  "vars" : [ {
-                 |    "name" : "@invokedDApp",
-                 |    "type" : "Address",
-                 |    "value" : {
-                 |      "bytes" : {
-                 |        "type" : "ByteVector",
-                 |        "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
-                 |      }
-                 |    }
-                 |  }, {
-                 |    "name" : "@invokedFuncName",
-                 |    "type" : "String",
-                 |    "value" : "burn"
-                 |  }, {
                  |    "name" : "i",
                  |    "type" : "Invocation",
                  |    "value" : {
@@ -1790,19 +1725,6 @@ class DebugApiRouteSpec
              |  },
              |  "error" : null,
              |  "vars" : [ {
-             |    "name" : "@invokedDApp",
-             |    "type" : "Address",
-             |    "value" : {
-             |      "bytes" : {
-             |        "type" : "ByteVector",
-             |        "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
-             |      }
-             |    }
-             |  }, {
-             |    "name" : "@invokedFuncName",
-             |    "type" : "String",
-             |    "value" : "default"
-             |  }, {
              |    "name" : "i",
              |    "type" : "Invocation",
              |    "value" : {
@@ -2279,19 +2201,6 @@ class DebugApiRouteSpec
              |    },
              |    "error" : null,
              |    "vars" : [ {
-             |      "name" : "@invokedDApp",
-             |      "type" : "Address",
-             |      "value" : {
-             |        "bytes" : {
-             |          "type" : "ByteVector",
-             |          "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
-             |        }
-             |      }
-             |    }, {
-             |      "name" : "@invokedFuncName",
-             |      "type" : "String",
-             |      "value" : "test"
-             |    }, {
              |      "name" : "i",
              |      "type" : "Invocation",
              |      "value" : {
@@ -2461,19 +2370,6 @@ class DebugApiRouteSpec
              |  },
              |  "error" : null,
              |  "vars" : [ {
-             |    "name" : "@invokedDApp",
-             |    "type" : "Address",
-             |    "value" : {
-             |      "bytes" : {
-             |        "type" : "ByteVector",
-             |        "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
-             |      }
-             |    }
-             |  }, {
-             |    "name" : "@invokedFuncName",
-             |    "type" : "String",
-             |    "value" : "test1"
-             |  }, {
              |    "name" : "i",
              |    "type" : "Invocation",
              |    "value" : {
@@ -2553,59 +2449,6 @@ class DebugApiRouteSpec
              |    "name" : "@complexityLimit",
              |    "type" : "Int",
              |    "value" : 25925
-             |  }, {
-             |    "name" : "test.@stateChanges",
-             |    "type" : "StateChanges",
-             |    "value" : {
-             |      "leases" : {
-             |        "type" : "Array",
-             |        "value" : [ ]
-             |      },
-             |      "reissues" : {
-             |        "type" : "Array",
-             |        "value" : [ ]
-             |      },
-             |      "data" : {
-             |        "type" : "Array",
-             |        "value" : [ {
-             |          "type" : "IntegerEntry",
-             |          "value" : {
-             |            "key" : {
-             |              "type" : "String",
-             |              "value" : "key"
-             |            },
-             |            "value" : {
-             |              "type" : "Int",
-             |              "value" : 1
-             |            }
-             |          }
-             |        } ]
-             |      },
-             |      "issues" : {
-             |        "type" : "Array",
-             |        "value" : [ ]
-             |      },
-             |      "sponsorFees" : {
-             |        "type" : "Array",
-             |        "value" : [ ]
-             |      },
-             |      "leaseCancels" : {
-             |        "type" : "Array",
-             |        "value" : [ ]
-             |      },
-             |      "transfers" : {
-             |        "type" : "Array",
-             |        "value" : [ ]
-             |      },
-             |      "burns" : {
-             |        "type" : "Array",
-             |        "value" : [ ]
-             |      },
-             |      "invokes" : {
-             |        "type" : "Array",
-             |        "value" : [ ]
-             |      }
-             |    }
              |  }, {
              |    "name" : "test.@complexity",
              |    "type" : "Int",
@@ -2807,19 +2650,6 @@ class DebugApiRouteSpec
                |  },
                |  "error" : null,
                |  "vars" : [ {
-               |    "name" : "@invokedDApp",
-               |    "type" : "Address",
-               |    "value" : {
-               |      "bytes" : {
-               |        "type" : "ByteVector",
-               |        "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
-               |      }
-               |    }
-               |  }, {
-               |    "name" : "@invokedFuncName",
-               |    "type" : "String",
-               |    "value" : "default"
-               |  }, {
                |    "name" : "i",
                |    "type" : "Invocation",
                |    "value" : {

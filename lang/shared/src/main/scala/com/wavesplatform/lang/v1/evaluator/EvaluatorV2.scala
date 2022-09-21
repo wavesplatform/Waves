@@ -11,6 +11,7 @@ import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ContextfulNativeFunction.{Extended, Simple}
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.LogExtraInfo
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.logFunc
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.LogKeys.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext, NativeFunction, UserFunction}
 import com.wavesplatform.lang.v1.traits.Environment
@@ -66,8 +67,8 @@ class EvaluatorV2(
         r.map { unused =>
           if (unused == limit) {
             if (unused >= 1 && fc.function.isInstanceOf[FunctionHeader.User]) {
-              ctx.log(LET(s"${fc.function.funcName}.@complexity", TRUE), CONST_LONG(1).asRight[ExecutionError])
-              ctx.log(LET("@complexityLimit", TRUE), CONST_LONG(unused - 1).asRight[ExecutionError])
+              ctx.log(LET(s"${fc.function.funcName}.$Complexity", TRUE), CONST_LONG(1).asRight[ExecutionError])
+              ctx.log(LET(ComplexityLimit, TRUE), CONST_LONG(unused - 1).asRight[ExecutionError])
             }
             unused - 1
           } else unused
@@ -418,12 +419,12 @@ object EvaluatorV2 {
     }
     logExtraInfo.dAppAddress.foreach { addr =>
       val addrObj = Bindings.senderObject(addr)
-      loggedCtx.log(LET("@invokedDApp", addrObj), addrObj.asRight[ExecutionError])
+      loggedCtx.log(LET(InvokedDApp, addrObj), addrObj.asRight[ExecutionError])
     }
 
     logExtraInfo.invokedFuncName.foreach { funcName =>
       val invokedFuncName = CONST_STRING(funcName)
-      invokedFuncName.foreach(name => loggedCtx.log(LET("@invokedFuncName", name), invokedFuncName))
+      invokedFuncName.foreach(name => loggedCtx.log(LET(InvokedFuncName, name), invokedFuncName))
     }
 
     logExtraInfo.invArg.flatMap(findInvArgLet(exprCopy, _)).foreach {
@@ -440,8 +441,8 @@ object EvaluatorV2 {
         val cost = f.costByLibVersion(stdLibVersion)
         if (limit >= cost) {
           logFuncArgs(fc, funcName, ctx)
-          ctx.log(LET(s"$funcName.@complexity", TRUE), CONST_LONG(cost).asRight[ExecutionError])
-          ctx.log(LET("@complexityLimit", TRUE), CONST_LONG(limit - cost).asRight[ExecutionError])
+          ctx.log(LET(s"$funcName.$Complexity", TRUE), CONST_LONG(cost).asRight[ExecutionError])
+          ctx.log(LET(ComplexityLimit, TRUE), CONST_LONG(limit - cost).asRight[ExecutionError])
         }
       case None =>
         logFuncArgs(fc, funcName, ctx)
@@ -450,6 +451,17 @@ object EvaluatorV2 {
 
   private def logFuncArgs(fc: FUNCTION_CALL, name: String, ctx: LoggedEvaluationContext[Environment, Id]): Unit = {
     val argsArr = ARR(fc.args.collect { case arg: EVALUATED => arg }.toIndexedSeq, false)
-    argsArr.foreach(_ => ctx.log(LET(s"$name.@args", TRUE), argsArr))
+    argsArr.foreach(_ => ctx.log(LET(s"$name.$Args", TRUE), argsArr))
+  }
+
+  object LogKeys {
+    val InvokedDApp     = "@invokedDApp"
+    val InvokedFuncName = "@invokedFuncName"
+    val ComplexityLimit = "@complexityLimit"
+    val Complexity      = "@complexity"
+    val Args            = "@args"
+    val StateChanges    = "@stateChanges"
+
+    val TraceExcluded = Seq(InvokedDApp, InvokedFuncName, StateChanges)
   }
 }
