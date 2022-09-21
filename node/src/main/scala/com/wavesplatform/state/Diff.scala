@@ -164,20 +164,21 @@ case class Diff(
     scriptsComplexity: Long,
     scriptResults: Map[ByteStr, InvokeScriptResult],
     ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta],
-    transactionFilter: BloomFilter[Array[Byte]]
+    transactionFilter: Option[BloomFilter[Array[Byte]]]
 ) {
+  import Diff.*
   @inline
   final def combineE(newer: Diff): Either[ValidationError, Diff] = combineF(newer).leftMap(GenericError(_))
 
-  def containsTransaction(txId: ByteStr): Boolean = transactionFilter.mightContain(txId.arr) && transactions.exists(_.transaction.id() == txId)
+  def containsTransaction(txId: ByteStr): Boolean =
+    transactions.nonEmpty && transactionFilter.exists(_.mightContain(txId.arr)) && transactions.exists(_.transaction.id() == txId)
 
   def combineF(newer: Diff): Either[String, Diff] =
     Diff
       .combine(portfolios, newer.portfolios)
       .map { portfolios =>
-        newer.transactions.foreach(nti => transactionFilter.put(nti.transaction.id().arr))
         Diff(
-          transactions = transactions ++ newer.transactions,
+          transactions = if (transactions.isEmpty) newer.transactions else transactions ++ newer.transactions,
           portfolios = portfolios,
           issuedAssets = issuedAssets ++ newer.issuedAssets,
           updatedAssets = updatedAssets |+| newer.updatedAssets,
@@ -192,7 +193,14 @@ case class Diff(
           scriptResults = scriptResults.combine(newer.scriptResults),
           scriptsComplexity = scriptsComplexity + newer.scriptsComplexity,
           ethereumTransactionMeta = ethereumTransactionMeta ++ newer.ethereumTransactionMeta,
-          transactionFilter = transactionFilter
+          transactionFilter = transactionFilter match {
+            case Some(bf) =>
+              newer.transactions.foreach(_.transaction.id().arr)
+              Some(bf)
+            case None if newer.transactions.nonEmpty =>
+              newer.transactionFilter
+            case _ => None
+          }
         )
       }
 }
@@ -230,7 +238,7 @@ object Diff {
       scriptsComplexity,
       scriptResults,
       ethereumTransactionMeta,
-      BloomFilter.create(Funnels.byteArrayFunnel(), 10000, 0.01f)
+      None
     )
 
   def withTransaction(
@@ -266,9 +274,7 @@ object Diff {
       scriptsComplexity,
       scriptResults,
       ethereumTransactionMeta,
-      BloomFilter
-        .create[Array[Byte]](Funnels.byteArrayFunnel(), 10000, 0.01f)
-        .tap(_.put(nti.transaction.id().arr))
+      mkFilterForTransactions(nti.transaction)
     )
 
   val empty: Diff = Diff()
@@ -289,6 +295,10 @@ object Diff {
           }
         case (r, _) => r
       }
+
+  private def mkFilter() = BloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), 10000, 0.01f)
+  private def mkFilterForTransactions(tx: Transaction) =
+    Some(mkFilter().tap(_.put(tx.id().arr)))
 
   implicit class DiffExt(private val d: Diff) extends AnyVal {
     def errorMessage(txId: ByteStr): Option[InvokeScriptResult.ErrorMessage] =
@@ -317,7 +327,7 @@ object Diff {
 
       d.copy(
         transactions = Vector(NewTransactionInfo(tx, affectedAddresses, applied, d.scriptsComplexity)),
-        transactionFilter = d.transactionFilter.copy().tap(_.put(tx.id().arr))
+        transactionFilter = mkFilterForTransactions(tx)
       )
     }
   }

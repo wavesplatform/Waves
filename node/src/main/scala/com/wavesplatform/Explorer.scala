@@ -19,6 +19,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB
 import com.google.common.hash.{Funnels, BloomFilter as GBloomFilter}
+import play.api.libs.json.Json
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -308,6 +309,12 @@ object Explorer extends ScorexLogging {
             count += 1
           }
           log.info(s"Found $count transactions")
+        case "SH" =>
+          val targetHeight = argument(1, "height").toInt
+          log.info(s"Loading state hash at $targetHeight")
+          db.get(Keys.stateHash(targetHeight)).foreach { sh =>
+            println(Json.toJson(sh).toString())
+          }
       }
     } finally db.close()
   }

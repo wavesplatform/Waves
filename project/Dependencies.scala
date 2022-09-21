@@ -171,6 +171,8 @@ object Dependencies {
       "com.typesafe.scala-logging"                      %% "scala-logging" % "3.9.5",
       "eu.timepit"                                      %% "refined"       % "0.10.1" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
       "eu.timepit"                                      %% "refined-cats"  % "0.10.1" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
+      "org.eclipse.collections" % "eclipse-collections" % "11.1.0",
+      "org.mapdb" % "mapdb" % "3.0.8",
       akkaModule("testkit")                              % Test,
       akkaHttpModule("akka-http-testkit")                % Test,
       leveldbJava().exclude("com.google.guava", "guava") % Test

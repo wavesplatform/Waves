@@ -7,7 +7,12 @@ import com.google.common.cache.{CacheBuilder, CacheLoader}
 import com.google.common.collect.AbstractIterator
 import com.google.common.primitives.UnsignedBytes
 import com.typesafe.scalalogging.LazyLogging
+import com.wavesplatform.database.InMemoryDB.ByteArrayHashingStrategy
+import org.eclipse.collections.api.block.HashingStrategy
+import org.eclipse.collections.impl.factory.{HashingStrategyMaps, HashingStrategySets}
 import org.iq80.leveldb.*
+
+import scala.compat.java8.FunctionConverters.*
 
 class KW private (val bs: Array[Byte]) extends Comparable[KW] {
   override def equals(obj: Any): Boolean = obj match {
@@ -27,20 +32,18 @@ object KW {
 }
 
 class TestBatch extends WriteBatch {
-  val newEntries     = new util.HashMap[KW, Array[Byte]]
-  val deletedEntries = new util.HashSet[KW]
+  val newEntries     = HashingStrategyMaps.mutable.`with`[Array[Byte], Array[Byte]](ByteArrayHashingStrategy)
+  val deletedEntries = HashingStrategySets.mutable.`with`[Array[Byte]](ByteArrayHashingStrategy)
 
   override def put(key: Array[Byte], value: Array[Byte]): WriteBatch = {
-    val bs = KW(key)
-    deletedEntries.remove(bs)
-    newEntries.put(bs, value)
+    deletedEntries.remove(key)
+    newEntries.put(key, value)
     this
   }
 
   override def delete(key: Array[Byte]): WriteBatch = {
-    val bs = KW(key)
-    newEntries.remove(bs)
-    deletedEntries.add(bs)
+    newEntries.remove(key)
+    deletedEntries.add(key)
     this
   }
 
@@ -88,11 +91,21 @@ class TestIterator(entries: util.TreeMap[KW, Array[Byte]]) extends DBIterator {
   override def next(): JEntry[Array[Byte], Array[Byte]] = iter.next()
 }
 
+object InMemoryDB {
+  object ByteArrayHashingStrategy extends HashingStrategy[Array[Byte]] {
+    override def computeHashCode(obj: Array[Byte]): Int = util.Arrays.hashCode(obj)
+
+    override def equals(object1: Array[Byte], object2: Array[Byte]): Boolean = util.Arrays.equals(object1, object2)
+  }
+}
+
 class InMemoryDB(underlying: DB) extends DB with LazyLogging {
+  import InMemoryDB.*
+
   private var estimatedSize: Long = 0L
   private var batchCount          = 0L
-  private val entries             = new util.HashMap[KW, Array[Byte]]
-  private val toDelete            = new util.HashSet[KW]
+  private val entries             = HashingStrategyMaps.mutable.`with`[Array[Byte], Array[Byte]](ByteArrayHashingStrategy)
+  private val toDelete            = HashingStrategySets.mutable.`with`[Array[Byte]](ByteArrayHashingStrategy)
 
   private val cc = CacheBuilder
     .newBuilder()
@@ -108,17 +121,16 @@ class InMemoryDB(underlying: DB) extends DB with LazyLogging {
   private val MaxBatchSize = 512 * 1024 * 1024
   logger.info(s"Max batch size = $MaxBatchSize")
 
-  override def get(key: Array[Byte]): Array[Byte] = {
-    val kw = KW(key)
+  override def get(key: Array[Byte]): Array[Byte] =
     entries.getOrDefault(
-      kw,
-      if (toDelete.contains(kw)) null
+      key,
+      if (toDelete.contains(key)) null
       else {
+        val kw = KW(key)
         val bs = cc.get(kw)
         if (bs.length == 0) null else bs
       }
     )
-  }
 
   override def get(key: Array[Byte], options: ReadOptions): Array[Byte] = get(key)
 
@@ -126,33 +138,30 @@ class InMemoryDB(underlying: DB) extends DB with LazyLogging {
 
   override def iterator(options: ReadOptions): DBIterator = underlying.iterator()
 
-  private def putAndCountBytes(key: KW, value: Array[Byte]): Unit = {
+  private def putAndCountBytes(key: Array[Byte], value: Array[Byte]): Unit = {
     toDelete.remove(key)
-    val entrySize = key.bs.length + value.length
+    val entrySize = key.length + value.length
     estimatedSize += entrySize
-    if (entrySize > 10000) {
-      logger.info(s"size: $entrySize, prefix: ${key.bs.mkString("[",",","]")}")
-    }
-    Option(entries.put(key, value)).foreach(bs => estimatedSize -= (key.bs.length + bs.length))
+    Option(entries.put(key, value)).foreach(bs => estimatedSize -= (key.length + bs.length))
   }
 
-  private def deleteAndCountBytes(key: KW): Unit = {
+  private def deleteAndCountBytes(key: Array[Byte]): Unit = {
     toDelete.add(key)
-    Option(entries.remove(key)).foreach(v => estimatedSize -= (key.bs.length + v.length))
+    Option(entries.remove(key)).foreach(v => estimatedSize -= (key.length + v.length))
   }
 
-  override def put(key: Array[Byte], value: Array[Byte]): Unit = putAndCountBytes(KW(key), value)
+  override def put(key: Array[Byte], value: Array[Byte]): Unit = putAndCountBytes(key, value)
 
-  override def delete(key: Array[Byte]): Unit = deleteAndCountBytes(KW(key))
+  override def delete(key: Array[Byte]): Unit = deleteAndCountBytes(key)
 
   private def flush(): Unit = {
     logger.info(s"${toDelete.size} keys to delete, ${entries.size} to add")
     underlying.suspendCompactions()
     underlying.readWrite { rw =>
-      toDelete.forEach(k => rw.delete(k.bs))
-      entries.forEach { (k, v) =>
-        rw.put(k.bs, v)
-      }
+      toDelete.forEach(((t: Array[Byte]) => rw.delete(t)).asJava)
+      entries.forEach({ (k: Array[Byte], v: Array[Byte]) =>
+        rw.put(k, v)
+      }.asJava)
     }
     cc.invalidateAll()
     underlying.resumeCompactions()
@@ -165,8 +174,8 @@ class InMemoryDB(underlying: DB) extends DB with LazyLogging {
   override def write(updates: WriteBatch): Unit = updates match {
     case tb: TestBatch =>
       batchCount += 1
-      tb.deletedEntries.forEach(deleteAndCountBytes)
-      tb.newEntries.forEach(putAndCountBytes)
+      tb.deletedEntries.forEach((k => deleteAndCountBytes(k)).asJava)
+      tb.newEntries.forEach((k, v) => putAndCountBytes(k, v))
 
       if (estimatedSize > MaxBatchSize) {
         flush()

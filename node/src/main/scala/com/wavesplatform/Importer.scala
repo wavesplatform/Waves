@@ -28,7 +28,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Proven, Signed, Transaction}
 import com.wavesplatform.utils.*
-import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
+import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import kamon.Kamon
 import monix.eval.Task
@@ -219,13 +219,10 @@ object Importer extends ScorexLogging {
           if (blocksToSkip > 0) {
             blocksToSkip -= 1
           } else {
-            val blockV5 = blockchain.isFeatureActivated(
-              BlockchainFeatures.BlockV5,
-              blockchain.height + 1
-            )
-            val block =
-              (if (importOptions.format == Formats.Binary && !blockV5) Block.parseBytes(blockBytes)
-               else PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(blockBytes)), unsafe = true)).get
+            val blockV5               = blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, blockchain.height + 1)
+            lazy val parsedProtoBlock = PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(blockBytes)), unsafe = true)
+
+            val block = (if (!blockV5) Block.parseBytes(blockBytes) else parsedProtoBlock).orElse(parsedProtoBlock).get
 
             Task
               .parTraverse(block.transactionData) {
@@ -291,7 +288,7 @@ object Importer extends ScorexLogging {
     val scheduler = Schedulers.singleThread("appender")
     val time      = new NTP(settings.ntpServer)
 
-    val db          = openDB(settings.dbSettings.directory)
+    val db = openDB(settings.dbSettings.directory)
     val (blockchainUpdater, levelDb) =
       StorageFactory(settings, db, time, Observer.empty, BlockchainUpdateTriggers.combined(triggers))
     val pos         = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
