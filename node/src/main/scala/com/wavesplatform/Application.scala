@@ -68,7 +68,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   import Application.*
   import monix.execution.Scheduler.Implicits.global as scheduler
 
-  private[this] val db = openDB(settings.dbSettings.directory)
+  private[this] val db = openDB(settings.dbSettings)
 
   private[this] val spendableBalanceChanged = ConcurrentSubject.publish[(Address, Asset)]
 

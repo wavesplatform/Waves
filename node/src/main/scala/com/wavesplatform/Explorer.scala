@@ -62,7 +62,7 @@ object Explorer extends ScorexLogging {
 
     log.info(s"Data directory: ${settings.dbSettings.directory}")
 
-    val db     = openDB(settings.dbSettings.directory)
+    val db     = openDB(settings.dbSettings)
     val reader = LevelDBWriter.readOnly(db, settings)
 
     val blockchainHeight = reader.height

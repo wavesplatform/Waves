@@ -23,6 +23,7 @@ import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
+import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.reader.LeaseDetails
@@ -42,9 +43,9 @@ import scala.collection.mutable
 package object database {
   private lazy val logger: Logger = Logger(LoggerFactory.getLogger(getClass.getName))
 
-  def openDB(path: String, recreate: Boolean = false): DB = {
-    logger.debug(s"Open DB at $path")
-    val file = new File(path)
+  def openDB(settings: DBSettings, recreate: Boolean = false): DB = {
+    logger.debug(s"Open DB at ${settings.directory}")
+    val file = new File(settings.directory)
     val options = new Options()
       .createIfMissing(true)
       .paranoidChecks(true)
@@ -54,7 +55,7 @@ package object database {
     }
 
     file.getAbsoluteFile.getParentFile.mkdirs()
-    new InMemoryDB(LevelDBFactory.factory.open(file, options))
+    new InMemoryDB(LevelDBFactory.factory.open(file, options), settings.inMemory)
   }
 
   final type DBEntry = JMap.Entry[Array[Byte], Array[Byte]]

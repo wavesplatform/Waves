@@ -1,13 +1,12 @@
 package com.wavesplatform.database
 
 import java.util
-import java.util.Map.Entry as JEntry
 
 import com.google.common.cache.{CacheBuilder, CacheLoader}
-import com.google.common.collect.AbstractIterator
 import com.google.common.primitives.UnsignedBytes
 import com.typesafe.scalalogging.LazyLogging
 import com.wavesplatform.database.InMemoryDB.ByteArrayHashingStrategy
+import com.wavesplatform.settings.InMemorySettings
 import org.eclipse.collections.api.block.HashingStrategy
 import org.eclipse.collections.impl.factory.{HashingStrategyMaps, HashingStrategySets}
 import org.iq80.leveldb.*
@@ -50,47 +49,6 @@ class TestBatch extends WriteBatch {
   override def close(): Unit = {}
 }
 
-class EW(entries: util.NavigableMap[KW, Array[Byte]]) extends AbstractIterator[JEntry[Array[Byte], Array[Byte]]] {
-  private val iterator = entries.navigableKeySet().iterator()
-  override def computeNext(): JEntry[Array[Byte], Array[Byte]] =
-    if (iterator.hasNext) new JEntry[Array[Byte], Array[Byte]] {
-      private val k                      = iterator.next()
-      override def getKey: Array[Byte]   = k.bs
-      override def getValue: Array[Byte] = entries.get(k)
-
-      override def setValue(value: Array[Byte]): Array[Byte] = ???
-    }
-    else endOfData()
-}
-
-class TestIterator(entries: util.TreeMap[KW, Array[Byte]]) extends DBIterator {
-  private var iter = new EW(entries)
-
-  override def seek(key: Array[Byte]): Unit = {
-    iter = new EW(entries.tailMap(KW(key), true))
-  }
-
-  override def seekToFirst(): Unit = {
-    iter = new EW(entries)
-  }
-
-  override def peekNext(): JEntry[Array[Byte], Array[Byte]] = iter.peek()
-
-  override def hasPrev: Boolean = ???
-
-  override def prev(): JEntry[Array[Byte], Array[Byte]] = ???
-
-  override def peekPrev(): JEntry[Array[Byte], Array[Byte]] = ???
-
-  override def seekToLast(): Unit = {}
-
-  override def close(): Unit = {}
-
-  override def hasNext: Boolean = iter.hasNext
-
-  override def next(): JEntry[Array[Byte], Array[Byte]] = iter.next()
-}
-
 object InMemoryDB {
   object ByteArrayHashingStrategy extends HashingStrategy[Array[Byte]] {
     override def computeHashCode(obj: Array[Byte]): Int = util.Arrays.hashCode(obj)
@@ -99,7 +57,7 @@ object InMemoryDB {
   }
 }
 
-class InMemoryDB(underlying: DB) extends DB with LazyLogging {
+class InMemoryDB(underlying: DB, settings: InMemorySettings) extends DB with LazyLogging {
   import InMemoryDB.*
 
   private var estimatedSize: Long = 0L
@@ -109,7 +67,7 @@ class InMemoryDB(underlying: DB) extends DB with LazyLogging {
 
   private val cc = CacheBuilder
     .newBuilder()
-    .maximumWeight(256 * 1024 * 1024)
+    .maximumWeight(settings.maxCacheWeight)
     .weigher((_: KW, value: Array[Byte]) => value.length)
     .build[KW, Array[Byte]](new CacheLoader[KW, Array[Byte]] {
       override def load(key: KW): Array[Byte] = {
@@ -118,8 +76,7 @@ class InMemoryDB(underlying: DB) extends DB with LazyLogging {
       }
     })
 
-  private val MaxBatchSize = 512 * 1024 * 1024
-  logger.info(s"Max batch size = $MaxBatchSize")
+  logger.info(s"Max batch size = ${settings.batchSize}")
 
   override def get(key: Array[Byte]): Array[Byte] =
     entries.getOrDefault(
@@ -177,7 +134,7 @@ class InMemoryDB(underlying: DB) extends DB with LazyLogging {
       tb.deletedEntries.forEach((k => deleteAndCountBytes(k)).asJava)
       tb.newEntries.forEach((k, v) => putAndCountBytes(k, v))
 
-      if (estimatedSize > MaxBatchSize) {
+      if (estimatedSize > settings.maxCacheWeight) {
         flush()
       }
 
