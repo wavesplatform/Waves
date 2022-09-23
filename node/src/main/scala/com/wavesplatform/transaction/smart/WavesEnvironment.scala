@@ -384,10 +384,9 @@ class DAppEnvironment(
           if (reentrant) calledAddresses else calledAddresses + invoke.sender.toAddress,
           invocationTracker
         )(invoke)
-      fixedDiff = diff.copy(
-        scriptResults = Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = diff.scriptResults(txId))))),
-        scriptsRun = diff.scriptsRun + 1
-      )
+      fixedDiff = diff
+        .withScriptResults(Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = diff.scriptResults(txId))))))
+        .withScriptRuns(diff.scriptsRun + 1)
       newCurrentDiff <- traced(currentDiff.combineF(fixedDiff).leftMap(GenericError(_)))
     } yield {
       currentDiff = newCurrentDiff

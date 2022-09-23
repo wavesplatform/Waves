@@ -362,14 +362,12 @@ object CryptoContext {
         ("index", LONG)
       ) {
         case xs @ ARR(proof) :: CONST_BYTESTR(value) :: CONST_LONG(index) :: Nil =>
-          if (value.size == 32 && proof.length <= 16 && proof.forall({
-                case CONST_BYTESTR(v) => v.size == 32
-                case _                => false
-              })) {
-            CONST_BYTESTR(ByteStr(createRoot(value.arr, Math.toIntExact(index), proof.reverse.map({
-              case CONST_BYTESTR(v) => v.arr
-              case _                => throw new Exception("Expect ByteStr")
-            }))))
+          val filteredProofs = proof.collect {
+            case bs@CONST_BYTESTR(v) if v.size == 32 => bs
+          }
+
+          if (value.size == 32 && proof.length <= 16 && filteredProofs.size == proof.size) {
+            CONST_BYTESTR(ByteStr(createRoot(value.arr, Math.toIntExact(index), filteredProofs.reverse.map(_.bs.arr))))
           } else {
             notImplemented[Id, EVALUATED](s"createMerkleRoot(merkleProof: ByteVector, valueBytes: ByteVector)", xs)
           }
