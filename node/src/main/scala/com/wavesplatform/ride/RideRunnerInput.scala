@@ -9,6 +9,7 @@ import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.ride.input.AccountState
 import com.wavesplatform.state.InvokeScriptResult.DataEntry
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, Height, LeaseBalance, TxMeta}
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
@@ -21,21 +22,39 @@ case class RideRunnerInput(
     scriptAddress: Address,
     trace: Boolean,
     request: JsObject,
-    accountScript: Map[Address, AccountScriptInfo] = Map.empty,
+    accounts: Map[Address, AccountState] = Map.empty,
     height: Int,
     activatedFeatures: Map[Short, Int] = Map.empty,
-    accountData: Map[Address, Map[String, DataEntry]] = Map.empty,
-    hasData: Map[Address, Boolean] = Map.empty,
     resolveAlias: Map[Alias, Address] = Map.empty,
-    balance: Map[Address, Map[Asset, Long]] = Map.empty,
     assetDescription: Map[Asset, AssetDescription] = Map.empty,
     blockHeader: Map[Int, SignedBlockHeader] = Map.empty,
     hitSource: Map[Int, BlockId] = Map.empty, // VRF
     transactionMeta: Map[ByteStr, TxMeta] = Map.empty,
     transferById: Map[ByteStr, TransferTransactionLike] = Map.empty,
-    leaseBalance: Map[Address, LeaseBalance] = Map.empty,
-    balanceSnapshots: Map[Address, Map[Int, Map[Option[BlockId], Seq[BalanceSnapshot]]]] = Map.empty
-)
+) {
+  lazy val accountScript: Map[Address, AccountScriptInfo] = for {
+    (addr, state) <- accounts
+    script        <- state.script
+  } yield addr -> script
+
+  lazy val accountData: Map[Address, Map[String, DataEntry]] = accountStateLens(_.data)
+
+  lazy val hasData: Map[Address, Boolean] = accountStateLens(state => state.hasData.getOrElse(state.data.nonEmpty))
+
+  lazy val balance: Map[Address, Map[Asset, Long]] = accountStateLens(_.balance)
+
+  lazy val balanceSnapshots: Map[Address, Map[Int, Map[Option[BlockId], Seq[BalanceSnapshot]]]] = accountStateLens(_.balanceSnapshots)
+
+  lazy val leaseBalance: Map[Address, LeaseBalance] = for {
+    (addr, state) <- accounts
+    lease <- state.lease
+  } yield addr -> lease
+
+  private def accountStateLens[T](f: AccountState => T): Map[Address, T] = for {
+    (addr, state) <- accounts
+  } yield addr -> f(state)
+}
+
 object RideRunnerInput {
 
   // TODO numericMapFormat
@@ -135,6 +154,8 @@ object RideRunnerInput {
   implicit val leaseInfoFormat = DebugApiRoute.leaseInfoFormat
 
   implicit val balanceSnapshotFormat: OFormat[BalanceSnapshot] = Json.format
+
+  implicit val accountStateFormat: OFormat[AccountState] = Json.using[Json.WithDefaultValues].format
 
   implicit val rideRunnerInputFormat: OFormat[RideRunnerInput] = Json.using[Json.WithDefaultValues].format
 
