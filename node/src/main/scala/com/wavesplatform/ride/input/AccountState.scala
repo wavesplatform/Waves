@@ -5,7 +5,7 @@ import com.wavesplatform.state.InvokeScriptResult.DataEntry
 import com.wavesplatform.state.{AccountScriptInfo, BalanceSnapshot, LeaseBalance}
 import com.wavesplatform.transaction.Asset
 
-case class AddressState(
+case class AccountState(
     script: Option[AccountScriptInfo] = None,
     data: Map[String, DataEntry] = Map.empty,
     hasData: Option[Boolean] = None,
