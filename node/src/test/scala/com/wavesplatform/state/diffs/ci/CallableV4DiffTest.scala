@@ -42,52 +42,6 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
     }
   }
 
-  property("asset script can disallow reissue") {
-    val disallowReissueAsset =
-      assetVerifier(
-        """
-          | match tx {
-          |   case _: ReissueTransaction => false
-          |   case _ => true
-          | }
-        """.stripMargin
-      )
-
-    Seq(true, false).foreach { fail =>
-      val (_, setScript, invoke, issue, _, _, _) = paymentPreconditions(0.013.waves, fail, Some(disallowReissueAsset))
-      withDomain(RideV6, AddrWithBalance.enoughBalances(defaultSigner, secondSigner)) { d =>
-        d.appendBlock(setScript, issue)
-        if (fail)
-          d.appendAndAssertFailed(invoke, "Transaction is not allowed by script of the asset")
-        else
-          d.appendBlockE(invoke) should produce("Transaction is not allowed by script of the asset")
-      }
-    }
-  }
-
-  property("asset script can disallow burn") {
-    val disallowBurnAsset =
-      assetVerifier(
-        """
-          | match tx {
-          |   case _: BurnTransaction => false
-          |   case _ => true
-          | }
-        """.stripMargin
-      )
-
-    Seq(true, false).foreach { fail =>
-      val (_, setScript, invoke, issue, _, _, _) = paymentPreconditions(0.013.waves, fail, Some(disallowBurnAsset))
-      withDomain(RideV6, AddrWithBalance.enoughBalances(defaultSigner, secondSigner)) { d =>
-        d.appendBlock(setScript, issue)
-        if (fail)
-          d.appendAndAssertFailed(invoke, "Transaction is not allowed by script of the asset")
-        else
-          d.appendBlockE(invoke) should produce("Transaction is not allowed by script of the asset")
-      }
-    }
-  }
-
   property("asset script can allow burn and reissue") {
     val allowBurnAndReissueAsset =
       assetVerifier(

@@ -15,12 +15,13 @@ import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.{Transaction, TxHelpers}
 import org.scalatest.{EitherValues, OptionValues}
 
 import java.nio.charset.StandardCharsets
 
-class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues with EitherValues {
+class RideV6FailRejectTest extends FreeSpec with WithDomain with OptionValues with EitherValues {
   private val otherChainId = (AddressScheme.current.chainId + 1).toByte
 
   private val invalidAssetId = IssuedAsset(ByteStr(("1" * 5).getBytes(StandardCharsets.UTF_8)))
@@ -60,6 +61,85 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
 
   "After RideV6 activation" - {
     val cases = Seq(
+      {
+        val aliceSmartAssetTx = TxHelpers.issue(
+          issuer = alice,
+          script = Some(
+            mkAssetScript(
+              """
+                | match tx {
+                |   case _: ReissueTransaction => false
+                |   case _ => true
+                | }
+                |""".stripMargin
+            )
+          )
+        )
+        Case(
+          "NODE-124 Asset script can forbid reissue",
+          "Transaction is not allowed by script of the asset",
+          { targetComplexity =>
+            val baseComplexity = 1 + 1 + 1 + 1 // 1 for strict, 1 for list, 1 for Reissue, 1 for asset script
+            mkFooScript(
+              s"""
+                 |strict complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 |[Reissue(base58'${aliceSmartAssetTx.id()}', 10, true)]
+                 |""".stripMargin
+            )
+          },
+          knownTxs = Seq(aliceSmartAssetTx)
+        )
+      }, {
+        val aliceSmartAssetTx = TxHelpers.issue(
+          issuer = alice,
+          script = Some(
+            mkAssetScript(
+              """
+                | match tx {
+                |   case _: BurnTransaction => false
+                |   case _ => true
+                | }
+                |""".stripMargin
+            )
+          )
+        )
+        Case(
+          "NODE-125 Asset script can forbid burn",
+          "Transaction is not allowed by script of the asset",
+          { targetComplexity =>
+            val baseComplexity = 1 + 1 + 1 + 1 // 1 for strict, 1 for list, 1 for Burn, 1 for asset script
+            mkFooScript(
+              s"""
+                 |strict complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 |[Burn(base58'${aliceSmartAssetTx.id()}', 10)]
+                 |""".stripMargin
+            )
+          },
+          knownTxs = Seq(aliceSmartAssetTx)
+        )
+      }, {
+        val bobSmartAssetTx = TxHelpers.issue(
+          issuer = bob,
+          script = Some(mkAssetScript("if (true) then throw() else true"))
+        )
+
+        Case(
+          "NODE-522 DApp completes successfully, but asset script fails for payments",
+          s"Transaction is not allowed by script of the asset ${bobSmartAssetTx.id()}",
+          { targetComplexity =>
+            val baseComplexity = 1 + 1 // 1 for strict, 1 for asset script
+            mkFooScript(
+              s"""
+                 |strict complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 |[]
+                 |""".stripMargin
+            )
+          },
+          invokeTx =
+            TxHelpers.invoke(dApp = aliceAddr, invoker = bob, func = Some("foo"), fee = 3.waves, payments = Seq(Payment(1, bobSmartAssetTx.asset))),
+          knownTxs = Seq(bobSmartAssetTx)
+        )
+      },
       Case(
         "NODE-540 If an invoke exceeds the limit of writes",
         "Stored data count limit is exceeded",
