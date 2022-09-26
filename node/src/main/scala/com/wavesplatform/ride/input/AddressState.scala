@@ -6,10 +6,10 @@ import com.wavesplatform.state.{AccountScriptInfo, BalanceSnapshot, LeaseBalance
 import com.wavesplatform.transaction.Asset
 
 case class AddressState(
-    scriptInfo: Option[AccountScriptInfo] = None,
+    script: Option[AccountScriptInfo] = None,
     data: Map[String, DataEntry] = Map.empty,
     hasData: Option[Boolean] = None,
     balance: Map[Asset, Long] = Map.empty,
-    leasing: Option[LeaseBalance] = None,
-    balanceHistory: Map[Int, Map[Option[BlockId], Seq[BalanceSnapshot]]] = Map.empty
+    lease: Option[LeaseBalance] = None,
+    balanceSnapshots: Map[Int, Map[Option[BlockId], Seq[BalanceSnapshot]]] = Map.empty
 )
