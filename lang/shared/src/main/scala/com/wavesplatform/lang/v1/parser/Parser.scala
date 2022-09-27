@@ -34,6 +34,9 @@ object Parser {
 
   def unusedText[A: P] = comment ~ directive ~ comment
 
+  def spaces[A: P]   = CharIn(" \t").repX()
+  def newLines[A: P] = CharIn("\n\r").repX(1)
+
   def escapedUnicodeSymbolP[A: P]: P[(Int, String, Int)] = P(Index ~~ (NoCut(unicodeSymbolP) | specialSymbols).! ~~ Index)
   def stringP[A: P]: P[EXPR] =
     P(Index ~~ "\"" ~/ Pass ~~ (escapedUnicodeSymbolP | notEndOfString).!.repX ~~ "\"" ~~ Index)
@@ -566,13 +569,9 @@ object Parser {
               P(pl | pr)
             }
           })
-        def kind(implicit c: fastparse.P[Any]) = kindc(c)
-        val error = Index.map(i => INVALID(Pos(i, i), "expected a second operator"))
-        val parser =
-          if (kinds.contains(BinaryOperation.SUM_OP) || kinds.contains(BinaryOperation.SUB_OP))
-            P(Index ~~ operand ~~ " ".? ~~ P(kind ~ (NoCut(operand) | error)).rep)
-          else
-            P(Index ~~ operand ~ P(kind ~ (NoCut(operand) | error)).rep)
+        def operator(implicit c: fastparse.P[Any]) = kindc(c)
+        def error(implicit c: fastparse.P[Any]) = Index.map(i => INVALID(Pos(i, i), "expected a second operator"))
+        val parser = P(Index ~~ operand ~~ P(!(newLines ~~ spaces ~~ numberP) ~ operator ~ (NoCut(operand) | error)).rep)
         parser.map {
           case (start, left: EXPR, r: Seq[(BinaryOperation, EXPR)]) =>
             r.foldLeft(left) { case (acc, (currKind, currOperand)) => currKind.expr(start, currOperand.position.end, acc, currOperand) }
