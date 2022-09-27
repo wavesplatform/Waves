@@ -1,6 +1,6 @@
 package com.wavesplatform.ride.input
 
-import com.wavesplatform.account.{Alias, PublicKey}
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.script.Script
@@ -15,7 +15,7 @@ case class RunnerAccountState(
     balance: Map[Asset, Long] = Map.empty,
     leasing: Option[LeaseBalance] = None,
     balanceHistory: Map[Int, Map[Option[BlockId], Seq[BalanceSnapshot]]] = Map.empty,
-    aliases: List[Alias] = Nil
+    aliases: List[String] = Nil
 )
 
 case class RunnerScriptInfo(

@@ -50,8 +50,8 @@ case class RideRunnerInput(
 
   lazy val resolveAlias: Map[Alias, Address] = for {
     (addr, state) <- accounts
-    alias <- state.aliases
-  } yield alias -> addr
+    alias         <- state.aliases
+  } yield Alias.createWithChainId(alias, 'W'.toByte).explicitGet() -> addr // TODO chain id from input
 
   private def accountStateLens[T](f: RunnerAccountState => T): Map[Address, T] = for {
     (addr, state) <- accounts
