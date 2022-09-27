@@ -9,12 +9,12 @@ import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.ride.input.AccountState
+import com.wavesplatform.ride.input.{RunnerAccountState, RunnerBlockInfo}
 import com.wavesplatform.state.InvokeScriptResult.DataEntry
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, Height, LeaseBalance, TxMeta}
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
 import com.wavesplatform.transaction.{Asset, TransactionFactory}
-import play.api.libs.json.*
+import play.api.libs.json.{Json as PJson, *}
 
 import scala.util.Try
 
@@ -22,15 +22,14 @@ case class RideRunnerInput(
     scriptAddress: Address,
     trace: Boolean,
     request: JsObject,
-    accounts: Map[Address, AccountState] = Map.empty,
+    accounts: Map[Address, RunnerAccountState] = Map.empty,
     height: Int,
     activatedFeatures: Map[Short, Int] = Map.empty,
     resolveAlias: Map[Alias, Address] = Map.empty,
     assetDescription: Map[Asset, AssetDescription] = Map.empty,
-    blockHeader: Map[Int, SignedBlockHeader] = Map.empty,
-    hitSource: Map[Int, BlockId] = Map.empty, // VRF
+    blocks: Map[Int, RunnerBlockInfo] = Map.empty,
     transactionMeta: Map[ByteStr, TxMeta] = Map.empty,
-    transferById: Map[ByteStr, TransferTransactionLike] = Map.empty,
+    transferById: Map[ByteStr, TransferTransactionLike] = Map.empty
 ) {
   lazy val accountScript: Map[Address, AccountScriptInfo] = for {
     (addr, state) <- accounts
@@ -47,15 +46,26 @@ case class RideRunnerInput(
 
   lazy val leaseBalance: Map[Address, LeaseBalance] = for {
     (addr, state) <- accounts
-    lease <- state.leasing
+    lease         <- state.leasing
   } yield addr -> lease
 
-  private def accountStateLens[T](f: AccountState => T): Map[Address, T] = for {
+  private def accountStateLens[T](f: RunnerAccountState => T): Map[Address, T] = for {
     (addr, state) <- accounts
   } yield addr -> f(state)
+
+  lazy val blockHeader: Map[Int, SignedBlockHeader] = for {
+    (height, blockInfo) <- blocks
+  } yield height -> blockInfo.blockHeader
+
+  lazy val hitSource: Map[Int, ByteStr] = for {
+    (height, blockInfo) <- blocks
+    vrf                 <- blockInfo.VRF
+  } yield height -> vrf
 }
 
 object RideRunnerInput {
+
+  val Json = PJson.using[PJson.WithDefaultValues]
 
   // TODO numericMapFormat
   implicit def shortMapFormat[T: Format]: Format[Map[Short, T]] = mapFormat[Short, T](
@@ -155,9 +165,11 @@ object RideRunnerInput {
 
   implicit val balanceSnapshotFormat: OFormat[BalanceSnapshot] = Json.format
 
-  implicit val accountStateFormat: OFormat[AccountState] = Json.using[Json.WithDefaultValues].format
+  implicit val runnerAccountStateFormat: OFormat[RunnerAccountState] = Json.format
 
-  implicit val rideRunnerInputFormat: OFormat[RideRunnerInput] = Json.using[Json.WithDefaultValues].format
+  implicit val runnerBlockInfoFormat: OFormat[RunnerBlockInfo] = Json.format
+
+  implicit val rideRunnerInputFormat: OFormat[RideRunnerInput] = Json.format
 
   def mapFormat[K, V: Format](stringifyKey: K => String, parseKey: String => JsResult[K])(implicit vFormat: Format[V]): Format[Map[K, V]] = {
     Format(

@@ -128,7 +128,7 @@ func bar() = {
 
       override def blockHeader(height: Int): Option[SignedBlockHeader] = input.blockHeader.get(height)
 
-      override def hitSource(height: Int): Option[BlockId] = input.hitSource.get(height) // VRF
+      override def hitSource(height: Int): Option[ByteStr] = input.hitSource.get(height) // VRF
 
       /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
       override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] =
