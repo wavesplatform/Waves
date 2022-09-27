@@ -1,14 +1,14 @@
 package com.wavesplatform.api.http.utils
 
 import cats.implicits.{toBifunctorOps, toTraverseOps}
-import com.wavesplatform.account.{AddressOrAlias, PublicKey}
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.requests.InvokeScriptRequest
 import com.wavesplatform.api.http.requests.InvokeScriptRequest.FunctionCallPart
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invocation
-import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
+import com.wavesplatform.lang.v1.traits.domain.Recipient.Address as RideAddress
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart
 import com.wavesplatform.transaction.smart.AttachedPaymentExtractor
@@ -31,8 +31,8 @@ case class UtilsInvocationRequest(
       functionCall = InvokeScriptRequest.buildFunctionCall(call)
       feeAssetId <- feeAssetId.traverse(decodeBase58)
       sender <- sender
-        .map(AddressOrAlias.fromString(_, checkChainId = false).map(a => Address(ByteStr(a.bytes))))
-        .getOrElse(Right(Address(ByteStr(new Array[Byte](26)))))
+        .map(Address.fromString(_, None).map(a => RideAddress(ByteStr(a.bytes))))
+        .getOrElse(Right(RideAddress(ByteStr(new Array[Byte](26)))))
       payments <- AttachedPaymentExtractor
         .extractPayments(payment, V6, blockchainAllowsMultiPayment = true, smart.DApp)
         .leftMap(GenericError(_))
