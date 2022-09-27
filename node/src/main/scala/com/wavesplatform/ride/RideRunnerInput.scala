@@ -26,7 +26,6 @@ case class RideRunnerInput(
     accounts: Map[Address, RunnerAccountState] = Map.empty,
     height: Int,
     activatedFeatures: Map[Short, Int] = Map.empty,
-    resolveAlias: Map[Alias, Address] = Map.empty,
     assetDescription: Map[Asset, AssetDescription] = Map.empty,
     blocks: Map[Int, RunnerBlockInfo] = Map.empty,
     transactions: Map[ByteStr, RunnerTransactionInfo] = Map.empty
@@ -48,6 +47,11 @@ case class RideRunnerInput(
     (addr, state) <- accounts
     lease         <- state.leasing
   } yield addr -> lease
+
+  lazy val resolveAlias: Map[Alias, Address] = for {
+    (addr, state) <- accounts
+    alias <- state.aliases
+  } yield alias -> addr
 
   private def accountStateLens[T](f: RunnerAccountState => T): Map[Address, T] = for {
     (addr, state) <- accounts
