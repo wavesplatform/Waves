@@ -14,7 +14,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
-import com.wavesplatform.lang.directives.values.{V2, V3, V6}
+import com.wavesplatform.lang.directives.values.{V2, V3, V5, V6}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -29,7 +29,7 @@ import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import com.wavesplatform.settings.TestSettings
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.{Blockchain, IntegerDataEntry, LeaseBalance}
-import com.wavesplatform.test.DomainPresets.RideV6
+import com.wavesplatform.test.DomainPresets.{RideV5, RideV6}
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -830,72 +830,75 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   }
 
   routePath("/script/evaluate/{address}") - {
+    val letFromContract = 1000
+    val testScript = TxHelpers.scriptV5(
+      s"""
+         |let letFromContract = $letFromContract
+         |
+         |func test(i: Int) = i * 10
+         |func testB() = true
+         |func testBS() = base58'MATCHER'
+         |func testS() = "Test"
+         |func testF() = throw("Test")
+         |func testCompl() = ${"sigVerify(base58'', base58'', base58'') ||" * 200} true
+         |func testThis() = this
+         |func testListArg(list: List[String|ByteVector|Int], str: String, bytes: ByteVector) = list.containsElement(str)
+         |
+         |func nestedCalls(x: List[(String, String, List[Any])]) = {
+         |  func call(a: String, x: (String, String, List[Any])) = {
+         |    let (dAppAddress, funcName, args) = x
+         |    strict res = Address(fromBase58String(dAppAddress)).invoke(funcName, args, [])
+         |    a + res.exactAs[String] + "\n"
+         |  }
+         |  FOLD<20>(x, "", call)
+         |}
+         |
+         |@Callable(i)
+         |func getValue() = ([], "value")
+         |
+         |@Callable(i)
+         |func testCallable() = [BinaryEntry("test", i.caller.bytes)]
+         |
+         |@Callable(i)
+         |func testSyncinvoke() = {
+         |  strict r = invoke(this, "testCallable", [], [])
+         |  [BinaryEntry("testSyncInvoke", i.caller.bytes)]
+         |}
+         |
+         |@Callable(i)
+         |func testSyncCallComplexityExcess() = {
+         |  strict r = invoke(this, "testSyncCallComplexityExcess", [], [])
+         |  []
+         |}
+         |
+         |@Callable(i)
+         |func testWriteEntryType(b: ByteVector) = [ BinaryEntry("bytes", b) ] 
+         """.stripMargin
+    )
+
+    val dAppAccount = TxHelpers.defaultSigner
+    val dAppAddress = TxHelpers.defaultSigner.toAddress
+
+    def evalScript(text: String, address: Address = dAppAddress) =
+      Post(routePath(s"/script/evaluate/$address"), Json.obj("expr" -> text))
+
+    def evalBin(expr: EXPR) = {
+      val serialized = ByteStr(SerdeV1.serialize(expr))
+      Post(routePath(s"/script/evaluate/$dAppAddress"), Json.obj("expr" -> serialized.toString))
+    }
+
+    def responseJson: JsObject = {
+      val fullJson = responseAs[JsObject]
+      (fullJson \ "address").as[String] shouldBe dAppAddress.toString
+      (fullJson \ "expr").as[String] should not be empty
+      (fullJson \ "result").asOpt[JsObject].getOrElse(fullJson - "address" - "expr")
+    }
+
     "simple expression" in {
-      withDomain(DomainPresets.RideV5) { d =>
+      withDomain(RideV5) { d =>
         val blockchain = d.blockchain
         val api        = utilsApi.copy(blockchain = blockchain)
         val route      = seal(api.route)
-
-        val letFromContract = 1000
-        val testScript = TxHelpers.scriptV5(s"""
-                                               |let letFromContract = $letFromContract
-                                               |
-                                               |func test(i: Int) = i * 10
-                                               |func testB() = true
-                                               |func testBS() = base58'MATCHER'
-                                               |func testS() = "Test"
-                                               |func testF() = throw("Test")
-                                               |func testCompl() = ${"sigVerify(base58'', base58'', base58'') ||" * 200} true
-                                               |func testThis() = this
-                                               |func testListArg(list: List[String|ByteVector|Int], str: String, bytes: ByteVector) = list.containsElement(str)
-                                               |
-                                               |func nestedCalls(x: List[(String, String, List[Any])]) = {
-                                               |  func call(a: String, x: (String, String, List[Any])) = {
-                                               |    let (dAppAddress, funcName, args) = x
-                                               |    strict res = Address(fromBase58String(dAppAddress)).invoke(funcName, args, [])
-                                               |    a + res.exactAs[String] + "\n"
-                                               |  }
-                                               |  FOLD<20>(x, "", call)
-                                               |}
-                                               |
-                                               |@Callable(i)
-                                               |func getValue() = ([], "value")
-                                               |
-                                               |@Callable(i)
-                                               |func testCallable() = [BinaryEntry("test", i.caller.bytes)]
-                                               |
-                                               |@Callable(i)
-                                               |func testSyncinvoke() = {
-                                               |  strict r = invoke(this, "testCallable", [], [])
-                                               |  [BinaryEntry("testSyncInvoke", i.caller.bytes)]
-                                               |}
-                                               |
-                                               |@Callable(i)
-                                               |func testSyncCallComplexityExcess() = {
-                                               |  strict r = invoke(this, "testSyncCallComplexityExcess", [], [])
-                                               |  []
-                                               |}
-                                               |
-                                               |@Callable(i)
-                                               |func testWriteEntryType(b: ByteVector) = [ BinaryEntry("bytes", b) ] """.stripMargin)
-
-        val dAppAccount = TxHelpers.defaultSigner
-        val dAppAddress = TxHelpers.defaultSigner.toAddress
-
-        def evalScript(text: String, address: Address = dAppAddress) =
-          Post(routePath(s"/script/evaluate/$address"), Json.obj("expr" -> text))
-
-        def evalBin(expr: EXPR) = {
-          val serialized = ByteStr(SerdeV1.serialize(expr))
-          Post(routePath(s"/script/evaluate/$dAppAddress"), Json.obj("expr" -> serialized.toString))
-        }
-
-        def responseJson: JsObject = {
-          val fullJson = responseAs[JsObject]
-          (fullJson \ "address").as[String] shouldBe dAppAddress.toString
-          (fullJson \ "expr").as[String] should not be empty
-          (fullJson \ "result").asOpt[JsObject].getOrElse(fullJson - "address" - "expr")
-        }
 
         evalScript("testNone()") ~> route ~> check {
           responseAs[JsObject] shouldBe Json.obj("error" -> 199, "message" -> s"Address $dAppAddress is not dApp")
@@ -1062,6 +1065,35 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
 
         evalScript(s"nestedCalls([(\"$dAppAddress2\", \"call\", [123, \"abc\"]), (\"$dAppAddress\", \"getValue\", [])])") ~> route ~> check {
           (responseAs[JsValue] \ "result" \ "value").as[String] shouldBe "abc123\nvalue\n"
+        }
+      }
+    }
+
+    "compacted dApp" in {
+      withDomain(RideV6) { d =>
+        val blockchain = d.blockchain
+        val route      = utilsApi.copy(blockchain = blockchain).route
+
+        val compactedDApp = TestCompiler(V6).compileContract(
+          """
+            | func user1() = 1
+            | func user2() = 2
+            |
+            | @Callable(i)
+            | func call() = ([], user1() + user2())
+          """.stripMargin,
+          compact = true
+        )
+        d.helpers.setScript(dAppAccount, compactedDApp)
+
+        evalScript("user1()") ~> route ~> check {
+          (responseAs[JsValue] \ "result" \ "value").as[Int] shouldBe 1
+        }
+        evalScript("user2()") ~> route ~> check {
+          (responseAs[JsValue] \ "result" \ "value").as[Int] shouldBe 2
+        }
+        evalScript("call()") ~> route ~> check {
+          (responseAs[JsValue] \ "result" \ "value" \ "_2" \ "value").as[Int] shouldBe 3
         }
       }
     }

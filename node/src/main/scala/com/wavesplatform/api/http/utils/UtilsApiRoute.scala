@@ -1,16 +1,9 @@
 package com.wavesplatform.api.http.utils
-
 import akka.http.scaladsl.server.{PathMatcher1, Route}
 import cats.syntax.either.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.*
-import com.wavesplatform.api.http.ApiError.{
-  ConflictedRequestStructure,
-  CustomValidationError,
-  InvalidMessage,
-  ScriptCompilerError,
-  TooBigArrayAllocation
-}
+import com.wavesplatform.api.http.ApiError.{ConflictedRequestStructure, CustomValidationError, InvalidMessage, ScriptCompilerError, TooBigArrayAllocation}
 import com.wavesplatform.api.http.requests.{ScriptWithImportsRequest, byteStrFormat}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
