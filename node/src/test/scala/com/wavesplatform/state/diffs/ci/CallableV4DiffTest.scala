@@ -16,7 +16,6 @@ import com.wavesplatform.state.{EmptyDataEntry, SponsorshipValue}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.{RideV4, RideV6}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TxHelpers.{defaultSigner, secondSigner}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
