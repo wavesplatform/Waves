@@ -10,8 +10,7 @@ import com.wavesplatform.transaction.Asset
 
 case class RunnerAccountState(
     scriptInfo: Option[RunnerScriptInfo] = None,
-    data: Map[String, RunnerDataEntry] = Map.empty,
-    hasData: Option[Boolean] = None,
+    data: Option[Map[String, RunnerDataEntry]] = None,
     balance: Map[Asset, Long] = Map.empty,
     leasing: Option[LeaseBalance] = None,
     balanceHistory: Map[Int, Map[Option[BlockId], Seq[BalanceSnapshot]]] = Map.empty,

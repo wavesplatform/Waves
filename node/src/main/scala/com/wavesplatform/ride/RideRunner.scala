@@ -103,7 +103,7 @@ func foo(x: Int) = {
 
 @Callable(inv)
 func bar() = {
-  let x1 = if (value(getBoolean("b"))) then 1 else 2
+  let x1 = if (valueOrElse(getBoolean("b"), false)) then 1 else 0
   ([], x1)
 }"""
     val estimator      = ScriptEstimatorV3(fixOverflow = true, overhead = false)
@@ -197,7 +197,7 @@ func bar() = {
 
       /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
       override def accountData(acc: Address, key: String): Option[DataEntry[_]] =
-        input.accountData(acc).get(key)
+        input.accountData.getOrElse(acc, Map.empty).get(key)
 
       override def leaseBalance(address: Address): LeaseBalance = input.leaseBalance.getOrElse(address, LeaseBalance(0, 0))
 

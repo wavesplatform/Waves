@@ -35,9 +35,12 @@ case class RideRunnerInput(
     scriptInfo    <- state.scriptInfo
   } yield addr -> scriptInfo
 
-  lazy val accountData: Map[Address, Map[String, DataEntry]] = accountStateLens(_.data.map { case (key, entry) => key -> entry.toDataEntry(key) })
+  lazy val accountData: Map[Address, Map[String, DataEntry]] = for {
+    (addr, state) <- accounts
+    data          <- state.data
+  } yield addr -> data.map { case (key, entry) => key -> entry.toDataEntry(key) }
 
-  lazy val hasData: Map[Address, Boolean] = accountStateLens(state => state.hasData.getOrElse(state.data.nonEmpty))
+  lazy val hasData: Map[Address, Boolean] = accountStateLens(_.data.nonEmpty)
 
   lazy val balance: Map[Address, Map[Asset, Long]] = accountStateLens(_.balance)
 
