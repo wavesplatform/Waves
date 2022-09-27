@@ -567,7 +567,13 @@ object Parser {
             }
           })
         def kind(implicit c: fastparse.P[Any]) = kindc(c)
-        P(Index ~~ operand ~ P(kind ~ (NoCut(operand) | Index.map(i => INVALID(Pos(i, i), "expected a second operator")))).rep).map {
+        val error = Index.map(i => INVALID(Pos(i, i), "expected a second operator"))
+        val parser =
+          if (kinds.contains(BinaryOperation.SUM_OP) || kinds.contains(BinaryOperation.SUB_OP))
+            P(Index ~~ operand ~~ " ".? ~~ P(kind ~ (NoCut(operand) | error)).rep)
+          else
+            P(Index ~~ operand ~ P(kind ~ (NoCut(operand) | error)).rep)
+        parser.map {
           case (start, left: EXPR, r: Seq[(BinaryOperation, EXPR)]) =>
             r.foldLeft(left) { case (acc, (currKind, currOperand)) => currKind.expr(start, currOperand.position.end, acc, currOperand) }
         }
