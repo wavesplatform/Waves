@@ -84,6 +84,7 @@ object BloomFilter extends ScorexLogging {
     filter
   }
 
+  // FIXME: check for correctness with rocksdb
   def loadOrPopulate(
       db: RocksDB,
       directory: String,
