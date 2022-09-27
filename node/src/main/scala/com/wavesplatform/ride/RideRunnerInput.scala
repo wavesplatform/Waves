@@ -9,7 +9,7 @@ import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.ride.input.{RunnerAccountState, RunnerBlockInfo}
+import com.wavesplatform.ride.input.{RunnerAccountState, RunnerBlockInfo, RunnerTransactionInfo}
 import com.wavesplatform.state.InvokeScriptResult.DataEntry
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, Height, LeaseBalance, TxMeta}
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
@@ -28,8 +28,7 @@ case class RideRunnerInput(
     resolveAlias: Map[Alias, Address] = Map.empty,
     assetDescription: Map[Asset, AssetDescription] = Map.empty,
     blocks: Map[Int, RunnerBlockInfo] = Map.empty,
-    transactionMeta: Map[ByteStr, TxMeta] = Map.empty,
-    transferById: Map[ByteStr, TransferTransactionLike] = Map.empty
+    transactions: Map[ByteStr, RunnerTransactionInfo] = Map.empty
 ) {
   lazy val accountScript: Map[Address, AccountScriptInfo] = for {
     (addr, state) <- accounts
@@ -61,6 +60,16 @@ case class RideRunnerInput(
     (height, blockInfo) <- blocks
     vrf                 <- blockInfo.VRF
   } yield height -> vrf
+
+  lazy val transactionMeta: Map[ByteStr, TxMeta] = for {
+    (id, transactionInfo) <- transactions
+    meta                  <- transactionInfo.meta
+  } yield id -> meta
+
+  lazy val transferById: Map[ByteStr, TransferTransactionLike] = for {
+    (id, transactionInfo) <- transactions
+    transaction           <- transactionInfo.transaction
+  } yield id -> transaction
 }
 
 object RideRunnerInput {
@@ -168,6 +177,8 @@ object RideRunnerInput {
   implicit val runnerAccountStateFormat: OFormat[RunnerAccountState] = Json.format
 
   implicit val runnerBlockInfoFormat: OFormat[RunnerBlockInfo] = Json.format
+
+  implicit val runnerTransactionInfoFormat: OFormat[RunnerTransactionInfo] = Json.format
 
   implicit val rideRunnerInputFormat: OFormat[RideRunnerInput] = Json.format
 
