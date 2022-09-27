@@ -34,7 +34,7 @@ case class RideRunnerInput(
 ) {
   lazy val accountScript: Map[Address, AccountScriptInfo] = for {
     (addr, state) <- accounts
-    script        <- state.script
+    script        <- state.scriptInfo
   } yield addr -> script
 
   lazy val accountData: Map[Address, Map[String, DataEntry]] = accountStateLens(_.data)
@@ -43,11 +43,11 @@ case class RideRunnerInput(
 
   lazy val balance: Map[Address, Map[Asset, Long]] = accountStateLens(_.balance)
 
-  lazy val balanceSnapshots: Map[Address, Map[Int, Map[Option[BlockId], Seq[BalanceSnapshot]]]] = accountStateLens(_.balanceSnapshots)
+  lazy val balanceSnapshots: Map[Address, Map[Int, Map[Option[BlockId], Seq[BalanceSnapshot]]]] = accountStateLens(_.balanceHistory)
 
   lazy val leaseBalance: Map[Address, LeaseBalance] = for {
     (addr, state) <- accounts
-    lease <- state.lease
+    lease <- state.leasing
   } yield addr -> lease
 
   private def accountStateLens[T](f: AccountState => T): Map[Address, T] = for {
