@@ -9,13 +9,14 @@ import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.ride.input.{RunnerAccountState, RunnerBlockInfo, RunnerTransactionInfo}
+import com.wavesplatform.ride.input.*
 import com.wavesplatform.state.InvokeScriptResult.DataEntry
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, Height, LeaseBalance, TxMeta}
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
 import com.wavesplatform.transaction.{Asset, TransactionFactory}
-import play.api.libs.json.{Json as PJson, *}
+import play.api.libs.json.*
 
+import java.util.Locale
 import scala.util.Try
 
 case class RideRunnerInput(
@@ -30,12 +31,12 @@ case class RideRunnerInput(
     blocks: Map[Int, RunnerBlockInfo] = Map.empty,
     transactions: Map[ByteStr, RunnerTransactionInfo] = Map.empty
 ) {
-  lazy val accountScript: Map[Address, AccountScriptInfo] = for {
+  lazy val accountScript: Map[Address, RunnerScriptInfo] = for {
     (addr, state) <- accounts
-    script        <- state.scriptInfo
-  } yield addr -> script
+    scriptInfo    <- state.scriptInfo
+  } yield addr -> scriptInfo
 
-  lazy val accountData: Map[Address, Map[String, DataEntry]] = accountStateLens(_.data)
+  lazy val accountData: Map[Address, Map[String, DataEntry]] = accountStateLens(_.data.map { case (key, entry) => key -> entry.toDataEntry(key) })
 
   lazy val hasData: Map[Address, Boolean] = accountStateLens(state => state.hasData.getOrElse(state.data.nonEmpty))
 
@@ -74,7 +75,12 @@ case class RideRunnerInput(
 
 object RideRunnerInput {
 
-  val Json = PJson.using[PJson.WithDefaultValues]
+  implicit val jsonConfiguration = JsonConfiguration[Json.WithDefaultValues](
+    discriminator = "type",
+    typeNaming = JsonNaming { fullName =>
+      fullName.split('.').last.replace("RunnerDataEntry", "").toLowerCase(Locale.US)
+    }
+  )
 
   // TODO numericMapFormat
   implicit def shortMapFormat[T: Format]: Format[Map[Short, T]] = mapFormat[Short, T](
@@ -174,6 +180,15 @@ object RideRunnerInput {
 
   implicit val balanceSnapshotFormat: OFormat[BalanceSnapshot] = Json.format
 
+  implicit val runnerScriptInfoFormat: OFormat[RunnerScriptInfo] = Json.format
+
+  implicit val binaryRunnerDataEntryFormat: OFormat[BinaryRunnerDataEntry]   = Json.format
+  implicit val booleanRunnerDataEntryFormat: OFormat[BooleanRunnerDataEntry] = Json.format
+  implicit val integerRunnerDataEntryFormat: OFormat[IntegerRunnerDataEntry] = Json.format
+  implicit val stringRunnerDataEntryFormat: OFormat[StringRunnerDataEntry]   = Json.format
+
+  implicit val runnerDataEntryFormat: OFormat[RunnerDataEntry] = Json.format
+
   implicit val runnerAccountStateFormat: OFormat[RunnerAccountState] = Json.format
 
   implicit val runnerBlockInfoFormat: OFormat[RunnerBlockInfo] = Json.format
@@ -203,4 +218,6 @@ object RideRunnerInput {
     if (str.startsWith("base58:")) Base58.decode(str.substring(7))
     else if (str.startsWith(Base64.Prefix)) Base64.decode(str)
     else Base58.decode(str)
+
+  def parse(str: String): RideRunnerInput = Json.configured.parse(str).as[RideRunnerInput]
 }

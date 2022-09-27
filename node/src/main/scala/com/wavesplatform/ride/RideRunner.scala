@@ -11,8 +11,12 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.features.BlockchainFeatures.RideV6
+import com.wavesplatform.features.EstimatorProvider.EstimatorBlockchainExt
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.lang.{API, ValidationError}
@@ -68,7 +72,7 @@ object RideRunner {
       override val chainId: Byte = 'W'.toByte
     }
 
-    val input          = Json.parse(Using(Source.fromFile(new File(s"$basePath/input.json")))(_.getLines().mkString("\n")).get).as[RideRunnerInput]
+    val input          = RideRunnerInput.parse(Using(Source.fromFile(new File(s"$basePath/input.json")))(_.getLines().mkString("\n")).get)
     val scriptSrc      = """
 {-#STDLIB_VERSION 6 #-}
 {-#SCRIPT_TYPE ACCOUNT #-}
@@ -114,15 +118,39 @@ func bar() = {
       override def transactionInfo(id: BlockId) = kill("transactionInfo")
 
       override def accountScript(address: Address): Option[AccountScriptInfo] = {
-        // 3PCH3sUqeiPFAhrKzEnSEXoE2B6G9YNromV
         input.accountScript.get(address).map { input =>
-          input.copy(
-            script = Script.fromBase64String(Base64.encode(compiledScript.bytes)).explicitGet(),
-            verifierComplexity = compiledScript.verifierComplexity,
-            complexitiesByEstimator = Map(
-              estimator.version -> compiledScript.callableComplexities
-            )
+          val complexityInfo = Seq(ScriptEstimatorV1, ScriptEstimatorV2, this.estimator).map { estimator =>
+            estimator.version -> Script
+              .complexityInfo(
+                input.script,
+                estimator,
+                fixEstimateOfVerifier = this.isFeatureActivated(RideV6),
+                useContractVerifierLimit = false,
+                withCombinedContext = true
+              )
+              .getOrElse(throw new RuntimeException(s"Can't get a complexity info of '$address' script"))
+          }
+
+          val (lastEstimatorVersion, lastComplexityInfo) = complexityInfo.last
+          val r = AccountScriptInfo(
+            script = input.script,
+            publicKey = input.publicKey,
+            verifierComplexity = lastComplexityInfo.verifierComplexity,
+            complexitiesByEstimator = complexityInfo
+              .map { case (v, complexityInfo) => v -> complexityInfo.callableComplexities }
+              .toMap
+              .updated(lastEstimatorVersion, lastComplexityInfo.callableComplexities) // to preserve
           )
+
+          if (address.toString == "3PCH3sUqeiPFAhrKzEnSEXoE2B6G9YNromV") {
+            r.copy(
+              script = Script.fromBase64String(Base64.encode(compiledScript.bytes)).explicitGet(),
+              verifierComplexity = compiledScript.verifierComplexity,
+              complexitiesByEstimator = Map(
+                estimator.version -> compiledScript.callableComplexities
+              )
+            )
+          } else r
         }
       }
 
