@@ -88,6 +88,7 @@ func foo(x: Int) = {
   let asset = base58'8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS'
   let txId = base58'8rc5Asw43qbq7LMZ6tu2aVbVkw72XmBt7tTnwMSNfaNq'
 
+  # Functions
   let x1 = getIntegerValue(alice, "a")
   let x2 = if (isDataStorageUntouched(carl)) then 1 else 0
   let x3 = assetBalance(bob, asset)
@@ -98,7 +99,12 @@ func foo(x: Int) = {
   let x8 = value(transferTransactionById(txId)).amount
   let x9 = wavesBalance(carl).available
   let x10 = invoke(this, "bar", [], []).exactAs[Int]
-  ([], x + x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8 + x9 + x10)
+
+  # Vals
+  let y1 = height
+  let y2 = lastBlock.height
+
+  ([], x + x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8 + x9 + x10 + y1 + y2)
 }
 
 @Callable(inv)
@@ -112,11 +118,10 @@ func bar() = {
     def kill(methodName: String) = throw new RuntimeException(methodName)
     // TODO default values?
     val blockchain: Blockchain = new Blockchain {
-      // conflicts with accountData
+      // Ride: isDataStorageUntouched
       override def hasData(address: Address): Boolean = input.hasData.getOrElse(address, throw new RuntimeException(s"hasData($address)"))
 
-      override def transactionInfo(id: BlockId) = kill("transactionInfo")
-
+      // Ride: scriptHash
       override def accountScript(address: Address): Option[AccountScriptInfo] = {
         input.accountScript.get(address).map { input =>
           val complexityInfo = Seq(ScriptEstimatorV1, ScriptEstimatorV2, this.estimator).map { estimator =>
@@ -154,10 +159,18 @@ func bar() = {
         }
       }
 
-      override def blockHeader(height: Int): Option[SignedBlockHeader] = input.blockHeader.get(height)
+      // Ride: blockInfoByHeight, lastBlock
+      override def blockHeader(height: Int): Option[SignedBlockHeader] =
+        // Dirty, but we have a clear error instead of "None.get"
+        Some(input.blockHeader.getOrElse(
+          height,
+          throw new RuntimeException(s"blockHeader($height): can't find a block header, please specify or check your script")
+        ))
 
+      // Ride: blockInfoByHeight
       override def hitSource(height: Int): Option[ByteStr] = input.hitSource.get(height) // VRF
 
+      // Ride: wavesBalance (specifies to=None)
       /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
       override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] =
         input.balanceSnapshots
@@ -165,11 +178,43 @@ func bar() = {
           .getOrElse(from, throw new RuntimeException(s"from: $from"))          // Map.empty)
           .getOrElse(to, throw new RuntimeException(s"to: $to"))                // Seq.empty)
 
-      override def hasAccountScript(address: Address) = kill("hasAccountScript")
-
       override def settings: BlockchainSettings = nodeSettings.blockchainSettings
 
+      // Ride: wavesBalance, height, lastBlock TODO: a binding in Ride?
       override def height: Int = input.height
+
+      override def activatedFeatures: Map[Short, Int] = input.activatedFeatures
+
+      // Ride: assetInfo
+      override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription] = input.assetDescription.get(id)
+
+      // Ride: get*Value (data), get* (data), isDataStorageUntouched, balance, scriptHash, wavesBalance
+      override def resolveAlias(a: Alias): Either[ValidationError, Address] =
+        input.resolveAlias.get(a).toRight(AliasDoesNotExist(a): ValidationError)
+
+      // Ride: get*Value (data), get* (data)
+      /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
+      override def accountData(acc: Address, key: String): Option[DataEntry[_]] =
+        input.accountData.getOrElse(acc, Map.empty).get(key)
+
+      // Ride: wavesBalance
+      override def leaseBalance(address: Address): LeaseBalance = input.leaseBalance.getOrElse(address, LeaseBalance(0, 0))
+
+      // Ride: assetBalance, wavesBalance
+      override def balance(address: Address, mayBeAssetId: Asset): Long =
+        input.balance.get(address).flatMap(_.get(mayBeAssetId)).getOrElse(0)
+
+      // Ride: transactionHeightById
+      override def transactionMeta(id: ByteStr): Option[TxMeta] = input.transactionMeta.get(id)
+
+      // Ride: transferTransactionById
+      override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =
+        input.transferById.get(id).map { tx =>
+          val meta = transactionMeta(id).getOrElse(throw new RuntimeException(s"Can't find a metadata of the transaction $id"))
+          (meta.height, tx)
+        }
+
+      override def hasAccountScript(address: Address) = kill("hasAccountScript")
 
       override def score: BigInt = kill("score")
 
@@ -180,35 +225,15 @@ func bar() = {
       /** Features related */
       override def approvedFeatures: Map[Short, Int] = kill("approvedFeatures")
 
-      override def activatedFeatures: Map[Short, Int] = input.activatedFeatures
-
       override def featureVotes(height: Int): Map[Short, Int] = kill("featureVotes")
 
       override def containsTransaction(tx: Transaction): Boolean = kill("containsTransaction")
-
-      override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription] = input.assetDescription.get(id)
-
-      override def resolveAlias(a: Alias): Either[ValidationError, Address] =
-        input.resolveAlias.get(a).toRight(AliasDoesNotExist(a): ValidationError)
 
       override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = kill("leaseDetails")
 
       override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee = kill("filledVolumeAndFee")
 
-      /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
-      override def accountData(acc: Address, key: String): Option[DataEntry[_]] =
-        input.accountData.getOrElse(acc, Map.empty).get(key)
-
-      override def leaseBalance(address: Address): LeaseBalance = input.leaseBalance.getOrElse(address, LeaseBalance(0, 0))
-
-      override def balance(address: Address, mayBeAssetId: Asset): Long =
-        input.balance.get(address).flatMap(_.get(mayBeAssetId)).getOrElse(0)
-
-      override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =
-        input.transferById.get(id).map { tx =>
-          val meta = transactionMeta(id).getOrElse(throw new RuntimeException(s"Can't find a metadata of the transaction $id"))
-          (meta.height, tx)
-        }
+      override def transactionInfo(id: BlockId) = kill("transactionInfo")
 
       /** Block reward related */
       override def blockReward(height: Int): Option[Long] = kill("blockReward")
@@ -216,8 +241,6 @@ func bar() = {
       override def blockRewardVotes(height: Int): Seq[Long] = kill("blockRewardVotes")
 
       override def wavesAmount(height: Int): BigInt = kill("wavesAmount")
-
-      override def transactionMeta(id: ByteStr): Option[TxMeta] = input.transactionMeta.get(id)
 
       override def balanceAtHeight(address: Address, height: Int, assetId: Asset): Option[(Int, Long)] = kill("balanceAtHeight")
 
