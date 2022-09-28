@@ -12,7 +12,7 @@ case class RunnerAccountState(
     data: Option[Map[String, RunnerDataEntry]] = None,
     balance: Map[Asset, Long] = Map.empty,
     leasing: Option[LeaseBalance] = None,
-    balanceHistory: Map[Int, Seq[BalanceSnapshot]] = Map.empty,
+    generatingBalance: Option[Long] = None,
     aliases: List[String] = Nil
 )
 

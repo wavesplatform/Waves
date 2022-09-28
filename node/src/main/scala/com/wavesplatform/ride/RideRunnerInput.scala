@@ -12,6 +12,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.ride.input.*
 import com.wavesplatform.state.InvokeScriptResult.DataEntry
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, Height, LeaseBalance, TxMeta}
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
 import com.wavesplatform.transaction.{Asset, TransactionFactory}
 import play.api.libs.json.*
@@ -19,6 +20,7 @@ import play.api.libs.json.*
 import java.util.Locale
 import scala.util.Try
 
+// TODO Longs in JS
 case class RideRunnerInput(
     scriptAddress: Address,
     trace: Boolean,
@@ -44,7 +46,12 @@ case class RideRunnerInput(
 
   lazy val balance: Map[Address, Map[Asset, Long]] = accountStateLens(_.balance)
 
-  lazy val balanceSnapshots: Map[Address, Map[Int, Seq[BalanceSnapshot]]] = accountStateLens(_.balanceHistory)
+  lazy val balanceSnapshots: Map[Address, Seq[BalanceSnapshot]] = for {
+    (addr, state) <- accounts
+  } yield {
+    val generatingBalance = state.generatingBalance.orElse(state.balance.get(Waves)).getOrElse(0L)
+    addr -> Seq(BalanceSnapshot(height, generatingBalance, 0, 0))
+  }
 
   lazy val leaseBalance: Map[Address, LeaseBalance] = for {
     (addr, state) <- accounts

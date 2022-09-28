@@ -176,9 +176,7 @@ func bar() = {
       /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
       override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] =
         // "to" always None
-        input.balanceSnapshots
-          .getOrElse(address, throw new RuntimeException(s"address: $address")) // TODO Map.empty)
-          .getOrElse(from, throw new RuntimeException(s"from: $from"))          // Map.empty)
+        input.balanceSnapshots.getOrElse(address, Seq(BalanceSnapshot(height, 0, 0, 0))).filter(_.height >= from)
 
       override def settings: BlockchainSettings = nodeSettings.blockchainSettings
 
