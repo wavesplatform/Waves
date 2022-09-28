@@ -24,7 +24,7 @@ import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{Asset, Authorized, EthereumTransaction, GenesisTransaction}
+import com.wavesplatform.transaction.{Asset, Authorized, EthereumTransaction}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -557,21 +557,18 @@ final case class BlockAppended(
 }
 
 object BlockAppended {
-  def from(block: Block, diff: DetailedDiff, blockchainBeforeWithMinerReward: Blockchain): BlockAppended = {
+  def from(block: Block, diff: DetailedDiff, blockchainBeforeWithMinerReward: Blockchain, minerReward: Option[Long]): BlockAppended = {
+    val height = blockchainBeforeWithMinerReward.height
     val (blockStateUpdate, txsStateUpdates, txsMetadata, refAssets) =
       StateUpdate.container(blockchainBeforeWithMinerReward, diff, block.sender.toAddress)
 
     // updatedWavesAmount can change as a result of either genesis transactions or miner rewards
-    val updatedWavesAmount = blockchainBeforeWithMinerReward.height match {
-      // genesis case
-      case 0 => block.transactionData.collect { case GenesisTransaction(_, amount, _, _, _) => amount.value }.sum
-      // miner reward case
-      case height => blockchainBeforeWithMinerReward.wavesAmount(height).toLong
-    }
+    val wavesAmount        = blockchainBeforeWithMinerReward.wavesAmount(height).toLong
+    val updatedWavesAmount = wavesAmount + minerReward.filter(_ => height > 0).getOrElse(0L)
 
     BlockAppended(
       block.id(),
-      blockchainBeforeWithMinerReward.height + 1,
+      height + 1,
       block,
       updatedWavesAmount,
       blockStateUpdate,

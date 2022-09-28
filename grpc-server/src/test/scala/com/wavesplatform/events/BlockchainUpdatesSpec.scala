@@ -278,9 +278,36 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       )
     }
 
-    "should include correct waves amount" in withNEmptyBlocksSubscription(settings = currentSettings) { result =>
-      val balances = result.collect { case b if b.update.isAppend => b.getAppend.getBlock.updatedWavesAmount }
-      balances shouldBe Seq(10000000000000000L, 10000000600000000L, 10000001200000000L)
+    "should include correct waves amount" in {
+      val totalWaves = 100_000_000_0000_0000L
+      val reward     = 6_0000_0000
+
+      withNEmptyBlocksSubscription(settings = currentSettings) { result =>
+        val balances = result.collect { case b if b.update.isAppend => b.getAppend.getBlock.updatedWavesAmount }
+        balances shouldBe Seq(totalWaves + reward, totalWaves + reward * 2, totalWaves + reward * 3)
+      }
+
+      withDomainAndRepo(currentSettings) { case (d, repo) =>
+        d.appendBlock()
+        d.blockchain.wavesAmount(1) shouldBe totalWaves + reward
+        repo.getBlockUpdate(1).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward
+
+        d.appendBlock()
+        d.blockchain.wavesAmount(1) shouldBe totalWaves + reward
+        d.blockchain.wavesAmount(2) shouldBe totalWaves + reward * 2
+        repo.getBlockUpdate(1).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward
+        repo.getBlockUpdate(2).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 2
+
+        d.appendMicroBlock(transfer)
+        d.blockchain.wavesAmount(2) shouldBe totalWaves + reward * 2
+        repo.getBlockUpdate(2).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 2
+
+        d.appendKeyBlock()
+        d.blockchain.wavesAmount(2) shouldBe totalWaves + reward * 2
+        d.blockchain.wavesAmount(3) shouldBe totalWaves + reward * 3
+        repo.getBlockUpdate(2).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 2
+        repo.getBlockUpdate(3).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 3
+      }
     }
 
     "should include correct heights" in withNEmptyBlocksSubscription(settings = currentSettings) { result =>
