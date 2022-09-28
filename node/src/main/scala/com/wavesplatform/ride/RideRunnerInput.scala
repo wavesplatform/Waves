@@ -44,7 +44,7 @@ case class RideRunnerInput(
 
   lazy val balance: Map[Address, Map[Asset, Long]] = accountStateLens(_.balance)
 
-  lazy val balanceSnapshots: Map[Address, Map[Int, Map[Option[BlockId], Seq[BalanceSnapshot]]]] = accountStateLens(_.balanceHistory)
+  lazy val balanceSnapshots: Map[Address, Map[Int, Seq[BalanceSnapshot]]] = accountStateLens(_.balanceHistory)
 
   lazy val leaseBalance: Map[Address, LeaseBalance] = for {
     (addr, state) <- accounts

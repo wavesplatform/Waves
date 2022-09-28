@@ -162,10 +162,12 @@ func bar() = {
       // Ride: blockInfoByHeight, lastBlock
       override def blockHeader(height: Int): Option[SignedBlockHeader] =
         // Dirty, but we have a clear error instead of "None.get"
-        Some(input.blockHeader.getOrElse(
-          height,
-          throw new RuntimeException(s"blockHeader($height): can't find a block header, please specify or check your script")
-        ))
+        Some(
+          input.blockHeader.getOrElse(
+            height,
+            throw new RuntimeException(s"blockHeader($height): can't find a block header, please specify or check your script")
+          )
+        )
 
       // Ride: blockInfoByHeight
       override def hitSource(height: Int): Option[ByteStr] = input.hitSource.get(height) // VRF
@@ -173,10 +175,10 @@ func bar() = {
       // Ride: wavesBalance (specifies to=None)
       /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
       override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] =
+        // "to" always None
         input.balanceSnapshots
           .getOrElse(address, throw new RuntimeException(s"address: $address")) // TODO Map.empty)
           .getOrElse(from, throw new RuntimeException(s"from: $from"))          // Map.empty)
-          .getOrElse(to, throw new RuntimeException(s"to: $to"))                // Seq.empty)
 
       override def settings: BlockchainSettings = nodeSettings.blockchainSettings
 
