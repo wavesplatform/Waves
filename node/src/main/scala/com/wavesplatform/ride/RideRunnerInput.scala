@@ -12,7 +12,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.ride.input.*
 import com.wavesplatform.state.InvokeScriptResult.DataEntry
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, Height, LeaseBalance, TxMeta}
-import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
 import com.wavesplatform.transaction.{Asset, TransactionFactory}
 import play.api.libs.json.*
@@ -28,7 +28,7 @@ case class RideRunnerInput(
     accounts: Map[Address, RunnerAccountState] = Map.empty,
     height: Int,
     activatedFeatures: Map[Short, Int] = Map.empty,
-    assetDescription: Map[Asset, AssetDescription] = Map.empty,
+    assets: Map[IssuedAsset, RunnerAssetInfo] = Map.empty,
     blocks: Map[Int, RunnerBlockInfo] = Map.empty,
     transactions: Map[ByteStr, RunnerTransactionInfo] = Map.empty
 ) {
@@ -130,6 +130,16 @@ object RideRunnerInput {
     }
   )
 
+  implicit def issuedAssetMapFormat[T: Format]: Format[Map[IssuedAsset, T]] = mapFormat[IssuedAsset, T](
+    _.toString,
+    { str =>
+      ByteStr
+        .decodeBase58(str)
+        .map(IssuedAsset(_))
+        .fold[JsResult[IssuedAsset]](e => JsError(s"Can't parse IssuedAsset '$str': ${e.getMessage}"), JsSuccess(_))
+    }
+  )
+
   implicit def optBlockMapFormat[T: Format]: Format[Map[Option[BlockId], T]] = mapFormat[Option[BlockId], T](
     _.fold("")(_.base64),
     str =>
@@ -204,6 +214,8 @@ object RideRunnerInput {
   implicit val runnerDataEntryFormat: OFormat[RunnerDataEntry] = Json.format
 
   implicit val runnerAccountStateFormat: OFormat[RunnerAccountState] = Json.format
+
+  implicit val runnerAssetInfoFormat: OFormat[RunnerAssetInfo] = Json.format
 
   implicit val runnerBlockInfoFormat: OFormat[RunnerBlockInfo] = Json.format
 

@@ -1,9 +1,9 @@
 package com.wavesplatform.ride
 
 import cats.syntax.either.*
+import com.google.protobuf.UnsafeByteOperations
 import com.wavesplatform.Application
 import com.wavesplatform.account.{Address, AddressScheme, Alias}
-import com.wavesplatform.api.http.*
 import com.wavesplatform.api.http.ApiError.{ConflictedRequestStructure, InvalidMessage}
 import com.wavesplatform.api.http.requests.byteStrFormat
 import com.wavesplatform.api.http.utils.{UtilsEvaluator, UtilsInvocationRequest}
@@ -11,16 +11,17 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.RideV6
 import com.wavesplatform.features.EstimatorProvider.EstimatorBlockchainExt
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.lang.{API, ValidationError}
-import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{
@@ -30,36 +31,42 @@ import com.wavesplatform.state.{
   BalanceSnapshot,
   Blockchain,
   DataEntry,
+  Height,
   LeaseBalance,
   TxMeta,
   VolumeAndFee
 }
-import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError, ScriptExecutionError}
-import com.wavesplatform.transaction.smart.script.trace.TraceStep
+import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError}
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 import play.api.libs.json.*
 
 import java.io.File
 import scala.io.Source
+import scala.util.chaining.scalaUtilChainingOps
 import scala.util.{Try, Using}
 
 object RideRunner {
   /*
   seed: test
 
+  Has a script
   Nonce is: 0
   Public key: Cq5itmx4wbYuogySAoUp58MimLLkQrFFLr1tpJy2BYp1
   Address in 'W': 3PCH3sUqeiPFAhrKzEnSEXoE2B6G9YNromV
 
+  alice
   Nonce is: 1
   Public key: BWfushcMzh4YhHUjaHAW4iPUJHtCZ6SrpkDXtEhAiRQn
   Address in 'W': 3P6GhtTsABtYUgzhXTA4cDwbqqy7HqruiQQ
 
+  bob
   Nonce is: 2
   Public key: 9K1Nu1udY4NAv77ktLqGAAxRtkL1epGA7tickpjDgPjP
   Address in 'W': 3PE7TH41wVuhn2SpAwWBBzeGxxzz8wXrb6L
 
+  jane
   Nonce is: 3
   Public key: 5gmbkRC62E4YMX5RAnotUtpqccna8wPaNqCqo5hZsTeo
   Address in 'W': 3P4xDBqzXgR8HyXoyNn1C8Bd88h4rsEBMHA
@@ -104,7 +111,7 @@ func foo(x: Int) = {
   let y1 = height
   let y2 = lastBlock.height
 
-  ([], x + x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8 + x9 + x10 + y1 + y2)
+  ([ScriptTransfer(bob, 1, asset)], x + x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8 + x9 + x10 + y1 + y2)
 }
 
 @Callable(inv)
@@ -125,15 +132,7 @@ func bar() = {
       override def accountScript(address: Address): Option[AccountScriptInfo] = {
         input.accountScript.get(address).map { input =>
           val complexityInfo = Seq(ScriptEstimatorV1, ScriptEstimatorV2, this.estimator).map { estimator =>
-            estimator.version -> Script
-              .complexityInfo(
-                input.script,
-                estimator,
-                fixEstimateOfVerifier = this.isFeatureActivated(RideV6),
-                useContractVerifierLimit = false,
-                withCombinedContext = true
-              )
-              .getOrElse(throw new RuntimeException(s"Can't get a complexity info of '$address' script"))
+            estimator.version -> complexityInfoOf(address.toString, input.script)
           }
 
           val (lastEstimatorVersion, lastComplexityInfo) = complexityInfo.last
@@ -185,8 +184,39 @@ func bar() = {
 
       override def activatedFeatures: Map[Short, Int] = input.activatedFeatures
 
+      private lazy val assets: Map[IssuedAsset, AssetDescription] = input.assets.map { case (asset, info) =>
+        asset -> AssetDescription(
+          originTransactionId = asset.id,
+          issuer = info.issuerPublicKey,
+          name = UnsafeByteOperations.unsafeWrap(info.name.arr),
+          description = UnsafeByteOperations.unsafeWrap(info.description.arr),
+          decimals = info.decimals,
+          reissuable = info.reissuable,
+          totalVolume = info.quantity,
+          lastUpdatedAt = Height(1),
+          script = info.script.map { script =>
+            val complexityInfo = complexityInfoOf(asset.toString, script)
+            AssetScriptInfo(script, complexityInfo.verifierComplexity)
+          },
+          sponsorship = info.minSponsoredAssetFee,
+          nft = this.isFeatureActivated(BlockchainFeatures.ReduceNFTFee) && info.quantity == 1 && info.decimals == 0 && !info.reissuable
+        )
+      }
+
+      private def complexityInfoOf(label: String, script: Script): ComplexityInfo =
+        Script.complexityInfo(
+          script,
+          this.estimator,
+          fixEstimateOfVerifier = this.isFeatureActivated(RideV6),
+          useContractVerifierLimit = false,
+          withCombinedContext = true
+        ) match {
+          case Right(x) => x
+          case Left(e)  => throw new RuntimeException(s"Can't get a complexity info of '$label' script: $e")
+        }
+
       // Ride: assetInfo
-      override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription] = input.assetDescription.get(id)
+      override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription] = assets.get(id)
 
       // Ride: get*Value (data), get* (data), isDataStorageUntouched, balance, scriptHash, wavesBalance
       override def resolveAlias(a: Alias): Either[ValidationError, Address] =
@@ -213,6 +243,9 @@ func bar() = {
           val meta = transactionMeta(id).getOrElse(throw new RuntimeException(s"Can't find a metadata of the transaction $id"))
           (meta.height, tx)
         }
+
+      // Ride (indirectly): asset script validation
+      override def assetScript(id: Asset.IssuedAsset): Option[AssetScriptInfo] = assets.get(id).flatMap(_.script)
 
       override def hasAccountScript(address: Address) = kill("hasAccountScript")
 
@@ -244,8 +277,6 @@ func bar() = {
 
       override def balanceAtHeight(address: Address, height: Int, assetId: Asset): Option[(Int, Long)] = kill("balanceAtHeight")
 
-      override def assetScript(id: Asset.IssuedAsset): Option[AssetScriptInfo] = kill("assetScript")
-
       override def resolveERC20Address(address: ERC20Address): Option[Asset.IssuedAsset] = kill("resolveERC20Address")
     }
 
@@ -256,11 +287,9 @@ func bar() = {
     val pk            = scriptInfo.publicKey
     val script        = scriptInfo.script
 
-    val simpleExpr = request.value.get("expr").map(parseCall(_, script.stdLibVersion))
-    val exprFromInvocation =
-      request
-        .asOpt[UtilsInvocationRequest]
-        .map(_.toInvocation.flatMap(UtilsEvaluator.toExpr(script, _)))
+    val simpleExpr         = request.value.get("expr").map(parseCall(_, script.stdLibVersion))
+    val parsedRequest      = request.asOpt[UtilsInvocationRequest]
+    val exprFromInvocation = parsedRequest.map(_.toInvocation.flatMap(UtilsEvaluator.toExpr(script, _)))
 
     val exprE = (simpleExpr, exprFromInvocation) match {
       case (Some(_), Some(_)) if request.fields.size > 1 => Left(ConflictedRequestStructure.json)
@@ -270,20 +299,19 @@ func bar() = {
     }
 
     val apiResult = Try(exprE.flatMap { exprE =>
-      val evaluated = for {
+      for {
         expr <- exprE
         limit = Int.MaxValue // settings.evaluateScriptComplexityLimit
-        (result, complexity, log) <- UtilsEvaluator.executeExpression(blockchain, script, scriptAddress, pk, limit)(expr)
-      } yield {
-        Json.obj(
-          "result"     -> ScriptValuesJson.serializeValue(result),
-          "complexity" -> complexity
-        ) ++ (if (trace) Json.obj(TraceStep.logJson(log)) else Json.obj())
-      }
-      evaluated.leftMap {
-        case e: ScriptExecutionError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.error)
-        case e                       => ApiError.fromValidationError(e).json
-      }
+        result <- UtilsEvaluator.executeExpression2(
+          blockchain,
+          script,
+          scriptAddress,
+          pk,
+          limit,
+          parsedRequest.flatMap(_.payment).getOrElse(Seq.empty),
+          scriptedAssets = input.assets.collect { case (asset, x) if x.script.nonEmpty => asset }.toSeq
+        )()
+      } yield result
     }.merge)
 
     println(s"apiResult: $apiResult")
