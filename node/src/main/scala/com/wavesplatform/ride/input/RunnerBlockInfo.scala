@@ -1,9 +1,12 @@
 package com.wavesplatform.ride.input
 
-import com.wavesplatform.block.SignedBlockHeader
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 
 case class RunnerBlockInfo(
-    blockHeader: SignedBlockHeader,
+    timestamp: Long,
+    baseTarget: Long,
+    generationSignature: ByteStr,
+    generatorPublicKey: PublicKey,
     VRF: Option[ByteStr] = None
 )

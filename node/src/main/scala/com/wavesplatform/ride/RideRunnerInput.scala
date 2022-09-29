@@ -69,7 +69,20 @@ case class RideRunnerInput(
 
   lazy val blockHeader: Map[Int, SignedBlockHeader] = for {
     (height, blockInfo) <- blocks
-  } yield height -> blockInfo.blockHeader
+  } yield height -> SignedBlockHeader(
+    header = BlockHeader(
+      version = 5,
+      timestamp = blockInfo.timestamp,
+      reference = ByteStr(Array.emptyByteArray),
+      baseTarget = blockInfo.baseTarget,
+      generationSignature = blockInfo.generationSignature,
+      generator = blockInfo.generatorPublicKey,
+      featureVotes = Nil,
+      rewardVote = -1,
+      transactionsRoot = ByteStr(Array.emptyByteArray)
+    ),
+    signature = ByteStr(Array.emptyByteArray)
+  )
 
   lazy val hitSource: Map[Int, ByteStr] = for {
     (height, blockInfo) <- blocks

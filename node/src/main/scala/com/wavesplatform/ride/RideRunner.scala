@@ -188,8 +188,8 @@ func bar() = {
         asset -> AssetDescription(
           originTransactionId = asset.id,
           issuer = info.issuerPublicKey,
-          name = UnsafeByteOperations.unsafeWrap(info.name.arr),
-          description = UnsafeByteOperations.unsafeWrap(info.description.arr),
+          name = UnsafeByteOperations.unsafeWrap(info.name.arr), // TODO allow to specify base58
+          description = UnsafeByteOperations.unsafeWrap(info.description.arr), // TODO allow to specify base58
           decimals = info.decimals,
           reissuable = info.reissuable,
           totalVolume = info.quantity,
