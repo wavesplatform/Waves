@@ -2,7 +2,7 @@ package com.wavesplatform.ride
 
 import com.google.protobuf.ByteString
 import com.google.protobuf.UnsafeByteOperations.unsafeWrap
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.api.http.DebugApiRoute
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
@@ -90,14 +90,12 @@ case class RideRunnerInput(
   } yield height -> vrf
 
   lazy val transactionMeta: Map[ByteStr, TxMeta] = for {
-    (id, transactionInfo) <- transactions
-    meta                  <- transactionInfo.meta
-  } yield id -> meta
-
-  lazy val transferById: Map[ByteStr, TransferTransactionLike] = for {
-    (id, transactionInfo) <- transactions
-    transaction           <- transactionInfo.transaction
-  } yield id -> transaction
+    (id, tx) <- transactions
+  } yield id -> TxMeta(
+    height = Height(tx.height),
+    succeeded = true,
+    spentComplexity = 0
+  )
 }
 
 object RideRunnerInput {
@@ -181,6 +179,22 @@ object RideRunnerInput {
       str => unsafeWrap(decodeBytesFromStr(str)),
       x => s"${Base64.Prefix}${Base64.encode(x.toByteArray)}"
     )
+
+  // from test/http
+  implicit val addressOrAliasFormat: Format[AddressOrAlias] = Format[AddressOrAlias](
+    Reads {
+      case JsString(str) =>
+        Base58
+          .tryDecodeWithLimit(str)
+          .toEither
+          .flatMap(AddressOrAlias.fromBytes)
+          .map(JsSuccess(_))
+          .getOrElse(JsError("Can't read Address or Alias"))
+
+      case _ => JsError("Can't read Address or Alias")
+    },
+    Writes(x => JsString(x.toString))
+  )
 
   // IDEA and the compiler don't know that it is used
   implicit val byteStrFormat = com.wavesplatform.api.http.requests.byteStrFormat

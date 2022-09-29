@@ -1,11 +1,19 @@
 package com.wavesplatform.ride.input
 
-import com.wavesplatform.state.TxMeta
-import com.wavesplatform.transaction.transfer.TransferTransactionLike
+import com.wavesplatform.account.{AddressOrAlias, PublicKey}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.transaction.Asset
 
 case class RunnerTransactionInfo(
-    transaction: Option[TransferTransactionLike] = None,
-    meta: Option[TxMeta] = None
-) {
-  require(transaction.nonEmpty || meta.nonEmpty, s"transaction.nonEmpty=${transaction.nonEmpty} || meta.nonEmpty=${meta.nonEmpty}")
-}
+    feeAssetId: Asset,
+    amount: Long,
+    assetId: Asset,
+    recipient: AddressOrAlias,
+    attachment: ByteStr,
+    fee: Long,
+    timestamp: Long,
+    version: Byte,
+    senderPublicKey: PublicKey,
+    proofs: List[ByteStr],
+    height: Int
+)

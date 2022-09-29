@@ -38,13 +38,12 @@ import com.wavesplatform.state.{
 }
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError}
-import com.wavesplatform.transaction.transfer.TransferTransactionLike
-import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
+import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
+import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction, TxPositiveAmount}
 import play.api.libs.json.*
 
 import java.io.File
 import scala.io.Source
-import scala.util.chaining.scalaUtilChainingOps
 import scala.util.{Try, Using}
 
 object RideRunner {
@@ -188,7 +187,7 @@ func bar() = {
         asset -> AssetDescription(
           originTransactionId = asset.id,
           issuer = info.issuerPublicKey,
-          name = UnsafeByteOperations.unsafeWrap(info.name.arr), // TODO allow to specify base58
+          name = UnsafeByteOperations.unsafeWrap(info.name.arr),               // TODO allow to specify base58
           description = UnsafeByteOperations.unsafeWrap(info.description.arr), // TODO allow to specify base58
           decimals = info.decimals,
           reissuable = info.reissuable,
@@ -237,9 +236,25 @@ func bar() = {
       // Ride: transactionHeightById
       override def transactionMeta(id: ByteStr): Option[TxMeta] = input.transactionMeta.get(id)
 
+      lazy val transferById: Map[ByteStr, TransferTransactionLike] = for {
+        (id, tx) <- input.transactions
+      } yield id -> TransferTransaction(
+        version = tx.version,
+        sender = tx.senderPublicKey,
+        recipient = tx.recipient,
+        assetId = tx.assetId,
+        amount = TxPositiveAmount.from(tx.amount).explicitGet(),
+        feeAssetId = tx.feeAssetId,
+        fee = TxPositiveAmount.from(tx.fee).explicitGet(),
+        attachment = tx.attachment,
+        timestamp = tx.timestamp,
+        proofs = tx.proofs,
+        chainId = settings.addressSchemeCharacter.toByte
+      )
+
       // Ride: transferTransactionById
       override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =
-        input.transferById.get(id).map { tx =>
+        transferById.get(id).map { tx =>
           val meta = transactionMeta(id).getOrElse(throw new RuntimeException(s"Can't find a metadata of the transaction $id"))
           (meta.height, tx)
         }
