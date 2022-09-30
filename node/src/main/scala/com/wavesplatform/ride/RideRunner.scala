@@ -1,12 +1,8 @@
 package com.wavesplatform.ride
 
-import cats.syntax.either.*
 import com.google.protobuf.UnsafeByteOperations
 import com.wavesplatform.Application
 import com.wavesplatform.account.{Address, AddressScheme, Alias}
-import com.wavesplatform.api.http.ApiError.{ConflictedRequestStructure, InvalidMessage}
-import com.wavesplatform.api.http.requests.byteStrFormat
-import com.wavesplatform.api.http.utils.{UtilsEvaluator, UtilsInvocationRequest}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
@@ -14,15 +10,15 @@ import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.BlockchainFeatures.RideV6
 import com.wavesplatform.features.EstimatorProvider.EstimatorBlockchainExt
-import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.lang.{API, ValidationError}
+import com.wavesplatform.ride.input.RunnerRequest
 import com.wavesplatform.settings.BlockchainSettings
+import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{
   AccountScriptInfo,
@@ -37,14 +33,14 @@ import com.wavesplatform.state.{
   VolumeAndFee
 }
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError}
+import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
+import com.wavesplatform.transaction.smart.script.trace.InvokeScriptTrace
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction, TxPositiveAmount}
-import play.api.libs.json.*
 
 import java.io.File
 import scala.io.Source
-import scala.util.{Try, Using}
+import scala.util.Using
 
 object RideRunner {
   /*
@@ -295,55 +291,24 @@ func bar() = {
       override def resolveERC20Address(address: ERC20Address): Option[Asset.IssuedAsset] = kill("resolveERC20Address")
     }
 
-    val trace         = input.trace
-    val request       = input.request
-    val scriptAddress = input.scriptAddress
-    val scriptInfo    = blockchain.accountScript(scriptAddress).get
-    val pk            = scriptInfo.publicKey
-    val script        = scriptInfo.script
-
-    val simpleExpr         = request.value.get("expr").map(parseCall(_, script.stdLibVersion))
-    val parsedRequest      = request.asOpt[UtilsInvocationRequest]
-    val exprFromInvocation = parsedRequest.map(_.toInvocation.flatMap(UtilsEvaluator.toExpr(script, _)))
-
-    val exprE = (simpleExpr, exprFromInvocation) match {
-      case (Some(_), Some(_)) if request.fields.size > 1 => Left(ConflictedRequestStructure.json)
-      case (None, None)                                  => Left(InvalidMessage.json)
-      case (Some(expr), _)                               => Right(expr)
-      case (None, Some(expr))                            => Right(expr)
-    }
-
-    val apiResult = Try(exprE.flatMap { exprE =>
-      for {
-        expr <- exprE
-        limit = Int.MaxValue // settings.evaluateScriptComplexityLimit
-        result <- UtilsEvaluator.executeExpression2(
-          blockchain,
-          script,
-          scriptAddress,
-          pk,
-          limit,
-          parsedRequest.flatMap(_.payment).getOrElse(Seq.empty),
-          scriptedAssets = input.assets.collect { case (asset, x) if x.script.nonEmpty => asset }.toSeq
-        )()
-      } yield result
-    }.merge)
-
+    val apiResult = execute(blockchain, input.request)
     println(s"apiResult: $apiResult")
   }
 
-  // UtilsApiRoute
-  private def parseCall(js: JsReadable, version: StdLibVersion) = {
-    val binaryCall = js
-      .asOpt[ByteStr]
-      .toRight(GenericError("Unable to parse expr bytes"))
-      .flatMap(bytes => SerdeV1.deserialize(bytes.arr).bimap(GenericError(_), _._1))
-
-    val textCall = js
-      .asOpt[String]
-      .toRight(GenericError("Unable to read expr string"))
-      .flatMap(UtilsEvaluator.compile(version))
-
-    binaryCall.orElse(textCall)
+  def execute(
+      blockchain: Blockchain,
+      request: RunnerRequest
+  ): Either[ValidationError, Any] = {
+    val result = InvokeScriptTransactionDiff(
+      blockchain,
+      System.currentTimeMillis(), // blockTime
+      limitedExecution = false
+    )(request.toTx(blockchain.settings.addressSchemeCharacter.toByte))
+    // TODO trace
+    result.resultE.map { all =>
+      result.trace
+        .collect { case x: InvokeScriptTrace => x.resultE.map(x => (x.returnedValue, all)) }
+        .mkString("\n")
+    }
   }
 }

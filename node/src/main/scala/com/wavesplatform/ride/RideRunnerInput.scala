@@ -1,20 +1,22 @@
 package com.wavesplatform.ride
 
+import cats.syntax.either.*
 import com.google.protobuf.ByteString
 import com.google.protobuf.UnsafeByteOperations.unsafeWrap
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
-import com.wavesplatform.api.http.DebugApiRoute
+import com.wavesplatform.api.http.{DebugApiRoute, requests}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
+import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.ride.input.*
 import com.wavesplatform.state.InvokeScriptResult.DataEntry
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, Height, LeaseBalance, TxMeta}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
-import com.wavesplatform.transaction.{Asset, TransactionFactory}
+import com.wavesplatform.transaction.{Asset, Proofs, TransactionFactory, TxPositiveAmount}
 import play.api.libs.json.*
 
 import java.util.Locale
@@ -22,9 +24,7 @@ import scala.util.Try
 
 // TODO Longs in JS
 case class RideRunnerInput(
-    scriptAddress: Address,
-    trace: Boolean,
-    request: JsObject,
+    request: RunnerRequest,
     accounts: Map[Address, RunnerAccountState] = Map.empty,
     height: Int,
     activatedFeatures: Map[Short, Int] = Map.empty,
@@ -197,7 +197,7 @@ object RideRunnerInput {
   )
 
   // IDEA and the compiler don't know that it is used
-  implicit val byteStrFormat = com.wavesplatform.api.http.requests.byteStrFormat
+  implicit val byteStrFormat = com.wavesplatform.utils.byteStrFormat
 
   implicit val heightFormat: Format[Height] = Height.lift
 
@@ -248,7 +248,28 @@ object RideRunnerInput {
 
   implicit val runnerTransactionInfoFormat: OFormat[RunnerTransactionInfo] = Json.format
 
-  implicit val rideRunnerInputFormat: OFormat[RideRunnerInput] = Json.format
+  implicit val stdLibVersionFormat: Format[StdLibVersion] = implicitly[Format[Int]]
+    .bimap(StdLibVersion.VersionDic.idMap.apply, _.id)
+
+  implicit val txPositiveAmountFormat: Format[TxPositiveAmount] = implicitly[Format[Long]]
+    .bimap(TxPositiveAmount.from(_).explicitGet(), _.value)
+
+  implicit val proofsReads: Reads[Proofs]         = requests.proofsReads
+  implicit val runnerExprRead: Reads[RunnerExpr]  = Json.reads
+  implicit val runnerCallReads: Reads[RunnerCall] = Json.reads
+  implicit val runnerCallRequestFormat: Reads[Either[RunnerExpr, RunnerCall]] = Reads { json =>
+    val asExpr     = runnerExprRead.reads(json).map(_.asLeft[RunnerCall])
+    val asFuncCall = runnerCallReads.reads(json).map(_.asRight[RunnerExpr])
+    (asExpr, asFuncCall) match {
+      case (r @ JsSuccess(_, _), _) => r
+      case (_, r @ JsSuccess(_, _)) => r
+      case (JsError(e1), JsError(e2)) =>
+        JsError(e1 ++ e2)
+    }
+  }
+  implicit val runnerRequestFormat: Reads[RunnerRequest] = Json.reads
+
+  implicit val rideRunnerInputFormat: Reads[RideRunnerInput] = Json.reads
 
   def mapFormat[K, V: Format](stringifyKey: K => String, parseKey: String => JsResult[K])(implicit vFormat: Format[V]): Format[Map[K, V]] = {
     Format(
