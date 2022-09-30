@@ -62,7 +62,7 @@ object UtilsEvaluator {
         override def payments: Seq[Payment]            = thisPayments
         override def root: InvokeScriptTransactionLike = this
         override val sender: PublicKey                 = PublicKey(ByteStr(new Array[Byte](32)))
-        override def assetFee: (Asset, Long)           = Asset.Waves -> 0L // TODO sponsorship?
+        override def assetFee: (Asset, Long)           = Asset.Waves -> 0L
         override def timestamp: Long                   = System.currentTimeMillis()
         override def chainId: Byte                     = AddressScheme.current.chainId
         override def id: Coeval[ByteStr]               = Coeval.evalOnce(ByteStr.empty)

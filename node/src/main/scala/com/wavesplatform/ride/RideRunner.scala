@@ -177,7 +177,25 @@ func bar() = {
       // Ride: wavesBalance, height, lastBlock TODO: a binding in Ride?
       override def height: Int = input.height
 
-      override def activatedFeatures: Map[Short, Int] = input.activatedFeatures
+      override val activatedFeatures: Map[Short, Int] = Map[Int, Int](
+        1  -> 810000,
+        2  -> 805000,
+        3  -> 940000,
+        4  -> 1190000,
+        5  -> 1060000,
+        6  -> 1070000,
+        7  -> 1080000,
+        8  -> 1100000,
+        9  -> 1340000,
+        10 -> 1340000,
+        11 -> 1610000,
+        12 -> 1610000,
+        13 -> 1610000,
+        14 -> 1740000,
+        15 -> 2230000,
+        16 -> 2650000,
+        17 -> 3180000
+      ).map { case (id, height) => id.toShort -> height } ++ input.extraFeatures.map(id => id -> (height - 1))
 
       private lazy val assets: Map[IssuedAsset, AssetDescription] = input.assets.map { case (asset, info) =>
         asset -> AssetDescription(
@@ -304,7 +322,6 @@ func bar() = {
       System.currentTimeMillis(), // blockTime
       limitedExecution = false
     )(request.toTx(blockchain.settings.addressSchemeCharacter.toByte))
-    // TODO trace
     result.resultE.map { all =>
       result.trace
         .collect { case x: InvokeScriptTrace => x.resultE.map(x => (x.returnedValue, all)) }

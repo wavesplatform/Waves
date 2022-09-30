@@ -15,9 +15,9 @@ import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeS
 import com.wavesplatform.transaction.{Asset, Proofs, TxPositiveAmount, TxTimestamp, TxVersion}
 
 case class RunnerRequest(
-    trace: Boolean,
-    senderPublicKey: PublicKey,
     call: Either[RunnerExpr, RunnerCall],
+    senderPublicKey: PublicKey = PublicKey(new Array[Byte](32)),
+    trace: Boolean = false,
     fee: TxPositiveAmount = TxPositiveAmount(1_000_000),
     feeAssetId: Asset = Waves,
     timestamp: TxTimestamp = System.currentTimeMillis(),
@@ -25,21 +25,6 @@ case class RunnerRequest(
 ) {
   def toTx(thatChainId: Byte): InvokeScriptTransactionLike = call match {
     case Left(expr) =>
-//      new InvokeScriptTransactionLike {
-//        override def assetFee: (Asset, Long) = (feeAssetId, fee.value)
-//        override def timestamp: TxTimestamp = timestamp
-//        override def chainId: TxVersion = thatChainId
-//        override def id: Coeval[ByteStr] = Coeval.now(ByteStr.empty)
-//        override val tpe: TransactionType = TransactionType.InvokeScript
-//        override def dApp: AddressOrAlias = senderPublicKey.toAddress(thatChainId)
-//        override def funcCall: Terms.FUNCTION_CALL = ???
-//
-//        override def payments: Seq[Payment] = ???
-//
-//        override def root: InvokeScriptTransactionLike = ???
-//
-//        override val sender: PublicKey = _
-//      }
       InvokeExpressionTransaction(
         version = TxVersion.V1,
         sender = senderPublicKey,

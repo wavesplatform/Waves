@@ -27,7 +27,7 @@ case class RideRunnerInput(
     request: RunnerRequest,
     accounts: Map[Address, RunnerAccountState] = Map.empty,
     height: Int,
-    activatedFeatures: Map[Short, Int] = Map.empty,
+    extraFeatures: Set[Short] = Set.empty,
     assets: Map[IssuedAsset, RunnerAssetInfo] = Map.empty,
     blocks: Map[Int, RunnerBlockInfo] = Map.empty,
     transactions: Map[ByteStr, RunnerTransactionInfo] = Map.empty
