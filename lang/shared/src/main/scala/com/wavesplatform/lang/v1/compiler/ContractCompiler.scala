@@ -375,7 +375,8 @@ object ContractCompiler {
           case Left(err) => Left(err)
           case Right(c)  => Right(c)
         }
-      case f: fastparse.Parsed.Failure => Left(f.toString)
+      case f: fastparse.Parsed.Failure =>
+        Left(Parser.toString(input, f))
     }
   }
 

@@ -42,7 +42,7 @@ object ExpressionCompiler {
   def compile(input: String, ctx: CompilerContext, allowIllFormedStrings: Boolean = false): Either[String, (EXPR, FINAL)] = {
     Parser.parseExpr(input) match {
       case fastparse.Parsed.Success(xs, _) => ExpressionCompiler(ctx, xs, allowIllFormedStrings)
-      case f: fastparse.Parsed.Failure     => Left(f.toString)
+      case f: fastparse.Parsed.Failure     => Left(Parser.toString(input, f))
     }
   }
 

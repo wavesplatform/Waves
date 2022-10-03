@@ -13,6 +13,7 @@ import com.wavesplatform.lang.v1.parser.UnaryOperation.*
 import com.wavesplatform.lang.v1.{ContractLimits, compiler}
 import fastparse.*
 import fastparse.MultiLineWhitespace.*
+import fastparse.Parsed.Failure
 
 import scala.annotation.tailrec
 
@@ -136,10 +137,6 @@ object Parser {
   def falseP[A: P]: P[FALSE]      = P(Index ~~ "false".! ~~ !(char | digit) ~~ Index).map { case (start, _, end) => FALSE(Pos(start, end)) }
   def curlyBracesP[A: P]: P[EXPR] = P("{" ~ baseExpr ~ "}")
 
-  def refP[A: P]: P[REF] = P(correctVarName).map { x =>
-    REF(Pos(x.position.start, x.position.end), x)
-  }
-
   def lfunP[A: P]: P[REF] = P(correctLFunName).map { x =>
     REF(Pos(x.position.start, x.position.end), x)
   }
@@ -255,10 +252,10 @@ object Parser {
 
   def funcP(implicit c: fastparse.P[Any]): P[FUNC] = {
     def funcname(implicit c: fastparse.P[Any])    = anyVarName
-    def argWithType(implicit c: fastparse.P[Any]) = anyVarName ~ ":" ~ unionTypeP ~ comment
+    def argWithType(implicit c: fastparse.P[Any]) = anyVarName ~/ ":" ~ unionTypeP ~ comment
     def args(implicit c: fastparse.P[Any])        = "(" ~ comment ~ argWithType.rep(0, "," ~ comment) ~ ")" ~ comment
     def funcHeader(implicit c: fastparse.P[Any]) =
-      Index ~~ "func" ~ funcname ~ comment ~ args ~ "=" ~ P(singleBaseExpr | ("{" ~ comment ~ baseExpr ~ "}")) ~~ Index
+      Index ~~ "func" ~ funcname ~ comment ~/ args ~ "=" ~ P(singleBaseExpr | ("{" ~ comment ~ baseExpr ~ "}")) ~~ Index
     funcHeader.map {
       case (start, name, args, expr, end) => FUNC(Pos(start, end), expr, name, args)
     }
@@ -708,5 +705,12 @@ object Parser {
           }
         case _ => Left(new Exception("Unknown parsing error."))
       }
+  }
+
+  def toString(input: String, f: Failure): String = {
+    val found = input.drop(f.index).takeWhile(!_.isWhitespace)
+    val start = input.lastIndexWhere(_.isWhitespace, input.lastIndexWhere(_.isWhitespace, f.index) - 1) + 1
+    val end   = f.index + found.length - 1
+    s"Parse error: expected ${f.label}, found \"$found\" in $start-$end"
   }
 }
