@@ -14,7 +14,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
-import com.wavesplatform.lang.directives.values.{V2, V3, V6}
+import com.wavesplatform.lang.directives.values.{V2, V3, V5, V6}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -1058,6 +1058,27 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
 
     evalScript(s"nestedCalls([(\"$dAppAddress2\", \"call\", [123, \"abc\"]), (\"$dAppAddress\", \"getValue\", [])])") ~> route ~> check {
       (responseAs[JsValue] \ "result" \ "value").as[String] shouldBe "abc123\nvalue\n"
+    }
+
+    val compactedDApp = TestCompiler(V5).compileContract(
+      """
+        | func user1() = 1
+        | func user2() = 2
+        |
+        | @Callable(i)
+        | func call() = ([], user1() + user2())
+      """.stripMargin,
+      compact = true
+    )
+    d.helpers.setScript(dAppAccount, compactedDApp)
+    evalScript("user1()")  ~> route ~> check {
+      (responseAs[JsValue] \ "result" \ "value").as[Int] shouldBe 1
+    }
+    evalScript("user2()")  ~> route ~> check {
+      (responseAs[JsValue] \ "result" \ "value").as[Int] shouldBe 2
+    }
+    evalScript("call()")  ~> route ~> check {
+      (responseAs[JsValue] \ "result" \ "value" \ "_2" \ "value").as[Int] shouldBe 3
     }
   }
 

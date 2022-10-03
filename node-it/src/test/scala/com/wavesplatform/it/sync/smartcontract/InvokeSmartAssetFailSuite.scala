@@ -64,7 +64,7 @@ class InvokeSmartAssetFailSuite extends BaseTransactionSuite {
     sender.setScript(dApp, Some(script), setScriptFee, waitForTx = true)
     assertApiError(
       sender.invokeScript(caller, dApp.toAddress.toString, Some("some"), List(CONST_BOOLEAN(true))),
-      AssertiveApiError(ScriptExecutionError.Id, "Error while executing account-script: Asset was issued by other address")
+      AssertiveApiError(ScriptExecutionError.Id, "Error while executing dApp: Asset was issued by other address")
     )
   }
 }
