@@ -14,6 +14,7 @@ import com.wavesplatform.events.protobuf.BlockchainUpdated.Rollback.RollbackType
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.events.protobuf.serde.*
 import com.wavesplatform.events.protobuf.{TransactionMetadata, BlockchainUpdated as PBBlockchainUpdated}
+import com.wavesplatform.features.BlockchainFeatures.BlockReward
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -282,31 +283,47 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       val totalWaves = 100_000_000_0000_0000L
       val reward     = 6_0000_0000
 
-      withNEmptyBlocksSubscription(settings = currentSettings) { result =>
+      val settings = currentSettings.setFeaturesHeight((BlockReward, 3))
+
+      withNEmptyBlocksSubscription(settings = settings, count = 3) { result =>
         val balances = result.collect { case b if b.update.isAppend => b.getAppend.getBlock.updatedWavesAmount }
-        balances shouldBe Seq(totalWaves + reward, totalWaves + reward * 2, totalWaves + reward * 3)
+        balances shouldBe Seq(totalWaves, totalWaves, totalWaves + reward, totalWaves + reward * 2)
       }
 
-      withDomainAndRepo(currentSettings) { case (d, repo) =>
+      withDomainAndRepo(settings) { case (d, repo) =>
         d.appendBlock()
-        d.blockchain.wavesAmount(1) shouldBe totalWaves + reward
-        repo.getBlockUpdate(1).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward
+        d.blockchain.wavesAmount(1) shouldBe totalWaves
+        repo.getBlockUpdate(1).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves
 
         d.appendBlock()
-        d.blockchain.wavesAmount(1) shouldBe totalWaves + reward
-        d.blockchain.wavesAmount(2) shouldBe totalWaves + reward * 2
-        repo.getBlockUpdate(1).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward
-        repo.getBlockUpdate(2).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 2
+        d.blockchain.wavesAmount(2) shouldBe totalWaves
+        repo.getBlockUpdate(2).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves
+
+        d.appendBlock()
+        d.blockchain.wavesAmount(3) shouldBe totalWaves + reward
+        repo.getBlockUpdate(3).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward
+
+        val block4 = d.appendBlock().id()
+        d.blockchain.wavesAmount(4) shouldBe totalWaves + reward * 2
+        repo.getBlockUpdate(4).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 2
 
         d.appendMicroBlock(transfer)
-        d.blockchain.wavesAmount(2) shouldBe totalWaves + reward * 2
-        repo.getBlockUpdate(2).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 2
+        d.blockchain.wavesAmount(4) shouldBe totalWaves + reward * 2
+        repo.getBlockUpdate(4).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 2
 
-        d.appendKeyBlock()
-        d.blockchain.wavesAmount(2) shouldBe totalWaves + reward * 2
-        d.blockchain.wavesAmount(3) shouldBe totalWaves + reward * 3
-        repo.getBlockUpdate(2).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 2
-        repo.getBlockUpdate(3).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 3
+        // micro rollback
+        d.appendKeyBlock(Some(block4))
+        d.blockchain.wavesAmount(4) shouldBe totalWaves + reward * 2
+        repo.getBlockUpdate(4).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 2
+
+        d.appendBlock()
+        d.blockchain.wavesAmount(5) shouldBe totalWaves + reward * 3
+        repo.getBlockUpdate(5).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 3
+
+        // block rollback
+        d.rollbackTo(block4)
+        d.blockchain.wavesAmount(4) shouldBe totalWaves + reward * 2
+        repo.getBlockUpdate(4).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 2
       }
     }
 
