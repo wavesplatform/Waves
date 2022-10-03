@@ -16,10 +16,10 @@ import com.wavesplatform.transaction.{Asset, Proofs, TxPositiveAmount, TxTimesta
 
 case class RunnerRequest(
     call: Either[RunnerExpr, RunnerCall],
-    senderPublicKey: PublicKey = PublicKey(new Array[Byte](32)),
     trace: Boolean = false,
-    fee: TxPositiveAmount = TxPositiveAmount(1_000_000),
+    senderPublicKey: PublicKey = EmptyPublicKey,
     feeAssetId: Asset = Waves,
+    fee: TxPositiveAmount = TxPositiveAmount(5_000_000_000L), // 50 WAVES
     timestamp: TxTimestamp = System.currentTimeMillis(),
     proofs: Proofs = Proofs.empty
 ) {

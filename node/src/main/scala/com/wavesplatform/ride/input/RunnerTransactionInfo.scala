@@ -1,19 +1,20 @@
 package com.wavesplatform.ride.input
 
-import com.wavesplatform.account.{AddressOrAlias, PublicKey}
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.Waves
 
 case class RunnerTransactionInfo(
-    feeAssetId: Asset,
-    amount: Long,
-    assetId: Asset,
-    recipient: AddressOrAlias,
-    attachment: ByteStr,
-    fee: Long,
-    timestamp: Long,
-    version: Byte,
-    senderPublicKey: PublicKey,
-    proofs: List[ByteStr],
-    height: Int
+    amount: Long = 1,
+    assetId: Asset = Waves,
+    fee: Long = 100_000,
+    feeAssetId: Asset = Waves,
+    recipient: Option[String] = None,
+    attachment: ByteStr = ByteStr.empty,
+    timestamp: Long = System.currentTimeMillis(),
+    version: Byte = 3,
+    senderPublicKey: PublicKey = EmptyPublicKey,
+    proofs: List[ByteStr] = Nil,
+    height: Option[Int] = None
 )

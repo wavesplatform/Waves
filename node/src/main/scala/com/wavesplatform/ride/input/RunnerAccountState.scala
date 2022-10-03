@@ -17,7 +17,7 @@ case class RunnerAccountState(
 )
 
 case class RunnerScriptInfo(
-    publicKey: PublicKey,
+    publicKey: PublicKey = EmptyPublicKey,
     script: Script
 )
 

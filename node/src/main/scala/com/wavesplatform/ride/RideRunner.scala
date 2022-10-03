@@ -41,6 +41,7 @@ import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction, TxPositi
 import java.io.File
 import scala.io.Source
 import scala.util.Using
+import scala.util.chaining.scalaUtilChainingOps
 
 object RideRunner {
   /*
@@ -120,6 +121,8 @@ func bar() = {
     def kill(methodName: String) = throw new RuntimeException(methodName)
     // TODO default values?
     val blockchain: Blockchain = new Blockchain {
+      private val chainId: Byte = settings.addressSchemeCharacter.toByte
+
       // Ride: isDataStorageUntouched
       override def hasData(address: Address): Boolean = input.hasData.getOrElse(address, throw new RuntimeException(s"hasData($address)"))
 
@@ -247,15 +250,36 @@ func bar() = {
       override def balance(address: Address, mayBeAssetId: Asset): Long =
         input.balance.get(address).flatMap(_.get(mayBeAssetId)).getOrElse(0)
 
+      lazy val transactionMetaById: Map[ByteStr, TxMeta] = for {
+        (id, tx) <- input.transactions
+      } yield id -> TxMeta(
+        height = Height(tx.height.getOrElse((height - 1).max(1))),
+        succeeded = true,
+        spentComplexity = 0
+      )
+
       // Ride: transactionHeightById
-      override def transactionMeta(id: ByteStr): Option[TxMeta] = input.transactionMeta.get(id)
+      override def transactionMeta(id: ByteStr): Option[TxMeta] = transactionMetaById.get(id)
+
+      private val emptyAddress = Address(new Array[Byte](Address.HashLength), chainId)
 
       lazy val transferById: Map[ByteStr, TransferTransactionLike] = for {
         (id, tx) <- input.transactions
       } yield id -> TransferTransaction(
         version = tx.version,
         sender = tx.senderPublicKey,
-        recipient = tx.recipient,
+        recipient = tx.recipient
+          .map { x =>
+            if (x.startsWith("alias:"))
+              Alias.fromString(x).explicitGet().tap { x =>
+                require(
+                  x.chainId == settings.addressSchemeCharacter,
+                  s"Expected for alias '$x' to be from '${settings.addressSchemeCharacter}' network"
+                )
+              }
+            else Address.fromString(x).left.map(_ => Alias.createWithChainId(x, chainId).explicitGet()).merge
+          }
+          .getOrElse(emptyAddress),
         assetId = tx.assetId,
         amount = TxPositiveAmount.from(tx.amount).explicitGet(),
         feeAssetId = tx.feeAssetId,
@@ -263,7 +287,7 @@ func bar() = {
         attachment = tx.attachment,
         timestamp = tx.timestamp,
         proofs = tx.proofs,
-        chainId = settings.addressSchemeCharacter.toByte
+        chainId = chainId
       )
 
       // Ride: transferTransactionById

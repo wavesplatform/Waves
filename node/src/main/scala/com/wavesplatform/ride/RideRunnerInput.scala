@@ -26,7 +26,7 @@ import scala.util.Try
 case class RideRunnerInput(
     request: RunnerRequest,
     accounts: Map[Address, RunnerAccountState] = Map.empty,
-    height: Int,
+    height: Int = 3296627,
     extraFeatures: Set[Short] = Set.empty,
     assets: Map[IssuedAsset, RunnerAssetInfo] = Map.empty,
     blocks: Map[Int, RunnerBlockInfo] = Map.empty,
@@ -88,14 +88,6 @@ case class RideRunnerInput(
     (height, blockInfo) <- blocks
     vrf                 <- blockInfo.VRF
   } yield height -> vrf
-
-  lazy val transactionMeta: Map[ByteStr, TxMeta] = for {
-    (id, tx) <- transactions
-  } yield id -> TxMeta(
-    height = Height(tx.height),
-    succeeded = true,
-    spentComplexity = 0
-  )
 }
 
 object RideRunnerInput {
