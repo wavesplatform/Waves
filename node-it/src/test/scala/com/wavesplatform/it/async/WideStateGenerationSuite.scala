@@ -34,6 +34,7 @@ class WideStateGenerationSuite extends BaseFreeSpec with WaitForHeight2 with Tra
         |  }
         |  utx.allow-skip-checks = false
         |  utx.max-scripted-size = 1000000
+        |  rest-api.port = 6869
         |}""".stripMargin
     ),
     tag = getClass.getSimpleName,
