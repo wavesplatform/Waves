@@ -288,7 +288,7 @@ class Docker(
 
       val node = new DockerNode(actualConfig, containerId, getNodeInfo(containerId, WavesSettings.fromRootConfig(actualConfig)))
       nodes.add(node)
-      log.debug(s"Started $containerId -> ${node.name}: ${node.nodeInfo}${if (enableDebugger) s", debugger port = $debuggerPort" else ""}")
+      log.debug(s"Started $containerId -> ${node.name}")
       node
     } catch {
       case NonFatal(e) =>
@@ -607,8 +607,8 @@ object Docker {
       .mkString(" ")
 
   case class NodeInfo(restApiPort: Int, networkPort: Int, wavesIpAddress: String, ports: JMap[String, JList[PortBinding]]) {
-    val nodeApiEndpoint: URL                       = new URL(s"http://localhost:${externalPort(restApiPort)}")
-    val hostNetworkAddress: InetSocketAddress      = new InetSocketAddress("localhost", externalPort(networkPort))
+    lazy val nodeApiEndpoint: URL                       = new URL(s"http://localhost:${externalPort(restApiPort)}")
+    lazy val hostNetworkAddress: InetSocketAddress      = new InetSocketAddress("localhost", externalPort(networkPort))
     val containerNetworkAddress: InetSocketAddress = new InetSocketAddress(wavesIpAddress, networkPort)
 
     def portNotFound(internalPort: Int) =
