@@ -14,7 +14,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.it.Node
-import com.wavesplatform.it.sync.invokeExpressionFee
 import com.wavesplatform.it.util.*
 import com.wavesplatform.it.util.GlobalTimer.instance as timer
 import com.wavesplatform.lang.script.ScriptReader
@@ -496,7 +495,7 @@ object AsyncHttpApi extends Assertions {
     def invokeExpression(
         caller: KeyPair,
         expression: ExprScript,
-        fee: Long = invokeExpressionFee,
+        fee: Long = 0,
         feeAssetId: Option[String] = None,
         version: TxVersion = TxVersion.V1
     ): Future[(Transaction, JsValue)] =
