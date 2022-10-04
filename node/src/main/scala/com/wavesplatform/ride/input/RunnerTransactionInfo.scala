@@ -11,7 +11,7 @@ case class RunnerTransactionInfo(
     fee: Long = 100_000,
     feeAssetId: Asset = Waves,
     recipient: Option[String] = None,
-    attachment: ByteStr = ByteStr.empty,
+    attachment: String = "",
     timestamp: Long = System.currentTimeMillis(),
     version: Byte = 3,
     senderPublicKey: PublicKey = EmptyPublicKey,

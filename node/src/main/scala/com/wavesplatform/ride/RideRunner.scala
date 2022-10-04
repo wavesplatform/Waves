@@ -3,6 +3,7 @@ package com.wavesplatform.ride
 import com.google.protobuf.UnsafeByteOperations
 import com.wavesplatform.Application
 import com.wavesplatform.account.{Address, AddressScheme, Alias}
+import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
@@ -17,28 +18,20 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.{API, ValidationError}
 import com.wavesplatform.ride.input.RunnerRequest
+import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{
-  AccountScriptInfo,
-  AssetDescription,
-  AssetScriptInfo,
-  BalanceSnapshot,
-  Blockchain,
-  DataEntry,
-  Height,
-  LeaseBalance,
-  TxMeta,
-  VolumeAndFee
-}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, Blockchain, DataEntry, Height, LeaseBalance, TxMeta, VolumeAndFee}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
-import com.wavesplatform.transaction.smart.script.trace.InvokeScriptTrace
+import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError, ScriptExecutionError}
+import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TraceStep}
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction, TxPositiveAmount}
+import play.api.libs.json.{JsObject, Json}
 
 import java.io.File
+import java.nio.charset.StandardCharsets
 import scala.io.Source
 import scala.util.Using
 import scala.util.chaining.scalaUtilChainingOps
@@ -107,7 +100,7 @@ func foo(x: Int) = {
   let y1 = height
   let y2 = lastBlock.height
 
-  ([ScriptTransfer(bob, 1, asset)], x + x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8 + x9 + x10 + y1 + y2)
+  ([ScriptTransfer(bob, 1, asset)], x + x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8 + x9 + x10 + y1 + y2 + 9007199254740991)
 }
 
 @Callable(inv)
@@ -204,8 +197,8 @@ func bar() = {
         asset -> AssetDescription(
           originTransactionId = asset.id,
           issuer = info.issuerPublicKey,
-          name = UnsafeByteOperations.unsafeWrap(info.name.arr),               // TODO allow to specify base58
-          description = UnsafeByteOperations.unsafeWrap(info.description.arr), // TODO allow to specify base58
+          name = UnsafeByteOperations.unsafeWrap(decodeStringLikeBytes(info.name).arr),
+          description = UnsafeByteOperations.unsafeWrap(decodeStringLikeBytes(info.description).arr),
           decimals = info.decimals,
           reissuable = info.reissuable,
           totalVolume = info.quantity,
@@ -284,11 +277,17 @@ func bar() = {
         amount = TxPositiveAmount.from(tx.amount).explicitGet(),
         feeAssetId = tx.feeAssetId,
         fee = TxPositiveAmount.from(tx.fee).explicitGet(),
-        attachment = tx.attachment,
+        attachment = decodeStringLikeBytes(tx.attachment),
         timestamp = tx.timestamp,
         proofs = tx.proofs,
         chainId = chainId
       )
+
+      // TODO move all such staff in types
+      private def decodeStringLikeBytes(x: String): ByteStr = {
+        if (x.startsWith("base64:") || x.startsWith("base58:")) ByteStr.decodeBase58(x).get
+        else ByteStr(x.getBytes(StandardCharsets.UTF_8))
+      }
 
       // Ride: transferTransactionById
       override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =
@@ -340,16 +339,33 @@ func bar() = {
   def execute(
       blockchain: Blockchain,
       request: RunnerRequest
-  ): Either[ValidationError, Any] = {
+  ): JsObject = {
     val result = InvokeScriptTransactionDiff(
       blockchain,
       System.currentTimeMillis(), // blockTime
       limitedExecution = false
     )(request.toTx(blockchain.settings.addressSchemeCharacter.toByte))
-    result.resultE.map { all =>
-      result.trace
-        .collect { case x: InvokeScriptTrace => x.resultE.map(x => (x.returnedValue, all)) }
-        .mkString("\n")
-    }
+    result.resultE
+      .flatMap { all =>
+        result.trace
+          .collectFirst { case trace: InvokeScriptTrace =>
+            trace.resultE.map { x =>
+              val base = Json.obj(
+                "result"     -> ScriptValuesJson.serializeValue(x.returnedValue),
+                "complexity" -> all.scriptsComplexity
+              )
+
+              if (request.trace) base ++ Json.obj(TraceStep.logJson(trace.log)) else base
+            }
+          }
+          .toRight(GenericError("No results"): ValidationError)
+          .flatten
+      }
+      .left
+      .map {
+        case e: ScriptExecutionError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.error)
+        case e                       => ApiError.fromValidationError(e).json
+      }
+      .merge
   }
 }

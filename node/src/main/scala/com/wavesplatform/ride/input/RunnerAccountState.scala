@@ -11,7 +11,7 @@ case class RunnerAccountState(
     scriptInfo: Option[RunnerScriptInfo] = None,
     data: Option[Map[String, RunnerDataEntry]] = None,
     balance: Map[Asset, Long] = Map.empty,
-    leasing: Option[LeaseBalance] = None,
+    leasing: Option[RunnerLeaseBalance] = None,
     generatingBalance: Option[Long] = None,
     aliases: List[String] = Nil
 )

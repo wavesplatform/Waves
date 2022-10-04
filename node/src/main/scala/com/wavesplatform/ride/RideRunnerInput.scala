@@ -56,7 +56,7 @@ case class RideRunnerInput(
   lazy val leaseBalance: Map[Address, LeaseBalance] = for {
     (addr, state) <- accounts
     lease         <- state.leasing
-  } yield addr -> lease
+  } yield addr -> LeaseBalance(lease.in, lease.out)
 
   lazy val resolveAlias: Map[Alias, Address] = for {
     (addr, state) <- accounts
@@ -221,7 +221,8 @@ object RideRunnerInput {
 
   implicit val leaseInfoFormat = DebugApiRoute.leaseInfoFormat
 
-  implicit val balanceSnapshotFormat: OFormat[BalanceSnapshot] = Json.format
+  implicit val balanceSnapshotFormat: OFormat[BalanceSnapshot]       = Json.format
+  implicit val runnerLeaseBalanceFormat: OFormat[RunnerLeaseBalance] = Json.format
 
   implicit val runnerScriptInfoFormat: OFormat[RunnerScriptInfo] = Json.format
 
