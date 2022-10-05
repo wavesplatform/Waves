@@ -304,6 +304,10 @@ class Docker(
     val containerInfo  = inspectContainer(containerId)
     val wavesIpAddress = containerInfo.networkSettings().networks().get(wavesNetwork.name()).ipAddress()
 
+    println()
+    println("!!!")
+    println(containerInfo)
+
     NodeInfo(restApiPort, networkPort, wavesIpAddress, containerInfo.networkSettings().ports())
   }
 
