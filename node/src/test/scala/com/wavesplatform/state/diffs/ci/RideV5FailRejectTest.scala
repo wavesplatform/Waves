@@ -124,8 +124,7 @@ class RideV5FailRejectTest extends PropSpec with WithDomain {
       d.appendAndAssertFailed(invokeTx, "Transaction is not allowed by script of the asset")
     }
 
-    // TODO: move test after bug fix
-    //  after RideV6 failing of negative balance check before execution of ScriptTransfer asset script always leads to invoke rejection
+    // TODO: move test after bug fix NODE-2520
     withDomain(RideV6, AddrWithBalance.enoughBalances(secondSigner, signer(10))) { d =>
       d.appendBlock(issueTx)
       d.appendBlock(setScript(secondSigner, dApp))
