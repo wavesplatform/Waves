@@ -21,41 +21,46 @@ case class RunnerRequest(
     feeAssetId: Asset = Waves,
     fee: TxPositiveAmount = TxPositiveAmount(5_000_000_000L), // 50 WAVES
     timestamp: TxTimestamp = System.currentTimeMillis(),
-    proofs: Proofs = Proofs.empty
+    proofs: List[String] = Nil
 ) {
-  def toTx(thatChainId: Byte): InvokeScriptTransactionLike = call match {
-    case Left(expr) =>
-      InvokeExpressionTransaction(
-        version = TxVersion.V1,
-        sender = senderPublicKey,
-        expression = ExprScript(expr.stdLibVersion, expr.toExpr, isFreeCall = true, checkSize = false).explicitGet(),
-        fee = fee,
-        feeAssetId = feeAssetId,
-        timestamp = timestamp,
-        proofs = proofs,
-        chainId = thatChainId
-      )
-    case Right(call) =>
-      InvokeScriptTransaction(
-        version = TxVersion.V2,
-        sender = senderPublicKey,
-        dApp = call.dApp,
-        funcCallOpt = Some(InvokeScriptRequest.buildFunctionCall(call.call)),
-        payments = call.payments,
-        fee = fee,
-        feeAssetId = feeAssetId,
-        timestamp = timestamp,
-        proofs = proofs,
-        chainId = thatChainId
-      )
+  def toTx(thatChainId: Byte): InvokeScriptTransactionLike = {
+    val decodedProofs = Proofs(proofs.map(decodeStringLikeBytes))
+    call match {
+      case Left(expr) =>
+        InvokeExpressionTransaction(
+          version = TxVersion.V1,
+          sender = senderPublicKey,
+          expression = ExprScript(expr.stdLibVersion, expr.toExpr, isFreeCall = true, checkSize = false).explicitGet(),
+          fee = fee,
+          feeAssetId = feeAssetId,
+          timestamp = timestamp,
+          proofs = decodedProofs,
+          chainId = thatChainId
+        )
+      case Right(call) =>
+        InvokeScriptTransaction(
+          version = TxVersion.V2,
+          sender = senderPublicKey,
+          dApp = call.dApp,
+          funcCallOpt = Some(InvokeScriptRequest.buildFunctionCall(call.call)),
+          payments = call.payments.map(x => Payment(x.amount, x.assetId)),
+          fee = fee,
+          feeAssetId = feeAssetId,
+          timestamp = timestamp,
+          proofs = decodedProofs,
+          chainId = thatChainId
+        )
+    }
   }
 }
 
 case class RunnerCall(
     dApp: AddressOrAlias,
     call: FunctionCallPart = FunctionCallPart("default", Nil),
-    payments: Seq[Payment] = Nil
+    payments: Seq[RunnerCallPayment] = Nil
 )
+
+case class RunnerCallPayment(amount: Long, assetId: Asset = Waves)
 
 case class RunnerExpr(
     expr: String,

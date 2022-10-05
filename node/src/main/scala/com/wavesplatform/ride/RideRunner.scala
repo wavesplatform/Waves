@@ -17,7 +17,7 @@ import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.{API, ValidationError}
-import com.wavesplatform.ride.input.RunnerRequest
+import com.wavesplatform.ride.input.{RunnerRequest, decodeStringLikeBytes}
 import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
@@ -27,11 +27,10 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError, ScriptExecutionError}
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TraceStep}
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
-import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction, TxPositiveAmount}
+import com.wavesplatform.transaction.{Asset, ERC20Address, Proofs, Transaction, TxPositiveAmount}
 import play.api.libs.json.{JsObject, Json}
 
 import java.io.File
-import java.nio.charset.StandardCharsets
 import scala.io.Source
 import scala.util.Using
 import scala.util.chaining.scalaUtilChainingOps
@@ -279,15 +278,9 @@ func bar() = {
         fee = TxPositiveAmount.from(tx.fee).explicitGet(),
         attachment = decodeStringLikeBytes(tx.attachment),
         timestamp = tx.timestamp,
-        proofs = tx.proofs,
+        proofs = Proofs(tx.proofs.map(decodeStringLikeBytes)),
         chainId = chainId
       )
-
-      // TODO move all such staff in types
-      private def decodeStringLikeBytes(x: String): ByteStr = {
-        if (x.startsWith("base64:") || x.startsWith("base58:")) ByteStr.decodeBase58(x).get
-        else ByteStr(x.getBytes(StandardCharsets.UTF_8))
-      }
 
       // Ride: transferTransactionById
       override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =

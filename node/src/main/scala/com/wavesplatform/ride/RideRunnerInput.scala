@@ -247,9 +247,10 @@ object RideRunnerInput {
   implicit val txPositiveAmountFormat: Format[TxPositiveAmount] = implicitly[Format[Long]]
     .bimap(TxPositiveAmount.from(_).explicitGet(), _.value)
 
-  implicit val proofsReads: Reads[Proofs]         = requests.proofsReads
-  implicit val runnerExprRead: Reads[RunnerExpr]  = Json.reads
-  implicit val runnerCallReads: Reads[RunnerCall] = Json.reads
+  implicit val proofsReads: Reads[Proofs]                       = requests.proofsReads
+  implicit val runnerExprRead: Reads[RunnerExpr]                = Json.reads
+  implicit val runnerCallPaymentReads: Reads[RunnerCallPayment] = Json.reads
+  implicit val runnerCallReads: Reads[RunnerCall]               = Json.reads
   implicit val runnerCallRequestFormat: Reads[Either[RunnerExpr, RunnerCall]] = Reads { json =>
     val asExpr     = runnerExprRead.reads(json).map(_.asLeft[RunnerCall])
     val asFuncCall = runnerCallReads.reads(json).map(_.asRight[RunnerExpr])
