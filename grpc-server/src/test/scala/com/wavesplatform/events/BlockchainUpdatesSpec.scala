@@ -312,23 +312,25 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
 
       "on rollbacks" in {
         withDomainAndRepo(currentSettings) { case (d, repo) =>
+          d.appendBlock()
+
           // block and micro append
           val block = d.appendBlock()
           block.sender shouldBe defaultSigner.publicKey
 
           d.appendMicroBlock(TxHelpers.transfer(defaultSigner))
-          d.blockchain.wavesAmount(1) shouldBe totalWaves + reward
-          repo.getBlockUpdate(1).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward
-
-          // micro rollback
-          d.appendKeyBlock(Some(block.id()))
           d.blockchain.wavesAmount(2) shouldBe totalWaves + reward * 2
           repo.getBlockUpdate(2).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 2
 
+          // micro rollback
+          d.appendKeyBlock(Some(block.id()))
+          d.blockchain.wavesAmount(3) shouldBe totalWaves + reward * 3
+          repo.getBlockUpdate(3).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 3
+
           // block rollback
-          d.rollbackTo(1)
-          d.blockchain.wavesAmount(1) shouldBe totalWaves + reward
-          repo.getBlockUpdate(1).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward
+          d.rollbackTo(2)
+          d.blockchain.wavesAmount(2) shouldBe totalWaves + reward * 2
+          repo.getBlockUpdate(2).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 2
         }
       }
     }
