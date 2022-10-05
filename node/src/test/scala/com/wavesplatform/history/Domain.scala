@@ -11,6 +11,7 @@ import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.consensus.{PoSCalculator, PoSSelector}
 import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
 import com.wavesplatform.events.BlockchainUpdateTriggers
+import com.wavesplatform.features.BlockchainFeatures.RideV6
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
@@ -23,7 +24,7 @@ import com.wavesplatform.transaction.{BlockchainUpdater, *}
 import com.wavesplatform.utils.{EthEncoding, SystemTime}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{Application, TestValues, database}
+import com.wavesplatform.{Application, TestValues, crypto, database}
 import monix.execution.Scheduler.Implicits.global
 import org.iq80.leveldb.DB
 import org.scalatest.matchers.should.Matchers.*
@@ -52,7 +53,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   def createDiff(tx: Transaction): Diff                           = createDiffE(tx).explicitGet()
 
   lazy val utxPool: UtxPoolImpl = new UtxPoolImpl(SystemTime, blockchain, settings.utxSettings, settings.minerSettings.enable)
-  lazy val wallet: Wallet = Wallet(settings.walletSettings.copy(file = None))
+  lazy val wallet: Wallet       = Wallet(settings.walletSettings.copy(file = None))
 
   object commonApi {
 
@@ -226,7 +227,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   }
 
   def appendKeyBlock(ref: Option[ByteStr] = None): Block = {
-    val block = createBlock(Block.NgBlockVersion, Nil, ref.orElse(Some(lastBlockId)))
+    val block          = createBlock(Block.NgBlockVersion, Nil, ref.orElse(Some(lastBlockId)))
     val discardedDiffs = appendBlock(block)
     utxPool.setPriorityDiffs(discardedDiffs)
     utxPool.cleanUnconfirmed()
@@ -270,7 +271,13 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     blockchainUpdater.removeAfter(blockId).explicitGet()
   }
 
-  def createBlock(version: Byte, txs: Seq[Transaction], ref: Option[ByteStr] = blockchainUpdater.lastBlockId, strictTime: Boolean = false, generator: KeyPair = defaultSigner): Block = {
+  def createBlock(
+      version: Byte,
+      txs: Seq[Transaction],
+      ref: Option[ByteStr] = blockchainUpdater.lastBlockId,
+      strictTime: Boolean = false,
+      generator: KeyPair = defaultSigner
+  ): Block = {
     val reference = ref.getOrElse(randomSig)
     val parent = ref
       .flatMap { bs =>
@@ -399,9 +406,17 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 }
 
 object Domain {
-  implicit class BlockchainUpdaterExt[A <: BlockchainUpdater](bcu: A) {
-    def processBlock(block: Block): Either[ValidationError, Seq[Diff]] =
-      bcu.processBlock(block, block.header.generationSignature)
+  implicit class BlockchainUpdaterExt[A <: BlockchainUpdater with Blockchain](bcu: A) {
+    def processBlock(block: Block): Either[ValidationError, Seq[Diff]] = {
+      val hitSource =
+        if (bcu.height == 0)
+          block.header.generationSignature
+        else {
+          val hs = bcu.hitSource(bcu.height).get
+          crypto.verifyVRF(block.header.generationSignature, hs.arr, block.header.generator, bcu.isFeatureActivated(RideV6)).explicitGet()
+        }
+      bcu.processBlock(block, hitSource)
+    }
   }
 
   def portfolio(address: Address, db: DB, blockchainUpdater: BlockchainUpdaterImpl): Seq[(IssuedAsset, Long)] = db.withResource { resource =>

@@ -1,17 +1,17 @@
 package com.wavesplatform.transaction
 
-import java.security.Permission
-import java.util.concurrent.{Semaphore, TimeUnit}
-
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatureStatus
-import com.wavesplatform.history.Domain.BlockchainUpdaterExt
-import com.wavesplatform.state._
 import com.wavesplatform.history
+import com.wavesplatform.history.Domain.BlockchainUpdaterExt
+import com.wavesplatform.state.*
+import com.wavesplatform.test.DomainPresets.RideV6
 import com.wavesplatform.test.FreeSpec
 
+import java.security.Permission
+import java.util.concurrent.{Semaphore, TimeUnit}
 import scala.util.Try
 
 class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain {
@@ -20,18 +20,20 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain {
 
   private val WavesSettings = history.DefaultWavesSettings.copy(
     blockchainSettings = history.DefaultWavesSettings.blockchainSettings.copy(
-      functionalitySettings = history.DefaultWavesSettings.blockchainSettings.functionalitySettings.copy(featureCheckBlocksPeriod = ApprovalPeriod, blocksForFeatureActivation = (ApprovalPeriod * 0.9).toInt, preActivatedFeatures = Map.empty)
+      functionalitySettings = history.DefaultWavesSettings.blockchainSettings.functionalitySettings
+        .copy(featureCheckBlocksPeriod = ApprovalPeriod, blocksForFeatureActivation = (ApprovalPeriod * 0.9).toInt, preActivatedFeatures = Map.empty)
     ),
     featuresSettings = history.DefaultWavesSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = true)
   )
 
   private val WavesSettingsWithDoubling = WavesSettings.copy(
     blockchainSettings = WavesSettings.blockchainSettings.copy(
-      functionalitySettings = WavesSettings.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = Map.empty, doubleFeaturesPeriodsAfterHeight = 300)
+      functionalitySettings =
+        WavesSettings.blockchainSettings.functionalitySettings.copy(preActivatedFeatures = Map.empty, doubleFeaturesPeriodsAfterHeight = 300)
     )
   )
 
-  def appendBlock(block: Block, blockchainUpdater: BlockchainUpdater): Unit = {
+  def appendBlock(block: Block, blockchainUpdater: BlockchainUpdater with Blockchain): Unit = {
     blockchainUpdater.processBlock(block)
   }
 
@@ -219,8 +221,7 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain {
       b.processBlock(getNextTestBlockWithVotes(b, Seq(-1))) should beRight
     }
 
-    Try(b.processBlock(getNextTestBlockWithVotes(b, Seq(-1)))).recover {
-      case _: SecurityException => // NOP
+    Try(b.processBlock(getNextTestBlockWithVotes(b, Seq(-1)))).recover { case _: SecurityException => // NOP
     }
 
     signal.tryAcquire(10, TimeUnit.SECONDS)
@@ -350,4 +351,13 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain {
     b.processBlock(getNextTestBlockWithVotes(b, Seq())) should beRight
     b.featureStatus(2, b.height) should be(BlockchainFeatureStatus.Activated)
   }
+
+  "correct calculate hit source in tests" in
+    withDomain(RideV6) { d =>
+      d.appendBlock()
+      d.appendBlock()
+      d.appendBlock()
+      d.rollbackTo(2)
+      d.appendBlock()
+    }
 }
