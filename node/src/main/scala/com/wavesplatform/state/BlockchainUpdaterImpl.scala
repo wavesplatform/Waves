@@ -333,7 +333,7 @@ class BlockchainUpdaterImpl(
                           block,
                           hitSource,
                           differResult.carry,
-                          reward
+                          None
                         )
                         miner.scheduleMining(Some(tempBlockchain))
 
