@@ -11,7 +11,7 @@ import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.consensus.{PoSCalculator, PoSSelector}
 import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
 import com.wavesplatform.events.BlockchainUpdateTriggers
-import com.wavesplatform.features.BlockchainFeatures.RideV6
+import com.wavesplatform.features.BlockchainFeatures.{BlockV5, RideV6}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
@@ -409,7 +409,7 @@ object Domain {
   implicit class BlockchainUpdaterExt[A <: BlockchainUpdater with Blockchain](bcu: A) {
     def processBlock(block: Block): Either[ValidationError, Seq[Diff]] = {
       val hitSource =
-        if (bcu.height == 0)
+        if (bcu.height == 0 || !bcu.isFeatureActivated(BlockV5))
           block.header.generationSignature
         else {
           val hs = bcu.hitSource(bcu.height).get
