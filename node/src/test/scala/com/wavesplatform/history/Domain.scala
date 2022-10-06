@@ -220,11 +220,14 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   def appendBlockE(txs: Transaction*): Either[ValidationError, Seq[Diff]] =
     appendBlockE(createBlock(Block.PlainBlockVersion, txs))
 
-  def appendBlock(txs: Transaction*): Block = {
-    val block = createBlock(Block.PlainBlockVersion, txs)
+  def appendBlock(version: Byte, txs: Transaction*): Block = {
+    val block = createBlock(version, txs)
     appendBlock(block)
     lastBlock
   }
+
+  def appendBlock(txs: Transaction*): Block =
+    appendBlock(Block.PlainBlockVersion, txs: _*)
 
   def appendKeyBlock(ref: Option[ByteStr] = None): Block = {
     val block          = createBlock(Block.NgBlockVersion, Nil, ref.orElse(Some(lastBlockId)))
@@ -237,7 +240,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   def appendMicroBlockE(txs: Transaction*): Either[Throwable, BlockId] =
     Try(appendMicroBlock(txs*)).toEither
 
-  def appendMicroBlock(txs: Transaction*): BlockId = {
+  def createMicroBlock(txs: Transaction*): MicroBlock = {
     val lastBlock = this.lastBlock
     val block = Block
       .buildAndSign(
@@ -252,7 +255,11 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
         lastBlock.header.rewardVote
       )
       .explicitGet()
-    val mb = MicroBlock.buildAndSign(lastBlock.header.version, defaultSigner, txs, blockchainUpdater.lastBlockId.get, block.signature).explicitGet()
+    MicroBlock.buildAndSign(lastBlock.header.version, defaultSigner, txs, blockchainUpdater.lastBlockId.get, block.signature).explicitGet()
+  }
+
+  def appendMicroBlock(txs: Transaction*): BlockId = {
+    val mb = createMicroBlock(txs: _*)
     blockchainUpdater.processMicroBlock(mb).explicitGet()
   }
 
@@ -409,7 +416,7 @@ object Domain {
   implicit class BlockchainUpdaterExt[A <: BlockchainUpdater with Blockchain](bcu: A) {
     def processBlock(block: Block): Either[ValidationError, Seq[Diff]] = {
       val hitSource =
-        if (bcu.height == 0 || !bcu.isFeatureActivated(BlockV5))
+        if (bcu.height == 0 || !bcu.activatedFeaturesAt(bcu.height + 1).contains(BlockV5.id))
           block.header.generationSignature
         else {
           val hs = bcu.hitSource(bcu.height).get
