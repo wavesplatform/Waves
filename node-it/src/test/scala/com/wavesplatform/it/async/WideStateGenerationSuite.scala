@@ -37,8 +37,7 @@ class WideStateGenerationSuite extends BaseFreeSpec with WaitForHeight2 with Tra
         |  rest-api.port = 6869
         |}""".stripMargin
     ),
-    tag = getClass.getSimpleName,
-    enableProfiling = true
+    tag = getClass.getSimpleName
   )
 
   override protected val nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
