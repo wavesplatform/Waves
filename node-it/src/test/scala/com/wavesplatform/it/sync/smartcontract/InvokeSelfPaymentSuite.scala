@@ -96,7 +96,7 @@ class InvokeSelfPaymentSuite extends BaseTransactionSuite with CancelAfterFailur
          )) {
       assertApiError(
         sender.invokeScript(caller, dAppV4Address, Some("paySelf"), args),
-        AssertiveApiError(ScriptExecutionError.Id, "Error while executing account-script: DApp self-transfer is forbidden since V4")
+        AssertiveApiError(ScriptExecutionError.Id, "Error while executing dApp: DApp self-transfer is forbidden since V4")
       )
     }
   }
