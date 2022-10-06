@@ -22,7 +22,18 @@ import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, Blockchain, DataEntry, Height, LeaseBalance, TxMeta, VolumeAndFee}
+import com.wavesplatform.state.{
+  AccountScriptInfo,
+  AssetDescription,
+  AssetScriptInfo,
+  BalanceSnapshot,
+  Blockchain,
+  DataEntry,
+  Height,
+  LeaseBalance,
+  TxMeta,
+  VolumeAndFee
+}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError, ScriptExecutionError}
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TraceStep}
@@ -110,6 +121,22 @@ func bar() = {
     val estimator      = ScriptEstimatorV3(fixOverflow = true, overhead = false)
     val compiledScript = API.compile(input = scriptSrc, estimator).explicitGet()
 
+    input.request.call match {
+      case Right(call) =>
+        val script = Script.fromBase64String(Base64.encode(compiledScript.bytes)).explicitGet()
+        val same   = input.accounts(call.dApp.asInstanceOf[Address]).scriptInfo.exists(_.script == script)
+        require(same, "Scripts are not same!")
+
+      case _ =>
+    }
+
+//    println(
+//      s"""script = ${Base64.encode(compiledScript.bytes)},
+//         |verifierComplexity = ${compiledScript.verifierComplexity},
+//         |complexitiesByEstimator = Map(
+//         |  ${estimator.version} -> ${compiledScript.callableComplexities}
+//         |)""".stripMargin)
+
     def kill(methodName: String) = throw new RuntimeException(methodName)
     // TODO default values?
     val blockchain: Blockchain = new Blockchain {
@@ -126,7 +153,7 @@ func bar() = {
           }
 
           val (lastEstimatorVersion, lastComplexityInfo) = complexityInfo.last
-          val r = AccountScriptInfo(
+          AccountScriptInfo(
             script = input.script,
             publicKey = input.publicKey,
             verifierComplexity = lastComplexityInfo.verifierComplexity,
@@ -135,16 +162,6 @@ func bar() = {
               .toMap
               .updated(lastEstimatorVersion, lastComplexityInfo.callableComplexities) // to preserve
           )
-
-          if (address.toString == "3PCH3sUqeiPFAhrKzEnSEXoE2B6G9YNromV") {
-            r.copy(
-              script = Script.fromBase64String(Base64.encode(compiledScript.bytes)).explicitGet(),
-              verifierComplexity = compiledScript.verifierComplexity,
-              complexitiesByEstimator = Map(
-                estimator.version -> compiledScript.callableComplexities
-              )
-            )
-          } else r
         }
       }
 
