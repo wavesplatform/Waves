@@ -109,7 +109,7 @@ object TraceStep {
     }
 
   private def errorJson(e: ValidationError): JsObject = e match {
-    case see: ScriptExecutionError          => Json.obj(logJson(see.log), "error" -> see.error)
+    case see: ScriptExecutionError          => Json.obj(logJson(see.log), "error" -> see.message)
     case tne: TransactionNotAllowedByScript => Json.obj(logJson(tne.log), "error" -> JsNull)
     case fte: FailedTransactionError        => Json.obj(logJson(fte.log), "error" -> fte.error.map(JsString))
     case a                                  => Json.obj("error"                   -> a.toString)

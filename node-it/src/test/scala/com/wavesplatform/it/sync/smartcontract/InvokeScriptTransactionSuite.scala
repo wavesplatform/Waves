@@ -226,7 +226,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
           fee = 1.waves,
           version = TxVersion.V2
         ),
-      AssertiveApiError(ScriptExecutionError.Id, "Error while executing account-script: Empty keys aren't allowed in tx version >= 2")
+      AssertiveApiError(ScriptExecutionError.Id, "Error while executing dApp: Empty keys aren't allowed in tx version >= 2")
     )
 
     nodes.waitForHeightArise()
@@ -241,7 +241,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
         fee = 1.waves,
         version = TxVersion.V2
       ),
-      AssertiveApiError(ScriptExecutionError.Id, "Error while executing account-script: Empty keys aren't allowed in tx version >= 2")
+      AssertiveApiError(ScriptExecutionError.Id, "Error while executing dApp: Empty keys aren't allowed in tx version >= 2")
     )
 
     nodes.waitForHeightArise()
