@@ -5,9 +5,9 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.{BlockStats, Metrics}
 import com.wavesplatform.network.{ExtensionBlocks, InvalidBlockStorage, PeerDatabase, formatBlocks, id}
-import com.wavesplatform.state._
+import com.wavesplatform.state.*
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction._
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPoolImpl
 import io.netty.channel.Channel
@@ -20,7 +20,7 @@ import scala.util.{Left, Right}
 object ExtensionAppender extends ScorexLogging {
 
   def apply(
-      blockchainUpdater: BlockchainUpdater with Blockchain,
+      blockchainUpdater: BlockchainUpdater & Blockchain,
       utxStorage: UtxPoolImpl,
       pos: PoSSelector,
       time: Time,
@@ -52,61 +52,59 @@ object ExtensionAppender extends ScorexLogging {
                   }
                 } yield (commonBlockHeight, droppedBlocks)
 
-                droppedBlocksEi.flatMap {
-                  case (commonBlockHeight, droppedBlocks) =>
-                    val forkApplicationResultEi = {
-                      newBlocks.view
-                        .map { b =>
-                          b -> appendExtensionBlock(blockchainUpdater, pos, time, verify = true)(b)
-                            .map {
-                              _.foreach(bh => BlockStats.applied(b, BlockStats.Source.Ext, bh))
-                            }
+                droppedBlocksEi.flatMap { case (commonBlockHeight, droppedBlocks) =>
+                  val forkApplicationResultEi = {
+                    newBlocks.view
+                      .map { b =>
+                        b -> appendExtensionBlock(blockchainUpdater, pos, time, verify = true)(b)
+                          .map {
+                            _.foreach(bh => BlockStats.applied(b, BlockStats.Source.Ext, bh))
+                          }
+                      }
+                      .zipWithIndex
+                      .collectFirst { case ((b, Left(e)), i) => (i, b, e) }
+                      .fold[Either[ValidationError, Unit]](Right(())) { case (i, declinedBlock, e) =>
+                        e match {
+                          case _: TxValidationError.BlockFromFuture =>
+                          case _                                    => invalidBlocks.add(declinedBlock.id(), e)
                         }
-                        .zipWithIndex
-                        .collectFirst { case ((b, Left(e)), i) => (i, b, e) }
-                        .fold[Either[ValidationError, Unit]](Right(())) {
-                          case (i, declinedBlock, e) =>
-                            e match {
-                              case _: TxValidationError.BlockFromFuture =>
-                              case _                                    => invalidBlocks.add(declinedBlock.id(), e)
-                            }
 
-                            newBlocks.view
-                              .dropWhile(_ != declinedBlock)
-                              .foreach(BlockStats.declined(_, BlockStats.Source.Ext))
+                        newBlocks.view
+                          .dropWhile(_ != declinedBlock)
+                          .foreach(BlockStats.declined(_, BlockStats.Source.Ext))
 
-                            if (i == 0) log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block $declinedBlock: $e")
-                            else
-                              log.warn(
-                                s"Processed only ${i + 1} of ${newBlocks.size} blocks from extension, error appending next block $declinedBlock: $e"
-                              )
-
-                            Left(e)
-                        }
-                    }
-
-                    forkApplicationResultEi match {
-                      case Left(e) =>
-                        blockchainUpdater.removeAfter(lastCommonBlockId).explicitGet()
-                        droppedBlocks.foreach { case (b, gp) => blockchainUpdater.processBlock(b, gp).explicitGet() }
-                        Left(e)
-
-                      case Right(_) =>
-                        val depth = initialHeight - commonBlockHeight
-                        if (depth > 0) {
-                          Metrics.write(
-                            Point
-                              .measurement("rollback")
-                              .addField("depth", initialHeight - commonBlockHeight)
-                              .addField("txs", droppedBlocks.size)
+                        if (i == 0) log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block $declinedBlock: $e")
+                        else
+                          log.warn(
+                            s"Processed only ${i + 1} of ${newBlocks.size} blocks from extension, error appending next block $declinedBlock: $e"
                           )
-                        }
 
-                        val newTransactions = newBlocks.view.flatMap(_.transactionData).toSet
-                        utxStorage.removeAll(newTransactions)
-                        utxStorage.addAndCleanup(droppedBlocks.flatMap(_._1.transactionData).filterNot(newTransactions))
-                        Right(Some(blockchainUpdater.score))
-                    }
+                        Left(e)
+                      }
+                  }
+
+                  forkApplicationResultEi match {
+                    case Left(e) =>
+                      blockchainUpdater.removeAfter(lastCommonBlockId).explicitGet()
+                      droppedBlocks.foreach { case (b, gp) => blockchainUpdater.processBlock(b, gp).explicitGet() }
+                      Left(e)
+
+                    case Right(_) =>
+                      val depth = initialHeight - commonBlockHeight
+                      if (depth > 0) {
+                        Metrics.write(
+                          Point
+                            .measurement("rollback")
+                            .addField("depth", initialHeight - commonBlockHeight)
+                            .addField("txs", droppedBlocks.size)
+                        )
+                      }
+
+                      val newTransactions = newBlocks.view.flatMap(_.transactionData).toSet
+                      utxStorage.removeAll(newTransactions)
+                      utxStorage.addAndCleanup(droppedBlocks.flatMap(_._1.transactionData).filterNot(newTransactions))
+                      Right(Some(blockchainUpdater.score))
+                  }
                 }
 
               case None =>

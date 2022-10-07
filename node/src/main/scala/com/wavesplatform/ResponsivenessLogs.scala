@@ -154,7 +154,7 @@ private class ResponsivenessLogs(csvPrefix: String, metricName: String) extends 
         val fileStream = new FileOutputStream(s"${sys.props("waves.directory")}/$prefix-events-$date.csv", true)
         val pw         = new PrintWriter(fileStream)
         val reasonEscaped = reason match {
-          case Some(see: TxValidationError.ScriptExecutionError)        => s"ScriptExecutionError(${escape(see.error)})"
+          case Some(see: TxValidationError.ScriptExecutionError)        => s"ScriptExecutionError(${escape(see.message)})"
           case Some(_: TxValidationError.TransactionNotAllowedByScript) => "TransactionNotAllowedByScript"
           case Some(err)                                                => escape(err.toString)
           case None                                                     => ""
