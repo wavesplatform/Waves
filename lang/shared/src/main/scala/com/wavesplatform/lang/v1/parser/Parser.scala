@@ -27,6 +27,7 @@ object Parser {
   def upperChar[A: P]          = CharIn("A-Z")
   def char[A: P]               = lowerChar | upperChar
   def digit[A: P]              = CharIn("0-9")
+  def spaces[A: P]             = CharIn(" \t\n\r")
   def unicodeSymbolP[A: P]     = P("\\u" ~/ Pass ~~ (char | digit).repX(0, "", 4))
   def notEndOfString[A: P]     = CharPred(_ != '\"')
   def specialSymbols[A: P]     = P("\\" ~~ AnyChar)
@@ -258,7 +259,7 @@ object Parser {
     def argWithType(implicit c: fastparse.P[Any]) = anyVarName ~/ ":" ~ unionTypeP ~ comment
     def args(implicit c: fastparse.P[Any])        = "(" ~ comment ~ argWithType.rep(0, "," ~ comment) ~ ")" ~ comment
     def funcHeader(implicit c: fastparse.P[Any]) =
-      Index ~~ "func" ~ funcname ~ comment ~/ args ~ "=" ~ P(singleBaseExpr | ("{" ~ comment ~ baseExpr ~ "}")) ~~ Index
+      Index ~~ "func" ~~ &(spaces) ~ funcname ~ comment ~/ args ~ "=" ~ P(singleBaseExpr | ("{" ~ comment ~ baseExpr ~ "}")) ~~ Index
     funcHeader.map {
       case (start, name, args, expr, end) => FUNC(Pos(start, end), expr, name, args)
     }
@@ -430,7 +431,7 @@ object Parser {
 
   def variableDefP[A: P](key: String): P[Seq[LET]] =
     P(
-      Index ~~ key ~~ &(CharIn(" \t\n\r")) ~/ comment ~ (destructuredTupleValuesP | letNameP) ~ comment ~ Index ~ ("=" ~/ Index ~ baseExpr.?).? ~~ Index
+      Index ~~ key ~~ &(spaces) ~/ comment ~ (destructuredTupleValuesP | letNameP) ~ comment ~ Index ~ ("=" ~/ Index ~ baseExpr.?).? ~~ Index
     ).map {
       case (start, names, valuePos, valueRaw, end) =>
         val value = extractValue(valuePos, valueRaw)
