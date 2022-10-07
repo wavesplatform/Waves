@@ -2,12 +2,12 @@ package com.wavesplatform.lang.compiler
 
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values.{Expression, V3, V5}
-import com.wavesplatform.lang.utils._
+import com.wavesplatform.lang.utils.*
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.{Decompiler, ExpressionCompiler}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.test.{PropSpec, _}
+import com.wavesplatform.test.{PropSpec, *}
 
 class UnderscoreTest extends PropSpec {
   private def compile(script: String): Either[String, EXPR] =
@@ -43,15 +43,15 @@ class UnderscoreTest extends PropSpec {
   }
 
   property("two or more underscores in a row are prohibited") {
-    assert("__aa_a_a_", "_ff_f_f_", "_xx_x_x_") should produce("Parsed.Failure")
-    assert("_aa__a_a_", "_ff_f_f_", "_xx_x_x_") should produce("Parsed.Failure")
-    assert("_aa_a_a__", "_ff_f_f_", "_xx_x_x_") should produce("Parsed.Failure")
-    assert("_aa_a_a_", "__ff_f_f_", "_xx_x_x_") should produce("Parsed.Failure")
-    assert("_aa_a_a_", "_ff__f_f_", "_xx_x_x_") should produce("Parsed.Failure")
-    assert("_aa_a_a_", "_ff_f_f__", "_xx_x_x_") should produce("Parsed.Failure")
-    assert("_aa_a_a_", "_ff_f_f_", "__xx_x_x_") should produce("Parsed.Failure")
-    assert("_aa_a_a_", "_ff_f_f_", "_xx__x_x_") should produce("Parsed.Failure")
-    assert("_aa_a_a_", "_ff_f_f_", "_xx_x_x__") should produce("Parsed.Failure")
+    assert("__aa_a_a_", "_ff_f_f_", "_xx_x_x_") should produce("""expected not more than 1 underscore in a row, found "__aa_a_a_""")
+    assert("_aa__a_a_", "_ff_f_f_", "_xx_x_x_") should produce("""expected not more than 1 underscore in a row, found "_aa__a_a_""")
+    assert("_aa_a_a__", "_ff_f_f_", "_xx_x_x_") should produce("""expected not more than 1 underscore in a row, found "_aa_a_a__""")
+    assert("_aa_a_a_", "__ff_f_f_", "_xx_x_x_") should produce("""expected not more than 1 underscore in a row, found "__ff_f_f_""")
+    assert("_aa_a_a_", "_ff__f_f_", "_xx_x_x_") should produce("""expected not more than 1 underscore in a row, found "_ff__f_f_""")
+    assert("_aa_a_a_", "_ff_f_f__", "_xx_x_x_") should produce("""expected not more than 1 underscore in a row, found "_ff_f_f__""")
+    assert("_aa_a_a_", "_ff_f_f_", "__xx_x_x_") should produce("""expected not more than 1 underscore in a row, found "_ff_f_f_(__xx_x_x_""")
+    assert("_aa_a_a_", "_ff_f_f_", "_xx__x_x_") should produce("""expected not more than 1 underscore in a row, found "_ff_f_f_(_xx__x_x_:""")
+    assert("_aa_a_a_", "_ff_f_f_", "_xx_x_x__") should produce("""expected not more than 1 underscore in a row, found "_ff_f_f_(_xx_x_x__:""")
   }
 
   property("internal functions can't be used directly") {
@@ -74,7 +74,8 @@ class UnderscoreTest extends PropSpec {
           CONST_BOOLEAN(true),
           FUNCTION_CALL(Native(2), List(CONST_STRING("Match error").explicitGet()))
         )
-      ))
+      )
+    )
   }
 
   property("FOLD with underscores") {
@@ -98,10 +99,13 @@ class UnderscoreTest extends PropSpec {
                   Native(1100),
                   List(
                     CONST_LONG(2),
-                    FUNCTION_CALL(Native(1100),
-                                  List(CONST_LONG(3),
-                                       FUNCTION_CALL(Native(1100),
-                                                     List(CONST_LONG(4), FUNCTION_CALL(Native(1100), List(CONST_LONG(5), REF("nil")))))))
+                    FUNCTION_CALL(
+                      Native(1100),
+                      List(
+                        CONST_LONG(3),
+                        FUNCTION_CALL(Native(1100), List(CONST_LONG(4), FUNCTION_CALL(Native(1100), List(CONST_LONG(5), REF("nil")))))
+                      )
+                    )
                   )
                 )
               )
@@ -127,9 +131,11 @@ class UnderscoreTest extends PropSpec {
                     FUNC(
                       "$f0_2",
                       List(s"$$a", s"$$i"),
-                      IF(FUNCTION_CALL(Native(103), List(REF(s"$$i"), REF(s"$$s"))),
-                         REF(s"$$a"),
-                         FUNCTION_CALL(Native(2), List(CONST_STRING("List size exceeds 1").explicitGet())))
+                      IF(
+                        FUNCTION_CALL(Native(103), List(REF(s"$$i"), REF(s"$$s"))),
+                        REF(s"$$a"),
+                        FUNCTION_CALL(Native(2), List(CONST_STRING("List size exceeds 1").explicitGet()))
+                      )
                     ),
                     FUNCTION_CALL(User(s"$$f0_2"), List(FUNCTION_CALL(User(s"$$f0_1"), List(REF(s"$$acc0"), CONST_LONG(0))), CONST_LONG(1)))
                   )
@@ -138,6 +144,7 @@ class UnderscoreTest extends PropSpec {
             )
           )
         )
-      ))
+      )
+    )
   }
 }

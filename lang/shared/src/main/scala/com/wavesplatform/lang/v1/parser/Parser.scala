@@ -98,7 +98,10 @@ object Parser {
       .filter { case (_, x, _) => !keywords.contains(x) }
       .map { case (start, x, end) => PART.VALID(Pos(start, end), x) }
 
-  def declNameP[A: P]: P[Unit] = "_".? ~~ char ~~ ("_".? ~~ (digit | char)).repX() ~~ "_".?
+  def checkedUnderscore[A](implicit p: P[A]): P[Unit] =
+    ("_" ~~/ !"_".repX(1)).?.opaque("not more than 1 underscore in a row")
+
+  def declNameP[A: P]: P[Unit] = checkedUnderscore ~~ char ~~ ("_".? ~~ (digit | char)).repX() ~~ checkedUnderscore
 
   def correctLFunName[A: P]: P[PART[String]] =
     (Index ~~ declNameP.! ~~ Index)
@@ -292,7 +295,7 @@ object Parser {
       }
 
     def restMatchCaseInvalidP(implicit c: fastparse.P[Any]): P[String] = P((!P("=>") ~~ AnyChar.!).repX.map(_.mkString))
-    def varDefP(implicit c: fastparse.P[Any]): P[Option[PART[String]]] = (anyVarName ~~ !("'" | "(")).map(Some(_)) | P("_").!.map(_ => None)
+    def varDefP(implicit c: fastparse.P[Any]): P[Option[PART[String]]] = (NoCut(anyVarName) ~~ !("'" | "(")).map(Some(_)) | P("_").!.map(_ => None)
 
     def typesDefP(implicit c: fastparse.P[Any]) =
       (
@@ -359,13 +362,13 @@ object Parser {
         case (start, e, cases, end) => MATCH(Pos(start, end), e, cases.toList)
       }
 
-  def accessorName(implicit c: fastparse.P[Any]): P[PART[String]] = {
+  def accessOrName(implicit c: fastparse.P[Any]): P[PART[String]] = {
     def nameP(implicit c: fastparse.P[Any]) = (char | "_") ~~ ("_".? ~~ (digit | char)).repX()
     genericVarName(nameP(_))
   }
 
   def genericMethodName(implicit c: fastparse.P[Any]): P[PART[String]] =
-    accessorName.filter {
+    accessOrName.filter {
       case VALID(_, name) if GenericMethod.KnownMethods.contains(name) => true
       case _                                                           => false
     }
@@ -377,7 +380,7 @@ object Parser {
   def functionCallOrGetter[A: P]: P[Accessor] =
     (genericMethodName ~~/ ("[" ~ unionTypeP ~ "]")).map {
       case (name, tpe) => GenericMethod(name, tpe)
-    } | (accessorName.map(Getter) ~/ comment ~~ ("(" ~/ comment ~ functionCallArgs ~/ comment ~ ")").?).map {
+    } | (accessOrName.map(Getter) ~/ comment ~~ ("(" ~/ comment ~ functionCallArgs ~/ comment ~ ")").?).map {
       case (g @ Getter(name), args) => args.fold(g: Accessor)(Method(name, _))
     }
 
@@ -709,8 +712,12 @@ object Parser {
 
   def toString(input: String, f: Failure): String = {
     val found = input.drop(f.index).takeWhile(!_.isWhitespace)
+    val betterFound = if (f.label.exists(_.isWhitespace)) {
+      val beforeFound = input.take(input.indexOf(found))
+      beforeFound.drop(beforeFound.lastIndexWhere(_.isWhitespace) + 1) ++ found
+    } else found
     val start = input.lastIndexWhere(_.isWhitespace, input.lastIndexWhere(_.isWhitespace, f.index) - 1) + 1
     val end   = f.index + found.length - 1
-    s"Parse error: expected ${f.label}, found \"$found\" in $start-$end"
+    s"Parse error: expected ${f.label}, found \"$betterFound\" in $start-$end"
   }
 }
