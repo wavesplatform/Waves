@@ -2229,7 +2229,7 @@ paths:
           in: path
           description: >-
             For balance at height requests. Max number of blocks back from the
-            current height is set by `waves.db.max-rollback-depth`, 2000 by
+            current height is set by `waves.rest-api.distribution-address-limit`, 1000 by
             default
           required: true
           schema:
