@@ -6,7 +6,7 @@
    2. You've checked "Make project before run"
  */
 
-import sbt.Def
+import sbt.{Compile, Def}
 import sbt.Keys.{concurrentRestrictions, _}
 
 Global / onChangedBuildSource := ReloadOnSourceChanges
@@ -20,6 +20,7 @@ lazy val lang =
       libraryDependencies ++= Dependencies.lang.value ++ Dependencies.test,
       inConfig(Compile)(
         Seq(
+          sourceGenerators += Tasks.docSource,
           PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
           PB.protoSources += PB.externalIncludePath.value,
           PB.generate / includeFilter := { (f: File) =>
@@ -40,9 +41,6 @@ lazy val `lang-jvm` = lang.jvm
 
 lazy val `lang-js` = lang.js
   .enablePlugins(VersionObject)
-  .settings(
-    Compile / sourceGenerators += Tasks.docSource
-  )
 
 lazy val `lang-testkit` = project
   .dependsOn(`lang-jvm`)
@@ -54,15 +52,11 @@ lazy val `lang-testkit` = project
 lazy val `lang-tests` = project
   .in(file("lang/tests"))
   .dependsOn(`lang-testkit`)
-  .settings(
-    Compile / sourceGenerators += Tasks.docSource
-  )
 
 lazy val `lang-doc` = project
   .in(file("lang/doc"))
   .dependsOn(`lang-jvm`)
   .settings(
-    Compile / sourceGenerators += Tasks.docSource,
     libraryDependencies ++= Seq("com.github.spullara.mustache.java" % "compiler" % "0.9.10") ++ Dependencies.test
   )
 
