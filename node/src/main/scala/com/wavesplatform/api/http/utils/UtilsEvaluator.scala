@@ -22,7 +22,7 @@ import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TransactionType.TransactionType
-import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError}
+import com.wavesplatform.transaction.TxValidationError.{GenericError, InvokeRejectError}
 import com.wavesplatform.transaction.smart.*
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.{Asset, TransactionType}
@@ -94,10 +94,10 @@ object UtilsEvaluator {
           checkConstructorArgsTypes = true
         )
         .value()
-        .leftMap { case (err, _, log) => ScriptExecutionError.dAppExecution(err.message, log) }
+        .leftMap { case (err, _, log) => InvokeRejectError(err.message, log) }
       result <- limitedResult match {
         case (eval: EVALUATED, unusedComplexity, log) => Right((eval, limit - unusedComplexity, log))
-        case (_: EXPR, _, log)                        => Left(ScriptExecutionError.dAppExecution(s"Calculation complexity limit exceeded", log))
+        case (_: EXPR, _, log)                        => Left(InvokeRejectError(s"Calculation complexity limit exceeded", log))
       }
     } yield result
 }

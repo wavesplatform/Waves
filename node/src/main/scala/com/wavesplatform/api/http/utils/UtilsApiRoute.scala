@@ -21,7 +21,7 @@ import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.FeeValidation
-import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError}
+import com.wavesplatform.transaction.TxValidationError.{GenericError, InvokeRejectError}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.TraceStep
 import com.wavesplatform.utils.Time
@@ -281,7 +281,7 @@ case class UtilsApiRoute(
           "complexity" -> complexity
         ) ++ (if (trace) Json.obj(TraceStep.logJson(log)) else Json.obj())
         evaluated.leftMap {
-          case e: ScriptExecutionError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.error)
+          case e: InvokeRejectError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.message)
           case e                       => ApiError.fromValidationError(e).json
         }
       }.merge
