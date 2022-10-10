@@ -34,10 +34,10 @@ class BlockV5GrpcSuite extends freespec.AnyFreeSpec with ActivationStatusRequest
       blockV5.id().arr.length shouldBe crypto.DigestLength
       blockV5.signature.arr.length shouldBe crypto.SignatureLength
       blockV5.header.generationSignature.arr.length shouldBe Block.GenerationVRFSignatureLength
-      assert(blockV5.transactionsRootValid(), "transactionsRoot is not valid")
+      assert(blockV5.signatureValid(), "transactionsRoot is not valid")
       blockV5ById.header.version shouldBe Block.ProtoBlockVersion
       blockV5ById.header.generationSignature.arr.length shouldBe Block.GenerationVRFSignatureLength
-      assert(blockV5ById.transactionsRootValid(), "transactionsRoot is not valid")
+      assert(blockV5ById.signatureValid(), "transactionsRoot is not valid")
 
       sender.waitForHeight(currentHeight + 1, 2.minutes)
 
@@ -49,14 +49,14 @@ class BlockV5GrpcSuite extends freespec.AnyFreeSpec with ActivationStatusRequest
       ByteStr(sender.blockHeaderAt(currentHeight + 1).reference.toByteArray) shouldBe blockV5.id()
       blockAfterVRFUsingById.header.version shouldBe Block.ProtoBlockVersion
       blockAfterVRFUsingById.header.generationSignature.arr.length shouldBe Block.GenerationVRFSignatureLength
-      assert(blockAfterVRFUsingById.transactionsRootValid(), "transactionsRoot is not valid")
+      assert(blockAfterVRFUsingById.signatureValid(), "transactionsRoot is not valid")
 
       val blockSeqOfBlocksV5 = sender.blockSeq(currentHeight, currentHeight + 2)
 
       for (blockV5 <- blockSeqOfBlocksV5) {
         blockV5.header.version shouldBe Block.ProtoBlockVersion
         blockV5.header.generationSignature.arr.length shouldBe Block.GenerationVRFSignatureLength
-        assert(blockV5.transactionsRootValid(), "transactionsRoot is not valid")
+        assert(blockV5.signatureValid(), "transactionsRoot is not valid")
       }
 
       val blockSeqOfBlocksV5ByAddress = sender.blockSeqByAddress(miner.address, currentHeight, currentHeight + 2)
@@ -65,7 +65,7 @@ class BlockV5GrpcSuite extends freespec.AnyFreeSpec with ActivationStatusRequest
         blockV5.header.generator shouldBe miner.keyPair.publicKey
         blockV5.header.version shouldBe Block.ProtoBlockVersion
         blockV5.header.generationSignature.arr.length shouldBe Block.GenerationVRFSignatureLength
-        assert(blockV5.transactionsRootValid(), "transactionsRoot is not valid")
+        assert(blockV5.signatureValid(), "transactionsRoot is not valid")
       }
 
       val blockSeqOfBlocksV5ByPKGrpc = NodeExtGrpc(sender).blockSeq(
@@ -78,7 +78,7 @@ class BlockV5GrpcSuite extends freespec.AnyFreeSpec with ActivationStatusRequest
         blockV5.header.generator shouldBe miner.keyPair.publicKey
         blockV5.header.version shouldBe Block.ProtoBlockVersion
         blockV5.header.generationSignature.arr.length shouldBe Block.GenerationVRFSignatureLength
-        assert(blockV5.transactionsRootValid(), "transactionsRoot is not valid")
+        assert(blockV5.signatureValid(), "transactionsRoot is not valid")
       }
     }
   }

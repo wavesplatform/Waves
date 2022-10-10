@@ -58,8 +58,10 @@ object ApiError {
             if (e.isAssetScript) TransactionNotAllowedByAssetScript(tx)
             else TransactionNotAllowedByAccountScript(tx)
           case TxValidationError.Mistiming(errorMessage)                         => Mistiming(errorMessage)
-          case e: TxValidationError.ScriptExecutionError                         => ScriptExecutionError(tx, e.error, isTokenScript = e.isAssetScript)
-          case e: TxValidationError.FailedTransactionError if e.isExecutionError => ScriptExecutionError(tx, e.message, e.isAssetScript)
+          case e: TxValidationError.ScriptExecutionError                         => ScriptExecutionError(tx, e.message, e.isAssetScript)
+          case e: TxValidationError.FailedTransactionError if e.isAssetExecution => ScriptExecutionError(tx, e.message, isTokenScript = true)
+          case e: TxValidationError.FailedTransactionError if e.isDAppExecution  => InvokeExecutionError(tx, e.message)
+          case e: TxValidationError.InvokeRejectError                            => InvokeExecutionError(tx, e.message)
           case _: TxValidationError.FailedTransactionError                       => TransactionNotAllowedByAssetScript(tx)
           case err                                                               => StateCheckFailed(tx, fromValidationError(err))
         }
@@ -253,6 +255,13 @@ object ApiError {
     override val id: Int             = ScriptExecutionError.Id
     override val code: StatusCode    = StatusCodes.BadRequest
     override val message: String     = s"Error while executing ${if (isTokenScript) "token" else "account"}-script: $error"
+    override lazy val json: JsObject = ScriptErrorJson(id, tx, message)
+  }
+
+  final case class InvokeExecutionError(tx: Transaction, error: String) extends ApiError {
+    override val id: Int             = ScriptExecutionError.Id
+    override val code: StatusCode    = StatusCodes.BadRequest
+    override val message: String     = s"Error while executing dApp: $error"
     override lazy val json: JsObject = ScriptErrorJson(id, tx, message)
   }
 

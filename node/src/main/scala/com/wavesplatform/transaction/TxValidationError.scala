@@ -5,6 +5,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.v1.ContractLimits.FailFreeInvokeComplexity
 import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.state.InvokeScriptResult
 import com.wavesplatform.transaction.TxValidationError.FailedTransactionError.Cause
@@ -70,8 +71,9 @@ object TxValidationError {
       case Cause.AssetScriptInAction | Cause.AssetScript => assetScriptError(assetId.get, error)
     }
 
-    def isAssetScript: Boolean    = assetId.isDefined
-    def isExecutionError: Boolean = error.nonEmpty
+    def isDAppExecution: Boolean  = assetId.isEmpty && error.nonEmpty
+    def isAssetExecution: Boolean = assetId.nonEmpty && error.nonEmpty
+    def isFailFree: Boolean       = spentComplexity <= FailFreeInvokeComplexity
 
     def addComplexity(complexity: Long): FailedTransactionError = copy(spentComplexity = spentComplexity + complexity)
 
@@ -130,18 +132,18 @@ object TxValidationError {
     }
   }
 
-  case class ScriptExecutionError(error: String, log: Log[Id], assetId: Option[ByteStr]) extends ValidationError with WithLog {
+  case class ScriptExecutionError(message: String, log: Log[Id], assetId: Option[ByteStr]) extends ValidationError with WithLog {
     def isAssetScript: Boolean = assetId.isDefined
     private val target: String = assetId.fold("Account")(_ => "Asset")
     override def toString: String =
-      if (String.valueOf(error).startsWith("ScriptExecutionError"))
-        error
+      if (String.valueOf(message).startsWith("ScriptExecutionError"))
+        message
       else
-        s"ScriptExecutionError(error = $error, type = $target, log = ${logToString(log)})"
+        s"ScriptExecutionError(error = $message, type = $target, log = ${logToString(log)})"
   }
 
-  object ScriptExecutionError {
-    def dAppExecution(error: String, log: Log[Id]): ScriptExecutionError = ScriptExecutionError(error, log, None)
+  case class InvokeRejectError(message: String, log: Log[Id]) extends ValidationError with WithLog {
+    override def toString: String = s"InvokeRejectError(error = $message, log = ${logToString(log)})"
   }
 
   case class TransactionNotAllowedByScript(log: Log[Id], assetId: Option[ByteStr]) extends ValidationError {

@@ -315,7 +315,7 @@ class InvokeExpressionTest extends PropSpec with ScalaCheckPropertyChecks with W
     val (genesisTxs, invoke) = scenario(raiseError = true)
     withDomain(ContinuationTransaction) { d =>
       d.appendBlock(genesisTxs*)
-      intercept[Exception](d.appendBlock(invoke)).getMessage should include("ScriptExecutionError(error = Explicit script termination")
+      intercept[Exception](d.appendBlock(invoke)).getMessage should include("Explicit script termination")
     }
   }
 
