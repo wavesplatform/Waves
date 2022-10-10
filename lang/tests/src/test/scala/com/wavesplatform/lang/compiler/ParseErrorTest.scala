@@ -61,6 +61,20 @@ class ParseErrorTest extends PropSpec {
     )
   }
 
+  property("Java style type definition") {
+    assert(
+      """
+        | let x = 1
+        | let y = 1
+        | func f(Int a) = a
+      """.stripMargin,
+      """Parse error: expected ":", found "a)"""",
+      29,
+      36,
+      "f(Int a)"
+    )
+  }
+
   property("absence of arguments types") {
     assert(
       """
