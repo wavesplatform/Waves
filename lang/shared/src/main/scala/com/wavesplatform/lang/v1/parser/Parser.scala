@@ -501,8 +501,6 @@ object Parser {
   def block[A: P]: P[EXPR] = blockOr(INVALID(_, "expected ';'"))
 
   private def blockOr(otherExpr: Pos => EXPR)(implicit c: fastparse.P[Any]): P[EXPR] = {
-    def declaration(implicit c: fastparse.P[Any]) = variableDefP("let") | funcP.map(Seq(_))
-
     P(
       Index ~~
         declaration.rep(1) ~/
