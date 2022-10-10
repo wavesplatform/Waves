@@ -53,13 +53,6 @@ lazy val `lang-tests` = project
   .in(file("lang/tests"))
   .dependsOn(`lang-testkit`)
 
-lazy val `lang-doc` = project
-  .in(file("lang/doc"))
-  .dependsOn(`lang-jvm`)
-  .settings(
-    libraryDependencies ++= Seq("com.github.spullara.mustache.java" % "compiler" % "0.9.10") ++ Dependencies.test
-  )
-
 lazy val node = project.dependsOn(`lang-jvm`, `lang-testkit` % "test")
 
 lazy val `grpc-server`    = project.dependsOn(node % "compile;test->test;runtime->provided")
