@@ -474,7 +474,7 @@ class SyncDAppErrorLogTest extends PropSpec with WithDomain with OptionValues {
       "testCase",
       Seq(CONST_BOOLEAN(false))
     )((tx, leaseId, assetId) =>
-      s"""Left(ScriptExecutionError(error = AccountBalanceError(Map(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), type = Account, log = 
+      s"""Left(InvokeRejectError(error = AccountBalanceError(Map(3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM -> negative waves balance: 3N87Qja7rNj8z6H7nG9EYtjCXQtZLawaxyM, old: 999000010, new: -98900999990)), log = 
          |	@invokedDApp = Address(
          |		bytes = base58'3MsY23LPQnvPZnBKpvs6YcnCvGjLVD42pSy'
          |	)

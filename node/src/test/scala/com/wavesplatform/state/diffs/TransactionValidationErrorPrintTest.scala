@@ -13,7 +13,7 @@ import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationErro
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.RideV6
 import com.wavesplatform.transaction.TxValidationError.ScriptExecutionError
-import com.wavesplatform.transaction.{TxHelpers, TxValidationError}
+import com.wavesplatform.transaction.{ErrorWithLogPrinter, TxHelpers}
 import org.scalatest.Inside
 
 class TransactionValidationErrorPrintTest extends PropSpec with Inside with WithState {
@@ -299,7 +299,7 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside with With
              |	throw.@complexity = 1
              |	@complexityLimit = 2147482934
              |""".stripMargin
-        TxValidationError.logToString(see.log) shouldBe expected
+        ErrorWithLogPrinter.logToString(see.log) shouldBe expected
       }
     }
   }

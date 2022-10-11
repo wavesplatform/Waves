@@ -148,7 +148,7 @@ object TxValidationError {
   }
 
   case class InvokeRejectError(message: String, log: Log[Id]) extends ValidationError with WithLog {
-    override def toString: String = s"InvokeRejectError(error = $message, log = ${logToString(log)})"
+    override def toString: String = s"InvokeRejectError(error = $message, log = ${ErrorWithLogPrinter.logToString(log)})"
   }
 
   case class TransactionNotAllowedByScript(log: Log[Id], assetId: Option[ByteStr]) extends ValidationError {
@@ -156,18 +156,6 @@ object TxValidationError {
     private val target: String    = assetId.fold("Account")(_ => "Asset")
     override def toString: String = s"TransactionNotAllowedByScript(type = $target, log = ${ErrorWithLogPrinter.logToString(log)})"
   }
-
-  def logToString(log: Log[Id]): String =
-    if (log.isEmpty) ""
-    else {
-      log
-        .map {
-          case (name, Right(v))    => s"$name = ${TermPrinter(true).prettyString(v, 1)}"
-          case (name, l @ Left(_)) => s"$name = ${l.toString.replace("\n\t", "\n\t\t")}"
-        }
-        .map("\t" + _)
-        .mkString("\n", "\n", "\n")
-    }
 
   case class MicroBlockAppendError(err: String, microBlock: MicroBlock) extends ValidationError {
     override def toString: String = s"MicroBlockAppendError($err, ${microBlock.totalResBlockSig} ~> ${microBlock.reference.trim}])"

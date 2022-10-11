@@ -279,7 +279,7 @@ class TransactionBroadcastSpec
         responseAs[JsObject] should matchJson(
           s"""{
              |  "error" : 306,
-             |  "message" : "Error while executing account-script: Lease with id=$leaseCancelId not found",
+             |  "message" : "Error while executing dApp: Lease with id=$leaseCancelId not found",
              |  "transaction" : {
              |    "type" : 16,
              |    "id" : "${invoke.id()}",
