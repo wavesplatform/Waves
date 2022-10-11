@@ -117,10 +117,40 @@ class ParseErrorTest extends PropSpec {
     )
   }
 
-  private def assert(script: String, error: String, start: Int, end: Int, highlighting: String): Assertion = {
+  property("'func' keyword without definition") {
+    assert(
+      """
+        | let x = 1
+        | let y = 1
+        | func
+      """.stripMargin,
+      """Parse error: expected function name, found "func"""",
+      23,
+      27,
+      " func",
+      endExpr = false
+    )
+  }
+
+  property("missing function name") {
+    assert(
+      """
+        | let x = 1
+        | let y = 1
+        | func (a: Int) = a
+      """.stripMargin,
+      """Parse error: expected function name, found "func"""",
+      23,
+      27,
+      " func"
+    )
+  }
+
+  private def assert(script: String, error: String, start: Int, end: Int, highlighting: String, endExpr: Boolean = true): Assertion = {
     val fullError = s"$error in $start-$end"
+    val expr      = if (endExpr) script + "\ntrue" else script
     TestCompiler(V6).compile(script) shouldBe Left(fullError)
-    TestCompiler(V6).compileExpressionE(script + "\ntrue") shouldBe Left(fullError)
+    TestCompiler(V6).compileExpressionE(expr) shouldBe Left(fullError)
     script.slice(start, end + 1) shouldBe highlighting
   }
 }
