@@ -5,7 +5,6 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.v1.compiler.TermPrinter
 import com.wavesplatform.lang.v1.ContractLimits.FailFreeInvokeComplexity
 import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.state.InvokeScriptResult
