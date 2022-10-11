@@ -75,7 +75,7 @@ class ParseErrorTest extends PropSpec {
     )
   }
 
-  property("absence of arguments types") {
+  property("missing arguments types") {
     assert(
       """
         | let x = 1
