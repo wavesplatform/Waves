@@ -5,7 +5,7 @@ import com.wavesplatform.test.PropSpec
 import org.scalatest.Assertion
 
 class ParseErrorTest extends PropSpec {
-  property("missing first brace of function arguments definition") {
+  property("missing opening brace of function arguments definition") {
     assert(
       """
         | let x = 1
@@ -19,7 +19,7 @@ class ParseErrorTest extends PropSpec {
     )
   }
 
-  property("missing second brace of function arguments definition") {
+  property("missing closing brace of function arguments definition") {
     assert(
       """
         | let x = 1
@@ -143,6 +143,21 @@ class ParseErrorTest extends PropSpec {
       23,
       27,
       " func"
+    )
+  }
+
+  property("missing closing curly brace of function body") {
+    assert(
+      """
+        | func f(a: Int) = {
+        |   true
+        |
+      """.stripMargin,
+      """Parse error: expected "}", found """"",
+      35,
+      35,
+      " ",
+      endExpr = false
     )
   }
 
