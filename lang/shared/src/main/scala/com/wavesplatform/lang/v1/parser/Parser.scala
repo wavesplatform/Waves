@@ -248,7 +248,7 @@ object Parser {
 
   def funcP(implicit c: fastparse.P[Any]): P[FUNC] = {
     def funcName       = anyVarName
-    def funcKWAndName  = ("func" ~~ &(spaces) ~ funcName) | ("func" ~~ &(spaces) ~/ NoCut(funcName)).opaque("function name")
+    def funcKWAndName  = "func" ~~ ((&(spaces) ~ funcName) | (&(spaces) ~~/ Fail).opaque("function name"))
     def argWithType    = anyVarName ~/ ":" ~ unionTypeP ~ comment
     def args(min: Int) = "(" ~ comment ~ argWithType.rep(min, "," ~ comment) ~ ")" ~ comment
     def funcBody       = P(singleBaseExpr | ("{" ~ comment ~ baseExpr ~/ "}"))
