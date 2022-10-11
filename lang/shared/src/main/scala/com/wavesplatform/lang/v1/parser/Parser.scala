@@ -247,14 +247,15 @@ object Parser {
       .map(Tuple)
 
   def funcP(implicit c: fastparse.P[Any]): P[FUNC] = {
-    def funcname(implicit c: fastparse.P[Any])    = anyVarName
-    def argWithType(implicit c: fastparse.P[Any]) = anyVarName ~/ ":" ~ unionTypeP ~ comment
-    def args(implicit c: fastparse.P[Any])        = "(" ~ comment ~ argWithType.rep(0, "," ~ comment) ~ ")" ~ comment
-    def funcHeader(implicit c: fastparse.P[Any]) =
-      Index ~~ "func" ~~ &(spaces) ~ funcname ~ comment ~/ args ~ "=" ~ P(singleBaseExpr | ("{" ~ comment ~ baseExpr ~ "}")) ~~ Index
-    funcHeader.map { case (start, name, args, expr, end) =>
-      FUNC(Pos(start, end), expr, name, args)
-    }
+    def funcName       = anyVarName
+    def argWithType    = anyVarName ~/ ":" ~ unionTypeP ~ comment
+    def args(min: Int) = "(" ~ comment ~ argWithType.rep(min, "," ~ comment) ~ ")" ~ comment
+    def funcBody       = P(singleBaseExpr | ("{" ~ comment ~ baseExpr ~ "}"))
+    def correctFunc    = Index ~~ "func" ~~ &(spaces) ~ funcName ~ comment ~/ args(min = 0) ~ "=" ~ funcBody ~~ Index
+    def noKeyword      = (NoCut(funcName) ~ comment ~ NoCut(args(min = 1)) ~/ "=".? ~ funcBody.?) ~~ Fail
+    def noKeywordP     = noKeyword.asInstanceOf[P[Nothing]].opaque("'func' keyword")
+    (noKeywordP | correctFunc)
+      .map { case (start, name, args, expr, end) => FUNC(Pos(start, end), expr, name, args) }
   }
 
   def annotationP[A: P]: P[ANNOTATION] = (Index ~~ "@" ~ anyVarName ~ comment ~ "(" ~ comment ~ anyVarName.rep(0, ",") ~ comment ~ ")" ~~ Index).map {

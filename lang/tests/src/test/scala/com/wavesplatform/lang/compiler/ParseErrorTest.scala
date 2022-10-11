@@ -103,6 +103,20 @@ class ParseErrorTest extends PropSpec {
     )
   }
 
+  property("missing 'func' keyword") {
+    assert(
+      """
+        | let x = 1
+        | let y = 1
+        | f(a: Int) = a
+      """.stripMargin,
+      """Parse error: expected 'func' keyword, found "f(a:"""",
+      23,
+      27,
+      " f(a:"
+    )
+  }
+
   private def assert(script: String, error: String, start: Int, end: Int, highlighting: String): Assertion = {
     val fullError = s"$error in $start-$end"
     TestCompiler(V6).compile(script) shouldBe Left(fullError)
