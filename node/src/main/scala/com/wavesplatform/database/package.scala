@@ -74,7 +74,7 @@ package object database {
           .setCacheIndexAndFilterBlocks(true)
           .setPinL0FilterAndIndexBlocksInCache(true)
           .setFormatVersion(5)
-          .setBlockSize(64 << 10)
+          .setBlockSize(16 << 10)
           .setChecksumType(ChecksumType.kNoChecksum)
           .setBlockCache(new LRUCache(512 << 20, -1, false, 0.6))
           .setCacheIndexAndFilterBlocksWithHighPriority(true)
