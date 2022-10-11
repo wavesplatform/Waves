@@ -1,6 +1,7 @@
 package com.wavesplatform.api.http
 
 import java.security.SecureRandom
+
 import akka.http.scaladsl.server.{PathMatcher1, Route}
 import cats.syntax.either.*
 import cats.syntax.semigroup.*
@@ -37,7 +38,7 @@ import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.TransactionType.TransactionType
-import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError, ScriptExecutionError}
+import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError, InvokeRejectError}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{BlockchainContext, DAppEnvironment, InvokeScriptTransaction}
 import com.wavesplatform.transaction.{Asset, TransactionType}
@@ -298,8 +299,8 @@ case class UtilsApiRoute(
       val requestData = obj ++ Json.obj("address" -> address.toString)
       val responseJson = result
         .recover {
-          case e: ScriptExecutionError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.toString)
-          case other                   => ApiError.fromValidationError(other).json
+          case e: InvokeRejectError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.toString)
+          case other                => ApiError.fromValidationError(other).json
         }
         .explicitGet() ++ requestData
 
@@ -411,11 +412,11 @@ object UtilsApiRoute {
               case CommonError(_, Some(fte: FailedTransactionError)) => fte.error.getOrElse(err.message)
               case _                                                 => err.message
             }
-            ScriptExecutionError.dAppExecution(msg, log)
+            InvokeRejectError(msg, log)
           }
         result <- limitedResult match {
           case (eval: EVALUATED, unusedComplexity, _) => Right((eval, limit - unusedComplexity))
-          case (_: EXPR, _, log)                      => Left(ScriptExecutionError.dAppExecution(s"Calculation complexity limit exceeded", log))
+          case (_: EXPR, _, log)                      => Left(InvokeRejectError(s"Calculation complexity limit exceeded", log))
         }
       } yield result
     }

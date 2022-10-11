@@ -382,7 +382,7 @@ object InvokeScriptTransactionDiff {
       .flatten
       .leftMap[ValidationError] {
         case (FailOrRejectError(msg, true), _, log) =>
-          ScriptExecutionError.dAppExecution(msg, log)
+          InvokeRejectError(msg, log)
         case (error, unusedComplexity, log) =>
           val usedComplexity = startLimit - unusedComplexity.max(0)
           val msg = error match {
@@ -393,14 +393,14 @@ object InvokeScriptTransactionDiff {
             val storingComplexity = if (blockchain.storeEvaluatedComplexity) usedComplexity else estimatedComplexity
             FailedTransactionError.dAppExecution(msg, storingComplexity + paymentsComplexity, log)
           } else
-            ScriptExecutionError.dAppExecution(msg, log)
+            InvokeRejectError(msg, log)
       }
       .flatTap { case (r, log) =>
         InvokeDiffsCommon
           .checkScriptResultFields(blockchain, r)
           .leftMap[ValidationError] {
             case FailOrRejectError(message, true) =>
-              ScriptExecutionError.dAppExecution(message, log)
+              InvokeRejectError(message, log)
             case error =>
               val usedComplexity = startLimit - r.unusedComplexity
               val msg = error match {
@@ -411,7 +411,7 @@ object InvokeScriptTransactionDiff {
                 val storingComplexity = if (blockchain.storeEvaluatedComplexity) usedComplexity else estimatedComplexity
                 FailedTransactionError.dAppExecution(msg, storingComplexity + paymentsComplexity, log)
               } else
-                ScriptExecutionError.dAppExecution(msg, log)
+                InvokeRejectError(msg, log)
           }
       }
   }
