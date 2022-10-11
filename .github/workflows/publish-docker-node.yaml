@@ -80,4 +80,4 @@ jobs:
           push: true
           tags: ${{ steps.meta-private.outputs.tags }}
           build-args: |
-            NODE_TAG=${{ github.event.release.tag_name }}
+            NODE_TAG=${{ steps.meta-public.outputs.version }}
