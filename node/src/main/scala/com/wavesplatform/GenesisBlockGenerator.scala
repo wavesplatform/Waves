@@ -224,14 +224,12 @@ object GenesisBlockGenerator {
         posCalculator match {
           case FairPoSCalculator(minBlockTime, _) =>
             val averageBlockDelay = settings.averageBlockDelay.toMillis
-            if (averageBlockDelay <= minBlockTime)
-              throw new RuntimeException(
-                s"average-block-delay: ${averageBlockDelay}ms should be > min-block-time: ${minBlockTime}ms"
-              )
-            else {
-              val z = (1 - Math.exp((averageBlockDelay - minBlockTime) / 70000.0)) * balance
-              (5e17 * (Math.log(hitRate) / z)).toInt
-            }
+            require(
+              averageBlockDelay > minBlockTime,
+              s"average-block-delay: ${averageBlockDelay}ms should be > min-block-time: ${minBlockTime}ms"
+            )
+            val z = (1 - Math.exp((averageBlockDelay - minBlockTime) / 70000.0)) * balance
+            (5e17 * (Math.log(hitRate) / z)).toInt
           case NxtPoSCalculator =>
             (FairPoSCalculator.MaxHit * hitRate / settings.averageBlockDelay.toSeconds / balance).toInt
         }
