@@ -1278,7 +1278,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       inside(_) {
         case Right(diff) =>
           diff.scriptResults(invoke.id()).error.get.text should include("is already issued")
-        case Left(TransactionValidationError(ScriptExecutionError(error, _, _), _)) => error should include("is already issued")
+        case Left(TransactionValidationError(InvokeRejectError(error, _), _)) => error should include("is already issued")
       }
     }
   }
@@ -1497,7 +1497,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
             diff.scriptsComplexity should be > 0L
         }
         testDiff(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), from = V6) {
-          _ should produce("TransactionValidationError")
+          _ should produce("Transaction is not allowed by script of the asset")
         }
       }
   }

@@ -64,7 +64,8 @@ object BlockDiffer {
             pf.minus(pf.multiply(CurrentBlockFeePart))
           }
           .foldM(Portfolio.empty)(_.combine(_))
-      } else
+      }
+      else
         Right(Portfolio.empty)
 
     val initialFeeFromThisBlockE =
@@ -130,9 +131,9 @@ object BlockDiffer {
         constraint,
         prevBlockTimestamp,
         Diff.empty,
-        true,
+        hasNg = true,
         micro.transactionData,
-        verify
+        verify = verify
       )
     } yield r
   }
@@ -206,11 +207,10 @@ object BlockDiffer {
 
   private def patchesDiff(blockchain: Blockchain): Either[String, Diff] = {
     Seq(CancelAllLeases, CancelLeaseOverflow, CancelInvalidLeaseIn, CancelLeasesToDisabledAliases)
-      .foldM(Diff.empty) {
-        case (prevDiff, patch) =>
-          patch
-            .lift(CompositeBlockchain(blockchain, prevDiff))
-            .fold(prevDiff.asRight[String])(prevDiff.combineF)
+      .foldM(Diff.empty) { case (prevDiff, patch) =>
+        patch
+          .lift(CompositeBlockchain(blockchain, prevDiff))
+          .fold(prevDiff.asRight[String])(prevDiff.combineF)
       }
   }
 }
