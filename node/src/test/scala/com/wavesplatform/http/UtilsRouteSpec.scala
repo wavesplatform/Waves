@@ -54,6 +54,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       def getTimestamp(): Long = System.currentTimeMillis()
     },
     restAPISettings,
+    Int.MaxValue,
     () => estimator,
     Schedulers.timeBoundedFixedPool(
       new HashedWheelTimer(),

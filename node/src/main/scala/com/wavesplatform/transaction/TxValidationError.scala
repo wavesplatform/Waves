@@ -51,6 +51,7 @@ object TxValidationError {
 
   sealed trait WithLog extends Product with Serializable {
     def log: Log[Id]
+    def toStringWithLog(limit: Int): String
   }
 
   /** Errors which can produce failed transaction */
@@ -88,7 +89,10 @@ object TxValidationError {
       if (message.startsWith("FailedTransactionError"))
         message
       else
-        s"$errorDetails${ErrorWithLogPrinter.logToString(log)})"
+        s"FailedTransactionError(code = ${cause.code}, error = $message)"
+
+    override def toStringWithLog(limit: Int): String =
+      s"$errorDetails${ErrorWithLogPrinter.logToString(log, limit)})"
   }
 
   object FailedTransactionError {
@@ -143,17 +147,26 @@ object TxValidationError {
       if (String.valueOf(message).startsWith("ScriptExecutionError"))
         message
       else
-        s"ScriptExecutionError(error = $message, type = $target, log = ${ErrorWithLogPrinter.logToString(log)})"
+        s"ScriptExecutionError(error = $message, type = $target)"
+
+    override def toStringWithLog(limit: Int): String =
+      s"ScriptExecutionError(error = $message, type = $target, log = ${ErrorWithLogPrinter.logToString(log, limit)})"
   }
 
   case class InvokeRejectError(message: String, log: Log[Id]) extends ValidationError with WithLog {
-    override def toString: String = s"InvokeRejectError(error = $message, log = ${ErrorWithLogPrinter.logToString(log)})"
+    override def toString: String = s"InvokeRejectError(error = $message)"
+
+    override def toStringWithLog(limit: Int): String =
+      s"InvokeRejectError(error = $message, log = ${ErrorWithLogPrinter.logToString(log, limit)})"
   }
 
-  case class TransactionNotAllowedByScript(log: Log[Id], assetId: Option[ByteStr]) extends ValidationError {
+  case class TransactionNotAllowedByScript(log: Log[Id], assetId: Option[ByteStr]) extends ValidationError with WithLog {
     def isAssetScript: Boolean    = assetId.isDefined
     private val target: String    = assetId.fold("Account")(_ => "Asset")
-    override def toString: String = s"TransactionNotAllowedByScript(type = $target, log = ${ErrorWithLogPrinter.logToString(log)})"
+    override def toString: String = s"TransactionNotAllowedByScript(type = $target)"
+
+    override def toStringWithLog(limit: Int): String =
+      s"TransactionNotAllowedByScript(type = $target, log = ${ErrorWithLogPrinter.logToString(log, limit)})"
   }
 
   case class MicroBlockAppendError(err: String, microBlock: MicroBlock) extends ValidationError {

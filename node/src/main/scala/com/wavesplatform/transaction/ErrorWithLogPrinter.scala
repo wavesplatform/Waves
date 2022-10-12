@@ -9,10 +9,6 @@ import com.wavesplatform.transaction.TxValidationError.FailedTransactionError
 import scala.annotation.tailrec
 
 object ErrorWithLogPrinter {
-  val LogStrSizeLimit: Int = 4 * 1024 * 1024 // 4Mb
-
-  def logToString(log: Log[Id]): String =
-    logToString(log, LogStrSizeLimit)
 
   def logToString(log: Log[Id], limit: Int, depth: Int = 1): String = {
     @tailrec

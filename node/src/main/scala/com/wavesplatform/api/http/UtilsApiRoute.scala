@@ -51,6 +51,7 @@ import shapeless.Coproduct
 case class UtilsApiRoute(
     timeService: Time,
     settings: RestAPISettings,
+    maxTxErrorLogSize: Int,
     estimator: () => ScriptEstimator,
     limitedScheduler: Scheduler,
     blockchain: Blockchain
@@ -299,7 +300,7 @@ case class UtilsApiRoute(
       val requestData = obj ++ Json.obj("address" -> address.toString)
       val responseJson = result
         .recover {
-          case e: InvokeRejectError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.toString)
+          case e: InvokeRejectError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.toStringWithLog(maxTxErrorLogSize))
           case other                => ApiError.fromValidationError(other).json
         }
         .explicitGet() ++ requestData

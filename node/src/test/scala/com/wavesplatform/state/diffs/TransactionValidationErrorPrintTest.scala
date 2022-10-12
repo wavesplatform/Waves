@@ -299,7 +299,7 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside with With
              |	throw.@complexity = 1
              |	@complexityLimit = 2147482934
              |""".stripMargin
-        ErrorWithLogPrinter.logToString(see.log) shouldBe expected
+        ErrorWithLogPrinter.logToString(see.log, Int.MaxValue) shouldBe expected
       }
     }
   }
