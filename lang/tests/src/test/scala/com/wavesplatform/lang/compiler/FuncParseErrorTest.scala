@@ -124,7 +124,7 @@ class FuncParseErrorTest extends PropSpec {
         | let y = 1
         | func
       """.stripMargin,
-      """Parse error: expected function name, found """"",
+      """Parse error: expected function name""",
       24,
       27,
       "func",
@@ -139,7 +139,7 @@ class FuncParseErrorTest extends PropSpec {
         | let y = 1
         | func (a: Int) = a
       """.stripMargin,
-      """Parse error: expected function name, found """"",
+      """Parse error: expected function name""",
       24,
       27,
       "func"
@@ -153,7 +153,7 @@ class FuncParseErrorTest extends PropSpec {
         |   true
         |
       """.stripMargin,
-      """Parse error: expected "}", found """"",
+      """Parse error: expected "}"""",
       35,
       35,
       " ",
@@ -168,11 +168,10 @@ class FuncParseErrorTest extends PropSpec {
         |   let a = 1
         | }
       """.stripMargin,
-      """Parse error: expected expression, found """"",
+      """Parse error: expected expression""",
       26,
       26,
-      "1",
-      endExpr = false
+      "1"
     )
   }
 

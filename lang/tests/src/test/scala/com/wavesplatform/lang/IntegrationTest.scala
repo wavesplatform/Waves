@@ -114,7 +114,7 @@ class IntegrationTest extends PropSpec with Inside {
         |  case _ => throw()
         |}
       """.stripMargin
-    eval[EVALUATED](src) should produce("""Parse error: expected expression, found "" in 39-39""")
+    eval[EVALUATED](src) should produce("Parse error: expected expression in 39-39")
   }
 
   property("Exception handling") {

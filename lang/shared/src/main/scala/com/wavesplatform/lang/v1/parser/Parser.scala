@@ -691,6 +691,9 @@ object Parser {
     } else found
     val start = input.lastIndexWhere(_.isWhitespace, input.lastIndexWhere(_.isWhitespace, f.index) - 1) + 1
     val end   = f.index + found.length - 1
-    s"Parse error: expected ${f.label}, found \"$betterFound\" in $start-$end"
+    if (betterFound.nonEmpty)
+      s"Parse error: expected ${f.label}, found \"$betterFound\" in $start-$end"
+    else
+      s"Parse error: expected ${f.label} in $start-$end"
   }
 }
