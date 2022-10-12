@@ -50,7 +50,7 @@ object Verifier extends ScorexLogging {
       (pt, blockchain.accountScript(pt.sender.toAddress)) match {
         case (stx: PaymentTransaction, None) =>
           stats.signatureVerification
-            .measureForType(stx.tpe)(stx.signaturesValid())
+            .measureForType(stx.tpe)(stx.signatureValid)
             .as(0)
         case (et: ExchangeTransaction, scriptOpt) =>
           verifyExchange(et, blockchain, scriptOpt, if (limitedExecution) ContractLimits.FailFreeInvokeComplexity else Int.MaxValue)

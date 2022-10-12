@@ -308,25 +308,32 @@ object Diff {
       Integer.toHexString(d.hashCode())
 
     def bindTransaction(blockchain: Blockchain, tx: Transaction, applied: Boolean): Diff = {
-      val calledScripts = d.scriptResults.values.flatMap(inv => InvokeScriptResult.Invocation.calledAddresses(inv.invokes))
-      val maybeDApp = tx match {
+      val allAffectedAddresses = Set.newBuilder[Address]
+      for (r <- d.scriptResults.values) {
+        allAffectedAddresses ++= InvokeScriptResult.Invocation.calledAddresses(r.invokes)
+      }
+
+      allAffectedAddresses ++= d.portfolios.keys
+      allAffectedAddresses ++= d.accountData.keys
+
+      tx match {
         case i: InvokeTransaction =>
           i.dApp match {
-            case alias: Alias     => d.aliases.get(alias).orElse(blockchain.resolveAlias(alias).toOption)
-            case address: Address => Some(address)
+            case alias: Alias     => d.aliases.get(alias).orElse(blockchain.resolveAlias(alias).toOption).foreach(addr => allAffectedAddresses += addr)
+            case address: Address => allAffectedAddresses += address
           }
         case et: EthereumTransaction =>
           et.payload match {
-            case EthereumTransaction.Invocation(dApp, _) => Some(dApp)
-            case _                                       => None
+            case EthereumTransaction.Invocation(dApp, _) => allAffectedAddresses += dApp
+            case _                                       =>
           }
         case _ =>
           None
       }
-      val affectedAddresses = d.portfolios.keySet ++ d.accountData.keySet ++ calledScripts ++ maybeDApp
+
 
       d.copy(
-        transactions = Vector(NewTransactionInfo(tx, affectedAddresses, applied, d.scriptsComplexity)),
+        transactions = Vector(NewTransactionInfo(tx, allAffectedAddresses.result(), applied, d.scriptsComplexity)),
         transactionFilter = mkFilterForTransactions(tx)
       )
     }

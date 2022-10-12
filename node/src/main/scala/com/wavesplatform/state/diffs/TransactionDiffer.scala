@@ -26,8 +26,6 @@ import com.wavesplatform.transaction.smart.script.trace.{TraceStep, TracedResult
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import play.api.libs.json.Json
 
-import scala.collection.immutable.VectorMap
-
 object TransactionDiffer {
   def apply(prevBlockTs: Option[Long], currentBlockTs: Long, verify: Boolean = true)(
       blockchain: Blockchain,
