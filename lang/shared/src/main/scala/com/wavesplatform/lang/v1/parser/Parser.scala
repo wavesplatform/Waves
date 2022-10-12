@@ -514,9 +514,6 @@ object Parser {
 
   def baseExpr[A: P] = P(strictLetBlockP | binaryOp(baseAtom(block(_))(_), opsByPriority))
 
-  def blockOrDecl[A: P]    = baseAtom(blockOr(p => REF(p, VALID(p, "unit")))(_))
-  def baseExprOrDecl[A: P] = binaryOp(baseAtom(blockOrDecl(_))(_), opsByPriority)
-
   def singleBaseAtom[A: P] =
     comment ~
       P(foldMacroP | ifP | matchP | maybeAccessP) ~
@@ -593,9 +590,10 @@ object Parser {
     parse(str, expr(_), verboseFailures = true)
   }
 
-  def parseExprOrDecl(str: String): Parsed[EXPR] = {
-    def e[A: P] = P(Start ~ unusedText ~ (baseExprOrDecl | invalid) ~ End)
-    parse(str, e(_), verboseFailures = true)
+  def parseReplExpr(str: String): Parsed[EXPR] = {
+    def replAtom[A: P] = baseAtom(blockOr(p => REF(p, VALID(p, "unit")))(_))
+    def replExpr[A: P] = binaryOp(baseAtom(replAtom(_))(_), opsByPriority)
+    parse(str, replExpr(_), verboseFailures = true)
   }
 
   def parseContract(str: String): Parsed[DAPP] = {
