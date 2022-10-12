@@ -4,7 +4,7 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.test.PropSpec
 import org.scalatest.Assertion
 
-class ParseErrorTest extends PropSpec {
+class FuncParseErrorTest extends PropSpec {
   property("missing opening brace of function arguments definition") {
     assert(
       """
@@ -157,6 +157,21 @@ class ParseErrorTest extends PropSpec {
       35,
       35,
       " ",
+      endExpr = false
+    )
+  }
+
+  property("missing result expression") {
+    assert(
+      """
+        | func f() = {
+        |   let a = 1
+        | }
+      """.stripMargin,
+      """Parse error: expected expression, found """"",
+      26,
+      26,
+      "1",
       endExpr = false
     )
   }

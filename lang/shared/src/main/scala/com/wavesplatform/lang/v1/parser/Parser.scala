@@ -9,6 +9,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import com.wavesplatform.lang.v1.parser.BinaryOperation.*
 import com.wavesplatform.lang.v1.parser.Expressions.*
 import com.wavesplatform.lang.v1.parser.Expressions.PART.VALID
+import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.UnaryOperation.*
 import com.wavesplatform.lang.v1.{ContractLimits, compiler}
 import fastparse.*
@@ -486,25 +487,15 @@ object Parser {
       .map { case (pos, expr) => expr.getOrElse(INVALID(Pos(pos, pos), "expected a value's expression")) }
       .getOrElse(INVALID(Pos(valuePos, valuePos), "expected a value"))
 
-  def block[A: P]: P[EXPR] = blockOr(INVALID(_, "expected ';'"))
-
-  private def blockOr(otherExpr: Pos => EXPR)(implicit c: fastparse.P[Any]): P[EXPR] = {
-    P(
-      Index ~~
-        declaration.rep(1) ~/
-        Pass ~~
-        (
-          ("" ~ ";") ~/ (baseExpr | invalid).? |
-            newLineSep ~/ (baseExpr | invalid).? |
-            (Index ~~ CharPred(_ != '\n').repX).map(pos => Some(otherExpr(Pos(pos, pos))))
-        ) ~~
-        Index
-    ).map { case (start, declarations, body, end) =>
-      declarations.flatten.reverse
-        .foldLeft(body.getOrElse(INVALID(Pos(end, end), "expected a body"))) { (acc, l) =>
-          BLOCK(Pos(start, end), l, acc)
-        }
-    }
+  private def block(alternative: => Option[P[EXPR]])(implicit c: fastparse.P[Any]): P[EXPR] = {
+    def spaceBetween = ("" ~ ";") | newLineSep
+    def notFound     = ("" ~~/ Fail).opaque("expression")
+    def expr         = (spaceBetween ~ baseExpr) | alternative.getOrElse(notFound)
+    P(Index ~~ declaration.rep(1) ~~/ expr ~~ Index)
+      .map { case (start, declarations, body, end) =>
+        declarations.flatten.reverse
+          .foldLeft(body) { (acc, l) => BLOCK(Pos(start, end), l, acc) }
+      }
   }
 
   def baseAtom[A: P](epn: fastparse.P[Any] => P[EXPR]) = {
@@ -512,7 +503,7 @@ object Parser {
     comment ~ P(foldMacroP | ifP | matchP | ep | maybeAccessP) ~ comment
   }
 
-  def baseExpr[A: P] = P(strictLetBlockP | binaryOp(baseAtom(block(_))(_), opsByPriority))
+  def baseExpr[A: P] = P(strictLetBlockP | binaryOp(baseAtom(block(None)(_))(_), opsByPriority))
 
   def singleBaseAtom[A: P] =
     comment ~
@@ -591,7 +582,8 @@ object Parser {
   }
 
   def parseReplExpr(str: String): Parsed[EXPR] = {
-    def replAtom[A: P] = baseAtom(blockOr(p => REF(p, VALID(p, "unit")))(_))
+    def unit[A: P]     = Pass(REF(AnyPos, VALID(AnyPos, "unit")))
+    def replAtom[A: P] = baseAtom(block(Some(unit))(_))
     def replExpr[A: P] = binaryOp(baseAtom(replAtom(_))(_), opsByPriority)
     parse(str, replExpr(_), verboseFailures = true)
   }
