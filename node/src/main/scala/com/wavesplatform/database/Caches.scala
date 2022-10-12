@@ -13,7 +13,6 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, BlockMeta as PBBlockMeta}
-import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.DBSettings
@@ -25,7 +24,6 @@ import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.ObservedLoadingCache
 import monix.reactive.Observer
 
-import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.reflect.ClassTag
 
@@ -61,9 +59,9 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
   override def heightOf(blockId: ByteStr): Option[Int] = if (current.id.contains(blockId)) Some(height) else loadHeightOf(blockId)
 
-  private val bf = GBloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), 200_000_000)
+  private val transactionsBloomFilter = GBloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), 200_000_000)
 
-  override def containsTransaction(tx: Transaction): Boolean = bf.mightContain(tx.id().arr) && transactionMeta(tx.id()).nonEmpty
+  override def containsTransaction(tx: Transaction): Boolean = transactionsBloomFilter.mightContain(tx.id().arr) && transactionMeta(tx.id()).nonEmpty
 
   private val leaseBalanceCache: LoadingCache[Address, LeaseBalance] = cache(dbSettings.maxCacheSize, loadLeaseBalance)
   protected def loadLeaseBalance(address: Address): LeaseBalance
@@ -204,7 +202,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     val transactionMeta     = Seq.newBuilder[(TxMeta, Transaction)]
     val addressTransactions = ArrayListMultimap.create[AddressId, TransactionId]()
     for (nti <- diff.transactions) {
-      bf.put(nti.transaction.id().arr)
+      transactionsBloomFilter.put(nti.transaction.id().arr)
       transactionMeta += (TxMeta(Height(newHeight), nti.applied, nti.spentComplexity) -> nti.transaction)
       for (addr <- nti.affected) {
         addressTransactions.put(addressIdWithFallback(addr, newAddressIds), TransactionId(nti.transaction.id()))
@@ -311,6 +309,11 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     scriptCache.putAll(diff.scripts.asJava)
     assetScriptCache.putAll(diff.assetScripts.asJava)
     accountDataCache.putAll(newData.asJava)
+
+    if (height % 1000 == 0) {
+      println(s"addressId:\n${addressIdCache.stats().toString}")
+      println(s"balances:\n${balancesCache.stats().toString}")
+    }
   }
 
   protected def doRollback(targetHeight: Int): Seq[(Block, ByteStr)]
@@ -336,7 +339,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
 object Caches {
   case class CurrentBlockInfo(height: Height, meta: Option[PBBlockMeta], transactions: Seq[Transaction]) {
-    lazy val score: BigInt                           = meta.fold(BigInt(0))(m => BigInt(m.totalScore.toByteArray))
+    lazy val score: BigInt                           = meta.filterNot(_.totalScore.isEmpty).fold(BigInt(0))(m => BigInt(m.totalScore.toByteArray))
     lazy val block: Option[Block]                    = signedHeader.map(h => Block(h.header, h.signature, transactions))
     lazy val signedHeader: Option[SignedBlockHeader] = meta.map(toSignedHeader)
     lazy val id: Option[ByteStr]                     = meta.map(_.id)
