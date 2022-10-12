@@ -137,7 +137,7 @@ object Parser {
 
   def trueP[A: P]: P[TRUE]        = P(Index ~~ "true".! ~~ !(char | digit) ~~ Index).map { case (start, _, end) => TRUE(Pos(start, end)) }
   def falseP[A: P]: P[FALSE]      = P(Index ~~ "false".! ~~ !(char | digit) ~~ Index).map { case (start, _, end) => FALSE(Pos(start, end)) }
-  def curlyBracesP[A: P]: P[EXPR] = P("{" ~ baseExpr ~ "}")
+  def curlyBracesP[A: P]: P[EXPR] = P("{" ~ comment ~ baseExpr ~ comment ~/ "}")
 
   def lfunP[A: P]: P[REF] = P(correctLFunName).map { x =>
     REF(Pos(x.position.start, x.position.end), x)
@@ -251,7 +251,7 @@ object Parser {
     def funcKWAndName  = "func" ~~ ((&(spaces) ~ funcName) | (&(spaces) ~~/ Fail).opaque("function name"))
     def argWithType    = anyVarName ~/ ":" ~ unionTypeP ~ comment
     def args(min: Int) = "(" ~ comment ~ argWithType.rep(min, "," ~ comment) ~ ")" ~ comment
-    def funcBody       = P(singleBaseExpr | ("{" ~ comment ~ baseExpr ~/ "}"))
+    def funcBody       = singleBaseExpr
     def correctFunc    = Index ~~ funcKWAndName ~ comment ~/ args(min = 0) ~ "=" ~ funcBody ~~ Index
     def noKeyword      = NoCut(funcName.filter(_.isInstanceOf[VALID[_]])) ~ comment ~ NoCut(args(min = 1)) ~/ "=".? ~ funcBody.? ~~ Fail
     def noKeywordP     = noKeyword.asInstanceOf[P[Nothing]].opaque("'func' keyword")
