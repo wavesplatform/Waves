@@ -1,4 +1,4 @@
-package com.wavesplatform.lang
+package com.wavesplatform.lang.doc
 
 import com.wavesplatform.DocSource
 import com.wavesplatform.lang.directives.values.*
@@ -7,7 +7,7 @@ import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.test.*
 import org.scalatest.exceptions.TestFailedException
 
-class ObjectTypesTest extends PropSpec {
+class ObjectTypesDocTest extends PropSpec {
   private def getDocFields(typeName: String, version: StdLibVersion): List[(String, String)] =
     DocSource.typeData
       .getOrElse(
