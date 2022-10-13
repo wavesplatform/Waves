@@ -79,7 +79,7 @@ paths:
       description: >-
         Get a list addresses in the [node
         wallet](https://docs.waves.tech/en/waves-node/how-to-work-with-node-wallet)
-        by a given range of indices. Max range {from}-{to} is 100 addresses
+        by a given range of indices. Max range {from}-{to} is 1000 addresses.
       operationId: getWalletAddressesRange
       parameters:
         - name: from
@@ -200,8 +200,8 @@ paths:
           in: query
           description: >-
             For balance at height requests. Max number of blocks back from the
-            current height is set by `waves.db.max-rollback-depth`, 2000 by
-            default
+            current height is set by `rest-api.distribution-address-limit`, 1000 by
+            default.
           schema:
             type: integer
         - name: asset
@@ -251,7 +251,7 @@ paths:
                   description: >-
                     For balance at height requests. Max number of blocks back
                     from the current height is set by
-                    `waves.db.max-rollback-depth`, 2000 by default
+                    `rest-api.distribution-address-limit`, 1000 by default.
                 asset:
                   allOf:
                     - $ref: '#/components/schemas/AssetId'
@@ -286,7 +286,9 @@ paths:
       tags:
         - addresses
       summary: Data by keys or regexp
-      description: Read account data entries by given keys or a regular expression
+      description: >-
+        Read account data entries by given keys or a regular expression.
+        Limited by `rest-api.data-keys-request-limit`, 1000 by default.
       operationId: getDataByFilter
       parameters:
         - $ref: '#/components/parameters/address'
@@ -320,7 +322,9 @@ paths:
       tags:
         - addresses
       summary: Data by keys
-      description: Read account data entries by given keys
+      description: >-
+        Read account data entries by given keys.
+        Limited by `rest-api.data-keys-request-limit`, 1000 by default.
       operationId: getDataByMultipleKeysViaPost
       parameters:
         - $ref: '#/components/parameters/address'
@@ -631,7 +635,7 @@ paths:
       summary: Blocks forged by address
       description: >-
         Get a list of blocks forged by a given address. Max range {from}-{to} is
-        100 blocks
+        limited by `rest-api.blocks-request-limit`, 100 by default.
       operationId: getBlocksByAddress
       parameters:
         - name: from
@@ -662,8 +666,8 @@ paths:
         - blocks
       summary: Block range
       description: >-
-        Get blocks at a given range of heights. Max range {from}-{to} is 100
-        blocks
+        Get blocks at a given range of heights. Max range {from}-{to} is
+        limited by `rest-api.blocks-request-limit`, 100 by default.
       operationId: getBlocksRange
       parameters:
         - name: from
@@ -818,7 +822,7 @@ paths:
       summary: Block headers at range
       description: >-
         Get block headers at a given range of heights. Max range {from}-{to} is
-        100 blocks
+        limited by `rest-api.blocks-request-limit`, 100 by default.
       operationId: getBlockHeadersRange
       parameters:
         - name: from
@@ -1195,7 +1199,7 @@ paths:
       tags:
         - transactions
       summary: Transactions info
-      description: Get transactions by IDs
+      description: Get transactions by IDs. Limited by `rest-api.transactions-by-address-limit`, 1000 by default.
       operationId: getMultipleTxs
       parameters:
         - name: id
@@ -1506,7 +1510,7 @@ paths:
         Get [merkle
         proofs](https://docs.waves.tech/en/blockchain/block/merkle-root#proof-of-transaction-in-block)
         for given transactions. For dozens of transactions, better use the POST
-        method
+        method. Limited by `rest-api.transactions-by-address-limit`, 1000 by default.
       operationId: getMerkleProofs
       parameters:
         - name: id
@@ -1533,7 +1537,7 @@ paths:
       description: >-
         Get [merkle
         proofs](https://docs.waves.tech/en/blockchain/block/merkle-root#proof-of-transaction-in-block)
-        for given transactions
+        for given transactions. Limited by `rest-api.transactions-by-address-limit`, 1000 by default.
       operationId: getMerkleProofsViaPost
       requestBody:
         description: Transaction IDs
@@ -2091,7 +2095,8 @@ paths:
       description: >-
         Get detailed information about given assets. See [fields
         descriptions](https://docs.waves.tech/en/blockchain/token/#custom-token-parameters).
-        For dozens of assets, better use the POST method
+        For dozens of assets, better use the POST method.
+        Limited by `rest-api.asset-details-limit`, 100 by default.
       operationId: getMultipleAssetDetails
       parameters:
         - name: id
@@ -2124,7 +2129,8 @@ paths:
       summary: Information about multiple assets
       description: >-
         Get detailed information about given assets. See [fields
-        descriptions](https://docs.waves.tech/en/blockchain/token/#custom-token-parameters)
+        descriptions](https://docs.waves.tech/en/blockchain/token/#custom-token-parameters).
+        Limited by `rest-api.asset-details-limit`, 100 by default.
       operationId: getMultipleAssetDetailsViaPost
       parameters:
         - name: full
