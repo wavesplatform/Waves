@@ -407,51 +407,54 @@ object Parser {
         }
       }
 
-  private def destructuredTupleValuesP[A: P]: P[Seq[(Int, Option[PART[String]])]] =
+  private def destructuredTupleValuesP[A: P]: P[Seq[(Int, PART[String])]] =
     P("(") ~
-      (Index ~ anyVarName.?).rep(
+      (Index ~ anyVarName).rep(
         ContractLimits.MinTupleSize,
         comment ~ "," ~ comment,
         ContractLimits.MaxTupleSize
       ) ~
       P(")")
 
-  private def letNameP[A: P]: P[Seq[(Int, Option[PART[String]])]] =
-    (Index ~ anyVarName.?).map(Seq(_))
+  private def letNameP[A: P]: P[Seq[(Int, PART[String])]] =
+    (Index ~ anyVarName).map(Seq(_))
 
-  def variableDefP[A: P](key: String): P[Seq[LET]] =
-    P(
-      Index ~~ key ~~ &(
-        spaces
-      ) ~/ comment ~ (destructuredTupleValuesP | letNameP) ~ comment ~ Index ~ ("=" ~/ Index ~ baseExpr.?).? ~~ Index
-    ).map { case (start, names, valuePos, valueRaw, end) =>
-      val value = extractValue(valuePos, valueRaw)
-      val pos   = Pos(start, end)
-      if (names.length == 1)
-        names.map { case (nameStart, nameRaw) =>
-          val name = extractName(Pos(nameStart, nameStart), nameRaw)
-          LET(pos, name, value)
-        }
-      else {
-        val exprRefName = "$t0" + s"${pos.start}${pos.end}"
-        val exprRef     = LET(pos, VALID(pos, exprRefName), value)
-        val tupleValues =
-          names.zipWithIndex
-            .map { case ((nameStart, nameRaw), i) =>
-              val namePos = Pos(nameStart, nameStart)
-              val name    = extractName(namePos, nameRaw)
-              val getter = GETTER(
-                namePos,
-                REF(namePos, VALID(namePos, exprRefName)),
-                VALID(namePos, s"_${i + 1}")
-              )
-              LET(pos, name, getter)
-            }
-        exprRef +: tupleValues
+  def variableDefP[A: P](key: String): P[Seq[LET]] = {
+    def letNames      = destructuredTupleValuesP | letNameP
+    def letKWAndNames = key ~~ ((&(spaces) ~ letNames) | (&(spaces) ~~/ Fail).opaque("variable name"))
+    def noKeyword     = (letNames.filter(_.exists(_._2.isInstanceOf[VALID[_]])) ~ "=" ~/ baseExpr ~~ Fail).opaque("'let' or 'strict' keyword").asInstanceOf[P[Nothing]]
+    def correctLets   = P(Index ~~ letKWAndNames ~/ "=" ~ baseExpr ~~ Index)
+    (noKeyword | correctLets)
+      .map { case (start, names, value, end) =>
+        val pos = Pos(start, end)
+        if (names.length == 1)
+          singleLet(pos, names, value)
+        else
+          desugaredMultipleLets(pos, names, value)
       }
-    }
+  }
 
-  // Hack to force parse of "\n". Otherwise it is treated as a separator
+  private def singleLet(pos: Pos, names: Seq[(Int, PART[String])], value: EXPR) =
+    names.map { case (_, name) => LET(pos, name, value) }
+
+  private def desugaredMultipleLets[A: P](pos: Pos, names: Seq[(Int, PART[String])], value: EXPR) = {
+    val exprRefName = "$t0" + s"${pos.start}${pos.end}"
+    val exprRef     = LET(pos, VALID(pos, exprRefName), value)
+    val tupleValues =
+      names.zipWithIndex
+        .map { case ((nameStart, name), i) =>
+          val namePos = Pos(nameStart, nameStart)
+          val getter = GETTER(
+            namePos,
+            REF(namePos, VALID(namePos, exprRefName)),
+            VALID(namePos, s"_${i + 1}")
+          )
+          LET(pos, name, getter)
+        }
+    exprRef +: tupleValues
+  }
+
+// Hack to force parse of "\n". Otherwise it is treated as a separator
   def newLineSep(implicit c: fastparse.P[Any]) = {
     P(CharsWhileIn(" \t\r").repX ~~ "\n").repX(1)
   }
@@ -472,20 +475,6 @@ object Parser {
       Macro.unwrapStrict(blockPos, varNames, body.getOrElse(INVALID(Pos(end, end), "expected a body")))
     }
   }
-
-  private def extractName(
-      namePos: Pos,
-      nameRaw: Option[PART[String]]
-  ): PART[String] =
-    nameRaw.getOrElse(PART.INVALID(namePos, "expected a variable's name"))
-
-  private def extractValue(
-      valuePos: Int,
-      valueRaw: Option[(Int, Option[EXPR])]
-  ): EXPR =
-    valueRaw
-      .map { case (pos, expr) => expr.getOrElse(INVALID(Pos(pos, pos), "expected a value's expression")) }
-      .getOrElse(INVALID(Pos(valuePos, valuePos), "expected a value"))
 
   private def block(alternative: => Option[P[EXPR]])(implicit c: fastparse.P[Any]): P[EXPR] = {
     def spaceBetween = ("" ~ ";") | newLineSep
