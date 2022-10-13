@@ -254,8 +254,8 @@ object Parser {
     def args(min: Int) = "(" ~ comment ~ argWithType.rep(min, "," ~ comment) ~ ")" ~ comment
     def funcBody       = singleBaseExpr
     def correctFunc    = Index ~~ funcKWAndName ~ comment ~/ args(min = 0) ~ "=" ~ funcBody ~~ Index
-    def noKeyword      = NoCut(funcName.filter(_.isInstanceOf[VALID[_]])) ~ comment ~ NoCut(args(min = 1)) ~/ "=".? ~ funcBody.? ~~ Fail
-    def noKeywordP     = noKeyword.asInstanceOf[P[Nothing]].opaque("\"func\" keyword")
+    def noKeyword      = NoCut(funcName).filter(_.isInstanceOf[VALID[_]]) ~ comment ~ NoCut(args(min = 1)) ~/ "=".? ~ funcBody.? ~~ Fail
+    def noKeywordP     = noKeyword.asInstanceOf[P[Nothing]].opaque(""""func" keyword""")
     (noKeywordP | correctFunc)
       .map { case (start, name, args, expr, end) => FUNC(Pos(start, end), expr, name, args) }
   }
@@ -421,8 +421,8 @@ object Parser {
 
   def variableDefP[A: P](key: String): P[Seq[LET]] = {
     def letNames      = destructuredTupleValuesP | letNameP
-    def letKWAndNames = key ~~ ((&(spaces) ~ letNames) | (&(spaces) ~~/ Fail).opaque("variable name"))
-    def noKeyword     = letNames.filter(_.exists(_._2.isInstanceOf[VALID[_]])) ~ "=" ~/ baseExpr ~~ Fail
+    def letKWAndNames = key ~~ ((&(spaces) ~ comment ~ letNames ~ comment) | (&(spaces) ~~/ Fail).opaque("variable name"))
+    def noKeyword     = NoCut(letNames).filter(_.exists(_._2.isInstanceOf[VALID[_]])) ~ "=" ~~ !"=" ~/ baseExpr ~~ Fail
     def noKeywordP    = noKeyword.opaque(""""let" or "strict" keyword""").asInstanceOf[P[Nothing]]
     def correctLets   = P(Index ~~ letKWAndNames ~/ "=" ~ baseExpr ~~ Index)
     (correctLets | noKeywordP)
