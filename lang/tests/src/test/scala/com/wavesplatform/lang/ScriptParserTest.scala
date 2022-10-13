@@ -369,7 +369,7 @@ class ScriptParserTest extends PropSpec with ScriptGenParser {
 
   property("reserved keywords are invalid variable names in expr: let") {
     val script = "let + 1"
-    parseE(script) should produce("Expected expression")
+    parseE(script) should produce("Expected variable name")
   }
 
   property("reserved keywords are invalid variable names in expr: if") {
