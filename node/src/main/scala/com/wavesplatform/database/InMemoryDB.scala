@@ -7,8 +7,10 @@ import com.typesafe.scalalogging.LazyLogging
 import com.wavesplatform.database.InMemoryDB.ByteArrayHashingStrategy
 import com.wavesplatform.settings.InMemorySettings
 import org.eclipse.collections.api.block.HashingStrategy
+import org.eclipse.collections.api.tuple.Pair
 import org.eclipse.collections.impl.factory.{HashingStrategyMaps, HashingStrategySets}
 import org.rocksdb.{RocksDB, WriteBatch, WriteOptions}
+import org.eclipse.collections.impl.utility.MapIterate
 
 import scala.compat.java8.FunctionConverters.*
 
@@ -88,9 +90,11 @@ class InMemoryDB(underlying: RocksDB, settings: InMemorySettings) extends RocksD
 
   private def putAndCountBytes(key: Array[Byte], value: Array[Byte]): Unit = {
     toDelete.remove(key)
-    val entrySize = key.length + value.length
-    estimatedSize += entrySize
-    Option(entries.put(key, value)).foreach(bs => estimatedSize -= (key.length + bs.length))
+    estimatedSize += (key.length + value.length)
+    cc.invalidate(KW(key))
+    Option(entries.put(key, value)).foreach { bs =>
+      estimatedSize -= (key.length + bs.length)
+    }
   }
 
   private def deleteAndCountBytes(key: Array[Byte]): Unit = {
@@ -104,15 +108,22 @@ class InMemoryDB(underlying: RocksDB, settings: InMemorySettings) extends RocksD
 
   private def flush(): Unit = {
     logger.info(s"${toDelete.size} keys to delete, ${entries.size} to add")
-//    underlying.suspendCompactions()
-    underlying.readWrite { rw =>
-      toDelete.forEach(((t: Array[Byte]) => rw.delete(t)).asJava)
-      entries.forEach({ (k: Array[Byte], v: Array[Byte]) =>
-        rw.put(k, v)
-      }.asJava)
-    }
+
+    val batch = new WriteBatch()
+
+    MapIterate
+      .toListOfPairs(entries)
+      .sortThis((o1: Pair[Array[Byte], Array[Byte]], o2: Pair[Array[Byte], Array[Byte]]) =>
+        UnsignedBytes.lexicographicalComparator().compare(o1.getOne, o2.getOne)
+      )
+      .forEach({ (t: Pair[Array[Byte], Array[Byte]]) => batch.put(t.getOne, t.getTwo); () }.asJava)
+
+    toDelete.forEach({ (k: Array[Byte]) => batch.delete(k); () }.asJava)
+
+    underlying.write(new WriteOptions(), batch)
+
     cc.invalidateAll()
-//    underlying.resumeCompactions()
+
     logger.info("Finished persisting")
     entries.clear()
     toDelete.clear()

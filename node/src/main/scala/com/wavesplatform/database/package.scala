@@ -4,11 +4,13 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.util
 import java.util.{Collections, Map as JMap}
+import java.util.function.Consumer
+
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.collect.Maps
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
-import com.google.common.primitives.{Bytes, Ints, Longs}
+import com.google.common.primitives.{Bytes, Ints, Longs, UnsignedBytes}
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.Logger
 import com.wavesplatform.account.{AddressScheme, PublicKey}
@@ -43,6 +45,8 @@ import com.wavesplatform.utils.*
 import monix.eval.Task
 import monix.reactive.Observable
 import org.rocksdb.{BloomFilter as RBloomFilter, *}
+import org.eclipse.collections.api.tuple.Pair
+import org.eclipse.collections.impl.utility.MapIterate
 import org.slf4j.LoggerFactory
 import sun.nio.ch.Util
 import supertagged.TaggedType
@@ -532,6 +536,8 @@ package object database {
   }
 
   implicit class DBExt(val db: RocksDB) extends AnyVal {
+    import scala.jdk.FunctionConverters.*
+
     def readOnly[A](f: ReadOnlyDB => A): A = {
       Using.resource(db.getSnapshot) { s =>
         Using.resource(new ReadOptions().setSnapshot(s).setVerifyChecksums(false)) { ro =>
@@ -551,8 +557,18 @@ package object database {
       val nativeBatch = new WriteBatch()
       try {
         val r = f(rw)
-        batch.addedEntries.forEach { case (k, v) => nativeBatch.put(k.arr, v) }
-        batch.deletedEntries.forEach(k => nativeBatch.delete(k.arr))
+        MapIterate
+          .toListOfPairs(batch.addedEntries)
+          .sortThis((o1: Pair[Array[Byte], Array[Byte]], o2: Pair[Array[Byte], Array[Byte]]) =>
+            UnsignedBytes.lexicographicalComparator().compare(o1.getOne, o2.getOne)
+          )
+          .forEach(new Consumer[Pair[Array[Byte], Array[Byte]]] {
+            override def accept(t: Pair[Array[Byte], Array[Byte]]): Unit = nativeBatch.put(t.getOne, t.getTwo)
+          })
+        batch.deletedEntries.forEach({ (k: Array[Byte]) =>
+          nativeBatch.delete(k)
+          ()
+        }: Consumer[Array[Byte]])
         db.write(new WriteOptions().setSync(false), nativeBatch)
         r
       } finally {
