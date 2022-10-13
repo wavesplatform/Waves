@@ -25,7 +25,7 @@ class LetParseErrorTest extends PropSpec {
         | let x = 1
         | y = x
       """.stripMargin,
-      """Parse error: expected 'let' or 'strict' keyword, found "y"""",
+      """Parse error: expected "let" or "strict" keyword, found "y"""",
       12,
       13,
       " y"

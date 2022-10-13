@@ -110,7 +110,7 @@ class FuncParseErrorTest extends PropSpec {
         | let y = 1
         | f(a: Int) = a
       """.stripMargin,
-      """Parse error: expected 'func' keyword, found "f(a:"""",
+      """Parse error: expected "func" keyword, found "f(a:"""",
       23,
       27,
       " f(a:"
