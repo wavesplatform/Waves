@@ -1,15 +1,16 @@
-package com.wavesplatform.lang.v1
+package com.wavesplatform.lang
 
 import cats.syntax.semigroup.*
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.V3
+import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
+import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.{Common, Global}
 import monix.eval.Coeval
 
 package object estimator {
