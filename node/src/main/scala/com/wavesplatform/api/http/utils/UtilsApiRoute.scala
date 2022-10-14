@@ -3,7 +3,7 @@ import akka.http.scaladsl.server.{PathMatcher1, Route}
 import cats.syntax.either.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.*
-import com.wavesplatform.api.http.ApiError.{ConflictedRequestStructure, CustomValidationError, ScriptCompilerError, TooBigArrayAllocation, WrongJson}
+import com.wavesplatform.api.http.ApiError.{ConflictingRequestStructure, CustomValidationError, ScriptCompilerError, TooBigArrayAllocation, WrongJson}
 import com.wavesplatform.api.http.requests.{ScriptWithImportsRequest, byteStrFormat}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
@@ -265,7 +265,7 @@ case class UtilsApiRoute(
           .map(_.toInvocation.flatMap(UtilsEvaluator.toExpr(script, _)))
 
       val exprE = (simpleExpr, exprFromInvocation) match {
-        case (Some(_), Some(_)) if request.fields.size > 1 => Left(ConflictedRequestStructure.json)
+        case (Some(_), Some(_)) if request.fields.size > 1 => Left(ConflictingRequestStructure.json)
         case (None, None)                                  => Left(WrongJson().json)
         case (Some(expr), _)                               => Right(expr)
         case (None, Some(expr))                            => Right(expr)

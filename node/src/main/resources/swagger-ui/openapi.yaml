@@ -1849,7 +1849,7 @@ paths:
                         type: string
                       value: { }
         '400':
-          description: Conflicted request structure
+          description: Conflicting request structure
           content:
             application/json:
               schema:
@@ -1857,7 +1857,7 @@ paths:
                   - $ref: '#/components/schemas/ApiError'
                 example:
                   error: 198
-                  message: Conflicted request structure. Used first and second request versions
+                  message: Conflicting request structure. Used first and second request versions
   /utils/seed:
     get:
       tags:
