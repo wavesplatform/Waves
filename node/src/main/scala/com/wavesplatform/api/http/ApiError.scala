@@ -451,7 +451,7 @@ object ApiError {
 
   case object ConflictingRequestStructure extends ApiError {
     override val id      = 198
-    override val message = "Conflicting request structure. Used first and second request versions"
+    override val message = "Conflicting request structure. Both expression and invocation structure were sent"
     override val code    = StatusCodes.BadRequest
   }
 }

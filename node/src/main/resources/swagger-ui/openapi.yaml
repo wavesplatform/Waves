@@ -1857,7 +1857,7 @@ paths:
                   - $ref: '#/components/schemas/ApiError'
                 example:
                   error: 198
-                  message: Conflicting request structure. Used first and second request versions
+                  message: Conflicting request structure. Both expression and invocation structure were sent
   /utils/seed:
     get:
       tags:

@@ -1286,7 +1286,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
         "conflicting request structure" in {
           Post(routePath(s"/script/evaluate/$defaultAddress"), Json.obj("expr" -> "true") ++ invocation) ~> route ~> check {
             val json = responseAs[JsValue]
-            (json \ "message").as[String] shouldBe "Conflicting request structure. Used first and second request versions"
+            (json \ "message").as[String] shouldBe "Conflicting request structure. Both expression and invocation structure were sent"
             (json \ "error").as[Int] shouldBe 198
           }
         }
