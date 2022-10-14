@@ -1,5 +1,6 @@
 package com.wavesplatform.api.common
 
+import com.google.common.base.Charsets
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.AddressPortfolio.{assetBalanceIterator, nftIterator}
 import com.wavesplatform.api.common.TransactionMeta.Ethereum
@@ -9,6 +10,7 @@ import com.wavesplatform.database
 import com.wavesplatform.database.{DBExt, KeyTags, Keys}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.patch.CancelLeasesToDisabledAliases
 import com.wavesplatform.state.reader.LeaseDetails.Status
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Diff, Height, InvokeScriptResult}
@@ -20,6 +22,8 @@ import com.wavesplatform.transaction.{EthereumTransaction, TransactionType}
 import monix.eval.Task
 import monix.reactive.Observable
 import org.rocksdb.RocksDB
+
+import scala.collection.mutable
 
 trait CommonAccountsApi {
   import CommonAccountsApi.*
@@ -101,28 +105,24 @@ object CommonAccountsApi {
       blockchain.accountData(address, key)
 
     override def dataStream(address: Address, regex: Option[String]): Observable[DataEntry[?]] = Observable.defer {
-      val pattern = regex.map(_.r.pattern)
       val entriesFromDiff = diff().accountData
         .get(address)
-        .fold[Map[String, DataEntry[?]]](Map.empty)(_.data.filter { case (k, _) => pattern.forall(_.matcher(k).matches()) })
+        .fold[Map[String, DataEntry[?]]](Map.empty)(_.data.filter { case (k, _) => regex.forall(_.r.pattern.matcher(k).matches()) })
+      val entries = mutable.ArrayBuffer[DataEntry[?]](entriesFromDiff.values.toSeq*)
 
-      val entries = db.readOnly { ro =>
-        ro.get(Keys.addressId(address)).fold(Seq.empty[DataEntry[?]]) { addressId =>
-          val filteredKeys = Set.newBuilder[String]
-
-          ro.iterateOverPrefix(KeyTags.ChangedDataKeys.prefixBytes ++ addressId.toByteArray) { e =>
-            for (key <- database.readStrings(e.getValue) if !entriesFromDiff.contains(key) && pattern.forall(_.matcher(key).matches()))
-              filteredKeys += key
+      db.readOnly { ro =>
+        db.get(Keys.addressId(address)).foreach { addressId =>
+          db.iterateOver(KeyTags.DataHistory.prefixBytes ++ PBRecipients.publicKeyHash(address)) { e =>
+            val key = new String(e.getKey.drop(2 + Address.HashLength), Charsets.UTF_8)
+            if (regex.forall(_.r.pattern.matcher(key).matches()) && !entriesFromDiff.contains(key)) {
+              for (h <- ro.get(Keys.dataHistory(address, key)).headOption; e <- ro.get(Keys.data(addressId, key)(h))) {
+                entries += e
+              }
+            }
           }
-
-          for {
-            key <- filteredKeys.result().toVector
-            h   <- ro.get(Keys.dataHistory(address, key)).headOption
-            e   <- ro.get(Keys.data(addressId, key)(h))
-          } yield e
         }
       }
-      Observable.fromIterable((entriesFromDiff.values ++ entries).filterNot(_.isEmpty))
+      Observable.fromIterable(entries).filterNot(_.isEmpty)
     }
 
     override def resolveAlias(alias: Alias): Either[ValidationError, Address] = blockchain.resolveAlias(alias)
