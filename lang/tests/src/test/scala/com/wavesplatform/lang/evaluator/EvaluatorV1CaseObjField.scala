@@ -1,16 +1,16 @@
-package com.wavesplatform.lang
+package com.wavesplatform.lang.evaluator
 
 import cats.Id
 import cats.kernel.Monoid
-import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.Testing._
+import com.wavesplatform.lang.Common.*
+import com.wavesplatform.lang.Testing.*
 import com.wavesplatform.lang.directives.values.V1
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
-import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext._
-import com.wavesplatform.lang.v1.evaluator.ctx._
+import com.wavesplatform.lang.v1.evaluator.ctx.*
+import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.*
 import com.wavesplatform.test.PropSpec
 
 class EvaluatorV1CaseObjField extends PropSpec {
