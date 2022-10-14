@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.parser.error
 
-class FuncParseErrorTest extends ParseErrorTest {
+class FuncDefParseErrorTest extends ParseErrorTest {
   property("missing opening brace of function arguments definition") {
     assert(
       """

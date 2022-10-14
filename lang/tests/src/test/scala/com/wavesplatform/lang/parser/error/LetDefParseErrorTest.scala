@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.parser.error
 
-class LetParseErrorTest extends ParseErrorTest {
+class LetDefParseErrorTest extends ParseErrorTest {
   property("missing '=' of let definition") {
     assert(
       """
