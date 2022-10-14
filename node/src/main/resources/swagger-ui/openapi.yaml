@@ -281,6 +281,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Balance'
+            application/json;large-significand-format=string:
+              schema:
+                allOf:
+                  -  $ref: '#/components/schemas/Balance'
+                example:
+                  address: 2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY
+                  confirmations: 3
+                  balance: '123456789'
   '/addresses/data/{address}':
     get:
       tags:
@@ -544,6 +552,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Balance'
+            application/json;large-significand-format=string:
+              schema:
+                allOf:
+                  -  $ref: '#/components/schemas/Balance'
+                example:
+                  address: 2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY
+                  confirmations: 3
+                  balance: '123456789'
   '/addresses/effectiveBalance/{address}/{confirmations}':
     get:
       tags:
@@ -569,6 +585,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Balance'
+            application/json;large-significand-format=string:
+              schema:
+                allOf:
+                  -  $ref: '#/components/schemas/Balance'
+                example:
+                  address: 2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY
+                  confirmations: 3
+                  balance: '123456789'
   '/addresses/data/{address}/{key}':
     get:
       tags:
