@@ -187,7 +187,7 @@ object Parser {
           FOLD(Pos(start, end), lim, list, acc, f)
       }
 
-  def list[A: P]: P[EXPR] = (Index ~~ P("[") ~ functionCallArgs ~ P("]") ~~ Index).map { case (s, e, f) =>
+  def list[A: P]: P[EXPR] = (Index ~~ P("[") ~/ functionCallArgs ~ P("]") ~~ Index).map { case (s, e, f) =>
     val pos = Pos(s, f)
     e.foldRight(REF(pos, PART.VALID(pos, "nil")): EXPR) { (v, l) =>
       FUNCTION_CALL(pos, PART.VALID(pos, "cons"), List(v, l))
@@ -229,7 +229,7 @@ object Parser {
     val KnownMethods: Set[String] = Set(ExactAs, As)
   }
 
-  def singleTypeP[A: P]: P[Single] = (anyVarName ~~ ("[" ~~ Index ~ unionTypeP ~ Index ~~ "]").?).map { case (t, param) =>
+  def singleTypeP[A: P]: P[Single] = (anyVarName ~~ ("[" ~~ Index ~ unionTypeP ~ Index ~~/ "]").?).map { case (t, param) =>
     Single(t, param.map { case (start, param, end) => VALID(Pos(start, end), param) })
   }
 
@@ -372,14 +372,14 @@ object Parser {
   )
 
   def functionCallOrGetter[A: P]: P[Accessor] =
-    (genericMethodName ~~/ ("[" ~ unionTypeP ~ "]")).map { case (name, tpe) =>
+    (genericMethodName ~~/ ("[" ~ unionTypeP ~/ "]")).map { case (name, tpe) =>
       GenericMethod(name, tpe)
     } | (accessOrName.map(Getter) ~/ comment ~~ ("(" ~/ comment ~ functionCallArgs ~/ comment ~ ")").?).map { case (g @ Getter(name), args) =>
       args.fold(g: Accessor)(Method(name, _))
     }
 
   def maybeAccessP[A: P]: P[EXPR] =
-    P(Index ~~ extractableAtom ~~ Index ~~ NoCut(accessP).repX)
+    P(Index ~~ extractableAtom ~~ Index ~~ accessP.repX)
       .map { case (start, obj, _, accessors) =>
         accessors.foldLeft(obj) { case (e, (accessStart, a, accessEnd)) =>
           a match {
