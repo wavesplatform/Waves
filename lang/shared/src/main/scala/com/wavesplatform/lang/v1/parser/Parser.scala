@@ -170,7 +170,7 @@ object Parser {
 
   def functionCallArgs[A: P]: P[Seq[EXPR]] = comment ~ baseExpr.rep(0, comment ~ "," ~ comment) ~ comment
 
-  def maybeFunctionCallP[A: P]: P[EXPR] = (Index ~~ lfunP ~~ P("(" ~/ functionCallArgs ~ ")").? ~~ Index).map {
+  def functionCallOrRef[A: P]: P[EXPR] = (Index ~~ lfunP ~~ P("(" ~/ functionCallArgs ~ ")").? ~~ Index).map {
     case (start, REF(_, functionName, _, _), Some(args), accessEnd) => FUNCTION_CALL(Pos(start, accessEnd), functionName, args.toList)
     case (_, id, None, _)                                           => id
   }
@@ -213,7 +213,7 @@ object Parser {
   def extractableAtom[A: P]: P[EXPR] = P(
     curlyBracesP | bracesOrTuple |
       byteVectorP | stringP | numberP | trueP | falseP | list |
-      maybeFunctionCallP
+      functionCallOrRef
   )
 
   sealed trait Accessor
@@ -368,10 +368,10 @@ object Parser {
     }
 
   def accessP[A: P]: P[(Int, Accessor, Int)] = P(
-    (("" ~ comment ~ Index ~ "." ~/ comment ~ functionCallOrGetter) ~~ Index) | (Index ~~ "[" ~/ baseExpr.map(ListIndex) ~ "]" ~~ Index)
+    (("" ~ comment ~ Index ~ "." ~/ comment ~ getterOrOOPCall) ~~ Index) | (Index ~~ "[" ~/ baseExpr.map(ListIndex) ~ "]" ~~ Index)
   )
 
-  def functionCallOrGetter[A: P]: P[Accessor] =
+  def getterOrOOPCall[A: P]: P[Accessor] =
     (genericMethodName ~~/ ("[" ~ unionTypeP ~/ "]")).map { case (name, tpe) =>
       GenericMethod(name, tpe)
     } | (accessOrName.map(Getter) ~/ comment ~~ ("(" ~/ comment ~ functionCallArgs ~ comment ~ ")").?).map { case (g @ Getter(name), args) =>
