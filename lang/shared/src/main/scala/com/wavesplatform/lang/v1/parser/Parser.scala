@@ -176,7 +176,7 @@ object Parser {
   }
 
   def foldMacroP[A: P]: P[EXPR] =
-    (Index ~~ P("FOLD<") ~~ Index ~~ digit.repX(1).! ~~ Index ~~ ">(" ~/ baseExpr ~ "," ~ baseExpr ~ "," ~ lfunP ~ ")" ~~ Index)
+    (Index ~~ P("FOLD<") ~~ Index ~~ digit.repX(1).! ~~ Index ~~ ">(" ~/ baseExpr ~ "," ~ baseExpr ~ "," ~ lfunP ~/ ")" ~~ Index)
       .map { case (start, limStart, limit, limEnd, list, acc, f, end) =>
         val lim = limit.toInt
         if (lim < 1)
@@ -200,7 +200,7 @@ object Parser {
       max = ContractLimits.MaxTupleSize
     ) ~ comment
 
-  def bracesOrTuple[A: P]: P[EXPR] = (Index ~~ P("(") ~ bracedArgs ~ P(")") ~~ Index).map {
+  def bracesOrTuple[A: P]: P[EXPR] = (Index ~~ "(" ~ bracedArgs ~/ ")" ~~ Index).map {
     case (_, Seq(expr), _) => expr
     case (s, elements, f) =>
       FUNCTION_CALL(
@@ -244,7 +244,7 @@ object Parser {
         comment ~ "," ~ comment,
         ContractLimits.MaxTupleSize
       )
-      ~ ")")
+      ~/ ")")
       .map(Tuple)
 
   def funcP(implicit c: fastparse.P[Any]): P[FUNC] = {
@@ -260,7 +260,7 @@ object Parser {
       .map { case (start, name, args, expr, end) => FUNC(Pos(start, end), expr, name, args) }
   }
 
-  def annotationP[A: P]: P[ANNOTATION] = (Index ~~ "@" ~ anyVarName ~ comment ~ "(" ~ comment ~ anyVarName.rep(0, ",") ~ comment ~ ")" ~~ Index).map {
+  def annotationP[A: P]: P[ANNOTATION] = (Index ~~ "@" ~ anyVarName ~ comment ~ "(" ~ comment ~ anyVarName.rep(0, ",") ~ comment ~/ ")" ~~ Index).map {
     case (start, name: PART[String], args: Seq[PART[String]], end) => ANNOTATION(Pos(start, end), name, args)
   }
 
@@ -303,7 +303,7 @@ object Parser {
 
     def pattern(implicit c: fastparse.P[Any]): P[Pattern] =
       (varDefP ~ comment ~ typesDefP).map { case (v, t) => TypedVar(v, t) } |
-        (Index ~ "(" ~ pattern.rep(min = 2, sep = ",") ~ ")" ~ Index).map(p => TuplePat(p._2, Pos(p._1, p._3))) |
+        (Index ~ "(" ~ pattern.rep(min = 2, sep = ",") ~/ ")" ~ Index).map(p => TuplePat(p._2, Pos(p._1, p._3))) |
         (Index ~ anyVarName ~ "(" ~ (anyVarName ~ "=" ~ pattern).rep(sep = ",") ~ ")" ~ Index)
           .map(p => ObjPat(p._3.map(kp => (PART.toOption(kp._1).get, kp._2)).toMap, Single(p._2, None), Pos(p._1, p._4))) |
         (Index ~ baseExpr.rep(min = 1, sep = "|") ~ Index).map(p => ConstsPat(p._2, Pos(p._1, p._3)))
@@ -374,7 +374,7 @@ object Parser {
   def functionCallOrGetter[A: P]: P[Accessor] =
     (genericMethodName ~~/ ("[" ~ unionTypeP ~/ "]")).map { case (name, tpe) =>
       GenericMethod(name, tpe)
-    } | (accessOrName.map(Getter) ~/ comment ~~ ("(" ~/ comment ~ functionCallArgs ~/ comment ~ ")").?).map { case (g @ Getter(name), args) =>
+    } | (accessOrName.map(Getter) ~/ comment ~~ ("(" ~/ comment ~ functionCallArgs ~ comment ~ ")").?).map { case (g @ Getter(name), args) =>
       args.fold(g: Accessor)(Method(name, _))
     }
 
@@ -408,13 +408,13 @@ object Parser {
       }
 
   private def destructuredTupleValuesP[A: P]: P[Seq[(Int, PART[String])]] =
-    P("(") ~
+    "(" ~
       (Index ~ anyVarName).rep(
         ContractLimits.MinTupleSize,
         comment ~ "," ~ comment,
         ContractLimits.MaxTupleSize
-      ) ~
-      P(")")
+      ) ~/
+      ")"
 
   private def letNameP[A: P]: P[Seq[(Int, PART[String])]] =
     (Index ~ anyVarName).map(Seq(_))
