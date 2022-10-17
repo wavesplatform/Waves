@@ -1162,19 +1162,9 @@ paths:
             application/json;large-significand-format=string:
               schema:
                 $ref: '#/components/schemas/RewardStatus'
-              example:
-                height: 3340000
-                totalWavesAmount: '10960000600000000'
-                currentReward: '600000000'
-                minIncrement: '50000000'
-                term: 100000
-                nextCheck: 3439999
-                votingIntervalStart: 3430000
-                votingInterval: 10000
-                votingThreshold: 5001
-                votes:
-                  increase: 0
-                  decrease: 0
+              examples:
+                largeSignificandblockchainRewards:
+                  $ref: '#/components/examples/largeSignificandblockchainRewards'
   '/blockchain/rewards/{height}':
     get:
       tags:
@@ -1199,19 +1189,9 @@ paths:
             application/json;large-significand-format=string:
               schema:
                 $ref: '#/components/schemas/RewardStatus'
-              example:
-                height: 3340000
-                totalWavesAmount: '10960000600000000'
-                currentReward: '600000000'
-                minIncrement: '50000000'
-                term: 100000
-                nextCheck: 3439999
-                votingIntervalStart: 3430000
-                votingInterval: 10000
-                votingThreshold: 5001
-                votes:
-                  increase: 0
-                  decrease: 0
+              examples:
+                largeSignificandblockchainRewards:
+                  $ref: '#/components/examples/largeSignificandblockchainRewards'
   '/transactions/status/{id}':
     get:
       tags:
@@ -4443,6 +4423,20 @@ components:
         desiredReward: '30000'
         VRF: 'some_string_should_be_here'
         transactionsRoot: 'some_string_should_be_here'
+    largeSignificandblockchainRewards:
+      value:
+        height: 3340000
+        totalWavesAmount: '10960000600000000'
+        currentReward: '600000000'
+        minIncrement: '50000000'
+        term: 100000
+        nextCheck: 3439999
+        votingIntervalStart: 3430000
+        votingInterval: 10000
+        votingThreshold: 5001
+        votes:
+          increase: 0
+          decrease: 0
   securitySchemes:
     APIKey:
       type: apiKey
