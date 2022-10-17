@@ -25,7 +25,7 @@ trait ApiError {
 }
 
 //noinspection TypeAnnotation
-object  ApiError {
+object ApiError {
   implicit def fromValidationError(e: ValidationError): ApiError = {
     e match {
       case TxValidationError.InvalidAddress(_)               => InvalidAddress
