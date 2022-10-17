@@ -710,6 +710,12 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Block'
+            application/json;large-significand-format=string:
+              schema:
+                $ref: '#/components/schemas/Block'
+              examples:
+                largeSignificandBlock:
+                  $ref: '#/components/examples/largeSignificandBlock'
   '/blocks/seq/{from}/{to}':
     get:
       tags:
@@ -741,6 +747,12 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Block'
+            application/json;large-significand-format=string:
+              schema:
+                $ref: '#/components/schemas/Block'
+              examples:
+                largeSignificandBlock:
+                  $ref: '#/components/examples/largeSignificandBlock'
   '/blocks/delay/{id}/{blockNum}':
     get:
       tags:
@@ -802,6 +814,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Block'
+            application/json;large-significand-format=string:
+              schema:
+                $ref: '#/components/schemas/Block'
+              examples:
+                largeSignificandBlock:
+                  $ref: '#/components/examples/largeSignificandBlock'
   /blocks/last:
     get:
       tags:
@@ -816,6 +834,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Block'
+            application/json;large-significand-format=string:
+              schema:
+                $ref: '#/components/schemas/Block'
+              examples:
+                largeSignificandBlock:
+                  $ref: '#/components/examples/largeSignificandBlock'
   '/blocks/height/{id}':
     get:
       tags:
@@ -852,26 +876,9 @@ paths:
             application/json;large-significand-format=string:
               schema:
                 $ref: '#/components/schemas/BlockHeader'
-              example:
-                timestamp: 1234567890
-                version: 0
-                height: 1610000
-                totalFee: '100000'
-                reference: 'qwertyuikmn56khjkKHKJHK787'
-                generator: '3P274YB5qseSE9DTTL3bpSjosZrYBPDpJ8k'
-                generatorPublicKey: '2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY'
-                signature: 'string'
-                id: 'string'
-                nxt-consensus:
-                  base-target: 0
-                  generation-signature: 'qwertyuikmn56khjkKHKJHK787'
-                blocksize: 11234
-                transactionCount: 10
-                features: [0]
-                reward: '30000'
-                desiredReward: '30000'
-                VRF: 'some_string_should_be_here'
-                transactionsRoot: 'some_string_should_be_here'
+              examples:
+                largeSignificandBlock:
+                  $ref: '#/components/examples/largeSignificandBlock'
   '/blocks/headers/{id}':
     get:
       tags:
@@ -922,26 +929,9 @@ paths:
             application/json;large-significand-format=string:
               schema:
                 $ref: '#/components/schemas/BlockHeader'
-              example:
-                timestamp: 1234567890
-                version: 0
-                height: 1610000
-                totalFee: '100000'
-                reference: 'qwertyuikmn56khjkKHKJHK787'
-                generator: '3P274YB5qseSE9DTTL3bpSjosZrYBPDpJ8k'
-                generatorPublicKey: '2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY'
-                signature: 'string'
-                id: 'string'
-                nxt-consensus:
-                  base-target: 0
-                  generation-signature: 'qwertyuikmn56khjkKHKJHK787'
-                blocksize: 11234
-                transactionCount: 10
-                features: [0]
-                reward: '30000'
-                desiredReward: '30000'
-                VRF: 'some_string_should_be_here'
-                transactionsRoot: 'some_string_should_be_here'
+              examples:
+                largeSignificandBlock:
+                  $ref: '#/components/examples/largeSignificandBlock'
   /blocks/headers/last:
     get:
       tags:
@@ -959,26 +949,9 @@ paths:
             application/json;large-significand-format=string:
               schema:
                 $ref: '#/components/schemas/BlockHeader'
-              example:
-                timestamp: 1234567890
-                version: 0
-                height: 1610000
-                totalFee: '100000'
-                reference: 'qwertyuikmn56khjkKHKJHK787'
-                generator: '3P274YB5qseSE9DTTL3bpSjosZrYBPDpJ8k'
-                generatorPublicKey: '2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY'
-                signature: 'string'
-                id: 'string'
-                nxt-consensus:
-                  base-target: 0
-                  generation-signature: 'qwertyuikmn56khjkKHKJHK787'
-                blocksize: 11234
-                transactionCount: 10
-                features: [0]
-                reward: '30000'
-                desiredReward: '30000'
-                VRF: 'some_string_should_be_here'
-                transactionsRoot: 'some_string_should_be_here'
+              examples:
+                largeSignificandBlock:
+                  $ref: '#/components/examples/largeSignificandBlock'
   /peers/connect:
     post:
       tags:
@@ -1186,6 +1159,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RewardStatus'
+            application/json;large-significand-format=string:
+              schema:
+                $ref: '#/components/schemas/RewardStatus'
+              example:
+                height: 3340000
+                totalWavesAmount: '10960000600000000'
+                currentReward: '600000000'
+                minIncrement: '50000000'
+                term: 100000
+                nextCheck: 3439999
+                votingIntervalStart: 3430000
+                votingInterval: 10000
+                votingThreshold: 5001
+                votes:
+                  increase: 0
+                  decrease: 0
   '/blockchain/rewards/{height}':
     get:
       tags:
@@ -1207,6 +1196,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RewardStatus'
+            application/json;large-significand-format=string:
+              schema:
+                $ref: '#/components/schemas/RewardStatus'
+              example:
+                height: 3340000
+                totalWavesAmount: '10960000600000000'
+                currentReward: '600000000'
+                minIncrement: '50000000'
+                term: 100000
+                nextCheck: 3439999
+                votingIntervalStart: 3430000
+                votingInterval: 10000
+                votingThreshold: 5001
+                votes:
+                  increase: 0
+                  decrease: 0
   '/transactions/status/{id}':
     get:
       tags:
@@ -1542,6 +1547,19 @@ paths:
                   feeAmount:
                     type: integer
                     format: int64
+            application/json;large-significand-format=string:
+              schema:
+                required:
+                  - feeAmount
+                  - feeAssetId
+                type: object
+                properties:
+                  feeAssetId:
+                    type: string
+                    example: 'AGHJgjhHJGGKHJGKbjk1789jlkjl'
+                  feeAmount:
+                    type: string
+                    example: '50000'
       x-codegen-request-body-name: json
   '/transactions/sign/{signerAddress}':
     post:
@@ -4356,7 +4374,75 @@ components:
       required: true
       schema:
         $ref: '#/components/schemas/TransactionId'
-
+  examples:
+    largeSignificandBlock:
+      value:
+        timestamp: 1234567890
+        version: 0
+        height: 1610000
+        totalFee: '100000'
+        reference: 'qwertyuikmn56khjkKHKJHK787'
+        generator: '3P274YB5qseSE9DTTL3bpSjosZrYBPDpJ8k'
+        generatorPublicKey: '2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY'
+        signature: 'string'
+        id: 'string'
+        nxt-consensus:
+          base-target: 0
+          generation-signature: 'qwertyuikmn56khjkKHKJHK787'
+        blocksize: 11234
+        transactionCount: 10
+        features: [0]
+        reward: '30000'
+        desiredReward: '30000'
+        VRF: 'some_string_should_be_here'
+        transactionsRoot: 'some_string_should_be_here'
+        transactions:
+          - type: 4
+            id: '72nXQAzvDVPPyAJfwouTzThH3p2gZDiBSQa9d6LizWPh'
+            fee: '100000'
+            feeAssetId: null
+            timestamp: 1665987445497
+            version: 2
+            sender: '3PGS9W5aZ4kdBFJJ9jxmgjLW8qfqu1b3Y66'
+            senderPublicKey: 'EAtFj2ycPFH6hzAadJ9UDbo6UGTbo4fenFbGiSDVYPU6'
+            proof: ['3n8tCEh9dxqvGrc3wuaKpoYX6mpXHfEeY7GFeAKpxZP7yJpqRiiSsyHoD9uCELnNoYBamnnrvY46WzKMVfSRVWGE']
+            recipient: '3PDXpDCRkGz3jNMozjpbbrJeJZhKJHkoqjj'
+            assetId: null
+            feeAsset: null
+            amount": '100000'
+            attachment: 'Bf6'
+            applicationStatus: 'succeeded'
+          - type: 4
+            id: '72nXQAzvDVPPyAJfwouTzThH3p2gZDiBSQa9d6LizWPh'
+            fee: '100000'
+            feeAssetId: null
+            timestamp: 1665987445497
+            version: 2
+            amount: '3688883307'
+            price: '54930000'
+            buyMatcherFee: '1000'
+            sellMatcherFee: '3211053'
+    largeSignificandBlockHeader:
+      value:
+        timestamp: 1234567890
+        version: 0
+        height: 1610000
+        totalFee: '100000'
+        reference: 'qwertyuikmn56khjkKHKJHK787'
+        generator: '3P274YB5qseSE9DTTL3bpSjosZrYBPDpJ8k'
+        generatorPublicKey: '2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY'
+        signature: 'string'
+        id: 'string'
+        nxt-consensus:
+          base-target: 0
+          generation-signature: 'qwertyuikmn56khjkKHKJHK787'
+        blocksize: 11234
+        transactionCount: 10
+        features: [0]
+        reward: '30000'
+        desiredReward: '30000'
+        VRF: 'some_string_should_be_here'
+        transactionsRoot: 'some_string_should_be_here'
   securitySchemes:
     APIKey:
       type: apiKey
