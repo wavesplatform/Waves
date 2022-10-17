@@ -187,8 +187,8 @@ object Blockchain {
       else if (height > 1) PlainBlockVersion
       else GenesisBlockVersion
 
-    def binaryData(address: Address, key: String): Option[ByteStr] = blockchain.accountData(address, key).collect {
-      case BinaryDataEntry(_, value) => value
+    def binaryData(address: Address, key: String): Option[ByteStr] = blockchain.accountData(address, key).collect { case BinaryDataEntry(_, value) =>
+      value
     }
 
     def hasDApp(address: Address): Boolean =

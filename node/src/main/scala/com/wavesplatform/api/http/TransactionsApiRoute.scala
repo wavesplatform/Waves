@@ -289,7 +289,7 @@ object TransactionsApiRoute {
     def transactionMetaJson(meta: TransactionMeta): JsObject = {
       val specificInfo = meta.transaction match {
         case lease: LeaseTransaction =>
-          import com.wavesplatform.api.http.TransactionsApiRoute.LeaseStatus._
+          import com.wavesplatform.api.http.TransactionsApiRoute.LeaseStatus.*
           Json.obj("status" -> (if (blockchain.leaseDetails(lease.id()).exists(_.isActive)) active else canceled))
 
         case leaseCancel: LeaseCancelTransaction =>
@@ -359,7 +359,6 @@ object TransactionsApiRoute {
     // Extended lease format. Overrides default
     private[this] def leaseIdToLeaseRef(leaseId: ByteStr): LeaseRef = {
       val ld        = blockchain.leaseDetails(leaseId).get
-      val tm        = blockchain.transactionMeta(ld.sourceId).get
       val recipient = blockchain.resolveAlias(ld.recipient).explicitGet()
 
       val (status, cancelHeight, cancelTxId) = ld.status match {
@@ -368,7 +367,7 @@ object TransactionsApiRoute {
         case LeaseDetails.Status.Expired(height)         => (false, Some(height), None)
       }
 
-      LeaseRef(leaseId, ld.sourceId, ld.sender.toAddress, recipient, ld.amount, tm.height, LeaseStatus(status), cancelHeight, cancelTxId)
+      LeaseRef(leaseId, ld.sourceId, ld.sender.toAddress, recipient, ld.amount, ld.height, LeaseStatus(status), cancelHeight, cancelTxId)
     }
 
     private[http] implicit val leaseWrites: OWrites[InvokeScriptResult.Lease] =
@@ -378,7 +377,7 @@ object TransactionsApiRoute {
       LeaseRef.jsonWrites.contramap((l: InvokeScriptResult.LeaseCancel) => leaseIdToLeaseRef(l.id))
 
     // To override nested InvokeScriptResult writes
-    private[http] implicit lazy val invocationWrites: OWrites[InvokeScriptResult.Invocation] = (i: InvokeScriptResult.Invocation) =>
+    private[http] implicit val invocationWrites: OWrites[InvokeScriptResult.Invocation] = (i: InvokeScriptResult.Invocation) =>
       Json.obj(
         "dApp"         -> i.dApp,
         "call"         -> i.call,
@@ -386,7 +385,7 @@ object TransactionsApiRoute {
         "stateChanges" -> invokeScriptResultWrites.writes(i.stateChanges)
       )
 
-    private[http] implicit lazy val invokeScriptResultWrites: OWrites[InvokeScriptResult] = {
+    private[http] implicit val invokeScriptResultWrites: OWrites[InvokeScriptResult] = {
       import InvokeScriptResult.{issueFormat, reissueFormat, burnFormat, sponsorFeeFormat}
       Json.writes[InvokeScriptResult]
     }

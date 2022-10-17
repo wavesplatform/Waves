@@ -1,14 +1,18 @@
 package com.wavesplatform.api.common
 
+import com.google.common.collect.AbstractIterator
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
-import com.wavesplatform.database.{DBExt, DBResource, Keys}
+import com.wavesplatform.database.{AddressId, DBExt, DBResource, KeyTags, Keys, readTransactionHNSeqAndType}
 import com.wavesplatform.state.{Diff, Height, InvokeScriptResult, TransactionId, TxMeta, TxNum}
 import com.wavesplatform.transaction.{Authorized, EthereumTransaction, GenesisTransaction, Transaction, TransactionType}
 import monix.eval.Task
 import monix.reactive.Observable
-import org.rocksdb.RocksDB
+import org.rocksdb.{ReadOptions, RocksDB}
+
+import scala.jdk.CollectionConverters.*
+import scala.annotation.tailrec
 
 object AddressTransactions {
   private def loadTransaction(db: RocksDB, height: Height, txNum: TxNum, sender: Option[Address]): Option[(TxMeta, Transaction)] =
@@ -28,12 +32,18 @@ object AddressTransactions {
   def loadInvokeScriptResult(db: RocksDB, txId: ByteStr): Option[InvokeScriptResult] =
     db.withResource(r => loadInvokeScriptResult(r, txId))
 
+  def loadInvokeScriptResult(db: RocksDB, height: Height, txNum: TxNum): Option[InvokeScriptResult] =
+    db.get(Keys.invokeScriptResult(height, txNum))
+
   def loadEthereumMetadata(db: RocksDB, txId: ByteStr): Option[EthereumTransactionMeta] = db.withResource { resource =>
     for {
       tm <- resource.get(Keys.transactionMetaById(TransactionId(txId)))
       m  <- resource.get(Keys.ethereumTransactionMeta(Height(tm.height), TxNum(tm.num.toShort)))
     } yield m
   }
+
+  def loadEthereumMetadata(db: RocksDB, height: Height, txNum: TxNum): Option[EthereumTransactionMeta] =
+    db.get(Keys.ethereumTransactionMeta(height, txNum))
 
   def allAddressTransactions(
       db: RocksDB,
@@ -42,7 +52,7 @@ object AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Observable[(TxMeta, Transaction)] =
+  ): Observable[(TxMeta, Transaction, Option[TxNum])] =
     transactionsFromDiff(maybeDiff, subject, sender, types, fromId) ++
       transactionsFromDB(
         db,
@@ -58,9 +68,9 @@ object AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Observable[(TxMeta, Transaction)] = {
+  ): Observable[(TxMeta, Transaction, Option[TxNum])] = {
     db.get(Keys.addressId(subject))
-      .fold(Observable.empty[(TxMeta, Transaction)]) { addressId =>
+      .fold(Observable.empty[(TxMeta, Transaction, Option[TxNum])]) { addressId =>
         val (maxHeight, maxTxNum) =
           fromId
             .flatMap(id => db.get(Keys.transactionMetaById(TransactionId(id))))
@@ -70,20 +80,13 @@ object AddressTransactions {
 
         Observable
           .fromIterator(
-            Task {
-              (for {
-                seqNr                    <- (db.get(Keys.addressTransactionSeqNr(addressId)) to 0 by -1).view
-                (height, transactionIds) <- db.get(Keys.addressTransactionHN(addressId, seqNr)).view if height <= maxHeight
-                (txType, txNum)          <- transactionIds.view
-              } yield (height, txNum, txType))
-                .dropWhile { case (h, txNum, _) => h > maxHeight || h == maxHeight && txNum >= maxTxNum }
-                .collect { case (h, txNum, txType) if types.isEmpty || types(TransactionType(txType)) => h -> txNum }
-                .iterator
-            }
+            Task(new TxByAddressIterator(db, addressId, maxHeight, maxTxNum, types).asScala)
           )
-          .concatMapIterable { case (h, txNum) =>
-            loadTransaction(db, h, txNum, sender).toSeq
-          }
+          .concatMapIterable(_.flatMap { case (h, txNum) =>
+            loadTransaction(db, h, txNum, sender)
+              .map { case (m, tx) => (m, tx, Some(txNum)) }
+          })
+
       }
   }
 
@@ -93,7 +96,7 @@ object AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Observable[(TxMeta, Transaction)] = {
+  ): Observable[(TxMeta, Transaction, Option[TxNum])] = {
     Observable.fromIterator(
       Task {
         (for {
@@ -104,9 +107,36 @@ object AddressTransactions {
           .dropWhile { case (_, tx) => fromId.isDefined && !fromId.contains(tx.id()) }
           .dropWhile { case (_, tx) => fromId.contains(tx.id()) }
           .filter { case (_, tx) => types.isEmpty || types.contains(tx.tpe) }
-          .collect { case v @ (_, tx: Authorized) if sender.forall(_ == tx.sender.toAddress) => v }
+          .collect { case (m, tx: Authorized) if sender.forall(_ == tx.sender.toAddress) => (m, tx, None) }
           .iterator
       }
     )
+  }
+
+  class TxByAddressIterator(db: RocksDB, addressId: AddressId, maxHeight: Int, maxTxNum: Int, types: Set[Transaction.Type])
+      extends AbstractIterator[Seq[(Height, TxNum)]] {
+    val dbIterator = db.newIterator(new ReadOptions().setTotalOrderSeek(false).setPrefixSameAsStart(true))
+    val prefix     = KeyTags.AddressTransactionHeightTypeAndNums.prefixBytes ++ addressId.toByteArray
+    val seqNr      = db.get(Keys.addressTransactionSeqNr(addressId))
+
+    dbIterator.seekForPrev(Keys.addressTransactionHN(addressId, seqNr).keyBytes)
+
+    @tailrec
+    final override def computeNext(): Seq[(Height, TxNum)] = {
+      if (dbIterator.isValid) {
+        val (height, txs) = readTransactionHNSeqAndType(dbIterator.value())
+        dbIterator.prev()
+        if (height > maxHeight) {
+          computeNext()
+        } else if (height == maxHeight) {
+          txs.view
+            .dropWhile { case (_, txNum) => txNum >= maxTxNum }
+            .collect { case (tp, txNum) if types.isEmpty || types(TransactionType(tp)) => (height, txNum) }
+            .toSeq
+        } else {
+          txs.collect { case (tp, txNum) if types.isEmpty || types(TransactionType(tp)) => (height, txNum) }
+        }
+      } else endOfData()
+    }
   }
 }
