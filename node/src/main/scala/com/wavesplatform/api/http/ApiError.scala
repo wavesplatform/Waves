@@ -25,14 +25,14 @@ trait ApiError {
 }
 
 //noinspection TypeAnnotation
-object ApiError {
+object  ApiError {
   implicit def fromValidationError(e: ValidationError): ApiError = {
     e match {
       case TxValidationError.InvalidAddress(_)               => InvalidAddress
       case TxValidationError.NegativeAmount(x, of)           => NegativeAmount(s"$x of $of")
       case TxValidationError.NonPositiveAmount(x, of)        => NonPositiveAmount(s"$x of $of")
       case TxValidationError.InvalidDecimals(decimals)       => InvalidDecimals(decimals.toString)
-      case TxValidationError.NegativeMinFee(x, of)           => NegativeMinFee(s"$x per $of")
+      case TxValidationError.NegativeMin Fee(x, of)           => NegativeMinFee(s"$x per $of")
       case TxValidationError.InsufficientFee                 => InsufficientFee
       case TxValidationError.InvalidName                     => InvalidName
       case TxValidationError.InvalidSignature(_, _)          => InvalidSignature

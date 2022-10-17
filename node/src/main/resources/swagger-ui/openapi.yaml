@@ -527,6 +527,36 @@ paths:
                   effective:
                     type: integer
                     format: int64
+            application/json;large-significand-format=string:
+              schema:
+                required:
+                  - address
+                  - available
+                  - effective
+                  - generating
+                  - regular
+                type: object
+                properties:
+                  address:
+                    type: string
+                  regular:
+                    type: integer
+                    format: int64
+                  generating:
+                    type: integer
+                    format: int64
+                  available:
+                    type: integer
+                    format: int64
+                  effective:
+                    type: integer
+                    format: int64
+                example:
+                  address: '2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY'
+                  available: '50000'
+                  effective: '60000'
+                  generating: '700000'
+                  regular: '800000'
   '/addresses/balance/{address}/{confirmations}':
     get:
       tags:
@@ -819,6 +849,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BlockHeader'
+            application/json;large-significand-format=string:
+              schema:
+                $ref: '#/components/schemas/BlockHeader'
+              example:
+                timestamp: 1234567890
+                version: 0
+                height: 1610000
+                totalFee: '100000'
+                reference: 'qwertyuikmn56khjkKHKJHK787'
+                generator: '3P274YB5qseSE9DTTL3bpSjosZrYBPDpJ8k'
+                generatorPublicKey: '2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY'
+                signature: 'string'
+                id: 'string'
+                nxt-consensus:
+                  base-target: 0
+                  generation-signature: 'qwertyuikmn56khjkKHKJHK787'
+                blocksize: 11234
+                transactionCount: 10
+                features: [0]
+                reward: '30000'
+                desiredReward: '30000'
+                VRF: 'some_string_should_be_here'
+                transactionsRoot: 'some_string_should_be_here'
   '/blocks/headers/{id}':
     get:
       tags:
@@ -866,6 +919,29 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/BlockHeader'
+            application/json;large-significand-format=string:
+              schema:
+                $ref: '#/components/schemas/BlockHeader'
+              example:
+                timestamp: 1234567890
+                version: 0
+                height: 1610000
+                totalFee: '100000'
+                reference: 'qwertyuikmn56khjkKHKJHK787'
+                generator: '3P274YB5qseSE9DTTL3bpSjosZrYBPDpJ8k'
+                generatorPublicKey: '2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY'
+                signature: 'string'
+                id: 'string'
+                nxt-consensus:
+                  base-target: 0
+                  generation-signature: 'qwertyuikmn56khjkKHKJHK787'
+                blocksize: 11234
+                transactionCount: 10
+                features: [0]
+                reward: '30000'
+                desiredReward: '30000'
+                VRF: 'some_string_should_be_here'
+                transactionsRoot: 'some_string_should_be_here'
   /blocks/headers/last:
     get:
       tags:
@@ -880,6 +956,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BlockHeader'
+            application/json;large-significand-format=string:
+              schema:
+                $ref: '#/components/schemas/BlockHeader'
+              example:
+                timestamp: 1234567890
+                version: 0
+                height: 1610000
+                totalFee: '100000'
+                reference: 'qwertyuikmn56khjkKHKJHK787'
+                generator: '3P274YB5qseSE9DTTL3bpSjosZrYBPDpJ8k'
+                generatorPublicKey: '2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY'
+                signature: 'string'
+                id: 'string'
+                nxt-consensus:
+                  base-target: 0
+                  generation-signature: 'qwertyuikmn56khjkKHKJHK787'
+                blocksize: 11234
+                transactionCount: 10
+                features: [0]
+                reward: '30000'
+                desiredReward: '30000'
+                VRF: 'some_string_should_be_here'
+                transactionsRoot: 'some_string_should_be_here'
   /peers/connect:
     post:
       tags:
