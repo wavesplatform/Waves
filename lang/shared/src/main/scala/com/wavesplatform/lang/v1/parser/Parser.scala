@@ -170,7 +170,7 @@ object Parser {
 
   def functionCallArgs[A: P]: P[Seq[EXPR]] = comment ~ baseExpr.rep(0, comment ~ "," ~ comment) ~ comment
 
-  def functionCallOrRef[A: P]: P[EXPR] = (Index ~~ lfunP ~~ P("(" ~/ functionCallArgs ~ ")").? ~~ Index).map {
+  def functionCallOrRef[A: P]: P[EXPR] = (Index ~~ lfunP ~~ P("(" ~ functionCallArgs.opaque("""")"""") ~/ ")").? ~~ Index).map {
     case (start, REF(_, functionName, _, _), Some(args), accessEnd) => FUNCTION_CALL(Pos(start, accessEnd), functionName, args.toList)
     case (_, id, None, _)                                           => id
   }
@@ -374,7 +374,7 @@ object Parser {
   def getterOrOOPCall[A: P]: P[Accessor] =
     (genericMethodName ~~/ ("[" ~ unionTypeP ~/ "]")).map { case (name, tpe) =>
       GenericMethod(name, tpe)
-    } | (accessOrName.map(Getter) ~/ comment ~~ ("(" ~/ comment ~ functionCallArgs ~ comment ~ ")").?).map { case (g @ Getter(name), args) =>
+    } | (accessOrName.map(Getter) ~/ comment ~~ ("(" ~/ comment ~ functionCallArgs.opaque("""")"""") ~ comment ~/ ")").?).map { case (g @ Getter(name), args) =>
       args.fold(g: Accessor)(Method(name, _))
     }
 

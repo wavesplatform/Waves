@@ -29,6 +29,21 @@ class RoundBraceParseErrorTest extends ParseErrorTest {
     )
   }
 
+  property("missing closing round brace of function call without arguments") {
+    assert(
+      """
+        | func f() = 0
+        | let a = f(
+        | func g() = a
+      """.stripMargin,
+      """Parse error: expected ")", found "func"""",
+      27,
+      31,
+      " func",
+      endExpr = false
+    )
+  }
+
   property("missing closing round brace of OOP style call") {
     assert(
       """
@@ -40,6 +55,20 @@ class RoundBraceParseErrorTest extends ParseErrorTest {
       48,
       52,
       " func"
+    )
+  }
+
+  property("missing closing round brace of OOP style call without arguments") {
+    assert(
+      """
+        | let c = "".parseInt(
+        | func g() = c
+      """.stripMargin,
+      """Parse error: expected ")", found "func"""",
+      23,
+      27,
+      " func",
+      endExpr = false
     )
   }
 
