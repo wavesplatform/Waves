@@ -43,15 +43,15 @@ class UnderscoreTest extends PropSpec {
   }
 
   property("two or more underscores in a row are prohibited") {
-    assert("__aa_a_a_", "_ff_f_f_", "_xx_x_x_") should produce("""expected not more than 1 underscore in a row in 2-14""")
-    assert("_aa__a_a_", "_ff_f_f_", "_xx_x_x_") should produce("""expected not more than 1 underscore in a row in 2-14""")
-    assert("_aa_a_a__", "_ff_f_f_", "_xx_x_x_") should produce("""expected not more than 1 underscore in a row in 2-14""")
-    assert("_aa_a_a_", "__ff_f_f_", "_xx_x_x_") should produce("""expected not more than 1 underscore in a row in 20-43""")
-    assert("_aa_a_a_", "_ff__f_f_", "_xx_x_x_") should produce("""expected not more than 1 underscore in a row in 20-43""")
-    assert("_aa_a_a_", "_ff_f_f__", "_xx_x_x_") should produce("""expected not more than 1 underscore in a row in 20-43""")
-    assert("_aa_a_a_", "_ff_f_f_", "__xx_x_x_") should produce("""expected not more than 1 underscore in a row in 20-43""")
-    assert("_aa_a_a_", "_ff_f_f_", "_xx__x_x_") should produce("""expected not more than 1 underscore in a row in 20-43""")
-    assert("_aa_a_a_", "_ff_f_f_", "_xx_x_x__") should produce("""expected not more than 1 underscore in a row in 20-43""")
+    assert("__aa_a_a_", "_ff_f_f_", "_xx_x_x_") should produce("expected not more than 1 underscore in a row in 6-15")
+    assert("_aa__a_a_", "_ff_f_f_", "_xx_x_x_") should produce("expected not more than 1 underscore in a row in 9-15")
+    assert("_aa_a_a__", "_ff_f_f_", "_xx_x_x_") should produce("expected not more than 1 underscore in a row in 13-15")
+    assert("_aa_a_a_", "__ff_f_f_", "_xx_x_x_") should produce("expected not more than 1 underscore in a row in 25-44")
+    assert("_aa_a_a_", "_ff__f_f_", "_xx_x_x_") should produce("expected not more than 1 underscore in a row in 28-44")
+    assert("_aa_a_a_", "_ff_f_f__", "_xx_x_x_") should produce("expected not more than 1 underscore in a row in 32-44")
+    assert("_aa_a_a_", "_ff_f_f_", "__xx_x_x_") should produce("expected not more than 1 underscore in a row in 34-44")
+    assert("_aa_a_a_", "_ff_f_f_", "_xx__x_x_") should produce("expected not more than 1 underscore in a row in 37-44")
+    assert("_aa_a_a_", "_ff_f_f_", "_xx_x_x__") should produce("expected not more than 1 underscore in a row in 41-44")
   }
 
   property("internal functions can't be used directly") {

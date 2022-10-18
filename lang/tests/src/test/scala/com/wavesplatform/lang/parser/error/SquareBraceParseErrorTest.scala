@@ -8,9 +8,9 @@ class SquareBraceParseErrorTest extends ParseErrorTest {
         | func f() = true
       """.stripMargin,
       """Parse error: expected "]"""",
-      19,
-      23,
-      " func"
+      17,
+      20,
+      "3\n "
     )
   }
 
@@ -21,9 +21,9 @@ class SquareBraceParseErrorTest extends ParseErrorTest {
         | func f() = true
       """.stripMargin,
       """Parse error: expected "]"""",
-      16,
+      19,
       20,
-      "2, [,"
+      "["
     )
   }
 
@@ -35,9 +35,9 @@ class SquareBraceParseErrorTest extends ParseErrorTest {
         | func f() = true
       """.stripMargin,
       """Parse error: expected "]"""",
-      39,
-      43,
-      " func"
+      37,
+      40,
+      "1\n "
     )
   }
 
@@ -48,9 +48,9 @@ class SquareBraceParseErrorTest extends ParseErrorTest {
         | func f() = true
       """.stripMargin,
       """Parse error: expected "]"""",
-      29,
-      33,
-      " func"
+      27,
+      30,
+      "]\n "
     )
   }
 
@@ -58,9 +58,9 @@ class SquareBraceParseErrorTest extends ParseErrorTest {
     assert(
       """func f(a: List[List[String]|Int, b: ByteVector) = true""",
       """Parse error: expected "]"""",
-      5,
+      10,
       31,
-      "f(a: List[List[String]|Int,"
+      "List[List[String]|Int"
     )
   }
 
@@ -71,9 +71,9 @@ class SquareBraceParseErrorTest extends ParseErrorTest {
         | func f() = 1
       """.stripMargin,
       """Parse error: expected "]"""",
-      49,
-      53,
-      " func"
+      47,
+      50,
+      "t\n "
     )
   }
 }

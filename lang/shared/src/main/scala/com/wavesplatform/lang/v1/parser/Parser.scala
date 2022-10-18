@@ -569,7 +569,7 @@ object Parser {
     }(c)
 
   def parseExpr(str: String): Parsed[EXPR] = {
-    def expr[A: P] = P(Start ~ unusedText ~ (baseExpr | invalid) ~ End)
+    def expr[A: P] = P(Start ~ unusedText ~ (baseExpr | invalid | ("" ~/ Fail).opaque("result expression")) ~ End)
     parse(str, expr(_), verboseFailures = true)
   }
 
@@ -675,10 +675,22 @@ object Parser {
       }
   }
 
+  private val moveRightKeywords = Seq(""""func"""", """"let"""", " expression", "1 underscore")
+
   def toString(input: String, f: Failure): String = {
-    val found = input.drop(f.index).takeWhile(!_.isWhitespace)
-    val start = input.lastIndexWhere(_.isWhitespace, input.lastIndexWhere(_.isWhitespace, f.index) - 1) + 1
-    val end   = f.index + found.length - 1
+    val (start, end) =
+      if (moveRightKeywords.exists(f.label.contains)) {
+        val end = input.indexWhere(_.isWhitespace, f.index)
+        (f.index, if (end == -1) f.index else end)
+      }
+      else {
+        val start =
+          if (input(f.index - 1).isWhitespace)
+            input.lastIndexWhere(!_.isWhitespace, f.index - 1)
+          else
+            input.lastIndexWhere(_.isWhitespace, f.index - 1) + 1
+        (start, f.index)
+      }
     s"Parse error: expected ${f.label} in $start-$end"
   }
 }

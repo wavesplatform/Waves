@@ -10,8 +10,8 @@ class FuncDefParseErrorTest extends ParseErrorTest {
       """.stripMargin,
       """Parse error: expected "("""",
       29,
-      32,
-      "f a:"
+      31,
+      "f "
     )
   }
 
@@ -23,9 +23,9 @@ class FuncDefParseErrorTest extends ParseErrorTest {
         | func f(a: Int = a
       """.stripMargin,
       """Parse error: expected ")"""",
-      34,
+      36,
       38,
-      "Int ="
+      "t "
     )
   }
 
@@ -37,9 +37,9 @@ class FuncDefParseErrorTest extends ParseErrorTest {
         | func f(a: Int) a
       """.stripMargin,
       """Parse error: expected "="""",
-      34,
+      37,
       39,
-      "Int) a"
+      ") "
     )
   }
 
@@ -51,9 +51,9 @@ class FuncDefParseErrorTest extends ParseErrorTest {
         | func f(Int a) = a
       """.stripMargin,
       """Parse error: expected ":"""",
-      29,
-      36,
-      "f(Int a)"
+      33,
+      35,
+      "t "
     )
   }
 
@@ -65,9 +65,9 @@ class FuncDefParseErrorTest extends ParseErrorTest {
         | func f(a, b, c) = a
       """.stripMargin,
       """Parse error: expected ":"""",
-      24,
+      29,
       32,
-      "func f(a,"
+      "f(a"
     )
   }
 
@@ -79,9 +79,9 @@ class FuncDefParseErrorTest extends ParseErrorTest {
         | func f(a Int, b: String, c) a
       """.stripMargin,
       """Parse error: expected ":"""",
-      29,
-      36,
-      "f(a Int,"
+      31,
+      33,
+      "a "
     )
   }
 
@@ -93,9 +93,9 @@ class FuncDefParseErrorTest extends ParseErrorTest {
         | f(a: Int) = a
       """.stripMargin,
       """Parse error: expected "func" keyword""",
-      23,
-      27,
-      " f(a:"
+      24,
+      28,
+      "f(a:"
     )
   }
 
@@ -108,7 +108,7 @@ class FuncDefParseErrorTest extends ParseErrorTest {
       """.stripMargin,
       """Parse error: expected function name""",
       24,
-      27,
+      28,
       "func",
       endExpr = false
     )
@@ -123,7 +123,7 @@ class FuncDefParseErrorTest extends ParseErrorTest {
       """.stripMargin,
       """Parse error: expected function name""",
       24,
-      27,
+      28,
       "func"
     )
   }
@@ -136,9 +136,9 @@ class FuncDefParseErrorTest extends ParseErrorTest {
         | func f(a: Int) =
       """.stripMargin,
       """Parse error: expected function body""",
-      46,
-      46,
-      " ",
+      39,
+      47,
+      "=\n      ",
       endExpr = false
     )
   }
@@ -151,9 +151,9 @@ class FuncDefParseErrorTest extends ParseErrorTest {
         |
       """.stripMargin,
       """Parse error: expected "}"""",
-      35,
-      35,
-      " ",
+      27,
+      36,
+      "e\n\n      ",
       endExpr = false
     )
   }
@@ -167,7 +167,7 @@ class FuncDefParseErrorTest extends ParseErrorTest {
       """.stripMargin,
       """Parse error: expected expression""",
       26,
-      26,
+      27,
       "1"
     )
   }

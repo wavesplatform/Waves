@@ -10,7 +10,7 @@ class LetDefParseErrorTest extends ParseErrorTest {
       """Parse error: expected "="""",
       17,
       19,
-      "y x"
+      "y "
     )
   }
 
@@ -21,9 +21,9 @@ class LetDefParseErrorTest extends ParseErrorTest {
         | y = x
       """.stripMargin,
       """Parse error: expected "let" or "strict" keyword""",
-      12,
       13,
-      " y"
+      14,
+      "y"
     )
   }
 
@@ -35,7 +35,7 @@ class LetDefParseErrorTest extends ParseErrorTest {
       """.stripMargin,
       """Parse error: expected variable name""",
       13,
-      15,
+      16,
       "let",
       endExpr = false
     )
@@ -49,7 +49,7 @@ class LetDefParseErrorTest extends ParseErrorTest {
       """.stripMargin,
       """Parse error: expected variable name""",
       13,
-      15,
+      16,
       "let"
     )
   }
@@ -61,9 +61,9 @@ class LetDefParseErrorTest extends ParseErrorTest {
         | let y =
       """.stripMargin,
       """Parse error: expected let body""",
-      26,
-      26,
-      " ",
+      19,
+      27,
+      "=\n      ",
       endExpr = false
     )
   }
@@ -76,9 +76,9 @@ class LetDefParseErrorTest extends ParseErrorTest {
         |
       """.stripMargin,
       """Parse error: expected "}"""",
-      26,
-      26,
-      " ",
+      18,
+      27,
+      "e\n\n      ",
       endExpr = false
     )
   }
@@ -92,7 +92,7 @@ class LetDefParseErrorTest extends ParseErrorTest {
       """.stripMargin,
       """Parse error: expected expression""",
       30,
-      30,
+      31,
       "}"
     )
   }

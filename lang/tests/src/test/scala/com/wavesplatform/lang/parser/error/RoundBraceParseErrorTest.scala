@@ -9,9 +9,9 @@ class RoundBraceParseErrorTest extends ParseErrorTest {
         | let c = a + b
       """.stripMargin,
       """Parse error: expected ")"""",
-      38,
-      41,
-      " let"
+      36,
+      39,
+      "3\n "
     )
   }
 
@@ -23,9 +23,9 @@ class RoundBraceParseErrorTest extends ParseErrorTest {
         | func g() = c
       """.stripMargin,
       """Parse error: expected ")"""",
-      49,
-      53,
-      " func"
+      47,
+      50,
+      "2\n "
     )
   }
 
@@ -37,9 +37,9 @@ class RoundBraceParseErrorTest extends ParseErrorTest {
         | func g() = a
       """.stripMargin,
       """Parse error: expected ")"""",
-      27,
-      31,
-      " func",
+      25,
+      28,
+      "(\n ",
       endExpr = false
     )
   }
@@ -52,9 +52,9 @@ class RoundBraceParseErrorTest extends ParseErrorTest {
         | func g() = c
       """.stripMargin,
       """Parse error: expected ")"""",
-      48,
-      52,
-      " func"
+      46,
+      49,
+      "2\n "
     )
   }
 
@@ -65,9 +65,9 @@ class RoundBraceParseErrorTest extends ParseErrorTest {
         | func g() = c
       """.stripMargin,
       """Parse error: expected ")"""",
-      23,
-      27,
-      " func",
+      21,
+      24,
+      "(\n ",
       endExpr = false
     )
   }
@@ -81,9 +81,9 @@ class RoundBraceParseErrorTest extends ParseErrorTest {
         | func f() = 1
       """.stripMargin,
       """Parse error: expected ")"""",
-      89,
-      93,
-      " func"
+      87,
+      90,
+      "m\n "
     )
   }
 
@@ -94,9 +94,9 @@ class RoundBraceParseErrorTest extends ParseErrorTest {
         | let b = 1
       """.stripMargin,
       """Parse error: expected ")"""",
-      16,
-      19,
-      " let"
+      14,
+      17,
+      "2\n "
     )
   }
 
@@ -107,9 +107,9 @@ class RoundBraceParseErrorTest extends ParseErrorTest {
         | let b = 1
       """.stripMargin,
       """Parse error: expected ")"""",
-      35,
+      47,
       48,
-      "List[Int]), c:"
+      "c"
     )
   }
 
@@ -122,7 +122,7 @@ class RoundBraceParseErrorTest extends ParseErrorTest {
       """Parse error: expected ")"""",
       13,
       15,
-      "c ="
+      "c "
     )
   }
 
@@ -133,9 +133,9 @@ class RoundBraceParseErrorTest extends ParseErrorTest {
         | func f() = []
       """.stripMargin,
       """Parse error: expected ")"""",
-      14,
-      18,
-      " func",
+      12,
+      15,
+      "i\n ",
       onlyDApp = true
     )
   }
@@ -150,9 +150,9 @@ class RoundBraceParseErrorTest extends ParseErrorTest {
         |   }
       """.stripMargin,
       """Parse error: expected ")"""",
-      89,
-      98,
-      "String) =>"
+      95,
+      97,
+      ") "
     )
   }
 
@@ -166,9 +166,9 @@ class RoundBraceParseErrorTest extends ParseErrorTest {
         |   }
       """.stripMargin,
       """Parse error: expected ")"""",
-      65,
-      75,
-      "base58'' =>"
+      72,
+      74,
+      "' "
     )
   }
 }

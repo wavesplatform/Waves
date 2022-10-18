@@ -12,9 +12,9 @@ class CurlyBraceParseErrorTest extends ParseErrorTest {
         | func f() = 1
       """.stripMargin,
       """Parse error: expected "}"""",
-      113,
-      117,
-      " func"
+      110,
+      114,
+      ")\n\n "
     )
   }
 
@@ -31,9 +31,9 @@ class CurlyBraceParseErrorTest extends ParseErrorTest {
         | }
       """.stripMargin,
       """Parse error: expected "}"""",
-      119,
-      123,
-      " case"
+      115,
+      120,
+      ")\n   "
     )
   }
 
@@ -50,9 +50,9 @@ class CurlyBraceParseErrorTest extends ParseErrorTest {
         | func f() = true
       """.stripMargin,
       """Parse error: expected "}"""",
-      62,
-      66,
-      " then"
+      58,
+      63,
+      "x\n   "
     )
   }
 
@@ -72,9 +72,9 @@ class CurlyBraceParseErrorTest extends ParseErrorTest {
         | func f() = true
       """.stripMargin,
       """Parse error: expected "}"""",
-      110,
-      114,
-      " else"
+      106,
+      111,
+      ")\n   "
     )
   }
 
@@ -97,9 +97,9 @@ class CurlyBraceParseErrorTest extends ParseErrorTest {
         | func f() = true
       """.stripMargin,
       """Parse error: expected "}"""",
-      183,
-      187,
-      " func"
+      180,
+      184,
+      "}\n\n "
     )
   }
 }

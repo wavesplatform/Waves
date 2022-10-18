@@ -19,6 +19,6 @@ abstract class ParseErrorTest extends PropSpec {
     val expr      = if (endExpr) script + "\ntrue" else script
     TestCompiler(V6).compile(script) shouldBe Left(fullError)
     if (!onlyDApp) TestCompiler(V6).compileExpressionE(expr) shouldBe Left(fullError)
-    script.slice(start, end + 1) shouldBe highlighting
+    script.slice(start, end) shouldBe highlighting
   }
 }
