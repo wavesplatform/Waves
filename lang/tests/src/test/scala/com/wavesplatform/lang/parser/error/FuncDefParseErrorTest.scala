@@ -8,7 +8,7 @@ class FuncDefParseErrorTest extends ParseErrorTest {
         | let y = 1
         | func f a: Int) = a
       """.stripMargin,
-      """Parse error: expected "(", found "a:"""",
+      """Parse error: expected "("""",
       29,
       32,
       "f a:"
@@ -22,7 +22,7 @@ class FuncDefParseErrorTest extends ParseErrorTest {
         | let y = 1
         | func f(a: Int = a
       """.stripMargin,
-      """Parse error: expected ")", found "="""",
+      """Parse error: expected ")"""",
       34,
       38,
       "Int ="
@@ -36,7 +36,7 @@ class FuncDefParseErrorTest extends ParseErrorTest {
         | let y = 1
         | func f(a: Int) a
       """.stripMargin,
-      """Parse error: expected "=", found "a"""",
+      """Parse error: expected "="""",
       34,
       39,
       "Int) a"
@@ -50,7 +50,7 @@ class FuncDefParseErrorTest extends ParseErrorTest {
         | let y = 1
         | func f(a Int) = a
       """.stripMargin,
-      """Parse error: expected ":", found "Int)"""",
+      """Parse error: expected ":"""",
       29,
       36,
       "f(a Int)"
@@ -64,7 +64,7 @@ class FuncDefParseErrorTest extends ParseErrorTest {
         | let y = 1
         | func f(Int a) = a
       """.stripMargin,
-      """Parse error: expected ":", found "a)"""",
+      """Parse error: expected ":"""",
       29,
       36,
       "f(Int a)"
@@ -78,7 +78,7 @@ class FuncDefParseErrorTest extends ParseErrorTest {
         | let y = 1
         | func f(a, b, c) = a
       """.stripMargin,
-      """Parse error: expected ":", found ","""",
+      """Parse error: expected ":"""",
       24,
       32,
       "func f(a,"
@@ -92,7 +92,7 @@ class FuncDefParseErrorTest extends ParseErrorTest {
         | let y = 1
         | func f(a Int, b: String, c) a
       """.stripMargin,
-      """Parse error: expected ":", found "Int,"""",
+      """Parse error: expected ":"""",
       29,
       36,
       "f(a Int,"
@@ -106,7 +106,7 @@ class FuncDefParseErrorTest extends ParseErrorTest {
         | let y = 1
         | f(a: Int) = a
       """.stripMargin,
-      """Parse error: expected "func" keyword, found "f(a:"""",
+      """Parse error: expected "func" keyword""",
       23,
       27,
       " f(a:"

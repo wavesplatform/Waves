@@ -260,9 +260,10 @@ object Parser {
       .map { case (start, name, args, expr, end) => FUNC(Pos(start, end), expr, name, args) }
   }
 
-  def annotationP[A: P]: P[ANNOTATION] = (Index ~~ "@" ~ anyVarName ~ comment ~ "(" ~ comment ~ anyVarName.rep(0, ",") ~ comment ~/ ")" ~~ Index).map {
-    case (start, name: PART[String], args: Seq[PART[String]], end) => ANNOTATION(Pos(start, end), name, args)
-  }
+  def annotationP[A: P]: P[ANNOTATION] =
+    (Index ~~ "@" ~ anyVarName ~ comment ~ "(" ~ comment ~ anyVarName.rep(0, ",") ~ comment ~/ ")" ~~ Index).map {
+      case (start, name: PART[String], args: Seq[PART[String]], end) => ANNOTATION(Pos(start, end), name, args)
+    }
 
   def annotatedFunc[A: P]: P[ANNOTATEDFUNC] = (Index ~~ annotationP.rep(1) ~ comment ~ funcP ~~ Index).map { case (start, as, f, end) =>
     ANNOTATEDFUNC(Pos(start, end), as, f)
@@ -374,8 +375,9 @@ object Parser {
   def getterOrOOPCall[A: P]: P[Accessor] =
     (genericMethodName ~~/ ("[" ~ unionTypeP ~/ "]")).map { case (name, tpe) =>
       GenericMethod(name, tpe)
-    } | (accessOrName.map(Getter) ~/ comment ~~ ("(" ~/ comment ~ functionCallArgs.opaque("""")"""") ~ comment ~/ ")").?).map { case (g @ Getter(name), args) =>
-      args.fold(g: Accessor)(Method(name, _))
+    } | (accessOrName.map(Getter) ~/ comment ~~ ("(" ~/ comment ~ functionCallArgs.opaque("""")"""") ~ comment ~/ ")").?).map {
+      case (g @ Getter(name), args) =>
+        args.fold(g: Accessor)(Method(name, _))
     }
 
   def maybeAccessP[A: P]: P[EXPR] =
@@ -675,15 +677,8 @@ object Parser {
 
   def toString(input: String, f: Failure): String = {
     val found = input.drop(f.index).takeWhile(!_.isWhitespace)
-    val betterFound = if (f.label.exists(_.isWhitespace)) {
-      val beforeFound = input.take(input.indexOf(found))
-      beforeFound.drop(beforeFound.lastIndexWhere(_.isWhitespace) + 1) ++ found
-    } else found
     val start = input.lastIndexWhere(_.isWhitespace, input.lastIndexWhere(_.isWhitespace, f.index) - 1) + 1
     val end   = f.index + found.length - 1
-    if (betterFound.nonEmpty)
-      s"Parse error: expected ${f.label}, found \"$betterFound\" in $start-$end"
-    else
-      s"Parse error: expected ${f.label} in $start-$end"
+    s"Parse error: expected ${f.label} in $start-$end"
   }
 }

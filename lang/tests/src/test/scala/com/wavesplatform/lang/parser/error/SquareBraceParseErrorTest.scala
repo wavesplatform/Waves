@@ -7,7 +7,7 @@ class SquareBraceParseErrorTest extends ParseErrorTest {
         | let x = [1, 2, 3
         | func f() = true
       """.stripMargin,
-      """Parse error: expected "]", found "func"""",
+      """Parse error: expected "]"""",
       19,
       23,
       " func"
@@ -20,7 +20,7 @@ class SquareBraceParseErrorTest extends ParseErrorTest {
         | let x = [[1], 2, [, [[[]]]
         | func f() = true
       """.stripMargin,
-      """Parse error: expected "]", found ","""",
+      """Parse error: expected "]"""",
       16,
       20,
       "2, [,"
@@ -34,7 +34,7 @@ class SquareBraceParseErrorTest extends ParseErrorTest {
         | let a = list[1
         | func f() = true
       """.stripMargin,
-      """Parse error: expected "]", found "func"""",
+      """Parse error: expected "]"""",
       39,
       43,
       " func"
@@ -47,7 +47,7 @@ class SquareBraceParseErrorTest extends ParseErrorTest {
         | let a = [[1]][[1, 2, 3][1]
         | func f() = true
       """.stripMargin,
-      """Parse error: expected "]", found "func"""",
+      """Parse error: expected "]"""",
       29,
       33,
       " func"
@@ -57,7 +57,7 @@ class SquareBraceParseErrorTest extends ParseErrorTest {
   property("missing closing square brace of generic type") {
     assert(
       """func f(a: List[List[String]|Int, b: ByteVector) = true""",
-      """Parse error: expected "]", found ","""",
+      """Parse error: expected "]"""",
       5,
       31,
       "f(a: List[List[String]|Int,"
@@ -70,7 +70,7 @@ class SquareBraceParseErrorTest extends ParseErrorTest {
         | let a = (if true then 1 else unit).exactAs[Int
         | func f() = 1
       """.stripMargin,
-      """Parse error: expected "]", found "func"""",
+      """Parse error: expected "]"""",
       49,
       53,
       " func"
