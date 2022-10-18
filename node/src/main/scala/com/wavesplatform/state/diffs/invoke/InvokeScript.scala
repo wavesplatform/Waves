@@ -1,14 +1,12 @@
 package com.wavesplatform.state.diffs.invoke
 
-import com.wavesplatform.account._
+import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.{Authorized, TransactionBase, TxTimestamp}
-import play.api.libs.json.{JsObject, Json}
 
 trait InvokeScriptLike {
   def dApp: AddressOrAlias
@@ -32,12 +30,6 @@ object InvokeScriptLike {
 
     def txId: ByteStr          = isl.root.id()
     def timestamp: TxTimestamp = isl.root.timestamp
-
-    def toJson: JsObject =
-      Json.obj(
-        "dApp"             -> isl.dApp.toString,
-        "payment"          -> isl.payments
-      ) ++ Json.obj("call" -> InvokeScriptTxSerializer.functionCallToJson(isl.funcCall))
   }
 
   val IssuedAssets: PartialFunction[Payment, IssuedAsset] = { case Payment(_, assetId: IssuedAsset) => assetId }
