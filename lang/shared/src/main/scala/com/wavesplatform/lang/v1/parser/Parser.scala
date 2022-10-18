@@ -249,7 +249,7 @@ object Parser {
 
   def funcP(implicit c: fastparse.P[Any]): P[FUNC] = {
     def funcName       = anyVarName
-    def funcKWAndName  = "func" ~~ ((&(spaces) ~ funcName) | (&(spaces) ~~/ Fail).opaque("function name"))
+    def funcKWAndName  = "func" ~~ ((&(spaces) ~ funcName) | (&(spaces | "(") ~~/ Fail).opaque("function name"))
     def argWithType    = anyVarName ~/ ":" ~ unionTypeP ~ comment
     def args(min: Int) = "(" ~ comment ~ argWithType.rep(min, "," ~ comment) ~ ")" ~ comment
     def funcBody       = singleBaseExpr
@@ -675,15 +675,14 @@ object Parser {
       }
   }
 
-  private val moveRightKeywords = Seq(""""func"""", """"let"""", " expression", "1 underscore")
+  private val moveRightKeywords = Seq(""""func"""", """"let"""", " expression", "1 underscore", "end-of-input")
 
   def toString(input: String, f: Failure): String = {
     val (start, end) =
       if (moveRightKeywords.exists(f.label.contains)) {
         val end = input.indexWhere(_.isWhitespace, f.index)
         (f.index, if (end == -1) f.index else end)
-      }
-      else {
+      } else {
         val start =
           if (input(f.index - 1).isWhitespace)
             input.lastIndexWhere(!_.isWhitespace, f.index - 1)
@@ -691,6 +690,7 @@ object Parser {
             input.lastIndexWhere(_.isWhitespace, f.index - 1) + 1
         (start, f.index)
       }
-    s"Parse error: expected ${f.label} in $start-$end"
+    val expectation = if (f.label == "end-of-input") "illegal expression" else s"expected ${f.label}"
+    s"Parse error: $expectation in $start-$end"
   }
 }

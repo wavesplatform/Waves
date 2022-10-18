@@ -128,6 +128,20 @@ class FuncDefParseErrorTest extends ParseErrorTest {
     )
   }
 
+  property("missing function name without space") {
+    assert(
+      """
+        | let x = 1
+        | let y = 1
+        | func(a: Int) = a
+      """.stripMargin,
+      """Parse error: expected function name""",
+      24,
+      28,
+      "func"
+    )
+  }
+
   property("missing function body") {
     assert(
       """
