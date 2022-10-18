@@ -54,6 +54,20 @@ class LetDefParseErrorTest extends ParseErrorTest {
     )
   }
 
+  property("missing let body") {
+    assert(
+      """
+        | let x = 1
+        | let y =
+      """.stripMargin,
+      """Parse error: expected let body""",
+      26,
+      26,
+      " ",
+      endExpr = false
+    )
+  }
+
   property("missing closing curly brace of let body") {
     assert(
       """

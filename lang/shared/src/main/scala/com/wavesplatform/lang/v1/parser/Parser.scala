@@ -424,7 +424,7 @@ object Parser {
     def letKWAndNames = key ~~ ((&(spaces) ~ comment ~ letNames ~ comment) | ("" ~~/ Fail).opaque("variable name"))
     def noKeyword     = NoCut(letNames).filter(_.exists(_._2.isInstanceOf[VALID[_]])) ~ "=" ~~ !"=" ~/ baseExpr ~~ Fail
     def noKeywordP    = noKeyword.opaque(""""let" or "strict" keyword""").asInstanceOf[P[Nothing]]
-    def correctLets   = P(Index ~~ letKWAndNames ~/ "=" ~ baseExpr ~~ Index)
+    def correctLets   = P(Index ~~ letKWAndNames ~/ ("=" ~ baseExpr | "=" ~/ Fail.opaque("let body")) ~~ Index)
     (correctLets | noKeywordP)
       .map { case (start, names, value, end) =>
         val pos = Pos(start, end)
