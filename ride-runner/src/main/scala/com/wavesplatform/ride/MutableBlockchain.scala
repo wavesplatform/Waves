@@ -4,6 +4,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.grpc.BlockchainGrpcApi
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
@@ -26,7 +27,7 @@ import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 
 import scala.collection.mutable
 
-class MutableBlockchain(override val settings: BlockchainSettings) extends Blockchain {
+class MutableBlockchain(override val settings: BlockchainSettings, blockchainApi: BlockchainGrpcApi) extends Blockchain {
   private def kill(methodName: String) = throw new RuntimeException(methodName)
 
   private val data = mutable.AnyRefMap.empty[Address, mutable.AnyRefMap[String, DataEntry[_]]]
@@ -34,13 +35,14 @@ class MutableBlockchain(override val settings: BlockchainSettings) extends Block
     data.get(address) match {
       case Some(xs) => xs
       case None =>
-        val xs = mutable.AnyRefMap.empty[String, DataEntry[_]]
+        val dataEntries = blockchainApi.getAccountDataEntries(address)
+        val xs          = mutable.AnyRefMap.from[String, DataEntry[_]](dataEntries.map(x => (x.key, x)))
         data.put(address, xs)
         xs
     }
 
   // Ride: isDataStorageUntouched
-  override def hasData(address: Address): Boolean = data.contains(address)
+  override def hasData(address: Address): Boolean = data.contains(address) // TODO use utils/evaluate through REST API
   def putHasData(address: Address): Unit          = withData(address)
 
   // Ride: get*Value (data), get* (data)
@@ -54,40 +56,59 @@ class MutableBlockchain(override val settings: BlockchainSettings) extends Block
     }
   }
 
-  private val accountScripts = mutable.AnyRefMap.empty[Address, AccountScriptInfo]
+  // None means "we don't know". Some(None) means "we know, there is no script"
+  private val accountScripts = mutable.AnyRefMap.empty[Address, Option[AccountScriptInfo]]
   // Ride: scriptHash
-  override def accountScript(address: Address): Option[AccountScriptInfo] = accountScripts.get(address)
+  override def accountScript(address: Address): Option[AccountScriptInfo] =
+    accountScripts
+      .updateWith(address) {
+        case None => Some(blockchainApi.getAccountScript(address))
+        case x    => x
+      }
+      .get
 
   private val blockHeaders = mutable.LongMap.empty[(SignedBlockHeader, ByteStr)]
+
   // Ride: blockInfoByHeight, lastBlock
-  override def blockHeader(height: Int): Option[SignedBlockHeader] =
-    // Dirty, but we have a clear error instead of "None.get"
-    Some(
-      blockHeaders
-        .getOrElse(
-          height,
-          throw new RuntimeException(s"blockHeader($height): can't find a block header, please specify or check your script")
-        )
-        ._1
-    )
+  override def blockHeader(height: Int): Option[SignedBlockHeader] = {
+    if (this.height < height) None
+    else {
+      val header = blockHeaders
+        .updateWith(height) {
+          case None => blockchainApi.getBlockHeader(height)
+          case x    => x
+        }
+        .map(_._1)
+
+      // Dirty, but we have a clear error instead of "None.get"
+      if (header.isEmpty) throw new RuntimeException(s"blockHeader($height): can't find a block, please specify or check your script")
+      else header
+    }
+  }
 
   // Ride: blockInfoByHeight
   override def hitSource(height: Int): Option[ByteStr] =
-    // Dirty, but we have a clear error instead of "None.get"
-    Some(
-      blockHeaders
-        .getOrElse(
-          height,
-          throw new RuntimeException(s"blockHeader($height): can't find VRF, please specify or check your script")
-        )
-        ._2
-    ) // VRF
+    if (this.height < height) None
+    else {
+      val header = blockHeaders
+        .updateWith(height) {
+          case None => blockchainApi.getBlockHeader(height)
+          case x    => x
+        }
+        .map(_._2)
+
+      // Dirty, but we have a clear error instead of "None.get"
+      if (header.isEmpty) throw new RuntimeException(s"blockHeader($height): can't find VRF, please specify or check your script")
+      else header
+    }
 
   // Ride: wavesBalance, height, lastBlock TODO: a binding in Ride?
-  var _height: Int = 0
+  var _height: Int = blockchainApi.getCurrentBlockchainHeight()
+
   override def height: Int = _height
 
   var _activatedFeatures = settings.functionalitySettings.preActivatedFeatures
+
   override def activatedFeatures: Map[Short, Int] = _activatedFeatures
 
   private val assets = mutable.AnyRefMap.empty[IssuedAsset, AssetDescription]

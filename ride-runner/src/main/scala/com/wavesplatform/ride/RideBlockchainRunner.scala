@@ -23,7 +23,8 @@ object RideBlockchainRunner {
       override val chainId: Byte = 'W'.toByte
     }
 
-    val mutableBlockchain = new MutableBlockchain(nodeSettings.blockchainSettings)
+    //val mutableBlockchain = new MutableBlockchain(nodeSettings.blockchainSettings)
+    //mutableBlockchain.putHasData()
 
 //    val apiResult = execute(blockchain, input.request)
 //    println(s"apiResult: $apiResult")
