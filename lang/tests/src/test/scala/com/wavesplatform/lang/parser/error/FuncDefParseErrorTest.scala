@@ -43,20 +43,6 @@ class FuncDefParseErrorTest extends ParseErrorTest {
     )
   }
 
-  property("missing ':' of function arguments definition") {
-    assert(
-      """
-        | let x = 1
-        | let y = 1
-        | func f(a Int) = a
-      """.stripMargin,
-      """Parse error: expected ":"""",
-      29,
-      36,
-      "f(a Int)"
-    )
-  }
-
   property("Java style type definition") {
     assert(
       """
