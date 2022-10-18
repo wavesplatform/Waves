@@ -249,7 +249,7 @@ object Parser {
 
   def funcP(implicit c: fastparse.P[Any]): P[FUNC] = {
     def funcName       = anyVarName
-    def funcKWAndName  = "func" ~~ ((&(spaces) ~ funcName) | ("" ~~/ Fail).opaque("function name"))
+    def funcKWAndName  = "func" ~~ ((&(spaces) ~ funcName) | (&(spaces) ~~/ Fail).opaque("function name"))
     def argWithType    = anyVarName ~/ ":" ~ unionTypeP ~ comment
     def args(min: Int) = "(" ~ comment ~ argWithType.rep(min, "," ~ comment) ~ ")" ~ comment
     def funcBody       = singleBaseExpr
@@ -421,7 +421,7 @@ object Parser {
 
   def variableDefP[A: P](key: String): P[Seq[LET]] = {
     def letNames      = destructuredTupleValuesP | letNameP
-    def letKWAndNames = key ~~ ((&(spaces) ~ comment ~ letNames ~ comment) | ("" ~~/ Fail).opaque("variable name"))
+    def letKWAndNames = key ~~ ((&(spaces) ~ comment ~ letNames ~ comment) | (&(spaces) ~~/ Fail).opaque("variable name"))
     def noKeyword     = NoCut(letNames).filter(_.exists(_._2.isInstanceOf[VALID[_]])) ~ "=" ~~ !"=" ~/ baseExpr ~~ Fail
     def noKeywordP    = noKeyword.opaque(""""let" or "strict" keyword""").asInstanceOf[P[Nothing]]
     def correctLets   = P(Index ~~ letKWAndNames ~/ ("=" ~ baseExpr | "=" ~/ Fail.opaque("let body")) ~~ Index)
