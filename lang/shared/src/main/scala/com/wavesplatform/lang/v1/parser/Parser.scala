@@ -253,7 +253,7 @@ object Parser {
     def argWithType    = anyVarName ~/ ":" ~ unionTypeP ~ comment
     def args(min: Int) = "(" ~ comment ~ argWithType.rep(min, "," ~ comment) ~ ")" ~ comment
     def funcBody       = singleBaseExpr
-    def correctFunc    = Index ~~ funcKWAndName ~ comment ~/ args(min = 0) ~ "=" ~ funcBody ~~ Index
+    def correctFunc    = Index ~~ funcKWAndName ~ comment ~/ args(min = 0) ~ ("=" ~ funcBody | "=" ~/ Fail.opaque("function body")) ~~ Index
     def noKeyword      = NoCut(funcName).filter(_.isInstanceOf[VALID[_]]) ~ comment ~ NoCut(args(min = 1)) ~/ "=".? ~ funcBody.? ~~ Fail
     def noKeywordP     = noKeyword.asInstanceOf[P[Nothing]].opaque(""""func" keyword""")
     (noKeywordP | correctFunc)

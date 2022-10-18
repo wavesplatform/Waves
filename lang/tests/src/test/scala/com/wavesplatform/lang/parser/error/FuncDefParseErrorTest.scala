@@ -142,6 +142,21 @@ class FuncDefParseErrorTest extends ParseErrorTest {
     )
   }
 
+  property("missing function body") {
+    assert(
+      """
+        | let x = 1
+        | let y = 1
+        | func f(a: Int) =
+      """.stripMargin,
+      """Parse error: expected function body""",
+      46,
+      46,
+      " ",
+      endExpr = false
+    )
+  }
+
   property("missing closing curly brace of function body") {
     assert(
       """
