@@ -138,7 +138,6 @@ func bar() = {
 //         |)""".stripMargin)
 
     def kill(methodName: String) = throw new RuntimeException(methodName)
-    // TODO default values?
     val blockchain: Blockchain = new Blockchain {
       private val chainId: Byte = settings.addressSchemeCharacter.toByte
 
