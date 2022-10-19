@@ -10,4 +10,22 @@ class CommonParseErrorTest extends ParseErrorTest {
   property("empty script with comment as expression") {
     TestCompiler(V6).compileExpressionE("#abcd") shouldBe Left("Parse error: expected result expression in 5-5")
   }
+
+  property("illegal line break inside comment") {
+    assert(
+      """
+        | # comment
+        | # comment
+        | break
+        | # comment
+        | # comment
+        | func(a: Int) = a
+      """.stripMargin,
+      """Parse error: illegal expression""",
+      24,
+      29,
+      "break",
+      onlyDApp = true
+    )
+  }
 }
