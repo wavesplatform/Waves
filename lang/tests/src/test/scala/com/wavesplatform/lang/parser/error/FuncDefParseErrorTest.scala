@@ -185,4 +185,17 @@ class FuncDefParseErrorTest extends ParseErrorTest {
       "1"
     )
   }
+
+  property("forbid definition without space") {
+    assert(
+      """
+        | funcf() = 1
+      """.stripMargin,
+      """Parse error: illegal expression""",
+      2,
+      9,
+      "funcf()",
+      onlyDApp = true
+    )
+  }
 }
