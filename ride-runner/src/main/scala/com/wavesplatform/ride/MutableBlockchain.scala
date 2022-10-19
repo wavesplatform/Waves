@@ -6,6 +6,7 @@ import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.grpc.BlockchainGrpcApi
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.ride.MutableBlockchain.CachedData
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{
@@ -57,15 +58,16 @@ class MutableBlockchain(override val settings: BlockchainSettings, blockchainApi
   }
 
   // None means "we don't know". Some(None) means "we know, there is no script"
-  private val accountScripts = mutable.AnyRefMap.empty[Address, Option[AccountScriptInfo]]
+  private val accountScripts = mutable.AnyRefMap.empty[Address, CachedData[AccountScriptInfo]]
   // Ride: scriptHash
   override def accountScript(address: Address): Option[AccountScriptInfo] =
     accountScripts
       .updateWith(address) {
-        case None => Some(blockchainApi.getAccountScript(address))
+        case None => Some(CachedData.loaded(blockchainApi.getAccountScript(address)))
         case x    => x
       }
       .get
+      .mayBeValue
 
   private val blockHeaders = mutable.LongMap.empty[(SignedBlockHeader, ByteStr)]
 
@@ -113,30 +115,46 @@ class MutableBlockchain(override val settings: BlockchainSettings, blockchainApi
 
   private val assets = mutable.AnyRefMap.empty[IssuedAsset, AssetDescription]
   // Ride: assetInfo
-  override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription] = assets.get(id)
+  override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription] =
+    assets.updateWith(id) {
+      case None => blockchainApi.getAssetDescription(id)
+      case x    => x
+    }
 
   // Ride (indirectly): asset script validation
-  override def assetScript(id: Asset.IssuedAsset): Option[AssetScriptInfo] = assets.get(id).flatMap(_.script)
+  override def assetScript(id: Asset.IssuedAsset): Option[AssetScriptInfo] = assetDescription(id).flatMap(_.script)
 
   private val aliases = mutable.AnyRefMap.empty[Alias, Address]
   // Ride: get*Value (data), get* (data), isDataStorageUntouched, balance, scriptHash, wavesBalance
   override def resolveAlias(a: Alias): Either[ValidationError, Address] =
-    aliases.get(a).toRight(AliasDoesNotExist(a): ValidationError)
+    aliases
+      .updateWith(a) {
+        case None => blockchainApi.resolveAlias(a)
+        case x    => x
+      }
+      .toRight(AliasDoesNotExist(a): ValidationError)
 
   private val portfolios = mutable.AnyRefMap.empty[Address, Portfolio]
+  private def withPortfolios(address: Address): Portfolio =
+    portfolios
+      .updateWith(address) {
+        case None => Some(blockchainApi.getBalances(address))
+        case x    => x
+      }
+      .get
+
   // Ride: wavesBalance
-  override def leaseBalance(address: Address): LeaseBalance = portfolios.getOrElse(address, Portfolio.empty).lease
+  override def leaseBalance(address: Address): LeaseBalance = withPortfolios(address).lease
 
   // Ride: assetBalance, wavesBalance
-  override def balance(address: Address, mayBeAssetId: Asset): Long =
-    portfolios.getOrElse(address, Portfolio.empty).balanceOf(mayBeAssetId)
+  override def balance(address: Address, mayBeAssetId: Asset): Long = withPortfolios(address).balanceOf(mayBeAssetId)
 
   // Ride: wavesBalance (specifies to=None)
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] =
     // "to" always None
     // TODO this should work correctly
-    List(BalanceSnapshot(height, portfolios.getOrElse(address, Portfolio.empty)))
+    List(BalanceSnapshot(height, withPortfolios(address)))
   // input.balanceSnapshots.getOrElse(address, Seq(BalanceSnapshot(height, 0, 0, 0))).filter(_.height >= from)
 
   private val transactions = mutable.AnyRefMap.empty[ByteStr, (TxMeta, Option[TransferTransactionLike])]
@@ -178,4 +196,30 @@ class MutableBlockchain(override val settings: BlockchainSettings, blockchainApi
   override def balanceAtHeight(address: Address, height: Int, assetId: Asset): Option[(Int, Long)] = kill("balanceAtHeight")
 
   override def resolveERC20Address(address: ERC20Address): Option[Asset.IssuedAsset] = kill("resolveERC20Address")
+}
+
+object MutableBlockchain {
+  sealed trait CachedData[+T] extends Product with Serializable {
+    def isLoaded: Boolean
+    def mayBeValue: Option[T]
+  }
+  object CachedData {
+    case object NotLoaded extends CachedData[Nothing] {
+      override val isLoaded   = false
+      override val mayBeValue = None
+    }
+    case class Cached[T](value: T) extends CachedData[T] {
+      override def isLoaded: Boolean     = true
+      override def mayBeValue: Option[T] = Some(value)
+    }
+    case object Absence extends CachedData[Nothing] {
+      override val isLoaded   = true
+      override val mayBeValue = None
+    }
+
+    def loaded[T](x: Option[T]): CachedData[T] = x match {
+      case Some(x) => Cached(x)
+      case None    => Absence
+    }
+  }
 }
