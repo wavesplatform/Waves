@@ -13,7 +13,10 @@ import com.wavesplatform.api.grpc.{
   BalancesRequest,
   BlockRequest,
   BlocksApiGrpc,
-  DataRequest
+  DataRequest,
+  PBSignedTransactionConversions,
+  TransactionsApiGrpc,
+  TransactionsRequest
 }
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -23,8 +26,9 @@ import com.wavesplatform.grpc.observers.RichGrpcObserver
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.PBTransactions.{toVanillaDataEntry, toVanillaScript}
 import com.wavesplatform.ride.input.EmptyPublicKey
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, DataEntry, Height, LeaseBalance, Portfolio}
-import com.wavesplatform.transaction.Asset
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, DataEntry, Height, LeaseBalance, Portfolio, TxMeta}
+import com.wavesplatform.transaction.transfer.TransferTransactionLike
+import com.wavesplatform.transaction.{Asset, EthereumTransaction}
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.*
 import io.grpc.stub.ClientCalls
@@ -160,13 +164,13 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
           decimals = x.decimals,
           reissuable = x.reissuable,
           totalVolume = x.totalVolume,
-          lastUpdatedAt = Height(1), // Not used in Ride
+          lastUpdatedAt = Height(1), // not used, see: https://docs.waves.tech/en/ride/structures/common-structures/asset#fields
           script = for {
             pbScript <- x.script
             script   <- toVanillaScript(pbScript.scriptBytes)
           } yield AssetScriptInfo(script, pbScript.complexity),
           sponsorship = x.sponsorship,
-          nft = false // TODO
+          nft = false // not used, see: https://docs.waves.tech/en/ride/structures/common-structures/asset#fields
         )
       )
     } catch {
@@ -208,6 +212,41 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
           )
       }
     }
+  }
+
+  def getTransaction(id: ByteStr): Option[(TxMeta, Option[TransferTransactionLike])] = {
+    val xs = ClientCalls
+      .blockingServerStreamingCall(
+        grpcApiChannel.newCall(TransactionsApiGrpc.METHOD_GET_TRANSACTIONS, CallOptions.DEFAULT),
+        TransactionsRequest(transactionIds = Seq(UnsafeByteOperations.unsafeWrap(id.arr)))
+      )
+
+    if (xs.hasNext) {
+      val pbTx = xs.next()
+
+      val tx: Option[TransferTransactionLike] = pbTx.transaction.flatMap { signedTx =>
+        signedTx.toVanilla.toOption.flatMap {
+          case tx: EthereumTransaction =>
+            tx.payload match {
+              case transfer: EthereumTransaction.Transfer =>
+                // TODO have to call GET /eth/assets/... or blockchain.resolveERC20Address
+                transfer.toTransferLike(tx, blockchain = ???).toOption
+              case _ => none
+            }
+
+          case tx: TransferTransactionLike => tx.some
+          case _                           => none
+        }
+      }
+
+      val meta = TxMeta(
+        height = Height(pbTx.height.toInt),
+        succeeded = pbTx.applicationStatus.isSucceeded,
+        spentComplexity = 0 // TODO ???
+      )
+
+      (meta, tx).some
+    } else None
   }
 
   override def close(): Unit = {

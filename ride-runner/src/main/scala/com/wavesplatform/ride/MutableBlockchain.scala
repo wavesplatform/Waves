@@ -158,12 +158,18 @@ class MutableBlockchain(override val settings: BlockchainSettings, blockchainApi
   // input.balanceSnapshots.getOrElse(address, Seq(BalanceSnapshot(height, 0, 0, 0))).filter(_.height >= from)
 
   private val transactions = mutable.AnyRefMap.empty[ByteStr, (TxMeta, Option[TransferTransactionLike])]
+  private def withTransactions(id: ByteStr): Option[(TxMeta, Option[TransferTransactionLike])] =
+    transactions.updateWith(id) {
+      case None => blockchainApi.getTransaction(id)
+      case x    => x
+    }
+
   // Ride: transactionHeightById
-  override def transactionMeta(id: ByteStr): Option[TxMeta] = transactions.get(id).map(_._1)
+  override def transactionMeta(id: ByteStr): Option[TxMeta] = withTransactions(id).map(_._1)
 
   // Ride: transferTransactionById
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =
-    transactions.get(id).flatMap { case (meta, tx) => tx.map((meta.height, _)) }
+    withTransactions(id).flatMap { case (meta, tx) => tx.map((meta.height, _)) }
 
   override def hasAccountScript(address: Address) = kill("hasAccountScript")
 
@@ -195,6 +201,7 @@ class MutableBlockchain(override val settings: BlockchainSettings, blockchainApi
 
   override def balanceAtHeight(address: Address, height: Int, assetId: Asset): Option[(Int, Long)] = kill("balanceAtHeight")
 
+  // GET /eth/assets
   override def resolveERC20Address(address: ERC20Address): Option[Asset.IssuedAsset] = kill("resolveERC20Address")
 }
 
