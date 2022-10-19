@@ -59,15 +59,17 @@ class MutableBlockchain(override val settings: BlockchainSettings, blockchainApi
 
   // None means "we don't know". Some(None) means "we know, there is no script"
   private val accountScripts = mutable.AnyRefMap.empty[Address, CachedData[AccountScriptInfo]]
-  // Ride: scriptHash
-  override def accountScript(address: Address): Option[AccountScriptInfo] =
+  private def withAccountScript(address: Address): Option[CachedData[AccountScriptInfo]] =
     accountScripts
       .updateWith(address) {
         case None => Some(CachedData.loaded(blockchainApi.getAccountScript(address)))
         case x    => x
       }
-      .get
-      .mayBeValue
+
+  // Ride: scriptHash
+  override def accountScript(address: Address): Option[AccountScriptInfo] = withAccountScript(address).get.mayBeValue
+
+  override def hasAccountScript(address: Address) = withAccountScript(address).get.mayBeValue.nonEmpty
 
   private val blockHeaders = mutable.LongMap.empty[(SignedBlockHeader, ByteStr)]
 
@@ -170,8 +172,6 @@ class MutableBlockchain(override val settings: BlockchainSettings, blockchainApi
   // Ride: transferTransactionById
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =
     withTransactions(id).flatMap { case (meta, tx) => tx.map((meta.height, _)) }
-
-  override def hasAccountScript(address: Address) = kill("hasAccountScript")
 
   override def score: BigInt = kill("score")
 

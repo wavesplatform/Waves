@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Add debug="true" to debug configuration -->
+<!-- Add scanPeriod="30 seconds" to refresh configuration -->
+<configuration debug="false" scan="false" scanPeriod="30 seconds">
+    <!-- To disable not interesting status logs -->
+    <statusListener class="ch.qos.logback.core.status.NopStatusListener" />
+    <!--    <shutdownHook class="ch.qos.logback.core.hook.DelayingShutdownHook"/>-->
+
+    <!-- JRE -->
+    <logger name="sun.rmi" level="INFO"/>
+    <logger name="javax.management" level="INFO"/>
+
+    <!-- Netty -->
+    <logger name="io.grpc" level="WARN"/>
+    <logger name="io.netty" level="WARN"/>
+    <logger name="io.grpc.netty" level="ERROR"/>
+    <logger name="io.grpc.Context" level="INFO"/> <!-- To ignore "Storage override doesn't exist. Using default" -->
+    <logger name="org.reflections" level="WARN"/>
+    <logger name="com.alibaba" level="ERROR"/>
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <target>System.out</target>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>TRACE</level>
+        </filter>
+        <encoder>
+            <pattern>%date{ISO8601,UTC} %-5level [%.25thread] %logger{26} - %msg%n%ex</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="ASYNC-STDOUT" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>2048</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <appender-ref ref="STDOUT"/>
+    </appender>
+
+    <root>
+        <appender-ref ref="ASYNC-STDOUT"/>
+    </root>
+
+    <root level="TRACE"/>
+</configuration>

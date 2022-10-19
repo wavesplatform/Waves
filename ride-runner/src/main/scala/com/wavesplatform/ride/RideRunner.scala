@@ -257,7 +257,7 @@ object RideRunner {
       // Ride (indirectly): asset script validation
       override def assetScript(id: Asset.IssuedAsset): Option[AssetScriptInfo] = assets.get(id).flatMap(_.script)
 
-      override def hasAccountScript(address: Address) = kill("hasAccountScript")
+      override def hasAccountScript(address: Address) = kill(s"hasAccountScript($address)")
 
       override def score: BigInt = kill("score")
 

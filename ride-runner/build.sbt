@@ -1,0 +1,1 @@
+libraryDependencies ++= Seq(Dependencies.logback)

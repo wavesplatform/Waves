@@ -41,6 +41,7 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.ScheduledExecutorService
 import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters.IteratorHasAsScala
+import scala.util.chaining.scalaUtilChainingOps
 
 class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hangScheduler: ScheduledExecutorService)
     extends AutoCloseable
@@ -84,12 +85,14 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
   }
 
   def getCurrentBlockchainHeight(): Int =
-    ClientCalls.blockingUnaryCall(
-      grpcApiChannel.newCall(BlocksApiGrpc.METHOD_GET_CURRENT_HEIGHT, CallOptions.DEFAULT),
-      Empty()
-    )
+    ClientCalls
+      .blockingUnaryCall(
+        grpcApiChannel.newCall(BlocksApiGrpc.METHOD_GET_CURRENT_HEIGHT, CallOptions.DEFAULT),
+        Empty()
+      )
+      .tap(r => log.info(s"getCurrentBlockchainHeight: $r"))
 
-  def getAccountDataEntries(address: Address): Seq[DataEntry[_]] = {
+  def getAccountDataEntries(address: Address): Seq[DataEntry[_]] =
     ClientCalls
       .blockingServerStreamingCall(
         grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_DATA_ENTRIES, CallOptions.DEFAULT),
@@ -99,7 +102,7 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
       .flatMap(_.entry)
       .map(toVanillaDataEntry)
       .toSeq
-  }
+      .tap(r => log.info(s"getAccountDataEntries($address): found ${r.length} elements"))
 
   def getAccountScript(address: Address): Option[AccountScriptInfo] = {
     val x = ClientCalls.blockingUnaryCall(
@@ -107,14 +110,16 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
       AccountRequest(toPb(address))
     )
 
-    toVanillaScript(x.scriptBytes).map { script =>
-      AccountScriptInfo(
-        publicKey = EmptyPublicKey,
-        script = script, // Only this field matters in Ride Runner, see MutableBlockchain.accountScript
-        verifierComplexity = x.complexity,
-        complexitiesByEstimator = Map.empty // TODO or not?
-      )
-    }
+    toVanillaScript(x.scriptBytes)
+      .map { script =>
+        AccountScriptInfo(
+          publicKey = EmptyPublicKey,
+          script = script, // Only this field matters in Ride Runner, see MutableBlockchain.accountScript
+          verifierComplexity = x.complexity,
+          complexitiesByEstimator = Map.empty // TODO or not?
+        )
+      }
+      .tap(r => log.info(s"getAccountScript($address):${if (r.isEmpty) " not" else ""} found"))
   }
 
   /** @return
@@ -126,70 +131,80 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
       BlockRequest(request = BlockRequest.Request.Height(height))
     )
 
-    x.block.flatMap(_.header).map { header =>
-      // TODO toVanilla
-      val signedHeader = SignedBlockHeader(
-        header = BlockHeader(
-          version = header.version.toByte,
-          timestamp = header.timestamp,
-          reference = header.reference.toByteStr,
-          baseTarget = header.baseTarget,
-          generationSignature = header.generationSignature.toByteStr,
-          generator = PublicKey(header.generator.toByteArray),
-          featureVotes = header.featureVotes.map(_.toShort),
-          rewardVote = header.rewardVote,
-          transactionsRoot = header.transactionsRoot.toByteStr
-        ),
-        signature = x.block.fold(ByteString.EMPTY)(_.signature).toByteStr
-      )
+    x.block
+      .flatMap(_.header)
+      .map { header =>
+        // TODO toVanilla
+        val signedHeader = SignedBlockHeader(
+          header = BlockHeader(
+            version = header.version.toByte,
+            timestamp = header.timestamp,
+            reference = header.reference.toByteStr,
+            baseTarget = header.baseTarget,
+            generationSignature = header.generationSignature.toByteStr,
+            generator = PublicKey(header.generator.toByteArray),
+            featureVotes = header.featureVotes.map(_.toShort),
+            rewardVote = header.rewardVote,
+            transactionsRoot = header.transactionsRoot.toByteStr
+          ),
+          signature = x.block.fold(ByteString.EMPTY)(_.signature).toByteStr
+        )
 
-      (signedHeader, ByteStr.empty) // TODO It seems VRF only from REST API
-    }
+        (signedHeader, ByteStr.empty) // TODO It seems VRF only from REST API
+      }
+      .tap(r => log.info(s"getBlockHeader($height):${if (r.isEmpty) " not" else ""} found"))
   }
 
-  def getAssetDescription(asset: Asset.IssuedAsset): Option[AssetDescription] =
-    try {
-      val x = ClientCalls
-        .blockingUnaryCall(
-          grpcApiChannel.newCall(AssetsApiGrpc.METHOD_GET_INFO, CallOptions.DEFAULT),
-          AssetRequest(UnsafeByteOperations.unsafeWrap(asset.id.arr))
-        )
+  def getAssetDescription(asset: Asset.IssuedAsset): Option[AssetDescription] = {
+    val r =
+      try {
+        val x = ClientCalls
+          .blockingUnaryCall(
+            grpcApiChannel.newCall(AssetsApiGrpc.METHOD_GET_INFO, CallOptions.DEFAULT),
+            AssetRequest(UnsafeByteOperations.unsafeWrap(asset.id.arr))
+          )
 
-      Some(
-        AssetDescription(
-          originTransactionId = asset.id,
-          issuer = PublicKey(x.issuer.toByteArray),
-          name = UnsafeByteOperations.unsafeWrap(x.name.getBytes(StandardCharsets.UTF_8)),
-          description = UnsafeByteOperations.unsafeWrap(x.description.getBytes(StandardCharsets.UTF_8)),
-          decimals = x.decimals,
-          reissuable = x.reissuable,
-          totalVolume = x.totalVolume,
-          lastUpdatedAt = Height(1), // not used, see: https://docs.waves.tech/en/ride/structures/common-structures/asset#fields
-          script = for {
-            pbScript <- x.script
-            script   <- toVanillaScript(pbScript.scriptBytes)
-          } yield AssetScriptInfo(script, pbScript.complexity),
-          sponsorship = x.sponsorship,
-          nft = false // not used, see: https://docs.waves.tech/en/ride/structures/common-structures/asset#fields
+        Some(
+          AssetDescription(
+            originTransactionId = asset.id,
+            issuer = PublicKey(x.issuer.toByteArray),
+            name = UnsafeByteOperations.unsafeWrap(x.name.getBytes(StandardCharsets.UTF_8)),
+            description = UnsafeByteOperations.unsafeWrap(x.description.getBytes(StandardCharsets.UTF_8)),
+            decimals = x.decimals,
+            reissuable = x.reissuable,
+            totalVolume = x.totalVolume,
+            lastUpdatedAt = Height(1), // not used, see: https://docs.waves.tech/en/ride/structures/common-structures/asset#fields
+            script = for {
+              pbScript <- x.script
+              script   <- toVanillaScript(pbScript.scriptBytes)
+            } yield AssetScriptInfo(script, pbScript.complexity),
+            sponsorship = x.sponsorship,
+            nft = false // not used, see: https://docs.waves.tech/en/ride/structures/common-structures/asset#fields
+          )
         )
-      )
-    } catch {
-      case x: StatusException if x.getStatus == Status.NOT_FOUND => None
-      case x                                                     => throw x
-    }
+      } catch {
+        case x: StatusException if x.getStatus == Status.NOT_FOUND => None
+      }
+
+    log.info(s"getAssetDescription($asset):${if (r.isEmpty) " not" else ""} found")
+    r
+  }
 
   def resolveAlias(alias: Alias): Option[Address] = {
-    try {
-      val x = ClientCalls.blockingUnaryCall(
-        grpcApiChannel.newCall(AccountsApiGrpc.METHOD_RESOLVE_ALIAS, CallOptions.DEFAULT),
-        alias.toString // TODO ???
-      )
+    val r =
+      try {
+        val x = ClientCalls.blockingUnaryCall(
+          grpcApiChannel.newCall(AccountsApiGrpc.METHOD_RESOLVE_ALIAS, CallOptions.DEFAULT),
+          alias.toString // TODO ???
+        )
 
-      Address.fromBytes(x.toByteArray).toOption
-    } catch {
-      case e: StatusException if e.getStatus == Status.INVALID_ARGUMENT => None
-      case x                                                            => throw x
-    }
+        Address.fromBytes(x.toByteArray).toOption
+      } catch {
+        case e: StatusException if e.getStatus == Status.INVALID_ARGUMENT => None
+      }
+
+    log.info(s"resolveAlias($alias):${if (r.isEmpty) " not" else ""} found")
+    r
   }
 
   def getBalances(address: Address): Portfolio = {
@@ -198,20 +213,22 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
       BalancesRequest(toPb(address))
     )
 
-    xs.asScala.foldLeft(Portfolio.empty) { case (r, x) =>
-      x.balance match {
-        case Balance.Empty => r
-        case Balance.Waves(wavesBalance) =>
-          r.copy(
-            balance = wavesBalance.regular,
-            lease = LeaseBalance(in = wavesBalance.leaseIn, out = wavesBalance.leaseOut)
-          )
-        case Balance.Asset(assetBalance) =>
-          r.copy(
-            assets = r.assets.updated(Asset.IssuedAsset(assetBalance.assetId.toByteStr), assetBalance.amount)
-          )
+    xs.asScala
+      .foldLeft(Portfolio.empty) { case (r, x) =>
+        x.balance match {
+          case Balance.Empty => r
+          case Balance.Waves(wavesBalance) =>
+            r.copy(
+              balance = wavesBalance.regular,
+              lease = LeaseBalance(in = wavesBalance.leaseIn, out = wavesBalance.leaseOut)
+            )
+          case Balance.Asset(assetBalance) =>
+            r.copy(
+              assets = r.assets.updated(Asset.IssuedAsset(assetBalance.assetId.toByteStr), assetBalance.amount)
+            )
+        }
       }
-    }
+      .tap(r => log.info(s"getBalances($address): found ${r.assets.size} assets"))
   }
 
   def getTransaction(id: ByteStr): Option[(TxMeta, Option[TransferTransactionLike])] = {
@@ -221,7 +238,7 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
         TransactionsRequest(transactionIds = Seq(UnsafeByteOperations.unsafeWrap(id.arr)))
       )
 
-    if (xs.hasNext) {
+    val r = if (xs.hasNext) {
       val pbTx = xs.next()
 
       val tx: Option[TransferTransactionLike] = pbTx.transaction.flatMap { signedTx =>
@@ -247,6 +264,9 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
 
       (meta, tx).some
     } else None
+
+    log.info(s"getTransaction($id):${if (r.isEmpty) " not" else ""} found")
+    r
   }
 
   override def close(): Unit = {
