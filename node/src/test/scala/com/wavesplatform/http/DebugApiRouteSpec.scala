@@ -3,17 +3,19 @@ package com.wavesplatform.http
 import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import com.typesafe.config.ConfigObject
+import com.wavesplatform.*
 import com.wavesplatform.account.Alias
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
-import com.wavesplatform.api.http.DebugApiRoute
-import com.wavesplatform.block.{Block, SignedBlockHeader}
+import com.wavesplatform.api.http.{DebugApiRoute, RouteTimeout}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -35,12 +37,14 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{ERC20Address, TxHelpers, TxVersion}
+import com.wavesplatform.utils.Schedulers
 import com.wavesplatform.{BlockchainStubHelpers, NTPTime, TestValues, TestWallet}
 import monix.eval.Task
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.Assertion
+import org.scalatest.{Assertion, OptionValues}
 import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
 
+import scala.concurrent.duration.*
 import scala.util.Random
 
 //noinspection ScalaStyle
@@ -51,7 +55,8 @@ class DebugApiRouteSpec
     with NTPTime
     with PathMockFactory
     with BlockchainStubHelpers
-    with WithDomain {
+    with WithDomain
+    with OptionValues {
   import DomainPresets.*
 
   val wavesSettings: WavesSettings = WavesSettings.default()
@@ -65,6 +70,7 @@ class DebugApiRouteSpec
     StateHash(randomHash, hashes)
   }
 
+  val scheduler = Schedulers.fixedPool(1, "heavy-request-scheduler")
   val debugApiRoute: DebugApiRoute =
     DebugApiRoute(
       wavesSettings,
@@ -89,7 +95,9 @@ class DebugApiRouteSpec
         case 2 => Some(testStateHash)
         case _ => None
       },
-      () => blockchain
+      () => blockchain,
+      new RouteTimeout(60.seconds)(scheduler),
+      scheduler
     )
   import debugApiRoute.*
 
@@ -101,23 +109,43 @@ class DebugApiRouteSpec
   }
 
   routePath("/stateHash") - {
-    "works" in {
-      (blockchain.blockHeader(_: Int)).when(*).returning(Some(SignedBlockHeader(block.header, block.signature)))
-      Get(routePath("/stateHash/2")) ~> route ~> check {
-        status shouldBe StatusCodes.OK
-        responseAs[JsObject] shouldBe (Json.toJson(testStateHash).as[JsObject] ++ Json.obj("blockId" -> block.id().toString))
+    "works" - {
+      val settingsWithStateHashes = DomainPresets.SettingsFromDefaultConfig.copy(
+        dbSettings = DomainPresets.SettingsFromDefaultConfig.dbSettings.copy(storeStateHashes = true)
+      )
+
+      "at nonexistent height" in withDomain(settingsWithStateHashes) { d =>
+        d.appendBlock(TestBlock.create(Nil))
+        Get(routePath("/stateHash/2")) ~> routeWithBlockchain(d) ~> check {
+          status shouldBe StatusCodes.NotFound
+        }
       }
 
-      Get(routePath("/stateHash/3")) ~> route ~> check {
-        status shouldBe StatusCodes.NotFound
+      "at existing height" in expectStateHashAt2("2")
+      "last" in expectStateHashAt2("last")
+
+      def expectStateHashAt2(suffix: String): Assertion = withDomain(settingsWithStateHashes) { d =>
+        val genesisBlock = TestBlock.create(Nil)
+        d.appendBlock(genesisBlock)
+
+        val blockAt2 = TestBlock.create(0, genesisBlock.id(), Nil)
+        d.appendBlock(blockAt2)
+        d.appendBlock(TestBlock.create(0, blockAt2.id(), Nil))
+
+        val stateHashAt2 = d.levelDBWriter.loadStateHash(2).value
+        Get(routePath(s"/stateHash/$suffix")) ~> routeWithBlockchain(d) ~> check {
+          status shouldBe StatusCodes.OK
+          responseAs[JsObject] shouldBe (Json.toJson(stateHashAt2).as[JsObject] ++ Json.obj(
+            "blockId" -> blockAt2.id().toString,
+            "height"  -> 2,
+            "version" -> Version.VersionString
+          ))
+        }
       }
     }
   }
 
   routePath("/validate") - {
-    def routeWithBlockchain(blockchain: Blockchain & NG) =
-      debugApiRoute.copy(blockchain = blockchain, priorityPoolBlockchain = () => blockchain).route
-
     def validatePost(tx: TransferTransaction) =
       Post(routePath("/validate"), HttpEntity(ContentTypes.`application/json`, tx.json().toString()))
 
@@ -1096,6 +1124,18 @@ class DebugApiRouteSpec
       }
     }
   }
+
+  private def routeWithBlockchain(blockchain: Blockchain & NG) =
+    debugApiRoute.copy(blockchain = blockchain, priorityPoolBlockchain = () => blockchain).route
+
+  private def routeWithBlockchain(d: Domain) =
+    debugApiRoute
+      .copy(
+        blockchain = d.blockchain,
+        priorityPoolBlockchain = () => d.blockchain,
+        loadStateHash = d.levelDBWriter.loadStateHash
+      )
+      .route
 
   private[this] def jsonPost(path: String, json: JsValue) = {
     Post(path, HttpEntity(ContentTypes.`application/json`, json.toString()))

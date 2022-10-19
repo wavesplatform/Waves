@@ -1,12 +1,11 @@
 package com.wavesplatform.transaction
 
-import scala.util.Either
-
 import cats.Id
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.v1.ContractLimits.FailFreeInvokeComplexity
 import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.state.InvokeScriptResult
 import com.wavesplatform.transaction.TxValidationError.FailedTransactionError.Cause
@@ -22,6 +21,7 @@ object TxValidationError {
   case class NegativeMinFee(minFee: Long, of: String)        extends ValidationError
   case object InsufficientFee                                extends ValidationError
   case object TooBigArray                                    extends ValidationError
+  case class TooBigInBytes(err: String)                      extends ValidationError
   case object InvalidName                                    extends ValidationError
   case object InvalidAssetId                                 extends ValidationError
   case object OverflowError                                  extends ValidationError
@@ -32,14 +32,14 @@ object TxValidationError {
   case class BlockFromFuture(ts: Long)                       extends ValidationError
   case class AlreadyInTheState(txId: ByteStr, txHeight: Int) extends ValidationError
   case class AccountBalanceError(errs: Map[Address, String]) extends ValidationError
-  case class AliasDoesNotExist(a: Alias)                     extends ValidationError { override def toString: String = s"Alias '$a' does not exists." }
-  case class AliasIsDisabled(a: Alias)                       extends ValidationError
+  case class AliasDoesNotExist(a: Alias) extends ValidationError { override def toString: String = s"Alias '$a' does not exists." }
+  case class AliasIsDisabled(a: Alias)   extends ValidationError
   case class OrderValidationError(order: Order, err: String) extends ValidationError
   case class SenderIsBlacklisted(addr: String)               extends ValidationError
   case class Mistiming(err: String)                          extends ValidationError
   case class BlockAppendError(err: String, b: Block)         extends ValidationError
   case class ActivationError(err: String)                    extends ValidationError
-  case class GenericError(err: String)                         extends ValidationError
+  case class GenericError(err: String)                       extends ValidationError
 
   object GenericError {
     def apply(ex: Throwable): GenericError = new GenericError(ex.getMessage)
@@ -63,7 +63,7 @@ object TxValidationError {
       invocations: Seq[InvokeScriptResult.Invocation] = Nil
   ) extends ValidationError
       with WithLog {
-    import FailedTransactionError._
+    import FailedTransactionError.*
 
     def code: Int = cause.code
     def message: String = cause match {
@@ -71,8 +71,9 @@ object TxValidationError {
       case Cause.AssetScriptInAction | Cause.AssetScript => assetScriptError(assetId.get, error)
     }
 
-    def isAssetScript: Boolean    = assetId.isDefined
-    def isExecutionError: Boolean = error.nonEmpty
+    def isDAppExecution: Boolean  = assetId.isEmpty && error.nonEmpty
+    def isAssetExecution: Boolean = assetId.nonEmpty && error.nonEmpty
+    def isFailFree: Boolean       = spentComplexity <= FailFreeInvokeComplexity
 
     def addComplexity(complexity: Long): FailedTransactionError = copy(spentComplexity = spentComplexity + complexity)
 
@@ -131,18 +132,18 @@ object TxValidationError {
     }
   }
 
-  case class ScriptExecutionError(error: String, log: Log[Id], assetId: Option[ByteStr]) extends ValidationError with WithLog {
+  case class ScriptExecutionError(message: String, log: Log[Id], assetId: Option[ByteStr]) extends ValidationError with WithLog {
     def isAssetScript: Boolean = assetId.isDefined
     private val target: String = assetId.fold("Account")(_ => "Asset")
     override def toString: String =
-      if (String.valueOf(error).startsWith("ScriptExecutionError"))
-        error
+      if (String.valueOf(message).startsWith("ScriptExecutionError"))
+        message
       else
-        s"ScriptExecutionError(error = $error, type = $target, log = ${logToString(log)})"
+        s"ScriptExecutionError(error = $message, type = $target, log = ${logToString(log)})"
   }
 
-  object ScriptExecutionError {
-    def dAppExecution(error: String, log: Log[Id]): ScriptExecutionError = ScriptExecutionError(error, log, None)
+  case class InvokeRejectError(message: String, log: Log[Id]) extends ValidationError with WithLog {
+    override def toString: String = s"InvokeRejectError(error = $message, log = ${logToString(log)})"
   }
 
   case class TransactionNotAllowedByScript(log: Log[Id], assetId: Option[ByteStr]) extends ValidationError {

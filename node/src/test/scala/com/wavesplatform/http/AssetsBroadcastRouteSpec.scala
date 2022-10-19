@@ -4,6 +4,7 @@ import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.RequestGen
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiError.*
+import com.wavesplatform.api.http.RouteTimeout
 import com.wavesplatform.api.http.assets.*
 import com.wavesplatform.api.http.requests.{SignedTransferV1Request, SignedTransferV2Request}
 import com.wavesplatform.common.state.ByteStr
@@ -21,6 +22,8 @@ import org.scalacheck.Gen as G
 import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.*
 
+import scala.concurrent.duration.*
+
 class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with RequestGen with PathMockFactory with RestAPISettingsHelper {
 
   private[this] val route = AssetsApiRoute(
@@ -31,15 +34,16 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     stub[Time],
     stub[CommonAccountsApi],
     stub[CommonAssetsApi],
-    1000
+    1000,
+    new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
   ).route
 
   private[this] val fixedIssueGen = for {
     (sender, _, _, quantity, decimals, reissuable, fee, timestamp) <- issueParamGen
-    nameLength                                                     <- G.choose(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
-    name                                                           <- G.listOfN(nameLength, G.alphaNumChar)
-    description                                                    <- G.listOfN(IssueTransaction.MaxAssetDescriptionLength, G.alphaNumChar)
-    tx                                                             <- createLegacyIssue(sender, name.mkString.utf8Bytes, description.mkString.utf8Bytes, quantity, decimals, reissuable, fee, timestamp)
+    nameLength  <- G.choose(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
+    name        <- G.listOfN(nameLength, G.alphaNumChar)
+    description <- G.listOfN(IssueTransaction.MaxAssetDescriptionLength, G.alphaNumChar)
+    tx          <- createLegacyIssue(sender, name.mkString.utf8Bytes, description.mkString.utf8Bytes, quantity, decimals, reissuable, fee, timestamp)
   } yield tx
 
   "returns StateCheckFailed" - {
@@ -47,15 +51,23 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
       ("url", "generator", "transform"),
       ("issue", fixedIssueGen, identity),
       ("reissue", reissueGen.retryUntil(_.version == 1), identity),
-      ("burn", burnGen.retryUntil(_.version == 1), {
-        case o: JsObject => o ++ Json.obj("quantity" -> o.value("amount"))
-        case other       => other
-      }),
-      ("transfer", transferV1Gen, {
-        case o: JsObject if o.value.contains("feeAsset") =>
-          o ++ Json.obj("feeAssetId" -> o.value("feeAsset"), "quantity" -> o.value("amount"))
-        case other => other
-      })
+      (
+        "burn",
+        burnGen.retryUntil(_.version == 1),
+        {
+          case o: JsObject => o ++ Json.obj("quantity" -> o.value("amount"))
+          case other       => other
+        }
+      ),
+      (
+        "transfer",
+        transferV1Gen,
+        {
+          case o: JsObject if o.value.contains("feeAsset") =>
+            o ++ Json.obj("feeAssetId" -> o.value("feeAsset"), "quantity" -> o.value("amount"))
+          case other => other
+        }
+      )
     )
 
     def posting(url: String, v: JsValue): RouteTestResult = Post(routePath(url), v) ~> route
@@ -151,11 +163,6 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
             WrongJson(errors = Seq(JsPath \ "feeAssetId" -> Seq(JsonValidationError(s"Too long assetId: length of $a exceeds 44"))))
           )
         }
-        forAll(longAttachment) { a =>
-          posting(tr.copy(attachment = Some(a))) should produce(
-            WrongJson(errors = Seq(JsPath \ "attachment" -> Seq(JsonValidationError(s"Length ${a.length} exceeds maximum length of 192"))))
-          )
-        }
         forAll(nonPositiveLong) { fee =>
           posting(tr.copy(fee = fee)) should produce(InsufficientFee)
         }
@@ -172,7 +179,8 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
       stub[Time],
       stub[CommonAccountsApi],
       stub[CommonAssetsApi],
-      1000
+      1000,
+      new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
     ).route
 
     val seed               = "seed".getBytes("UTF-8")

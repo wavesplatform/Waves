@@ -136,7 +136,6 @@ object Importer extends ScorexLogging {
               db,
               blockchainUpdater,
               utxPool,
-              wallet,
               _ => Future.successful(TracedResult.wrapE(Left(GenericError("Not implemented during import")))),
               Application.loadBlockAt(db, blockchainUpdater)
             )
