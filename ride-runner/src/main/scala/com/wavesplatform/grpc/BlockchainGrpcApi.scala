@@ -8,10 +8,12 @@ import com.wavesplatform.api.grpc.BalanceResponse.Balance
 import com.wavesplatform.api.grpc.{
   AccountRequest,
   AccountsApiGrpc,
+  ActivationStatusRequest,
   AssetRequest,
   AssetsApiGrpc,
   BalancesRequest,
   BlockRequest,
+  BlockchainApiGrpc,
   BlocksApiGrpc,
   DataRequest,
   PBSignedTransactionConversions,
@@ -20,9 +22,12 @@ import com.wavesplatform.api.grpc.{
 }
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.events.api.grpc.protobuf.*
 import com.wavesplatform.grpc.BlockchainGrpcApi.{Event, Settings}
 import com.wavesplatform.grpc.observers.RichGrpcObserver
+import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.PBTransactions.{toVanillaDataEntry, toVanillaScript}
 import com.wavesplatform.ride.input.EmptyPublicKey
@@ -92,19 +97,56 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
       )
       .tap(r => log.info(s"getCurrentBlockchainHeight: $r"))
 
-  def getAccountDataEntries(address: Address): Seq[DataEntry[_]] =
+  def getActivatedFeatures(height: Int): Map[Short, Int] =
     ClientCalls
-      .blockingServerStreamingCall(
-        grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_DATA_ENTRIES, CallOptions.DEFAULT),
-        DataRequest(toPb(address))
+      .blockingUnaryCall(
+        grpcApiChannel.newCall(BlockchainApiGrpc.METHOD_GET_ACTIVATION_STATUS, CallOptions.DEFAULT),
+        ActivationStatusRequest(height)
       )
-      .asScala
-      .flatMap(_.entry)
-      .map(toVanillaDataEntry)
-      .toSeq
-      .tap(r => log.info(s"getAccountDataEntries($address): found ${r.length} elements"))
+      .features
+      .map(x => x.id.toShort -> x.activationHeight) // TODO ???
+      .toMap
+      .tap(r => log.info(s"getActivatedFeatures: ${r.mkString(", ")}"))
 
-  def getAccountScript(address: Address): Option[AccountScriptInfo] = {
+  def getAccountDataEntries(address: Address): Seq[DataEntry[_]] =
+    try
+      ClientCalls
+        .blockingServerStreamingCall(
+          grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_DATA_ENTRIES, CallOptions.DEFAULT),
+          DataRequest(toPb(address))
+        )
+        .asScala
+        .flatMap(_.entry)
+        .map(toVanillaDataEntry)
+        .toSeq
+        .tap(r => log.info(s"getAccountDataEntries($address): found ${r.length} elements"))
+    catch {
+      case e: Throwable =>
+        log.error(s"getAccountDataEntries($address)", e)
+        throw e
+    }
+
+  def getAccountDataEntry(address: Address, key: String): Option[DataEntry[_]] =
+    try {
+      ClientCalls
+        .blockingServerStreamingCall(
+          grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_DATA_ENTRIES, CallOptions.DEFAULT),
+          DataRequest(address = toPb(address), key = key)
+        )
+        .asScala
+        .flatMap(_.entry)
+        .map(toVanillaDataEntry)
+        .take(1)
+        .toSeq
+        .headOption
+        .tap(r => log.info(s"getAccountDataEntry($address, '$key'):${if (r.isEmpty) " not" else ""} found"))
+    } catch {
+      case e: Throwable =>
+        log.error(s"getAccountDataEntry($address, '$key')", e)
+        throw e
+    }
+
+  def getAccountScript(address: Address, estimator: ScriptEstimator): Option[AccountScriptInfo] = {
     val x = ClientCalls.blockingUnaryCall(
       grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_SCRIPT, CallOptions.DEFAULT),
       AccountRequest(toPb(address))
@@ -112,11 +154,19 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
 
     toVanillaScript(x.scriptBytes)
       .map { script =>
+        // DiffCommons
+        val fixEstimateOfVerifier    = true // blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
+        val useContractVerifierLimit = true // !isAsset && blockchain.useReducedVerifierComplexityLimit
+
+        // TODO explicitGet?
+        val complexityInfo = Script.complexityInfo(script, estimator, fixEstimateOfVerifier, useContractVerifierLimit).explicitGet()
+        log.info(s"Complexities (estimator of v${estimator.version}): ${complexityInfo.callableComplexities}")
+
         AccountScriptInfo(
           publicKey = EmptyPublicKey,
           script = script, // Only this field matters in Ride Runner, see MutableBlockchain.accountScript
           verifierComplexity = x.complexity,
-          complexitiesByEstimator = Map.empty // TODO or not?
+          complexitiesByEstimator = Map(estimator.version -> complexityInfo.callableComplexities)
         )
       }
       .tap(r => log.info(s"getAccountScript($address):${if (r.isEmpty) " not" else ""} found"))

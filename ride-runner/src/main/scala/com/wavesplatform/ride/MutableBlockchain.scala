@@ -4,6 +4,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.features.EstimatorProvider.EstimatorBlockchainExt
 import com.wavesplatform.grpc.BlockchainGrpcApi
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.ride.MutableBlockchain.CachedData
@@ -31,40 +32,39 @@ import scala.collection.mutable
 class MutableBlockchain(override val settings: BlockchainSettings, blockchainApi: BlockchainGrpcApi) extends Blockchain {
   private def kill(methodName: String) = throw new RuntimeException(methodName)
 
-  private val data = mutable.AnyRefMap.empty[Address, mutable.AnyRefMap[String, DataEntry[_]]]
-  private def withData(address: Address): mutable.AnyRefMap[String, DataEntry[_]] =
-    data.get(address) match {
-      case Some(xs) => xs
-      case None =>
-        val dataEntries = blockchainApi.getAccountDataEntries(address)
-        val xs          = mutable.AnyRefMap.from[String, DataEntry[_]](dataEntries.map(x => (x.key, x)))
-        data.put(address, xs)
-        xs
-    }
+  private val data = mutable.AnyRefMap.empty[Address, mutable.AnyRefMap[String, CachedData[DataEntry[_]]]]
 
+  // TODO use utils/evaluate through REST API
   // Ride: isDataStorageUntouched
-  override def hasData(address: Address): Boolean = data.contains(address) // TODO use utils/evaluate through REST API
-  def putHasData(address: Address): Unit          = withData(address)
+  override def hasData(address: Address): Boolean = data.contains(address)
+  def putHasData(address: Address): Unit          = {}
 
   // Ride: get*Value (data), get* (data)
-  override def accountData(acc: Address, key: String): Option[DataEntry[_]] =
-    data.getOrElse(acc, Map.empty[String, DataEntry[_]]).get(key)
-  def putAccountData(acc: Address, key: String, data: Option[DataEntry[_]]): Unit = {
-    val xs = withData(acc)
-    data match {
-      case Some(value) => xs.put(key, value)
-      case None        => xs.remove(key)
+  override def accountData(address: Address, key: String): Option[DataEntry[_]] = {
+    val xs = data.updateWith(address) {
+      case None => Some(mutable.AnyRefMap.empty[String, CachedData[DataEntry[_]]])
+      case x    => x
     }
+
+    xs.get
+      .updateWith(key) {
+        case None => Some(CachedData.loaded(blockchainApi.getAccountDataEntry(address, key)))
+        case x    => x
+      }
+      .flatMap(_.mayBeValue)
+  }
+
+  def putAccountData(acc: Address, key: String, data: Option[DataEntry[_]]): Unit = {
+
   }
 
   // None means "we don't know". Some(None) means "we know, there is no script"
   private val accountScripts = mutable.AnyRefMap.empty[Address, CachedData[AccountScriptInfo]]
   private def withAccountScript(address: Address): Option[CachedData[AccountScriptInfo]] =
-    accountScripts
-      .updateWith(address) {
-        case None => Some(CachedData.loaded(blockchainApi.getAccountScript(address)))
-        case x    => x
-      }
+    accountScripts.updateWith(address) {
+      case None => Some(CachedData.loaded(blockchainApi.getAccountScript(address, this.estimator)))
+      case x    => x
+    }
 
   // Ride: scriptHash
   override def accountScript(address: Address): Option[AccountScriptInfo] = withAccountScript(address).get.mayBeValue
@@ -111,7 +111,7 @@ class MutableBlockchain(override val settings: BlockchainSettings, blockchainApi
 
   override def height: Int = _height
 
-  var _activatedFeatures = settings.functionalitySettings.preActivatedFeatures
+  var _activatedFeatures = blockchainApi.getActivatedFeatures(height)
 
   override def activatedFeatures: Map[Short, Int] = _activatedFeatures
 

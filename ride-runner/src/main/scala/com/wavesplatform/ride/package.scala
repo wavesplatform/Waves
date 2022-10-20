@@ -10,6 +10,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
 import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError}
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TraceStep}
+import org.slf4j.LoggerFactory
 import play.api.libs.json.{JsObject, Json}
 
 package object ride {
@@ -60,11 +61,17 @@ let x1 = if (valueOrElse(getBoolean("b"), false)) then 1 else 0
       blockchain: Blockchain,
       request: RunnerRequest
   ): JsObject = {
+    val log = LoggerFactory.getLogger("execute")
+    val tx  = request.toTx(blockchain.settings.addressSchemeCharacter.toByte)
+    log.info("Transaction: {}", tx)
+    log.info("Running from {}", tx.sender.toAddress)
+
     val result = InvokeScriptTransactionDiff(
       blockchain,
       System.currentTimeMillis(), // blockTime
       limitedExecution = false
-    )(request.toTx(blockchain.settings.addressSchemeCharacter.toByte))
+    )(tx)
+
     result.resultE
       .flatMap { all =>
         result.trace

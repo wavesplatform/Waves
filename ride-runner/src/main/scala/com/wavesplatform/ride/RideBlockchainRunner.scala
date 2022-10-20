@@ -2,10 +2,8 @@ package com.wavesplatform.ride
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.Application
-import com.wavesplatform.account.{Address, AddressScheme}
-import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.grpc.{BlockchainGrpcApi, GrpcClientSettings, GrpcConnector}
-import com.wavesplatform.lang.script.Script
 import com.wavesplatform.resources.*
 import com.wavesplatform.utils.ScorexLogging
 
@@ -24,13 +22,8 @@ object RideBlockchainRunner extends ScorexLogging {
       override val chainId: Byte = 'W'.toByte
     }
 
-    val input = RideRunnerInput.parse(Using(Source.fromFile(new File(s"$basePath/input.json")))(_.getLines().mkString("\n")).get)
-    input.request.call.foreach { call =>
-      val script = Script.fromBase64String(Base64.encode(compiledScript.bytes)).explicitGet()
-      val same   = input.accounts(call.dApp.asInstanceOf[Address]).scriptInfo.exists(_.script == script)
-      require(same, "Scripts are not same!")
-    }
-
+    // TODO expr should work too
+    val input = RideRunnerInput.parse(Using(Source.fromFile(new File(s"$basePath/input2.json")))(_.getLines().mkString("\n")).get)
     val r = Using.Manager { use =>
       val connector = use(new GrpcConnector)
       val channel = connector.mkChannel(
@@ -66,6 +59,7 @@ object RideBlockchainRunner extends ScorexLogging {
 
       val mutableBlockchain = new MutableBlockchain(nodeSettings.blockchainSettings, blockchainApi)
 
+      log.info("input: {}", input)
       val apiResult = execute(
         mutableBlockchain,
         input.request
