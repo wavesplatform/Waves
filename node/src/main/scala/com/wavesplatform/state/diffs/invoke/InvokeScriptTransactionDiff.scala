@@ -41,8 +41,6 @@ import com.wavesplatform.transaction.validation.impl.DataTxValidator
 import monix.eval.Coeval
 import shapeless.Coproduct
 
-import scala.util.Right
-
 object InvokeScriptTransactionDiff {
 
   private[this] def allIssues(r: InvokeScriptResult): Seq[Issue] = {
@@ -222,7 +220,7 @@ object InvokeScriptTransactionDiff {
           case i: IncompleteResult =>
             TracedResult(Left(GenericError(s"Evaluation was uncompleted with unused complexity = ${i.unusedComplexity}")))
         }
-        totalDiff <- TracedResult(invocationDiff.copy(scriptsComplexity = 0).combineF(resultDiff)).leftMap(GenericError(_))
+        totalDiff <- TracedResult(invocationDiff.withScriptsComplexity(0).combineF(resultDiff)).leftMap(GenericError(_))
       } yield totalDiff
     }
 
@@ -370,28 +368,28 @@ object InvokeScriptTransactionDiff {
       .flatten
       .leftMap[ValidationError] {
         case (FailOrRejectError(msg, true), _, log) =>
-          ScriptExecutionError.dAppExecution(msg, log)
+          InvokeRejectError(msg, log)
         case (error, unusedComplexity, log) =>
           val usedComplexity = startLimit - unusedComplexity.max(0)
           if (usedComplexity > failFreeLimit) {
             val storingComplexity = if (blockchain.storeEvaluatedComplexity) usedComplexity else estimatedComplexity
             FailedTransactionError.dAppExecution(error.message, storingComplexity + paymentsComplexity, log)
           } else
-            ScriptExecutionError.dAppExecution(error.message, log)
+            InvokeRejectError(error.message, log)
       }
       .flatTap { case (r, log) =>
         InvokeDiffsCommon
           .checkScriptResultFields(blockchain, r)
           .leftMap[ValidationError] {
             case FailOrRejectError(message, true) =>
-              ScriptExecutionError.dAppExecution(message, log)
+              InvokeRejectError(message, log)
             case error =>
               val usedComplexity = startLimit - r.unusedComplexity
               if (usedComplexity > failFreeLimit) {
                 val storingComplexity = if (blockchain.storeEvaluatedComplexity) usedComplexity else estimatedComplexity
                 FailedTransactionError.dAppExecution(error.toString, storingComplexity + paymentsComplexity, log)
               } else
-                ScriptExecutionError.dAppExecution(error.toString, log)
+                InvokeRejectError(error.toString, log)
           }
       }
   }

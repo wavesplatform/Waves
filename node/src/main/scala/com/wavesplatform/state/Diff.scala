@@ -5,6 +5,7 @@ import cats.data.Ior
 import cats.implicits.{catsSyntaxSemigroup, toFlatMapOps, toFunctorOps}
 import cats.kernel.{Monoid, Semigroup}
 import cats.syntax.either.*
+import com.google.common.hash.{BloomFilter, Funnels}
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
@@ -19,7 +20,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.InvokeTransaction
 import com.wavesplatform.transaction.{Asset, EthereumTransaction, Transaction}
 
-import scala.collection.immutable.VectorMap
+import scala.util.chaining.*
 
 case class LeaseBalance(in: Long, out: Long) {
   def combineF[F[_]: Monad](that: LeaseBalance)(implicit s: Summarizer[F]): F[LeaseBalance] =
@@ -145,32 +146,54 @@ case class NewTransactionInfo(transaction: Transaction, affected: Set[Address], 
 
 case class NewAssetInfo(static: AssetStaticInfo, dynamic: AssetInfo, volume: AssetVolumeInfo)
 
-case class Diff(
-    transactions: collection.Map[ByteStr, NewTransactionInfo] = VectorMap.empty,
-    portfolios: Map[Address, Portfolio] = Map.empty,
-    issuedAssets: Map[IssuedAsset, NewAssetInfo] = Map.empty,
-    updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map.empty,
-    aliases: Map[Alias, Address] = Map.empty,
-    orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
-    leaseState: Map[ByteStr, LeaseDetails] = Map.empty,
-    scripts: Map[Address, Option[AccountScriptInfo]] = Map.empty,
-    assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] = Map.empty,
-    accountData: Map[Address, AccountDataInfo] = Map.empty,
-    sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
-    scriptsRun: Int = 0,
-    scriptsComplexity: Long = 0,
-    scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty,
-    ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map.empty
+case class Diff private (
+    transactions: Vector[NewTransactionInfo],
+    portfolios: Map[Address, Portfolio],
+    issuedAssets: Map[IssuedAsset, NewAssetInfo],
+    updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
+    aliases: Map[Alias, Address],
+    orderFills: Map[ByteStr, VolumeAndFee],
+    leaseState: Map[ByteStr, LeaseDetails],
+    scripts: Map[Address, Option[AccountScriptInfo]],
+    assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]],
+    accountData: Map[Address, AccountDataInfo],
+    sponsorship: Map[IssuedAsset, Sponsorship],
+    scriptsRun: Int,
+    scriptsComplexity: Long,
+    scriptResults: Map[ByteStr, InvokeScriptResult],
+    ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta],
+    transactionFilter: Option[BloomFilter[Array[Byte]]]
 ) {
   @inline
   final def combineE(newer: Diff): Either[ValidationError, Diff] = combineF(newer).leftMap(GenericError(_))
 
+  def transaction(txId: ByteStr): Option[NewTransactionInfo] =
+    if (transactions.nonEmpty && transactionFilter.exists(_.mightContain(txId.arr)))
+      transactions.find(_.transaction.id() == txId)
+    else None
+
+  def withScriptsComplexity(newScriptsComplexity: Long): Diff = copy(scriptsComplexity = newScriptsComplexity)
+
+  def withScriptResults(newScriptResults: Map[ByteStr, InvokeScriptResult]): Diff = copy(scriptResults = newScriptResults)
+
+  def withScriptRuns(newScriptRuns: Int): Diff = copy(scriptsRun = newScriptRuns)
+
+  def withPortfolios(newPortfolios: Map[Address, Portfolio]): Diff = copy(portfolios = newPortfolios)
+
   def combineF(newer: Diff): Either[String, Diff] =
     Diff
       .combine(portfolios, newer.portfolios)
-      .map(portfolios =>
+      .map { portfolios =>
+        val newTransactions = if (transactions.isEmpty) newer.transactions else transactions ++ newer.transactions
+        val newFilter = transactionFilter match {
+          case Some(bf) =>
+            newer.transactions.foreach(nti => bf.put(nti.transaction.id().arr))
+            Some(bf)
+          case None => newer.transactionFilter
+        }
+
         Diff(
-          transactions = transactions ++ newer.transactions,
+          transactions = newTransactions,
           portfolios = portfolios,
           issuedAssets = issuedAssets ++ newer.issuedAssets,
           updatedAssets = updatedAssets |+| newer.updatedAssets,
@@ -184,12 +207,84 @@ case class Diff(
           scriptsRun = scriptsRun + newer.scriptsRun,
           scriptResults = scriptResults.combine(newer.scriptResults),
           scriptsComplexity = scriptsComplexity + newer.scriptsComplexity,
-          ethereumTransactionMeta = ethereumTransactionMeta ++ newer.ethereumTransactionMeta
+          ethereumTransactionMeta = ethereumTransactionMeta ++ newer.ethereumTransactionMeta,
+          transactionFilter = newFilter
         )
-      )
+      }
 }
 
 object Diff {
+  def apply(
+      portfolios: Map[Address, Portfolio] = Map.empty,
+      issuedAssets: Map[IssuedAsset, NewAssetInfo] = Map.empty,
+      updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map.empty,
+      aliases: Map[Alias, Address] = Map.empty,
+      orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
+      leaseState: Map[ByteStr, LeaseDetails] = Map.empty,
+      scripts: Map[Address, Option[AccountScriptInfo]] = Map.empty,
+      assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] = Map.empty,
+      accountData: Map[Address, AccountDataInfo] = Map.empty,
+      sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
+      scriptsRun: Int = 0,
+      scriptsComplexity: Long = 0,
+      scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty,
+      ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map.empty
+  ): Diff =
+    new Diff(
+      Vector.empty,
+      portfolios,
+      issuedAssets,
+      updatedAssets,
+      aliases,
+      orderFills,
+      leaseState,
+      scripts,
+      assetScripts,
+      accountData,
+      sponsorship,
+      scriptsRun,
+      scriptsComplexity,
+      scriptResults,
+      ethereumTransactionMeta,
+      None
+    )
+
+  def withTransactions(
+      nti: Vector[NewTransactionInfo],
+      portfolios: Map[Address, Portfolio] = Map.empty,
+      issuedAssets: Map[IssuedAsset, NewAssetInfo] = Map.empty,
+      updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map.empty,
+      aliases: Map[Alias, Address] = Map.empty,
+      orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
+      leaseState: Map[ByteStr, LeaseDetails] = Map.empty,
+      scripts: Map[Address, Option[AccountScriptInfo]] = Map.empty,
+      assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] = Map.empty,
+      accountData: Map[Address, AccountDataInfo] = Map.empty,
+      sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
+      scriptsRun: Int = 0,
+      scriptsComplexity: Long = 0,
+      scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty,
+      ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map.empty
+  ): Diff =
+    new Diff(
+      nti,
+      portfolios,
+      issuedAssets,
+      updatedAssets,
+      aliases,
+      orderFills,
+      leaseState,
+      scripts,
+      assetScripts,
+      accountData,
+      sponsorship,
+      scriptsRun,
+      scriptsComplexity,
+      scriptResults,
+      ethereumTransactionMeta,
+      mkFilterForTransactions(nti.map(_.transaction)*)
+    )
+
   val empty: Diff = Diff()
 
   def combine(portfolios1: Map[Address, Portfolio], portfolios2: Map[Address, Portfolio]): Either[String, Map[Address, Portfolio]] =
@@ -209,6 +304,17 @@ object Diff {
         case (r, _) => r
       }
 
+  private def mkFilter() =
+    BloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), 10000, 0.01f)
+  private def mkFilterForTransactions(tx: Transaction*) =
+    Some(
+      mkFilter().tap(bf =>
+        tx.foreach { t =>
+          bf.put(t.id().arr)
+        }
+      )
+    )
+
   implicit class DiffExt(private val d: Diff) extends AnyVal {
     def errorMessage(txId: ByteStr): Option[InvokeScriptResult.ErrorMessage] =
       d.scriptResults.get(txId).flatMap(_.error)
@@ -227,13 +333,17 @@ object Diff {
         case et: EthereumTransaction =>
           et.payload match {
             case EthereumTransaction.Invocation(dApp, _) => Some(dApp)
-            case _ => None
+            case _                                       => None
           }
         case _ =>
           None
       }
       val affectedAddresses = d.portfolios.keySet ++ d.accountData.keySet ++ calledScripts ++ maybeDApp
-      d.copy(transactions = VectorMap(tx.id() -> NewTransactionInfo(tx, affectedAddresses, applied, d.scriptsComplexity)))
+
+      d.copy(
+        transactions = Vector(NewTransactionInfo(tx, affectedAddresses, applied, d.scriptsComplexity)),
+        transactionFilter = mkFilterForTransactions(tx)
+      )
     }
   }
 }

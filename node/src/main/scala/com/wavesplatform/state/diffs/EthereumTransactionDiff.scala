@@ -15,7 +15,7 @@ object EthereumTransactionDiff {
     val resultEi = e.payload match {
       case et: EthereumTransaction.Transfer =>
         for (assetId <- et.tryResolveAsset(blockchain))
-          yield Diff.empty.copy(
+          yield Diff(
             ethereumTransactionMeta = Map(
               e.id() -> EthereumTransactionMeta(
                 EthereumTransactionMeta.Payload.Transfer(
@@ -31,7 +31,7 @@ object EthereumTransactionDiff {
       case ei: EthereumTransaction.Invocation =>
         for {
           invocation <- ei.toInvokeScriptLike(e, blockchain)
-        } yield Diff.empty.copy(
+        } yield Diff(
           ethereumTransactionMeta = Map(
             e.id() -> EthereumTransactionMeta(
               EthereumTransactionMeta.Payload.Invocation(

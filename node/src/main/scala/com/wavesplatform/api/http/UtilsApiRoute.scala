@@ -21,7 +21,7 @@ import com.wavesplatform.lang.directives.values.{DApp as DAppType, *}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
-import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
+import com.wavesplatform.lang.v1.compiler.{ContractScriptCompactor, ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
@@ -37,7 +37,7 @@ import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.TransactionType.TransactionType
-import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError}
+import com.wavesplatform.transaction.TxValidationError.{GenericError, InvokeRejectError}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{BlockchainContext, DAppEnvironment, InvokeScriptTransaction}
 import com.wavesplatform.transaction.{Asset, TransactionType}
@@ -298,8 +298,8 @@ case class UtilsApiRoute(
       val requestData = obj ++ Json.obj("address" -> address.toString)
       val responseJson = result
         .recover {
-          case e: ScriptExecutionError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.error)
-          case other                   => ApiError.fromValidationError(other).json
+          case e: InvokeRejectError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.message)
+          case other                => ApiError.fromValidationError(other).json
         }
         .explicitGet() ++ requestData
 
@@ -393,7 +393,7 @@ object UtilsApiRoute {
             fixUnicodeFunctions = true,
             useNewPowPrecision = true
           )
-        call = ContractEvaluator.buildSyntheticCall(script.expr.asInstanceOf[DApp], expr)
+        call = ContractEvaluator.buildSyntheticCall(ContractScriptCompactor.decompact(script.expr.asInstanceOf[DApp]), expr)
         limitedResult <- EvaluatorV2
           .applyLimitedCoeval(
             call,
@@ -405,10 +405,10 @@ object UtilsApiRoute {
             checkConstructorArgsTypes = true
           )
           .value()
-          .leftMap { case (err, _, log) => ScriptExecutionError.dAppExecution(err.message, log) }
+          .leftMap { case (err, _, log) => InvokeRejectError(err.message, log) }
         result <- limitedResult match {
           case (eval: EVALUATED, unusedComplexity, _) => Right((eval, limit - unusedComplexity))
-          case (_: EXPR, _, log)                      => Left(ScriptExecutionError.dAppExecution(s"Calculation complexity limit exceeded", log))
+          case (_: EXPR, _, log)                      => Left(InvokeRejectError(s"Calculation complexity limit exceeded", log))
         }
       } yield result
     }

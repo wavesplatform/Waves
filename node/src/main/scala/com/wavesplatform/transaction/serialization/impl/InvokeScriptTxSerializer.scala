@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
+
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
@@ -34,11 +35,18 @@ object InvokeScriptTxSerializer {
       case Terms.CONST_BOOLEAN(bool)  => Json.obj("type" -> "boolean", "value" -> bool)
       case Terms.CONST_BYTESTR(bytes) => Json.obj("type" -> "binary", "value" -> bytes.base64)
       case Terms.CONST_STRING(str)    => Json.obj("type" -> "string", "value" -> str)
-      case Terms.ARR(_)               => Json.obj("type" -> "list", "value" -> "unsupported") // should not be shown on normal cases, added only to avoid NotImplementedError while constructing error for illegal callable argument type
-      case arg                        => throw new NotImplementedError(s"Not supported: $arg")
+      case Terms.ARR(_) =>
+        Json.obj(
+          "type"  -> "list",
+          "value" -> "unsupported"
+        ) // should not be shown on normal cases, added only to avoid NotImplementedError while constructing error for illegal callable argument type
+      case arg => throw new NotImplementedError(s"Not supported: $arg")
     }
 
-  def toJson(tx: InvokeScriptTransaction): JsObject = BaseTxJson.toJson(tx) ++ tx.toJson
+  def toJson(tx: InvokeScriptTransaction): JsObject = BaseTxJson.toJson(tx) ++ Json.obj(
+    "dApp"    -> tx.dApp.toString,
+    "payment" -> tx.payments
+  ) ++ Json.obj("call" -> InvokeScriptTxSerializer.functionCallToJson(tx.funcCall))
 
   def bodyBytes(tx: InvokeScriptTransaction): Array[Byte] = {
     import tx.*

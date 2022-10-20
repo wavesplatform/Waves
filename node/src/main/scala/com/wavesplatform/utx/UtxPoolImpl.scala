@@ -447,7 +447,7 @@ class UtxPoolImpl(
 
   @scala.annotation.tailrec
   private def extractErrorMessage(error: ValidationError): String = error match {
-    case see: TxValidationError.ScriptExecutionError        => s"ScriptExecutionError(${see.error})"
+    case see: TxValidationError.ScriptExecutionError        => s"ScriptExecutionError(${see.message})"
     case _: TxValidationError.TransactionNotAllowedByScript => "TransactionNotAllowedByScript"
     case TransactionValidationError(cause, _)               => extractErrorMessage(cause)
     case other                                              => other.toString
