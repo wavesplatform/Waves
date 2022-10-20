@@ -71,7 +71,7 @@ object JsAPITest extends JsTestBase {
             |   func funcRef() = letCall
             |   []
             | }
-        """.stripMargin,
+          """.stripMargin,
           V6
         ),
         3
