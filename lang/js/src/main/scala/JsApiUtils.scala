@@ -147,9 +147,7 @@ object JsApiUtils {
       case Expressions.FOLD(_, limit, value, acc, func, _, _) =>
         val additionalDataObj = jObj.applyDynamic("apply")(
           "name"  -> s"FOLD<$limit>",
-          "value" -> serExpr(value),
-          "acc"   -> serExpr(acc),
-          "func"  -> func.key.toString
+          "args"  -> js.Array(serExpr(value), serExpr(acc), func.key.toString: js.Any)
         )
         mergeJSObjects(commonDataObj, additionalDataObj)
 
