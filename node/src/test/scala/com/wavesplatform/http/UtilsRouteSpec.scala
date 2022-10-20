@@ -1100,14 +1100,14 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
 
     "invocation" - {
       withDomain(RideV6) { d =>
-        val dApp = TestCompiler(V6).compileContract(
+        def dApp(caller: Address) = TestCompiler(V6).compileContract(
           s"""
              | @Callable(i)
              | func f(arg1: Int, arg2: String) = {
              |   let check =
              |     this                    == Address(base58'$defaultAddress')            &&
-             |     i.caller                == Address(base58'$secondAddress')             &&
-             |     i.originCaller          == Address(base58'$secondAddress')             &&
+             |     i.caller                == Address(base58'$caller')                    &&
+             |     i.originCaller          == Address(base58'$caller')                    &&
              |     i.callerPublicKey       == base58'${secondSigner.publicKey}'           &&
              |     i.originCallerPublicKey == base58'${secondSigner.publicKey}'           &&
              |     i.fee                   == 123456                                      &&
@@ -1134,10 +1134,10 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
              | }
            """.stripMargin
         )
-        d.appendBlock(setScript(defaultSigner, dApp))
+        d.appendBlock(setScript(defaultSigner, dApp(caller = secondAddress)))
 
         val route = utilsApi.copy(blockchain = d.blockchain).route
-        val invocation =
+        def invocation(senderAddress: Option[Address] = Some(secondAddress)) =
           Json
             .parse(
               s"""
@@ -1158,7 +1158,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
                  |  "id": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8",
                  |  "fee": 123456,
                  |  "feeAssetId": "abcd",
-                 |  "sender": "$secondAddress",
+                 |  ${senderAddress.fold("")(a => s""""sender": "$a",""")}
                  |  "senderPublicKey": "${secondSigner.publicKey}",
                  |  "payment": [
                  |    {
@@ -1257,17 +1257,17 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
           )
 
         "successful result" in {
-          Post(routePath(s"/script/evaluate/$defaultAddress"), invocation) ~> route ~> check {
+          Post(routePath(s"/script/evaluate/$defaultAddress"), invocation()) ~> route ~> check {
             val json = responseAs[JsValue]
             (json \ "complexity").as[Int] shouldBe 16
             (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
             (json \ "vars").isEmpty shouldBe true
-            json.as[UtilsInvocationRequest] shouldBe invocation.as[UtilsInvocationRequest]
+            json.as[UtilsInvocationRequest] shouldBe invocation().as[UtilsInvocationRequest]
           }
         }
 
         "trace" in {
-          Post(routePath(s"/script/evaluate/$defaultAddress?trace=true"), invocation) ~> route ~> check {
+          Post(routePath(s"/script/evaluate/$defaultAddress?trace=true"), invocation()) ~> route ~> check {
             val json = responseAs[JsValue]
             (json \ "complexity").as[Int] shouldBe 16
             (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
@@ -1284,10 +1284,34 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
         }
 
         "conflicting request structure" in {
-          Post(routePath(s"/script/evaluate/$defaultAddress"), Json.obj("expr" -> "true") ++ invocation) ~> route ~> check {
+          Post(routePath(s"/script/evaluate/$defaultAddress"), Json.obj("expr" -> "true") ++ invocation()) ~> route ~> check {
             val json = responseAs[JsValue]
             (json \ "message").as[String] shouldBe "Conflicting request structure. Both expression and invocation structure were sent"
             (json \ "error").as[Int] shouldBe 198
+          }
+        }
+
+        "sender address can be calculated from PK" in {
+          Post(routePath(s"/script/evaluate/$defaultAddress"), invocation(None)) ~> route ~> check {
+            val json = responseAs[JsValue]
+            (json \ "complexity").as[Int] shouldBe 16
+            (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
+            (json \ "vars").isEmpty shouldBe true
+            json.as[UtilsInvocationRequest] shouldBe invocation(None).as[UtilsInvocationRequest]
+          }
+        }
+
+        "sender address can differ from PK address" in withDomain(RideV6) { d =>
+          val customSender = signer(2).toAddress
+          val route        = utilsApi.copy(blockchain = d.blockchain).route
+          d.appendBlock(setScript(defaultSigner, dApp(caller = customSender)))
+
+          Post(routePath(s"/script/evaluate/$defaultAddress"), invocation(Some(customSender))) ~> route ~> check {
+            val json = responseAs[JsValue]
+            (json \ "complexity").as[Int] shouldBe 16
+            (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
+            (json \ "vars").isEmpty shouldBe true
+            json.as[UtilsInvocationRequest] shouldBe invocation(Some(customSender)).as[UtilsInvocationRequest]
           }
         }
       }
