@@ -41,8 +41,6 @@ import com.wavesplatform.transaction.validation.impl.DataTxValidator
 import monix.eval.Coeval
 import shapeless.Coproduct
 
-import scala.util.Right
-
 object InvokeScriptTransactionDiff {
 
   private[this] def allIssues(r: InvokeScriptResult): Seq[Issue] = {
@@ -224,7 +222,7 @@ object InvokeScriptTransactionDiff {
           case i: IncompleteResult =>
             TracedResult(Left(GenericError(s"Evaluation was uncompleted with unused complexity = ${i.unusedComplexity}")))
         }
-        totalDiff <- TracedResult(invocationDiff.copy(scriptsComplexity = 0).combineF(resultDiff)).leftMap(GenericError(_))
+        totalDiff <- TracedResult(invocationDiff.withScriptsComplexity(0).combineF(resultDiff)).leftMap(GenericError(_))
       } yield totalDiff
     }
 

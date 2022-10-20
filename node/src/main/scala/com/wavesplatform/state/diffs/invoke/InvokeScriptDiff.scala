@@ -369,7 +369,7 @@ object InvokeScriptDiff {
               }
             resultDiff <- traced(
               diff
-                .copy(scriptsComplexity = 0)
+                .withScriptsComplexity(0)
                 .combineE(actionsDiff)
                 .flatMap(_.combineE(Diff(scriptsComplexity = paymentsComplexity)))
             )
