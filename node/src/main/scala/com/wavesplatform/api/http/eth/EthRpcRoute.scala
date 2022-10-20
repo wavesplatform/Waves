@@ -71,7 +71,7 @@ case class EthRpcRoute(blockchain: () => Blockchain, transactionsApi: CommonTran
           extractParam1[String](jso) { str =>
             val blockNumberOpt = str match {
               case "earliest" => Some(1).asRight
-              case "latest"   => Some(blockchain.height).asRight
+              case "latest"   => Some(bc.height).asRight
               case "pending"  => None.asRight
               case _ =>
                 Try(Some(Integer.parseInt(str.drop(2), 16)))
@@ -162,7 +162,7 @@ case class EthRpcRoute(blockchain: () => Blockchain, transactionsApi: CommonTran
                     Json.obj(
                       "hash"             -> toHexString(tm.transaction.id().arr),
                       "nonce"            -> "0x1",
-                      "blockHash"        -> toHexString(blockchain.lastBlockId.get.arr),
+                      "blockHash"        -> toHexString(bc.lastBlockId.get.arr),
                       "blockNumber"      -> toHexString(BigInteger.valueOf(tm.height)),
                       "transactionIndex" -> "0x1",
                       "from"             -> toHexString(tx.senderAddress().publicKeyHash),
