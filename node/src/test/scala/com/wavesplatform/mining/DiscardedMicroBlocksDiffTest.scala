@@ -75,7 +75,7 @@ class DiscardedMicroBlocksDiffTest extends PropSpec with WithDomain {
     testInterimState(
       leaseCancel(leaseTx.id()),
       _.accountsApi.activeLeases(defaultAddress).toListL.runSyncUnsafe() shouldBe empty,
-      Seq(leaseTx)
+      preconditions = Seq(leaseTx)
     )
   }
 
