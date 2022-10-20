@@ -1126,7 +1126,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
              |     i.originCaller          == Address(base58'${"1" * 26}')                &&
              |     i.callerPublicKey       == base58'${"1" * 32}'                         &&
              |     i.originCallerPublicKey == base58'${"1" * 32}'                         &&
-             |     i.fee                   == 0                                           &&
+             |     i.fee                   == 500000                                      &&
              |     i.payments              == []                                          &&
              |     i.transactionId         == base58'${"1" * 32}'                         &&
              |     i.feeAssetId            == unit

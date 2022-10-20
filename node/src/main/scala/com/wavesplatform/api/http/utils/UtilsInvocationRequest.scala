@@ -10,16 +10,17 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invocation
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address as RideAddress
+import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.smart
 import com.wavesplatform.transaction.smart.AttachedPaymentExtractor
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.{TransactionType, smart}
 import play.api.libs.json.{Json, Reads}
 
 case class UtilsInvocationRequest(
     call: FunctionCallPart = FunctionCallPart("default", Nil),
     id: String = ByteStr(empty32Bytes).toString,
-    fee: Long = 0,
+    fee: Long = FeeConstants(TransactionType.InvokeScript) * FeeUnit,
     feeAssetId: Option[String] = None,
     sender: Option[String] = None,
     senderPublicKey: String = ByteStr(empty32Bytes).toString,
