@@ -26,7 +26,8 @@ object Parser {
   def keywords                 = Set("let", "strict", "base58", "base64", "true", "false", "if", "then", "else", "match", "case", "func")
   def lowerChar[A: P]          = CharIn("a-z")
   def upperChar[A: P]          = CharIn("A-Z")
-  def char[A: P]               = lowerChar | upperChar
+  def nonLatinChar[A: P]       = (CharPred(_.isLetter) ~~/ Fail).opaque("only latin charset for definitions")
+  def char[A: P]               = lowerChar | upperChar | nonLatinChar
   def digit[A: P]              = CharIn("0-9")
   def spaces[A: P]             = CharIn(" \t\n\r")
   def unicodeSymbolP[A: P]     = P("\\u" ~/ Pass ~~ (char | digit).repX(0, "", 4))
@@ -675,7 +676,7 @@ object Parser {
       }
   }
 
-  private val moveRightKeywords = Seq(""""func"""", """"let"""", " expression", "1 underscore", "end-of-input")
+  private val moveRightKeywords = Seq(""""func"""", """"let"""", " expression", "1 underscore", "end-of-input", "latin charset")
 
   def toString(input: String, f: Failure): String = {
     val (start, end) =

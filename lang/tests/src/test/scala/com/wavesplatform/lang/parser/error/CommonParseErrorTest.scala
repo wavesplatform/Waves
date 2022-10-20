@@ -28,4 +28,28 @@ class CommonParseErrorTest extends ParseErrorTest {
       onlyDApp = true
     )
   }
+
+  property("cyrillic charset for definition") {
+    assert(
+      """
+        | func кириллица() = []
+      """.stripMargin,
+      """Parse error: expected only latin charset for definitions""",
+      7,
+      18,
+      "кириллица()"
+    )
+  }
+
+  property("chinese charset for definition") {
+    assert(
+      """
+        | let 煊镕不 = []
+      """.stripMargin,
+      """Parse error: expected only latin charset for definitions""",
+      6,
+      9,
+      "煊镕不"
+    )
+  }
 }
