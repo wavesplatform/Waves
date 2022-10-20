@@ -34,12 +34,11 @@ trait ApiMarshallers extends JsonFormats {
 
   def tracedResultMarshaller[A](includeTrace: Boolean)(implicit writes: OWrites[A]): ToResponseMarshaller[TracedResult[ApiError, A]] =
     fromStatusCodeAndValue[StatusCode, JsValue]
-      .compose(
-        ae =>
-          (
-            ae.resultE.fold(_.code, _ => StatusCodes.OK),
-            ae.resultE.fold(_.json, writes.writes) ++ (if (includeTrace) Json.obj("trace" -> ae.trace.map(_.loggedJson)) else Json.obj())
-          )
+      .compose(ae =>
+        (
+          ae.resultE.fold(_.code, _ => StatusCodes.OK),
+          ae.resultE.fold(_.json, writes.writes) ++ (if (includeTrace) Json.obj("trace" -> ae.trace.map(_.loggedJson)) else Json.obj())
+        )
       )
 
   private[this] lazy val jsonStringUnmarshaller =
@@ -102,6 +101,31 @@ trait ApiMarshallers extends JsonFormats {
           case Marshalling.WithFixedContentType(`contentType`, marshal) => marshal
           case Marshalling.WithOpenCharset(`mediaType`, marshal)        => () => marshal(charset)
         }
+    }
+  }
+
+  def jsonStreamMarshallerNew(
+      prefix: String = "[",
+      delimiter: String = ",",
+      suffix: String = "]"
+  ): ToResponseMarshaller[Source[ByteString, NotUsed]] = {
+    val framingRenderer = Flow[ByteString].intersperse(ByteString(prefix), ByteString(delimiter), ByteString(suffix))
+    Marshaller[Source[ByteString, NotUsed], HttpResponse] { implicit ec => source =>
+      FastFuture.successful(
+        List(
+          Marshalling.WithFixedContentType(
+            `application/json`,
+            () => {
+
+              val marshalledElements: Source[ByteString, NotUsed] =
+                source
+                  .via(framingRenderer)
+
+              HttpResponse(entity = HttpEntity(`application/json`, marshalledElements))
+            }
+          )
+        )
+      )
     }
   }
 

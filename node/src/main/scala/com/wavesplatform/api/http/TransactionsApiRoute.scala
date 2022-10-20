@@ -2,24 +2,35 @@ package com.wavesplatform.api.http
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
+import akka.util.ByteString
 import cats.instances.either.*
 import cats.instances.list.*
 import cats.instances.try_.*
 import cats.syntax.alternative.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, *}
+import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.{Blockchain, InvokeScriptResult, TxMeta}
+import com.wavesplatform.state.{
+  BinaryDataEntry,
+  Blockchain,
+  BooleanDataEntry,
+  EmptyDataEntry,
+  IntegerDataEntry,
+  InvokeScriptResult,
+  StringDataEntry,
+  TxMeta
+}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.lease.*
@@ -32,7 +43,23 @@ import play.api.libs.json.*
 
 import scala.util.Success
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta.Payload
+import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.lang.v1.compiler.Terms.{
+  ARR,
+  CONST_BOOLEAN,
+  CONST_BYTESTR,
+  CONST_LONG,
+  CONST_STRING,
+  CaseObj,
+  EVALUATED,
+  EXPR,
+  FAIL,
+  FUNCTION_CALL
+}
 import com.wavesplatform.lang.v1.serialization.SerdeV1
+import com.wavesplatform.state.InvokeScriptResult.{DataEntry, Lease, LeaseCancel}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import monix.reactive.Observable
 
 case class TransactionsApiRoute(
@@ -65,7 +92,7 @@ case class TransactionsApiRoute(
         if (limit > settings.transactionsByAddressLimit) throw ApiException(TooBigArrayAllocation)
 
         transactionsByAddress(address, limit, after) // Double list - [ [tx1, tx2, ...] ]
-      }(jsonStreamMarshaller("[[", ",", "]]"))
+      }(jsonStreamMarshallerNew("[[", ",", "]]"))
     }
   }
 
@@ -199,7 +226,7 @@ case class TransactionsApiRoute(
       case _ => InvalidSignature
     }
 
-  def transactionsByAddress(address: Address, limitParam: Int, maybeAfter: Option[ByteStr]): Observable[JsObject] = {
+  def transactionsByAddress(address: Address, limitParam: Int, maybeAfter: Option[ByteStr]): Observable[ByteString] = {
     val aliasesOfAddress: Task[Set[Alias]] =
       commonApi
         .aliasesOfAddress(address)
@@ -210,7 +237,7 @@ case class TransactionsApiRoute(
 
     /** Produces compact representation for large transactions by stripping unnecessary data. Currently implemented for MassTransfer transaction only.
       */
-    def compactJson(address: Address, meta: TransactionMeta): Task[JsObject] = {
+    def compactJson(address: Address, meta: TransactionMeta): Task[ByteString] = {
       import com.wavesplatform.transaction.transfer.*
       meta.transaction match {
         case mtt: MassTransferTransaction if mtt.sender.toAddress != address =>
@@ -222,9 +249,9 @@ case class TransactionsApiRoute(
                }
              )
            ) aliasesOfAddress.map(aliases => mtt.compactJson(address, aliases))
-           else Task.now(mtt.compactJson(address, Set.empty))).map(_ ++ serializer.transactionMetaJson(meta))
+           else Task.now(mtt.compactJson(address, Set.empty))).map(a => ByteString(Json.stringify(a ++ serializer.transactionMetaJson(meta))))
 
-        case _ => Task.now(serializer.transactionWithMetaJson(meta))
+        case _ => Task.now(serializer.transactionWithMetaJsonNew(meta))
       }
     }
 
@@ -274,7 +301,7 @@ object TransactionsApiRoute {
     } yield TransactionProof(id, transactionIndex, merkleProof)
   }
 
-  private[http] object TransactionJsonSerializer {
+  object TransactionJsonSerializer {
     def applicationStatus(isBlockV5: Boolean, succeeded: Boolean): JsObject =
       if (isBlockV5)
         Json.obj("applicationStatus" -> (if (succeeded) ApplicationStatus.Succeeded else ApplicationStatus.ScriptExecutionFailed))
@@ -285,7 +312,263 @@ object TransactionsApiRoute {
       Json.obj("height" -> height)
   }
 
-  private[http] final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: CommonTransactionsApi) {
+  final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: CommonTransactionsApi) {
+    import com.github.plokhotnyuk.jsoniter_scala.macros.*
+    import com.github.plokhotnyuk.jsoniter_scala.core.*
+
+    case class EthereumInvokeMeta(
+        height: Int,
+        applicationStatus: Option[String],
+        spentComplexity: Long,
+        `type`: String,
+        id: String,
+        fee: Long,
+        feeAssetId: Option[String],
+        timestamp: Long,
+        version: Byte,
+        chainId: Option[Byte],
+        bytes: String,
+        sender: String,
+        senderPublicKey: String,
+        dApp: String,
+        call: Option[FUNCTION_CALL],
+        payment: Seq[Payment],
+        stateChanges: Option[InvokeScriptResult]
+    )
+
+    case class InvokeMeta(
+        height: Int,
+        applicationStatus: Option[String],
+        spentComplexity: Long,
+        stateChanges: Option[InvokeScriptResult],
+        `type`: Int,
+        id: String,
+        fee: Long,
+        feeAssetId: Option[String],
+        timestamp: Long,
+        version: Byte,
+        chainId: Option[Byte],
+        sender: String,
+        senderPublicKey: String,
+        proofs: Seq[String],
+        dApp: String,
+        payment: Seq[Payment],
+        call: FUNCTION_CALL
+    )
+
+    val stringCodec: JsonValueCodec[String]               = JsonCodecMaker.make
+    val optionStringCodec: JsonValueCodec[Option[String]] = JsonCodecMaker.make
+
+    def optionCodec[A](implicit jsonValueCodec: JsonValueCodec[A]): JsonValueCodec[Option[A]] = JsonCodecMaker.make
+
+    implicit val addressCodec: JsonValueCodec[Address] = new JsonValueCodec[Address] {
+      override def decodeValue(in: JsonReader, default: Address): Address = ???
+      override def encodeValue(x: Address, out: JsonWriter): Unit         = stringCodec.encodeValue(x.toString, out)
+      override def nullValue: Address                                     = ???
+    }
+
+    implicit val addressOrAliasCodec: JsonValueCodec[AddressOrAlias] = new JsonValueCodec[AddressOrAlias] {
+      override def decodeValue(in: JsonReader, default: AddressOrAlias): AddressOrAlias = ???
+      override def encodeValue(x: AddressOrAlias, out: JsonWriter): Unit = x match {
+        case addr: Address => stringCodec.encodeValue(addr.toString, out)
+        case alias: Alias  => stringCodec.encodeValue(alias.toString, out)
+      }
+      override def nullValue: AddressOrAlias = ???
+    }
+
+    implicit val byteStrCodec: JsonValueCodec[ByteStr] = new JsonValueCodec[ByteStr] {
+      override def decodeValue(in: JsonReader, default: ByteStr): ByteStr = ???
+      override def encodeValue(x: ByteStr, out: JsonWriter): Unit         = stringCodec.encodeValue(x.toString, out)
+      override def nullValue: ByteStr                                     = ???
+    }
+
+    implicit val assetCodec: JsonValueCodec[Asset] = new JsonValueCodec[Asset] {
+      override def decodeValue(in: JsonReader, default: Asset): Asset = ???
+      override def encodeValue(x: Asset, out: JsonWriter): Unit =
+        optionStringCodec.encodeValue(
+          x match {
+            case Waves           => None
+            case IssuedAsset(id) => Some(id.toString)
+          },
+          out
+        )
+      override def nullValue: Asset = ???
+    }
+
+    implicit val evaluatedCodec: JsonValueCodec[EVALUATED] = new JsonValueCodec[EVALUATED] {
+      override def decodeValue(in: JsonReader, default: EVALUATED): EVALUATED = ???
+      override def encodeValue(x: EVALUATED, out: JsonWriter): Unit = {
+        out.writeObjectStart()
+        x match {
+          case CONST_LONG(num) =>
+            out.writeKey("type")
+            out.writeVal("Int")
+            out.writeKey("value")
+            out.writeVal(num)
+          case CONST_BYTESTR(bs) =>
+            out.writeKey("type")
+            out.writeVal("ByteVector")
+            out.writeKey("value")
+            out.writeVal(bs.toString)
+          case CONST_STRING(str) =>
+            out.writeKey("type")
+            out.writeVal("String")
+            out.writeKey("value")
+            out.writeVal(str)
+          case CONST_BOOLEAN(b) =>
+            out.writeKey("type")
+            out.writeVal("Boolean")
+            out.writeKey("value")
+            out.writeVal(b)
+          case CaseObj(caseType, fields) =>
+            out.writeKey("type")
+            out.writeVal(caseType.name)
+            out.writeKey("value")
+            out.writeObjectStart()
+            fields.foreach { case (key, value) =>
+              out.writeKey(key)
+              encodeValue(value, out)
+            }
+            out.writeObjectEnd()
+          case ARR(xs) =>
+            out.writeKey("type")
+            out.writeVal("Array")
+            out.writeKey("value")
+            out.writeArrayStart()
+            xs.foreach(encodeValue(_, out))
+            out.writeArrayEnd()
+          case FAIL(reason) =>
+            out.writeKey("error")
+            out.writeVal(reason)
+        }
+        out.writeObjectEnd()
+      }
+      override def nullValue: EVALUATED = ???
+    }
+
+    implicit val funcCallCodec: JsonValueCodec[FUNCTION_CALL] = new JsonValueCodec[FUNCTION_CALL] {
+      def writeSingleArg(arg: EXPR, out: JsonWriter): Unit = {
+        out.writeObjectStart()
+        arg match {
+          case CONST_LONG(num) =>
+            out.writeKey("type")
+            out.writeVal("integer")
+            out.writeKey("value")
+            out.writeVal(num)
+          case CONST_BOOLEAN(bool) =>
+            out.writeKey("type")
+            out.writeVal("boolean")
+            out.writeKey("value")
+            out.writeVal(bool)
+          case CONST_BYTESTR(bytes) =>
+            out.writeKey("type")
+            out.writeVal("binary")
+            out.writeKey("value")
+            out.writeVal(bytes.base64)
+          case CONST_STRING(str) =>
+            out.writeKey("type")
+            out.writeVal("string")
+            out.writeKey("value")
+            out.writeVal(str)
+          case ARR(_) =>
+            out.writeKey("type")
+            out.writeVal("list")
+            out.writeKey("value")
+            out.writeVal("unsupported")
+          case arg => throw new NotImplementedError(s"Not supported: $arg")
+        }
+        out.writeObjectEnd()
+      }
+
+      override def decodeValue(in: JsonReader, default: FUNCTION_CALL): FUNCTION_CALL = ???
+      override def encodeValue(x: FUNCTION_CALL, out: JsonWriter): Unit = {
+        out.writeObjectStart()
+        out.writeKey("function")
+        out.writeVal(x.function.funcName)
+        out.writeKey("args")
+        out.writeArrayStart()
+        x.args.foreach {
+          case Terms.ARR(elements) =>
+            out.writeObjectStart()
+            out.writeKey("type")
+            out.writeVal("list")
+            out.writeKey("value")
+            out.writeArrayStart()
+            elements.foreach(writeSingleArg(_, out))
+            out.writeArrayEnd()
+            out.writeObjectEnd()
+          case other => writeSingleArg(other, out)
+        }
+        out.writeArrayEnd()
+        out.writeObjectEnd()
+      }
+      override def nullValue: FUNCTION_CALL = ???
+    }
+
+    implicit val leaseRefCodec: JsonValueCodec[LeaseRef] = JsonCodecMaker.make(CodecMakerConfig.withTransientNone(false))
+
+    implicit val leaseCodec: JsonValueCodec[Lease] = new JsonValueCodec[Lease] {
+      override def decodeValue(in: JsonReader, default: Lease): Lease = ???
+      override def encodeValue(x: Lease, out: JsonWriter): Unit =
+        leaseRefCodec.encodeValue(leaseIdToLeaseRef(x.id), out)
+      override def nullValue: Lease = ???
+    }
+
+    implicit val leaseCancelCodec: JsonValueCodec[LeaseCancel] = new JsonValueCodec[LeaseCancel] {
+      override def decodeValue(in: JsonReader, default: LeaseCancel): LeaseCancel = ???
+      override def encodeValue(x: LeaseCancel, out: JsonWriter): Unit =
+        leaseRefCodec.encodeValue(leaseIdToLeaseRef(x.id), out)
+      override def nullValue: LeaseCancel = ???
+    }
+
+    implicit val dataEntryCodec: JsonValueCodec[DataEntry] = new JsonValueCodec[DataEntry] {
+      override def decodeValue(in: JsonReader, default: DataEntry): DataEntry = ???
+      override def encodeValue(x: DataEntry, out: JsonWriter): Unit = {
+        out.writeObjectStart()
+        x match {
+          case BinaryDataEntry(key, value) =>
+            out.writeKey("type")
+            out.writeVal("binary")
+            out.writeKey("key")
+            out.writeVal(key)
+            out.writeKey("value")
+            out.writeVal(value.base64)
+          case IntegerDataEntry(key, value) =>
+            out.writeKey("type")
+            out.writeVal("integer")
+            out.writeKey("key")
+            out.writeVal(key)
+            out.writeKey("value")
+            out.writeVal(value)
+          case BooleanDataEntry(key, value) =>
+            out.writeKey("type")
+            out.writeVal("boolean")
+            out.writeKey("key")
+            out.writeVal(key)
+            out.writeKey("value")
+            out.writeVal(value)
+          case StringDataEntry(key, value) =>
+            out.writeKey("type")
+            out.writeVal("string")
+            out.writeKey("key")
+            out.writeVal(key)
+            out.writeKey("value")
+            out.writeVal(value)
+          case EmptyDataEntry(key) =>
+            out.writeKey("key")
+            out.writeVal(key)
+        }
+        out.writeObjectEnd()
+      }
+      override def nullValue: DataEntry = ???
+    }
+
+    implicit val invokeMetaCodec: JsonValueCodec[InvokeMeta] =
+      JsonCodecMaker.make(CodecMakerConfig.withDiscriminatorFieldName(None).withAllowRecursiveTypes(true).withTransientEmpty(false))
+
+    implicit val ethInvokeMetaCodec: JsonValueCodec[EthereumInvokeMeta] =
+      JsonCodecMaker.make(CodecMakerConfig.withDiscriminatorFieldName(None).withAllowRecursiveTypes(true).withTransientEmpty(false))
+
     def transactionMetaJson(meta: TransactionMeta): JsObject = {
       val specificInfo = meta.transaction match {
         case lease: LeaseTransaction =>
@@ -340,9 +623,65 @@ object TransactionsApiRoute {
       ).reduce(_ ++ _)
     }
 
-    def transactionWithMetaJson(meta: TransactionMeta): JsObject = {
+    def transactionWithMetaJson(meta: TransactionMeta): JsObject =
       meta.transaction.json() ++ transactionMetaJson(meta)
-    }
+
+    def transactionWithMetaJsonNew(meta: TransactionMeta): ByteString =
+      meta match {
+        case TransactionMeta.Invoke(height, transaction, succeeded, spentComplexity, invokeScriptResult) =>
+          val invokeMeta = InvokeMeta(
+            height,
+            if (isBlockV5(height))
+              if (succeeded) Some(ApplicationStatus.Succeeded) else Some(ApplicationStatus.ScriptExecutionFailed)
+            else
+              None,
+            spentComplexity,
+            invokeScriptResult,
+            transaction.tpe.id.toByte,
+            transaction.id().toString,
+            transaction.assetFee._2,
+            transaction.assetFee._1.maybeBase58Repr,
+            transaction.timestamp,
+            transaction.asInstanceOf[VersionedTransaction].version,
+            if (transaction.asInstanceOf[PBSince].isProtobufVersion) Some(transaction.chainId) else None,
+            transaction.asInstanceOf[ProvenTransaction].sender.toAddress(transaction.chainId).toString,
+            transaction.asInstanceOf[ProvenTransaction].sender.toString,
+            transaction.asInstanceOf[ProvenTransaction].proofs.proofs.map(_.toString),
+            transaction.dApp.toString,
+            transaction.payments,
+            transaction.funcCall
+          )
+          ByteString(writeToArray(invokeMeta)(invokeMetaCodec))
+        case TransactionMeta.Ethereum(height, tx, succeeded, spentComplexity, Some(EthereumTransactionMeta(Payload.Invocation(i), _)), isr) =>
+          val functionCallEi = SerdeV1.deserializeFunctionCall(i.functionCall.toByteArray).toOption
+          val payments       = i.payments.map(p => InvokeScriptTransaction.Payment(p.amount, PBAmounts.toVanillaAssetId(p.assetId)))
+
+          val ethereumInvokeMeta = EthereumInvokeMeta(
+            height,
+            if (isBlockV5(height))
+              if (succeeded) Some(ApplicationStatus.Succeeded) else Some(ApplicationStatus.ScriptExecutionFailed)
+            else
+              None,
+            spentComplexity,
+            "invocation",
+            tx.id().toString,
+            tx.assetFee._2,
+            tx.assetFee._1.maybeBase58Repr,
+            tx.timestamp,
+            tx.asInstanceOf[VersionedTransaction].version,
+            if (tx.asInstanceOf[PBSince].isProtobufVersion) Some(tx.chainId) else None,
+            EthEncoding.toHexString(tx.bytes()),
+            tx.senderAddress().toString,
+            tx.signerPublicKey().toString,
+            Address(EthEncoding.toBytes(tx.underlying.getTo)).toString,
+            functionCallEi,
+            payments,
+            isr
+          )
+          ByteString(writeToArray(ethereumInvokeMeta)(ethInvokeMetaCodec))
+        case other =>
+          ByteString(Json.stringify(meta.transaction.json() ++ transactionMetaJson(meta)))
+      }
 
     def unconfirmedTxExtendedJson(tx: Transaction): JsObject = tx match {
       case leaseCancel: LeaseCancelTransaction =>
@@ -391,7 +730,7 @@ object TransactionsApiRoute {
     }
   }
 
-  private[this] final case class LeaseRef(
+  final case class LeaseRef(
       id: ByteStr,
       originTransactionId: ByteStr,
       sender: Address,
