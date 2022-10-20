@@ -7,8 +7,8 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.state.IntegerDataEntry
 import com.wavesplatform.state.appender.BlockAppender
+import com.wavesplatform.state.{EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.test.DomainPresets.RideV6
 import com.wavesplatform.test.{NumericExt, PropSpec, TestTime}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -48,6 +48,14 @@ class DiscardedMicroBlocksDiffTest extends PropSpec with WithDomain {
     )
   }
 
+  property("interim account data delete") {
+    testInterimState(
+      dataEntry(defaultSigner, EmptyDataEntry("key")),
+      _.accountsApi.data(defaultAddress, "key") shouldBe None,
+      preconditions = Seq(dataEntry(defaultSigner, StringDataEntry("key", "value")))
+    )
+  }
+
   property("interim account script") {
     testInterimState(
       setScript(defaultSigner, TestCompiler(V6).compileExpression("true")),
@@ -59,6 +67,15 @@ class DiscardedMicroBlocksDiffTest extends PropSpec with WithDomain {
     testInterimState(
       lease(),
       _.accountsApi.activeLeases(defaultAddress).toListL.runSyncUnsafe() should not be empty
+    )
+  }
+
+  property("interim cancel leases") {
+    val leaseTx = lease()
+    testInterimState(
+      leaseCancel(leaseTx.id()),
+      _.accountsApi.activeLeases(defaultAddress).toListL.runSyncUnsafe() shouldBe empty,
+      Seq(leaseTx)
     )
   }
 
@@ -92,6 +109,16 @@ class DiscardedMicroBlocksDiffTest extends PropSpec with WithDomain {
     )
   }
 
+  property("interim asset burn") {
+    val issueTx = issue()
+    val asset   = IssuedAsset(issueTx.id())
+    testInterimState(
+      burn(asset, amount = 1),
+      _.assetsApi.description(asset).get.totalVolume shouldBe issueTx.quantity.value - 1,
+      preconditions = Seq(issueTx)
+    )
+  }
+
   property("interim asset script") {
     val exprTrue  = TestCompiler(V6).compileExpression("true")
     val exprFalse = TestCompiler(V6).compileExpression("false")
@@ -121,6 +148,17 @@ class DiscardedMicroBlocksDiffTest extends PropSpec with WithDomain {
       sponsor(asset, Some(123)),
       _.assetsApi.description(asset).map(_.sponsorship) shouldBe Some(123),
       preconditions = Seq(issueTx)
+    )
+  }
+
+  property("interim sponsorship cancel") {
+    val issueTx   = issue()
+    val asset     = IssuedAsset(issueTx.id())
+    val sponsorTx = sponsor(asset, Some(123))
+    testInterimState(
+      sponsor(asset, None),
+      _.assetsApi.description(asset).map(_.sponsorship) shouldBe Some(0),
+      preconditions = Seq(issueTx, sponsorTx)
     )
   }
 
