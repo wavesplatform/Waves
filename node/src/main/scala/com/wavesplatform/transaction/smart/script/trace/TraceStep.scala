@@ -3,20 +3,21 @@ package com.wavesplatform.transaction.smart.script.trace
 import cats.Id
 import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.{CommonError, ValidationError}
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV2.LogKeys
 import com.wavesplatform.lang.v1.evaluator.{Log, ScriptResult}
 import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.state.InvokeScriptResult
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TransactionBase
 import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, ScriptExecutionError, TransactionNotAllowedByScript}
-import com.wavesplatform.transaction.assets._
+import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import play.api.libs.json.Json.JsValueWrapper
-import play.api.libs.json._
+import play.api.libs.json.*
 
 sealed abstract class TraceStep {
   def json: JsObject // TODO: Is this format necessary?
@@ -94,7 +95,7 @@ case class InvokeScriptTrace(
     ) ++ (resultE match {
       case Right(value) => TraceStep.maybeErrorJson(None) ++ Json.obj("result" -> TraceStep.scriptResultJson(invokeId, value))
       case Left(e)      => TraceStep.maybeErrorJson(Some(e))
-    }) ++ (if (logged) Json.obj(TraceStep.logJson(log)) else JsObject.empty)
+    }) ++ (if (logged && resultE.isRight) Json.obj(TraceStep.logJson(log)) else JsObject.empty)
   }
 }
 
@@ -112,12 +113,13 @@ object TraceStep {
     case see: ScriptExecutionError          => Json.obj(logJson(see.log), "error" -> see.message)
     case tne: TransactionNotAllowedByScript => Json.obj(logJson(tne.log), "error" -> JsNull)
     case fte: FailedTransactionError        => Json.obj(logJson(fte.log), "error" -> fte.error.map(JsString))
-    case a                                  => Json.obj("error"                   -> a.toString)
+    case a                                  => Json.obj("error" -> a.toString)
   }
 
   private[trace] def logJson(l: Log[Id]): (String, JsValueWrapper) =
-    "vars" -> l.map {
-      case (k, Right(v))  => Json.obj("name" -> k) ++ ScriptValuesJson.serializeValue(v)
-      case (k, Left(err)) => Json.obj("name" -> k, "error" -> err.message)
+    "vars" -> l.collect {
+      case (k, Right(v)) if !LogKeys.TraceExcluded.exists(k.contains)   => Json.obj("name" -> k) ++ ScriptValuesJson.serializeValue(v)
+      case (k, Left(CommonError(_, Some(fte: FailedTransactionError)))) => Json.obj("name" -> k, "error" -> fte.error)
+      case (k, Left(err))                                               => Json.obj("name" -> k, "error" -> err.message)
     }
 }

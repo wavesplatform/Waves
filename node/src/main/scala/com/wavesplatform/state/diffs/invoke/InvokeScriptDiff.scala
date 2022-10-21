@@ -235,6 +235,7 @@ object InvokeScriptDiff {
                       version,
                       blockchain,
                       contract,
+                      dAppAddress,
                       invocation,
                       environment,
                       complexityAfterPayments,
@@ -275,7 +276,8 @@ object InvokeScriptDiff {
                     isSyncCall = true,
                     limitedExecution,
                     totalComplexityLimit,
-                    Seq()
+                    Seq(),
+                    log
                   )
                 )
               )
@@ -401,6 +403,7 @@ object InvokeScriptDiff {
       version: StdLibVersion,
       blockchain: Blockchain,
       contract: DApp,
+      dAppAddress: Address,
       invocation: ContractEvaluator.Invocation,
       environment: Environment[Id],
       limit: Int,
@@ -408,14 +411,27 @@ object InvokeScriptDiff {
   ): Coeval[Either[ValidationError, (ScriptResult, Log[Id])]] = {
     val evaluationCtx = CachedDAppCTX.get(version, blockchain).completeContext(environment)
     ContractEvaluator
-      .applyV2Coeval(evaluationCtx, contract, invocation, version, limit, blockchain.correctFunctionCallScope, blockchain.newEvaluatorMode)
+      .applyV2Coeval(
+        evaluationCtx,
+        contract,
+        ByteStr(dAppAddress.bytes),
+        invocation,
+        version,
+        limit,
+        blockchain.correctFunctionCallScope,
+        blockchain.newEvaluatorMode
+      )
       .map(
         _.leftMap[ValidationError] {
           case (reject @ FailOrRejectError(_, true), _, _) =>
             reject.copy(skipInvokeComplexity = false)
           case (error, unusedComplexity, log) =>
             val usedComplexity = startComplexityLimit - unusedComplexity
-            FailedTransactionError.dAppExecution(error.message, usedComplexity, log)
+            val msg = error match {
+              case CommonError(_, Some(fte: FailedTransactionError)) => fte.error.getOrElse(error.message)
+              case _                                                 => error.message
+            }
+            FailedTransactionError.dAppExecution(msg, usedComplexity, log)
         }.flatTap { case (r, log) =>
           InvokeDiffsCommon
             .checkScriptResultFields(blockchain, r)
@@ -423,7 +439,11 @@ object InvokeScriptDiff {
               case reject: FailOrRejectError => reject
               case error =>
                 val usedComplexity = startComplexityLimit - r.unusedComplexity
-                FailedTransactionError.dAppExecution(error.toString, usedComplexity, log)
+                val msg = error match {
+                  case fte: FailedTransactionError => fte.error.getOrElse(error.toString)
+                  case _                           => error.toString
+                }
+                FailedTransactionError.dAppExecution(msg, usedComplexity, log)
             })
         }
       )
