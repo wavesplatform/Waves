@@ -55,7 +55,7 @@ lazy val `lang-tests` = project
   .dependsOn(`lang-testkit`)
 
 lazy val `lang-tests-js` = project
-  .in(file("lang/testsJS"))
+  .in(file("lang/tests-js"))
   .enablePlugins(ScalaJSPlugin)
   .dependsOn(`lang-js`)
   .settings(
