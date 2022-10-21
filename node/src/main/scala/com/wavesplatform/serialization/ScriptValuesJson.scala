@@ -6,8 +6,8 @@ import play.api.libs.json.{JsObject, Json}
 
 object ScriptValuesJson {
   def serializeValue(e: EVALUATED, intAsString: Boolean): JsObject = (e: @unchecked) match {
-    case CONST_LONG(num)                => Json.obj("type" -> "Int", "value" -> num)
     case CONST_LONG(num) if intAsString => Json.obj("type" -> "Int", "value" -> num.toString)
+    case CONST_LONG(num)                => Json.obj("type" -> "Int", "value" -> num)
     case CONST_BYTESTR(bs)              => Json.obj("type" -> "ByteVector", "value" -> bs.toString)
     case CONST_STRING(str)              => Json.obj("type" -> "String", "value" -> str)
     case CONST_BOOLEAN(b)               => Json.obj("type" -> "Boolean", "value" -> b)
