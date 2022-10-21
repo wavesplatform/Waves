@@ -124,7 +124,6 @@ case class DebugApiRoute(
       .runAsyncLogErr
   }
 
-  // FIXME: use iterator correctly
   def rollback: Route = (path("rollback") & withRequestTimeout(15.minutes)) {
     jsonPost[RollbackParams] { params =>
       blockchain.blockHeader(params.rollbackTo) match {
@@ -174,7 +173,6 @@ case class DebugApiRoute(
     complete(if (full) fullConfig else wavesConfig)
   }
 
-  // FIXME: use iterator correctly
   def rollbackTo: Route = path("rollback-to" / Segment) { signature =>
     delete {
       val signatureEi: Either[ValidationError, ByteStr] =
@@ -256,7 +254,7 @@ case class DebugApiRoute(
         "valid"          -> error.isEmpty,
         "validationTime" -> (System.nanoTime() - startTime).nanos.toMillis,
         "trace" -> tracedDiff.trace.map {
-          case ist: InvokeScriptTrace => JsObject.empty // ist.maybeLoggedJson(logged = true)(serializer.invokeScriptResultWrites)
+          case ist: InvokeScriptTrace => ist.maybeLoggedJson(logged = true)(serializer.invokeScriptResultWrites)
           case trace                  => trace.loggedJson
         },
         "height" -> blockchain.height

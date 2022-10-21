@@ -164,6 +164,8 @@ final class CompositeBlockchain private (
     inner
       .resolveERC20Address(address)
       .orElse(diff.issuedAssets.keys.find(id => ERC20Address(id) == address))
+
+  override def compositeBlockchain: Blockchain = this
 }
 
 object CompositeBlockchain {

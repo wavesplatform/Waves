@@ -235,6 +235,9 @@ case class TransactionsApiRoute(
         .map(aliases => aliases.toSet)
         .memoize
 
+    val blockV5Activation  = blockchain.activatedFeatures.get(BlockchainFeatures.BlockV5.id)
+    val improvedSerializer = serializer.copy(blockchain = blockchain.compositeBlockchain)
+
     /** Produces compact representation for large transactions by stripping unnecessary data. Currently implemented for MassTransfer transaction only.
       */
     def compactJson(address: Address, meta: TransactionMeta): Task[ByteString] = {
@@ -249,9 +252,9 @@ case class TransactionsApiRoute(
                }
              )
            ) aliasesOfAddress.map(aliases => mtt.compactJson(address, aliases))
-           else Task.now(mtt.compactJson(address, Set.empty))).map(a => ByteString(Json.stringify(a ++ serializer.transactionMetaJson(meta))))
+           else Task.now(mtt.compactJson(address, Set.empty))).map(a => ByteString(Json.stringify(a ++ improvedSerializer.transactionMetaJson(meta))))
 
-        case _ => Task.now(serializer.transactionWithMetaJsonNew(meta))
+        case _ => Task.now(improvedSerializer.transactionWithMetaJsonNew(meta, h => blockV5Activation.exists(v5h => v5h <= h)))
       }
     }
 
@@ -317,10 +320,6 @@ object TransactionsApiRoute {
     import com.github.plokhotnyuk.jsoniter_scala.core.*
 
     case class EthereumInvokeMeta(
-        height: Int,
-        applicationStatus: Option[String],
-        spentComplexity: Long,
-        `type`: String,
         id: String,
         fee: Long,
         feeAssetId: Option[String],
@@ -330,6 +329,10 @@ object TransactionsApiRoute {
         bytes: String,
         sender: String,
         senderPublicKey: String,
+        height: Int,
+        applicationStatus: Option[String],
+        spentComplexity: Long,
+        `type`: String,
         dApp: String,
         call: Option[FUNCTION_CALL],
         payment: Seq[Payment],
@@ -337,10 +340,6 @@ object TransactionsApiRoute {
     )
 
     case class InvokeMeta(
-        height: Int,
-        applicationStatus: Option[String],
-        spentComplexity: Long,
-        stateChanges: Option[InvokeScriptResult],
         `type`: Int,
         id: String,
         fee: Long,
@@ -353,7 +352,11 @@ object TransactionsApiRoute {
         proofs: Seq[String],
         dApp: String,
         payment: Seq[Payment],
-        call: FUNCTION_CALL
+        call: FUNCTION_CALL,
+        height: Int,
+        applicationStatus: Option[String],
+        spentComplexity: Long,
+        stateChanges: Option[InvokeScriptResult]
     )
 
     val stringCodec: JsonValueCodec[String]               = JsonCodecMaker.make
@@ -564,10 +567,14 @@ object TransactionsApiRoute {
     }
 
     implicit val invokeMetaCodec: JsonValueCodec[InvokeMeta] =
-      JsonCodecMaker.make(CodecMakerConfig.withDiscriminatorFieldName(None).withAllowRecursiveTypes(true).withTransientEmpty(false))
+      JsonCodecMaker.make(
+        CodecMakerConfig.withDiscriminatorFieldName(None).withAllowRecursiveTypes(true).withTransientEmpty(false).withTransientDefault(false)
+      )
 
     implicit val ethInvokeMetaCodec: JsonValueCodec[EthereumInvokeMeta] =
-      JsonCodecMaker.make(CodecMakerConfig.withDiscriminatorFieldName(None).withAllowRecursiveTypes(true).withTransientEmpty(false))
+      JsonCodecMaker.make(
+        CodecMakerConfig.withDiscriminatorFieldName(None).withAllowRecursiveTypes(true).withTransientEmpty(false).withTransientDefault(false)
+      )
 
     def transactionMetaJson(meta: TransactionMeta): JsObject = {
       val specificInfo = meta.transaction match {
@@ -626,17 +633,10 @@ object TransactionsApiRoute {
     def transactionWithMetaJson(meta: TransactionMeta): JsObject =
       meta.transaction.json() ++ transactionMetaJson(meta)
 
-    def transactionWithMetaJsonNew(meta: TransactionMeta): ByteString =
+    def transactionWithMetaJsonNew(meta: TransactionMeta, isBlockV5: Int => Boolean): ByteString =
       meta match {
         case TransactionMeta.Invoke(height, transaction, succeeded, spentComplexity, invokeScriptResult) =>
           val invokeMeta = InvokeMeta(
-            height,
-            if (isBlockV5(height))
-              if (succeeded) Some(ApplicationStatus.Succeeded) else Some(ApplicationStatus.ScriptExecutionFailed)
-            else
-              None,
-            spentComplexity,
-            invokeScriptResult,
             transaction.tpe.id.toByte,
             transaction.id().toString,
             transaction.assetFee._2,
@@ -649,7 +649,14 @@ object TransactionsApiRoute {
             transaction.asInstanceOf[ProvenTransaction].proofs.proofs.map(_.toString),
             transaction.dApp.toString,
             transaction.payments,
-            transaction.funcCall
+            transaction.funcCall,
+            height,
+            if (isBlockV5(height))
+              if (succeeded) Some(ApplicationStatus.Succeeded) else Some(ApplicationStatus.ScriptExecutionFailed)
+            else
+              None,
+            spentComplexity,
+            invokeScriptResult
           )
           ByteString(writeToArray(invokeMeta)(invokeMetaCodec))
         case TransactionMeta.Ethereum(height, tx, succeeded, spentComplexity, Some(EthereumTransactionMeta(Payload.Invocation(i), _)), isr) =>
@@ -657,13 +664,6 @@ object TransactionsApiRoute {
           val payments       = i.payments.map(p => InvokeScriptTransaction.Payment(p.amount, PBAmounts.toVanillaAssetId(p.assetId)))
 
           val ethereumInvokeMeta = EthereumInvokeMeta(
-            height,
-            if (isBlockV5(height))
-              if (succeeded) Some(ApplicationStatus.Succeeded) else Some(ApplicationStatus.ScriptExecutionFailed)
-            else
-              None,
-            spentComplexity,
-            "invocation",
             tx.id().toString,
             tx.assetFee._2,
             tx.assetFee._1.maybeBase58Repr,
@@ -673,6 +673,13 @@ object TransactionsApiRoute {
             EthEncoding.toHexString(tx.bytes()),
             tx.senderAddress().toString,
             tx.signerPublicKey().toString,
+            height,
+            if (isBlockV5(height))
+              if (succeeded) Some(ApplicationStatus.Succeeded) else Some(ApplicationStatus.ScriptExecutionFailed)
+            else
+              None,
+            spentComplexity,
+            "invocation",
             Address(EthEncoding.toBytes(tx.underlying.getTo)).toString,
             functionCallEi,
             payments,
@@ -698,6 +705,7 @@ object TransactionsApiRoute {
     // Extended lease format. Overrides default
     private[this] def leaseIdToLeaseRef(leaseId: ByteStr): LeaseRef = {
       val ld        = blockchain.leaseDetails(leaseId).get
+      val tm        = blockchain.transactionMeta(ld.sourceId).get
       val recipient = blockchain.resolveAlias(ld.recipient).explicitGet()
 
       val (status, cancelHeight, cancelTxId) = ld.status match {
@@ -706,7 +714,7 @@ object TransactionsApiRoute {
         case LeaseDetails.Status.Expired(height)         => (false, Some(height), None)
       }
 
-      LeaseRef(leaseId, ld.sourceId, ld.sender.toAddress, recipient, ld.amount, ld.height, LeaseStatus(status), cancelHeight, cancelTxId)
+      LeaseRef(leaseId, ld.sourceId, ld.sender.toAddress, recipient, ld.amount, tm.height, LeaseStatus(status), cancelHeight, cancelTxId)
     }
 
     private[http] implicit val leaseWrites: OWrites[InvokeScriptResult.Lease] =

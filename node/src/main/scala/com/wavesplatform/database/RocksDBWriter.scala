@@ -841,6 +841,7 @@ abstract class RocksDBWriter private[database] (
       .map(addressId => db.get(Keys.idToAddress(addressId)))
   }
 
+  // FIXME: optimize for batch requests (getSnapshot in readOnly)
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readOnly { db =>
     for {
       h             <- db.get(Keys.leaseDetailsHistory(leaseId)).headOption
@@ -969,4 +970,6 @@ abstract class RocksDBWriter private[database] (
         .filter(asset => asset.id.size == 32 && ERC20Address(asset) == address)
     else None
   }
+
+  override def compositeBlockchain: Blockchain = this
 }

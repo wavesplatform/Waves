@@ -74,6 +74,8 @@ trait Blockchain {
   def balance(address: Address, mayBeAssetId: Asset = Waves): Long
 
   def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]
+
+  def compositeBlockchain: Blockchain
 }
 
 object Blockchain {

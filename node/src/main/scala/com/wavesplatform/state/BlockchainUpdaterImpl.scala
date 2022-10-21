@@ -658,6 +658,7 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.resolveAlias(alias)
   }
 
+  // FIXME: optimize for batch requests (get compositeBlockchain)
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readLock {
     compositeBlockchain.leaseDetails(leaseId)
   }
@@ -720,7 +721,7 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.resolveERC20Address(address)
   }
 
-  private[this] def compositeBlockchain =
+  override def compositeBlockchain: Blockchain =
     ngState.fold(leveldb: Blockchain)(CompositeBlockchain(leveldb, _))
 
   // noinspection ScalaStyle,TypeAnnotation

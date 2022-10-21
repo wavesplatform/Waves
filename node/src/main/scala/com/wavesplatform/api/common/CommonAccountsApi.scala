@@ -103,6 +103,7 @@ object CommonAccountsApi {
     override def data(address: Address, key: String): Option[DataEntry[?]] =
       blockchain.accountData(address, key)
 
+    // FIXME: streaming
     override def dataStream(address: Address, regex: Option[String]): Observable[DataEntry[?]] = Observable.defer {
       val entriesFromDiff = diff().accountData
         .get(address)
