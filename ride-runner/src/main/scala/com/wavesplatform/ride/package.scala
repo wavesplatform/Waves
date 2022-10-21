@@ -63,8 +63,8 @@ let x1 = if (valueOrElse(getBoolean("b"), false)) then 1 else 0
   ): JsObject = {
     val log = LoggerFactory.getLogger("execute")
     val tx  = request.toTx(blockchain.settings.addressSchemeCharacter.toByte)
-    log.info("Transaction: {}", tx)
-    log.info("Running from {}", tx.sender.toAddress)
+//    log.info("Transaction: {}", tx)
+//    log.info("Running from {}", tx.sender.toAddress)
 
     val result = InvokeScriptTransactionDiff(
       blockchain,

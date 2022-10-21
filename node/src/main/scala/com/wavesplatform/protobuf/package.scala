@@ -4,6 +4,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.transaction.PBRecipients
+import com.wavesplatform.transaction.Asset
 
 package object protobuf {
   implicit class ByteStrExt(val bs: ByteStr) extends AnyVal {
@@ -21,5 +22,6 @@ package object protobuf {
       PBRecipients
         .toAddress(bs.toByteArray, AddressScheme.current.chainId)
         .fold(ve => throw new IllegalArgumentException(ve.toString), identity)
+    def toIssuedAsset: Asset.IssuedAsset = Asset.IssuedAsset(toByteStr)
   }
 }
