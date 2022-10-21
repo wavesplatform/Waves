@@ -58,7 +58,7 @@ case class Domain(
   def createDiffE(tx: Transaction): Either[ValidationError, Diff] = transactionDiffer(tx).resultE
   def createDiff(tx: Transaction): Diff                           = createDiffE(tx).explicitGet()
 
-  lazy val utxPool        =
+  lazy val utxPool =
     new TestUtxPool(SystemTime, blockchain, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable, beforeSetPriorityDiffs)
   lazy val wallet: Wallet = Wallet(settings.walletSettings.copy(file = None))
 
