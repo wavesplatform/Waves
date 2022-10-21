@@ -6,7 +6,6 @@
    2. You've checked "Make project before run"
  */
 
-import sbt.{Def, util}
 import sbt.{Compile, Def}
 import sbt.Keys.{concurrentRestrictions, _}
 
