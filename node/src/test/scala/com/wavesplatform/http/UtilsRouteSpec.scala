@@ -1,11 +1,12 @@
 package com.wavesplatform.http
 
+import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.testkit.RouteTestTimeout
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
-import com.wavesplatform.api.http.UtilsApiRoute
 import com.wavesplatform.api.http.requests.ScriptWithImportsRequest
+import com.wavesplatform.api.http.{CustomJson, UtilsApiRoute}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
@@ -837,6 +838,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     val testScript = TxHelpers.scriptV5(s"""
                                            |let letFromContract = $letFromContract
                                            |
+                                           |func any(value: Any) = value
                                            |func test(i: Int) = i * 10
                                            |func testB() = true
                                            |func testBS() = base58'MATCHER'
@@ -1068,6 +1070,16 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
 
     evalScript(s"nestedCalls([(\"$dAppAddress2\", \"call\", [123, \"abc\"]), (\"$dAppAddress\", \"getValue\", [])])") ~> route ~> check {
       (responseAs[JsValue] \ "result" \ "value").as[String] shouldBe "abc123\nvalue\n"
+    }
+
+    evalScript(s"any(${Long.MaxValue})") ~> Accept(CustomJson.jsonWithNumbersAsStrings) ~> route ~> check {
+      responseJson shouldBe Json.obj("type" -> "Int", "value" -> s"${Long.MaxValue}")
+    }
+
+    evalScript(s"any([${Long.MaxValue}, 0, ${Long.MinValue}])") ~> Accept(CustomJson.jsonWithNumbersAsStrings) ~> route ~> check {
+      (responseJson \ "type").as[String] shouldBe "Array"
+      (responseJson \ "value").get.toString shouldBe
+        s"""[{"type":"Int","value":"${Long.MaxValue}"},{"type":"Int","value":"0"},{"type":"Int","value":"${Long.MinValue}"}]"""
     }
 
     val compactedDApp = TestCompiler(V5).compileContract(

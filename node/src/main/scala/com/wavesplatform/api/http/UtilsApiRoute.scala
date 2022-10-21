@@ -1,7 +1,8 @@
 package com.wavesplatform.api.http
 
-import java.security.SecureRandom
+import akka.http.scaladsl.model.headers.Accept
 
+import java.security.SecureRandom
 import akka.http.scaladsl.server.{PathMatcher1, Route}
 import cats.syntax.either.*
 import cats.syntax.semigroup.*
@@ -272,7 +273,7 @@ case class UtilsApiRoute(
     })
 
   def evaluate: Route =
-    (path("script" / "evaluate" / ScriptedAddress) & jsonPostD[JsObject]) { (address, obj) =>
+    (path("script" / "evaluate" / ScriptedAddress) & jsonPostD[JsObject] & optionalHeaderValueByType(Accept)) { (address, obj, accept) =>
       val scriptInfo = blockchain.accountScript(address).get
       val pk         = scriptInfo.publicKey
       val script     = scriptInfo.script
@@ -295,7 +296,8 @@ case class UtilsApiRoute(
         for {
           expr                 <- parseCall(obj \ "expr")
           (result, complexity) <- ScriptCallEvaluator.executeExpression(blockchain, script, address, pk, settings.evaluateScriptComplexityLimit)(expr)
-        } yield Json.obj("result" -> ScriptValuesJson.serializeValue(result), "complexity" -> complexity)
+          intAsString           = accept.exists(_.mediaRanges.exists(CustomJson.acceptsNumbersAsStrings))
+        } yield Json.obj("result" -> ScriptValuesJson.serializeValue(result, intAsString), "complexity" -> complexity)
 
       val requestData = obj ++ Json.obj("address" -> address.toString)
       val responseJson = result
