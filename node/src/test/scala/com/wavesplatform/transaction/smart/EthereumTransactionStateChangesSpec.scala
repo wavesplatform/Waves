@@ -60,10 +60,10 @@ class EthereumTransactionStateChangesSpec extends FlatSpec with WithDomain with 
     d.helpers.setScript(
       dApp,
       TxHelpers.scriptV5(s"""@Callable(i)
-        |func deposit() = {
-        |  if ((${(1 to 15).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}) || true) then throw("err")
-        |  else [StringEntry("test", "foo")]
-        |}""".stripMargin)
+                            |func deposit() = {
+                            |  if ((${(1 to 15).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}) || true) then throw("err")
+                            |  else [StringEntry("test", "foo")]
+                            |}""".stripMargin)
     )
 
     val invoke = EthTxGenerator.generateEthInvoke(
@@ -232,7 +232,7 @@ class EthereumTransactionStateChangesSpec extends FlatSpec with WithDomain with 
                                                                   |  } ],
                                                                   |  "error" : {
                                                                   |    "code" : 1,
-                                                                  |    "text" : "FailedTransactionError(code = 1, error = err, log =)"
+                                                                  |    "text" : "err"
                                                                   |  }
                                                                   |}
                                                                   |""".stripMargin)

@@ -25,7 +25,7 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
     val acc       = TestValues.keyPair
     val settings  = domainSettingsWithFS(TestFunctionalitySettings.withFeatures(BlockchainFeatures.NG))
     withDomain(settings, Seq(AddrWithBalance(acc.toAddress, TestValues.bigMoney))) { d =>
-      val utxPool = new UtxPoolImpl(ntpTime, d.blockchainUpdater, settings.utxSettings, settings.minerSettings.enable)
+      val utxPool = new UtxPoolImpl(ntpTime, d.blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
       val microBlockMiner = new MicroBlockMinerImpl(
         _ => (),
         null,

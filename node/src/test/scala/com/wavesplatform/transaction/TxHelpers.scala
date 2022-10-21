@@ -344,7 +344,8 @@ object TxHelpers {
       script: Script,
       fee: Long = FeeConstants(TransactionType.SetScript) * FeeUnit,
       version: TxVersion = TxVersion.V1,
-      chainId: Byte = AddressScheme.current.chainId
+      chainId: Byte = AddressScheme.current.chainId,
+      timestamp: TxTimestamp = timestamp
   ): SetScriptTransaction = {
     SetScriptTransaction.selfSigned(version, acc, Some(script), fee, timestamp, chainId).explicitGet()
   }
@@ -369,7 +370,8 @@ object TxHelpers {
       invoker: KeyPair = defaultSigner,
       fee: Long = FeeConstants(TransactionType.InvokeScript) * FeeUnit,
       feeAssetId: Asset = Waves,
-      version: TxVersion = TxVersion.V2
+      version: TxVersion = TxVersion.V2,
+      timestamp: TxTimestamp = timestamp
   ): InvokeScriptTransaction = {
     val fc = func.map(name => functionCall(name, args*))
     Signed.invokeScript(version, invoker, dApp, fc, payments, fee, feeAssetId, timestamp)

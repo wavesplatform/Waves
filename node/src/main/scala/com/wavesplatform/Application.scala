@@ -124,7 +124,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels            = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-    val utxStorage             = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.minerSettings.enable, utxEvents.onNext)
+    val utxStorage             = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable, utxEvents.onNext)
     maybeUtx = Some(utxStorage)
 
     def blockchainWithDiscardedDiffs(): CompositeBlockchain = {
@@ -388,6 +388,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         UtilsApiRoute(
           time,
           settings.restAPISettings,
+          settings.maxTxErrorLogSize,
           () => blockchainUpdater.estimator,
           limitedScheduler,
           blockchainUpdater

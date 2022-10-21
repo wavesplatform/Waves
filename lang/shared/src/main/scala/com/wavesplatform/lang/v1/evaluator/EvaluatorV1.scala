@@ -25,11 +25,11 @@ object EvaluatorV1 {
       Eval.now(x)
   }
 
-  private val evaluator = new EvaluatorV1[Id, Environment]
+  private val evaluator                     = new EvaluatorV1[Id, Environment]
   def apply(): EvaluatorV1[Id, Environment] = evaluator
 }
 
-class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: Monad[CoevalF[F, *]]) {
+class EvaluatorV1[F[_]: Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: Monad[CoevalF[F, *]]) {
   private val lenses = new Lenses[F, C]
   import lenses.*
 
@@ -47,7 +47,7 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: M
   private def evalFuncBlock(func: FUNC, inner: EXPR): EvalM[F, C, (EvaluationContext[C, F], EVALUATED)] = {
     val funcHeader = FunctionHeader.User(func.name)
     val function = UserFunction(func.name, 0, NOTHING, func.args.map(n => (n, NOTHING))*)(func.body)
-        .asInstanceOf[UserFunction[C]]
+      .asInstanceOf[UserFunction[C]]
     local {
       modify[F, LoggedEvaluationContext[C, F], ExecutionError](funcs.modify(_)(_.updated(funcHeader, function)))
         .flatMap(_ => evalExprWithCtx(inner))
@@ -57,7 +57,7 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: M
   private def evalRef(key: String): EvalM[F, C, (EvaluationContext[C, F], EVALUATED)] =
     for {
       ctx <- get[F, LoggedEvaluationContext[C, F], ExecutionError]
-      r   <- lets.get(ctx).get(key) match {
+      r <- lets.get(ctx).get(key) match {
         case Some(lzy) => liftTER[F, C, EVALUATED](lzy.value)
         case None      => raiseError[F, LoggedEvaluationContext[C, F], ExecutionError, EVALUATED](s"A definition of '$key' not found")
       }
@@ -89,9 +89,8 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: M
         .map {
           case func: UserFunction[C] =>
             Monad[EvalM[F, C, *]].flatMap(args.traverse(evalExpr)) { args =>
-              val letDefsWithArgs = args.zip(func.signature.args).foldLeft(ctx.ec.letDefs) {
-                case (r, (argValue, (argName, _))) =>
-                  r + (argName -> LazyVal.fromEvaluated(argValue, ctx.l(s"$argName")))
+              val letDefsWithArgs = args.zip(func.signature.args).foldLeft(ctx.ec.letDefs) { case (r, (argValue, (argName, _))) =>
+                r + (argName -> LazyVal.fromEvaluated(argValue, ctx.l(s"$argName")))
               }
               local {
                 val newState: EvalM[F, C, Unit] = set[F, LoggedEvaluationContext[C, F], ExecutionError](lets.set(ctx)(letDefsWithArgs)).map(_.pure[F])
@@ -101,15 +100,14 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: M
           case func: NativeFunction[C] =>
             Monad[EvalM[F, C, *]].flatMap(args.traverse(evalExpr)) { args =>
               val evaluated = func.ev match {
-                case f: Simple[C]   =>
-                  val r = Try(f.evaluate(ctx.ec.environment, args))
-                    .toEither
+                case f: Simple[C] =>
+                  val r = Try(f.evaluate(ctx.ec.environment, args)).toEither
                     .bimap(e => CommonError(e.toString): ExecutionError, EitherT(_))
                     .pure[F]
                   EitherT(r).flatten.value.pure[Eval]
                 case f: Extended[C] =>
                   f.evaluate(ctx.ec.environment, args, Int.MaxValue)
-                    .map(_.map(_._1))
+                    .map(_.map(_._1.map(_._1)))
                     .to[Eval]
               }
               liftTER[F, C, EVALUATED](evaluated)
@@ -119,11 +117,10 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: M
           // no such function, try data constructor
           header match {
             case FunctionHeader.User(typeName, _) =>
-              types.get(ctx).get(typeName).collect {
-                case t @ CASETYPEREF(_, fields, _) =>
-                  args
-                    .traverse[EvalM[F, C, *], EVALUATED](evalExpr)
-                    .map(values => CaseObj(t, fields.map(_._1).zip(values).toMap): EVALUATED)
+              types.get(ctx).get(typeName).collect { case t @ CASETYPEREF(_, fields, _) =>
+                args
+                  .traverse[EvalM[F, C, *], EVALUATED](evalExpr)
+                  .map(values => CaseObj(t, fields.map(_._1).zip(values).toMap): EVALUATED)
               }
             case _ => None
           }
@@ -136,8 +133,8 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: M
       case LET_BLOCK(let, inner) => evalLetBlock(let, inner)
       case BLOCK(dec, inner) =>
         dec match {
-          case l: LET  => evalLetBlock(l, inner)
-          case f: FUNC => evalFuncBlock(f, inner)
+          case l: LET        => evalLetBlock(l, inner)
+          case f: FUNC       => evalFuncBlock(f, inner)
           case _: FAILED_DEC => raiseError("Attempt to evaluate failed declaration.")
         }
       case REF(str)                    => evalRef(str)
@@ -145,7 +142,7 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: M
       case IF(cond, t1, t2)            => evalIF(cond, t1, t2)
       case GETTER(expr, field)         => evalGetter(expr, field)
       case FUNCTION_CALL(header, args) => evalFunctionCall(header, args)
-      case _: FAILED_EXPR => raiseError("Attempt to evaluate failed expression.")
+      case _: FAILED_EXPR              => raiseError("Attempt to evaluate failed expression.")
     }
 
   private def evalExpr(t: EXPR): EvalM[F, C, EVALUATED] =
@@ -154,7 +151,7 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: M
   def applyWithLogging[A <: EVALUATED](c: EvaluationContext[C, F], expr: EXPR): F[Either[(ExecutionError, Log[F]), (A, Log[F])]] = {
     val log = ListBuffer[LogItem[F]]()
     val lec = LoggedEvaluationContext[C, F]((str: String) => (v: LetExecResult[F]) => log.append((str, v)), c)
-    val r = evalExpr(expr).map(_.asInstanceOf[A]).run(lec).value._2
+    val r   = evalExpr(expr).map(_.asInstanceOf[A]).run(lec).value._2
     r.map(_.bimap((_, log.toList), (_, log.toList)))
   }
 

@@ -23,6 +23,7 @@ import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.compiler.{ContractScriptCompactor, ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.LogExtraInfo
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2}
@@ -30,14 +31,14 @@ import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
-import com.wavesplatform.lang.{API, CompileResult, Global, ValidationError}
+import com.wavesplatform.lang.{API, CommonError, CompileResult, Global, ValidationError}
 import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.TransactionType.TransactionType
-import com.wavesplatform.transaction.TxValidationError.{GenericError, InvokeRejectError}
+import com.wavesplatform.transaction.TxValidationError.{FailedTransactionError, GenericError, InvokeRejectError}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{BlockchainContext, DAppEnvironment, InvokeScriptTransaction}
 import com.wavesplatform.transaction.{Asset, TransactionType}
@@ -50,6 +51,7 @@ import shapeless.Coproduct
 case class UtilsApiRoute(
     timeService: Time,
     settings: RestAPISettings,
+    maxTxErrorLogSize: Int,
     estimator: () => ScriptEstimator,
     limitedScheduler: Scheduler,
     blockchain: Blockchain
@@ -298,7 +300,7 @@ case class UtilsApiRoute(
       val requestData = obj ++ Json.obj("address" -> address.toString)
       val responseJson = result
         .recover {
-          case e: InvokeRejectError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.message)
+          case e: InvokeRejectError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.toStringWithLog(maxTxErrorLogSize))
           case other                => ApiError.fromValidationError(other).json
         }
         .explicitGet() ++ requestData
@@ -397,6 +399,7 @@ object UtilsApiRoute {
         limitedResult <- EvaluatorV2
           .applyLimitedCoeval(
             call,
+            LogExtraInfo(),
             limit,
             ctx,
             script.stdLibVersion,
@@ -405,7 +408,13 @@ object UtilsApiRoute {
             checkConstructorArgsTypes = true
           )
           .value()
-          .leftMap { case (err, _, log) => InvokeRejectError(err.message, log) }
+          .leftMap { case (err, _, log) =>
+            val msg = err match {
+              case CommonError(_, Some(fte: FailedTransactionError)) => fte.error.getOrElse(err.message)
+              case _                                                 => err.message
+            }
+            InvokeRejectError(msg, log)
+          }
         result <- limitedResult match {
           case (eval: EVALUATED, unusedComplexity, _) => Right((eval, limit - unusedComplexity))
           case (_: EXPR, _, log)                      => Left(InvokeRejectError(s"Calculation complexity limit exceeded", log))

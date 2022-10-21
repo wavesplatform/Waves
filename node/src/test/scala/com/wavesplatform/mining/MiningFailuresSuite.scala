@@ -32,14 +32,16 @@ class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithDB {
     val blockchainUpdater = stub[BlockchainUpdaterNG]
 
     val wavesSettings = {
-      val config = ConfigFactory.parseString("""
-          |waves.miner {
-          |  quorum = 0
-          |  interval-after-last-block-then-generation-is-allowed = 0
-          |}
-          |
-          |waves.features.supported=[2]
-          |""".stripMargin).withFallback(ConfigFactory.load())
+      val config = ConfigFactory
+        .parseString("""
+                       |waves.miner {
+                       |  quorum = 0
+                       |  interval-after-last-block-then-generation-is-allowed = 0
+                       |}
+                       |
+                       |waves.features.supported=[2]
+                       |""".stripMargin)
+        .withFallback(ConfigFactory.load())
 
       WavesSettings.fromRootConfig(loadConfig(config))
     }
@@ -54,8 +56,9 @@ class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithDB {
       val scheduler   = Scheduler.singleThread("appender")
       val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
       val wallet      = Wallet(WalletSettings(None, Some("123"), None))
-      val utxPool     = new UtxPoolImpl(ntpTime, blockchainUpdater, wavesSettings.utxSettings, wavesSettings.minerSettings.enable)
-      val pos         = PoSSelector(blockchainUpdater, wavesSettings.synchronizationSettings.maxBaseTarget)
+      val utxPool =
+        new UtxPoolImpl(ntpTime, blockchainUpdater, wavesSettings.utxSettings, wavesSettings.maxTxErrorLogSize, wavesSettings.minerSettings.enable)
+      val pos = PoSSelector(blockchainUpdater, wavesSettings.synchronizationSettings.maxBaseTarget)
       new MinerImpl(
         allChannels,
         blockchainUpdater,

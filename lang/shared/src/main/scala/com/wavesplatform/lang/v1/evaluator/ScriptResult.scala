@@ -36,7 +36,7 @@ object ScriptResult {
   private def err[A](actual: AnyRef, version: StdLibVersion, expected: String = ""): Either[ExecutionError, A] =
     Types
       .callableReturnType(version)
-      .leftMap(CommonError)
+      .leftMap(CommonError(_))
       .flatMap(t =>
         Left(
           callableResultError(t, actual, CallableFunction) + (if (expected.isEmpty) "" else s" instead of $expected")
@@ -112,7 +112,7 @@ object ScriptResult {
           recipient <- processRecipient(recipient, ctx, version)
           address <- recipient match {
             case a: Address  => Right(a)
-            case Alias(name) => ctx.environment.resolveAlias(name).leftMap(CommonError)
+            case Alias(name) => ctx.environment.resolveAlias(name).leftMap(CommonError(_))
           }
         } yield AssetTransfer(address, recipient, b, token)
       case other =>

@@ -14,8 +14,8 @@ import monix.execution.Scheduler.Implicits.global
 class ExtensionAppenderSpec extends FlatSpec with WithDomain {
   "Extension appender" should "drop duplicate transactions from UTX" in
     withDomain(balances = AddrWithBalance.enoughBalances(TxHelpers.defaultSigner)) { d =>
-      val utx               = new UtxPoolImpl(SystemTime, d.blockchain, d.settings.utxSettings, d.settings.minerSettings.enable)
-      val time              = TestTime()
+      val utx  = new UtxPoolImpl(SystemTime, d.blockchain, d.settings.utxSettings, d.settings.maxTxErrorLogSize, d.settings.minerSettings.enable)
+      val time = TestTime()
       val extensionAppender = ExtensionAppender(d.blockchain, utx, d.posSelector, time, InvalidBlockStorage.NoOp, PeerDatabase.NoOp, global)(null, _)
 
       val tx     = TxHelpers.transfer()
