@@ -47,7 +47,7 @@ import org.slf4j.LoggerFactory
 import supertagged.TaggedType
 
 import scala.annotation.tailrec
-import scala.collection.mutable
+import scala.collection.{View, mutable}
 import scala.util.Using
 
 //noinspection UnstableApiUsage
@@ -518,6 +518,12 @@ package object database {
       }
     }
 
+    import scala.jdk.CollectionConverters.*
+
+    def multiGet[A, B](keys: Seq[(Key[A], B)]): View[(A, B)] =
+      keys.view.zip(db.multiGetAsList(keys.map(_._1.keyBytes).asJava).asScala).map { case ((k, av), v) =>
+        k.parse(v) -> av
+      }
     def get[A](key: Key[A]): A                           = key.parse(db.get(key.keyBytes))
     def get[A](key: Key[A], readOptions: ReadOptions): A = key.parse(db.get(readOptions, key.keyBytes))
     def has(key: Key[?]): Boolean                        = db.get(key.keyBytes) != null

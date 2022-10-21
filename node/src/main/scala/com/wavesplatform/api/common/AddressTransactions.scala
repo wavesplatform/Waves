@@ -23,6 +23,16 @@ object AddressTransactions {
       case _                                                                            => None
     }
 
+  private def loadTransactions(db: RocksDB, txs: Seq[(Height, TxNum)], sender: Option[Address]): Seq[(TxMeta, Transaction, Option[TxNum])] =
+    db.multiGet(txs.map { case (h, n) => Keys.transactionAt(h, n) -> n })
+      .flatMap {
+        case (Some((m, tx: Authorized)), txNum) if sender.forall(_ == tx.sender.toAddress)         => Some((m, tx, Some(txNum)))
+        case (Some((m, gt: GenesisTransaction)), txNum) if sender.isEmpty                          => Some((m, gt, Some(txNum)))
+        case (Some((m, et: EthereumTransaction)), txNum) if sender.forall(_ == et.senderAddress()) => Some((m, et, Some(txNum)))
+        case _                                                                                     => None
+      }
+      .toSeq
+
   private def loadInvokeScriptResult(resource: DBResource, txId: ByteStr): Option[InvokeScriptResult] =
     for {
       tm           <- resource.get(Keys.transactionMetaById(TransactionId(txId)))
@@ -82,11 +92,9 @@ object AddressTransactions {
           .fromIterator(
             Task(new TxByAddressIterator(db, addressId, maxHeight, maxTxNum, types).asScala)
           )
-          .concatMapIterable(_.flatMap { case (h, txNum) =>
-            loadTransaction(db, h, txNum, sender)
-              .map { case (m, tx) => (m, tx, Some(txNum)) }
-          })
-
+          .concatMapIterable(identity)
+          .bufferTumbling(100)
+          .concatMapIterable(loadTransactions(db, _, sender))
       }
   }
 
