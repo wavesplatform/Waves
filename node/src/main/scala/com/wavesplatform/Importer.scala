@@ -169,7 +169,7 @@ object Importer extends ScorexLogging {
   @volatile private var quit = false
   private val lock           = new Object
 
-  //noinspection UnstableApiUsage
+  // noinspection UnstableApiUsage
   def startImport(
       inputStream: BufferedInputStream,
       blockchain: Blockchain,
@@ -278,7 +278,7 @@ object Importer extends ScorexLogging {
     val db          = openDB(settings.dbSettings.directory)
     val (blockchainUpdater, levelDb) =
       StorageFactory(settings, db, time, Observer.empty, BlockchainUpdateTriggers.combined(triggers))
-    val utxPool     = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.minerSettings.enable)
+    val utxPool     = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
     val pos         = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
     val extAppender = BlockAppender(blockchainUpdater, time, utxPool, pos, scheduler, importOptions.verify) _
 
