@@ -6,6 +6,7 @@
    2. You've checked "Make project before run"
  */
 
+import sbt.{Def, util}
 import sbt.{Compile, Def}
 import sbt.Keys.{concurrentRestrictions, _}
 
@@ -52,6 +53,27 @@ lazy val `lang-testkit` = project
 lazy val `lang-tests` = project
   .in(file("lang/tests"))
   .dependsOn(`lang-testkit`)
+  .settings(
+    Compile / sourceGenerators += Tasks.docSource
+  )
+
+lazy val `lang-tests-js` = project
+  .in(file("lang/testsJS"))
+  .enablePlugins(ScalaJSPlugin)
+  .dependsOn(`lang-js`)
+  .settings(
+    libraryDependencies += Dependencies.scalaJsTest.value,
+    testFrameworks += new TestFramework("utest.runner.Framework"),
+    Compile / sourceGenerators += Tasks.docSource
+  )
+
+lazy val `lang-doc` = project
+  .in(file("lang/doc"))
+  .dependsOn(`lang-jvm`)
+  .settings(
+    Compile / sourceGenerators += Tasks.docSource,
+    libraryDependencies ++= Seq("com.github.spullara.mustache.java" % "compiler" % "0.9.10") ++ Dependencies.test
+  )
 
 lazy val node = project.dependsOn(`lang-jvm`, `lang-testkit` % "test")
 
@@ -100,6 +122,7 @@ lazy val `waves-node` = (project in file("."))
     `lang-js`,
     `lang-jvm`,
     `lang-tests`,
+    `lang-tests-js`,
     `lang-testkit`,
     `repl-js`,
     `repl-jvm`,
@@ -188,6 +211,7 @@ checkPRRaw := Def
       (`lang-tests` / Test / test).value
       (`repl-jvm` / Test / test).value
       (`lang-js` / Compile / fastOptJS).value
+      (`lang-tests-js` / Test / test).value
       (`grpc-server` / Test / test).value
       (node / Test / test).value
       (`repl-js` / Compile / fastOptJS).value
