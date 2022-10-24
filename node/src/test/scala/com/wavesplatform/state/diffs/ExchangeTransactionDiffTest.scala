@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import cats.Order as _
-import com.wavesplatform.account.{Address, KeyPair, PrivateKey}
+import com.wavesplatform.account.{Address, AddressScheme, KeyPair, PrivateKey}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -18,10 +18,11 @@ import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.ExchangeTransactionDiff.getOrderFeePortfolio
+import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.test.*
-import com.wavesplatform.transaction.*
 import com.wavesplatform.test.DomainPresets.*
+import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AccountBalanceError
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -56,6 +57,9 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
 
   val fsWithBlockV5: FunctionalitySettings =
     fsWithOrderFeature.copy(preActivatedFeatures = fsWithOrderFeature.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
+
+  val fsWithRideV6: FunctionalitySettings =
+    fsWithBlockV5.copy(preActivatedFeatures = fsWithBlockV5.preActivatedFeatures + (BlockchainFeatures.RideV6.id -> 0))
 
   private val estimator = ScriptEstimatorV2
 
@@ -927,6 +931,8 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     BlockchainFeatures.FairPoS             -> 0
   )
 
+  private val RideV6 = DomainPresets.RideV6.blockchainSettings.functionalitySettings
+
   private def createSettings(preActivatedFeatures: (BlockchainFeature, Int)*): FunctionalitySettings =
     TestFunctionalitySettings.Enabled
       .copy(
@@ -979,25 +985,25 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
 
   property("ExchangeTransactions invalid if buyer scripts fails") {
     for {
-      buyerScriptSrc  <- script("Order", false)
+      buyerScriptSrc  <- script("Order", false, complex = true)
       sellerScriptSrc <- script("Order", true)
       txScript        <- script("ExchangeTransaction", true)
     } yield {
       val (genesis, transfers, issueAndScripts, exchangeTx, _) = smartTradePreconditions(buyerScriptSrc, sellerScriptSrc, txScript)
       val preconBlocks = Seq(TestBlock.create(Seq(genesis)), TestBlock.create(transfers), TestBlock.create(issueAndScripts))
-      assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), fsV2)("TransactionNotAllowedByScript")
+      assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), RideV6)("TransactionNotAllowedByScript")
     }
   }
 
   property("ExchangeTransactions invalid if seller scripts fails") {
     for {
       buyerScriptSrc  <- script("Order", true)
-      sellerScriptSrc <- script("Order", false)
+      sellerScriptSrc <- script("Order", false, complex = true)
       txScript        <- script("ExchangeTransaction", true)
     } yield {
       val (genesis, transfers, issueAndScripts, exchangeTx, _) = smartTradePreconditions(buyerScriptSrc, sellerScriptSrc, txScript)
       val preconBlocks = Seq(TestBlock.create(Seq(genesis)), TestBlock.create(transfers), TestBlock.create(issueAndScripts))
-      assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), fsV2)("TransactionNotAllowedByScript")
+      assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), RideV6)("TransactionNotAllowedByScript")
     }
   }
 
@@ -1005,11 +1011,11 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     for {
       buyerScriptSrc  <- script("Order", true)
       sellerScriptSrc <- script("Order", true)
-      txScript        <- script("ExchangeTransaction", false)
+      txScript        <- script("ExchangeTransaction", false, complex = true)
     } yield {
       val (genesis, transfers, issueAndScripts, exchangeTx, _) = smartTradePreconditions(buyerScriptSrc, sellerScriptSrc, txScript)
       val preconBlocks = Seq(TestBlock.create(Seq(genesis)), TestBlock.create(transfers), TestBlock.create(issueAndScripts))
-      assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), fsV2)("TransactionNotAllowedByScript")
+      assertLeft(preconBlocks, TestBlock.create(Seq(exchangeTx)), RideV6)("TransactionNotAllowedByScript")
     }
   }
 
@@ -1032,6 +1038,138 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       val blockWithExchange = TestBlock.create(Seq(exchangeWithResignedOrder))
 
       assertLeft(preconBlocks, blockWithExchange, fsWithOrderFeature)("Proof doesn't validate as signature")
+    }
+  }
+
+  property("ExchangeTransaction invalid if exchange.price > buyOrder.price or exchange.price < sellOrder.price") {
+    val buyer   = TxHelpers.signer(1)
+    val seller  = TxHelpers.signer(2)
+    val matcher = TxHelpers.signer(3)
+
+    val genesis            = Seq(buyer, seller, matcher).map(acc => TxHelpers.genesis(acc.toAddress))
+    val amountAssetIssueTx = TxHelpers.issue(seller, ENOUGH_AMT, name = "asset2", decimals = 8, version = TxVersion.V1)
+    val priceAssetIssueTx  = TxHelpers.issue(buyer, ENOUGH_AMT, name = "asset1", decimals = 6, version = TxVersion.V1)
+    val baseBlocks         = Seq(TestBlock.create(genesis :+ priceAssetIssueTx :+ amountAssetIssueTx))
+
+    val amountAsset = Asset.IssuedAsset(amountAssetIssueTx.assetId)
+    val priceAsset  = Asset.IssuedAsset(priceAssetIssueTx.assetId)
+
+    def mkTestOrder(tpe: OrderType, price: Long, version: Int, priceMode: OrderPriceMode) = TxHelpers.order(
+      tpe,
+      amountAsset,
+      priceAsset,
+      price = price,
+      sender = buyer,
+      matcher = matcher,
+      version = version.toByte,
+      priceMode = priceMode
+    )
+
+    // decimalPrice = 12.5
+    val cases = {
+      val case1OldTxs = for {
+        txVersion <- 1 to 2
+        // See ExchangeTxValidator
+        ordersVersions = txVersion match {
+          case 1 => 1 to 1
+          case 2 => 1 to 3
+        }
+
+        buyOrderVersion  <- ordersVersions
+        sellOrderVersion <- ordersVersions
+
+        r <- Seq(
+          // normalizedPrice = decimalPrice * 10^(8 + priceAssetDecimals - amountAssetDecimals) = 12_500_000
+          (
+            txVersion,
+            12_500_000L,
+            mkTestOrder(OrderType.BUY, 12_400_000L, buyOrderVersion, OrderPriceMode.Default),
+            mkTestOrder(OrderType.SELL, 12_500_000L, sellOrderVersion, OrderPriceMode.Default),
+            "exchange.price = 12_500_000 should be <= buyOrder.price = 12_400_000"
+          ),
+          (
+            txVersion,
+            12_500_000L,
+            mkTestOrder(OrderType.BUY, 12_500_000L, buyOrderVersion, OrderPriceMode.Default),
+            mkTestOrder(OrderType.SELL, 12_600_000L, sellOrderVersion, OrderPriceMode.Default),
+            "exchange.price = 12_500_000 should be >= sellOrder.price = 12_600_000"
+          )
+        )
+      } yield r
+
+      val case1NewTxs = Seq(
+        // normalizedPrice = decimalPrice * 10^(priceAssetDecimals - amountAssetDecimals) = 15
+        (
+          3,
+          1_250_000_000L,
+          mkTestOrder(OrderType.BUY, 12_400_000L, 4, OrderPriceMode.AssetDecimals),
+          mkTestOrder(OrderType.SELL, 12_500_000L, 4, OrderPriceMode.AssetDecimals),
+          "exchange.price = 1_250_000_000 should be <= buyOrder.price = 1_240_000_000 (assetDecimals price = 12_400_000)"
+        ),
+        (
+          3,
+          1_250_000_000L,
+          mkTestOrder(OrderType.BUY, 12_500_000L, 4, OrderPriceMode.AssetDecimals),
+          mkTestOrder(OrderType.SELL, 12_600_000L, 4, OrderPriceMode.AssetDecimals),
+          "exchange.price = 1_250_000_000 should be >= sellOrder.price = 1_260_000_000 (assetDecimals price = 12_600_000)"
+        )
+      )
+
+      val case2 = Seq(
+        // normalizedPrice = decimalPrice * 10^8 = 1_250_000_000
+        (
+          3,
+          1_250_000_000L,
+          mkTestOrder(OrderType.BUY, 1_240_000_000L, 4, OrderPriceMode.FixedDecimals),
+          mkTestOrder(OrderType.SELL, 1_250_000_000L, 4, OrderPriceMode.FixedDecimals),
+          "exchange.price = 1_250_000_000 should be <= buyOrder.price = 1_240_000_000"
+        ),
+        (
+          3,
+          1_250_000_000L,
+          mkTestOrder(OrderType.BUY, 1_250_000_000L, 4, OrderPriceMode.FixedDecimals),
+          mkTestOrder(OrderType.SELL, 1_260_000_000L, 4, OrderPriceMode.FixedDecimals),
+          "exchange.price = 1_250_000_000 should be >= sellOrder.price = 1_260_000_000"
+        )
+      )
+
+      val mixedCase = Seq(
+        (
+          3,
+          1_250_000_000L,
+          mkTestOrder(OrderType.BUY, 12_400_000L, 2, OrderPriceMode.Default),
+          mkTestOrder(OrderType.SELL, 1_250_000_000L, 4, OrderPriceMode.FixedDecimals),
+          "exchange.price = 1_250_000_000 should be <= buyOrder.price = 1_240_000_000 (assetDecimals price = 12_400_000)"
+        ),
+        (
+          3,
+          1_250_000_000L,
+          mkTestOrder(OrderType.BUY, 1_250_000_000L, 4, OrderPriceMode.FixedDecimals),
+          mkTestOrder(OrderType.SELL, 12_600_000L, 4, OrderPriceMode.AssetDecimals),
+          "exchange.price = 1_250_000_000 should be >= sellOrder.price = 1_260_000_000 (assetDecimals price = 12_600_000)"
+        )
+      )
+
+      Table(
+        ("txVersion", "txPrice", "buyOrder", "sellOrder", "expectedError"),
+        (case1OldTxs ++ case2 ++ case1NewTxs ++ mixedCase)*
+      )
+    }
+
+    forAll(cases) { case (txVersion, txPrice, buyOrder, sellOrder, expectedError) =>
+      val exchange = TxHelpers.exchangeFromOrders(
+        order1 = buyOrder,
+        order2 = sellOrder,
+        price = txPrice,
+        matcher = matcher,
+        version = txVersion.toByte,
+        fee = TestValues.fee,
+        chainId = AddressScheme.current.chainId
+      )
+
+      assertDiffEi(baseBlocks, TestBlock.create(Seq(exchange)), fsWithRideV6) { blockDiffEi =>
+        blockDiffEi should produce(expectedError)
+      }
     }
   }
 
@@ -1556,7 +1694,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     }
   }
 
-  property("Counts complexity correctly for failed transactions") {
+  property("Counts complexity correctly for exchanges failed by assets") {
     def test(
         priceAssetIssue: IssueTransaction,
         amountAssetIssue: IssueTransaction,
@@ -1576,24 +1714,13 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
         IssuedAsset(priceAssetIssue.assetId),
         IssuedAsset(order2FeeAssetIssue.assetId)
       )
-      val exchange = TxHelpers.exchangeFromOrders(order1, order2)
+      val fee      = FeeConstants(TransactionType.Exchange) * FeeUnit + 2 * ScriptExtraFee
+      val exchange = TxHelpers.exchangeFromOrders(order1, order2, fee = fee)
 
-      withDomain(
-        domainSettingsWithFS(
-          TestFunctionalitySettings.withFeatures(
-            BlockchainFeatures.SmartAssets,
-            BlockchainFeatures.SmartAccountTrading,
-            BlockchainFeatures.OrderV3,
-            BlockchainFeatures.BlockV5
-          )
-        )
-      ) { d =>
+      withDomain(RideV4) { d =>
         d.appendBlock(Seq(amountAssetIssue, priceAssetIssue, order1FeeAssetIssue, order2FeeAssetIssue).distinct*)
-        val newBlock = d.createBlock(2.toByte, Seq(exchange))
-        val diff = BlockDiffer
-          .fromBlock(d.blockchainUpdater, Some(d.lastBlock), newBlock, MiningConstraint.Unlimited, newBlock.header.generationSignature)
-          .explicitGet()
-        diff.diff.scriptsComplexity shouldBe complexity
+        d.appendAndAssertFailed(exchange)
+        d.liquidDiff.scriptsComplexity shouldBe complexity
       }
     }
 
@@ -1757,9 +1884,10 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     }
   }
 
-  def script(caseType: String, v: Boolean): Seq[String] = Seq(true, false).map { full =>
+  def script(caseType: String, v: Boolean, complex: Boolean = false): Seq[String] = Seq(true, false).map { full =>
     val expr =
       s"""
+         |  strict c = ${if (complex) (1 to 16).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ") else "true"}
          |  match tx {
          |   case _: $caseType => $v
          |   case _ => ${!v}

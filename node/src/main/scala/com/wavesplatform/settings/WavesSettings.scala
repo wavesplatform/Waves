@@ -10,6 +10,7 @@ import scala.concurrent.duration.FiniteDuration
 case class WavesSettings(
     directory: String,
     ntpServer: String,
+    maxTxErrorLogSize: Int,
     dbSettings: DBSettings,
     extensions: Seq[String],
     extensionsShutdownTimeout: FiniteDuration,
@@ -32,6 +33,7 @@ object WavesSettings extends CustomValueReaders {
 
     val directory                 = waves.as[String]("directory")
     val ntpServer                 = waves.as[String]("ntp-server")
+    val maxTxErrorLogSize         = waves.as[Int]("max-tx-error-log-size")
     val dbSettings                = waves.as[DBSettings]("db")
     val extensions                = waves.as[Seq[String]]("extensions")
     val extensionsShutdownTimeout = waves.as[FiniteDuration]("extensions-shutdown-timeout")
@@ -49,6 +51,7 @@ object WavesSettings extends CustomValueReaders {
     WavesSettings(
       directory,
       ntpServer,
+      maxTxErrorLogSize,
       dbSettings,
       extensions,
       extensionsShutdownTimeout,

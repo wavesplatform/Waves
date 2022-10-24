@@ -81,7 +81,7 @@ class BlockchainUpdaterImpl(
       ngState
         .flatMap(_.totalDiffOf(id))
         .map { case (_, diff, _, _, _) =>
-          diff.transactions.values.toSeq.map(info => (TxMeta(Height(height), info.applied, info.spentComplexity), info.transaction))
+          diff.transactions.toSeq.map(info => (TxMeta(Height(height), info.applied, info.spentComplexity), info.transaction))
         }
     )
 

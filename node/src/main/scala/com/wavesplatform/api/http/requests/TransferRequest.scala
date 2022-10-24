@@ -3,9 +3,9 @@ package com.wavesplatform.api.http.requests
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.{Asset, Proofs}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import play.api.libs.json._
+import com.wavesplatform.transaction.{Asset, Proofs}
+import play.api.libs.json.*
 
 case class TransferRequest(
     version: Option[Byte],

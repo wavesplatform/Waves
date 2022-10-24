@@ -54,7 +54,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
         ),
       AssertiveApiError(
         ScriptExecutionError.Id,
-        "Error while executing account-script: Fee in WAVES for InvokeScriptTransaction (5299999 in WAVES) with 12 total scripts invoked does not exceed minimal value of 5300000 WAVES."
+        "Error while executing dApp: Fee in WAVES for InvokeScriptTransaction (5299999 in WAVES) with 12 total scripts invoked does not exceed minimal value of 5300000 WAVES."
       )
     )
 
@@ -70,7 +70,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
       .id
     nodes.waitForHeightAriseAndTxPresent(invokeScriptTxId)
 
-    sender.debugStateChanges(invokeScriptTxId).stateChanges.get.error shouldBe empty
+    sender.stateChanges(invokeScriptTxId).stateChanges.get.error shouldBe empty
   }
 
   test("can't invoke with insufficient payment for @Verifier") {
@@ -123,7 +123,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
         ),
       AssertiveApiError(
         ScriptExecutionError.Id,
-        "Error while executing account-script: Fee in WAVES for InvokeScriptTransaction (900000 in WAVES) with 2 total scripts invoked does not exceed minimal value of 1300000 WAVES."
+        "Error while executing dApp: Fee in WAVES for InvokeScriptTransaction (900000 in WAVES) with 2 total scripts invoked does not exceed minimal value of 1300000 WAVES."
       )
     )
   }
@@ -173,7 +173,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
           payment = Seq(Payment(amountLessThanDAppScriptLimit, IssuedAsset(ByteStr.decodeBase58(asset2).get))),
           fee = smartMinFee + smartFee + smartFee
         ),
-      AssertiveApiError(ScriptExecutionError.Id, s"Error while executing account-script: need payment in 15+ tokens of asset2 $asset2")
+      AssertiveApiError(ScriptExecutionError.Id, s"Error while executing dApp: need payment in 15+ tokens of asset2 $asset2")
     )
   }
 

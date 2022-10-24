@@ -86,7 +86,10 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
         .flatMap(txId => Observable.fromIterable(commonApi.transactionById(txId.toByteStr)))
         .collect {
           case TransactionMeta.Invoke(_, transaction, _, _, invokeScriptResult) =>
-            InvokeScriptResultResponse.of(Some(PBTransactions.protobuf(transaction)), invokeScriptResult.map(VISR.toPB))
+            InvokeScriptResultResponse.of(
+              Some(PBTransactions.protobuf(transaction)),
+              invokeScriptResult.map(VISR.toPB(_, addressForTransfer = true))
+            )
         }
 
       responseObserver.completeWith(result)
@@ -128,7 +131,7 @@ private object TransactionsApiGrpcImpl {
     val transactionId = meta.transaction.id().toByteString
     val status        = if (meta.succeeded) ApplicationStatus.SUCCEEDED else ApplicationStatus.SCRIPT_EXECUTION_FAILED
     val invokeScriptResult = meta match {
-      case TransactionMeta.Invoke(_, _, _, _, r) => r.map(VISR.toPB)
+      case TransactionMeta.Invoke(_, _, _, _, r) => r.map(VISR.toPB(_, addressForTransfer = true))
       case _                                  => None
     }
 

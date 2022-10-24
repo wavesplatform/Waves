@@ -4,7 +4,8 @@ import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.TestWallet
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
-import com.wavesplatform.api.http.BlocksApiRoute
+import com.wavesplatform.api.http.{BlocksApiRoute, RouteTimeout}
+import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
 import com.wavesplatform.block.serialization.BlockHeaderSerializer
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -12,17 +13,19 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.TxHelpers
-import com.wavesplatform.utils.SystemTime
+import com.wavesplatform.utils.{Schedulers, SystemTime}
 import monix.reactive.Observable
 import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.*
 
+import scala.concurrent.duration.*
 import scala.util.Random
 
 class BlocksApiRouteSpec extends RouteSpec("/blocks") with PathMockFactory with RestAPISettingsHelper with TestWallet with WithDomain {
-  private val blocksApi                      = mock[CommonBlocksApi]
-  private val blocksApiRoute: BlocksApiRoute = BlocksApiRoute(restAPISettings, blocksApi, SystemTime)
-  private val route                          = blocksApiRoute.route
+  private val blocksApi = mock[CommonBlocksApi]
+  private val blocksApiRoute: BlocksApiRoute =
+    BlocksApiRoute(restAPISettings, blocksApi, SystemTime, new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler")))
+  private val route = blocksApiRoute.route
 
   private val testBlock1 = TestBlock.create(Nil)
   private val testBlock2 = TestBlock.create(Nil, Block.ProtoBlockVersion)
@@ -249,6 +252,17 @@ class BlocksApiRouteSpec extends RouteSpec("/blocks") with PathMockFactory with 
       val delay = (responseAs[JsObject] \ "delay").as[Int]
       delay shouldBe 1000
     }
+
+    Get(routePath(s"/delay/${blocks.last.id()}/${BlocksApiRoute.MaxBlocksForDelay}")) ~> route ~> check {
+      response.status shouldBe StatusCodes.OK
+      val delay = (responseAs[JsObject] \ "delay").as[Int]
+      delay shouldBe 1000
+    }
+
+    Get(routePath(s"/delay/${blocks.last.id()}/${BlocksApiRoute.MaxBlocksForDelay + 1}")) ~> route ~> check {
+      response.status shouldBe StatusCodes.BadRequest
+      (responseAs[JsObject] \ "message").as[String] shouldBe TooBigArrayAllocation(BlocksApiRoute.MaxBlocksForDelay).message
+    }
   }
 
   routePath("/heightByTimestamp") - {
@@ -315,20 +329,18 @@ class BlocksApiRouteSpec extends RouteSpec("/blocks") with PathMockFactory with 
     }
 
     "random blocks" in {
-      val (_, blocks) = (1 to 10).foldLeft((0L, Vector.empty[Block])) {
-        case ((ts, blocks), _) =>
-          val newBlock = TestBlock.create(ts + 100 + Random.nextInt(10000), Nil)
-          (newBlock.header.timestamp, blocks :+ newBlock)
+      val (_, blocks) = (1 to 10).foldLeft((0L, Vector.empty[Block])) { case ((ts, blocks), _) =>
+        val newBlock = TestBlock.create(ts + 100 + Random.nextInt(10000), Nil)
+        (newBlock.header.timestamp, blocks :+ newBlock)
       }
 
       val route = blocksApiRoute.copy(commonApi = emulateBlocks(blocks)).route
 
-      blocks.zipWithIndex.foreach {
-        case (block, index) =>
-          Get(routePath(s"/heightByTimestamp/${block.header.timestamp}")) ~> route ~> check {
-            val result = (responseAs[JsObject] \ "height").as[Int]
-            result shouldBe (index + 1)
-          }
+      blocks.zipWithIndex.foreach { case (block, index) =>
+        Get(routePath(s"/heightByTimestamp/${block.header.timestamp}")) ~> route ~> check {
+          val result = (responseAs[JsObject] \ "height").as[Int]
+          result shouldBe (index + 1)
+        }
       }
     }
   }

@@ -3,8 +3,10 @@ package com.wavesplatform.transaction.utils
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
-import com.wavesplatform.transaction.{ABIConverter, Asset, EthereumTransaction}
+import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, FeeUnit}
+import com.wavesplatform.transaction.TransactionType.Transfer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.{ABIConverter, Asset, EthereumTransaction}
 import com.wavesplatform.utils.EthEncoding
 import org.web3j.abi.FunctionEncoder
 import org.web3j.abi.datatypes.{AbiTypes, StructType}
@@ -43,7 +45,8 @@ object EthTxGenerator {
       val arrayClass = toEthType(listType)
       new ethTypes.DynamicArray(arrayClass.getClass.asInstanceOf[Class[ethTypes.Type[?]]], ethTypedXs*) {
         override def getTypeAsString: String =
-          (if (classOf[StructType].isAssignableFrom(arrayClass.getClass)) arrayClass.getTypeAsString else AbiTypes.getTypeAString(getComponentType)) + "[]"
+          (if (classOf[StructType].isAssignableFrom(arrayClass.getClass)) arrayClass.getTypeAsString
+           else AbiTypes.getTypeAString(getComponentType)) + "[]"
       }
     case Arg.Struct(values*) => new ethTypes.StaticStruct(values.map(toEthType)*)
   }
@@ -57,13 +60,19 @@ object EthTxGenerator {
     EthereumTransaction(signedTx).explicitGet()
   }
 
-  def generateEthTransfer(keyPair: ECKeyPair, recipient: Address, amount: Long, asset: Asset): EthereumTransaction = asset match {
+  def generateEthTransfer(
+      keyPair: ECKeyPair,
+      recipient: Address,
+      amount: Long,
+      asset: Asset,
+      fee: Long = FeeConstants(Transfer) * FeeUnit
+  ): EthereumTransaction = asset match {
     case Asset.Waves =>
       signRawTransaction(keyPair, recipient.chainId)(
         RawTransaction.createTransaction(
           BigInt(System.currentTimeMillis()).bigInteger,
           EthereumTransaction.GasPrice,
-          BigInt(100000).bigInteger, // fee
+          BigInt(fee).bigInteger, // fee
           EthEncoding.toHexString(recipient.publicKeyHash),
           (BigInt(amount) * EthereumTransaction.AmountMultiplier).bigInteger,
           ""
@@ -85,7 +94,7 @@ object EthTxGenerator {
         RawTransaction.createTransaction(
           BigInt(System.currentTimeMillis()).bigInteger, // nonce
           EthereumTransaction.GasPrice,
-          BigInt(100000).bigInteger,                     // fee
+          BigInt(fee).bigInteger,                        // fee
           EthEncoding.toHexString(assetId.arr.take(20)), // to (asset erc20 "contract" address)
           FunctionEncoder.encode(function)               // data
         )

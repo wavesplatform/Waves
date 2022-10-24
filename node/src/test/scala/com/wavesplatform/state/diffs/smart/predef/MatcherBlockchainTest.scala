@@ -57,20 +57,46 @@ class MatcherBlockchainTest extends PropSpec with MockFactory with WithDomain {
       override def balance(address: Address, mayBeAssetId: Asset): Long                                     = ???
       override def resolveERC20Address(address: ERC20Address): Option[Asset.IssuedAsset]                    = ???
     }
+
     val tx = TransferTransaction.selfSigned(1.toByte, accountGen.sample.get, accountGen.sample.get.toAddress, Waves, 1, Waves, 1, ByteStr.empty, 0)
-    ScriptRunner.applyGeneric(
-      Coproduct(tx.explicitGet()),
-      blockchain,
-      TestCompiler(V5).compileExpression("true"),
-      isAssetScript = false,
-      Coproduct(Recipient.Address(ByteStr.empty)),
-      defaultLimit = 2000,
-      default = null,
-      useCorrectScriptVersion = true,
-      fixUnicodeFunctions = true,
-      useNewPowPrecision = true,
-      checkEstimatorSumOverflow = true,
-      newEvaluatorMode = true
-    ) shouldBe ((Nil, 0, Right(CONST_BOOLEAN(true))))
+    val scripts =
+      Seq(
+        TestCompiler(V5).compileExpression("true"),
+        TestCompiler(V5).compileContract(
+          """
+            |@Callable(i)
+            |func foo() = []
+            |""".stripMargin
+        ),
+        TestCompiler(V5).compileContract(
+          """
+            |@Callable(i)
+            |func foo() = []
+            |
+            |@Verifier(tx)
+            |func bar() = true
+            |""".stripMargin
+        )
+      )
+
+    scripts.foreach { script =>
+      ScriptRunner
+        .applyGeneric(
+          Coproduct(tx.explicitGet()),
+          blockchain,
+          script,
+          isAssetScript = false,
+          Coproduct(Recipient.Address(ByteStr.empty)),
+          defaultLimit = 2000,
+          default = null,
+          useCorrectScriptVersion = true,
+          fixUnicodeFunctions = true,
+          useNewPowPrecision = true,
+          checkEstimatorSumOverflow = true,
+          newEvaluatorMode = true,
+          checkWeakPk = true
+        )
+        ._3 shouldBe Right(CONST_BOOLEAN(true))
+    }
   }
 }

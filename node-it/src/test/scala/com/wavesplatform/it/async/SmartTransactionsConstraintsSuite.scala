@@ -4,7 +4,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.http.requests.SignedSetScriptRequest
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.api.AsyncHttpApi.*
 import com.wavesplatform.it.{BaseFreeSpec, NodeConfigs, TransferSending}
 import com.wavesplatform.lang.directives.values.V1
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -15,7 +15,7 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import play.api.libs.json.{JsNumber, Json}
 
 import scala.concurrent.Await.result
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class SmartTransactionsConstraintsSuite extends BaseFreeSpec with TransferSending {
 
@@ -23,23 +23,23 @@ class SmartTransactionsConstraintsSuite extends BaseFreeSpec with TransferSendin
     .overrideBase(
       _.raw(
         s"""akka.http.server {
-         |  parsing.max-content-length = 3737439
-         |  request-timeout = 60s
-         |}
-         |
-         |waves {
-         |  miner.quorum = 0
-         |
-         |  blockchain.custom {
-         |    functionality {
-         |      pre-activated-features {
-         |        2: 0
-         |        4: 0
-         |        11: 100500
-         |      }
-         |    }
-         |  }
-         |}""".stripMargin
+           |  parsing.max-content-length = 3737439
+           |  request-timeout = 60s
+           |}
+           |
+           |waves {
+           |  miner.quorum = 0
+           |
+           |  blockchain.custom {
+           |    functionality {
+           |      pre-activated-features {
+           |        2: 0
+           |        4: 0
+           |        11: 100500
+           |      }
+           |    }
+           |  }
+           |}""".stripMargin
       )
     )
     .withDefault(1)
@@ -50,17 +50,19 @@ class SmartTransactionsConstraintsSuite extends BaseFreeSpec with TransferSendin
 
   s"Block is limited by size after activation" in result(
     for {
+      startHeight <- miner.waitForHeightArise
+      newBlockHeight = startHeight + 3
       _ <- miner.signedBroadcast(Json.toJsObject(toRequest(setScriptTx(smartPrivateKey))) + ("type" -> JsNumber(13)))
       _ <- processRequests(generateTransfersFromAccount(MaxScriptRunsInBlock * 3, smartPrivateKey.toAddress.toString))
-      _ <- miner.waitForHeight(5)
+      _ <- miner.waitForHeight(newBlockHeight)
       _ <- processRequests(generateTransfersFromAccount(MaxScriptRunsInBlock * 3, smartPrivateKey.toAddress.toString))
       _ <- scala.concurrent.Future.sequence(
         (0 to 9).map(_ => processRequests(generateTransfersFromAccount((50 - MaxScriptRunsInBlock / 10), simplePrivateKey.toAddress.toString)))
       )
-      _                  <- miner.waitForHeight(6)
-      blockWithSetScript <- miner.blockHeadersAt(2)
-      restBlocks         <- miner.blockHeadersSeq(3, 4)
-      newBlock           <- miner.blockHeadersAt(5)
+      _                  <- miner.waitForHeight(newBlockHeight + 1)
+      blockWithSetScript <- miner.blockHeadersAt(startHeight)
+      restBlocks         <- miner.blockHeadersSeq(startHeight + 1, newBlockHeight - 1)
+      newBlock           <- miner.blockHeadersAt(newBlockHeight)
     } yield {
       blockWithSetScript.transactionCount should (be <= (MaxScriptRunsInBlock + 1) and be >= 1)
       restBlocks.foreach { x =>

@@ -5,6 +5,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.v1.compiler.TestCompiler
+import com.wavesplatform.state.Portfolio
 import com.wavesplatform.state.diffs.FeeValidation.FeeUnit
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -46,6 +47,33 @@ class InvokeFeeTest extends PropSpec with WithDomain {
       d.appendBlockE(invoke(fee = invokeFee - 1, feeAssetId = asset)) should produce(
         s"Fee for InvokeScriptTransaction (499999 in $asset) does not exceed minimal value of 500000 WAVES"
       )
+    }
+  }
+
+  property("invoke sponsored fee on failed transaction should be charged correctly") {
+    val issuer  = secondSigner
+    val invoker = signer(2)
+    val dAppAcc = signer(3)
+    withDomain(RideV5, AddrWithBalance.enoughBalances(issuer, invoker, dAppAcc)) { d =>
+      val dApp = TestCompiler(V5).compileContract(
+        s"""
+           | @Callable(i)
+           | func default() = {
+           |   strict c = ${(1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}
+           |   if (true) then throw() else []
+           | }
+         """.stripMargin
+      )
+      val issueTx    = issue(issuer)
+      val asset      = IssuedAsset(issueTx.id())
+      val coeff      = 12345
+      val sponsorTx  = sponsor(asset, Some(FeeUnit / coeff), issuer)
+      val transferTx = transfer(issuer, invoker.toAddress, asset = asset)
+      d.appendBlock(issueTx, sponsorTx, transferTx, setScript(dAppAcc, dApp))
+      d.appendAndAssertFailed(invoke(invoker = invoker, dApp = dAppAcc.toAddress, fee = invokeFee / coeff, feeAssetId = asset))
+      d.liquidDiff.portfolios(invoker.toAddress) shouldBe Portfolio.build(asset, -invokeFee / coeff)
+      d.liquidDiff.portfolios(issuer.toAddress) shouldBe Portfolio(-invokeFee, assets = Map(asset -> invokeFee / coeff))
+      d.liquidDiff.portfolios.get(dAppAcc.toAddress) shouldBe None
     }
   }
 

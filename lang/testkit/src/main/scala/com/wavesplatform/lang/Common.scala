@@ -3,20 +3,21 @@ package com.wavesplatform.lang
 import cats.Id
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.CTX
-import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
-import com.wavesplatform.lang.v1.evaluator.ctx._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, _}
+import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, Log}
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1.*
+import com.wavesplatform.lang.v1.evaluator.ctx.*
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, *}
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import monix.eval.Coeval
+import shapeless.Coproduct
 
 import scala.annotation.tailrec
 import scala.util.{Left, Right, Try}
@@ -41,8 +42,8 @@ object Common {
       case _                                                   => ??? // suppress pattern match warning
     }
 
-  val pointTypeA = CASETYPEREF("PointA", List("X"  -> LONG, "YA" -> LONG))
-  val pointTypeB = CASETYPEREF("PointB", List("X"  -> LONG, "YB" -> LONG))
+  val pointTypeA = CASETYPEREF("PointA", List("X" -> LONG, "YA" -> LONG))
+  val pointTypeB = CASETYPEREF("PointB", List("X" -> LONG, "YB" -> LONG))
   val pointTypeC = CASETYPEREF("PointC", List("YB" -> LONG))
   val pointTypeD = CASETYPEREF("PointD", List("YB" -> UNION(LONG, UNIT)))
 
@@ -51,8 +52,8 @@ object Common {
   val BorC    = UNION(pointTypeB, pointTypeC)
   val CorD    = UNION(pointTypeC, pointTypeD)
 
-  val pointAInstance  = CaseObj(pointTypeA, Map("X"  -> 3L, "YA" -> 40L))
-  val pointBInstance  = CaseObj(pointTypeB, Map("X"  -> 3L, "YB" -> 41L))
+  val pointAInstance  = CaseObj(pointTypeA, Map("X" -> 3L, "YA" -> 40L))
+  val pointBInstance  = CaseObj(pointTypeB, Map("X" -> 3L, "YB" -> 41L))
   val pointCInstance  = CaseObj(pointTypeC, Map("YB" -> 42L))
   val pointDInstance1 = CaseObj(pointTypeD, Map("YB" -> 43L))
 
@@ -71,30 +72,38 @@ object Common {
       Seq.empty[BaseFunction[NoContext]]
     )
 
-  def emptyBlockchainEnvironment(h: Int = 1, in: Coeval[Environment.InputEntity] = Coeval(???), nByte: Byte = 'T'): Environment[Id] = new Environment[Id] {
-    override def height: Long  = h
-    override def chainId: Byte = nByte
-    override def inputEntity   = in()
+  def emptyBlockchainEnvironment(h: Int = 1, in: Coeval[Environment.InputEntity] = Coeval(???), nByte: Byte = 'T'): Environment[Id] =
+    new Environment[Id] {
+      override def height: Long  = h
+      override def chainId: Byte = nByte
+      override def inputEntity   = in()
 
-    override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
-    override def transferTransactionById(id: Array[Byte]): Option[Tx.Transfer]                                   = ???
-    override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
-    override def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo]                                         = ???
-    override def lastBlockOpt(): Option[BlockInfo]                                                               = ???
-    override def blockInfoByHeight(height: Int): Option[BlockInfo]                                               = ???
-    override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                        = ???
-    override def hasData(recipient: Recipient): Boolean                                                          = ???
-    override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
-    override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
-    override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails]    = ???
-    override def tthis: Environment.Tthis                                                                        = ???
-    override def multiPaymentAllowed: Boolean                                                                    =  true
-    override def txId: ByteStr                                                                                   = ???
-    override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
-    override def addressFromString(address: String): Either[String, Recipient.Address]                           = ???
-    override def addressFromPublicKey(publicKey: ByteStr): Either[String, Address]                               = ???
-    def accountScript(addressOrAlias: Recipient): Option[Script]                                                 = ???
-    override def callScript(dApp: Address, func: String, args: List[EVALUATED], payments: Seq[(Option[Array[Byte]], Long)], remainingComplexity: Int, reentrant: Boolean): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
+      override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
+      override def transferTransactionById(id: Array[Byte]): Option[Tx.Transfer]                                   = ???
+      override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
+      override def assetInfoById(id: Array[Byte]): Option[ScriptAssetInfo]                                         = ???
+      override def lastBlockOpt(): Option[BlockInfo]                                                               = ???
+      override def blockInfoByHeight(height: Int): Option[BlockInfo]                                               = ???
+      override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any]                        = None
+      override def hasData(recipient: Recipient): Boolean                                                          = false
+      override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
+      override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
+      override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails]    = ???
+      override def tthis: Environment.Tthis                                                                        = Coproduct(Address(ByteStr.empty))
+      override def multiPaymentAllowed: Boolean                                                                    = true
+      override def txId: ByteStr                                                                                   = ???
+      override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
+      override def addressFromString(address: String): Either[String, Recipient.Address]                           = ???
+      override def addressFromPublicKey(publicKey: ByteStr): Either[String, Address]                               = ???
+      def accountScript(addressOrAlias: Recipient): Option[Script]                                                 = ???
+      override def callScript(
+          dApp: Address,
+          func: String,
+          args: List[EVALUATED],
+          payments: Seq[(Option[Array[Byte]], Long)],
+          remainingComplexity: Int,
+          reentrant: Boolean
+      ): Coeval[(Either[ValidationError, (EVALUATED, Log[Id])], Int)] = ???
     }
 
   def addressFromPublicKey(chainId: Byte, pk: Array[Byte], addressVersion: Byte = EnvironmentFunctions.AddressVersion): Array[Byte] = {
@@ -117,7 +126,9 @@ object Common {
           checkSum sameElements checkSumGenerated
         }
 
-        if (version == EnvironmentFunctions.AddressVersion && network == chainId && addressBytes.length == EnvironmentFunctions.AddressLength && checksumCorrect)
+        if (
+          version == EnvironmentFunctions.AddressVersion && network == chainId && addressBytes.length == EnvironmentFunctions.AddressLength && checksumCorrect
+        )
           Right(Some(addressBytes))
         else Right(None)
     }

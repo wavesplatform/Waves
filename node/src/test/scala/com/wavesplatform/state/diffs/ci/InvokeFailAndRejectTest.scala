@@ -3,6 +3,8 @@ package com.wavesplatform.state.diffs.ci
 import com.wavesplatform.TestValues.invokeFee
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.v1.ExprScript.ExprScriptImpl
 import com.wavesplatform.lang.v1.compiler.Terms.TRUE
@@ -25,8 +27,11 @@ class InvokeFailAndRejectTest extends PropSpec with WithDomain {
      """.stripMargin
   )
 
+  private def assertForV5AndV6[A](assert: Domain => A): Unit =
+    Seq(RideV5, RideV6).foreach(withDomain(_, AddrWithBalance.enoughBalances(secondSigner))(assert))
+
   property("invoke fails by payment script") {
-    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+    assertForV5AndV6 { d =>
       val i     = issue(script = Some(assetFailScript))
       val asset = IssuedAsset(i.id())
       val dApp = TestCompiler(V5).compileContract(
@@ -45,8 +50,8 @@ class InvokeFailAndRejectTest extends PropSpec with WithDomain {
   }
 
   property("invoke fails by ScriptTransfer script") {
-    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
-      val i     = issue(script = Some(assetFailScript))
+    assertForV5AndV6 { d =>
+      val i     = issue(secondSigner, script = Some(assetFailScript))
       val asset = IssuedAsset(i.id())
       val dApp = TestCompiler(V5).compileContract(
         s"""
@@ -63,7 +68,7 @@ class InvokeFailAndRejectTest extends PropSpec with WithDomain {
   }
 
   property("invoke with ScriptTransfer fails by payment script") {
-    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+    assertForV5AndV6 { d =>
       val failAssetIssue = issue(script = Some(assetFailScript))
       val trueAssetIssue = issue(secondSigner, script = Some(ExprScriptImpl(V3, false, TRUE)))
       val failAsset      = IssuedAsset(failAssetIssue.id())
@@ -86,7 +91,7 @@ class InvokeFailAndRejectTest extends PropSpec with WithDomain {
   }
 
   property("invoke with failing payment is rejected due to dApp script") {
-    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+    assertForV5AndV6 { d =>
       val failAssetIssue = issue(script = Some(assetFailScript))
       val failAsset      = IssuedAsset(failAssetIssue.id())
       val dApp = TestCompiler(V5).compileContract(
@@ -176,27 +181,33 @@ class InvokeFailAndRejectTest extends PropSpec with WithDomain {
     }
   }
 
-  property("invoke is always rejected if action address is from other network") {
-    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
-      val dApp = TestCompiler(V5).compileContract(
-        s"""
-           | @Callable(i)
-           | func default() = {
-           |   strict c = ${(1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}
-           |   [
-           |     ScriptTransfer(Address(base58'3P2pTpQhGbZrJXATKr75A1uZjeTrb4PHMYf'), 1, unit)
-           |   ]
-           | }
-         """.stripMargin
-      )
-      val invokeTx = invoke()
-      d.appendBlock(setScript(secondSigner, dApp))
-      d.appendBlockE(invokeTx) should produce("Address belongs to another network: expected: 84(T), actual: 87(W)")
+  property("invoke is always rejected if action address is from other network before activation of RideV6") {
+    assertForV5AndV6 { d =>
+      Seq(true, false).foreach { above1000Complexity =>
+        val c = if (above1000Complexity) (1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ") else "1"
+        val dApp = TestCompiler(V5).compileContract(
+          s"""
+             | @Callable(i)
+             | func default() = {
+             |   strict c = $c
+             |   [
+             |     ScriptTransfer(Address(base58'3P2pTpQhGbZrJXATKr75A1uZjeTrb4PHMYf'), 1, unit)
+             |   ]
+             | }
+             """.stripMargin
+        )
+        val invokeTx = invoke()
+        d.appendBlock(setScript(secondSigner, dApp))
+        if (d.blockchain.isFeatureActivated(BlockchainFeatures.RideV6) && above1000Complexity)
+          d.appendAndAssertFailed(invokeTx, "Address belongs to another network: expected: 84(T), actual: 87(W)")
+        else
+          d.appendBlockE(invokeTx) should produce("Address belongs to another network: expected: 84(T), actual: 87(W)")
+      }
     }
   }
 
   property("invoke is rejected or failed if attached invoke address is from other network") {
-    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+    assertForV5AndV6 { d =>
       val sigVerify = s"strict c = ${(1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}"
       Seq(false, true).foreach { complex =>
         val dApp = TestCompiler(V5).compileContract(
@@ -220,7 +231,7 @@ class InvokeFailAndRejectTest extends PropSpec with WithDomain {
   }
 
   property("invoke is rejected from account with non-boolean verifier") {
-    withDomain(RideV5, AddrWithBalance.enoughBalances(secondSigner)) { d =>
+    assertForV5AndV6 { d =>
       val dApp = TestCompiler(V5).compileContract(
         s"""
            | @Callable(i)

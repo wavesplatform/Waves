@@ -34,9 +34,16 @@ class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler) extends Bl
   private[this] var liquidState = Option.empty[LiquidState]
   private[this] val handlers    = ConcurrentHashMap.newKeySet[Handler]()
 
-  def shutdown(): Unit = monitor.synchronized {
-    db.close()
+  def newHandler(id: String, maybeLiquidState: Option[LiquidState], subject: PublishToOneSubject[BlockchainUpdated], maxQueueSize: Int): Handler =
+    new Handler(id, maybeLiquidState, subject, maxQueueSize)
+
+  def shutdownHandlers(): Unit = monitor.synchronized {
     handlers.forEach(_.shutdown())
+  }
+
+  def shutdown(): Unit = {
+    shutdownHandlers()
+    db.close()
   }
 
   def height: Int =
@@ -62,8 +69,8 @@ class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler) extends Bl
       s"Block reference ${block.header.reference} does not match last block id ${liquidState.get.totalBlockId}"
     )
 
-    liquidState.foreach(
-      ls => db.put(keyForHeight(ls.keyBlock.height), ls.solidify().protobuf.update(_.append.block.optionalBlock := None).toByteArray)
+    liquidState.foreach(ls =>
+      db.put(keyForHeight(ls.keyBlock.height), ls.solidify().protobuf.update(_.append.block.optionalBlock := None).toByteArray)
     )
 
     val ba = BlockAppended.from(block, diff, blockchainBeforeWithMinerReward)
@@ -221,7 +228,7 @@ class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler) extends Bl
     require(toHeight == 0 || toHeight >= fromHeight, "fromHeight must not exceed toHeight")
     monitor.synchronized {
       val subject = PublishToOneSubject[BlockchainUpdated]()
-      val handler = new Handler(streamId, liquidState, subject, 250)
+      val handler = newHandler(streamId, liquidState, subject, 250)
       handlers.add(handler)
 
       val removeHandler = Task {
