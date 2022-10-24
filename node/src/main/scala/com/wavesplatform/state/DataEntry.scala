@@ -1,5 +1,6 @@
 package com.wavesplatform.state
 
+import com.github.plokhotnyuk.jsoniter_scala.core.{JsonReader, JsonValueCodec, JsonWriter}
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.traits.domain.{DataItem, DataOp}
@@ -79,6 +80,48 @@ object DataEntry {
     }
 
     def writes(item: DataEntry[_]): JsValue = item.toJson
+  }
+
+  implicit val dataEntryCodec: JsonValueCodec[DataEntry[?]] = new JsonValueCodec[DataEntry[?]] {
+    override def decodeValue(in: JsonReader, default: DataEntry[?]): DataEntry[?] = ???
+    override def encodeValue(x: DataEntry[?], out: JsonWriter): Unit = {
+      out.writeObjectStart()
+      x match {
+        case BinaryDataEntry(key, value) =>
+          out.writeKey("type")
+          out.writeVal("binary")
+          out.writeKey("key")
+          out.writeVal(key)
+          out.writeKey("value")
+          out.writeVal(value.base64)
+        case IntegerDataEntry(key, value) =>
+          out.writeKey("type")
+          out.writeVal("integer")
+          out.writeKey("key")
+          out.writeVal(key)
+          out.writeKey("value")
+          out.writeVal(value)
+        case BooleanDataEntry(key, value) =>
+          out.writeKey("type")
+          out.writeVal("boolean")
+          out.writeKey("key")
+          out.writeVal(key)
+          out.writeKey("value")
+          out.writeVal(value)
+        case StringDataEntry(key, value) =>
+          out.writeKey("type")
+          out.writeVal("string")
+          out.writeKey("key")
+          out.writeVal(key)
+          out.writeKey("value")
+          out.writeVal(value)
+        case EmptyDataEntry(key) =>
+          out.writeKey("key")
+          out.writeVal(key)
+      }
+      out.writeObjectEnd()
+    }
+    override def nullValue: DataEntry[?] = ???
   }
 
   implicit class DataEntryExt(private val de: DataEntry[_]) extends AnyVal {

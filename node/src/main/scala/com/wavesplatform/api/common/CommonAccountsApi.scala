@@ -1,12 +1,13 @@
 package com.wavesplatform.api.common
 
 import com.google.common.base.Charsets
+import com.google.common.collect.AbstractIterator
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.AddressPortfolio.{assetBalanceIterator, nftIterator}
 import com.wavesplatform.api.common.TransactionMeta.Ethereum
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{DBExt, KeyTags, Keys}
+import com.wavesplatform.database.{AddressId, DBExt, KeyTags, Keys, readIntSeq}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBRecipients
@@ -20,9 +21,10 @@ import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.{EthereumTransaction, TransactionType}
 import monix.eval.Task
 import monix.reactive.Observable
-import org.rocksdb.RocksDB
+import org.rocksdb.{ReadOptions, RocksDB, RocksIterator}
 
-import scala.collection.mutable
+import scala.annotation.tailrec
+import scala.jdk.CollectionConverters.*
 
 trait CommonAccountsApi {
   import CommonAccountsApi.*
@@ -103,26 +105,19 @@ object CommonAccountsApi {
     override def data(address: Address, key: String): Option[DataEntry[?]] =
       blockchain.accountData(address, key)
 
-    // FIXME: streaming
     override def dataStream(address: Address, regex: Option[String]): Observable[DataEntry[?]] = Observable.defer {
       val entriesFromDiff = diff().accountData
         .get(address)
-        .fold[Map[String, DataEntry[?]]](Map.empty)(_.data.filter { case (k, _) => regex.forall(_.r.pattern.matcher(k).matches()) })
-      val entries = mutable.ArrayBuffer[DataEntry[?]](entriesFromDiff.values.toSeq*)
+        .fold(Array.empty[DataEntry[?]])(_.data.filter { case (k, _) => regex.forall(_.r.pattern.matcher(k).matches()) }.values.toArray.sortBy(_.key))
 
       db.readOnly { ro =>
-        db.get(Keys.addressId(address)).foreach { addressId =>
-          db.iterateOver(KeyTags.DataHistory.prefixBytes ++ PBRecipients.publicKeyHash(address)) { e =>
-            val key = new String(e.getKey.drop(2 + Address.HashLength), Charsets.UTF_8)
-            if (regex.forall(_.r.pattern.matcher(key).matches()) && !entriesFromDiff.contains(key)) {
-              for (h <- ro.get(Keys.dataHistory(address, key)).headOption; e <- ro.get(Keys.data(addressId, key)(h))) {
-                entries += e
-              }
-            }
-          }
+        ro.get(Keys.addressId(address)).map { addressId =>
+          Observable.fromIterator(
+            Task(new AddressDataIterator(db, address, addressId, entriesFromDiff, regex).asScala)
+          )
         }
-      }
-      Observable.fromIterable(entries).filterNot(_.isEmpty)
+      }.getOrElse(Observable.empty)
+        .filterNot(_.isEmpty)
     }
 
     override def resolveAlias(alias: Alias): Either[ValidationError, Address] = blockchain.resolveAlias(alias)
@@ -203,4 +198,64 @@ object CommonAccountsApi {
       blockchain.leaseDetails(id).exists(_.isActive)
   }
 
+  class AddressDataIterator(
+      db: RocksDB,
+      address: Address,
+      addressId: AddressId,
+      entriesFromDiff: Array[DataEntry[?]],
+      regex: Option[String]
+  ) extends AbstractIterator[DataEntry[?]] {
+    val dbIterator: RocksIterator = db.newIterator(new ReadOptions().setTotalOrderSeek(false).setPrefixSameAsStart(true))
+    val prefix: Array[Byte]       = KeyTags.DataHistory.prefixBytes ++ PBRecipients.publicKeyHash(address)
+
+    val length: Int = entriesFromDiff.length
+
+    dbIterator.seek(prefix)
+
+    var nextIndex                         = 0
+    var nextDbEntry: Option[DataEntry[?]] = None
+
+    def matches(key: String): Boolean = regex.forall(_.r.pattern.matcher(key).matches())
+
+    @tailrec
+    final override def computeNext(): DataEntry[?] = {
+      nextDbEntry match {
+        case Some(dbEntry) =>
+          if (nextIndex < length) {
+            val entryFromDiff = entriesFromDiff(nextIndex)
+            if (entryFromDiff.key < dbEntry.key) {
+              nextIndex += 1
+              entriesFromDiff(nextIndex - 1)
+            } else if (entryFromDiff.key == dbEntry.key) {
+              nextIndex += 1
+              nextDbEntry = None
+              entriesFromDiff(nextIndex - 1)
+            } else {
+              nextDbEntry = None
+              dbEntry
+            }
+          } else {
+            nextDbEntry = None
+            dbEntry
+          }
+        case None =>
+          if (dbIterator.isValid) {
+            val key = new String(dbIterator.key().drop(2 + Address.HashLength), Charsets.UTF_8)
+            if (matches(key)) {
+              val newNextEntry = readIntSeq(dbIterator.value()).headOption
+                .flatMap(h => db.get(Keys.data(addressId, key)(h)))
+              nextDbEntry = newNextEntry
+            }
+            dbIterator.next()
+            computeNext()
+          } else if (nextIndex < length) {
+            nextIndex += 1
+            entriesFromDiff(nextIndex - 1)
+          } else {
+            dbIterator.close()
+            endOfData()
+          }
+      }
+    }
+  }
 }

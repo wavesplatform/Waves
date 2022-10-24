@@ -351,7 +351,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         }
       )
 
-      val heavyRequestScheduler = Scheduler(heavyRequestExecutor, ExecutionModel.AlwaysAsyncExecution)
+      val heavyRequestScheduler = Scheduler(heavyRequestExecutor)
 
       val routeTimeout = new RouteTimeout(
         FiniteDuration(settings.config.getDuration("akka.http.server.request-timeout").getSeconds, TimeUnit.SECONDS)

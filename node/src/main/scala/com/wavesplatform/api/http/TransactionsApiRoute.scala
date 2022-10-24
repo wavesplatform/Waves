@@ -21,16 +21,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.{
-  BinaryDataEntry,
-  Blockchain,
-  BooleanDataEntry,
-  EmptyDataEntry,
-  IntegerDataEntry,
-  InvokeScriptResult,
-  StringDataEntry,
-  TxMeta
-}
+import com.wavesplatform.state.{Blockchain, InvokeScriptResult, TxMeta}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.lease.*
@@ -57,7 +48,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{
   FUNCTION_CALL
 }
 import com.wavesplatform.lang.v1.serialization.SerdeV1
-import com.wavesplatform.state.InvokeScriptResult.{DataEntry, Lease, LeaseCancel}
+import com.wavesplatform.state.InvokeScriptResult.{Lease, LeaseCancel}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import monix.reactive.Observable
@@ -524,48 +515,6 @@ object TransactionsApiRoute {
       override def nullValue: LeaseCancel = ???
     }
 
-    implicit val dataEntryCodec: JsonValueCodec[DataEntry] = new JsonValueCodec[DataEntry] {
-      override def decodeValue(in: JsonReader, default: DataEntry): DataEntry = ???
-      override def encodeValue(x: DataEntry, out: JsonWriter): Unit = {
-        out.writeObjectStart()
-        x match {
-          case BinaryDataEntry(key, value) =>
-            out.writeKey("type")
-            out.writeVal("binary")
-            out.writeKey("key")
-            out.writeVal(key)
-            out.writeKey("value")
-            out.writeVal(value.base64)
-          case IntegerDataEntry(key, value) =>
-            out.writeKey("type")
-            out.writeVal("integer")
-            out.writeKey("key")
-            out.writeVal(key)
-            out.writeKey("value")
-            out.writeVal(value)
-          case BooleanDataEntry(key, value) =>
-            out.writeKey("type")
-            out.writeVal("boolean")
-            out.writeKey("key")
-            out.writeVal(key)
-            out.writeKey("value")
-            out.writeVal(value)
-          case StringDataEntry(key, value) =>
-            out.writeKey("type")
-            out.writeVal("string")
-            out.writeKey("key")
-            out.writeVal(key)
-            out.writeKey("value")
-            out.writeVal(value)
-          case EmptyDataEntry(key) =>
-            out.writeKey("key")
-            out.writeVal(key)
-        }
-        out.writeObjectEnd()
-      }
-      override def nullValue: DataEntry = ???
-    }
-
     implicit val invokeMetaCodec: JsonValueCodec[InvokeMeta] =
       JsonCodecMaker.make(
         CodecMakerConfig.withDiscriminatorFieldName(None).withAllowRecursiveTypes(true).withTransientEmpty(false).withTransientDefault(false)
@@ -658,7 +607,7 @@ object TransactionsApiRoute {
             spentComplexity,
             invokeScriptResult
           )
-          ByteString(writeToArray(invokeMeta)(invokeMetaCodec))
+          ByteString.fromArrayUnsafe(writeToArray(invokeMeta)(invokeMetaCodec))
         case TransactionMeta.Ethereum(height, tx, succeeded, spentComplexity, Some(EthereumTransactionMeta(Payload.Invocation(i), _)), isr) =>
           val functionCallEi = SerdeV1.deserializeFunctionCall(i.functionCall.toByteArray).toOption
           val payments       = i.payments.map(p => InvokeScriptTransaction.Payment(p.amount, PBAmounts.toVanillaAssetId(p.assetId)))
@@ -685,7 +634,7 @@ object TransactionsApiRoute {
             payments,
             isr
           )
-          ByteString(writeToArray(ethereumInvokeMeta)(ethInvokeMetaCodec))
+          ByteString.fromArrayUnsafe(writeToArray(ethereumInvokeMeta)(ethInvokeMetaCodec))
         case other =>
           ByteString(Json.stringify(meta.transaction.json() ++ transactionMetaJson(meta)))
       }
