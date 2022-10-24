@@ -1,22 +1,18 @@
-package com.wavesplatform.ride
+package com.wavesplatform.ride.blockchain
 
 import com.google.protobuf.{ByteString, UnsafeByteOperations}
-import com.wavesplatform.account.{Address, Alias, PublicKey}
+import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.SignedBlockHeader
+import com.wavesplatform.collections.syntax.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.events.protobuf.StateUpdate
-import com.wavesplatform.features.EstimatorProvider.EstimatorBlockchainExt
 import com.wavesplatform.grpc.BlockchainGrpcApi
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.PBAmounts.toAssetAndAmount
-import com.wavesplatform.protobuf.transaction.PBTransactions.{toVanillaDataEntry, toVanillaScript}
-import com.wavesplatform.ride.MutableBlockchain.CachedData
+import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{
   AccountScriptInfo,
   AssetDescription,
@@ -27,99 +23,29 @@ import com.wavesplatform.state.{
   Height,
   LeaseBalance,
   Portfolio,
-  TxMeta,
-  VolumeAndFee
+  TxMeta
 }
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
-import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 import com.wavesplatform.utils.ScorexLogging
-import com.wavesplatform.collections.syntax.*
 
 import java.nio.charset.StandardCharsets
 import scala.collection.mutable
 
-class MutableBlockchain(override val settings: BlockchainSettings, blockchainApi: BlockchainGrpcApi) extends Blockchain with ScorexLogging {
+class BlockchainStorage(val settings: BlockchainSettings, blockchainApi: BlockchainGrpcApi) extends ScorexLogging {
+  private type TagT = Blockchain
+
   private val chainId = settings.addressSchemeCharacter.toByte
 
-  private def kill(methodName: String) = throw new RuntimeException(methodName)
+  val data = new RideData[(Address, String), DataEntry[?], TagT](Function.tupled(blockchainApi.getAccountDataEntry))
 
-  private val data = mutable.AnyRefMap.empty[Address, mutable.AnyRefMap[String, CachedData[DataEntry[_]]]]
-
-  // TODO return Boolean to know: we updated the data or not/
-  def replaceAccountData(update: StateUpdate.DataEntryUpdate): Boolean = {
-    val address = update.address.toAddress
-    data.get(address).fold(false) { data =>
-      val key = update.getDataEntry.key
-      data.replaceIfExists(key) { _ =>
-        log.debug(s"[$address, $key] Updated data")
-        Some(CachedData.Cached(toVanillaDataEntry(update.getDataEntry)))
-      }
-    }
-  }
-
-  // TODO use utils/evaluate through REST API
-  // Ride: isDataStorageUntouched
-  override def hasData(address: Address): Boolean = data.contains(address)
-
-  // Ride: get*Value (data), get* (data)
-  override def accountData(address: Address, key: String): Option[DataEntry[_]] = {
-    val xs = data.updateWith(address) {
-      case None => Some(mutable.AnyRefMap.empty[String, CachedData[DataEntry[_]]])
-      case x    => x
-    }
-
-    xs.get
-      .updateWith(key) {
-        case None => Some(CachedData.loaded(blockchainApi.getAccountDataEntry(address, key)))
-        case x    => x
-      }
-      .flatMap(_.mayBeValue)
-  }
-
-  // None means "we don't know". Some(None) means "we know, there is no script"
-  private val accountScripts = mutable.AnyRefMap.empty[Address, CachedData[AccountScriptInfo]]
-  def replaceAccountScript(account: PublicKey, newScript: ByteString): Boolean = {
-    val address = account.toAddress(chainId)
-    accountScripts.replaceIfExists(address) { _ =>
-      log.debug(s"[$address] Updated account script")
-
-      val script = toVanillaScript(newScript)
-
-      // TODO dup, see BlockchainGrpcApi
-
-      // DiffCommons
-      val fixEstimateOfVerifier    = true // blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
-      val useContractVerifierLimit = true // !isAsset && blockchain.useReducedVerifierComplexityLimit
-
-      Some(CachedData.loaded(script.map { script =>
-        // TODO explicitGet?
-        val complexityInfo = Script.complexityInfo(script, this.estimator, fixEstimateOfVerifier, useContractVerifierLimit).explicitGet()
-
-        AccountScriptInfo(
-          publicKey = account,
-          script = script, // Only this field matters in Ride Runner, see MutableBlockchain.accountScript
-          verifierComplexity = complexityInfo.verifierComplexity,
-          complexitiesByEstimator = Map(this.estimator.version -> complexityInfo.callableComplexities)
-        )
-      }))
-    }
-  }
-
-  private def withAccountScript(address: Address): Option[CachedData[AccountScriptInfo]] =
-    accountScripts.updateWith(address) {
-      case None => Some(CachedData.loaded(blockchainApi.getAccountScript(address, this.estimator)))
-      case x    => x
-    }
-
-  // Ride: scriptHash
-  override def accountScript(address: Address): Option[AccountScriptInfo] = withAccountScript(address).get.mayBeValue
-
-  override def hasAccountScript(address: Address) = withAccountScript(address).get.mayBeValue.nonEmpty
+  val accountScripts = new RideData[Address, AccountScriptInfo, TagT](blockchainApi.getAccountScript(_, this.estimator))
 
   // It seems, we don't need to update this. Only for some optimization needs
-  private val blockHeaders = mutable.LongMap.empty[(SignedBlockHeader, ByteStr)]
+//  private val blockHeaders = mutable.LongMap.empty[(SignedBlockHeader, ByteStr)]
+  val blockHeaders = new ReadOnlyRideData[Integer, (SignedBlockHeader, ByteStr), TagT](height => )
 
   // Ride: blockInfoByHeight, lastBlock
   override def blockHeader(height: Int): Option[SignedBlockHeader] = {
@@ -293,61 +219,4 @@ class MutableBlockchain(override val settings: BlockchainSettings, blockchainApi
   // Ride: transferTransactionById
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =
     withTransactions(id).flatMap { case (meta, tx) => tx.map((meta.height, _)) }
-
-  override def score: BigInt = kill("score")
-
-  override def carryFee: Long = kill("carryFee")
-
-  override def heightOf(blockId: ByteStr): Option[Int] = kill("heightOf")
-
-  /** Features related */
-  override def approvedFeatures: Map[Short, Int] = kill("approvedFeatures")
-
-  override def featureVotes(height: Int): Map[Short, Int] = kill("featureVotes")
-
-  override def containsTransaction(tx: Transaction): Boolean = kill("containsTransaction")
-
-  override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = kill("leaseDetails")
-
-  override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee = kill("filledVolumeAndFee")
-
-  override def transactionInfo(id: BlockId) = kill("transactionInfo")
-
-  /** Block reward related */
-  override def blockReward(height: Int): Option[Long] = kill("blockReward")
-
-  override def blockRewardVotes(height: Int): Seq[Long] = kill("blockRewardVotes")
-
-  override def wavesAmount(height: Int): BigInt = kill("wavesAmount")
-
-  override def balanceAtHeight(address: Address, height: Int, assetId: Asset): Option[(Int, Long)] = kill("balanceAtHeight")
-
-  // GET /eth/assets
-  override def resolveERC20Address(address: ERC20Address): Option[Asset.IssuedAsset] = kill("resolveERC20Address")
-}
-
-object MutableBlockchain {
-  sealed trait CachedData[+T] extends Product with Serializable {
-    def isLoaded: Boolean
-    def mayBeValue: Option[T]
-  }
-  object CachedData {
-    case object NotLoaded extends CachedData[Nothing] {
-      override val isLoaded   = false
-      override val mayBeValue = None
-    }
-    case class Cached[T](value: T) extends CachedData[T] {
-      override def isLoaded: Boolean     = true
-      override def mayBeValue: Option[T] = Some(value)
-    }
-    case object Absence extends CachedData[Nothing] {
-      override val isLoaded   = true
-      override val mayBeValue = None
-    }
-
-    def loaded[T](x: Option[T]): CachedData[T] = x match {
-      case Some(x) => Cached(x)
-      case None    => Absence
-    }
-  }
 }

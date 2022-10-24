@@ -12,6 +12,7 @@ import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.resources.*
+import com.wavesplatform.ride.blockchain.MutableBlockchain
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.Scheduler
 import play.api.libs.json.JsObject
