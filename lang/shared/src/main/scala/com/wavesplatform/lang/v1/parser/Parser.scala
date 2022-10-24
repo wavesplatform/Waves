@@ -16,8 +16,6 @@ import fastparse.*
 import fastparse.MultiLineWhitespace.*
 import fastparse.Parsed.Failure
 
-import scala.annotation.tailrec
-
 object Parser {
 
   private val Global                                        = com.wavesplatform.lang.hacks.Global // Hack for IDEA
@@ -603,8 +601,7 @@ object Parser {
 
   type RemovedCharPos = Pos
 
-  def parseExpressionWithErrorRecovery(scriptStr: String): Either[Throwable, (SCRIPT, Option[RemovedCharPos])] = {
-
+  def parseExpressionWithErrorRecovery(scriptStr: String): Either[String, (SCRIPT, Option[RemovedCharPos])] = {
     def parse(str: String): Either[Parsed.Failure, SCRIPT] =
       parseExpr(str) match {
         case Parsed.Success(resExpr, _) => Right(SCRIPT(resExpr.position, resExpr))
@@ -612,17 +609,15 @@ object Parser {
       }
 
     parseWithError[SCRIPT](
-      new StringBuilder(scriptStr),
-      parse,
-      SCRIPT(Pos(0, scriptStr.length - 1), INVALID(Pos(0, scriptStr.length - 1), "Parsing failed. Unknown error."))
+      scriptStr,
+      parse
     ).map { exprAndErrorIndexes =>
       val removedCharPosOpt = if (exprAndErrorIndexes._2.isEmpty) None else Some(Pos(exprAndErrorIndexes._2.min, exprAndErrorIndexes._2.max))
       (exprAndErrorIndexes._1, removedCharPosOpt)
     }
   }
 
-  def parseDAPPWithErrorRecovery(scriptStr: String): Either[Throwable, (DAPP, Option[RemovedCharPos])] = {
-
+  def parseDAPPWithErrorRecovery(scriptStr: String): Either[String, (DAPP, Option[RemovedCharPos])] = {
     def parse(str: String): Either[Parsed.Failure, DAPP] =
       parseContract(str) match {
         case Parsed.Success(resDAPP, _) => Right(resDAPP)
@@ -630,68 +625,40 @@ object Parser {
       }
 
     parseWithError[DAPP](
-      new StringBuilder(scriptStr),
-      parse,
-      DAPP(Pos(0, scriptStr.length - 1), List.empty, List.empty)
+      scriptStr,
+      parse
     ).map { dAppAndErrorIndexes =>
       val removedCharPosOpt = if (dAppAndErrorIndexes._2.isEmpty) None else Some(Pos(dAppAndErrorIndexes._2.min, dAppAndErrorIndexes._2.max))
       (dAppAndErrorIndexes._1, removedCharPosOpt)
     }
   }
 
-  @tailrec
-  private def clearChar(source: StringBuilder, pos: Int): Int = {
-    if (pos >= 0) {
-      if (" \n\r".contains(source.charAt(pos))) {
-        clearChar(source, pos - 1)
-      } else {
-        source.setCharAt(pos, ' ')
-        pos
-      }
-    } else {
-      0
-    }
-  }
-
   private def parseWithError[T](
-      source: StringBuilder,
-      parse: String => Either[Parsed.Failure, T],
-      defaultResult: T
-  ): Either[Throwable, (T, Iterable[Int])] = {
-    parse(source.toString())
+      source: String,
+      parse: String => Either[Parsed.Failure, T]
+  ): Either[String, (T, Iterable[Int])] =
+    parse(source)
       .map(dApp => (dApp, Nil))
-      .left
-      .flatMap {
-        case ex: Parsed.Failure =>
-          val errorLastPos       = ex.index
-          val lastRemovedCharPos = clearChar(source, errorLastPos - 1)
-          val posList            = Set(errorLastPos, lastRemovedCharPos)
-          if (lastRemovedCharPos > 0) {
-            parseWithError(source, parse, defaultResult)
-              .map(dAppAndErrorIndexes => (dAppAndErrorIndexes._1, posList ++ dAppAndErrorIndexes._2.toList))
-          } else {
-            Right((defaultResult, posList))
-          }
-        case _ => Left(new Exception("Unknown parsing error."))
-      }
+      .leftMap(toString(source, _))
+
+  def toString(input: String, f: Failure): String = {
+    val (start, end) = errorPosition(input, f)
+    val expectation  = if (f.label == "end-of-input") "illegal expression" else s"expected ${f.label}"
+    s"Parse error: $expectation in $start-$end"
   }
 
   private val moveRightKeywords = Seq(""""func"""", """"let"""", " expression", "1 underscore", "end-of-input", "latin charset")
 
-  def toString(input: String, f: Failure): String = {
-    val (start, end) =
-      if (moveRightKeywords.exists(f.label.contains)) {
-        val end = input.indexWhere(_.isWhitespace, f.index)
-        (f.index, if (end == -1) f.index else end)
-      } else {
-        val start =
-          if (input(f.index - 1).isWhitespace)
-            input.lastIndexWhere(!_.isWhitespace, f.index - 1)
-          else
-            input.lastIndexWhere(_.isWhitespace, f.index - 1) + 1
-        (start, f.index)
-      }
-    val expectation = if (f.label == "end-of-input") "illegal expression" else s"expected ${f.label}"
-    s"Parse error: $expectation in $start-$end"
-  }
+  private def errorPosition(input: String, f: Failure): (Int, Int) =
+    if (moveRightKeywords.exists(f.label.contains)) {
+      val end = input.indexWhere(_.isWhitespace, f.index)
+      (f.index, if (end == -1) f.index else end)
+    } else {
+      val start =
+        if (input(f.index - 1).isWhitespace)
+          input.lastIndexWhere(!_.isWhitespace, f.index - 1)
+        else
+          input.lastIndexWhere(_.isWhitespace, f.index - 1) + 1
+      (start, f.index)
+    }
 }
