@@ -3,13 +3,16 @@ package com.wavesplatform.ride.input
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.api.http.requests.InvokeScriptRequest
 import com.wavesplatform.api.http.requests.InvokeScriptRequest.FunctionCallPart
-import com.wavesplatform.api.http.utils.UtilsEvaluator
+import com.wavesplatform.api.http.utils.{UtilsEvaluator, UtilsInvocationRequest}
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V6}
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction}
 import com.wavesplatform.transaction.{Asset, Proofs, TxPositiveAmount, TxTimestamp, TxVersion}
@@ -52,6 +55,28 @@ case class RunnerRequest(
         )
     }
   }
+
+  def toExpr(thatChainId: Byte, script: Script): Either[ValidationError, EXPR] = {
+    call match {
+      case Left(expr) =>
+        // TODO SerdeV1.deserialize(bytes.arr).
+        UtilsEvaluator.compile(expr.stdLibVersion)(expr.expr)
+
+      case Right(call) =>
+        UtilsInvocationRequest(
+          call = call.call,
+          // id = ???,
+          fee = fee.value,
+          feeAssetId = feeAssetId.maybeBase58Repr,
+          sender = Some(senderPublicKey.toAddress(thatChainId).toString),
+          senderPublicKey = senderPublicKey.toString,
+          payment = call.payments.map(x => Payment(x.amount, x.assetId))
+        ).toInvocation
+          .flatMap(UtilsEvaluator.toExpr(script, _))
+          .left
+          .map(e => GenericError(e.toString))
+    }
+  }
 }
 
 case class RunnerCall(
@@ -63,7 +88,7 @@ case class RunnerCall(
 case class RunnerCallPayment(amount: Long, assetId: Asset = Waves)
 
 case class RunnerExpr(
-    expr: String,
+    expr: String, // TODO Either[ByteStr, String]
     stdLibVersion: StdLibVersion = V6
 ) {
   // ([], expr) is what InvokeExpressionTransaction requires

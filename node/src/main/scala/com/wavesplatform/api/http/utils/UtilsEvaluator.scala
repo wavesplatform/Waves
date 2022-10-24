@@ -10,7 +10,7 @@ import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp as DAppType, *}
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, EVALUATED, EXPR}
+import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invocation
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2, Log}
@@ -18,19 +18,16 @@ import com.wavesplatform.lang.v1.traits.Environment.Tthis
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.{ValidationError, utils}
-import com.wavesplatform.state.diffs.invoke.{InvokeScriptDiff, InvokeScriptTransactionDiff, InvokeScriptTransactionLike}
-import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult}
+import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
+import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TransactionType.TransactionType
 import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError}
 import com.wavesplatform.transaction.smart.*
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.transaction.smart.script.trace.InvokeScriptTrace
 import com.wavesplatform.transaction.{Asset, TransactionType}
 import monix.eval.Coeval
 import shapeless.Coproduct
-
-import scala.util.chaining.scalaUtilChainingOps
 
 object UtilsEvaluator {
   def compile(version: StdLibVersion)(str: String): Either[GenericError, EXPR] =
@@ -48,9 +45,7 @@ object UtilsEvaluator {
       script: Script,
       address: Address,
       pk: PublicKey,
-      limit: Int,
-      thisPayments: Seq[Payment] = Seq.empty,
-      scriptedAssets: Seq[IssuedAsset] = Seq.empty
+      limit: Int
   )(
       expr: EXPR
   ): Either[ValidationError, (EVALUATED, Int, Log[Id])] =
@@ -59,14 +54,14 @@ object UtilsEvaluator {
       invoke = new InvokeScriptTransactionLike {
         override def dApp: AddressOrAlias              = address
         override def funcCall: Terms.FUNCTION_CALL     = Terms.FUNCTION_CALL(FunctionHeader.User("foo"), Nil)
-        override def payments: Seq[Payment]            = thisPayments
+        override def payments: Seq[Payment]            = Nil
         override def root: InvokeScriptTransactionLike = this
         override val sender: PublicKey                 = PublicKey(ByteStr(new Array[Byte](32)))
         override def assetFee: (Asset, Long)           = Asset.Waves -> 0L
         override def timestamp: Long                   = System.currentTimeMillis()
         override def chainId: Byte                     = AddressScheme.current.chainId
         override def id: Coeval[ByteStr]               = Coeval.evalOnce(ByteStr.empty)
-        override def checkedAssets: Seq[IssuedAsset]   = scriptedAssets.tap(xs => println(s"checkedAssets: ${xs.mkString("\n")}"))
+        override def checkedAssets: Seq[IssuedAsset]   = Nil
         override val tpe: TransactionType              = TransactionType.InvokeScript
       }
       environment = new DAppEnvironment(

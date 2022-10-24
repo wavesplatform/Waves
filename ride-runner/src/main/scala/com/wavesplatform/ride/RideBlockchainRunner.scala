@@ -1,7 +1,6 @@
 package com.wavesplatform.ride
 
 import cats.implicits.*
-import scalapb.json4s.JsonFormat
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.Application
 import com.wavesplatform.account.AddressScheme
@@ -98,7 +97,7 @@ object RideBlockchainRunner extends ScorexLogging {
         .takeWhile {
           case Event.Closed      => false
           case Event.Next(event) => event.getUpdate.height < end
-          case _ => false
+          case _                 => false
         }
         .foreach {
           case Event.Failed(error) => println(error)
@@ -106,31 +105,13 @@ object RideBlockchainRunner extends ScorexLogging {
           case Event.Next(event) =>
             val update = event.getUpdate
             update.update match {
-              case Update.Empty =>
-
               case Update.Append(append) =>
                 mutableBlockchain.setHeight(update.height)
-
-                val stateUpdate = (append.getStateUpdate +: append.transactionStateUpdates).view
-
-                stateUpdate.flatMap(_.assets).map(_.getAfter).foreach(mutableBlockchain.replaceAssetDescription)
-                stateUpdate.flatMap(_.balances).foreach(mutableBlockchain.replaceBalance)
-                stateUpdate.flatMap(_.leasingForAddress).foreach(mutableBlockchain.replaceLeasing)
-                stateUpdate.flatMap(_.dataEntries).foreach(mutableBlockchain.replaceAccountData)
 
                 val txs = append.body match {
                   case Body.Block(block)           => block.getBlock.transactions
                   case Body.MicroBlock(microBlock) => microBlock.getMicroBlock.getMicroBlock.transactions
                   case Body.Empty                  => Seq.empty
-                }
-
-                val dataUpdates = txs.view.map(_.transaction).flatMap {
-                  case Transaction.WavesTransaction(tx) =>
-                    tx.data match {
-                      case Data.DataTransaction(txData) => txData.data
-                      case _ => Nil
-                    }
-                  case _ => Nil
                 }
 
 //                log.info(
@@ -139,35 +120,59 @@ object RideBlockchainRunner extends ScorexLogging {
 //                    s"dataUpdates=${dataUpdates.size}: ${dataUpdates.map(x => s"${x.key} -> ${x.value}").mkString(", ")}"
 //                )
 
-                txs.view
-                  .map(_.transaction)
-                  .flatMap {
-                    case Transaction.WavesTransaction(tx) =>
-                      tx.data match {
-                        case Data.SetScript(txData) => (tx.senderPublicKey.toPublicKey, txData.script).some
-                        case _                      => none
+                val stateUpdate = (append.getStateUpdate +: append.transactionStateUpdates).view
+                val updated =
+                  stateUpdate.flatMap(_.assets).map(_.getAfter).foldLeft(false) { case (r, x) =>
+                    r || mutableBlockchain.replaceAssetDescription(x)
+                  } ||
+                    stateUpdate.flatMap(_.balances).foldLeft(false) { case (r, x) =>
+                      r || mutableBlockchain.replaceBalance(x)
+                    } ||
+                    stateUpdate.flatMap(_.leasingForAddress).foldLeft(false) {
+                      _ || mutableBlockchain.replaceLeasing(_)
+                    } ||
+                    stateUpdate.flatMap(_.dataEntries).foldLeft(false) { case (r, x) =>
+                      r || mutableBlockchain.replaceAccountData(x)
+                    } ||
+                    txs.view
+                      .map(_.transaction)
+                      .flatMap {
+                        case Transaction.WavesTransaction(tx) =>
+                          tx.data match {
+                            case Data.SetScript(txData) => (tx.senderPublicKey.toPublicKey, txData.script).some
+                            case _                      => none
+                          }
+                        case _ => none
                       }
-                    case _ => none
-                  }
-                  .foreach(Function.tupled(mutableBlockchain.replaceAccountScript))
+                      .foldLeft(false) { case (r, (pk, script)) =>
+                        r || mutableBlockchain.replaceAccountScript(pk, script)
+                      } ||
+                    append.transactionIds.foldLeft(false) { case (r, x) =>
+                      r || mutableBlockchain.replaceTransactionMeta(x, update.height)
+                    }
 
-                append.transactionIds.foreach(mutableBlockchain.replaceTransactionMeta(_, update.height))
+                if (updated) {
+                  val apiResult = executeUtilsEvaluate(
+                    mutableBlockchain,
+                    input.request
+                  )
 
-                // Run
-                val apiResult = execute(
-                  mutableBlockchain,
-                  input.request
-                )
+                  log.info(s"[${update.height}] apiResult: ${apiResult.value("result").as[JsObject].value("value")}")
+                } else {
+                  log.debug(s"[${update.height}] Not updated")
+                }
 
-                // %d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d__3092089__34390720__0__1051594096626912__32516225386450__
-                // 118605367995696__541091757276709__659697125272405__274154__2739486910802__2835679375701__
-                // 29543498__9554543__1000000000__1000000__1000000__89526355538909
-                log.info(s"apiResult: ${apiResult.value("result").as[JsObject].value("value")}")
-
-              case Update.Rollback(rollback) =>
-                log.info("Rollback, ignore")
+              case _: Update.Rollback => log.info("Rollback, ignore")
+              case Update.Empty       =>
             }
         }(Scheduler(commonScheduler))
+
+      val apiResult = executeUtilsEvaluate(
+        mutableBlockchain,
+        input.request
+      )
+
+      log.info(s"[Init] apiResult: ${apiResult.value("result").as[JsObject].value("value")}")
 
       blockchainApi.watchBlockchainUpdates(blockchainUpdatesApiChannel, start)
 

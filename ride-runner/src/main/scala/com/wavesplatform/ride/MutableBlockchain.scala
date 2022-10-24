@@ -35,6 +35,7 @@ import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.collections.syntax.*
 
 import java.nio.charset.StandardCharsets
 import scala.collection.mutable
@@ -47,15 +48,13 @@ class MutableBlockchain(override val settings: BlockchainSettings, blockchainApi
   private val data = mutable.AnyRefMap.empty[Address, mutable.AnyRefMap[String, CachedData[DataEntry[_]]]]
 
   // TODO return Boolean to know: we updated the data or not/
-  def replaceAccountData(update: StateUpdate.DataEntryUpdate): Unit = {
+  def replaceAccountData(update: StateUpdate.DataEntryUpdate): Boolean = {
     val address = update.address.toAddress
-    data.get(address).foreach { data =>
+    data.get(address).fold(false) { data =>
       val key = update.getDataEntry.key
-      data.updateWith(key) {
-        case Some(_) =>
-          log.debug(s"[$address, $key] Updated data")
-          Some(CachedData.Cached(toVanillaDataEntry(update.getDataEntry)))
-        case x => x
+      data.replaceIfExists(key) { _ =>
+        log.debug(s"[$address, $key] Updated data")
+        Some(CachedData.Cached(toVanillaDataEntry(update.getDataEntry)))
       }
     }
   }
@@ -81,32 +80,30 @@ class MutableBlockchain(override val settings: BlockchainSettings, blockchainApi
 
   // None means "we don't know". Some(None) means "we know, there is no script"
   private val accountScripts = mutable.AnyRefMap.empty[Address, CachedData[AccountScriptInfo]]
-  def replaceAccountScript(account: PublicKey, newScript: ByteString): Unit = {
+  def replaceAccountScript(account: PublicKey, newScript: ByteString): Boolean = {
     val address = account.toAddress(chainId)
-    accountScripts.updateWith(address) {
-      case Some(_) =>
-        log.debug(s"[$address] Updated account script")
+    accountScripts.replaceIfExists(address) { _ =>
+      log.debug(s"[$address] Updated account script")
 
-        val script = toVanillaScript(newScript)
+      val script = toVanillaScript(newScript)
 
-        // TODO dup, see BlockchainGrpcApi
+      // TODO dup, see BlockchainGrpcApi
 
-        // DiffCommons
-        val fixEstimateOfVerifier    = true // blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
-        val useContractVerifierLimit = true // !isAsset && blockchain.useReducedVerifierComplexityLimit
+      // DiffCommons
+      val fixEstimateOfVerifier    = true // blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
+      val useContractVerifierLimit = true // !isAsset && blockchain.useReducedVerifierComplexityLimit
 
-        Some(CachedData.loaded(script.map { script =>
-          // TODO explicitGet?
-          val complexityInfo = Script.complexityInfo(script, this.estimator, fixEstimateOfVerifier, useContractVerifierLimit).explicitGet()
+      Some(CachedData.loaded(script.map { script =>
+        // TODO explicitGet?
+        val complexityInfo = Script.complexityInfo(script, this.estimator, fixEstimateOfVerifier, useContractVerifierLimit).explicitGet()
 
-          AccountScriptInfo(
-            publicKey = account,
-            script = script, // Only this field matters in Ride Runner, see MutableBlockchain.accountScript
-            verifierComplexity = complexityInfo.verifierComplexity,
-            complexitiesByEstimator = Map(this.estimator.version -> complexityInfo.callableComplexities)
-          )
-        }))
-      case x => x
+        AccountScriptInfo(
+          publicKey = account,
+          script = script, // Only this field matters in Ride Runner, see MutableBlockchain.accountScript
+          verifierComplexity = complexityInfo.verifierComplexity,
+          complexitiesByEstimator = Map(this.estimator.version -> complexityInfo.callableComplexities)
+        )
+      }))
     }
   }
 
@@ -175,30 +172,28 @@ class MutableBlockchain(override val settings: BlockchainSettings, blockchainApi
   override def activatedFeatures: Map[Short, Int] = _activatedFeatures
 
   private val assets = mutable.AnyRefMap.empty[IssuedAsset, AssetDescription]
-  def replaceAssetDescription(update: StateUpdate.AssetDetails): Unit = {
+  def replaceAssetDescription(update: StateUpdate.AssetDetails): Boolean = {
     val asset = update.assetId.toIssuedAsset
-    assets.updateWith(asset) {
-      case Some(_) =>
-        log.debug(s"[$asset] Updated asset")
-        Some(
-          AssetDescription(
-            originTransactionId = asset.id,
-            issuer = update.issuer.toPublicKey,
-            name = UnsafeByteOperations.unsafeWrap(update.name.getBytes(StandardCharsets.UTF_8)),
-            description = UnsafeByteOperations.unsafeWrap(update.description.getBytes(StandardCharsets.UTF_8)),
-            decimals = update.decimals,
-            reissuable = update.reissuable,
-            totalVolume = update.volume,
-            lastUpdatedAt = Height(update.lastUpdated),
-            script = for {
-              pbScript <- update.scriptInfo
-              script   <- toVanillaScript(pbScript.script)
-            } yield AssetScriptInfo(script, pbScript.complexity),
-            sponsorship = update.sponsorship,
-            nft = update.nft
-          )
+    assets.replaceIfExists(asset) { _ =>
+      log.debug(s"[$asset] Updated asset")
+      Some(
+        AssetDescription(
+          originTransactionId = asset.id,
+          issuer = update.issuer.toPublicKey,
+          name = UnsafeByteOperations.unsafeWrap(update.name.getBytes(StandardCharsets.UTF_8)),
+          description = UnsafeByteOperations.unsafeWrap(update.description.getBytes(StandardCharsets.UTF_8)),
+          decimals = update.decimals,
+          reissuable = update.reissuable,
+          totalVolume = update.volume,
+          lastUpdatedAt = Height(update.lastUpdated),
+          script = for {
+            pbScript <- update.scriptInfo
+            script   <- toVanillaScript(pbScript.script)
+          } yield AssetScriptInfo(script, pbScript.complexity),
+          sponsorship = update.sponsorship,
+          nft = update.nft
         )
-      case x => x
+      )
     }
   }
 
@@ -224,26 +219,22 @@ class MutableBlockchain(override val settings: BlockchainSettings, blockchainApi
       .toRight(AliasDoesNotExist(a): ValidationError)
 
   private val portfolios = mutable.AnyRefMap.empty[Address, Portfolio]
-  def replaceBalance(toReplace: StateUpdate.BalanceUpdate): Unit = {
+  def replaceBalance(toReplace: StateUpdate.BalanceUpdate): Boolean = {
     val address = toReplace.address.toAddress
-    portfolios.updateWith(address) {
-      case Some(prev) =>
-        val (asset, after) = toAssetAndAmount(toReplace.getAmountAfter)
-        log.debug(s"[$address, $asset] Updated balance: $after")
-        Some(asset match {
-          case Asset.Waves        => prev.copy(balance = after)
-          case asset: IssuedAsset => prev.copy(assets = prev.assets.updated(asset, after))
-        })
-      case x => x
+    portfolios.replaceIfExists(address) { prev =>
+      val (asset, after) = toAssetAndAmount(toReplace.getAmountAfter)
+      log.debug(s"[$address, $asset] Updated balance: $after")
+      Some(asset match {
+        case Asset.Waves        => prev.copy(balance = after)
+        case asset: IssuedAsset => prev.copy(assets = prev.assets.updated(asset, after))
+      })
     }
   }
-  def replaceLeasing(toReplace: StateUpdate.LeasingUpdate): Unit = {
+  def replaceLeasing(toReplace: StateUpdate.LeasingUpdate): Boolean = {
     val address = toReplace.address.toAddress
-    portfolios.updateWith(address) {
-      case Some(prev) =>
-        log.debug(s"[$address] Updated leasing")
-        Some(prev.copy(lease = LeaseBalance(toReplace.inAfter, toReplace.outAfter)))
-      case x => x
+    portfolios.replaceIfExists(address) { prev =>
+      log.debug(s"[$address] Updated leasing")
+      Some(prev.copy(lease = LeaseBalance(toReplace.inAfter, toReplace.outAfter)))
     }
   }
 
@@ -273,22 +264,20 @@ class MutableBlockchain(override val settings: BlockchainSettings, blockchainApi
   private val transactions = mutable.AnyRefMap.empty[ByteStr, (TxMeta, Option[TransferTransactionLike])]
 
   // Got a transaction, got a rollback, same transaction on new height/failed/removed
-  def replaceTransactionMeta(pbId: ByteString, height: Int): Unit = {
+  def replaceTransactionMeta(pbId: ByteString, height: Int): Boolean = {
     val id = pbId.toByteStr
-    transactions.updateWith(id) {
-      case Some((_, tx)) =>
-        log.debug(s"[$id] Updated transaction")
-        Some(
-          (
-            TxMeta(
-              height = Height(height),
-              succeeded = true,   // Not used in Ride
-              spentComplexity = 0 // TODO ???
-            ),
-            tx
-          )
+    transactions.replaceIfExists(id) { case ((_, tx)) =>
+      log.debug(s"[$id] Updated transaction")
+      Some(
+        (
+          TxMeta(
+            height = Height(height),
+            succeeded = true,   // Not used in Ride
+            spentComplexity = 0 // TODO: It seems, not used
+          ),
+          tx
         )
-      case x => x
+      )
     }
   }
 

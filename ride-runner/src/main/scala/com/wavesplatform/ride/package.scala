@@ -1,6 +1,8 @@
 package com.wavesplatform
 
+import cats.syntax.either.*
 import com.wavesplatform.api.http.ApiError
+import com.wavesplatform.api.http.utils.UtilsEvaluator
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.{API, ValidationError}
@@ -56,6 +58,38 @@ let x1 = if (valueOrElse(getBoolean("b"), false)) then 1 else 0
 }"""
   val estimatorV3    = ScriptEstimatorV3(fixOverflow = true, overhead = false)
   val compiledScript = API.compile(input = exampleScriptSrc, estimatorV3).explicitGet()
+
+  def executeUtilsEvaluate(
+      blockchain: Blockchain,
+      request: RunnerRequest
+  ): JsObject = {
+    val chainId    = blockchain.settings.addressSchemeCharacter.toByte
+    val senderAddr = request.senderPublicKey.toAddress(chainId)
+    val dAppAddr   = request.call.fold(_ => senderAddr, _.dApp)
+    val script = blockchain
+      .accountScript(blockchain.resolveAlias(dAppAddr).explicitGet())
+      .getOrElse(throw new RuntimeException(s"No script on '$dAppAddr'"))
+      .script
+
+    val evaluated = for {
+      expr <- request.toExpr(chainId, script)
+      (result, complexity, log) <- UtilsEvaluator.executeExpression(
+        blockchain = blockchain,
+        script = script,
+        address = senderAddr,
+        pk = request.senderPublicKey,
+        limit = Int.MaxValue
+      )(expr)
+    } yield Json.obj(
+      "result"     -> ScriptValuesJson.serializeValue(result),
+      "complexity" -> complexity
+    ) ++ (if (request.trace) Json.obj(TraceStep.logJson(log)) else Json.obj())
+
+    evaluated.leftMap {
+      case e: ScriptExecutionError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.error)
+      case e                       => ApiError.fromValidationError(e).json
+    }.merge
+  }
 
   def execute(
       blockchain: Blockchain,
