@@ -48,6 +48,9 @@ object UtilsEvaluator {
       invoke = new InvokeScriptTransactionLike {
         override def dApp: AddressOrAlias              = address
         override def funcCall: Terms.FUNCTION_CALL     = Terms.FUNCTION_CALL(FunctionHeader.User(""), Nil)
+        // Payments, that are mapped to RIDE structure, is taken from Invocation,
+        // while this field used for validation inside InvokeScriptTransactionDiff,
+        // that unused in the current implementation.
         override def payments: Seq[Payment]            = Seq.empty
         override def root: InvokeScriptTransactionLike = this
         override val sender: PublicKey                 = PublicKey(ByteStr(new Array[Byte](32)))
