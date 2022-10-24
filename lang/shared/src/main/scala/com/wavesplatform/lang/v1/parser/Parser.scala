@@ -601,7 +601,7 @@ object Parser {
 
   type RemovedCharPos = Pos
 
-  def parseExpressionWithErrorRecovery(scriptStr: String): Either[String, (SCRIPT, Option[RemovedCharPos])] = {
+  def parseExpressionWithErrorRecovery(scriptStr: String): Either[(String, Int, Int), (SCRIPT, Option[RemovedCharPos])] = {
     def parse(str: String): Either[Parsed.Failure, SCRIPT] =
       parseExpr(str) match {
         case Parsed.Success(resExpr, _) => Right(SCRIPT(resExpr.position, resExpr))
@@ -617,7 +617,7 @@ object Parser {
     }
   }
 
-  def parseDAPPWithErrorRecovery(scriptStr: String): Either[String, (DAPP, Option[RemovedCharPos])] = {
+  def parseDAPPWithErrorRecovery(scriptStr: String): Either[(String, Int, Int), (DAPP, Option[RemovedCharPos])] = {
     def parse(str: String): Either[Parsed.Failure, DAPP] =
       parseContract(str) match {
         case Parsed.Success(resDAPP, _) => Right(resDAPP)
@@ -636,16 +636,10 @@ object Parser {
   private def parseWithError[T](
       source: String,
       parse: String => Either[Parsed.Failure, T]
-  ): Either[String, (T, Iterable[Int])] =
+  ): Either[(String, Int, Int), (T, Iterable[Int])] =
     parse(source)
       .map(dApp => (dApp, Nil))
-      .leftMap(toString(source, _))
-
-  def toString(input: String, f: Failure): String = {
-    val (start, end) = errorPosition(input, f)
-    val expectation  = if (f.label == "end-of-input") "illegal expression" else s"expected ${f.label}"
-    s"Parse error: $expectation in $start-$end"
-  }
+      .leftMap(errorWithPosition(source, _))
 
   private val moveRightKeywords = Seq(""""func"""", """"let"""", " expression", "1 underscore", "end-of-input", "latin charset")
 
@@ -661,4 +655,13 @@ object Parser {
           input.lastIndexWhere(_.isWhitespace, f.index - 1) + 1
       (start, f.index)
     }
+
+  private def errorWithPosition(input: String, f: Failure): (String, Int, Int) = {
+    val (start, end) = errorPosition(input, f)
+    val expectation  = if (f.label == "end-of-input") "illegal expression" else s"expected ${f.label}"
+    (s"Parse error: $expectation in $start-$end", start, end)
+  }
+
+  def toString(input: String, f: Failure): String =
+    errorWithPosition(input, f)._1
 }

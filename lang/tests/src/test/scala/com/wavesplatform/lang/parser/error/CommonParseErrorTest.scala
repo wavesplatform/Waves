@@ -61,18 +61,18 @@ class CommonParseErrorTest extends ParseErrorTest {
       .compileWithParseResult(
         """
           | let 煊镕不 = []
-          """.stripMargin,
+        """.stripMargin,
         utils.compilerContext(DirectiveSet.contractDirectiveSet),
         V6
-      ) shouldBe Left("Parse error: expected only latin charset for definitions in 6-9")
+      ) shouldBe (Left("Parse error: expected only latin charset for definitions in 6-9"), 6, 9)
 
     ExpressionCompiler
       .compileWithParseResult(
         """
           | let 煊镕不 = []
           | true
-          """.stripMargin,
+        """.stripMargin,
         utils.compilerContext(V6, Expression, false)
-      ) shouldBe Left("Parse error: expected only latin charset for definitions in 6-9")
+      ) shouldBe (Left("Parse error: expected only latin charset for definitions in 6-9"), 6, 9)
   }
 }

@@ -112,16 +112,17 @@ trait BaseGlobal {
       compRes <- ExpressionCompiler.compileWithParseResult(input, context)
       (compExpr, exprScript, compErrorList) = compRes
       illegalBlockVersionUsage              = letBlockOnly && com.wavesplatform.lang.v1.compiler.containsBlockV2(compExpr)
-      _ <- Either.cond(!illegalBlockVersionUsage, (), "UserFunctions are only enabled in STDLIB_VERSION >= 3")
+      _ <- Either.cond(!illegalBlockVersionUsage, (), "UserFunctions are only enabled in STDLIB_VERSION >= 3").leftMap((_, 0, 0))
       bytes = if (compErrorList.isEmpty) serializeExpression(compExpr, stdLibVersion) else Array.empty[Byte]
 
       vars  = utils.varNames(stdLibVersion, Expression)
       costs = utils.functionCosts(stdLibVersion, DAppType)
-      complexity <- if (compErrorList.isEmpty) estimator(vars, costs, compExpr) else Either.right(0L)
+      complexity <- if (compErrorList.isEmpty) estimator(vars, costs, compExpr).leftMap((_, 0, 0)) else Either.right(0L)
     } yield (bytes, complexity, exprScript, compErrorList))
-      .recover { case e =>
-        (Array.empty, 0, Expressions.SCRIPT(AnyPos, Expressions.INVALID(AnyPos, "Unknown error.")), List(Generic(0, 0, e)))
+      .recover { case (e, start, end) =>
+        (Array.empty[Byte], 0L, Expressions.SCRIPT(AnyPos, Expressions.INVALID(AnyPos, "Unknown error.")), List(Generic(start, end, e)))
       }
+      .leftMap(_._1)
   }
 
   def parseAndCompileContract(
@@ -137,13 +138,14 @@ trait BaseGlobal {
       (compDAppOpt, exprDApp, compErrorList) = compRes
       complexityWithMap <-
         if (compDAppOpt.nonEmpty && compErrorList.isEmpty)
-          ContractScript.estimateComplexity(stdLibVersion, compDAppOpt.get, estimator, fixEstimateOfVerifier = true)
+          ContractScript.estimateComplexity(stdLibVersion, compDAppOpt.get, estimator, fixEstimateOfVerifier = true).leftMap((_, 0, 0))
         else Right((0L, Map.empty[String, Long]))
-      bytes <- if (compDAppOpt.nonEmpty && compErrorList.isEmpty) serializeContract(compDAppOpt.get, stdLibVersion) else Right(Array.empty[Byte])
+      bytes <- if (compDAppOpt.nonEmpty && compErrorList.isEmpty) serializeContract(compDAppOpt.get, stdLibVersion).leftMap((_, 0, 0)) else Right(Array.empty[Byte])
     } yield (bytes, complexityWithMap, exprDApp, compErrorList))
-      .recover { case e =>
-        (Array.empty, (0, Map.empty), Expressions.DAPP(AnyPos, List.empty, List.empty), List(Generic(0, 0, e)))
+      .recover { case (e, start, end) =>
+        (Array.empty[Byte], (0L, Map.empty[String, Long]), Expressions.DAPP(AnyPos, List.empty, List.empty), List(Generic(start, end, e)))
       }
+      .leftMap(_._1)
   }
 
   val compileExpression: (String, CompilerContext, StdLibVersion, ScriptType, ScriptEstimator) => Either[String, (Array[Byte], EXPR, Long)] =
