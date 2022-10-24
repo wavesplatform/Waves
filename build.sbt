@@ -57,16 +57,6 @@ lazy val `lang-tests` = project
     Compile / sourceGenerators += Tasks.docSource
   )
 
-lazy val `lang-tests-js` = project
-  .in(file("lang/testsJS"))
-  .enablePlugins(ScalaJSPlugin)
-  .dependsOn(`lang-js`)
-  .settings(
-    libraryDependencies += Dependencies.scalaJsTest.value,
-    testFrameworks += new TestFramework("utest.runner.Framework"),
-    Compile / sourceGenerators += Tasks.docSource
-  )
-
 lazy val `lang-doc` = project
   .in(file("lang/doc"))
   .dependsOn(`lang-jvm`)
