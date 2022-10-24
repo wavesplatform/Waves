@@ -64,7 +64,7 @@ class CommonParseErrorTest extends ParseErrorTest {
         """.stripMargin,
         utils.compilerContext(DirectiveSet.contractDirectiveSet),
         V6
-      ) shouldBe (Left("Parse error: expected only latin charset for definitions in 6-9"), 6, 9)
+      ) shouldBe Left(("Parse error: expected only latin charset for definitions in 6-9", 6, 9))
 
     ExpressionCompiler
       .compileWithParseResult(
@@ -73,6 +73,6 @@ class CommonParseErrorTest extends ParseErrorTest {
           | true
         """.stripMargin,
         utils.compilerContext(V6, Expression, false)
-      ) shouldBe (Left("Parse error: expected only latin charset for definitions in 6-9"), 6, 9)
+      ) shouldBe Left(("Parse error: expected only latin charset for definitions in 6-9", 6, 9))
   }
 }
