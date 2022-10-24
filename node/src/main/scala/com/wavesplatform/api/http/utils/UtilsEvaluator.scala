@@ -12,7 +12,7 @@ import com.wavesplatform.lang.directives.values.{DApp as DAppType, *}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.compiler.{ContractScriptCompactor, ExpressionCompiler, Terms}
-import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invocation
+import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.{Invocation, LogExtraInfo}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2, Log}
 import com.wavesplatform.lang.v1.traits.Environment.Tthis
 import com.wavesplatform.lang.v1.traits.domain.Recipient
@@ -38,7 +38,7 @@ object UtilsEvaluator {
   def toExpr(script: Script, invocation: Invocation): Either[ValidationError, EXPR] =
     ContractEvaluator
       .buildExprFromInvocation(script.expr.asInstanceOf[DApp], invocation, script.stdLibVersion)
-      .leftMap(e => GenericError(e.message))
+      .bimap(e => GenericError(e.message), _.expr)
 
   def executeExpression(blockchain: Blockchain, script: Script, address: Address, pk: PublicKey, limit: Int)(
       expr: EXPR
@@ -86,6 +86,7 @@ object UtilsEvaluator {
       limitedResult <- EvaluatorV2
         .applyLimitedCoeval(
           call,
+          LogExtraInfo(),
           limit,
           ctx,
           script.stdLibVersion,

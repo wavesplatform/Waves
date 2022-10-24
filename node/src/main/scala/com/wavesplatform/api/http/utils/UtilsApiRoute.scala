@@ -33,6 +33,7 @@ import java.security.SecureRandom
 case class UtilsApiRoute(
     timeService: Time,
     settings: RestAPISettings,
+    maxTxErrorLogSize: Int,
     estimator: () => ScriptEstimator,
     limitedScheduler: Scheduler,
     blockchain: Blockchain
@@ -281,8 +282,8 @@ case class UtilsApiRoute(
           "complexity" -> complexity
         ) ++ (if (trace) Json.obj(TraceStep.logJson(log)) else Json.obj())
         evaluated.leftMap {
-          case e: InvokeRejectError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.message)
-          case e                       => ApiError.fromValidationError(e).json
+          case e: InvokeRejectError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.toStringWithLog(maxTxErrorLogSize))
+          case e                    => ApiError.fromValidationError(e).json
         }
       }.merge
 

@@ -190,7 +190,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
     val newAddresses = Set.newBuilder[Address]
     newAddresses ++= diff.portfolios.keys.filter(addressIdCache.get(_).isEmpty)
-    for (NewTransactionInfo(_, addresses, _, _) <- diff.transactions.values; address <- addresses if addressIdCache.get(address).isEmpty) {
+    for (NewTransactionInfo(_, addresses, _, _) <- diff.transactions; address <- addresses if addressIdCache.get(address).isEmpty) {
       newAddresses += address
     }
 
@@ -210,11 +210,11 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
     val transactionMeta     = Seq.newBuilder[(TxMeta, Transaction)]
     val addressTransactions = ArrayListMultimap.create[AddressId, TransactionId]()
-    for (((id, nti), _) <- diff.transactions.zipWithIndex) {
-      transactionIds.put(id, newHeight)
+    for (nti <- diff.transactions) {
+      transactionIds.put(nti.transaction.id(), newHeight)
       transactionMeta += (TxMeta(Height(newHeight), nti.applied, nti.spentComplexity) -> nti.transaction)
       for (addr <- nti.affected) {
-        addressTransactions.put(addressIdWithFallback(addr, newAddressIds), TransactionId(id))
+        addressTransactions.put(addressIdWithFallback(addr, newAddressIds), TransactionId(nti.transaction.id()))
       }
     }
 

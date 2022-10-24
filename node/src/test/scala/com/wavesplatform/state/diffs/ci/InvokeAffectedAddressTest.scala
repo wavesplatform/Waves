@@ -28,7 +28,7 @@ class InvokeAffectedAddressTest extends PropSpec with WithDomain {
           d.appendAndAssertFailed(invoke(secondAddress))
         else
           d.appendAndAssertSucceed(invoke(secondAddress))
-        d.liquidDiff.transactions.head._2.affected shouldBe Set(defaultAddress, secondAddress)
+        d.liquidDiff.transactions.head.affected shouldBe Set(defaultAddress, secondAddress)
       }
     }
   }
@@ -42,7 +42,7 @@ class InvokeAffectedAddressTest extends PropSpec with WithDomain {
           d.appendAndAssertFailed(invoke(Alias.create("alias").explicitGet()))
         else
           d.appendAndAssertSucceed(invoke(Alias.create("alias").explicitGet()))
-        d.liquidDiff.transactions.head._2.affected shouldBe Set(defaultAddress, secondAddress)
+        d.liquidDiff.transactions.head.affected shouldBe Set(defaultAddress, secondAddress)
       }
     }
   }
@@ -58,7 +58,7 @@ class InvokeAffectedAddressTest extends PropSpec with WithDomain {
           d.liquidDiff.errorMessage(invokeTx.id()) shouldBe defined
         } else
           d.appendAndAssertSucceed(aliasTx, invokeTx)
-        d.liquidDiff.transactions(invokeTx.id()).affected shouldBe Set(defaultAddress, secondAddress)
+        d.liquidDiff.transaction(invokeTx.id()).get.affected shouldBe Set(defaultAddress, secondAddress)
       }
     }
   }

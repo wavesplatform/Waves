@@ -56,6 +56,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       def getTimestamp(): Long = System.currentTimeMillis()
     },
     restAPISettings,
+    Int.MaxValue,
     () => estimator,
     Schedulers.timeBoundedFixedPool(
       new HashedWheelTimer(),
@@ -872,7 +873,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
          |}
          |
          |@Callable(i)
-         |func testWriteEntryType(b: ByteVector) = [ BinaryEntry("bytes", b) ] 
+         |func testWriteEntryType(b: ByteVector) = [ BinaryEntry("bytes", b) ]
          """.stripMargin
     )
 
@@ -925,15 +926,24 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
         }
 
         evalScript("testNone()") ~> route ~> check {
-          responseJson shouldBe Json.obj("error" -> 306, "message" -> "Function or type 'testNone' not found")
+          responseJson shouldBe Json.obj(
+            "error"   -> 306,
+            "message" -> "InvokeRejectError(error = Function or type 'testNone' not found, log = \n\ttestNone.@args = []\n)"
+          )
         }
 
         evalScript("testCompl()") ~> route ~> check {
-          responseJson shouldBe Json.obj("error" -> 306, "message" -> "Calculation complexity limit exceeded")
+          responseJson shouldBe Json.obj(
+            "error" -> 306,
+            "message" -> "InvokeRejectError(error = Calculation complexity limit exceeded, log = \n\ttestCompl.@args = []\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 25800\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 25599\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 25398\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 25197\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 24996\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 24795\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 24594\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 24393\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 24192\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 23991\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 23790\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 23589\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 23388\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 23187\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 22986\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 22785\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 22584\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 22383\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 22182\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 21981\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 21780\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 21579\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 21378\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 21177\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 20976\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 20775\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 20574\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 20373\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 20172\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 19971\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 19770\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 19569\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 19368\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 19167\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 18966\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 18765\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 18564\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 18363\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 18162\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 17961\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 17760\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 17559\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 17358\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 17157\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 16956\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 16755\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 16554\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 16353\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 16152\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 15951\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 15750\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 15549\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 15348\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 15147\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 14946\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 14745\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 14544\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 14343\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 14142\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 13941\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 13740\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 13539\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 13338\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 13137\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 12936\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 12735\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 12534\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 12333\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 12132\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 11931\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 11730\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 11529\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 11328\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 11127\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 10926\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 10725\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 10524\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 10323\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 10122\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 9921\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 9720\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 9519\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 9318\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 9117\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 8916\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 8715\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 8514\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 8313\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 8112\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 7911\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 7710\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 7509\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 7308\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 7107\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 6906\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 6705\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 6504\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 6303\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 6102\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 5901\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 5700\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 5499\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 5298\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 5097\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 4896\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 4695\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 4494\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 4293\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 4092\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 3891\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 3690\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 3489\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 3288\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 3087\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 2886\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 2685\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 2484\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 2283\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 2082\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 1881\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 1680\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 1479\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 1278\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 1077\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 876\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 675\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 474\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 273\n\tsigVerify.@args = [\n\t\tbase58'',\n\t\tbase58'',\n\t\tbase58''\n\t]\n\tsigVerify.@complexity = 200\n\t@complexityLimit = 72\n)"
+          )
         }
 
         evalScript("testF()") ~> route ~> check {
-          responseJson shouldBe Json.obj("error" -> 306, "message" -> "Test")
+          responseJson shouldBe Json.obj(
+            "error" -> 306,
+            "message" -> "InvokeRejectError(error = Test, log = \n\ttestF.@args = []\n\tthrow.@args = [\n\t\t\"Test\"\n\t]\n\tthrow.@complexity = 1\n\t@complexityLimit = 25999\n)"
+          )
         }
 
         evalScript("test(123)") ~> route ~> check {
@@ -1013,22 +1023,23 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
                                                  |}""".stripMargin)
         }
 
-        val complexityLimit = 1234
+        val complexityLimit = 200
         val customApi       = api.copy(settings = restAPISettings.copy(evaluateScriptComplexityLimit = complexityLimit))
         evalScript(""" testSyncCallComplexityExcess() """) ~> customApi.route ~> check {
+          val message = "InvokeRejectError(error = FailedTransactionError(code = 1, error = Invoke complexity limit = 200 is exceeded), log = \n\ttestSyncCallComplexityExcess.@args = []\n\tinvoke.@args = [\n\t\tAddress(\n\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t),\n\t\t\"testSyncCallComplexityExcess\",\n\t\t[],\n\t\t[]\n\t]\n\tinvoke.@complexity = 75\n\t@complexityLimit = 122\n\tr = FailedTransactionError(code = 1, error = Invoke complexity limit = 200 is exceeded, log = \n\t\t@invokedDApp = Address(\n\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t)\n\t\t@invokedFuncName = \"testSyncCallComplexityExcess\"\n\t\ti = Invocation(\n\t\t\toriginCaller = Address(\n\t\t\t\tbytes = base58'3MuPKL2kQz1Gp9t7QwrDZN5F8m3u5Uzzo3e'\n\t\t\t)\n\t\t\tpayments = []\n\t\t\tcallerPublicKey = base58'9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ'\n\t\t\tfeeAssetId = Unit\n\t\t\toriginCallerPublicKey = base58'11111111111111111111111111111111'\n\t\t\ttransactionId = base58''\n\t\t\tcaller = Address(\n\t\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t\t)\n\t\t\tfee = 0\n\t\t)\n\t\ttestSyncCallComplexityExcess.@args = []\n\t\tinvoke.@args = [\n\t\t\tAddress(\n\t\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t\t),\n\t\t\t\"testSyncCallComplexityExcess\",\n\t\t\t[],\n\t\t\t[]\n\t\t]\n\t\tinvoke.@complexity = 75\n\t\t@complexityLimit = 44\n\t\tr = FailedTransactionError(code = 1, error = Invoke complexity limit = 200 is exceeded, log = \n\t\t\t@invokedDApp = Address(\n\t\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t\t)\n\t\t\t@invokedFuncName = \"testSyncCallComplexityExcess\"\n\t\t\ti = Invocation(\n\t\t\t\toriginCaller = Address(\n\t\t\t\t\tbytes = base58'3MuPKL2kQz1Gp9t7QwrDZN5F8m3u5Uzzo3e'\n\t\t\t\t)\n\t\t\t\tpayments = []\n\t\t\t\tcallerPublicKey = base58'9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ'\n\t\t\t\tfeeAssetId = Unit\n\t\t\t\toriginCallerPublicKey = base58'11111111111111111111111111111111'\n\t\t\t\ttransactionId = base58''\n\t\t\t\tcaller = Address(\n\t\t\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t\t\t)\n\t\t\t\tfee = 0\n\t\t\t)\n\t\t\ttestSyncCallComplexityExcess.@args = []\n\t\t)\n\t)\n)"
           responseAs[JsValue] should matchJson(
-            s"""{"error":306,"message":"FailedTransactionError(code = 1, error = Invoke complexity limit = $complexityLimit is exceeded, log =)","expr":" testSyncCallComplexityExcess() ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
+            s"""{"error":306,"message":"$message""""
           )
         }
 
         evalScript(""" testWriteEntryType("abc") """) ~> route ~> check {
           responseAs[JsValue] should matchJson(
-            """{"error":306,"message":"Passed args (bytes, abc) are unsuitable for constructor BinaryEntry(String, ByteVector)","expr":" testWriteEntryType(\"abc\") ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
+            """{"error":306,"message":"InvokeRejectError(error = Passed args (bytes, abc) are unsuitable for constructor BinaryEntry(String, ByteVector), log = \n\ttestWriteEntryType.@args = [\n\t\t\"abc\"\n\t]\n\tb = \"abc\"\n\tBinaryEntry.@args = [\n\t\t\"bytes\",\n\t\t\"abc\"\n\t]\n)","expr":" testWriteEntryType(\"abc\") ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
           )
         }
         evalScript(""" testWriteEntryType(base58'aaaa') """) ~> route ~> check {
           responseAs[JsValue] should matchJson(
-            """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"bytes"},"value":{"type":"ByteVector","value":"aaaa"}}}]},"complexity":3,"expr":" testWriteEntryType(base58'aaaa') ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
+            """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"bytes"},"value":{"type":"ByteVector","value":"aaaa"}}}]},"complexity":2,"expr":" testWriteEntryType(base58'aaaa') ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
           )
         }
 
@@ -1051,7 +1062,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
 
         evalScript(""" callable() """, dAppAddress2) ~> route ~> check {
           responseAs[JsValue] should matchJson(
-            """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"testSyncInvoke"},"value":{"type":"ByteVector","value":"11111111111111111111111111"}}}]},"complexity":297,"expr":" callable() ","address":"3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"}"""
+            """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"testSyncInvoke"},"value":{"type":"ByteVector","value":"11111111111111111111111111"}}}]},"complexity":284,"expr":" callable() ","address":"3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"}"""
           )
         }
 
@@ -1174,7 +1185,75 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
         val expectedTrace =
           Json.parse(
             s"""
-               |[
+               | [
+               |  {
+               |    "name": "f.@args",
+               |    "type": "Array",
+               |    "value": [
+               |      {
+               |        "type": "Int",
+               |        "value": 123
+               |      },
+               |      {
+               |        "type": "String",
+               |        "value": "abc"
+               |      }
+               |    ]
+               |  },
+               |  {
+               |    "name": "Address.@args",
+               |    "type": "Array",
+               |    "value": [
+               |      {
+               |        "type": "ByteVector",
+               |        "value": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+               |      }
+               |    ]
+               |  },
+               |  {
+               |    "name": "Address.@complexity",
+               |    "type": "Int",
+               |    "value": 1
+               |  },
+               |  {
+               |    "name": "@complexityLimit",
+               |    "type": "Int",
+               |    "value": 25999
+               |  },
+               |  {
+               |    "name": "==.@args",
+               |    "type": "Array",
+               |    "value": [
+               |      {
+               |        "type": "Address",
+               |        "value": {
+               |          "bytes": {
+               |            "type": "ByteVector",
+               |            "value": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+               |          }
+               |        }
+               |      },
+               |      {
+               |        "type": "Address",
+               |        "value": {
+               |          "bytes": {
+               |            "type": "ByteVector",
+               |            "value": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+               |          }
+               |        }
+               |      }
+               |    ]
+               |  },
+               |  {
+               |    "name": "==.@complexity",
+               |    "type": "Int",
+               |    "value": 1
+               |  },
+               |  {
+               |    "name": "@complexityLimit",
+               |    "type": "Int",
+               |    "value": 25998
+               |  },
                |  {
                |    "name": "i",
                |    "type": "Invocation",
@@ -1238,14 +1317,399 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
                |    }
                |  },
                |  {
+               |    "name": "Address.@args",
+               |    "type": "Array",
+               |    "value": [
+               |      {
+               |        "type": "ByteVector",
+               |        "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+               |      }
+               |    ]
+               |  },
+               |  {
+               |    "name": "Address.@complexity",
+               |    "type": "Int",
+               |    "value": 1
+               |  },
+               |  {
+               |    "name": "@complexityLimit",
+               |    "type": "Int",
+               |    "value": 25997
+               |  },
+               |  {
+               |    "name": "==.@args",
+               |    "type": "Array",
+               |    "value": [
+               |      {
+               |        "type": "Address",
+               |        "value": {
+               |          "bytes": {
+               |            "type": "ByteVector",
+               |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+               |          }
+               |        }
+               |      },
+               |      {
+               |        "type": "Address",
+               |        "value": {
+               |          "bytes": {
+               |            "type": "ByteVector",
+               |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+               |          }
+               |        }
+               |      }
+               |    ]
+               |  },
+               |  {
+               |    "name": "==.@complexity",
+               |    "type": "Int",
+               |    "value": 1
+               |  },
+               |  {
+               |    "name": "@complexityLimit",
+               |    "type": "Int",
+               |    "value": 25996
+               |  },
+               |  {
+               |    "name": "Address.@args",
+               |    "type": "Array",
+               |    "value": [
+               |      {
+               |        "type": "ByteVector",
+               |        "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+               |      }
+               |    ]
+               |  },
+               |  {
+               |    "name": "Address.@complexity",
+               |    "type": "Int",
+               |    "value": 1
+               |  },
+               |  {
+               |    "name": "@complexityLimit",
+               |    "type": "Int",
+               |    "value": 25995
+               |  },
+               |  {
+               |    "name": "==.@args",
+               |    "type": "Array",
+               |    "value": [
+               |      {
+               |        "type": "Address",
+               |        "value": {
+               |          "bytes": {
+               |            "type": "ByteVector",
+               |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+               |          }
+               |        }
+               |      },
+               |      {
+               |        "type": "Address",
+               |        "value": {
+               |          "bytes": {
+               |            "type": "ByteVector",
+               |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+               |          }
+               |        }
+               |      }
+               |    ]
+               |  },
+               |  {
+               |    "name": "==.@complexity",
+               |    "type": "Int",
+               |    "value": 1
+               |  },
+               |  {
+               |    "name": "@complexityLimit",
+               |    "type": "Int",
+               |    "value": 25994
+               |  },
+               |  {
+               |    "name": "==.@args",
+               |    "type": "Array",
+               |    "value": [
+               |      {
+               |        "type": "ByteVector",
+               |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
+               |      },
+               |      {
+               |        "type": "ByteVector",
+               |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
+               |      }
+               |    ]
+               |  },
+               |  {
+               |    "name": "==.@complexity",
+               |    "type": "Int",
+               |    "value": 1
+               |  },
+               |  {
+               |    "name": "@complexityLimit",
+               |    "type": "Int",
+               |    "value": 25993
+               |  },
+               |  {
+               |    "name": "==.@args",
+               |    "type": "Array",
+               |    "value": [
+               |      {
+               |        "type": "ByteVector",
+               |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
+               |      },
+               |      {
+               |        "type": "ByteVector",
+               |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
+               |      }
+               |    ]
+               |  },
+               |  {
+               |    "name": "==.@complexity",
+               |    "type": "Int",
+               |    "value": 1
+               |  },
+               |  {
+               |    "name": "@complexityLimit",
+               |    "type": "Int",
+               |    "value": 25992
+               |  },
+               |  {
+               |    "name": "==.@args",
+               |    "type": "Array",
+               |    "value": [
+               |      {
+               |        "type": "Int",
+               |        "value": 123456
+               |      },
+               |      {
+               |        "type": "Int",
+               |        "value": 123456
+               |      }
+               |    ]
+               |  },
+               |  {
+               |    "name": "==.@complexity",
+               |    "type": "Int",
+               |    "value": 1
+               |  },
+               |  {
+               |    "name": "@complexityLimit",
+               |    "type": "Int",
+               |    "value": 25991
+               |  },
+               |  {
+               |    "name": "AttachedPayment.@args",
+               |    "type": "Array",
+               |    "value": [
+               |      {
+               |        "type": "Unit",
+               |        "value": {}
+               |      },
+               |      {
+               |        "type": "Int",
+               |        "value": 1
+               |      }
+               |    ]
+               |  },
+               |  {
+               |    "name": "AttachedPayment.@complexity",
+               |    "type": "Int",
+               |    "value": 1
+               |  },
+               |  {
+               |    "name": "@complexityLimit",
+               |    "type": "Int",
+               |    "value": 25990
+               |  },
+               |  {
+               |    "name": "cons.@args",
+               |    "type": "Array",
+               |    "value": [
+               |      {
+               |        "type": "AttachedPayment",
+               |        "value": {
+               |          "assetId": {
+               |            "type": "Unit",
+               |            "value": {}
+               |          },
+               |          "amount": {
+               |            "type": "Int",
+               |            "value": 1
+               |          }
+               |        }
+               |      },
+               |      {
+               |        "type": "Array",
+               |        "value": []
+               |      }
+               |    ]
+               |  },
+               |  {
+               |    "name": "cons.@complexity",
+               |    "type": "Int",
+               |    "value": 1
+               |  },
+               |  {
+               |    "name": "@complexityLimit",
+               |    "type": "Int",
+               |    "value": 25989
+               |  },
+               |  {
+               |    "name": "==.@args",
+               |    "type": "Array",
+               |    "value": [
+               |      {
+               |        "type": "Array",
+               |        "value": [
+               |          {
+               |            "type": "AttachedPayment",
+               |            "value": {
+               |              "amount": {
+               |                "type": "Int",
+               |                "value": 1
+               |              },
+               |              "assetId": {
+               |                "type": "Unit",
+               |                "value": {}
+               |              }
+               |            }
+               |          }
+               |        ]
+               |      },
+               |      {
+               |        "type": "Array",
+               |        "value": [
+               |          {
+               |            "type": "AttachedPayment",
+               |            "value": {
+               |              "assetId": {
+               |                "type": "Unit",
+               |                "value": {}
+               |              },
+               |              "amount": {
+               |                "type": "Int",
+               |                "value": 1
+               |              }
+               |            }
+               |          }
+               |        ]
+               |      }
+               |    ]
+               |  },
+               |  {
+               |    "name": "==.@complexity",
+               |    "type": "Int",
+               |    "value": 1
+               |  },
+               |  {
+               |    "name": "@complexityLimit",
+               |    "type": "Int",
+               |    "value": 25988
+               |  },
+               |  {
+               |    "name": "==.@args",
+               |    "type": "Array",
+               |    "value": [
+               |      {
+               |        "type": "ByteVector",
+               |        "value": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8"
+               |      },
+               |      {
+               |        "type": "ByteVector",
+               |        "value": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8"
+               |      }
+               |    ]
+               |  },
+               |  {
+               |    "name": "==.@complexity",
+               |    "type": "Int",
+               |    "value": 1
+               |  },
+               |  {
+               |    "name": "@complexityLimit",
+               |    "type": "Int",
+               |    "value": 25987
+               |  },
+               |  {
+               |    "name": "==.@args",
+               |    "type": "Array",
+               |    "value": [
+               |      {
+               |        "type": "ByteVector",
+               |        "value": "abcd"
+               |      },
+               |      {
+               |        "type": "ByteVector",
+               |        "value": "abcd"
+               |      }
+               |    ]
+               |  },
+               |  {
+               |    "name": "==.@complexity",
+               |    "type": "Int",
+               |    "value": 1
+               |  },
+               |  {
+               |    "name": "@complexityLimit",
+               |    "type": "Int",
+               |    "value": 25986
+               |  },
+               |  {
                |    "name": "arg1",
                |    "type": "Int",
                |    "value": 123
                |  },
                |  {
+               |    "name": "==.@args",
+               |    "type": "Array",
+               |    "value": [
+               |      {
+               |        "type": "Int",
+               |        "value": 123
+               |      },
+               |      {
+               |        "type": "Int",
+               |        "value": 123
+               |      }
+               |    ]
+               |  },
+               |  {
+               |    "name": "==.@complexity",
+               |    "type": "Int",
+               |    "value": 1
+               |  },
+               |  {
+               |    "name": "@complexityLimit",
+               |    "type": "Int",
+               |    "value": 25985
+               |  },
+               |  {
                |    "name": "arg2",
                |    "type": "String",
                |    "value": "abc"
+               |  },
+               |  {
+               |    "name": "==.@args",
+               |    "type": "Array",
+               |    "value": [
+               |      {
+               |        "type": "String",
+               |        "value": "abc"
+               |      },
+               |      {
+               |        "type": "String",
+               |        "value": "abc"
+               |      }
+               |    ]
+               |  },
+               |  {
+               |    "name": "==.@complexity",
+               |    "type": "Int",
+               |    "value": 1
+               |  },
+               |  {
+               |    "name": "@complexityLimit",
+               |    "type": "Int",
+               |    "value": 25984
                |  },
                |  {
                |    "name": "check",

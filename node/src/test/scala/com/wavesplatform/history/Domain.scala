@@ -51,7 +51,8 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   def createDiffE(tx: Transaction): Either[ValidationError, Diff] = transactionDiffer(tx).resultE
   def createDiff(tx: Transaction): Diff                           = createDiffE(tx).explicitGet()
 
-  lazy val utxPool: UtxPoolImpl = new UtxPoolImpl(SystemTime, blockchain, settings.utxSettings, settings.minerSettings.enable)
+  lazy val utxPool: UtxPoolImpl =
+    new UtxPoolImpl(SystemTime, blockchain, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
   lazy val wallet: Wallet = Wallet(settings.walletSettings.copy(file = None))
 
   object commonApi {
@@ -226,7 +227,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   }
 
   def appendKeyBlock(ref: Option[ByteStr] = None): Block = {
-    val block = createBlock(Block.NgBlockVersion, Nil, ref.orElse(Some(lastBlockId)))
+    val block          = createBlock(Block.NgBlockVersion, Nil, ref.orElse(Some(lastBlockId)))
     val discardedDiffs = appendBlock(block)
     utxPool.setPriorityDiffs(discardedDiffs)
     utxPool.cleanUnconfirmed()
@@ -270,7 +271,13 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     blockchainUpdater.removeAfter(blockId).explicitGet()
   }
 
-  def createBlock(version: Byte, txs: Seq[Transaction], ref: Option[ByteStr] = blockchainUpdater.lastBlockId, strictTime: Boolean = false, generator: KeyPair = defaultSigner): Block = {
+  def createBlock(
+      version: Byte,
+      txs: Seq[Transaction],
+      ref: Option[ByteStr] = blockchainUpdater.lastBlockId,
+      strictTime: Boolean = false,
+      generator: KeyPair = defaultSigner
+  ): Block = {
     val reference = ref.getOrElse(randomSig)
     val parent = ref
       .flatMap { bs =>
