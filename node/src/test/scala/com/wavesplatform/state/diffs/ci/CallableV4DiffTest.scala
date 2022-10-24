@@ -16,7 +16,6 @@ import com.wavesplatform.state.{EmptyDataEntry, SponsorshipValue}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.{RideV4, RideV6}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TxHelpers.{defaultSigner, secondSigner}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
@@ -39,52 +38,6 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
 
       blockchain.assetDescription(asset).get.totalVolume shouldBe resultAmount
       blockchain.balance(master.toAddress, asset) shouldBe resultAmount
-    }
-  }
-
-  property("asset script can disallow reissue") {
-    val disallowReissueAsset =
-      assetVerifier(
-        """
-          | match tx {
-          |   case _: ReissueTransaction => false
-          |   case _ => true
-          | }
-        """.stripMargin
-      )
-
-    Seq(true, false).foreach { fail =>
-      val (_, setScript, invoke, issue, _, _, _) = paymentPreconditions(0.013.waves, fail, Some(disallowReissueAsset))
-      withDomain(RideV6, AddrWithBalance.enoughBalances(defaultSigner, secondSigner)) { d =>
-        d.appendBlock(setScript, issue)
-        if (fail)
-          d.appendAndAssertFailed(invoke, "Transaction is not allowed by script of the asset")
-        else
-          d.appendBlockE(invoke) should produce("Transaction is not allowed by script of the asset")
-      }
-    }
-  }
-
-  property("asset script can disallow burn") {
-    val disallowBurnAsset =
-      assetVerifier(
-        """
-          | match tx {
-          |   case _: BurnTransaction => false
-          |   case _ => true
-          | }
-        """.stripMargin
-      )
-
-    Seq(true, false).foreach { fail =>
-      val (_, setScript, invoke, issue, _, _, _) = paymentPreconditions(0.013.waves, fail, Some(disallowBurnAsset))
-      withDomain(RideV6, AddrWithBalance.enoughBalances(defaultSigner, secondSigner)) { d =>
-        d.appendBlock(setScript, issue)
-        if (fail)
-          d.appendAndAssertFailed(invoke, "Transaction is not allowed by script of the asset")
-        else
-          d.appendBlockE(invoke) should produce("Transaction is not allowed by script of the asset")
-      }
     }
   }
 
