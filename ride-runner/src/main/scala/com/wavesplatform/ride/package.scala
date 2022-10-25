@@ -64,7 +64,7 @@ let x1 = if (valueOrElse(getBoolean("b"), false)) then 1 else 0
       request: RunnerRequest
   ): JsObject = {
     val chainId    = blockchain.settings.addressSchemeCharacter.toByte
-    val senderAddr = request.senderPublicKey.toAddress(chainId)
+    val senderAddr = request.exactSender(chainId)
     val dAppAddr   = request.call.fold(_ => senderAddr, _.dApp)
     val script = blockchain
       .accountScript(blockchain.resolveAlias(dAppAddr).explicitGet())
@@ -77,7 +77,7 @@ let x1 = if (valueOrElse(getBoolean("b"), false)) then 1 else 0
         blockchain = blockchain,
         script = script,
         address = senderAddr,
-        pk = request.senderPublicKey,
+        pk = request.senderPk,
         limit = Int.MaxValue
       )(expr)
     } yield Json.obj(
@@ -95,7 +95,7 @@ let x1 = if (valueOrElse(getBoolean("b"), false)) then 1 else 0
       blockchain: Blockchain,
       request: RunnerRequest
   ): JsObject = {
-    val log = LoggerFactory.getLogger("execute")
+    // val log = LoggerFactory.getLogger("execute")
     val tx  = request.toTx(blockchain.settings.addressSchemeCharacter.toByte)
 //    log.info("Transaction: {}", tx)
 //    log.info("Running from {}", tx.sender.toAddress)

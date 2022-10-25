@@ -36,7 +36,7 @@ object RideBlockchainRunner extends ScorexLogging {
     }
 
     // TODO expr should work too
-    val input = RideRunnerInput.parse(Using(Source.fromFile(new File(s"$basePath/input2.json")))(_.getLines().mkString("\n")).get)
+    val input = RideRunnerInput.parseMany(Using(Source.fromFile(new File(s"$basePath/input3.json")))(_.getLines().mkString("\n")).get)
     val r = Using.Manager { use =>
       val connector = use(new GrpcConnector)
 
@@ -93,7 +93,7 @@ object RideBlockchainRunner extends ScorexLogging {
 
       val blockchainStorage = new BlockchainStorage[Int](nodeSettings.blockchainSettings, blockchainApi)
 
-      val scripts = Vector(RideScript(0, blockchainStorage, input.request))
+      val scripts = input.zipWithIndex.map { case (input, index) => RideScript(index, blockchainStorage, input.request) }
 
       // Initialization to cache required data
       scripts.foreach { script =>
@@ -165,11 +165,13 @@ object RideBlockchainRunner extends ScorexLogging {
 
                 if (updated.isEmpty) {
                   log.debug(s"[${update.height}] Not updated")
-                } else
+                } else {
+                  log.debug(s"[${update.height}] Updated for: ${updated.mkString(", ")}")
                   updated.foreach { index =>
                     val apiResult = scripts(index).run()
                     log.info(s"[${update.height}, $index] apiResult: ${apiResult.value("result").as[JsObject].value("value")}")
                   }
+                }
 
               case _: Update.Rollback => log.info("Rollback, ignore")
               case Update.Empty       =>

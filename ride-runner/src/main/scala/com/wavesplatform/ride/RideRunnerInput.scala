@@ -288,4 +288,5 @@ object RideRunnerInput {
     else Base58.decode(str)
 
   def parse(str: String): RideRunnerInput = Json.configured.parse(str).as[RideRunnerInput]
+  def parseMany(str: String): Vector[RideRunnerInput] = Json.configured.parse(str).as[Vector[RideRunnerInput]]
 }
