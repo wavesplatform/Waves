@@ -15,12 +15,15 @@ import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
-import com.wavesplatform.transaction.{Transaction, TxHelpers}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.utils.EthConverters.*
+import com.wavesplatform.transaction.utils.EthTxGenerator
+import com.wavesplatform.transaction.{EthereumTransaction, Transaction, TxHelpers, TxVersion}
 import org.scalatest.{EitherValues, OptionValues}
 
 import java.nio.charset.StandardCharsets
 
-class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues with EitherValues {
+class RideV6FailRejectTest extends FreeSpec with WithDomain with OptionValues with EitherValues {
   private val otherChainId = (AddressScheme.current.chainId + 1).toByte
 
   private val invalidAssetId = IssuedAsset(ByteStr(("1" * 5).getBytes(StandardCharsets.UTF_8)))
@@ -32,6 +35,12 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
   private val bobAddr           = bob.toAddress
   private val bobOtherChainAddr = bob.toAddress(otherChainId)
 
+  private val invoker     = TxHelpers.signer(3)
+  private val invokerAddr = invoker.toAddress
+
+  private val ethInvoker     = invoker.toEthKeyPair
+  private val ethInvokerAddr = ethInvoker.toWavesAddress
+
   private val aliceRegularAssetTx       = TxHelpers.issue(issuer = alice, amount = Long.MaxValue - 1)
   private val aliceRegularAssetId       = aliceRegularAssetTx.id()
   private val aliceNotReIssuableAssetTx = TxHelpers.issue(issuer = alice, amount = 100, reissuable = false)
@@ -39,8 +48,16 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
   private val aliceLeasingId            = aliceLeasingTx.id()
   private val aliceInvokeTx = TxHelpers.invoke(
     dApp = aliceAddr,
-    invoker = alice,
+    invoker = invoker,
     func = Some("foo"),
+    fee = 3.waves
+  )
+  private val ethAliceInvokeTx = EthTxGenerator.generateEthInvoke(
+    keyPair = ethInvoker,
+    address = aliceAddr,
+    funcName = "foo",
+    args = Seq.empty,
+    payments = Seq.empty,
     fee = 3.waves
   )
 
@@ -50,8 +67,10 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
   private val bobLeasingId = bobLeasingTx.id()
 
   private val defaultInitWavesBalances = Map(
-    aliceAddr -> ENOUGH_AMT,
-    bobAddr   -> ENOUGH_AMT
+    aliceAddr      -> ENOUGH_AMT,
+    bobAddr        -> ENOUGH_AMT,
+    invokerAddr    -> ENOUGH_AMT,
+    ethInvokerAddr -> ENOUGH_AMT
   )
 
   private val defaultScript = mkScriptWithOneAction("""IntegerEntry("i", 1)""")
@@ -60,6 +79,98 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
 
   "After RideV6 activation" - {
     val cases = Seq(
+      {
+        val aliceSmartAssetTx = TxHelpers.issue(
+          issuer = alice,
+          script = Some(
+            mkAssetScript(
+              """
+                | match tx {
+                |   case _: ReissueTransaction => false
+                |   case _ => true
+                | }
+                |""".stripMargin
+            )
+          )
+        )
+        Case(
+          "NODE-124 Asset script can forbid reissue",
+          "Transaction is not allowed by script of the asset",
+          { targetComplexity =>
+            val baseComplexity = 1 + 1 + 1 + 1 // 1 for strict, 1 for list, 1 for Reissue, 1 for asset script
+            mkFooScript(
+              s"""
+                 |strict complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 |[Reissue(base58'${aliceSmartAssetTx.id()}', 10, true)]
+                 |""".stripMargin
+            )
+          },
+          knownTxs = Seq(aliceSmartAssetTx)
+        )
+      }, {
+        val aliceSmartAssetTx = TxHelpers.issue(
+          issuer = alice,
+          script = Some(
+            mkAssetScript(
+              """
+                | match tx {
+                |   case _: BurnTransaction => false
+                |   case _ => true
+                | }
+                |""".stripMargin
+            )
+          )
+        )
+        Case(
+          "NODE-125 Asset script can forbid burn",
+          "Transaction is not allowed by script of the asset",
+          { targetComplexity =>
+            val baseComplexity = 1 + 1 + 1 + 1 // 1 for strict, 1 for list, 1 for Burn, 1 for asset script
+            mkFooScript(
+              s"""
+                 |strict complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 |[Burn(base58'${aliceSmartAssetTx.id()}', 10)]
+                 |""".stripMargin
+            )
+          },
+          knownTxs = Seq(aliceSmartAssetTx)
+        )
+      }, {
+        val bobSmartAssetTx = TxHelpers.issue(
+          issuer = bob,
+          script = Some(
+            mkAssetScript(
+              s"""
+                 |match tx {
+                 |  case tr: InvokeScriptTransaction => throw()
+                 |  case _ => true
+                 |}
+                 |""".stripMargin
+            )
+          )
+        )
+        Case(
+          "NODE-522 DApp completes successfully, but asset script fails for payments",
+          s"Transaction is not allowed by script of the asset ${bobSmartAssetTx.id()}",
+          { targetComplexity =>
+            val baseComplexity = 1 + 2 // 1 for strict, 2 for asset script
+            mkFooScript(
+              s"""
+                 |strict complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 |[]
+                 |""".stripMargin
+            )
+          },
+          invokeTx = TxHelpers
+            .invoke(dApp = aliceAddr, invoker = invoker, func = Some("foo"), fee = 3.waves, payments = Seq(Payment(1, bobSmartAssetTx.asset))),
+          ethInvokeTx = Some(EthTxGenerator.generateEthInvoke(ethInvoker, aliceAddr, "foo", Seq.empty, Seq(Payment(1, bobSmartAssetTx.asset)))),
+          knownTxs = Seq(
+            bobSmartAssetTx,
+            TxHelpers.transfer(bob, invokerAddr, 1, bobSmartAssetTx.asset),
+            TxHelpers.transfer(bob, ethInvokerAddr, 1, bobSmartAssetTx.asset)
+          )
+        )
+      },
       Case(
         "NODE-540 If an invoke exceeds the limit of writes",
         "Stored data count limit is exceeded",
@@ -175,96 +286,116 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
         },
         supportedVersions = Seq(V3)
       )
-    ) ++
-      Seq(
+    ) ++ {
+      val dataEntries = Seq(
         "Binary"  -> s"""BinaryEntry("", base58'${Base58.encode("test".getBytes(StandardCharsets.UTF_8))}')""",
         "Boolean" -> """BooleanEntry("", false)""",
         "Delete"  -> """DeleteEntry("")""",
         "Integer" -> """IntegerEntry("", 0)""",
         "String"  -> """StringEntry("", "lie")"""
-      ).map { case (entryType, entry) =>
+      )
+
+      def mkDAppFunc(entry: String): Int => StdLibVersion => Script = { targetComplexity =>
+        val baseComplexity = 1 + 2 + 1 + 1 // 1 for strict, 2 for list (two elements), 1 for IntegerEntry, 1 for test entry
+        mkFooScript(
+          s"""
+             | strict complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+             | [IntegerEntry("k", 1), $entry]
+             |""".stripMargin
+        )
+      }
+
+      dataEntries.map { case (entryType, entry) =>
         Case(
           s"NODE-546 If an invoke writes an empty $entryType key to the state",
-          "Empty keys aren't allowed in tx version >= 2",
-          { targetComplexity =>
-            val baseComplexity = 1 + 2 + 1 + 1 // 1 for strict, 2 for list (two elements), 1 for IntegerEntry, 1 for test entry
-            mkFooScript(
-              s"""
-                 | strict complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
-                 | [IntegerEntry("k", 1), $entry]
-                 |""".stripMargin
-            )
-          }
+          "Data entry key should not be empty",
+          mkDAppFunc(entry),
+          invokeTx = aliceInvokeTx.copy(version = TxVersion.V1).signWith(invoker.privateKey)
         )
-      } ++ {
-        def mkNode548OneActionTypeScript(actionSrc: String): Int => StdLibVersion => Script = { targetComplexity =>
-          // 1+1 for strict, 1 for Address, 101 for list, 101 for actions
-          val baseComplexity = 1 + 1 + 1 + 101 + 101
-          mkFooScript(
-            s""" strict complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
-               | strict to = Address(base58'$bobAddr')
-               | [${(1 to 101).map(_ => actionSrc).mkString(", ")}]
-               | """.stripMargin
+      } ++
+        dataEntries.map { case (entryType, entry) =>
+          Case(
+            s"NODE-546 If an invoke writes an empty $entryType key to the state (invoke version >= 2)",
+            "Empty keys aren't allowed in tx version >= 2",
+            mkDAppFunc(entry),
+            ethInvokeTx = None
           )
         }
+    } ++ {
+      def mkNode548OneActionTypeScript(actionSrc: String): Int => StdLibVersion => Script = { targetComplexity =>
+        // 1+1 for strict, 1 for Address, 101 for list, 101 for actions
+        val baseComplexity = 1 + 1 + 1 + 101 + 101
+        mkFooScript(
+          s""" strict complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+             | strict to = Address(base58'$bobAddr')
+             | [${(1 to 101).map(_ => actionSrc).mkString(", ")}]
+             | """.stripMargin
+        )
+      }
 
+      Seq(
+        Case(
+          "NODE-548 If an invoke exceeds the limit of ScriptTransfer actions",
+          "Actions count limit is exceeded",
+          mkNode548OneActionTypeScript("ScriptTransfer(to, 1, unit)"),
+          supportedVersions = Seq(V4)
+        )
+      ) ++ Seq(
+        "ScriptTransfer" -> "ScriptTransfer(to, 1, unit)",
+        "Lease"          -> "Lease(to, 1)",
+        "LeaseCancel"    -> s"LeaseCancel(base58'$bobLeasingId')"
+      ).flatMap { case (actionType, actionSrc) =>
         Seq(
           Case(
-            "NODE-548 If an invoke exceeds the limit of ScriptTransfer actions",
+            s"NODE-548 If an invoke exceeds the limit of $actionType actions",
             "Actions count limit is exceeded",
-            mkNode548OneActionTypeScript("ScriptTransfer(to, 1, unit)"),
-            supportedVersions = Seq(V4)
-          )
-        ) ++ Seq(
-          "ScriptTransfer" -> "ScriptTransfer(to, 1, unit)",
-          "Lease"          -> "Lease(to, 1)",
-          "LeaseCancel"    -> s"LeaseCancel(base58'$bobLeasingId')"
-        ).flatMap { case (actionType, actionSrc) =>
-          Seq(
-            Case(
-              s"NODE-548 If an invoke exceeds the limit of $actionType actions",
-              "Actions count limit is exceeded",
-              mkNode548OneActionTypeScript(actionSrc),
-              supportedVersions = Seq(V5)
-            ),
-            Case(
-              s"NODE-548 If an invoke exceeds the limit of $actionType actions",
-              "ScriptTransfer, Lease, LeaseCancel actions count limit is exceeded",
-              mkNode548OneActionTypeScript(actionSrc),
-              supportedVersions = Seq(V6)
-            )
-          )
-        } ++ Seq(
-          V5 -> "Actions count limit is exceeded",
-          V6 -> "ScriptTransfer, Lease, LeaseCancel actions count limit is exceeded"
-        ).map { case (v, rejectError) =>
+            mkNode548OneActionTypeScript(actionSrc),
+            supportedVersions = Seq(V5)
+          ),
           Case(
-            "NODE-548 If an invoke exceeds the limit of mixed non-data actions",
-            rejectError,
-            { targetComplexity =>
-              val baseComplexity = 1 + 1 + 101 + 101 // 1 for strict, 1 for Address, 101 for list, 101 for actions
-              mkFooScript(
-                s""" strict complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
-                   | let to = Address(base58'$bobAddr')
-                   | [
-                   |   ${(1 to 34).map(_ => s"""ScriptTransfer(to, 1, unit)""").mkString(", ")},
-                   |   ${(1 to 34).map(_ => s"""Lease(to, 1)""").mkString(", ")},
-                   |   ${(1 to 33).map(_ => s"""LeaseCancel(base58'$bobLeasingId')""").mkString(", ")}
-                   | ]
-                   | """.stripMargin
-              )
-            },
-            supportedVersions = Seq(v)
+            s"NODE-548 If an invoke exceeds the limit of $actionType actions",
+            "ScriptTransfer, Lease, LeaseCancel actions count limit is exceeded",
+            mkNode548OneActionTypeScript(actionSrc),
+            supportedVersions = Seq(V6)
           )
-        }
-      } ++
+        )
+      } ++ Seq(
+        V5 -> "Actions count limit is exceeded",
+        V6 -> "ScriptTransfer, Lease, LeaseCancel actions count limit is exceeded"
+      ).map { case (v, rejectError) =>
+        Case(
+          "NODE-548 If an invoke exceeds the limit of mixed non-data actions",
+          rejectError,
+          { targetComplexity =>
+            val baseComplexity = 1 + 1 + 101 + 101 // 1 for strict, 1 for Address, 101 for list, 101 for actions
+            mkFooScript(
+              s""" strict complexInt = ${mkIntExprWithComplexity(targetComplexity - baseComplexity)}
+                 | let to = Address(base58'$bobAddr')
+                 | [
+                 |   ${(1 to 34).map(_ => s"""ScriptTransfer(to, 1, unit)""").mkString(", ")},
+                 |   ${(1 to 34).map(_ => s"""Lease(to, 1)""").mkString(", ")},
+                 |   ${(1 to 33).map(_ => s"""LeaseCancel(base58'$bobLeasingId')""").mkString(", ")}
+                 | ]
+                 | """.stripMargin
+            )
+          },
+          supportedVersions = Seq(v)
+        )
+      }
+    } ++
       Seq(
         Case(
           "NODE-550 If an invoke sends a self-payment",
           "DApp self-payment is forbidden since V4",
-          invokeTx = aliceInvokeTx // self-payment, because this is a self-invoke
-            .copy(payments = Seq(InvokeScriptTransaction.Payment(1, Waves)))
-            .signWith(alice.privateKey)
+          invokeTx = TxHelpers
+            .invoke(
+              dApp = aliceAddr,
+              invoker = alice,
+              func = Some("foo"),
+              fee = 3.waves,
+              payments = Seq(InvokeScriptTransaction.Payment(1, Waves))
+            ),
+          ethInvokeTx = None
         ),
         Case(
           "NODE-552 If an invoke sends a ScriptTransfer for himself",
@@ -298,8 +429,10 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
             )
           },
           initBalances = Map(
-            aliceAddr -> Long.MaxValue,
-            bobAddr   -> ENOUGH_AMT
+            aliceAddr      -> Long.MaxValue,
+            bobAddr        -> ENOUGH_AMT,
+            invokerAddr    -> ENOUGH_AMT,
+            ethInvokerAddr -> ENOUGH_AMT
           )
         ),
         Case(
@@ -729,22 +862,12 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
       testCase.title - {
         testCase.supportedVersions.foreach { v =>
           s"$v" - {
-            "<=1000 complexity - rejected" in test(ContractLimits.FailFreeInvokeComplexity - 300) { d =>
-              d.createDiffE(testCase.invokeTx) should produce(testCase.rejectError)
-            }
+            "<=1000 complexity - rejected" in rejectTxTest(testCase.invokeTx)
+            ">1000 complexity - failed" in failTxTest(testCase.invokeTx)
 
-            ">1000 complexity - failed" in {
-              val complexity = ContractLimits.FailFreeInvokeComplexity + 1
-              test(complexity) { d =>
-                val diff              = d.createDiffE(testCase.invokeTx).value
-                val (_, scriptResult) = diff.scriptResults.headOption.value
-                scriptResult.error.value.text should include(testCase.rejectError)
-
-                d.appendBlock(testCase.invokeTx)
-                val invokeTxMeta = d.transactionsApi.transactionById(testCase.invokeTx.id()).value
-                invokeTxMeta.spentComplexity shouldBe complexity
-                invokeTxMeta.succeeded shouldBe false
-              }
+            testCase.ethInvokeTx.foreach { ethInvoke =>
+              "<=1000 complexity - rejected (Ethereum)" in rejectTxTest(ethInvoke)
+              ">1000 complexity - failed (Ethereum)" in failTxTest(ethInvoke)
             }
 
             def test(complexity: Int)(f: Domain => Unit): Unit =
@@ -756,6 +879,25 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
                 d.appendBlock((testCase.knownTxs :+ setScriptTx)*)
                 f(d)
               }
+
+            def rejectTxTest(invoke: Transaction): Unit =
+              test(ContractLimits.FailFreeInvokeComplexity - 300) { d =>
+                d.createDiffE(invoke) should produce(testCase.rejectError)
+              }
+
+            def failTxTest(invoke: Transaction): Unit = {
+              val complexity = ContractLimits.FailFreeInvokeComplexity + 1
+              test(complexity) { d =>
+                val diff              = d.createDiffE(invoke).value
+                val (_, scriptResult) = diff.scriptResults.headOption.value
+                scriptResult.error.value.text should include(testCase.rejectError)
+
+                d.appendBlock(invoke)
+                val invokeTxMeta = d.transactionsApi.transactionById(invoke.id()).value
+                invokeTxMeta.spentComplexity shouldBe complexity
+                invokeTxMeta.succeeded shouldBe false
+              }
+            }
           }
         }
       }
@@ -770,6 +912,7 @@ class RideV6ActivationTest extends FreeSpec with WithDomain with OptionValues wi
       rejectError: String,
       mkDApp: Int => StdLibVersion => Script = defaultScript,
       invokeTx: InvokeScriptTransaction = aliceInvokeTx,
+      ethInvokeTx: Option[EthereumTransaction] = Some(ethAliceInvokeTx),
       knownTxs: Seq[Transaction] = Seq.empty,
       initBalances: Map[Address, Long] = defaultInitWavesBalances,
       supportedVersions: Seq[StdLibVersion] = inV4V6
