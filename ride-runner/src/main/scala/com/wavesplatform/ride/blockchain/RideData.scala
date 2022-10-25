@@ -2,21 +2,25 @@ package com.wavesplatform.ride.blockchain
 
 import scala.collection.mutable
 
-// TODO trait with different collections: LongMap, AnyRefMap, etc...
+trait ReadOnlyRideData[KeyT, ValueT, TagT] {
+  def get(key: KeyT, tag: TagT): Option[ValueT]
+}
 
-class ReadOnlyRideData[KeyT <: AnyRef, ValueT, TagT](loader: KeyT => Option[ValueT]) {
-  protected val map = mutable.AnyRefMap.empty[KeyT, TaggedData[BlockchainData[ValueT], TagT]]
-
-  def get(key: KeyT, tag: TagT): Option[ValueT] = map
+final class RideData[KeyT, ValueT, TagT](
+    map: mutable.AbstractMap[KeyT, TaggedData[BlockchainData[ValueT], TagT]],
+    loader: KeyT => Option[ValueT]
+) extends ReadOnlyRideData[KeyT, ValueT, TagT] {
+  override def get(key: KeyT, tag: TagT): Option[ValueT] = map
     .updateWith(key) {
       case Some(orig) => Some(orig.withTag(tag))
       case None       => Some(TaggedData(BlockchainData.loaded[ValueT](loader(key)), Set(tag)))
     }
     .flatMap(_.data.mayBeValue)
-}
 
-class RideData[KeyT <: AnyRef, ValueT, TagT](loader: KeyT => Option[ValueT]) extends ReadOnlyRideData[KeyT, ValueT, TagT](loader) {
-  def replace(key: KeyT)(remap: Option[ValueT] => Option[ValueT]): Set[TagT] =
+  /**
+    * @param remap We could know, that the value does not exist
+    */
+  def replaceIfKnown(key: KeyT)(remap: Option[ValueT] => Option[ValueT]): Set[TagT] =
     map.get(key) match {
       case None => Set.empty
       case Some(orig) =>
@@ -27,4 +31,12 @@ class RideData[KeyT <: AnyRef, ValueT, TagT](loader: KeyT => Option[ValueT]) ext
           orig.tags
         }
     }
+}
+
+object RideData {
+  def anyRefMap[KeyT <: AnyRef, ValueT, TagT](loader: KeyT => Option[ValueT]): RideData[KeyT, ValueT, TagT] =
+    new RideData(mutable.AnyRefMap.empty[KeyT, TaggedData[BlockchainData[ValueT], TagT]], loader)
+
+  def mapReadOnly[KeyT, ValueT, TagT](loader: KeyT => Option[ValueT]): RideData[KeyT, ValueT, TagT] =
+    new RideData(mutable.HashMap.empty[KeyT, TaggedData[BlockchainData[ValueT], TagT]], loader)
 }

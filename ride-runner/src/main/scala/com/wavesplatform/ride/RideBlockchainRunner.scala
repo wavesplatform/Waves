@@ -12,7 +12,9 @@ import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.resources.*
-import com.wavesplatform.ride.blockchain.MutableBlockchain
+import com.wavesplatform.ride.blockchain.{BlockchainStorage, RideBlockchain}
+import com.wavesplatform.ride.input.RunnerRequest
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.Scheduler
 import play.api.libs.json.JsObject
@@ -89,9 +91,18 @@ object RideBlockchainRunner extends ScorexLogging {
         )
       )
 
-      val mutableBlockchain = new MutableBlockchain(nodeSettings.blockchainSettings, blockchainApi)
-      val start             = mutableBlockchain.height - 2
-      val end               = mutableBlockchain.height + 2
+      val blockchainStorage = new BlockchainStorage[Int](nodeSettings.blockchainSettings, blockchainApi)
+
+      val scripts = Vector(RideScript(0, blockchainStorage, input.request))
+
+      // Initialization to cache required data
+      scripts.foreach { script =>
+        val apiResult = script.run()
+        log.info(s"[Init, ${script.index}] apiResult: ${apiResult.value("result").as[JsObject].value("value")}")
+      }
+
+      val start = blockchainStorage.height - 2
+      val end   = blockchainStorage.height + 2
 
       log.info("input: {}", input)
       val events = blockchainApi.stream
@@ -107,7 +118,7 @@ object RideBlockchainRunner extends ScorexLogging {
             val update = event.getUpdate
             update.update match {
               case Update.Append(append) =>
-                mutableBlockchain.setHeight(update.height)
+                blockchainStorage.setHeight(update.height)
 
                 val txs = append.body match {
                   case Body.Block(block)           => block.getBlock.transactions
@@ -123,18 +134,18 @@ object RideBlockchainRunner extends ScorexLogging {
 
                 val stateUpdate = (append.getStateUpdate +: append.transactionStateUpdates).view
                 val updated =
-                  stateUpdate.flatMap(_.assets).map(_.getAfter).foldLeft(false) { case (r, x) =>
-                    r || mutableBlockchain.replaceAssetDescription(x)
-                  } ||
-                    stateUpdate.flatMap(_.balances).foldLeft(false) { case (r, x) =>
-                      r || mutableBlockchain.replaceBalance(x)
-                    } ||
-                    stateUpdate.flatMap(_.leasingForAddress).foldLeft(false) {
-                      _ || mutableBlockchain.replaceLeasing(_)
-                    } ||
-                    stateUpdate.flatMap(_.dataEntries).foldLeft(false) { case (r, x) =>
-                      r || mutableBlockchain.replaceAccountData(x)
-                    } ||
+                  stateUpdate.flatMap(_.assets).map(_.getAfter).foldLeft(Set.empty[Int]) { case (r, x) =>
+                    r union blockchainStorage.replaceAssetDescription(x)
+                  } union
+                    stateUpdate.flatMap(_.balances).foldLeft(Set.empty[Int]) { case (r, x) =>
+                      r union blockchainStorage.replaceBalance(x)
+                    } union
+                    stateUpdate.flatMap(_.leasingForAddress).foldLeft(Set.empty[Int]) {
+                      _ union blockchainStorage.replaceLeasing(_)
+                    } union
+                    stateUpdate.flatMap(_.dataEntries).foldLeft(Set.empty[Int]) { case (r, x) =>
+                      r union blockchainStorage.replaceAccountData(x)
+                    } union
                     txs.view
                       .map(_.transaction)
                       .flatMap {
@@ -145,35 +156,25 @@ object RideBlockchainRunner extends ScorexLogging {
                           }
                         case _ => none
                       }
-                      .foldLeft(false) { case (r, (pk, script)) =>
-                        r || mutableBlockchain.replaceAccountScript(pk, script)
-                      } ||
-                    append.transactionIds.foldLeft(false) { case (r, x) =>
-                      r || mutableBlockchain.replaceTransactionMeta(x, update.height)
+                      .foldLeft(Set.empty[Int]) { case (r, (pk, script)) =>
+                        r union blockchainStorage.replaceAccountScript(pk, script)
+                      } union
+                    append.transactionIds.foldLeft(Set.empty[Int]) { case (r, x) =>
+                      r union blockchainStorage.replaceTransactionMeta(x, update.height)
                     }
 
-                if (updated) {
-                  val apiResult = executeUtilsEvaluate(
-                    mutableBlockchain,
-                    input.request
-                  )
-
-                  log.info(s"[${update.height}] apiResult: ${apiResult.value("result").as[JsObject].value("value")}")
-                } else {
+                if (updated.isEmpty) {
                   log.debug(s"[${update.height}] Not updated")
-                }
+                } else
+                  updated.foreach { index =>
+                    val apiResult = scripts(index).run()
+                    log.info(s"[${update.height}, $index] apiResult: ${apiResult.value("result").as[JsObject].value("value")}")
+                  }
 
               case _: Update.Rollback => log.info("Rollback, ignore")
               case Update.Empty       =>
             }
         }(Scheduler(commonScheduler))
-
-      val apiResult = executeUtilsEvaluate(
-        mutableBlockchain,
-        input.request
-      )
-
-      log.info(s"[Init] apiResult: ${apiResult.value("result").as[JsObject].value("value")}")
 
       blockchainApi.watchBlockchainUpdates(blockchainUpdatesApiChannel, start)
 
@@ -185,4 +186,16 @@ object RideBlockchainRunner extends ScorexLogging {
       case _          => log.info("Done")
     }
   }
+}
+
+class RideScript(val index: Int, blockchain: Blockchain, runnerRequest: RunnerRequest) {
+  def run(): JsObject = executeUtilsEvaluate(
+    blockchain,
+    runnerRequest
+  )
+}
+
+object RideScript {
+  def apply(index: Int, blockchainStorage: BlockchainStorage[Int], runnerRequest: RunnerRequest): RideScript =
+    new RideScript(index, new RideBlockchain[Int](blockchainStorage, index), runnerRequest)
 }
