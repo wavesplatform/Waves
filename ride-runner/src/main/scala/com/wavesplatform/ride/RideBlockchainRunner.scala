@@ -12,7 +12,7 @@ import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.resources.*
-import com.wavesplatform.ride.blockchain.{BlockchainStorage, RideBlockchain}
+import com.wavesplatform.ride.blockchain.{BlockchainStorage, EmptyDbStorage, RideBlockchain}
 import com.wavesplatform.ride.input.RunnerRequest
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils.ScorexLogging
@@ -91,7 +91,7 @@ object RideBlockchainRunner extends ScorexLogging {
         )
       )
 
-      val blockchainStorage = new BlockchainStorage[Int](nodeSettings.blockchainSettings, blockchainApi)
+      val blockchainStorage = new BlockchainStorage[Int](nodeSettings.blockchainSettings, new EmptyDbStorage(), blockchainApi)
 
       val scripts = input.zipWithIndex.map { case (input, index) => RideScript(index, blockchainStorage, input.request) }
 

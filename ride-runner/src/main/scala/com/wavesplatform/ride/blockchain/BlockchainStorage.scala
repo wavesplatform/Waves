@@ -23,10 +23,13 @@ import com.wavesplatform.utils.ScorexLogging
 
 import java.nio.charset.StandardCharsets
 
-class BlockchainStorage[TagT](val settings: BlockchainSettings, blockchainApi: BlockchainGrpcApi) extends ScorexLogging {
+class BlockchainStorage[TagT](val settings: BlockchainSettings, dbStorage: DbStorage, blockchainApi: BlockchainGrpcApi) extends ScorexLogging {
   private val chainId = settings.addressSchemeCharacter.toByte
 
-  private val data = RideData.anyRefMap[(Address, String), DataEntry[?], TagT](Function.tupled(blockchainApi.getAccountDataEntry))
+  private val data = RideData.anyRefMap[(Address, String), DataEntry[?], TagT] {
+    load[(Address, String), DataEntry[_]](Function.tupled(dbStorage.getAccountDataEntry), Function.tupled(blockchainApi.getAccountDataEntry))
+  }
+
   def getData(address: Address, key: String, tag: TagT): Option[DataEntry[_]] = data.get((address, key), tag)
   def replaceAccountData(update: StateUpdate.DataEntryUpdate): Set[TagT] = {
     val address = update.address.toAddress
@@ -37,7 +40,10 @@ class BlockchainStorage[TagT](val settings: BlockchainSettings, blockchainApi: B
     }
   }
 
-  private val accountScripts = RideData.anyRefMap[Address, AccountScriptInfo, TagT](blockchainApi.getAccountScript(_, estimator))
+  private val accountScripts = RideData.anyRefMap[Address, AccountScriptInfo, TagT] {
+    load(dbStorage.getAccountScript, blockchainApi.getAccountScript(_, estimator))
+  }
+
   def getAccountScript(address: Address, tag: TagT): Option[AccountScriptInfo] = accountScripts.get(address, tag)
   def replaceAccountScript(account: PublicKey, newScript: ByteString): Set[TagT] = {
     val address = account.toAddress(chainId)
@@ -69,13 +75,13 @@ class BlockchainStorage[TagT](val settings: BlockchainSettings, blockchainApi: B
   // It seems, we don't need to update this. Only for some optimization needs
   private val blockHeaders = RideData.mapReadOnly[Int, SignedBlockHeader, TagT] { h =>
     if (h > height) throw new RuntimeException(s"Can't receive a block with height=$h > current height=$height")
-    else blockchainApi.getBlockHeader(h)
+    else load(dbStorage.getBlockHeader, blockchainApi.getBlockHeader)(h)
   }
   def getBlockHeader(height: Int, tag: TagT): Option[SignedBlockHeader] = blockHeaders.get(height, tag)
 
   private val vrf = RideData.mapReadOnly[Int, ByteStr, TagT] { h =>
     if (h > height) throw new RuntimeException(s"Can't receive a block VRF with height=$h > current height=$height")
-    else blockchainApi.getVrf(h)
+    else load(dbStorage.getVrf, blockchainApi.getVrf)(h)
   }
   def getVrf(height: Int, tag: TagT): Option[ByteStr] = vrf.get(height, tag)
 
@@ -89,9 +95,12 @@ class BlockchainStorage[TagT](val settings: BlockchainSettings, blockchainApi: B
   }
 
   // No way to get this from blockchain updates
-  var activatedFeatures = blockchainApi.getActivatedFeatures(height)
+  var activatedFeatures = load[Int, Map[Short, Int]](dbStorage.getActivatedFeatures, blockchainApi.getActivatedFeatures(_).some)(height)
+    .getOrElse(throw new RuntimeException("Impossible: activated features are empty"))
 
-  private val assets = RideData.anyRefMap[IssuedAsset, AssetDescription, TagT](blockchainApi.getAssetDescription)
+  private val assets = RideData.anyRefMap[IssuedAsset, AssetDescription, TagT] {
+    load(dbStorage.getAssetDescription, blockchainApi.getAssetDescription)
+  }
   def getAssetDescription(asset: IssuedAsset, tag: TagT): Option[AssetDescription] = assets.get(asset, tag)
   def replaceAssetDescription(update: StateUpdate.AssetDetails): Set[TagT] = {
     val asset = update.assetId.toIssuedAsset
@@ -119,11 +128,15 @@ class BlockchainStorage[TagT](val settings: BlockchainSettings, blockchainApi: B
   }
 
   // It seems, we don't need to update this. Only for some optimization needs
-  private val aliases = RideData.anyRefMap[Alias, Address, TagT](blockchainApi.resolveAlias)
+  private val aliases = RideData.anyRefMap[Alias, Address, TagT] {
+    load(dbStorage.resolveAlias, blockchainApi.resolveAlias)
+  }
 
   def getAlias(alias: Alias, tag: TagT): Option[Address] = aliases.get(alias, tag)
 
-  private val portfolios = RideData.anyRefMap[Address, Portfolio, TagT](blockchainApi.getBalances(_).some)
+  private val portfolios = RideData.anyRefMap[Address, Portfolio, TagT] {
+    load(dbStorage.getBalances, blockchainApi.getBalances(_).some)
+  }
 
   def getPortfolio(address: Address, tag: TagT): Option[Portfolio] = portfolios.get(address, tag)
   def replaceBalance(toReplace: StateUpdate.BalanceUpdate): Set[TagT] = {
@@ -147,7 +160,9 @@ class BlockchainStorage[TagT](val settings: BlockchainSettings, blockchainApi: B
     }
   }
 
-  private val transactions = RideData.anyRefMap[ByteStr, (TxMeta, Option[TransferTransactionLike]), TagT](blockchainApi.getTransaction)
+  private val transactions = RideData.anyRefMap[ByteStr, (TxMeta, Option[TransferTransactionLike]), TagT] {
+    load(dbStorage.getTransaction, blockchainApi.getTransaction)
+  }
 
   def getTransaction(id: ByteStr, tag: TagT): Option[(TxMeta, Option[TransferTransactionLike])] = transactions.get(id, tag)
 
@@ -171,4 +186,9 @@ class BlockchainStorage[TagT](val settings: BlockchainSettings, blockchainApi: B
   }
 
   private def estimator: ScriptEstimator = EstimatorProvider.byActivatedFeatures(settings.functionalitySettings, activatedFeatures, height)
+
+  private def load[KeyT, ValueT](
+      fromCache: KeyT => BlockchainData[ValueT],
+      fromBlockchain: KeyT => Option[ValueT]
+  )(key: KeyT): Option[ValueT] = fromCache(key).or(BlockchainData.loaded(fromBlockchain(key))).mayBeValue
 }
