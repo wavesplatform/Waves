@@ -191,10 +191,24 @@ class FuncDefParseErrorTest extends ParseErrorTest {
       """
         | funcf() = 1
       """.stripMargin,
-      """Parse error: illegal expression""",
+      """Parse error: expected "func" keyword""",
       2,
       9,
       "funcf()",
+      onlyDApp = true
+    )
+  }
+
+  property("forbid definition without space for callable") {
+    assert(
+      """
+        | @Callable(i)
+        | funccall() = []
+      """.stripMargin,
+      """Parse error: expected "func" keyword""",
+      16,
+      26,
+      "funccall()",
       onlyDApp = true
     )
   }

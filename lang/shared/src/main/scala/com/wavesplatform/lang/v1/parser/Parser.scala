@@ -31,7 +31,7 @@ object Parser {
   def unicodeSymbolP[A: P]     = P("\\u" ~/ Pass ~~ (char | digit).repX(0, "", 4))
   def notEndOfString[A: P]     = CharPred(_ != '\"')
   def specialSymbols[A: P]     = P("\\" ~~ AnyChar)
-  def comment[A: P]: P[Unit]   = P("#" ~~ CharPred(_ != '\n').repX).rep.map(_ => ())
+  def comment[A: P]: P[Unit]   = P("#" ~~ CharPred(_ != '\n').repX).rep
   def directive[A: P]: P[Unit] = P("{-#" ~ CharPred(el => el != '\n' && el != '#').rep ~ "#-}").rep(0, comment).map(_ => ())
 
   def unusedText[A: P] = comment ~ directive ~ comment
@@ -235,7 +235,8 @@ object Parser {
   def unionTypeP[A: P]: P[Type] =
     (Index ~ P("Any") ~ Index).map { case (start, end) => AnyType(Pos(start, end)) } | P(singleTypeP | tupleTypeP)
       .rep(1, comment ~ "|" ~ comment)
-      .map(Union.apply)
+      .map(Union(_))
+
   def tupleTypeP[A: P]: P[Tuple] =
     ("(" ~
       P(unionTypeP).rep(
@@ -253,9 +254,15 @@ object Parser {
     def args(min: Int) = "(" ~ comment ~ argWithType.rep(min, "," ~ comment) ~ ")" ~ comment
     def funcBody       = singleBaseExpr
     def correctFunc    = Index ~~ funcKWAndName ~ comment ~/ args(min = 0) ~ ("=" ~ funcBody | "=" ~/ Fail.opaque("function body")) ~~ Index
-    def noKeyword      = NoCut(funcName).filter(_.isInstanceOf[VALID[_]]) ~ comment ~ NoCut(args(min = 1)) ~/ "=".? ~ funcBody.? ~~ Fail
-    def noKeywordP     = noKeyword.asInstanceOf[P[Nothing]].opaque(""""func" keyword""")
-    (noKeywordP | correctFunc)
+    def noKeyword = {
+      def noArgs      = "(" ~ comment ~ ")" ~ comment
+      def validName   = NoCut(funcName).filter(_.isInstanceOf[VALID[_]])
+      def argsOrEqual = (NoCut(args(min = 1)) ~ "=".?) | (noArgs ~ "=" ~~ !"=")
+      (validName ~ comment ~ argsOrEqual ~/ funcBody.? ~~ Fail)
+        .asInstanceOf[P[Nothing]]
+        .opaque(""""func" keyword""")
+    }
+    (noKeyword | correctFunc)
       .map { case (start, name, args, expr, end) => FUNC(Pos(start, end), expr, name, args) }
   }
 
