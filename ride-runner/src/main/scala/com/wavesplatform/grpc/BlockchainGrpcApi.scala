@@ -175,7 +175,7 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
   /** @return
     *   (header, VRF)
     */
-  def getBlockHeader(height: Int): Option[(SignedBlockHeader, ByteStr)] = {
+  def getBlockHeader(height: Int): Option[SignedBlockHeader] = {
     val x = ClientCalls.blockingUnaryCall(
       grpcApiChannel.newCall(BlocksApiGrpc.METHOD_GET_BLOCK, CallOptions.DEFAULT),
       BlockRequest(request = BlockRequest.Request.Height(height))
@@ -185,7 +185,7 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
       .flatMap(_.header)
       .map { header =>
         // TODO toVanilla
-        val signedHeader = SignedBlockHeader(
+        SignedBlockHeader(
           header = BlockHeader(
             version = header.version.toByte,
             timestamp = header.timestamp,
@@ -199,11 +199,11 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
           ),
           signature = x.block.fold(ByteString.EMPTY)(_.signature).toByteStr
         )
-
-        (signedHeader, ByteStr.empty) // TODO It seems VRF only from REST API
       }
       .tap(r => log.info(s"getBlockHeader($height):${if (r.isEmpty) " not" else ""} found"))
   }
+
+  def getVrf(height: Int): Option[ByteStr] = none[ByteStr] // TODO It seems VRF only from REST API
 
   def getAssetDescription(asset: Asset.IssuedAsset): Option[AssetDescription] = {
     val r =
@@ -308,8 +308,8 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
 
       val meta = TxMeta(
         height = Height(pbTx.height.toInt),
-        succeeded = pbTx.applicationStatus.isSucceeded,
-        spentComplexity = 0 // TODO ???
+        succeeded = pbTx.applicationStatus.isSucceeded, // Not used in Ride
+        spentComplexity = 0                             // TODO: It seems, not used
       )
 
       (meta, tx).some

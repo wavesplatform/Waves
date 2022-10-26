@@ -26,7 +26,8 @@ import java.nio.charset.StandardCharsets
 class BlockchainStorage[TagT](val settings: BlockchainSettings, blockchainApi: BlockchainGrpcApi) extends ScorexLogging {
   private val chainId = settings.addressSchemeCharacter.toByte
 
-  val data = RideData.anyRefMap[(Address, String), DataEntry[?], TagT](Function.tupled(blockchainApi.getAccountDataEntry))
+  private val data = RideData.anyRefMap[(Address, String), DataEntry[?], TagT](Function.tupled(blockchainApi.getAccountDataEntry))
+  def getData(address: Address, key: String, tag: TagT): Option[DataEntry[_]] = data.get((address, key), tag)
   def replaceAccountData(update: StateUpdate.DataEntryUpdate): Set[TagT] = {
     val address = update.address.toAddress
     val key     = update.getDataEntry.key
@@ -36,7 +37,8 @@ class BlockchainStorage[TagT](val settings: BlockchainSettings, blockchainApi: B
     }
   }
 
-  val accountScripts = RideData.anyRefMap[Address, AccountScriptInfo, TagT](blockchainApi.getAccountScript(_, estimator))
+  private val accountScripts = RideData.anyRefMap[Address, AccountScriptInfo, TagT](blockchainApi.getAccountScript(_, estimator))
+  def getAccountScript(address: Address, tag: TagT): Option[AccountScriptInfo] = accountScripts.get(address, tag)
   def replaceAccountScript(account: PublicKey, newScript: ByteString): Set[TagT] = {
     val address = account.toAddress(chainId)
     accountScripts.replaceIfKnown(address) { _ =>
@@ -65,16 +67,21 @@ class BlockchainStorage[TagT](val settings: BlockchainSettings, blockchainApi: B
   }
 
   // It seems, we don't need to update this. Only for some optimization needs
-  val blockHeaders = RideData.mapReadOnly[Int, (SignedBlockHeader, ByteStr), TagT] { h =>
+  private val blockHeaders = RideData.mapReadOnly[Int, SignedBlockHeader, TagT] { h =>
     if (h > height) throw new RuntimeException(s"Can't receive a block with height=$h > current height=$height")
     else blockchainApi.getBlockHeader(h)
   }
+  def getBlockHeader(height: Int, tag: TagT): Option[SignedBlockHeader] = blockHeaders.get(height, tag)
+
+  private val vrf = RideData.mapReadOnly[Int, ByteStr, TagT] { h =>
+    if (h > height) throw new RuntimeException(s"Can't receive a block VRF with height=$h > current height=$height")
+    else blockchainApi.getVrf(h)
+  }
+  def getVrf(height: Int, tag: TagT): Option[ByteStr] = vrf.get(height, tag)
 
   // Ride: wavesBalance, height, lastBlock TODO: a binding in Ride?
   private var _height: Int = blockchainApi.getCurrentBlockchainHeight()
-
-  def height: Int = _height
-
+  def height: Int          = _height
   // TODO How do we known that this field is used in a script?
   def setHeight(height: Int): Unit = {
     log.debug(s"Updated height = $height")
@@ -84,7 +91,8 @@ class BlockchainStorage[TagT](val settings: BlockchainSettings, blockchainApi: B
   // No way to get this from blockchain updates
   var activatedFeatures = blockchainApi.getActivatedFeatures(height)
 
-  val assets = RideData.anyRefMap[IssuedAsset, AssetDescription, TagT](blockchainApi.getAssetDescription)
+  private val assets = RideData.anyRefMap[IssuedAsset, AssetDescription, TagT](blockchainApi.getAssetDescription)
+  def getAssetDescription(asset: IssuedAsset, tag: TagT): Option[AssetDescription] = assets.get(asset, tag)
   def replaceAssetDescription(update: StateUpdate.AssetDetails): Set[TagT] = {
     val asset = update.assetId.toIssuedAsset
     assets.replaceIfKnown(asset) { _ =>
@@ -111,10 +119,13 @@ class BlockchainStorage[TagT](val settings: BlockchainSettings, blockchainApi: B
   }
 
   // It seems, we don't need to update this. Only for some optimization needs
-  val aliases = RideData.anyRefMap[Alias, Address, TagT](blockchainApi.resolveAlias)
+  private val aliases = RideData.anyRefMap[Alias, Address, TagT](blockchainApi.resolveAlias)
 
-  val portfolios = RideData.anyRefMap[Address, Portfolio, TagT](blockchainApi.getBalances(_).some)
+  def getAlias(alias: Alias, tag: TagT): Option[Address] = aliases.get(alias, tag)
 
+  private val portfolios = RideData.anyRefMap[Address, Portfolio, TagT](blockchainApi.getBalances(_).some)
+
+  def getPortfolio(address: Address, tag: TagT): Option[Portfolio] = portfolios.get(address, tag)
   def replaceBalance(toReplace: StateUpdate.BalanceUpdate): Set[TagT] = {
     val address = toReplace.address.toAddress
     portfolios.replaceIfKnown(address) { mayBeOrig =>
@@ -128,7 +139,6 @@ class BlockchainStorage[TagT](val settings: BlockchainSettings, blockchainApi: B
       })
     }
   }
-
   def replaceLeasing(toReplace: StateUpdate.LeasingUpdate): Set[TagT] = {
     val address = toReplace.address.toAddress
     portfolios.replaceIfKnown(address) { orig =>
@@ -137,7 +147,9 @@ class BlockchainStorage[TagT](val settings: BlockchainSettings, blockchainApi: B
     }
   }
 
-  val transactions = RideData.anyRefMap[ByteStr, (TxMeta, Option[TransferTransactionLike]), TagT](blockchainApi.getTransaction)
+  private val transactions = RideData.anyRefMap[ByteStr, (TxMeta, Option[TransferTransactionLike]), TagT](blockchainApi.getTransaction)
+
+  def getTransaction(id: ByteStr, tag: TagT): Option[(TxMeta, Option[TransferTransactionLike])] = transactions.get(id, tag)
 
   // Got a transaction, got a rollback, same transaction on new height/failed/removed
   def replaceTransactionMeta(pbId: ByteString, height: Int): Set[TagT] = {
@@ -149,8 +161,8 @@ class BlockchainStorage[TagT](val settings: BlockchainSettings, blockchainApi: B
         (
           TxMeta(
             height = Height(height),
-            succeeded = true,   // Not used in Ride
-            spentComplexity = 0 // TODO: It seems, not used
+            succeeded = true,
+            spentComplexity = 0
           ),
           tx
         )

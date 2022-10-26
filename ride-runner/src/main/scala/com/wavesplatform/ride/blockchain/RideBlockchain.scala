@@ -32,19 +32,19 @@ class RideBlockchain[TagT](storage: BlockchainStorage[TagT], tag: TagT) extends 
   override def hasData(address: Address): Boolean = kill(s"hasData($address)") // data.contains(address)
 
   // Ride: get*Value (data), get* (data)
-  override def accountData(address: Address, key: String): Option[DataEntry[_]] = storage.data.get((address, key), tag)
+  override def accountData(address: Address, key: String): Option[DataEntry[_]] = storage.getData(address, key, tag)
 
   // Ride: scriptHash
-  override def accountScript(address: Address): Option[AccountScriptInfo] = storage.accountScripts.get(address, tag)
+  override def accountScript(address: Address): Option[AccountScriptInfo] = storage.getAccountScript(address, tag)
 
   // Indirectly
   override def hasAccountScript(address: Address): Boolean = accountScript(address).nonEmpty
 
   // Ride: blockInfoByHeight, lastBlock
-  override def blockHeader(height: Int): Option[SignedBlockHeader] = storage.blockHeaders.get(height, tag).map(_._1)
+  override def blockHeader(height: Int): Option[SignedBlockHeader] = storage.getBlockHeader(height, tag)
 
   // Ride: blockInfoByHeight
-  override def hitSource(height: Int): Option[ByteStr] = storage.blockHeaders.get(height, tag).map(_._2)
+  override def hitSource(height: Int): Option[ByteStr] = storage.getVrf(height, tag)
 
   // Ride: wavesBalance, height, lastBlock TODO: a binding in Ride?
   override def height: Int = storage.height
@@ -52,16 +52,16 @@ class RideBlockchain[TagT](storage: BlockchainStorage[TagT], tag: TagT) extends 
   override def activatedFeatures: Map[Short, Int] = storage.activatedFeatures
 
   // Ride: assetInfo
-  override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription] = storage.assets.get(id, tag)
+  override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription] = storage.getAssetDescription(id, tag)
 
   // Ride (indirectly): asset script validation
   override def assetScript(id: Asset.IssuedAsset): Option[AssetScriptInfo] = assetDescription(id).flatMap(_.script)
 
   // Ride: get*Value (data), get* (data), isDataStorageUntouched, balance, scriptHash, wavesBalance
   override def resolveAlias(a: Alias): Either[ValidationError, Address] =
-    storage.aliases.get(a, tag).toRight(AliasDoesNotExist(a): ValidationError)
+    storage.getAlias(a, tag).toRight(AliasDoesNotExist(a): ValidationError)
 
-  private def withPortfolios(address: Address): Portfolio = storage.portfolios.get(address, tag).getOrElse(Portfolio.empty)
+  private def withPortfolios(address: Address): Portfolio = storage.getPortfolio(address, tag).getOrElse(Portfolio.empty)
 
   // Ride: wavesBalance
   override def leaseBalance(address: Address): LeaseBalance = withPortfolios(address).lease
@@ -78,7 +78,7 @@ class RideBlockchain[TagT](storage: BlockchainStorage[TagT], tag: TagT) extends 
   // input.balanceSnapshots.getOrElse(address, Seq(BalanceSnapshot(height, 0, 0, 0))).filter(_.height >= from)
 
   private def withTransactions(id: ByteStr): Option[(TxMeta, Option[TransferTransactionLike])] =
-    storage.transactions.get(id, tag)
+    storage.getTransaction(id, tag)
 
   // Ride: transactionHeightById
   override def transactionMeta(id: ByteStr): Option[TxMeta] = withTransactions(id).map(_._1)
