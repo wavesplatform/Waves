@@ -55,11 +55,11 @@ object JsApiUtils {
     }
 
     jObj.applyDynamic("apply")(
-      "type"        -> "DAPP",
-      "posStart"    -> ast.position.start,
-      "posEnd"      -> ast.position.end,
-      "decList"     -> ast.decs.map(serDec).toJSArray,
-      "annFuncList" -> ast.fs.map(serAnnFunc)
+      "type"         -> "DAPP",
+      "posStart"     -> ast.position.start,
+      "posEnd"       -> ast.position.end,
+      "decList"      -> ast.decs.map(serDec).toJSArray,
+      "annFuncList"  -> ast.fs.map(serAnnFunc).toJSArray
     )
   }
 

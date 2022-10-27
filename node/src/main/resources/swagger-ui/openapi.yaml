@@ -1802,6 +1802,37 @@ paths:
               properties:
                 expr:
                   type: string
+                id:
+                  type: string
+                  example: "C8AgSFP8y91XUTpGtEQAQyjsSemxoY61ocGM852DFKF6"
+                  nullable: true
+                fee:
+                  type: number
+                  example: 500000
+                  nullable: true
+                feeAssetId:
+                  type: string
+                  example: null
+                  nullable: true
+                sender:
+                  type: string
+                  example: "3Mds6m8XZf4biC72NRkFx2kyoBdC9UvYRUR"
+                  nullable: true
+                senderPublicKey:
+                  type: string
+                  example: "3T9fL3XpeaHYbumohePPUmeuUqhyEeyzifi9vKouV8QoNtAT6kYV1oPAe9e2KCVquPcyXJpr2QwUiQKEUQPGZnc6"
+                  nullable: true
+                payment:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      amount:
+                        $ref: '#/components/schemas/Amount'
+                      assetId:
+                        allOf:
+                          - $ref: '#/components/schemas/AssetId'
+                        nullable: true
         required: true
       responses:
         '200':
@@ -1821,6 +1852,16 @@ paths:
                       type:
                         type: string
                       value: { }
+        '400':
+          description: Conflicting request structure
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiError'
+                example:
+                  error: 198
+                  message: Conflicting request structure. Both expression and invocation structure were sent
   /utils/seed:
     get:
       tags:
