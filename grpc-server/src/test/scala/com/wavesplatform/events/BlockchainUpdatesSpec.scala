@@ -283,6 +283,20 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       val totalWaves = 100_000_000_0000_0000L
       val reward     = 6_0000_0000
 
+      "on preactivated block reward" in {
+        val settings = currentSettings.setFeaturesHeight((BlockReward, 0))
+
+        withDomainAndRepo(settings) { case (d, repo) =>
+          d.appendBlock()
+          d.blockchain.wavesAmount(1) shouldBe totalWaves + reward
+          repo.getBlockUpdate(1).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward
+
+          d.appendBlock()
+          d.blockchain.wavesAmount(2) shouldBe totalWaves + reward * 2
+          repo.getBlockUpdate(2).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 2
+        }
+      }
+
       "on activation of block reward" in {
         val settings = currentSettings.setFeaturesHeight((BlockReward, 3))
 
