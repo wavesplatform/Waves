@@ -140,8 +140,8 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
         val nextHeight = state.height + 1
         val isProto    = state.activatedFeatures.get(BlockchainFeatures.BlockV5.id).exists(nextHeight > 1 && nextHeight >= _)
         val block      = TestBlock.create(txs, if (isProto) Block.ProtoBlockVersion else Block.PlainBlockVersion)
-        differ(state, block).map(
-          diff => state.append(diff.diff, diff.carry, diff.totalFee, None, block.header.generationSignature.take(Block.HitSourceLength), block)
+        differ(state, block).map(diff =>
+          state.append(diff.diff, diff.carry, diff.totalFee, None, block.header.generationSignature.take(Block.HitSourceLength), block)
         )
       })
     }
@@ -165,7 +165,8 @@ trait WithDomain extends WithState { _: Suite =>
     DomainPresets.domainSettingsWithFS(fs)
 
   def withDomain[A](
-      settings: WavesSettings = DomainPresets.SettingsFromDefaultConfig.addFeatures(BlockchainFeatures.SmartAccounts), // SmartAccounts to allow V2 transfers by default
+      settings: WavesSettings =
+        DomainPresets.SettingsFromDefaultConfig.addFeatures(BlockchainFeatures.SmartAccounts), // SmartAccounts to allow V2 transfers by default
       balances: Seq[AddrWithBalance] = Seq.empty,
       wrapDB: DB => DB = identity
   )(test: Domain => A): A =
@@ -180,9 +181,8 @@ trait WithDomain extends WithState { _: Suite =>
         loadActiveLeases(db, _, _)
       )
       domain = Domain(wrapDB(db), bcu, blockchain, settings)
-      val genesis = balances.map {
-        case AddrWithBalance(address, amount) =>
-          TxHelpers.genesis(address, amount)
+      val genesis = balances.map { case AddrWithBalance(address, amount) =>
+        TxHelpers.genesis(address, amount)
       }
       if (genesis.nonEmpty) {
         domain.appendBlock(genesis*)

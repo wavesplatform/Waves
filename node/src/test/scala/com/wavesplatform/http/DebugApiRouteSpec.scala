@@ -216,6 +216,7 @@ class DebugApiRouteSpec
               )
             )
           )
+        blockchain.stub.activateAllFeatures()
       }
 
       val route = routeWithBlockchain(blockchain)
@@ -226,7 +227,7 @@ class DebugApiRouteSpec
         (json \ "validationTime").as[Int] shouldBe 1000 +- 1000
         (json \ "error").as[String] should include("not allowed by script of the asset")
         (json \ "trace").as[JsArray] shouldBe Json.parse(
-          "[{\"type\":\"asset\",\"context\":\"orderAmount\",\"id\":\"5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx\",\"result\":\"failure\",\"vars\":[],\"error\":\"error\"}]"
+          "[{\"type\":\"asset\",\"context\":\"orderAmount\",\"id\":\"5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx\",\"result\":\"failure\",\"vars\":[{\"name\":\"throw.@args\",\"type\":\"Array\",\"value\":[{\"type\":\"String\",\"value\":\"error\"}]},{\"name\":\"throw.@complexity\",\"type\":\"Int\",\"value\":1},{\"name\":\"@complexityLimit\",\"type\":\"Int\",\"value\":2147483646}],\"error\":\"error\"}]"
         )
       }
     }
@@ -318,6 +319,7 @@ class DebugApiRouteSpec
           )
 
         (blockchain.hasAccountScript _).when(*).returns(true)
+        blockchain.stub.activateAllFeatures()
       }
 
       val route = routeWithBlockchain(blockchain)
@@ -336,7 +338,7 @@ class DebugApiRouteSpec
         }
       }
 
-      def testPayment(result: String) = withClue("payment") {
+      def testPayment(result: InvokeScriptTransaction => String) = withClue("payment") {
         val tx = TxHelpers.invoke(TxHelpers.secondAddress, fee = 1300000, payments = Seq(Payment(1L, TestValues.asset)))
 
         jsonPost(routePath("/validate"), tx.json()) ~> route ~> check {
@@ -347,108 +349,738 @@ class DebugApiRouteSpec
           else
             (json \ "transaction").as[JsObject] should matchJson(tx.json())
 
-          (json \ "trace").as[JsArray] should matchJson(Json.parse(result))
+          (json \ "trace").as[JsArray] should matchJson(Json.parse(result(tx)))
         }
       }
 
-      testPayment("""[ {
-                    |  "type" : "verifier",
-                    |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-                    |  "result" : "success",
-                    |  "error" : null
-                    |}, {
-                    |  "type" : "dApp",
-                    |  "id" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
-                    |  "function" : "default",
-                    |  "args" : [ ],
-                    |  "invocations" : [ ],
-                    |  "result" : {
-                    |    "data" : [ ],
-                    |    "transfers" : [ ],
-                    |    "issues" : [ ],
-                    |    "reissues" : [ ],
-                    |    "burns" : [ ],
-                    |    "sponsorFees" : [ ],
-                    |    "leases" : [ ],
-                    |    "leaseCancels" : [ ],
-                    |    "invokes" : [ ]
-                    |  },
-                    |  "error" : null,
-                    |  "vars" : [ ]
-                    |}, {
-                    |  "type" : "asset",
-                    |  "context" : "payment",
-                    |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
-                    |  "result" : "failure",
-                    |  "vars" : [ {
-                    |    "name" : "test",
-                    |    "type" : "Boolean",
-                    |    "value" : true
-                    |  } ],
-                    |  "error" : "error"
-                    |} ]""".stripMargin)
+      testPayment(tx => s"""[ {
+                           |  "type" : "verifier",
+                           |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                           |  "result" : "success",
+                           |  "error" : null
+                           |}, {
+                           |  "type" : "dApp",
+                           |  "id" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
+                           |  "function" : "default",
+                           |  "args" : [ ],
+                           |  "invocations" : [ ],
+                           |  "result" : {
+                           |    "data" : [ ],
+                           |    "transfers" : [ ],
+                           |    "issues" : [ ],
+                           |    "reissues" : [ ],
+                           |    "burns" : [ ],
+                           |    "sponsorFees" : [ ],
+                           |    "leases" : [ ],
+                           |    "leaseCancels" : [ ],
+                           |    "invokes" : [ ]
+                           |  },
+                           |  "error" : null,
+                           |  "vars" : [ {
+                           |    "name" : "i",
+                           |    "type" : "Invocation",
+                           |    "value" : {
+                           |      "payments" : {
+                           |        "type" : "Array",
+                           |        "value" : [ {
+                           |          "type" : "AttachedPayment",
+                           |          "value" : {
+                           |            "amount" : {
+                           |              "type" : "Int",
+                           |              "value" : 1
+                           |            },
+                           |            "assetId" : {
+                           |              "type" : "ByteVector",
+                           |              "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+                           |            }
+                           |          }
+                           |        } ]
+                           |      },
+                           |      "callerPublicKey" : {
+                           |        "type" : "ByteVector",
+                           |        "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+                           |      },
+                           |      "feeAssetId" : {
+                           |        "type" : "Unit",
+                           |        "value" : { }
+                           |      },
+                           |      "transactionId" : {
+                           |        "type" : "ByteVector",
+                           |        "value" : "${tx.id()}"
+                           |      },
+                           |      "caller" : {
+                           |        "type" : "Address",
+                           |        "value" : {
+                           |          "bytes" : {
+                           |            "type" : "ByteVector",
+                           |            "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+                           |          }
+                           |        }
+                           |      },
+                           |      "fee" : {
+                           |        "type" : "Int",
+                           |        "value" : 1300000
+                           |      }
+                           |    }
+                           |  }, {
+                           |    "name" : "default.@args",
+                           |    "type" : "Array",
+                           |    "value" : [ ]
+                           |  }, {
+                           |    "name" : "default.@complexity",
+                           |    "type" : "Int",
+                           |    "value" : 1
+                           |  }, {
+                           |    "name" : "@complexityLimit",
+                           |    "type" : "Int",
+                           |    "value" : 51994
+                           |  } ]
+                           |}, {
+                           |  "type" : "asset",
+                           |  "context" : "payment",
+                           |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
+                           |  "result" : "failure",
+                           |  "vars" : [ {
+                           |    "name" : "test",
+                           |    "type" : "Boolean",
+                           |    "value" : true
+                           |  }, {
+                           |    "name" : "throw.@args",
+                           |    "type" : "Array",
+                           |    "value" : [ {
+                           |      "type" : "String",
+                           |      "value" : "error"
+                           |    } ]
+                           |  }, {
+                           |    "name" : "throw.@complexity",
+                           |    "type" : "Int",
+                           |    "value" : 1
+                           |  }, {
+                           |    "name" : "@complexityLimit",
+                           |    "type" : "Int",
+                           |    "value" : 2147483646
+                           |  } ],
+                           |  "error" : "error"
+                           |} ]""".stripMargin)
 
       testFunction(
         "dataAndTransfer",
-        _ => """[ {
-               |  "type" : "verifier",
-               |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-               |  "result" : "success",
-               |  "error" : null
-               |}, {
-               |  "type" : "dApp",
-               |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-               |  "function" : "dataAndTransfer",
-               |  "args" : [ ],
-               |  "invocations" : [ ],
-               |  "result" : {
-               |    "data" : [ {
-               |      "key" : "key",
-               |      "type" : "integer",
-               |      "value" : 1
-               |    }, {
-               |      "key" : "key",
-               |      "type" : "boolean",
-               |      "value" : true
-               |    }, {
-               |      "key" : "key",
-               |      "type" : "string",
-               |      "value" : "str"
-               |    }, {
-               |      "key" : "key",
-               |      "type" : "binary",
-               |      "value" : "base64:"
-               |    }, {
-               |      "key" : "key",
-               |      "value" : null
-               |    } ],
-               |    "transfers" : [ {
-               |      "address" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
-               |      "asset" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
-               |      "amount" : 1
-               |    } ],
-               |    "issues" : [ ],
-               |    "reissues" : [ ],
-               |    "burns" : [ ],
-               |    "sponsorFees" : [ ],
-               |    "leases" : [ ],
-               |    "leaseCancels" : [ ],
-               |    "invokes" : [ ]
-               |  },
-               |  "error" : null,
-               |  "vars" : [ ]
-               |}, {
-               |  "type" : "asset",
-               |  "context" : "transfer",
-               |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
-               |  "result" : "failure",
-               |  "vars" : [ {
-               |    "name" : "test",
-               |    "type" : "Boolean",
-               |    "value" : true
-               |  } ],
-               |  "error" : "error"
-               |} ]""".stripMargin
+        tx => s"""[ {
+                 |  "type" : "verifier",
+                 |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                 |  "result" : "success",
+                 |  "error" : null
+                 |}, {
+                 |  "type" : "dApp",
+                 |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                 |  "function" : "dataAndTransfer",
+                 |  "args" : [ ],
+                 |  "invocations" : [ ],
+                 |  "result" : {
+                 |    "data" : [ {
+                 |      "key" : "key",
+                 |      "type" : "integer",
+                 |      "value" : 1
+                 |    }, {
+                 |      "key" : "key",
+                 |      "type" : "boolean",
+                 |      "value" : true
+                 |    }, {
+                 |      "key" : "key",
+                 |      "type" : "string",
+                 |      "value" : "str"
+                 |    }, {
+                 |      "key" : "key",
+                 |      "type" : "binary",
+                 |      "value" : "base64:"
+                 |    }, {
+                 |      "key" : "key",
+                 |      "value" : null
+                 |    } ],
+                 |    "transfers" : [ {
+                 |      "address" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC",
+                 |      "asset" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
+                 |      "amount" : 1
+                 |    } ],
+                 |    "issues" : [ ],
+                 |    "reissues" : [ ],
+                 |    "burns" : [ ],
+                 |    "sponsorFees" : [ ],
+                 |    "leases" : [ ],
+                 |    "leaseCancels" : [ ],
+                 |    "invokes" : [ ]
+                 |  },
+                 |  "error" : null,
+                 |  "vars" : [ {
+                 |    "name" : "i",
+                 |    "type" : "Invocation",
+                 |    "value" : {
+                 |      "payments" : {
+                 |        "type" : "Array",
+                 |        "value" : [ ]
+                 |      },
+                 |      "callerPublicKey" : {
+                 |        "type" : "ByteVector",
+                 |        "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+                 |      },
+                 |      "feeAssetId" : {
+                 |        "type" : "Unit",
+                 |        "value" : { }
+                 |      },
+                 |      "transactionId" : {
+                 |        "type" : "ByteVector",
+                 |        "value" : "${tx.id()}"
+                 |      },
+                 |      "caller" : {
+                 |        "type" : "Address",
+                 |        "value" : {
+                 |          "bytes" : {
+                 |            "type" : "ByteVector",
+                 |            "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+                 |          }
+                 |        }
+                 |      },
+                 |      "fee" : {
+                 |        "type" : "Int",
+                 |        "value" : 102500000
+                 |      }
+                 |    }
+                 |  }, {
+                 |    "name" : "dataAndTransfer.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ ]
+                 |  }, {
+                 |    "name" : "IntegerEntry.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "String",
+                 |      "value" : "key"
+                 |    }, {
+                 |      "type" : "Int",
+                 |      "value" : 1
+                 |    } ]
+                 |  }, {
+                 |    "name" : "IntegerEntry.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51999
+                 |  }, {
+                 |    "name" : "BooleanEntry.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "String",
+                 |      "value" : "key"
+                 |    }, {
+                 |      "type" : "Boolean",
+                 |      "value" : true
+                 |    } ]
+                 |  }, {
+                 |    "name" : "BooleanEntry.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51998
+                 |  }, {
+                 |    "name" : "StringEntry.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "String",
+                 |      "value" : "key"
+                 |    }, {
+                 |      "type" : "String",
+                 |      "value" : "str"
+                 |    } ]
+                 |  }, {
+                 |    "name" : "StringEntry.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51997
+                 |  }, {
+                 |    "name" : "BinaryEntry.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "String",
+                 |      "value" : "key"
+                 |    }, {
+                 |      "type" : "ByteVector",
+                 |      "value" : ""
+                 |    } ]
+                 |  }, {
+                 |    "name" : "BinaryEntry.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51996
+                 |  }, {
+                 |    "name" : "DeleteEntry.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "String",
+                 |      "value" : "key"
+                 |    } ]
+                 |  }, {
+                 |    "name" : "DeleteEntry.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51995
+                 |  }, {
+                 |    "name" : "Address.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "ByteVector",
+                 |      "value" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+                 |    } ]
+                 |  }, {
+                 |    "name" : "Address.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51994
+                 |  }, {
+                 |    "name" : "ScriptTransfer.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "Address",
+                 |      "value" : {
+                 |        "bytes" : {
+                 |          "type" : "ByteVector",
+                 |          "value" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+                 |        }
+                 |      }
+                 |    }, {
+                 |      "type" : "Int",
+                 |      "value" : 1
+                 |    }, {
+                 |      "type" : "ByteVector",
+                 |      "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+                 |    } ]
+                 |  }, {
+                 |    "name" : "ScriptTransfer.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51993
+                 |  }, {
+                 |    "name" : "cons.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "ScriptTransfer",
+                 |      "value" : {
+                 |        "recipient" : {
+                 |          "type" : "Address",
+                 |          "value" : {
+                 |            "bytes" : {
+                 |              "type" : "ByteVector",
+                 |              "value" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+                 |            }
+                 |          }
+                 |        },
+                 |        "amount" : {
+                 |          "type" : "Int",
+                 |          "value" : 1
+                 |        },
+                 |        "asset" : {
+                 |          "type" : "ByteVector",
+                 |          "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+                 |        }
+                 |      }
+                 |    }, {
+                 |      "type" : "Array",
+                 |      "value" : [ ]
+                 |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51992
+                 |  }, {
+                 |    "name" : "cons.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "DeleteEntry",
+                 |      "value" : {
+                 |        "key" : {
+                 |          "type" : "String",
+                 |          "value" : "key"
+                 |        }
+                 |      }
+                 |    }, {
+                 |      "type" : "Array",
+                 |      "value" : [ {
+                 |        "type" : "ScriptTransfer",
+                 |        "value" : {
+                 |          "recipient" : {
+                 |            "type" : "Address",
+                 |            "value" : {
+                 |              "bytes" : {
+                 |                "type" : "ByteVector",
+                 |                "value" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+                 |              }
+                 |            }
+                 |          },
+                 |          "amount" : {
+                 |            "type" : "Int",
+                 |            "value" : 1
+                 |          },
+                 |          "asset" : {
+                 |            "type" : "ByteVector",
+                 |            "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+                 |          }
+                 |        }
+                 |      } ]
+                 |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51991
+                 |  }, {
+                 |    "name" : "cons.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "BinaryEntry",
+                 |      "value" : {
+                 |        "key" : {
+                 |          "type" : "String",
+                 |          "value" : "key"
+                 |        },
+                 |        "value" : {
+                 |          "type" : "ByteVector",
+                 |          "value" : ""
+                 |        }
+                 |      }
+                 |    }, {
+                 |      "type" : "Array",
+                 |      "value" : [ {
+                 |        "type" : "DeleteEntry",
+                 |        "value" : {
+                 |          "key" : {
+                 |            "type" : "String",
+                 |            "value" : "key"
+                 |          }
+                 |        }
+                 |      }, {
+                 |        "type" : "ScriptTransfer",
+                 |        "value" : {
+                 |          "recipient" : {
+                 |            "type" : "Address",
+                 |            "value" : {
+                 |              "bytes" : {
+                 |                "type" : "ByteVector",
+                 |                "value" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+                 |              }
+                 |            }
+                 |          },
+                 |          "amount" : {
+                 |            "type" : "Int",
+                 |            "value" : 1
+                 |          },
+                 |          "asset" : {
+                 |            "type" : "ByteVector",
+                 |            "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+                 |          }
+                 |        }
+                 |      } ]
+                 |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51990
+                 |  }, {
+                 |    "name" : "cons.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "StringEntry",
+                 |      "value" : {
+                 |        "key" : {
+                 |          "type" : "String",
+                 |          "value" : "key"
+                 |        },
+                 |        "value" : {
+                 |          "type" : "String",
+                 |          "value" : "str"
+                 |        }
+                 |      }
+                 |    }, {
+                 |      "type" : "Array",
+                 |      "value" : [ {
+                 |        "type" : "BinaryEntry",
+                 |        "value" : {
+                 |          "key" : {
+                 |            "type" : "String",
+                 |            "value" : "key"
+                 |          },
+                 |          "value" : {
+                 |            "type" : "ByteVector",
+                 |            "value" : ""
+                 |          }
+                 |        }
+                 |      }, {
+                 |        "type" : "DeleteEntry",
+                 |        "value" : {
+                 |          "key" : {
+                 |            "type" : "String",
+                 |            "value" : "key"
+                 |          }
+                 |        }
+                 |      }, {
+                 |        "type" : "ScriptTransfer",
+                 |        "value" : {
+                 |          "recipient" : {
+                 |            "type" : "Address",
+                 |            "value" : {
+                 |              "bytes" : {
+                 |                "type" : "ByteVector",
+                 |                "value" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+                 |              }
+                 |            }
+                 |          },
+                 |          "amount" : {
+                 |            "type" : "Int",
+                 |            "value" : 1
+                 |          },
+                 |          "asset" : {
+                 |            "type" : "ByteVector",
+                 |            "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+                 |          }
+                 |        }
+                 |      } ]
+                 |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51989
+                 |  }, {
+                 |    "name" : "cons.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "BooleanEntry",
+                 |      "value" : {
+                 |        "key" : {
+                 |          "type" : "String",
+                 |          "value" : "key"
+                 |        },
+                 |        "value" : {
+                 |          "type" : "Boolean",
+                 |          "value" : true
+                 |        }
+                 |      }
+                 |    }, {
+                 |      "type" : "Array",
+                 |      "value" : [ {
+                 |        "type" : "StringEntry",
+                 |        "value" : {
+                 |          "key" : {
+                 |            "type" : "String",
+                 |            "value" : "key"
+                 |          },
+                 |          "value" : {
+                 |            "type" : "String",
+                 |            "value" : "str"
+                 |          }
+                 |        }
+                 |      }, {
+                 |        "type" : "BinaryEntry",
+                 |        "value" : {
+                 |          "key" : {
+                 |            "type" : "String",
+                 |            "value" : "key"
+                 |          },
+                 |          "value" : {
+                 |            "type" : "ByteVector",
+                 |            "value" : ""
+                 |          }
+                 |        }
+                 |      }, {
+                 |        "type" : "DeleteEntry",
+                 |        "value" : {
+                 |          "key" : {
+                 |            "type" : "String",
+                 |            "value" : "key"
+                 |          }
+                 |        }
+                 |      }, {
+                 |        "type" : "ScriptTransfer",
+                 |        "value" : {
+                 |          "recipient" : {
+                 |            "type" : "Address",
+                 |            "value" : {
+                 |              "bytes" : {
+                 |                "type" : "ByteVector",
+                 |                "value" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+                 |              }
+                 |            }
+                 |          },
+                 |          "amount" : {
+                 |            "type" : "Int",
+                 |            "value" : 1
+                 |          },
+                 |          "asset" : {
+                 |            "type" : "ByteVector",
+                 |            "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+                 |          }
+                 |        }
+                 |      } ]
+                 |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51988
+                 |  }, {
+                 |    "name" : "cons.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "IntegerEntry",
+                 |      "value" : {
+                 |        "key" : {
+                 |          "type" : "String",
+                 |          "value" : "key"
+                 |        },
+                 |        "value" : {
+                 |          "type" : "Int",
+                 |          "value" : 1
+                 |        }
+                 |      }
+                 |    }, {
+                 |      "type" : "Array",
+                 |      "value" : [ {
+                 |        "type" : "BooleanEntry",
+                 |        "value" : {
+                 |          "key" : {
+                 |            "type" : "String",
+                 |            "value" : "key"
+                 |          },
+                 |          "value" : {
+                 |            "type" : "Boolean",
+                 |            "value" : true
+                 |          }
+                 |        }
+                 |      }, {
+                 |        "type" : "StringEntry",
+                 |        "value" : {
+                 |          "key" : {
+                 |            "type" : "String",
+                 |            "value" : "key"
+                 |          },
+                 |          "value" : {
+                 |            "type" : "String",
+                 |            "value" : "str"
+                 |          }
+                 |        }
+                 |      }, {
+                 |        "type" : "BinaryEntry",
+                 |        "value" : {
+                 |          "key" : {
+                 |            "type" : "String",
+                 |            "value" : "key"
+                 |          },
+                 |          "value" : {
+                 |            "type" : "ByteVector",
+                 |            "value" : ""
+                 |          }
+                 |        }
+                 |      }, {
+                 |        "type" : "DeleteEntry",
+                 |        "value" : {
+                 |          "key" : {
+                 |            "type" : "String",
+                 |            "value" : "key"
+                 |          }
+                 |        }
+                 |      }, {
+                 |        "type" : "ScriptTransfer",
+                 |        "value" : {
+                 |          "recipient" : {
+                 |            "type" : "Address",
+                 |            "value" : {
+                 |              "bytes" : {
+                 |                "type" : "ByteVector",
+                 |                "value" : "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+                 |              }
+                 |            }
+                 |          },
+                 |          "amount" : {
+                 |            "type" : "Int",
+                 |            "value" : 1
+                 |          },
+                 |          "asset" : {
+                 |            "type" : "ByteVector",
+                 |            "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+                 |          }
+                 |        }
+                 |      } ]
+                 |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51987
+                 |  } ]
+                 |}, {
+                 |  "type" : "asset",
+                 |  "context" : "transfer",
+                 |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
+                 |  "result" : "failure",
+                 |  "vars" : [ {
+                 |    "name" : "test",
+                 |    "type" : "Boolean",
+                 |    "value" : true
+                 |  }, {
+                 |    "name" : "throw.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "String",
+                 |      "value" : "error"
+                 |    } ]
+                 |  }, {
+                 |    "name" : "throw.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 2147483646
+                 |  } ],
+                 |  "error" : "error"
+                 |} ]""".stripMargin
       )
 
       testFunction(
@@ -486,98 +1118,419 @@ class DebugApiRouteSpec
                  |  },
                  |  "error" : null,
                  |  "vars" : [ {
+                 |    "name" : "i",
+                 |    "type" : "Invocation",
+                 |    "value" : {
+                 |      "payments" : {
+                 |        "type" : "Array",
+                 |        "value" : [ ]
+                 |      },
+                 |      "callerPublicKey" : {
+                 |        "type" : "ByteVector",
+                 |        "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+                 |      },
+                 |      "feeAssetId" : {
+                 |        "type" : "Unit",
+                 |        "value" : { }
+                 |      },
+                 |      "transactionId" : {
+                 |        "type" : "ByteVector",
+                 |        "value" : "${tx.id()}"
+                 |      },
+                 |      "caller" : {
+                 |        "type" : "Address",
+                 |        "value" : {
+                 |          "bytes" : {
+                 |            "type" : "ByteVector",
+                 |            "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+                 |          }
+                 |        }
+                 |      },
+                 |      "fee" : {
+                 |        "type" : "Int",
+                 |        "value" : 102500000
+                 |      }
+                 |    }
+                 |  }, {
+                 |    "name" : "issue.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ ]
+                 |  }, {
                  |    "name" : "decimals",
                  |    "type" : "Int",
                  |    "value" : 4
+                 |  }, {
+                 |    "name" : "Issue.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "String",
+                 |      "value" : "name"
+                 |    }, {
+                 |      "type" : "String",
+                 |      "value" : "description"
+                 |    }, {
+                 |      "type" : "Int",
+                 |      "value" : 1000
+                 |    }, {
+                 |      "type" : "Int",
+                 |      "value" : 4
+                 |    }, {
+                 |      "type" : "Boolean",
+                 |      "value" : true
+                 |    }, {
+                 |      "type" : "Unit",
+                 |      "value" : { }
+                 |    }, {
+                 |      "type" : "Int",
+                 |      "value" : 0
+                 |    } ]
+                 |  }, {
+                 |    "name" : "Issue.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51999
+                 |  }, {
+                 |    "name" : "cons.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "Issue",
+                 |      "value" : {
+                 |        "isReissuable" : {
+                 |          "type" : "Boolean",
+                 |          "value" : true
+                 |        },
+                 |        "nonce" : {
+                 |          "type" : "Int",
+                 |          "value" : 0
+                 |        },
+                 |        "description" : {
+                 |          "type" : "String",
+                 |          "value" : "description"
+                 |        },
+                 |        "decimals" : {
+                 |          "type" : "Int",
+                 |          "value" : 4
+                 |        },
+                 |        "compiledScript" : {
+                 |          "type" : "Unit",
+                 |          "value" : { }
+                 |        },
+                 |        "name" : {
+                 |          "type" : "String",
+                 |          "value" : "name"
+                 |        },
+                 |        "quantity" : {
+                 |          "type" : "Int",
+                 |          "value" : 1000
+                 |        }
+                 |      }
+                 |    }, {
+                 |      "type" : "Array",
+                 |      "value" : [ ]
+                 |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51998
                  |  } ]
                  |} ]""".stripMargin
       )
 
       testFunction(
         "reissue",
-        _ => """[ {
-               |  "type" : "verifier",
-               |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-               |  "result" : "success",
-               |  "error" : null
-               |}, {
-               |  "type" : "dApp",
-               |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-               |  "function" : "reissue",
-               |  "args" : [ ],
-               |  "invocations" : [ ],
-               |  "result" : {
-               |    "data" : [ ],
-               |    "transfers" : [ ],
-               |    "issues" : [ ],
-               |    "reissues" : [ {
-               |      "assetId" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
-               |      "isReissuable" : false,
-               |      "quantity" : 1
-               |    } ],
-               |    "burns" : [ ],
-               |    "sponsorFees" : [ ],
-               |    "leases" : [ ],
-               |    "leaseCancels" : [ ],
-               |    "invokes" : [ ]
-               |  },
-               |  "error" : null,
-               |  "vars" : [ ]
-               |}, {
-               |  "type" : "asset",
-               |  "context" : "reissue",
-               |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
-               |  "result" : "failure",
-               |  "vars" : [ {
-               |    "name" : "test",
-               |    "type" : "Boolean",
-               |    "value" : true
-               |  } ],
-               |  "error" : "error"
-               |} ]""".stripMargin
+        tx => s"""[ {
+                 |  "type" : "verifier",
+                 |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                 |  "result" : "success",
+                 |  "error" : null
+                 |}, {
+                 |  "type" : "dApp",
+                 |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                 |  "function" : "reissue",
+                 |  "args" : [ ],
+                 |  "invocations" : [ ],
+                 |  "result" : {
+                 |    "data" : [ ],
+                 |    "transfers" : [ ],
+                 |    "issues" : [ ],
+                 |    "reissues" : [ {
+                 |      "assetId" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
+                 |      "isReissuable" : false,
+                 |      "quantity" : 1
+                 |    } ],
+                 |    "burns" : [ ],
+                 |    "sponsorFees" : [ ],
+                 |    "leases" : [ ],
+                 |    "leaseCancels" : [ ],
+                 |    "invokes" : [ ]
+                 |  },
+                 |  "error" : null,
+                 |  "vars" : [ {
+                 |    "name" : "i",
+                 |    "type" : "Invocation",
+                 |    "value" : {
+                 |      "payments" : {
+                 |        "type" : "Array",
+                 |        "value" : [ ]
+                 |      },
+                 |      "callerPublicKey" : {
+                 |        "type" : "ByteVector",
+                 |        "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+                 |      },
+                 |      "feeAssetId" : {
+                 |        "type" : "Unit",
+                 |        "value" : { }
+                 |      },
+                 |      "transactionId" : {
+                 |        "type" : "ByteVector",
+                 |        "value" : "${tx.id()}"
+                 |      },
+                 |      "caller" : {
+                 |        "type" : "Address",
+                 |        "value" : {
+                 |          "bytes" : {
+                 |            "type" : "ByteVector",
+                 |            "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+                 |          }
+                 |        }
+                 |      },
+                 |      "fee" : {
+                 |        "type" : "Int",
+                 |        "value" : 102500000
+                 |      }
+                 |    }
+                 |  }, {
+                 |    "name" : "reissue.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ ]
+                 |  }, {
+                 |    "name" : "Reissue.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "ByteVector",
+                 |      "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+                 |    }, {
+                 |      "type" : "Int",
+                 |      "value" : 1
+                 |    }, {
+                 |      "type" : "Boolean",
+                 |      "value" : false
+                 |    } ]
+                 |  }, {
+                 |    "name" : "Reissue.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51999
+                 |  }, {
+                 |    "name" : "cons.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "Reissue",
+                 |      "value" : {
+                 |        "assetId" : {
+                 |          "type" : "ByteVector",
+                 |          "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+                 |        },
+                 |        "quantity" : {
+                 |          "type" : "Int",
+                 |          "value" : 1
+                 |        },
+                 |        "isReissuable" : {
+                 |          "type" : "Boolean",
+                 |          "value" : false
+                 |        }
+                 |      }
+                 |    }, {
+                 |      "type" : "Array",
+                 |      "value" : [ ]
+                 |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51998
+                 |  } ]
+                 |}, {
+                 |  "type" : "asset",
+                 |  "context" : "reissue",
+                 |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
+                 |  "result" : "failure",
+                 |  "vars" : [ {
+                 |    "name" : "test",
+                 |    "type" : "Boolean",
+                 |    "value" : true
+                 |  }, {
+                 |    "name" : "throw.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "String",
+                 |      "value" : "error"
+                 |    } ]
+                 |  }, {
+                 |    "name" : "throw.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 2147483646
+                 |  } ],
+                 |  "error" : "error"
+                 |} ]""".stripMargin
       )
 
       testFunction(
         "burn",
-        _ => """[ {
-               |  "type" : "verifier",
-               |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-               |  "result" : "success",
-               |  "error" : null
-               |}, {
-               |  "type" : "dApp",
-               |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-               |  "function" : "burn",
-               |  "args" : [ ],
-               |  "invocations" : [ ],
-               |  "result" : {
-               |    "data" : [ ],
-               |    "transfers" : [ ],
-               |    "issues" : [ ],
-               |    "reissues" : [ ],
-               |    "burns" : [ {
-               |      "assetId" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
-               |      "quantity" : 1
-               |    } ],
-               |    "sponsorFees" : [ ],
-               |    "leases" : [ ],
-               |    "leaseCancels" : [ ],
-               |    "invokes" : [ ]
-               |  },
-               |  "error" : null,
-               |  "vars" : [ ]
-               |}, {
-               |  "type" : "asset",
-               |  "context" : "burn",
-               |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
-               |  "result" : "failure",
-               |  "vars" : [ {
-               |    "name" : "test",
-               |    "type" : "Boolean",
-               |    "value" : true
-               |  } ],
-               |  "error" : "error"
-               |} ]""".stripMargin
+        tx => s"""[ {
+                 |  "type" : "verifier",
+                 |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                 |  "result" : "success",
+                 |  "error" : null
+                 |}, {
+                 |  "type" : "dApp",
+                 |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+                 |  "function" : "burn",
+                 |  "args" : [ ],
+                 |  "invocations" : [ ],
+                 |  "result" : {
+                 |    "data" : [ ],
+                 |    "transfers" : [ ],
+                 |    "issues" : [ ],
+                 |    "reissues" : [ ],
+                 |    "burns" : [ {
+                 |      "assetId" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
+                 |      "quantity" : 1
+                 |    } ],
+                 |    "sponsorFees" : [ ],
+                 |    "leases" : [ ],
+                 |    "leaseCancels" : [ ],
+                 |    "invokes" : [ ]
+                 |  },
+                 |  "error" : null,
+                 |  "vars" : [ {
+                 |    "name" : "i",
+                 |    "type" : "Invocation",
+                 |    "value" : {
+                 |      "payments" : {
+                 |        "type" : "Array",
+                 |        "value" : [ ]
+                 |      },
+                 |      "callerPublicKey" : {
+                 |        "type" : "ByteVector",
+                 |        "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+                 |      },
+                 |      "feeAssetId" : {
+                 |        "type" : "Unit",
+                 |        "value" : { }
+                 |      },
+                 |      "transactionId" : {
+                 |        "type" : "ByteVector",
+                 |        "value" : "${tx.id()}"
+                 |      },
+                 |      "caller" : {
+                 |        "type" : "Address",
+                 |        "value" : {
+                 |          "bytes" : {
+                 |            "type" : "ByteVector",
+                 |            "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+                 |          }
+                 |        }
+                 |      },
+                 |      "fee" : {
+                 |        "type" : "Int",
+                 |        "value" : 102500000
+                 |      }
+                 |    }
+                 |  }, {
+                 |    "name" : "burn.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ ]
+                 |  }, {
+                 |    "name" : "Burn.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "ByteVector",
+                 |      "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+                 |    }, {
+                 |      "type" : "Int",
+                 |      "value" : 1
+                 |    } ]
+                 |  }, {
+                 |    "name" : "Burn.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51999
+                 |  }, {
+                 |    "name" : "cons.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "Burn",
+                 |      "value" : {
+                 |        "assetId" : {
+                 |          "type" : "ByteVector",
+                 |          "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+                 |        },
+                 |        "quantity" : {
+                 |          "type" : "Int",
+                 |          "value" : 1
+                 |        }
+                 |      }
+                 |    }, {
+                 |      "type" : "Array",
+                 |      "value" : [ ]
+                 |    } ]
+                 |  }, {
+                 |    "name" : "cons.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 51998
+                 |  } ]
+                 |}, {
+                 |  "type" : "asset",
+                 |  "context" : "burn",
+                 |  "id" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
+                 |  "result" : "failure",
+                 |  "vars" : [ {
+                 |    "name" : "test",
+                 |    "type" : "Boolean",
+                 |    "value" : true
+                 |  }, {
+                 |    "name" : "throw.@args",
+                 |    "type" : "Array",
+                 |    "value" : [ {
+                 |      "type" : "String",
+                 |      "value" : "error"
+                 |    } ]
+                 |  }, {
+                 |    "name" : "throw.@complexity",
+                 |    "type" : "Int",
+                 |    "value" : 1
+                 |  }, {
+                 |    "name" : "@complexityLimit",
+                 |    "type" : "Int",
+                 |    "value" : 2147483646
+                 |  } ],
+                 |  "error" : "error"
+                 |} ]""".stripMargin
       )
 
     }
@@ -602,6 +1555,8 @@ class DebugApiRouteSpec
         (blockchain.balance _).when(*, *).returns(Long.MaxValue)
 
         (blockchain.resolveAlias _).when(Alias.create(recipient2.name).explicitGet()).returning(Right(TxHelpers.secondAddress))
+
+        blockchain.stub.activateAllFeatures()
 
         val (dAppScript, _) = ScriptCompiler
           .compile(
@@ -770,13 +1725,344 @@ class DebugApiRouteSpec
              |  },
              |  "error" : null,
              |  "vars" : [ {
+             |    "name" : "i",
+             |    "type" : "Invocation",
+             |    "value" : {
+             |      "originCaller" : {
+             |        "type" : "Address",
+             |        "value" : {
+             |          "bytes" : {
+             |            "type" : "ByteVector",
+             |            "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+             |          }
+             |        }
+             |      },
+             |      "payments" : {
+             |        "type" : "Array",
+             |        "value" : [ ]
+             |      },
+             |      "callerPublicKey" : {
+             |        "type" : "ByteVector",
+             |        "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+             |      },
+             |      "feeAssetId" : {
+             |        "type" : "Unit",
+             |        "value" : { }
+             |      },
+             |      "originCallerPublicKey" : {
+             |        "type" : "ByteVector",
+             |        "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+             |      },
+             |      "transactionId" : {
+             |        "type" : "ByteVector",
+             |        "value" : "${invoke.id()}"
+             |      },
+             |      "caller" : {
+             |        "type" : "Address",
+             |        "value" : {
+             |          "bytes" : {
+             |            "type" : "ByteVector",
+             |            "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+             |          }
+             |        }
+             |      },
+             |      "fee" : {
+             |        "type" : "Int",
+             |        "value" : 500000
+             |      }
+             |    }
+             |  }, {
+             |    "name" : "default.@args",
+             |    "type" : "Array",
+             |    "value" : [ ]
+             |  }, {
+             |    "name" : "parseBigIntValue.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "String",
+             |      "value" : "6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042047"
+             |    } ]
+             |  }, {
+             |    "name" : "parseBigIntValue.@complexity",
+             |    "type" : "Int",
+             |    "value" : 65
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25935
+             |  }, {
              |    "name" : "a",
              |    "type" : "BigInt",
              |    "value" : 6.703903964971298549787012499102923E+153
              |  }, {
+             |    "name" : "==.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "BigInt",
+             |      "value" : 6.703903964971298549787012499102923E+153
+             |    }, {
+             |      "type" : "BigInt",
+             |      "value" : 6.703903964971298549787012499102923E+153
+             |    } ]
+             |  }, {
+             |    "name" : "==.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25934
+             |  }, {
              |    "name" : "test",
              |    "type" : "Int",
              |    "value" : 1
+             |  }, {
+             |    "name" : "==.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "Int",
+             |      "value" : 1
+             |    }, {
+             |      "type" : "Int",
+             |      "value" : 1
+             |    } ]
+             |  }, {
+             |    "name" : "==.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25933
+             |  }, {
+             |    "name" : "Address.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "ByteVector",
+             |      "value" : "3NAgxLPGnw3RGv9JT6NTDaG5D1iLUehg2xd"
+             |    } ]
+             |  }, {
+             |    "name" : "Address.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25932
+             |  }, {
+             |    "name" : "Lease.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "Address",
+             |      "value" : {
+             |        "bytes" : {
+             |          "type" : "ByteVector",
+             |          "value" : "3NAgxLPGnw3RGv9JT6NTDaG5D1iLUehg2xd"
+             |        }
+             |      }
+             |    }, {
+             |      "type" : "Int",
+             |      "value" : 100
+             |    }, {
+             |      "type" : "Int",
+             |      "value" : 0
+             |    } ]
+             |  }, {
+             |    "name" : "Lease.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25931
+             |  }, {
+             |    "name" : "Alias.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "String",
+             |      "value" : "some_alias"
+             |    } ]
+             |  }, {
+             |    "name" : "Alias.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25930
+             |  }, {
+             |    "name" : "Lease.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "Alias",
+             |      "value" : {
+             |        "alias" : {
+             |          "type" : "String",
+             |          "value" : "some_alias"
+             |        }
+             |      }
+             |    }, {
+             |      "type" : "Int",
+             |      "value" : 20
+             |    }, {
+             |      "type" : "Int",
+             |      "value" : 2
+             |    } ]
+             |  }, {
+             |    "name" : "Lease.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25929
+             |  }, {
+             |    "name" : "LeaseCancel.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "ByteVector",
+             |      "value" : "$leaseCancelId"
+             |    } ]
+             |  }, {
+             |    "name" : "LeaseCancel.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25928
+             |  }, {
+             |    "name" : "cons.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "LeaseCancel",
+             |      "value" : {
+             |        "leaseId" : {
+             |          "type" : "ByteVector",
+             |          "value" : "$leaseCancelId"
+             |        }
+             |      }
+             |    }, {
+             |      "type" : "Array",
+             |      "value" : [ ]
+             |    } ]
+             |  }, {
+             |    "name" : "cons.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25927
+             |  }, {
+             |    "name" : "cons.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "Lease",
+             |      "value" : {
+             |        "recipient" : {
+             |          "type" : "Alias",
+             |          "value" : {
+             |            "alias" : {
+             |              "type" : "String",
+             |              "value" : "some_alias"
+             |            }
+             |          }
+             |        },
+             |        "amount" : {
+             |          "type" : "Int",
+             |          "value" : 20
+             |        },
+             |        "nonce" : {
+             |          "type" : "Int",
+             |          "value" : 2
+             |        }
+             |      }
+             |    }, {
+             |      "type" : "Array",
+             |      "value" : [ {
+             |        "type" : "LeaseCancel",
+             |        "value" : {
+             |          "leaseId" : {
+             |            "type" : "ByteVector",
+             |            "value" : "$leaseCancelId"
+             |          }
+             |        }
+             |      } ]
+             |    } ]
+             |  }, {
+             |    "name" : "cons.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25926
+             |  }, {
+             |    "name" : "cons.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "Lease",
+             |      "value" : {
+             |        "recipient" : {
+             |          "type" : "Address",
+             |          "value" : {
+             |            "bytes" : {
+             |              "type" : "ByteVector",
+             |              "value" : "3NAgxLPGnw3RGv9JT6NTDaG5D1iLUehg2xd"
+             |            }
+             |          }
+             |        },
+             |        "amount" : {
+             |          "type" : "Int",
+             |          "value" : 100
+             |        },
+             |        "nonce" : {
+             |          "type" : "Int",
+             |          "value" : 0
+             |        }
+             |      }
+             |    }, {
+             |      "type" : "Array",
+             |      "value" : [ {
+             |        "type" : "Lease",
+             |        "value" : {
+             |          "recipient" : {
+             |            "type" : "Alias",
+             |            "value" : {
+             |              "alias" : {
+             |                "type" : "String",
+             |                "value" : "some_alias"
+             |              }
+             |            }
+             |          },
+             |          "amount" : {
+             |            "type" : "Int",
+             |            "value" : 20
+             |          },
+             |          "nonce" : {
+             |            "type" : "Int",
+             |            "value" : 2
+             |          }
+             |        }
+             |      }, {
+             |        "type" : "LeaseCancel",
+             |        "value" : {
+             |          "leaseId" : {
+             |            "type" : "ByteVector",
+             |            "value" : "$leaseCancelId"
+             |          }
+             |        }
+             |      } ]
+             |    } ]
+             |  }, {
+             |    "name" : "cons.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25925
              |  } ]
              |} ]
              |
@@ -793,6 +2079,7 @@ class DebugApiRouteSpec
 
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(*, *).returns(Long.MaxValue)
+        blockchain.stub.activateAllFeatures()
 
         val (dAppScript, _) = ScriptCompiler
           .compile(
@@ -914,13 +2201,160 @@ class DebugApiRouteSpec
              |    },
              |    "error" : null,
              |    "vars" : [ {
+             |      "name" : "i",
+             |      "type" : "Invocation",
+             |      "value" : {
+             |        "originCaller" : {
+             |          "type" : "Address",
+             |          "value" : {
+             |            "bytes" : {
+             |              "type" : "ByteVector",
+             |              "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+             |            }
+             |          }
+             |        },
+             |        "payments" : {
+             |          "type" : "Array",
+             |          "value" : [ ]
+             |        },
+             |        "callerPublicKey" : {
+             |          "type" : "ByteVector",
+             |          "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+             |        },
+             |        "feeAssetId" : {
+             |          "type" : "Unit",
+             |          "value" : { }
+             |        },
+             |        "originCallerPublicKey" : {
+             |          "type" : "ByteVector",
+             |          "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+             |        },
+             |        "transactionId" : {
+             |          "type" : "ByteVector",
+             |          "value" : "${invoke.id()}"
+             |        },
+             |        "caller" : {
+             |          "type" : "Address",
+             |          "value" : {
+             |            "bytes" : {
+             |              "type" : "ByteVector",
+             |              "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+             |            }
+             |          }
+             |        },
+             |        "fee" : {
+             |          "type" : "Int",
+             |          "value" : 500000
+             |        }
+             |      }
+             |    }, {
+             |      "name" : "test.@args",
+             |      "type" : "Array",
+             |      "value" : [ ]
+             |    }, {
+             |      "name" : "parseBigIntValue.@args",
+             |      "type" : "Array",
+             |      "value" : [ {
+             |        "type" : "String",
+             |        "value" : "6703903964971298549787012499102923063739682910296196688861780721860882015036773488400937149083451713845015929093243025426876941405973284973216824503042047"
+             |      } ]
+             |    }, {
+             |      "name" : "parseBigIntValue.@complexity",
+             |      "type" : "Int",
+             |      "value" : 65
+             |    }, {
+             |      "name" : "@complexityLimit",
+             |      "type" : "Int",
+             |      "value" : 25860
+             |    }, {
              |      "name" : "a",
              |      "type" : "BigInt",
              |      "value" : 6.703903964971298549787012499102923E+153
              |    }, {
+             |      "name" : "==.@args",
+             |      "type" : "Array",
+             |      "value" : [ {
+             |        "type" : "BigInt",
+             |        "value" : 6.703903964971298549787012499102923E+153
+             |      }, {
+             |        "type" : "BigInt",
+             |        "value" : 6.703903964971298549787012499102923E+153
+             |      } ]
+             |    }, {
+             |      "name" : "==.@complexity",
+             |      "type" : "Int",
+             |      "value" : 1
+             |    }, {
+             |      "name" : "@complexityLimit",
+             |      "type" : "Int",
+             |      "value" : 25859
+             |    }, {
              |      "name" : "test",
              |      "type" : "Int",
              |      "value" : 1
+             |    }, {
+             |      "name" : "==.@args",
+             |      "type" : "Array",
+             |      "value" : [ {
+             |        "type" : "Int",
+             |        "value" : 1
+             |      }, {
+             |        "type" : "Int",
+             |        "value" : 1
+             |      } ]
+             |    }, {
+             |      "name" : "==.@complexity",
+             |      "type" : "Int",
+             |      "value" : 1
+             |    }, {
+             |      "name" : "@complexityLimit",
+             |      "type" : "Int",
+             |      "value" : 25858
+             |    }, {
+             |      "name" : "IntegerEntry.@args",
+             |      "type" : "Array",
+             |      "value" : [ {
+             |        "type" : "String",
+             |        "value" : "key"
+             |      }, {
+             |        "type" : "Int",
+             |        "value" : 1
+             |      } ]
+             |    }, {
+             |      "name" : "IntegerEntry.@complexity",
+             |      "type" : "Int",
+             |      "value" : 1
+             |    }, {
+             |      "name" : "@complexityLimit",
+             |      "type" : "Int",
+             |      "value" : 25857
+             |    }, {
+             |      "name" : "cons.@args",
+             |      "type" : "Array",
+             |      "value" : [ {
+             |        "type" : "IntegerEntry",
+             |        "value" : {
+             |          "key" : {
+             |            "type" : "String",
+             |            "value" : "key"
+             |          },
+             |          "value" : {
+             |            "type" : "Int",
+             |            "value" : 1
+             |          }
+             |        }
+             |      }, {
+             |        "type" : "Array",
+             |        "value" : [ ]
+             |      } ]
+             |    }, {
+             |      "name" : "cons.@complexity",
+             |      "type" : "Int",
+             |      "value" : 1
+             |    }, {
+             |      "name" : "@complexityLimit",
+             |      "type" : "Int",
+             |      "value" : 25856
              |    } ]
              |  } ],
              |  "result" : {
@@ -936,9 +2370,133 @@ class DebugApiRouteSpec
              |  },
              |  "error" : null,
              |  "vars" : [ {
+             |    "name" : "i",
+             |    "type" : "Invocation",
+             |    "value" : {
+             |      "originCaller" : {
+             |        "type" : "Address",
+             |        "value" : {
+             |          "bytes" : {
+             |            "type" : "ByteVector",
+             |            "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+             |          }
+             |        }
+             |      },
+             |      "payments" : {
+             |        "type" : "Array",
+             |        "value" : [ ]
+             |      },
+             |      "callerPublicKey" : {
+             |        "type" : "ByteVector",
+             |        "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+             |      },
+             |      "feeAssetId" : {
+             |        "type" : "Unit",
+             |        "value" : { }
+             |      },
+             |      "originCallerPublicKey" : {
+             |        "type" : "ByteVector",
+             |        "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+             |      },
+             |      "transactionId" : {
+             |        "type" : "ByteVector",
+             |        "value" : "${invoke.id()}"
+             |      },
+             |      "caller" : {
+             |        "type" : "Address",
+             |        "value" : {
+             |          "bytes" : {
+             |            "type" : "ByteVector",
+             |            "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+             |          }
+             |        }
+             |      },
+             |      "fee" : {
+             |        "type" : "Int",
+             |        "value" : 500000
+             |      }
+             |    }
+             |  }, {
+             |    "name" : "test1.@args",
+             |    "type" : "Array",
+             |    "value" : [ ]
+             |  }, {
+             |    "name" : "reentrantInvoke.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "Address",
+             |      "value" : {
+             |        "bytes" : {
+             |          "type" : "ByteVector",
+             |          "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+             |        }
+             |      }
+             |    }, {
+             |      "type" : "String",
+             |      "value" : "test"
+             |    }, {
+             |      "type" : "Array",
+             |      "value" : [ ]
+             |    }, {
+             |      "type" : "Array",
+             |      "value" : [ ]
+             |    } ]
+             |  }, {
+             |    "name" : "reentrantInvoke.@complexity",
+             |    "type" : "Int",
+             |    "value" : 75
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25925
+             |  }, {
+             |    "name" : "test.@complexity",
+             |    "type" : "Int",
+             |    "value" : 69
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25856
+             |  }, {
              |    "name" : "result",
              |    "type" : "Unit",
              |    "value" : { }
+             |  }, {
+             |    "name" : "==.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "Unit",
+             |      "value" : { }
+             |    }, {
+             |      "type" : "Unit",
+             |      "value" : { }
+             |    } ]
+             |  }, {
+             |    "name" : "==.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25855
+             |  }, {
+             |    "name" : "==.@args",
+             |    "type" : "Array",
+             |    "value" : [ {
+             |      "type" : "Unit",
+             |      "value" : { }
+             |    }, {
+             |      "type" : "Unit",
+             |      "value" : { }
+             |    } ]
+             |  }, {
+             |    "name" : "==.@complexity",
+             |    "type" : "Int",
+             |    "value" : 1
+             |  }, {
+             |    "name" : "@complexityLimit",
+             |    "type" : "Int",
+             |    "value" : 25854
              |  } ]
              |} ]
           """.stripMargin
@@ -1068,41 +2626,139 @@ class DebugApiRouteSpec
           (json \ "expression").as[String] shouldBe expression.bytes.value().base64
           (json \ "valid").as[Boolean] shouldBe true
           (json \ "trace").as[JsArray] should matchJson(
-            """
-              |  [
-              |    {
-              |      "type": "dApp",
-              |      "id": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
-              |      "function": "default",
-              |      "args": [],
-              |      "invocations": [],
-              |      "result": {
-              |        "data": [],
-              |        "transfers": [],
-              |        "issues": [],
-              |        "reissues": [
-              |          {
-              |            "assetId": "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
-              |            "isReissuable": true,
-              |            "quantity": 1
-              |          }
-              |        ],
-              |        "burns": [],
-              |        "sponsorFees": [],
-              |        "leases": [],
-              |        "leaseCancels": [],
-              |        "invokes": []
-              |      },
-              |      "error": null,
-              |      "vars": [
-              |        {
-              |          "name": "assetId",
-              |          "type": "ByteVector",
-              |          "value": "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
-              |        }
-              |      ]
-              |    }
-              |  ]
+            s"""
+               |[ {
+               |  "type" : "dApp",
+               |  "id" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+               |  "function" : "default",
+               |  "args" : [ ],
+               |  "invocations" : [ ],
+               |  "result" : {
+               |    "data" : [ ],
+               |    "transfers" : [ ],
+               |    "issues" : [ ],
+               |    "reissues" : [ {
+               |      "assetId" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx",
+               |      "isReissuable" : true,
+               |      "quantity" : 1
+               |    } ],
+               |    "burns" : [ ],
+               |    "sponsorFees" : [ ],
+               |    "leases" : [ ],
+               |    "leaseCancels" : [ ],
+               |    "invokes" : [ ]
+               |  },
+               |  "error" : null,
+               |  "vars" : [ {
+               |    "name" : "i",
+               |    "type" : "Invocation",
+               |    "value" : {
+               |      "originCaller" : {
+               |        "type" : "Address",
+               |        "value" : {
+               |          "bytes" : {
+               |            "type" : "ByteVector",
+               |            "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+               |          }
+               |        }
+               |      },
+               |      "payments" : {
+               |        "type" : "Array",
+               |        "value" : [ ]
+               |      },
+               |      "callerPublicKey" : {
+               |        "type" : "ByteVector",
+               |        "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+               |      },
+               |      "feeAssetId" : {
+               |        "type" : "Unit",
+               |        "value" : { }
+               |      },
+               |      "originCallerPublicKey" : {
+               |        "type" : "ByteVector",
+               |        "value" : "9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ"
+               |      },
+               |      "transactionId" : {
+               |        "type" : "ByteVector",
+               |        "value" : "${invokeExpression.id()}"
+               |      },
+               |      "caller" : {
+               |        "type" : "Address",
+               |        "value" : {
+               |          "bytes" : {
+               |            "type" : "ByteVector",
+               |            "value" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+               |          }
+               |        }
+               |      },
+               |      "fee" : {
+               |        "type" : "Int",
+               |        "value" : 1000000
+               |      }
+               |    }
+               |  }, {
+               |    "name" : "default.@args",
+               |    "type" : "Array",
+               |    "value" : [ ]
+               |  }, {
+               |    "name" : "assetId",
+               |    "type" : "ByteVector",
+               |    "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+               |  }, {
+               |    "name" : "Reissue.@args",
+               |    "type" : "Array",
+               |    "value" : [ {
+               |      "type" : "ByteVector",
+               |      "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+               |    }, {
+               |      "type" : "Int",
+               |      "value" : 1
+               |    }, {
+               |      "type" : "Boolean",
+               |      "value" : true
+               |    } ]
+               |  }, {
+               |    "name" : "Reissue.@complexity",
+               |    "type" : "Int",
+               |    "value" : 1
+               |  }, {
+               |    "name" : "@complexityLimit",
+               |    "type" : "Int",
+               |    "value" : 51999
+               |  }, {
+               |    "name" : "cons.@args",
+               |    "type" : "Array",
+               |    "value" : [ {
+               |      "type" : "Reissue",
+               |      "value" : {
+               |        "assetId" : {
+               |          "type" : "ByteVector",
+               |          "value" : "5PjDJaGfSPJj4tFzMRCiuuAasKg5n8dJKXKenhuwZexx"
+               |        },
+               |        "quantity" : {
+               |          "type" : "Int",
+               |          "value" : 1
+               |        },
+               |        "isReissuable" : {
+               |          "type" : "Boolean",
+               |          "value" : true
+               |        }
+               |      }
+               |    }, {
+               |      "type" : "Array",
+               |      "value" : [ ]
+               |    } ]
+               |  }, {
+               |    "name" : "cons.@complexity",
+               |    "type" : "Int",
+               |    "value" : 1
+               |  }, {
+               |    "name" : "@complexityLimit",
+               |    "type" : "Int",
+               |    "value" : 51998
+               |  } ]
+               |} ]
+               |
           """.stripMargin
           )
         }

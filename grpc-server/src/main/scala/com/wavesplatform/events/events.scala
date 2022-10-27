@@ -421,7 +421,7 @@ object StateUpdate {
       )
     }
 
-    diff.transactions.values.map { tx =>
+    diff.transactions.map { tx =>
       TransactionMetadata(
         tx.transaction match {
           case a: Authorized => a.sender.toAddress.toByteString

@@ -92,7 +92,13 @@ class MinerAccountScriptRestrictionsTest extends PropSpec with WithDomain {
     val defaultSettings = WavesSettings.default()
     val wavesSettings   = defaultSettings.copy(minerSettings = defaultSettings.minerSettings.copy(quorum = 0))
 
-    val utx = new UtxPoolImpl(time, d.blockchainUpdater, wavesSettings.utxSettings, isMiningEnabled = wavesSettings.minerSettings.enable)
+    val utx = new UtxPoolImpl(
+      time,
+      d.blockchainUpdater,
+      wavesSettings.utxSettings,
+      wavesSettings.maxTxErrorLogSize,
+      isMiningEnabled = wavesSettings.minerSettings.enable
+    )
     val appenderScheduler = Scheduler.singleThread("appender")
 
     val miner = new MinerImpl(
