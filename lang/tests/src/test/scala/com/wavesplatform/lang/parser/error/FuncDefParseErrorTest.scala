@@ -212,4 +212,16 @@ class FuncDefParseErrorTest extends ParseErrorTest {
       onlyDApp = true
     )
   }
+
+  property("function name started from digit") {
+    assert(
+      """
+        | func 1call() = 1
+      """.stripMargin,
+      """Parse error: expected character or "_" at start of the definition""",
+      7,
+      14,
+      "1call()"
+    )
+  }
 }

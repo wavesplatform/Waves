@@ -101,7 +101,10 @@ object Parser {
   def checkedUnderscore[A](implicit p: P[A]): P[Unit] =
     ("_" ~~/ !"_".repX(1)).?.opaque("not more than 1 underscore in a row")
 
-  def declNameP[A: P]: P[Unit] = checkedUnderscore ~~ char ~~ ("_".? ~~ (digit | char)).repX() ~~ checkedUnderscore
+  def checkedChar[A](implicit p: P[A]): P[Unit] =
+    (digit ~~/ Fail).opaque("""character or "_" at start of the definition""") | char
+
+  def declNameP[A: P]: P[Unit] = checkedUnderscore ~~ checkedChar ~~ ("_".? ~~ (digit | char)).repX() ~~ checkedUnderscore
 
   def correctLFunName[A: P]: P[PART[String]] =
     (Index ~~ declNameP.! ~~ Index)
@@ -648,7 +651,8 @@ object Parser {
       .map(dApp => (dApp, Nil))
       .leftMap(errorWithPosition(source, _))
 
-  private val moveRightKeywords = Seq(""""func"""", """"let"""", " expression", "1 underscore", "end-of-input", "latin charset")
+  private val moveRightKeywords =
+    Seq(""""func"""", """"let"""", " expression", "1 underscore", "end-of-input", "latin charset", "definition")
 
   private def errorPosition(input: String, f: Failure): (Int, Int) =
     if (moveRightKeywords.exists(f.label.contains)) {

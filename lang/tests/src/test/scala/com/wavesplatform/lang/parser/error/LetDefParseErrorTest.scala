@@ -96,4 +96,16 @@ class LetDefParseErrorTest extends ParseErrorTest {
       "}"
     )
   }
+
+  property("let name started from digit") {
+    assert(
+      """
+        | let 1call = 1
+      """.stripMargin,
+      """Parse error: expected character or "_" at start of the definition""",
+      6,
+      11,
+      "1call"
+    )
+  }
 }
