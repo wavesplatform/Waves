@@ -98,22 +98,25 @@ object Parser {
       .filter { case (_, x, _) => !keywords.contains(x) }
       .map { case (start, x, end) => PART.VALID(Pos(start, end), x) }
 
-  def checkedUnderscore[A: P]: P[Unit] =
-    ("_" ~~/ !"_".repX(1)).?.opaque("not more than 1 underscore in a row")
+  def declNameP[A: P](check: Boolean = false): P[Unit] = {
+    val exclude           = Set('(', ')', ':', ']', '[')
+    def symbolsForError   = CharPred(c => !c.isWhitespace && !exclude.contains(c))
+    def checkedUnderscore = ("_" ~~/ !"_".repX(1)).opaque("not more than 1 underscore in a row")
 
-  def symbolsForError[A: P]: P[Unit] =
-    CharPred(c => !c.isWhitespace && c != '(' && c != ')' && c != ':' && c != ']' && c != '[')
-
-  def checkedChar[A: P]: P[Unit] =
-    char | (digit ~~/ Fail).opaque("""character or "_" at start of the definition""")
-
-  def checkedCharOrDigit[A: P]: P[Unit] =
-    digit | char | (symbolsForError ~~ &(digit | char) ~~/ Fail).opaque("""character, digit or "_" for the definition""")
-
-  def declNameP[A: P]: P[Unit] = checkedUnderscore ~~ checkedChar ~~ ("_".? ~~ checkedCharOrDigit).repX() ~~ checkedUnderscore
+    def onlyChar = {
+      def error = ((digit | symbolsForError) ~~ &(digit | char) ~~/ Fail).opaque("""character or "_" at start of the definition""")
+      if (check) char | error else char
+    }
+    def charOrDigit = {
+      def error = (symbolsForError ~~ &(digit | char) ~~/ Fail).opaque("""character, digit or "_" for the definition""")
+      def r     = checkedUnderscore | digit | char
+      if (check) r | error else r
+    }
+    checkedUnderscore.? ~~ onlyChar ~~ charOrDigit.repX() ~~ checkedUnderscore.?
+  }
 
   def correctLFunName[A: P]: P[PART[String]] =
-    (Index ~~ declNameP.! ~~ Index)
+    (Index ~~ declNameP().! ~~ Index)
       .filter { case (_, x, _) => !keywords.contains(x) }
       .map { case (start, x, end) => PART.VALID(Pos(start, end), x) }
 
@@ -125,8 +128,8 @@ object Parser {
     }
   }
 
-  def anyVarName(implicit c: fastparse.P[Any]): P[PART[String]] = {
-    def nameP(implicit c: fastparse.P[Any]): P[Unit] = declNameP
+  def anyVarName(check: Boolean = false)(implicit c: fastparse.P[Any]): P[PART[String]] = {
+    def nameP(implicit c: fastparse.P[Any]): P[Unit] = declNameP(check)
     genericVarName(nameP(_))
   }
 
@@ -237,7 +240,7 @@ object Parser {
     val KnownMethods: Set[String] = Set(ExactAs, As)
   }
 
-  def singleTypeP[A: P]: P[Single] = (anyVarName ~~ ("[" ~~ Index ~ unionTypeP ~ Index ~~/ "]").?).map { case (t, param) =>
+  def singleTypeP[A: P]: P[Single] = (anyVarName() ~~ ("[" ~~ Index ~ unionTypeP ~ Index ~~/ "]").?).map { case (t, param) =>
     Single(t, param.map { case (start, param, end) => VALID(Pos(start, end), param) })
   }
 
@@ -257,9 +260,9 @@ object Parser {
       .map(Tuple)
 
   def funcP(implicit c: fastparse.P[Any]): P[FUNC] = {
-    def funcName       = anyVarName
+    def funcName       = anyVarName(check = true)
     def funcKWAndName  = "func" ~~ ((&(spaces) ~ funcName) | (&(spaces | "(") ~~/ Fail).opaque("function name"))
-    def argWithType    = anyVarName ~/ ":" ~/ unionTypeP ~ comment
+    def argWithType    = anyVarName(check = true) ~/ ":" ~/ unionTypeP ~ comment
     def args(min: Int) = "(" ~ comment ~ argWithType.rep(min, "," ~ comment) ~ ")" ~ comment
     def funcBody       = singleBaseExpr
     def correctFunc    = Index ~~ funcKWAndName ~ comment ~/ args(min = 0) ~ ("=" ~ funcBody | "=" ~/ Fail.opaque("function body")) ~~ Index
@@ -276,7 +279,7 @@ object Parser {
   }
 
   def annotationP[A: P]: P[ANNOTATION] =
-    (Index ~~ "@" ~ anyVarName ~ comment ~ "(" ~ comment ~ anyVarName.rep(0, ",") ~ comment ~/ ")" ~~ Index).map {
+    (Index ~~ "@" ~ anyVarName() ~ comment ~ "(" ~ comment ~ anyVarName().rep(0, ",") ~ comment ~/ ")" ~~ Index).map {
       case (start, name: PART[String], args: Seq[PART[String]], end) => ANNOTATION(Pos(start, end), name, args)
     }
 
@@ -307,7 +310,7 @@ object Parser {
       }
 
     def restMatchCaseInvalidP(implicit c: fastparse.P[Any]): P[String] = P((!P("=>") ~~ AnyChar.!).repX.map(_.mkString))
-    def varDefP(implicit c: fastparse.P[Any]): P[Option[PART[String]]] = (NoCut(anyVarName) ~~ !("'" | "(")).map(Some(_)) | P("_").!.map(_ => None)
+    def varDefP(implicit c: fastparse.P[Any]): P[Option[PART[String]]] = (NoCut(anyVarName()) ~~ !("'" | "(")).map(Some(_)) | P("_").!.map(_ => None)
 
     def typesDefP(implicit c: fastparse.P[Any]) =
       (
@@ -320,7 +323,7 @@ object Parser {
     def pattern(implicit c: fastparse.P[Any]): P[Pattern] =
       (varDefP ~ comment ~ typesDefP).map { case (v, t) => TypedVar(v, t) } |
         (Index ~ "(" ~ pattern.rep(min = 2, sep = ",") ~/ ")" ~ Index).map(p => TuplePat(p._2, Pos(p._1, p._3))) |
-        (Index ~ anyVarName ~ "(" ~ (anyVarName ~ "=" ~ pattern).rep(sep = ",") ~ ")" ~ Index)
+        (Index ~ anyVarName() ~ "(" ~ (anyVarName() ~ "=" ~ pattern).rep(sep = ",") ~ ")" ~ Index)
           .map(p => ObjPat(p._3.map(kp => (PART.toOption(kp._1).get, kp._2)).toMap, Single(p._2, None), Pos(p._1, p._4))) |
         (Index ~ baseExpr.rep(min = 1, sep = "|") ~ Index).map(p => ConstsPat(p._2, Pos(p._1, p._3)))
 
@@ -426,7 +429,7 @@ object Parser {
 
   private def destructuredTupleValuesP[A: P]: P[Seq[(Int, PART[String])]] =
     "(" ~
-      (Index ~ anyVarName).rep(
+      (Index ~ anyVarName(check = true)).rep(
         ContractLimits.MinTupleSize,
         comment ~ "," ~ comment,
         ContractLimits.MaxTupleSize
@@ -434,7 +437,7 @@ object Parser {
       ")"
 
   private def letNameP[A: P]: P[Seq[(Int, PART[String])]] =
-    (Index ~ anyVarName).map(Seq(_))
+    (Index ~ anyVarName(check = true)).map(Seq(_))
 
   def variableDefP[A: P](key: String): P[Seq[LET]] = {
     def letNames      = destructuredTupleValuesP | letNameP
@@ -675,7 +678,7 @@ object Parser {
 
   private def errorWithPosition(input: String, f: Failure): (String, Int, Int) = {
     val (start, end) = errorPosition(input, f)
-    val expectation  =
+    val expectation =
       if (f.label == "end-of-input" || f.label.contains("|") || f.label.contains("~"))
         "illegal expression"
       else
