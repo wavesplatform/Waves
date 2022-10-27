@@ -249,18 +249,14 @@ trait BaseGlobal {
       .fromBase64String(compiledCode.trim)
       .map(script => Script.decompile(script)._1)
 
-  def dAppFuncTypes(compiledCode: String): Either[ScriptParseError, FunctionSignatures] =
-    for {
-      script <- Script.fromBase64String(compiledCode.trim)
-      result <- dAppFuncTypes(script)
-    } yield result
-
   def dAppFuncTypes(script: Script): Either[ScriptParseError, FunctionSignatures] =
     script match {
-      case ContractScriptImpl(_, dApp) =>
-        MetaMapper.dicFromProto(dApp).bimap(ScriptParseError, combineMetaWithDApp(_, dApp))
-      case _ => Left(ScriptParseError("Expected DApp"))
+      case ContractScriptImpl(_, dApp) => dAppFuncTypes(dApp)
+      case _                           => Left(ScriptParseError("Expected DApp"))
     }
+
+  def dAppFuncTypes(dApp: DApp): Either[ScriptParseError, FunctionSignatures] =
+    MetaMapper.dicFromProto(dApp).bimap(ScriptParseError, combineMetaWithDApp(_, dApp))
 
   private def combineMetaWithDApp(meta: ParsedMeta, dApp: DApp): FunctionSignatures = {
     val argTypesWithFuncName =
@@ -270,7 +266,7 @@ trait BaseGlobal {
             func.u.name -> (func.u.args zip argTypes)
           }
       )
-    FunctionSignatures(meta.version, argTypesWithFuncName)
+    FunctionSignatures(meta.version, argTypesWithFuncName.toMap)
   }
 
   def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean

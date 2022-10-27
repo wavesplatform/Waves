@@ -16,6 +16,7 @@ import com.wavesplatform.api.http.alias.AliasApiRoute
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.api.http.eth.EthRpcRoute
 import com.wavesplatform.api.http.leasing.LeaseApiRoute
+import com.wavesplatform.api.http.utils.UtilsApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.{DBExt, Keys, openDB}
