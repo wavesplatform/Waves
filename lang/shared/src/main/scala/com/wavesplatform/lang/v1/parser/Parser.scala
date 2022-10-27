@@ -99,7 +99,7 @@ object Parser {
       .map { case (start, x, end) => PART.VALID(Pos(start, end), x) }
 
   def declNameP[A: P](check: Boolean = false): P[Unit] = {
-    val exclude           = Set('(', ')', ':', ']', '[')
+    val exclude           = Set('(', ')', ':', ']', '[', '=')
     def symbolsForError   = CharPred(c => !c.isWhitespace && !exclude.contains(c))
     def checkedUnderscore = ("_" ~~/ !"_".repX(1)).opaque("not more than 1 underscore in a row")
 
