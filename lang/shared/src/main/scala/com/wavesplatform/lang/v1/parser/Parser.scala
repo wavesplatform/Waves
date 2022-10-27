@@ -669,7 +669,11 @@ object Parser {
 
   private def errorWithPosition(input: String, f: Failure): (String, Int, Int) = {
     val (start, end) = errorPosition(input, f)
-    val expectation  = if (f.label == "end-of-input") "illegal expression" else s"expected ${f.label}"
+    val expectation  =
+      if (f.label == "end-of-input" || f.label.contains("|") || f.label.contains("~"))
+        "illegal expression"
+      else
+        s"expected ${f.label}"
     (s"Parse error: $expectation in $start-$end", start, end)
   }
 
