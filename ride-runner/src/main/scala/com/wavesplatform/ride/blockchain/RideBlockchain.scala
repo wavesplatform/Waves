@@ -24,7 +24,7 @@ import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 
-class RideBlockchain[TagT](storage: BlockchainStorage[TagT], tag: TagT) extends Blockchain with ScorexLogging {
+class RideBlockchain[TagT](storage: SharedBlockchainStorage[TagT], tag: TagT) extends Blockchain with ScorexLogging {
   override def settings: BlockchainSettings = storage.settings
 
   // TODO use utils/evaluate through REST API

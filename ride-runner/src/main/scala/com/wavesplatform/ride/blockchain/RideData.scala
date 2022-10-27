@@ -2,15 +2,11 @@ package com.wavesplatform.ride.blockchain
 
 import scala.collection.mutable
 
-trait ReadOnlyRideData[KeyT, ValueT, TagT] {
-  def get(key: KeyT, tag: TagT): Option[ValueT]
-}
-
 final class RideData[KeyT, ValueT, TagT](
     map: mutable.AbstractMap[KeyT, TaggedData[BlockchainData[ValueT], TagT]],
     loader: KeyT => Option[ValueT]
-) extends ReadOnlyRideData[KeyT, ValueT, TagT] {
-  override def get(key: KeyT, tag: TagT): Option[ValueT] = map
+) {
+  def get(key: KeyT, tag: TagT): Option[ValueT] = map
     .updateWith(key) {
       case Some(orig) => Some(orig.withTag(tag))
       case None       => Some(TaggedData(BlockchainData.loaded[ValueT](loader(key)), Set(tag)))

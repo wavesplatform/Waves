@@ -12,7 +12,8 @@ import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.resources.*
-import com.wavesplatform.ride.blockchain.{BlockchainStorage, EmptyDbStorage, RideBlockchain}
+import com.wavesplatform.ride.blockchain.caches.EmptyBlockchainCaches
+import com.wavesplatform.ride.blockchain.{RideBlockchain, SharedBlockchainStorage}
 import com.wavesplatform.ride.input.RunnerRequest
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils.ScorexLogging
@@ -91,7 +92,7 @@ object RideBlockchainRunner extends ScorexLogging {
         )
       )
 
-      val blockchainStorage = new BlockchainStorage[Int](nodeSettings.blockchainSettings, new EmptyDbStorage(), blockchainApi)
+      val blockchainStorage = new SharedBlockchainStorage[Int](nodeSettings.blockchainSettings, EmptyBlockchainCaches, blockchainApi)
 
       val scripts = input.zipWithIndex.map { case (input, index) => RideScript(index, blockchainStorage, input.request) }
 
@@ -198,6 +199,6 @@ class RideScript(val index: Int, blockchain: Blockchain, runnerRequest: RunnerRe
 }
 
 object RideScript {
-  def apply(index: Int, blockchainStorage: BlockchainStorage[Int], runnerRequest: RunnerRequest): RideScript =
+  def apply(index: Int, blockchainStorage: SharedBlockchainStorage[Int], runnerRequest: RunnerRequest): RideScript =
     new RideScript(index, new RideBlockchain[Int](blockchainStorage, index), runnerRequest)
 }
