@@ -434,7 +434,6 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     Post(routePath("/script/meta"), dappBase64) ~> route ~> check {
       val json = responseAs[JsObject]
       json("version").as[String] shouldBe "1"
-      json("isArrayArguments").as[Boolean] shouldBe true
       json("callableFuncTypes") shouldBe JsObject(
         Seq(
           "func1" -> JsArray(
@@ -464,7 +463,6 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     Post(routePath("/script/meta"), dAppBase64) ~> route ~> check {
       val json = responseAs[JsValue]
       json("version").as[String] shouldBe "1"
-      json("isArrayArguments").as[Boolean] shouldBe true
       json("callableFuncTypes") shouldBe JsObject(
         Seq(
           "init" -> JsArray(
