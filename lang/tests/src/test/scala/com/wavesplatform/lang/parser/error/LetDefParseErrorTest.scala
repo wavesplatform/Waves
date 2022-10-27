@@ -108,4 +108,16 @@ class LetDefParseErrorTest extends ParseErrorTest {
       "1call"
     )
   }
+
+  property("illegal character in let name") {
+    assert(
+      """
+        | let c@ll
+      """.stripMargin,
+      """Parse error: expected character, digit or "_" for the definition""",
+      7,
+      10,
+      "@ll"
+    )
+  }
 }

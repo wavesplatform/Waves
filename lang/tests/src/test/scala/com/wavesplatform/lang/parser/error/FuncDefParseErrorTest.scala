@@ -248,4 +248,16 @@ class FuncDefParseErrorTest extends ParseErrorTest {
       "1a:Int)"
     )
   }
+
+  property("illegal character in function name") {
+    assert(
+      """
+        | func c@ll()
+      """.stripMargin,
+      """Parse error: expected character, digit or "_" for the definition""",
+      8,
+      13,
+      "@ll()"
+    )
+  }
 }

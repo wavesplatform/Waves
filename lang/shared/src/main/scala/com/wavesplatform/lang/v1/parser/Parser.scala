@@ -98,13 +98,19 @@ object Parser {
       .filter { case (_, x, _) => !keywords.contains(x) }
       .map { case (start, x, end) => PART.VALID(Pos(start, end), x) }
 
-  def checkedUnderscore[A](implicit p: P[A]): P[Unit] =
+  def checkedUnderscore[A: P]: P[Unit] =
     ("_" ~~/ !"_".repX(1)).?.opaque("not more than 1 underscore in a row")
 
-  def checkedChar[A](implicit p: P[A]): P[Unit] =
-    (digit ~~/ Fail).opaque("""character or "_" at start of the definition""") | char
+  def symbolsForError[A: P]: P[Unit] =
+    CharPred(c => !c.isWhitespace && c != '(' && c != ')' && c != ':' && c != ']' && c != '[')
 
-  def declNameP[A: P]: P[Unit] = checkedUnderscore ~~ checkedChar ~~ ("_".? ~~ (digit | char)).repX() ~~ checkedUnderscore
+  def checkedChar[A: P]: P[Unit] =
+    char | (digit ~~/ Fail).opaque("""character or "_" at start of the definition""")
+
+  def checkedCharOrDigit[A: P]: P[Unit] =
+    digit | char | (symbolsForError ~~ &(digit | char) ~~/ Fail).opaque("""character, digit or "_" for the definition""")
+
+  def declNameP[A: P]: P[Unit] = checkedUnderscore ~~ checkedChar ~~ ("_".? ~~ checkedCharOrDigit).repX() ~~ checkedUnderscore
 
   def correctLFunName[A: P]: P[PART[String]] =
     (Index ~~ declNameP.! ~~ Index)
