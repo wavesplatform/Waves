@@ -224,4 +224,16 @@ class FuncDefParseErrorTest extends ParseErrorTest {
       "1call()"
     )
   }
+
+  property("missing type after parameter definition with ':'") {
+    assert(
+      """
+        | func call(a:)
+      """.stripMargin,
+      """Parse error: illegal expression""",
+      7,
+      14,
+      "call(a:"
+    )
+  }
 }
