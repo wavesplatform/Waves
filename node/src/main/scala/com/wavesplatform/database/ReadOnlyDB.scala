@@ -13,6 +13,12 @@ class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
     key.parse(bytes)
   }
 
+  def getOpt[V](key: Key[V]): Option[V] = {
+    val bytes = db.get(key.keyBytes, readOptions)
+    LevelDBStats.read.recordTagged(key, bytes)
+    if (bytes == null) None else Some(key.parse(bytes))
+  }
+
   def has[V](key: Key[V]): Boolean = {
     val bytes = db.get(key.keyBytes, readOptions)
     LevelDBStats.read.recordTagged(key, bytes)

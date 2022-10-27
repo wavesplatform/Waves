@@ -27,7 +27,7 @@ trait BlockchainCaches {
   def setVrf(height: Int, data: BlockchainData[ByteStr]): Unit
 
   def getActivatedFeatures(height: Int): BlockchainData[Map[Short, Int]]
-  def setActivatedFeatures(height: Int, data: BlockchainData[Map[Short, Int]]): Unit
+  def setActivatedFeatures(height: Int, data: Map[Short, Int]): Unit
 
   def getAssetDescription(asset: Asset.IssuedAsset): BlockchainData[AssetDescription]
   def setAssetDescription(asset: Asset.IssuedAsset, data: BlockchainData[AssetDescription]): Unit
@@ -58,8 +58,8 @@ object EmptyBlockchainCaches extends BlockchainCaches {
   override def getVrf(height: Int): BlockchainData[ByteStr]             = BlockchainData.Unknown
   override def setVrf(height: Int, data: BlockchainData[ByteStr]): Unit = {}
 
-  override def getActivatedFeatures(height: Int): BlockchainData[Map[Short, Int]]             = BlockchainData.Unknown
-  override def setActivatedFeatures(height: Int, data: BlockchainData[Map[Short, Int]]): Unit = {}
+  override def getActivatedFeatures(height: Int): BlockchainData[Map[Short, Int]] = BlockchainData.Unknown
+  override def setActivatedFeatures(height: Int, data: Map[Short, Int]): Unit     = {}
 
   override def getAssetDescription(asset: Asset.IssuedAsset): BlockchainData[AssetDescription]             = BlockchainData.Unknown
   override def setAssetDescription(asset: Asset.IssuedAsset, data: BlockchainData[AssetDescription]): Unit = {}

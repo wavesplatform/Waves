@@ -38,7 +38,7 @@ object DataTxSerializer {
     }
   }
 
-  private def serializeEntry(e: DataEntry[?]): Array[Byte] = {
+  def serializeEntry(e: DataEntry[?]): Array[Byte] = {
     val keyBytes = e.key.utf8Bytes
     val valueBytes = e match {
       case IntegerDataEntry(_, value) => Bytes.concat(Array(Type.Integer.id.toByte), Longs.toByteArray(value))
@@ -71,7 +71,7 @@ object DataTxSerializer {
     DataTransaction(TxVersion.V1, sender, data, fee, timestamp, buf.getProofs, AddressScheme.current.chainId)
   }
 
-  private def parseEntry(buf: ByteBuffer): DataEntry[_] = {
+  def parseEntry(buf: ByteBuffer): DataEntry[_] = {
     val key = new String(Deser.parseArrayWithLength(buf), UTF_8)
     buf.get match {
       case t if t == Type.Integer.id => IntegerDataEntry(key, buf.getLong)
