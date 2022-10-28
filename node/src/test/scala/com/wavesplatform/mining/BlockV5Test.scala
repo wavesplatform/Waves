@@ -461,7 +461,7 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
     val pos               = PoSSelector(blockchain, settings.synchronizationSettings.maxBaseTarget)
     val allChannels       = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val wallet            = Wallet(WalletSettings(None, Some("123"), None))
-    val utxPool           = new UtxPoolImpl(time, blockchain, settings.utxSettings, settings.minerSettings.enable)
+    val utxPool           = new UtxPoolImpl(time, blockchain, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
     val minerScheduler    = Scheduler.singleThread("miner")
     val appenderScheduler = Scheduler.singleThread("appender")
     val miner = new MinerImpl(allChannels, blockchain, settings, time, utxPool, wallet, pos, minerScheduler, appenderScheduler, Observable.empty)

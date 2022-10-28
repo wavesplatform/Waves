@@ -110,7 +110,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
           (triggersMock.onProcessBlock _)
             .expects(where { (block, diff, _, bc) =>
               val txDiff = diff.transactionDiffs.head
-              val tx     = txDiff.transactions.head._2.transaction.asInstanceOf[TransferTransaction]
+              val tx     = txDiff.transactions.head.transaction.asInstanceOf[TransferTransaction]
 
               bc.height == 1 &&
               block.transactionData.length == 5 &&

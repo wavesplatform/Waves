@@ -53,22 +53,19 @@ final class CompositeBlockchain private (
       .orElse(diff.leaseState.get(leaseId))
 
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =
-    diff.transactions
-      .get(id)
+    diff.transaction(id)
       .collect { case NewTransactionInfo(tx: TransferTransaction, _, true, _) =>
         (height, tx)
       }
       .orElse(inner.transferById(id))
 
   override def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)] =
-    diff.transactions
-      .get(id)
+    diff.transaction(id)
       .map(t => (TxMeta(Height(this.height), t.applied, t.spentComplexity), t.transaction))
       .orElse(inner.transactionInfo(id))
 
   override def transactionMeta(id: ByteStr): Option[TxMeta] =
-    diff.transactions
-      .get(id)
+    diff.transaction(id)
       .map(t => TxMeta(Height(this.height), t.applied, t.spentComplexity))
       .orElse(inner.transactionMeta(id))
 
@@ -80,7 +77,7 @@ final class CompositeBlockchain private (
     case Left(_)                      => diff.aliases.get(alias).toRight(AliasDoesNotExist(alias))
   }
 
-  override def containsTransaction(tx: Transaction): Boolean = diff.transactions.contains(tx.id()) || inner.containsTransaction(tx)
+  override def containsTransaction(tx: Transaction): Boolean = diff.transaction(tx.id()).isDefined || inner.containsTransaction(tx)
 
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee =
     diff.orderFills.get(orderId).orEmpty.combine(inner.filledVolumeAndFee(orderId))

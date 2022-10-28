@@ -13,6 +13,7 @@ import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.utils.lazyContexts
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.LogExtraInfo
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.test.*
@@ -109,7 +110,7 @@ class MerkleTest extends PropSpec {
     val ctx     = lazyContexts(DirectiveSet(version, Account, Expression).explicitGet() -> true)()
     val evalCtx = ctx.evaluationContext[Id](Common.emptyBlockchainEnvironment())
     val typed   = ExpressionCompiler(ctx.compilerContext, untyped)
-    typed.flatMap(v => EvaluatorV2.applyCompleted(evalCtx, v._1, version, true, true)._3.leftMap(_.toString))
+    typed.flatMap(v => EvaluatorV2.applyCompleted(evalCtx, v._1, LogExtraInfo(), version, true, true)._3.leftMap(_.toString))
   }
 
   private def scriptSrc(root: Array[Byte], proof: Array[Byte], value: Array[Byte]): String = {

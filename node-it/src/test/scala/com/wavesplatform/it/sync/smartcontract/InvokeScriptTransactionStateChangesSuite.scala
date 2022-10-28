@@ -1,13 +1,13 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api._
-import com.wavesplatform.it.sync._
+import com.wavesplatform.it.api.SyncHttpApi.*
+import com.wavesplatform.it.api.*
+import com.wavesplatform.it.sync.*
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CONST_STRING}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import org.scalactic.source.Position
@@ -46,9 +46,9 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
 
     val js = invokeTx._2
 
-    (js \ "trace" \ 0 \ "vars" \ 0 \ "name").as[String] shouldBe "value"
-    (js \ "trace" \ 0 \ "vars" \ 0 \ "type").as[String] shouldBe "Int"
-    (js \ "trace" \ 0 \ "vars" \ 0 \ "value").as[Int] shouldBe data
+    (js \ "trace" \ 0 \ "vars" \ 2 \ "name").as[String] shouldBe "value"
+    (js \ "trace" \ 0 \ "vars" \ 2 \ "type").as[String] shouldBe "Int"
+    (js \ "trace" \ 0 \ "vars" \ 2 \ "value").as[Int] shouldBe data
 
     val id = sender.signedBroadcast(invokeTx._1, waitForTx = true).id
 

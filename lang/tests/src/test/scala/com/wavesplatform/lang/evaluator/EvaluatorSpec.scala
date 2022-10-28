@@ -9,6 +9,7 @@ import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.utils.lazyContexts
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
+import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.LogExtraInfo
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV2, Log}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
@@ -74,7 +75,7 @@ abstract class EvaluatorSpec extends PropSpec with ScriptGen with Inside {
   private def evalExpr(expr: EXPR, version: StdLibVersion, useNewPowPrecision: Boolean): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
     val ctx     = lazyContexts(DirectiveSet(version, Account, Expression).explicitGet() -> useNewPowPrecision).value()
     val evalCtx = ctx.evaluationContext(Common.emptyBlockchainEnvironment())
-    EvaluatorV2.applyCompleted(evalCtx, expr, version, correctFunctionCallScope = true, newMode = true)
+    EvaluatorV2.applyCompleted(evalCtx, expr, LogExtraInfo(), version, correctFunctionCallScope = true, newMode = true)
   }
 
   def compile(code: String, version: StdLibVersion): Either[String, EXPR] = {
