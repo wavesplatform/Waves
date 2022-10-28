@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1.repl.node.http.response.model
 
 import io.circe.{Decoder, HCursor}
 
-private[node] case class HeightResponse(height: Long, succeed: Boolean)
+private[lang] case class HeightResponse(height: Long, succeed: Boolean)
 
 object HeightResponse {
   implicit val decoder: Decoder[HeightResponse] = (c: HCursor) =>

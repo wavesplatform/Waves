@@ -1,5 +1,7 @@
 package com.wavesplatform.lang
 
+import cats.implicits.toBifunctorOps
+import com.wavesplatform.lang.contract.meta.FunctionSignatures
 import com.wavesplatform.lang.directives.Directive.extractDirectives
 import com.wavesplatform.lang.directives.values.{Call, Expression, Library, StdLibVersion, DApp as DAppType}
 import com.wavesplatform.lang.directives.{DirectiveParser, DirectiveSet}
@@ -7,7 +9,7 @@ import com.wavesplatform.lang.script.ScriptPreprocessor
 import com.wavesplatform.lang.v1.BaseGlobal
 import com.wavesplatform.lang.v1.BaseGlobal.DAppInfo
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
-import com.wavesplatform.lang.v1.compiler.{CompilationError, Types}
+import com.wavesplatform.lang.v1.compiler.{CompilationError, Types, UtilityFunctionPrefix}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
 import com.wavesplatform.lang.v1.parser.Expressions
@@ -49,7 +51,7 @@ object CompileResult {
     override val maxComplexity: Long                     = complexity
   }
 
-  case class DApp(version: StdLibVersion, dAppInfo: DAppInfo, error: Either[String, Unit]) extends CompileResult {
+  case class DApp(version: StdLibVersion, dAppInfo: DAppInfo, meta: FunctionSignatures, error: Either[String, Unit]) extends CompileResult {
     override def bytes: Array[Byte]                      = dAppInfo.bytes
     override def verifierComplexity: Long                = dAppInfo.verifierComplexity
     override def callableComplexities: Map[String, Long] = dAppInfo.callableComplexities
@@ -70,9 +72,7 @@ object API {
     utils
       .ctx(ver, isTokenContext, isContract)
       .vars
-      .collect {
-        case (name, (t, _)) if !name.startsWith("_") => (name, t)
-      }
+      .map { case (name, (t, _)) => (name, t) }
       .toSeq
 
   def allFunctions(ver: Int = 2, isTokenContext: Boolean = false, isContract: Boolean = false): Seq[(String, Seq[String], FunctionTypeSignature)] =
@@ -80,7 +80,7 @@ object API {
       .ctx(ver, isTokenContext, isContract)
       .functions
       .collect {
-        case f if !f.name.startsWith("_") => (f.name, f.args, f.signature)
+        case f if !f.name.startsWith(UtilityFunctionPrefix) => (f.name, f.args, f.signature)
       }
       .toSeq
 
@@ -206,8 +206,9 @@ object API {
       case (DAppType, _) =>
         // Just ignore stdlib version here
         G.compileContract(input, ctx, version, estimator, needCompaction, removeUnusedCode)
-          .map { di =>
-            CompileResult.DApp(version, di, G.checkContract(version, di.dApp, di.maxComplexity, di.annotatedComplexities, estimator))
+          .flatMap { di =>
+            val check = G.checkContract(version, di.dApp, di.maxComplexity, di.annotatedComplexities, estimator)
+            G.dAppFuncTypes(di.dApp).bimap(_.m, CompileResult.DApp(version, di, _, check))
           }
     }
   }

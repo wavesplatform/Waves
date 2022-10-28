@@ -51,7 +51,8 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   def createDiffE(tx: Transaction): Either[ValidationError, Diff] = transactionDiffer(tx).resultE
   def createDiff(tx: Transaction): Diff                           = createDiffE(tx).explicitGet()
 
-  lazy val utxPool: UtxPoolImpl = new UtxPoolImpl(SystemTime, blockchain, settings.utxSettings, settings.minerSettings.enable)
+  lazy val utxPool: UtxPoolImpl =
+    new UtxPoolImpl(SystemTime, blockchain, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
   lazy val wallet: Wallet = Wallet(settings.walletSettings.copy(file = None))
 
   object commonApi {
@@ -88,7 +89,6 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       db,
       blockchain,
       utxPool,
-      wallet,
       tx => Future.successful(utxPool.putIfNew(tx)),
       Application.loadBlockAt(db, blockchain)
     )
@@ -96,7 +96,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def liquidState: Option[NgState] = {
     val cls   = classOf[BlockchainUpdaterImpl]
-    val field = cls.getDeclaredField("ngState")
+    val field = cls.getDeclaredFields.find(_.getName.endsWith("ngState")).get
     field.setAccessible(true)
     field.get(blockchain).asInstanceOf[Option[NgState]]
   }
@@ -227,12 +227,15 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   }
 
   def appendKeyBlock(ref: Option[ByteStr] = None): Block = {
-    val block = createBlock(Block.NgBlockVersion, Nil, ref.orElse(Some(lastBlockId)))
+    val block          = createBlock(Block.NgBlockVersion, Nil, ref.orElse(Some(lastBlockId)))
     val discardedDiffs = appendBlock(block)
     utxPool.setPriorityDiffs(discardedDiffs)
     utxPool.cleanUnconfirmed()
     lastBlock
   }
+
+  def appendMicroBlockE(txs: Transaction*): Either[Throwable, BlockId] =
+    Try(appendMicroBlock(txs*)).toEither
 
   def appendMicroBlock(txs: Transaction*): BlockId = {
     val lastBlock = this.lastBlock
@@ -268,7 +271,13 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     blockchainUpdater.removeAfter(blockId).explicitGet()
   }
 
-  def createBlock(version: Byte, txs: Seq[Transaction], ref: Option[ByteStr] = blockchainUpdater.lastBlockId, strictTime: Boolean = false): Block = {
+  def createBlock(
+      version: Byte,
+      txs: Seq[Transaction],
+      ref: Option[ByteStr] = blockchainUpdater.lastBlockId,
+      strictTime: Boolean = false,
+      generator: KeyPair = defaultSigner
+  ): Block = {
     val reference = ref.getOrElse(randomSig)
     val parent = ref
       .flatMap { bs =>
@@ -285,7 +294,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     val timestamp =
       if (blockchain.height > 0)
         parent.timestamp + posSelector
-          .getValidBlockDelay(blockchain.height, defaultSigner, parent.baseTarget, blockchain.balance(defaultSigner.toAddress) max 1e12.toLong)
+          .getValidBlockDelay(blockchain.height, generator, parent.baseTarget, blockchain.balance(generator.toAddress) max 1e12.toLong)
           .explicitGet()
       else
         System.currentTimeMillis() - (1 hour).toMillis
@@ -294,7 +303,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       if (blockchain.height > 0)
         posSelector
           .consensusData(
-            defaultSigner,
+            generator,
             blockchain.height,
             settings.blockchainSettings.genesisSettings.averageBlockDelay,
             parent.baseTarget,
@@ -315,7 +324,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
         txs = txs,
         featureVotes = Nil,
         rewardVote = -1L,
-        signer = defaultSigner
+        signer = generator
       )
       .explicitGet()
   }
@@ -379,7 +388,6 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     db,
     blockchain,
     utxPool,
-    wallet,
     _ => Future.successful(TracedResult(Right(true))),
     h => blocksApi.blockAtHeight(h)
   )

@@ -1096,13 +1096,13 @@ class DecompilerTest extends PropSpec {
          |    let @ = g()
          |    if ($$isInstanceOf(@, "Boolean"))
          |        then @
-         |        else throw(($$getType(g()) + " couldn't be cast to Boolean"))
+         |        else throw(($$getType(@) + " couldn't be cast to Boolean"))
          |    })
          |    then {
          |        let @ = f()
          |        if ($$isInstanceOf(@, "Boolean"))
          |            then @
-         |            else throw(($$getType(f()) + " couldn't be cast to Boolean"))
+         |            else throw(($$getType(@) + " couldn't be cast to Boolean"))
          |        }
          |    else false
          |let @ = a

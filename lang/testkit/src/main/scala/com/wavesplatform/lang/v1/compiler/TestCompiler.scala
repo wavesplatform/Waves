@@ -34,11 +34,11 @@ class TestCompiler(version: StdLibVersion) {
     (baseCompilerContext |+|
       WavesContext.build(Global, DirectiveSet(version, Asset, Expression).explicitGet())).compilerContext
 
-  def compile(script: String, allowIllFormedStrings: Boolean = false): Either[String, DApp] =
-    ContractCompiler.compile(script, compilerContext, version, allowIllFormedStrings = allowIllFormedStrings)
+  def compile(script: String, allowIllFormedStrings: Boolean = false, compact: Boolean = false): Either[String, DApp] =
+    ContractCompiler.compile(script, compilerContext, version, allowIllFormedStrings = allowIllFormedStrings, needCompaction = compact)
 
-  def compileContract(script: String, allowIllFormedStrings: Boolean = false): ContractScriptImpl =
-    ContractScript(version, compile(script, allowIllFormedStrings).explicitGet()).explicitGet()
+  def compileContract(script: String, allowIllFormedStrings: Boolean = false, compact: Boolean = false): ContractScriptImpl =
+    ContractScript(version, compile(script, allowIllFormedStrings, compact).explicitGet()).explicitGet()
 
   def compileExpression(script: String, allowIllFormedStrings: Boolean = false, checkSize: Boolean = true): ExprScript =
     ExprScript(

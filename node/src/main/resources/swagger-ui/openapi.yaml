@@ -79,7 +79,7 @@ paths:
       description: >-
         Get a list addresses in the [node
         wallet](https://docs.waves.tech/en/waves-node/how-to-work-with-node-wallet)
-        by a given range of indices. Max range {from}-{to} is 100 addresses
+        by a given range of indices. Max range {from}-{to} is 1000 addresses.
       operationId: getWalletAddressesRange
       parameters:
         - name: from
@@ -200,10 +200,16 @@ paths:
           in: query
           description: >-
             For balance at height requests. Max number of blocks back from the
-            current height is set by `waves.db.max-rollback-depth`, 2000 by
-            default
+            current height is set by `rest-api.distribution-address-limit`, 1000 by
+            default.
           schema:
             type: integer
+        - name: asset
+          in: query
+          description: >-
+            Base58 encoded asset ID. Not defined for WAVES asset
+          schema:
+            $ref: '#/components/schemas/AssetId'
       responses:
         '200':
           description: successful operation
@@ -245,7 +251,11 @@ paths:
                   description: >-
                     For balance at height requests. Max number of blocks back
                     from the current height is set by
-                    `waves.db.max-rollback-depth`, 2000 by default
+                    `rest-api.distribution-address-limit`, 1000 by default.
+                asset:
+                  allOf:
+                    - $ref: '#/components/schemas/AssetId'
+                  description: Base58 encoded asset ID. Not defined for WAVES asset
       responses:
         '200':
           description: successful operation
@@ -276,7 +286,9 @@ paths:
       tags:
         - addresses
       summary: Data by keys or regexp
-      description: Read account data entries by given keys or a regular expression
+      description: >-
+        Read account data entries by given keys or a regular expression.
+        Limited by `rest-api.data-keys-request-limit`, 1000 by default.
       operationId: getDataByFilter
       parameters:
         - $ref: '#/components/parameters/address'
@@ -310,7 +322,9 @@ paths:
       tags:
         - addresses
       summary: Data by keys
-      description: Read account data entries by given keys
+      description: >-
+        Read account data entries by given keys.
+        Limited by `rest-api.data-keys-request-limit`, 1000 by default.
       operationId: getDataByMultipleKeysViaPost
       parameters:
         - $ref: '#/components/parameters/address'
@@ -621,7 +635,7 @@ paths:
       summary: Blocks forged by address
       description: >-
         Get a list of blocks forged by a given address. Max range {from}-{to} is
-        100 blocks
+        limited by `rest-api.blocks-request-limit`, 100 by default.
       operationId: getBlocksByAddress
       parameters:
         - name: from
@@ -652,8 +666,8 @@ paths:
         - blocks
       summary: Block range
       description: >-
-        Get blocks at a given range of heights. Max range {from}-{to} is 100
-        blocks
+        Get blocks at a given range of heights. Max range {from}-{to} is
+        limited by `rest-api.blocks-request-limit`, 100 by default.
       operationId: getBlocksRange
       parameters:
         - name: from
@@ -808,7 +822,7 @@ paths:
       summary: Block headers at range
       description: >-
         Get block headers at a given range of heights. Max range {from}-{to} is
-        100 blocks
+        limited by `rest-api.blocks-request-limit`, 100 by default.
       operationId: getBlockHeadersRange
       parameters:
         - name: from
@@ -1074,6 +1088,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RewardStatus'
+  '/transactions/status/{id}':
+    get:
+      tags:
+        - transactions
+      summary: Transaction status
+      description: Get transaction status by ID
+      operationId: getTxStatusById
+      parameters:
+        - $ref: '#/components/parameters/txId'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionStatus'
   /transactions/status:
     get:
       tags:
@@ -1102,7 +1132,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TransactionStatus'
+                type: array
+                items:
+                  $ref: '#/components/schemas/TransactionStatus'
     post:
       tags:
         - transactions
@@ -1166,8 +1198,8 @@ paths:
     get:
       tags:
         - transactions
-      summary: Transaction info
-      description: Get transactions by IDs
+      summary: Transactions info
+      description: Get transactions by IDs. Limited by `rest-api.transactions-by-address-limit`, 1000 by default.
       operationId: getMultipleTxs
       parameters:
         - name: id
@@ -1190,6 +1222,49 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Transaction'
+    post:
+      tags:
+        - transactions
+      summary: Transactions info
+      description: >-
+        Get transactions by IDs. Max number of transactions is set
+        by `waves.rest-api.transactions-by-address-limit`, 1000 by
+        default.<br>Transactions in the response are in the same order as in the
+        request.
+      operationId: getTxsViaPost
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                ids:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/TransactionId'
+                  minItems: 1
+                  maxItems: 1000
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/TransactionId'
+            encoding:
+              id:
+                style: form
+                explode: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Transaction'
+      x-codegen-request-body-name: ids
   /transactions/sign:
     post:
       tags:
@@ -1273,7 +1348,9 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Transaction'
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Transaction'
   /transactions/unconfirmed/size:
     get:
       tags:
@@ -1433,7 +1510,7 @@ paths:
         Get [merkle
         proofs](https://docs.waves.tech/en/blockchain/block/merkle-root#proof-of-transaction-in-block)
         for given transactions. For dozens of transactions, better use the POST
-        method
+        method. Limited by `rest-api.transactions-by-address-limit`, 1000 by default.
       operationId: getMerkleProofs
       parameters:
         - name: id
@@ -1460,7 +1537,7 @@ paths:
       description: >-
         Get [merkle
         proofs](https://docs.waves.tech/en/blockchain/block/merkle-root#proof-of-transaction-in-block)
-        for given transactions
+        for given transactions. Limited by `rest-api.transactions-by-address-limit`, 1000 by default.
       operationId: getMerkleProofsViaPost
       requestBody:
         description: Transaction IDs
@@ -1474,7 +1551,19 @@ paths:
                 ids:
                   type: array
                   items:
-                    type: string
+                    $ref: '#/components/schemas/TransactionId'
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/TransactionId'
+            encoding:
+              id:
+                style: form
+                explode: true
         required: false
       responses:
         '200':
@@ -1713,6 +1802,37 @@ paths:
               properties:
                 expr:
                   type: string
+                id:
+                  type: string
+                  example: "C8AgSFP8y91XUTpGtEQAQyjsSemxoY61ocGM852DFKF6"
+                  nullable: true
+                fee:
+                  type: number
+                  example: 500000
+                  nullable: true
+                feeAssetId:
+                  type: string
+                  example: null
+                  nullable: true
+                sender:
+                  type: string
+                  example: "3Mds6m8XZf4biC72NRkFx2kyoBdC9UvYRUR"
+                  nullable: true
+                senderPublicKey:
+                  type: string
+                  example: "3T9fL3XpeaHYbumohePPUmeuUqhyEeyzifi9vKouV8QoNtAT6kYV1oPAe9e2KCVquPcyXJpr2QwUiQKEUQPGZnc6"
+                  nullable: true
+                payment:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      amount:
+                        $ref: '#/components/schemas/Amount'
+                      assetId:
+                        allOf:
+                          - $ref: '#/components/schemas/AssetId'
+                        nullable: true
         required: true
       responses:
         '200':
@@ -1732,6 +1852,16 @@ paths:
                       type:
                         type: string
                       value: { }
+        '400':
+          description: Conflicting request structure
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiError'
+                example:
+                  error: 198
+                  message: Conflicting request structure. Both expression and invocation structure were sent
   /utils/seed:
     get:
       tags:
@@ -2006,7 +2136,8 @@ paths:
       description: >-
         Get detailed information about given assets. See [fields
         descriptions](https://docs.waves.tech/en/blockchain/token/#custom-token-parameters).
-        For dozens of assets, better use the POST method
+        For dozens of assets, better use the POST method.
+        Limited by `rest-api.asset-details-limit`, 100 by default.
       operationId: getMultipleAssetDetails
       parameters:
         - name: id
@@ -2039,7 +2170,8 @@ paths:
       summary: Information about multiple assets
       description: >-
         Get detailed information about given assets. See [fields
-        descriptions](https://docs.waves.tech/en/blockchain/token/#custom-token-parameters)
+        descriptions](https://docs.waves.tech/en/blockchain/token/#custom-token-parameters).
+        Limited by `rest-api.asset-details-limit`, 100 by default.
       operationId: getMultipleAssetDetailsViaPost
       parameters:
         - name: full
@@ -2144,7 +2276,7 @@ paths:
           in: path
           description: >-
             For balance at height requests. Max number of blocks back from the
-            current height is set by `waves.db.max-rollback-depth`, 2000 by
+            current height is set by `waves.rest-api.distribution-address-limit`, 1000 by
             default
           required: true
           schema:
@@ -2550,6 +2682,45 @@ paths:
           required: true
           schema:
             type: integer
+      responses:
+        '200':
+          description: State hash
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  blockId:
+                    type: string
+                  wavesBalanceHash:
+                    type: string
+                  assetsBalanceHash:
+                    type: string
+                  dataEntryHash:
+                    type: string
+                  accountScriptHash:
+                    type: string
+                  assetScriptHash:
+                    type: string
+                  leaseBalanceHash:
+                    type: string
+                  leaseStatusHash:
+                    type: string
+                  sponsorshipHash:
+                    type: string
+                  aliasHash:
+                    type: string
+                  stateHash:
+                    type: string
+  '/debug/stateHash/last':
+    get:
+      tags:
+        - debug
+      summary: Last block state hash
+      description: >-
+        Get state hash of the last block. Available only if node configuration contains
+        `waves.db.store-state-hashes = true` option
+      operationId: getStateHashLast
       responses:
         '200':
           description: State hash

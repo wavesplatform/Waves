@@ -5,9 +5,10 @@ import cats.syntax.foldable.*
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.*
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.*
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.EthereumTransaction.Transfer
+import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.transaction.smart.*
@@ -155,7 +156,12 @@ object FeeValidation {
         if (blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls)) 0 else tx.smartAssets(blockchain).size
       case tx: ExchangeTransaction =>
         tx.smartAssets(blockchain).size /* *3 if we decide to check orders and transaction */
-      case _ => tx.smartAssets(blockchain).size
+      case EthereumTransaction(t: Transfer, _, _, _) =>
+        t.tryResolveAsset(blockchain)
+          .collectFirst { case i: IssuedAsset => blockchain.hasAssetScript(i) }
+          .fold(0)(hasAsset => if (hasAsset) 1 else 0)
+      case _ =>
+        tx.smartAssets(blockchain).size
     }
 
     val finalAssetsCount =

@@ -36,21 +36,7 @@ case class RewardsSettings(
 }
 
 object RewardsSettings {
-  val MAINNET: RewardsSettings = apply(
-    100000,
-    6 * Constants.UnitsInWave,
-    50000000,
-    10000
-  )
-
-  val TESTNET: RewardsSettings = apply(
-    100000,
-    6 * Constants.UnitsInWave,
-    50000000,
-    10000
-  )
-
-  val STAGENET: RewardsSettings = apply(
+  val MAINNET, TESTNET, STAGENET = apply(
     100000,
     6 * Constants.UnitsInWave,
     50000000,

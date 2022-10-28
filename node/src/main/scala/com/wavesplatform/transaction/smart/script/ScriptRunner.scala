@@ -16,6 +16,7 @@ import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR, TRUE}
 import com.wavesplatform.lang.v1.evaluator.*
+import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.LogExtraInfo
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.lang.v1.traits.Environment
@@ -49,7 +50,8 @@ object ScriptRunner {
       blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls) &&
         blockchain.height > blockchain.settings.functionalitySettings.enforceTransferValidationAfter,
       blockchain.checkEstimatorSumOverflow,
-      blockchain.newEvaluatorMode
+      blockchain.newEvaluatorMode,
+      blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
     )
 
   def applyGeneric(
@@ -64,7 +66,8 @@ object ScriptRunner {
       fixUnicodeFunctions: Boolean,
       useNewPowPrecision: Boolean,
       checkEstimatorSumOverflow: Boolean,
-      newEvaluatorMode: Boolean
+      newEvaluatorMode: Boolean,
+      checkWeakPk: Boolean
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
 
     def evalVerifier(
@@ -95,7 +98,12 @@ object ScriptRunner {
       ctxE.fold(e => (Nil, 0, Left(e)), { case (ds, ctx) => partialEvaluate(ds, ctx) })
     }
 
-    def evaluate(ctx: EvaluationContext[Environment, Id], expr: EXPR, version: StdLibVersion): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
+    def evaluate(
+        ctx: EvaluationContext[Environment, Id],
+        expr: EXPR,
+        logExtraInfo: LogExtraInfo,
+        version: StdLibVersion
+    ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
       val correctedLimit =
         if (isAssetScript)
           ContractLimits.MaxComplexityByVersion(version)
@@ -112,19 +120,28 @@ object ScriptRunner {
           (defaultLimit, (_: EXPR) => Right(default))
 
       val (log, unusedComplexity, result) =
-        EvaluatorV2.applyOrDefault(ctx, expr, script.stdLibVersion, limit, correctFunctionCallScope = checkEstimatorSumOverflow, newMode = newEvaluatorMode, onExceed)
+        EvaluatorV2.applyOrDefault(
+          ctx,
+          expr,
+          logExtraInfo,
+          script.stdLibVersion,
+          limit,
+          correctFunctionCallScope = checkEstimatorSumOverflow,
+          newMode = newEvaluatorMode,
+          onExceed
+        )
 
       (log, limit - unusedComplexity, result)
     }
 
     script match {
       case s: ExprScript =>
-        evalVerifier(isContract = false, (_, ctx) => evaluate(ctx, s.expr, s.stdLibVersion))
+        evalVerifier(isContract = false, (_, ctx) => evaluate(ctx, s.expr, LogExtraInfo(), s.stdLibVersion))
 
       case ContractScript.ContractScriptImpl(v, DApp(_, decls, _, Some(vf))) =>
         val partialEvaluate: (DirectiveSet, EvaluationContext[Environment, Id]) => (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
           (directives, ctx) =>
-            val verify = ContractEvaluator.verify(decls, vf, evaluate(ctx, _, v), _)
+            val verify = ContractEvaluator.verify(decls, vf, evaluate(ctx, _, _, v), _)
             val bindingsVersion =
               if (useCorrectScriptVersion)
                 directives.stdLibVersion
@@ -151,7 +168,7 @@ object ScriptRunner {
               _ => ???
             )
           )
-        (Nil, 0, Verifier.verifyAsEllipticCurveSignature(proven, blockchain.isFeatureActivated(BlockchainFeatures.RideV6)).bimap(_.err, _ => TRUE))
+        (Nil, 0, Verifier.verifyAsEllipticCurveSignature(proven, checkWeakPk).bimap(_.err, _ => TRUE))
 
       case other =>
         (Nil, 0, Left(s"$other: Unsupported script version"))

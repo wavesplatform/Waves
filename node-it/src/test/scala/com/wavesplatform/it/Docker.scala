@@ -49,7 +49,7 @@ class Docker(
 ) extends AutoCloseable
     with ScorexLogging {
 
-  import Docker._
+  import Docker.*
 
   private val http = asyncHttpClient(
     config()
@@ -74,7 +74,7 @@ class Docker(
   }
 
   // a random network in 10.x.x.x range
-  val networkSeed = Random.nextInt(0x100000) << 4 | 0x0A000000
+  val networkSeed = Random.nextInt(0x100000) << 4 | 0x0a000000
   // 10.x.x.x/28 network will accommodate up to 13 nodes
   private val networkPrefix = s"${InetAddress.getByAddress(toByteArray(networkSeed)).getHostAddress}/28"
 
@@ -89,7 +89,7 @@ class Docker(
 
   private val genesisOverride = Docker.genesisOverride(Some(suiteConfig))
 
-  private def ipForNode(nodeId: Int) = InetAddress.getByAddress(toByteArray(nodeId & 0xF | networkSeed)).getHostAddress
+  private def ipForNode(nodeId: Int) = InetAddress.getByAddress(toByteArray(nodeId & 0xf | networkSeed)).getHostAddress
 
   private lazy val wavesNetwork: Network = {
     val id          = Random.nextInt(Int.MaxValue)
@@ -126,7 +126,7 @@ class Docker(
                   Ipam
                     .builder()
                     .driver("default")
-                    .config(singletonList(IpamConfig.create(networkPrefix, networkPrefix, ipForNode(0xE))))
+                    .config(singletonList(IpamConfig.create(networkPrefix, networkPrefix, ipForNode(0xe))))
                     .build()
                 )
                 .checkDuplicate(true)
@@ -239,14 +239,13 @@ class Docker(
         // Debugger
         if (enableDebugger) config += s"-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:$internalDebuggerPort "
 
-        if (enableProfiling) {
-          // https://www.yourkit.com/docs/java/help/startup_options.jsp
-          config += s"-agentpath:/usr/local/YourKit-JavaProfiler-2021.3/bin/linux-x86-64/libyjpagent.so=port=$ProfilerPort,listen=all," +
-            s"sampling,monitors,sessionname=WavesNode,dir=$ContainerRoot/profiler,logdir=$ContainerRoot,onexit=snapshot "
-        }
-
         config
       }
+
+      val profilerConfigEnv = if (enableProfiling) {
+        // https://www.yourkit.com/docs/java/help/startup_options.jsp
+        s"YOURKIT_OPTS=port=$ProfilerPort,listen=all,sampling,monitors,sessionname=WavesNode,dir=$ContainerRoot/profiler,logdir=$ContainerRoot,onexit=snapshot"
+      } else ""
 
       val debuggerPort = if (enableDebugger) Docker.freeDebuggerPort() else 0
 
@@ -256,13 +255,18 @@ class Docker(
         .publishAllPorts(true)
         .build()
 
+      val envs = Seq(
+        s"JAVA_OPTS=$configOverrides",
+        profilerConfigEnv
+      ).filter(_.nonEmpty)
+
       val containerConfig = ContainerConfig
         .builder()
         .image(imageName)
         .exposedPorts(s"$internalDebuggerPort")
         .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(wavesNetwork.name() -> endpointConfigFor(nodeName)).asJava))
         .hostConfig(hostConfig)
-        .env(s"JAVA_OPTS=$configOverrides")
+        .env(envs*)
         .build()
 
       val containerId = {
@@ -567,15 +571,16 @@ object Docker {
                                             |  signature = null # To calculate it in Block.genesis
                                             |}""".stripMargin)
 
-    val genesisConfig     = timestampOverrides.withFallback(configTemplate)
-    val gs                = genesisConfig.as[GenesisSettings]("waves.blockchain.custom.genesis")
-    val isRideV6Activated = featuresConfig.map(_.withFallback(configTemplate))
+    val genesisConfig = timestampOverrides.withFallback(configTemplate)
+    val gs            = genesisConfig.as[GenesisSettings]("waves.blockchain.custom.genesis")
+    val isRideV6Activated = featuresConfig
+      .map(_.withFallback(configTemplate))
       .getOrElse(configTemplate)
       .resolve()
       .getAs[Map[Short, Int]]("waves.blockchain.custom.functionality.pre-activated-features")
       .exists(_.get(BlockchainFeatures.RideV6.id).contains(0))
 
-    val genesisSignature  = Block.genesis(gs, rideV6Activated = isRideV6Activated).explicitGet().id()
+    val genesisSignature = Block.genesis(gs, rideV6Activated = isRideV6Activated).explicitGet().id()
 
     parseString(s"waves.blockchain.custom.genesis.signature = $genesisSignature").withFallback(timestampOverrides)
   }
@@ -584,7 +589,7 @@ object Docker {
     override val chainId: Byte = configTemplate.as[String]("waves.blockchain.custom.address-scheme-character").charAt(0).toByte
   }
 
-  def apply(owner: Class[_]): Docker = new Docker(tag = owner.getSimpleName)
+  def apply(owner: Class[?]): Docker = new Docker(tag = owner.getSimpleName)
 
   private def asProperties(config: Config): Properties = {
     val jsonConfig = config.resolve().root().render(ConfigRenderOptions.concise())

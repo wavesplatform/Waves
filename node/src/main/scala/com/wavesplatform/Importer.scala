@@ -136,7 +136,6 @@ object Importer extends ScorexLogging {
               db,
               blockchainUpdater,
               utxPool,
-              wallet,
               _ => Future.successful(TracedResult.wrapE(Left(GenericError("Not implemented during import")))),
               Application.loadBlockAt(db, blockchainUpdater)
             )
@@ -290,7 +289,7 @@ object Importer extends ScorexLogging {
     val db          = openDB(settings.dbSettings.directory)
     val (blockchainUpdater, levelDb) =
       StorageFactory(settings, db, time, Observer.empty, BlockchainUpdateTriggers.combined(triggers))
-    val utxPool     = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.minerSettings.enable)
+    val utxPool     = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
     val pos         = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
     val extAppender = BlockAppender(blockchainUpdater, time, utxPool, pos, scheduler, importOptions.verify) _
 

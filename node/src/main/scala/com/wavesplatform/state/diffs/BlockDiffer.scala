@@ -64,7 +64,8 @@ object BlockDiffer {
             pf.minus(pf.multiply(CurrentBlockFeePart))
           }
           .foldM(Portfolio.empty)(_.combine(_))
-      } else
+      }
+      else
         Right(Portfolio.empty)
 
     val initialFeeFromThisBlockE =
@@ -130,14 +131,14 @@ object BlockDiffer {
         constraint,
         prevBlockTimestamp,
         Diff.empty,
-        true,
+        hasNg = true,
         micro.transactionData,
-        verify
+        verify = verify
       )
     } yield r
   }
 
-  private def maybeApplySponsorship(blockchain: Blockchain, sponsorshipEnabled: Boolean, transactionFee: (Asset, Long)): (Asset, Long) =
+  def maybeApplySponsorship(blockchain: Blockchain, sponsorshipEnabled: Boolean, transactionFee: (Asset, Long)): (Asset, Long) =
     transactionFee match {
       case (ia: IssuedAsset, fee) if sponsorshipEnabled =>
         Waves -> Sponsorship.toWaves(fee, blockchain.assetDescription(ia).get.sponsorship)
@@ -206,11 +207,10 @@ object BlockDiffer {
 
   private def patchesDiff(blockchain: Blockchain): Either[String, Diff] = {
     Seq(CancelAllLeases, CancelLeaseOverflow, CancelInvalidLeaseIn, CancelLeasesToDisabledAliases)
-      .foldM(Diff.empty) {
-        case (prevDiff, patch) =>
-          patch
-            .lift(CompositeBlockchain(blockchain, prevDiff))
-            .fold(prevDiff.asRight[String])(prevDiff.combineF)
+      .foldM(Diff.empty) { case (prevDiff, patch) =>
+        patch
+          .lift(CompositeBlockchain(blockchain, prevDiff))
+          .fold(prevDiff.asRight[String])(prevDiff.combineF)
       }
   }
 }

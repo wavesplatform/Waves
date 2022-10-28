@@ -2,13 +2,14 @@ package com.wavesplatform.mining
 
 import java.time.LocalTime
 import cats.syntax.either.*
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block.*
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.metrics.{BlockStats, Instrumented, *}
+import com.wavesplatform.mining.Miner.*
 import com.wavesplatform.mining.microblocks.MicroBlockMiner
 import com.wavesplatform.network.*
 import com.wavesplatform.settings.WavesSettings
@@ -48,7 +49,7 @@ object MinerDebugInfo {
 
 class MinerImpl(
     allChannels: ChannelGroup,
-    blockchainUpdater: Blockchain with BlockchainUpdater with NG,
+    blockchainUpdater: Blockchain & BlockchainUpdater & NG,
     settings: WavesSettings,
     timeService: Time,
     utx: UtxPoolImpl,
@@ -89,7 +90,8 @@ class MinerImpl(
   def scheduleMining(tempBlockchain: Option[Blockchain]): Unit = {
     Miner.blockMiningStarted.increment()
 
-    val hasAllowedForMiningScriptsAccounts = wallet.privateKeyAccounts.filter(kp => hasAllowedForMiningScript(kp, tempBlockchain.getOrElse(blockchainUpdater)))
+    val hasAllowedForMiningScriptsAccounts =
+      wallet.privateKeyAccounts.filter(kp => hasAllowedForMiningScript(kp.toAddress, tempBlockchain.getOrElse(blockchainUpdater)))
     scheduledAttempts := CompositeCancelable.fromSet(hasAllowedForMiningScriptsAccounts.map { account =>
       generateBlockTask(account, tempBlockchain)
         .onErrorHandle(err => log.warn(s"Error mining Block", err))
@@ -106,25 +108,13 @@ class MinerImpl(
     Either
       .cond(parentHeight == 1, (), (timeService.correctedTime() - parentTimestamp).millis)
       .left
-      .flatMap(
-        blockAge =>
-          Either.cond(
-            blockAge <= minerSettings.intervalAfterLastBlockThenGenerationIsAllowed,
-            (),
-            s"BlockChain is too old (last block timestamp is $parentTimestamp generated $blockAge ago)"
-          )
+      .flatMap(blockAge =>
+        Either.cond(
+          blockAge <= minerSettings.intervalAfterLastBlockThenGenerationIsAllowed,
+          (),
+          s"BlockChain is too old (last block timestamp is $parentTimestamp generated $blockAge ago)"
+        )
       )
-
-  private def hasAllowedForMiningScript(account: KeyPair, blockchain: Blockchain): Boolean =
-    blockchain.isFeatureActivated(BlockchainFeatures.RideV6) || !blockchain.hasAccountScript(account.toAddress)
-
-  private def checkScript(blockchain: Blockchain, account: KeyPair): Either[String, Unit] = {
-    Either.cond(
-      hasAllowedForMiningScript(account, blockchain),
-      (),
-      s"Account(${account.toAddress}) is scripted and not allowed to forge blocks"
-    )
-  }
 
   private def ngEnabled: Boolean = blockchainUpdater.featureActivationHeight(BlockchainFeatures.NG.id).exists(blockchainUpdater.height > _ + 1)
 
@@ -155,7 +145,7 @@ class MinerImpl(
     }
   }
 
-  private[mining] def forgeBlock(account: KeyPair): Either[String, (Block, MiningConstraint)] = {
+  def forgeBlock(account: KeyPair): Either[String, (Block, MiningConstraint)] = {
     // should take last block right at the time of mining since microblocks might have been added
     val height          = blockchainUpdater.height
     val version         = blockchainUpdater.nextBlockVersion
@@ -217,7 +207,7 @@ class MinerImpl(
     if (version < RewardBlockVersion) -1L
     else settings.rewardsSettings.desired.getOrElse(-1L)
 
-  private def nextBlockGenerationTime(blockchain: Blockchain, height: Int, block: SignedBlockHeader, account: KeyPair): Either[String, Long] = {
+  def nextBlockGenerationTime(blockchain: Blockchain, height: Int, block: SignedBlockHeader, account: KeyPair): Either[String, Long] = {
     val balance = blockchain.generatingBalance(account.toAddress, Some(block.id()))
 
     if (blockchain.isMiningAllowed(height, balance)) {
@@ -239,7 +229,7 @@ class MinerImpl(
     val lastBlock = blockchain.lastBlockHeader.get
     for {
       _  <- checkAge(height, blockchain.lastBlockTimestamp.get) // lastBlock ?
-      _  <- checkScript(blockchain, account)
+      _  <- isAllowedForMining(account.toAddress, blockchain)
       ts <- nextBlockGenerationTime(blockchain, height, lastBlock, account)
       calculatedOffset = ts - timeService.correctedTime()
       offset           = Math.max(calculatedOffset, minerSettings.minimalBlockGenerationOffset.toMillis).millis
@@ -326,7 +316,7 @@ class MinerImpl(
     log.trace(s"MicroBlock mining scheduled for acc=${account.toAddress}")
   }
 
-  //noinspection TypeAnnotation,ScalaStyle
+  // noinspection TypeAnnotation,ScalaStyle
   private[this] object metrics {
     val blockBuildTimeStats = Kamon.timer("miner.pack-and-forge-block-time").withoutTags()
   }
@@ -342,5 +332,16 @@ object Miner {
     override def scheduleMining(blockchain: Option[Blockchain]): Unit                           = ()
     override def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration] = Left("Disabled")
     override val state: MinerDebugInfo.State                                                    = MinerDebugInfo.Disabled
+  }
+
+  def hasAllowedForMiningScript(address: Address, blockchain: Blockchain): Boolean =
+    blockchain.isFeatureActivated(BlockchainFeatures.RideV6) || !blockchain.hasAccountScript(address)
+
+  def isAllowedForMining(address: Address, blockchain: Blockchain): Either[String, Unit] = {
+    Either.cond(
+      hasAllowedForMiningScript(address, blockchain),
+      (),
+      s"Account($address) is scripted and not allowed to forge blocks"
+    )
   }
 }

@@ -61,7 +61,7 @@ object JsAPI {
       "MaxAccountVerifierComplexityByVersion" -> ((ver: Int) => MaxAccountVerifierComplexityByVersion(DirectiveDictionary[StdLibVersion].idMap(ver))),
       "MaxCallableComplexityByVersion"        -> ((ver: Int) => MaxCallableComplexityByVersion(DirectiveDictionary[StdLibVersion].idMap(ver))),
       "MaxExprSizeInBytes"                    -> MaxExprSizeInBytes,
-      "MaxContractSizeInBytes"                -> MaxContractSizeInBytes,
+      "MaxContractSizeInBytes"                -> MaxContractSizeInBytesV6,
       "MaxInvokeScriptArgs"                   -> MaxInvokeScriptArgs,
       "MaxInvokeScriptSizeInBytes"            -> MaxInvokeScriptSizeInBytes,
       "MaxWriteSetSizeInBytes"                -> MaxWriteSetSizeInBytes,
@@ -159,13 +159,19 @@ object JsAPI {
               "ast"        -> toJs(expr),
               "complexity" -> complexity.toDouble
             )
-          case CompileResult.DApp(_, di, error) =>
+          case CompileResult.DApp(_, di, meta, error) =>
+            val mappedMeta =
+              meta.argsWithFuncName.map { case (func, argsWithName) =>
+                func -> argsWithName.map { case (arg, argType) => arg -> argType.name }.toJSArray
+              }.toJSDictionary
+
             val compactNameToOriginalName: Map[String, String] =
               di.dApp.meta.compactNameAndOriginalNamePairList.map(pair => pair.compactName -> pair.originalName).toMap
 
             val resultFields: Seq[(String, Any)] = Seq(
               "result"               -> Global.toBuffer(di.bytes),
               "ast"                  -> toJs(di.dApp),
+              "meta"                 -> mappedMeta,
               "complexity"           -> di.maxComplexity._2.toDouble,
               "verifierComplexity"   -> di.verifierComplexity.toDouble,
               "callableComplexities" -> di.callableComplexities.view.mapValues(_.toDouble).toMap.toJSDictionary,
@@ -176,13 +182,12 @@ object JsAPI {
                 compactNameToOriginalName.getOrElse(name, name) -> complexity.toDouble
               }.toJSDictionary
             )
-            val errorFieldOpt: Seq[(String, Any)] = {
+            val errorFieldOpt: Seq[(String, Any)] =
               error
                 .fold(
                   error => Seq("error" -> error),
                   _ => Seq()
                 )
-            }
             js.Dynamic.literal.applyDynamic("apply")((resultFields ++ errorFieldOpt)*)
         }
       )
