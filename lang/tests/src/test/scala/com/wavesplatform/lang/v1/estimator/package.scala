@@ -5,6 +5,7 @@ import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
+import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.LogExtraInfo
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
@@ -19,7 +20,7 @@ package object estimator {
 
   private val environment = Common.emptyBlockchainEnvironment()
   private def evaluator(overhead: Boolean, expr: EXPR) =
-    EvaluatorV2.applyCompleted(ctx.evaluationContext(environment), expr, V3, correctFunctionCallScope = true, overhead)
+    EvaluatorV2.applyCompleted(ctx.evaluationContext(environment), expr, LogExtraInfo(), V3, correctFunctionCallScope = true, overhead)
 
   def evaluatorV2AsEstimator(overhead: Boolean): ScriptEstimator = new ScriptEstimator {
     override val version: Int = 0

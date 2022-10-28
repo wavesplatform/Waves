@@ -179,7 +179,7 @@ final case class ABIConverter(script: Script) {
 
   private[this] def functionsWithArgs: Seq[(String, List[(String, Types.FINAL)])] = {
     funcsWithTypes match {
-      case Right(signatures) => signatures.argsWithFuncName
+      case Right(signatures) => signatures.argsWithFuncName.toSeq
       case Left(_)           => Nil
     }
   }

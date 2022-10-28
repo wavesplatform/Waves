@@ -167,7 +167,8 @@ object InvokeDiffsCommon {
       isSyncCall: Boolean,
       limitedExecution: Boolean,
       totalComplexityLimit: Int,
-      otherIssues: Seq[Issue]
+      otherIssues: Seq[Issue],
+      log: Log[Id]
   ): TracedResult[ValidationError, Diff] = {
     val complexityLimit =
       if (limitedExecution) ContractLimits.FailFreeInvokeComplexity - storingComplexity
@@ -184,19 +185,21 @@ object InvokeDiffsCommon {
     val dataEntries     = actionsByType(classOf[DataOp]).asInstanceOf[List[DataOp]].map(dataItemToEntry)
 
     for {
-      _ <- TracedResult(checkDataEntries(blockchain, tx, dataEntries, version)).leftMap(FailedTransactionError.dAppExecution(_, storingComplexity))
-      _ <- TracedResult(checkLeaseCancels(leaseCancelList)).leftMap(FailedTransactionError.dAppExecution(_, storingComplexity))
+      _ <- TracedResult(checkDataEntries(blockchain, tx, dataEntries, version)).leftMap(
+        FailedTransactionError.dAppExecution(_, storingComplexity, log)
+      )
+      _ <- TracedResult(checkLeaseCancels(leaseCancelList)).leftMap(FailedTransactionError.dAppExecution(_, storingComplexity, log))
       _ <- TracedResult(
         checkScriptActionsAmount(version, actions, transferList, leaseList, leaseCancelList, dataEntries)
-          .leftMap(FailedTransactionError.dAppExecution(_, storingComplexity))
+          .leftMap(FailedTransactionError.dAppExecution(_, storingComplexity, log))
       )
 
       _ <- TracedResult(checkSelfPayments(dAppAddress, blockchain, tx, version, transferList))
-        .leftMap(FailedTransactionError.dAppExecution(_, storingComplexity))
+        .leftMap(FailedTransactionError.dAppExecution(_, storingComplexity, log))
       _ <- TracedResult(
-        Either.cond(transferList.map(_.amount).forall(_ >= 0), (), FailedTransactionError.dAppExecution("Negative amount", storingComplexity))
+        Either.cond(transferList.map(_.amount).forall(_ >= 0), (), FailedTransactionError.dAppExecution("Negative amount", storingComplexity, log))
       )
-      _ <- TracedResult(checkOverflow(transferList.map(_.amount))).leftMap(FailedTransactionError.dAppExecution(_, storingComplexity))
+      _ <- TracedResult(checkOverflow(transferList.map(_.amount))).leftMap(FailedTransactionError.dAppExecution(_, storingComplexity, log))
 
       actionAssets = transferList.flatMap(_.assetId).map(IssuedAsset(_)) ++
         reissueList.map(r => IssuedAsset(r.assetId)) ++
@@ -215,7 +218,7 @@ object InvokeDiffsCommon {
           val stepLimit       = ContractLimits.MaxComplexityByVersion(version)
 
           calcAndCheckFee(
-            FailedTransactionError.feeForActions,
+            FailedTransactionError.feeForActions(_, _, log),
             tx.root,
             blockchain,
             stepLimit,
@@ -230,7 +233,7 @@ object InvokeDiffsCommon {
         Either.cond(
           actionComplexities.sum + storingComplexity <= totalComplexityLimit || limitedExecution, // limited execution has own restriction "complexityLimit"
           (),
-          FailedTransactionError.feeForActions(s"Invoke complexity limit = $totalComplexityLimit is exceeded", storingComplexity)
+          FailedTransactionError.feeForActions(s"Invoke complexity limit = $totalComplexityLimit is exceeded", storingComplexity, log)
         )
       )
 
@@ -247,14 +250,14 @@ object InvokeDiffsCommon {
         resolveAddress(transfer.address, blockchain)
           .map(InvokeScriptResult.Payment(_, Asset.fromCompatId(transfer.assetId), transfer.amount))
           .leftMap {
-            case f: FailedTransactionError => f.addComplexity(storingComplexity)
+            case f: FailedTransactionError => f.addComplexity(storingComplexity).withLog(log)
             case e                         => e
           }
       }
 
       compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey)(actions, paymentsAndFeeDiff, complexityLimit)
         .leftMap {
-          case failed: FailedTransactionError => failed.addComplexity(storingComplexity)
+          case failed: FailedTransactionError => failed.addComplexity(storingComplexity).withLog(log)
           case other                          => other
         }
 

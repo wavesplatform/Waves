@@ -75,6 +75,15 @@ lazy val `lang-doc` = project
     libraryDependencies ++= Seq("com.github.spullara.mustache.java" % "compiler" % "0.9.10") ++ Dependencies.test
   )
 
+lazy val `lang-tests-js` = project
+  .in(file("lang/tests-js"))
+  .enablePlugins(ScalaJSPlugin)
+  .dependsOn(`lang-js`)
+  .settings(
+    libraryDependencies += Dependencies.scalaJsTest.value,
+    testFrameworks += new TestFramework("utest.runner.Framework")
+  )
+
 lazy val node = project.dependsOn(`lang-jvm`, `lang-testkit` % "test")
 
 lazy val `grpc-server`    = project.dependsOn(node % "compile;test->test;runtime->provided")

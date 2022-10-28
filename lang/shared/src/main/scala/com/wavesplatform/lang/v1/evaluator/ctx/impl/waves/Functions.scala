@@ -16,7 +16,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings.{scriptTransf
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, notImplemented, unit}
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, NativeFunction, UserFunction}
-import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction, FunctionIds}
+import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction, FunctionIds, Log}
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader}
@@ -433,9 +433,9 @@ object Functions {
         override def evaluate[F[_]: Monad](env: Environment[F], args: List[EVALUATED]): F[Either[ExecutionError, EVALUATED]] =
           args match {
             case (c: CaseObj) :: u :: Nil if u == unit =>
-              env.accountBalanceOf(caseObjToRecipient(c), None).map(_.map(CONST_LONG).leftMap(CommonError))
+              env.accountBalanceOf(caseObjToRecipient(c), None).map(_.map(CONST_LONG).leftMap(CommonError(_)))
             case (c: CaseObj) :: CONST_BYTESTR(assetId: ByteStr) :: Nil =>
-              env.accountBalanceOf(caseObjToRecipient(c), Some(assetId.arr)).map(_.map(CONST_LONG).leftMap(CommonError))
+              env.accountBalanceOf(caseObjToRecipient(c), Some(assetId.arr)).map(_.map(CONST_LONG).leftMap(CommonError(_)))
             case xs =>
               notImplemented[F, EVALUATED](s"assetBalance(a: Address|Alias, u: ByteVector|Unit)", xs)
           }
@@ -455,7 +455,7 @@ object Functions {
         override def evaluate[F[_]: Monad](env: Environment[F], args: List[EVALUATED]): F[Either[ExecutionError, EVALUATED]] =
           args match {
             case (c: CaseObj) :: CONST_BYTESTR(assetId: ByteStr) :: Nil =>
-              env.accountBalanceOf(caseObjToRecipient(c), Some(assetId.arr)).map(_.map(CONST_LONG).leftMap(CommonError))
+              env.accountBalanceOf(caseObjToRecipient(c), Some(assetId.arr)).map(_.map(CONST_LONG).leftMap(CommonError(_)))
             case xs =>
               notImplemented[F, EVALUATED](s"assetBalance(a: Address|Alias, u: ByteVector)", xs)
           }
@@ -487,7 +487,7 @@ object Functions {
                         "effective"  -> CONST_LONG(b.effective)
                       )
                     )
-                  ).leftMap(CommonError)
+                  ).leftMap(CommonError(_))
                 )
 
             case xs => notImplemented[F, EVALUATED](s"wavesBalance(a: Address|Alias)", xs)
@@ -593,7 +593,7 @@ object Functions {
             env: Environment[F],
             args: List[EVALUATED],
             availableComplexity: Int
-        )(implicit m: Monad[CoevalF[F, *]]): Coeval[F[(Either[ExecutionError, EVALUATED], Int)]] = {
+        )(implicit m: Monad[CoevalF[F, *]]): Coeval[F[(Either[ExecutionError, (EVALUATED, Log[F])], Int)]] = {
           val dAppBytes = args match {
             case (dApp: CaseObj) :: _ if dApp.caseType == addressType =>
               dApp.fields("bytes") match {
@@ -632,12 +632,13 @@ object Functions {
                 .map(_.map { case (result, spentComplexity) =>
                   val mappedError = result.leftMap {
                     case reject: FailOrRejectError => reject
-                    case other                     => CommonError(other.toString)
+                    case other                     => CommonError("Nested invoke error", Some(other))
                   }
                   (mappedError, availableComplexity - spentComplexity)
                 })
             case xs =>
-              val err = notImplemented[F, EVALUATED](s"invoke(dApp: Address, function: String, args: List[Any], payments: List[Payment])", xs)
+              val err =
+                notImplemented[F, (EVALUATED, Log[F])](s"invoke(dApp: Address, function: String, args: List[Any], payments: List[Payment])", xs)
               Coeval.now(err.map((_, 0)))
           }
         }
