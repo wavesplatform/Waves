@@ -6,7 +6,6 @@
    2. You've checked "Make project before run"
  */
 
-import sbt.{Def, util}
 import sbt.{Compile, Def}
 import sbt.Keys.{concurrentRestrictions, _}
 
@@ -53,27 +52,6 @@ lazy val `lang-testkit` = project
 lazy val `lang-tests` = project
   .in(file("lang/tests"))
   .dependsOn(`lang-testkit`)
-  .settings(
-    Compile / sourceGenerators += Tasks.docSource
-  )
-
-lazy val `lang-tests-js` = project
-  .in(file("lang/testsJS"))
-  .enablePlugins(ScalaJSPlugin)
-  .dependsOn(`lang-js`)
-  .settings(
-    libraryDependencies += Dependencies.scalaJsTest.value,
-    testFrameworks += new TestFramework("utest.runner.Framework"),
-    Compile / sourceGenerators += Tasks.docSource
-  )
-
-lazy val `lang-doc` = project
-  .in(file("lang/doc"))
-  .dependsOn(`lang-jvm`)
-  .settings(
-    Compile / sourceGenerators += Tasks.docSource,
-    libraryDependencies ++= Seq("com.github.spullara.mustache.java" % "compiler" % "0.9.10") ++ Dependencies.test
-  )
 
 lazy val `lang-tests-js` = project
   .in(file("lang/tests-js"))
