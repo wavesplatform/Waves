@@ -14,6 +14,7 @@ import com.wavesplatform.events.protobuf.BlockchainUpdated.Rollback.RollbackType
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.events.protobuf.serde.*
 import com.wavesplatform.events.protobuf.{TransactionMetadata, BlockchainUpdated as PBBlockchainUpdated}
+import com.wavesplatform.features.BlockchainFeatures.BlockReward
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -278,9 +279,74 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       )
     }
 
-    "should include correct waves amount" in withNEmptyBlocksSubscription(settings = currentSettings) { result =>
-      val balances = result.collect { case b if b.update.isAppend => b.getAppend.getBlock.updatedWavesAmount }
-      balances shouldBe Seq(10000000000000000L, 10000000600000000L, 10000001200000000L)
+    "should include correct waves amount" - {
+      val totalWaves = 100_000_000_0000_0000L
+      val reward     = 6_0000_0000
+
+      "on preactivated block reward" in {
+        val settings = currentSettings.setFeaturesHeight((BlockReward, 0))
+
+        withDomainAndRepo(settings) { case (d, repo) =>
+          d.appendBlock()
+          d.blockchain.wavesAmount(1) shouldBe totalWaves + reward
+          repo.getBlockUpdate(1).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward
+
+          d.appendBlock()
+          d.blockchain.wavesAmount(2) shouldBe totalWaves + reward * 2
+          repo.getBlockUpdate(2).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 2
+        }
+      }
+
+      "on activation of block reward" in {
+        val settings = currentSettings.setFeaturesHeight((BlockReward, 3))
+
+        withNEmptyBlocksSubscription(settings = settings, count = 3) { result =>
+          val balances = result.collect { case b if b.update.isAppend => b.getAppend.getBlock.updatedWavesAmount }
+          balances shouldBe Seq(totalWaves, totalWaves, totalWaves + reward, totalWaves + reward * 2)
+        }
+
+        withDomainAndRepo(settings) { case (d, repo) =>
+          d.appendBlock()
+          d.blockchain.wavesAmount(1) shouldBe totalWaves
+          repo.getBlockUpdate(1).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves
+
+          d.appendBlock()
+          d.blockchain.wavesAmount(2) shouldBe totalWaves
+          repo.getBlockUpdate(2).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves
+
+          d.appendBlock()
+          d.blockchain.wavesAmount(3) shouldBe totalWaves + reward
+          repo.getBlockUpdate(3).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward
+
+          d.appendBlock()
+          d.blockchain.wavesAmount(4) shouldBe totalWaves + reward * 2
+          repo.getBlockUpdate(4).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 2
+        }
+      }
+
+      "on rollbacks" in {
+        withDomainAndRepo(currentSettings) { case (d, repo) =>
+          d.appendBlock()
+
+          // block and micro append
+          val block = d.appendBlock()
+          block.sender shouldBe defaultSigner.publicKey
+
+          d.appendMicroBlock(TxHelpers.transfer(defaultSigner))
+          d.blockchain.wavesAmount(2) shouldBe totalWaves + reward * 2
+          repo.getBlockUpdate(2).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 2
+
+          // micro rollback
+          d.appendKeyBlock(Some(block.id()))
+          d.blockchain.wavesAmount(3) shouldBe totalWaves + reward * 3
+          repo.getBlockUpdate(3).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 3
+
+          // block rollback
+          d.rollbackTo(2)
+          d.blockchain.wavesAmount(2) shouldBe totalWaves + reward * 2
+          repo.getBlockUpdate(2).getUpdate.vanillaAppend.updatedWavesAmount shouldBe totalWaves + reward * 2
+        }
+      }
     }
 
     "should include correct heights" in withNEmptyBlocksSubscription(settings = currentSettings) { result =>

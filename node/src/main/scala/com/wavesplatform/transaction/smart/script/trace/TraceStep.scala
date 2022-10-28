@@ -116,7 +116,7 @@ object TraceStep {
     case a                                  => Json.obj("error" -> a.toString)
   }
 
-  private[trace] def logJson(l: Log[Id]): (String, JsValueWrapper) =
+  def logJson(l: Log[Id]): (String, JsValueWrapper) =
     "vars" -> l.collect {
       case (k, Right(v)) if !LogKeys.TraceExcluded.exists(k.contains)   => Json.obj("name" -> k) ++ ScriptValuesJson.serializeValue(v, intAsString = false)
       case (k, Left(CommonError(_, Some(fte: FailedTransactionError)))) => Json.obj("name" -> k, "error" -> fte.error)
