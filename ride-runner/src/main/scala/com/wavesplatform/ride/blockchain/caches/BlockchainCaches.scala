@@ -5,8 +5,7 @@ import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.ride.blockchain.BlockchainData
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, Portfolio, TxMeta}
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.transfer.TransferTransactionLike
+import com.wavesplatform.transaction.{Asset, Transaction}
 
 // TODO F abstraction? But getBalances?
 trait BlockchainCaches {
@@ -38,8 +37,8 @@ trait BlockchainCaches {
   def getBalances(address: Address): BlockchainData[Portfolio]
   def setBalances(address: Address, data: BlockchainData[Portfolio]): Unit // TODO
 
-  def getTransaction(id: ByteStr): BlockchainData[(TxMeta, Option[TransferTransactionLike])]
-  def setTransaction(id: ByteStr, data: BlockchainData[(TxMeta, Option[TransferTransactionLike])]): Unit
+  def getTransaction(id: ByteStr): BlockchainData[(TxMeta, Option[Transaction])]
+  def setTransaction(id: ByteStr, data: BlockchainData[(TxMeta, Option[Transaction])]): Unit
 }
 
 object EmptyBlockchainCaches extends BlockchainCaches {
@@ -70,6 +69,6 @@ object EmptyBlockchainCaches extends BlockchainCaches {
   override def getBalances(address: Address): BlockchainData[Portfolio]             = BlockchainData.Unknown
   override def setBalances(address: Address, data: BlockchainData[Portfolio]): Unit = {}
 
-  override def getTransaction(id: ByteStr): BlockchainData[(TxMeta, Option[TransferTransactionLike])]             = BlockchainData.Unknown
-  override def setTransaction(id: ByteStr, data: BlockchainData[(TxMeta, Option[TransferTransactionLike])]): Unit = {}
+  override def getTransaction(id: ByteStr): BlockchainData[(TxMeta, Option[Transaction])]             = BlockchainData.Unknown
+  override def setTransaction(id: ByteStr, data: BlockchainData[(TxMeta, Option[Transaction])]): Unit = {}
 }

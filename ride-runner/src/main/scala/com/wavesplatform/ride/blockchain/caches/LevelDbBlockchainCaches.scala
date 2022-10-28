@@ -6,8 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{DBExt, Key}
 import com.wavesplatform.ride.blockchain.BlockchainData
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, Portfolio, TxMeta}
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.transfer.TransferTransactionLike
+import com.wavesplatform.transaction.{Asset, Transaction}
 import org.iq80.leveldb.DB
 
 // TODO better name
@@ -71,10 +70,10 @@ class LevelDbBlockchainCaches(db: DB) extends BlockchainCaches {
   override def setBalances(address: Address, data: BlockchainData[Portfolio]): Unit =
     writeToDb(CacheKeys.Portfolios.mkKey(address), data)
 
-  override def getTransaction(id: ByteStr): BlockchainData[(TxMeta, Option[TransferTransactionLike])] =
+  override def getTransaction(id: ByteStr): BlockchainData[(TxMeta, Option[Transaction])] =
     readFromDb(CacheKeys.Transactions.mkKey(id))
 
-  override def setTransaction(id: ByteStr, data: BlockchainData[(TxMeta, Option[TransferTransactionLike])]): Unit =
+  override def setTransaction(id: ByteStr, data: BlockchainData[(TxMeta, Option[Transaction])]): Unit =
     writeToDb(CacheKeys.Transactions.mkKey(id), data)
 
   private def readFromDb[T](dbKey: Key[Option[T]]): BlockchainData[T] = {

@@ -5,21 +5,7 @@ import com.google.protobuf.empty.Empty
 import com.google.protobuf.{ByteString, UnsafeByteOperations}
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.api.grpc.BalanceResponse.Balance
-import com.wavesplatform.api.grpc.{
-  AccountRequest,
-  AccountsApiGrpc,
-  ActivationStatusRequest,
-  AssetRequest,
-  AssetsApiGrpc,
-  BalancesRequest,
-  BlockRequest,
-  BlockchainApiGrpc,
-  BlocksApiGrpc,
-  DataRequest,
-  PBSignedTransactionConversions,
-  TransactionsApiGrpc,
-  TransactionsRequest
-}
+import com.wavesplatform.api.grpc.{AccountRequest, AccountsApiGrpc, ActivationStatusRequest, AssetRequest, AssetsApiGrpc, BalancesRequest, BlockRequest, BlockchainApiGrpc, BlocksApiGrpc, DataRequest, PBSignedTransactionConversions, TransactionsApiGrpc, TransactionsRequest}
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -33,7 +19,7 @@ import com.wavesplatform.protobuf.transaction.PBTransactions.{toVanillaDataEntry
 import com.wavesplatform.ride.input.EmptyPublicKey
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, DataEntry, Height, LeaseBalance, Portfolio, TxMeta}
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
-import com.wavesplatform.transaction.{Asset, EthereumTransaction}
+import com.wavesplatform.transaction.{Asset, EthereumTransaction, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.*
 import io.grpc.stub.ClientCalls
@@ -281,7 +267,7 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
       .tap(r => log.info(s"getBalances($address): found ${r.assets.size} assets"))
   }
 
-  def getTransaction(id: ByteStr): Option[(TxMeta, Option[TransferTransactionLike])] = {
+  def getTransferLikeTransaction(id: ByteStr): Option[(TxMeta, Option[Transaction])] = {
     val xs = ClientCalls
       .blockingServerStreamingCall(
         grpcApiChannel.newCall(TransactionsApiGrpc.METHOD_GET_TRANSACTIONS, CallOptions.DEFAULT),
@@ -291,13 +277,14 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
     val r = if (xs.hasNext) {
       val pbTx = xs.next()
 
-      val tx: Option[TransferTransactionLike] = pbTx.transaction.flatMap { signedTx =>
+      val tx = pbTx.transaction.flatMap { signedTx =>
         signedTx.toVanilla.toOption.flatMap {
-          case tx: EthereumTransaction =>
-            tx.payload match {
-              case transfer: EthereumTransaction.Transfer =>
+          case etx: EthereumTransaction =>
+            etx.payload match {
+              case _: EthereumTransaction.Transfer =>
                 // TODO have to call GET /eth/assets/... or blockchain.resolveERC20Address
-                transfer.toTransferLike(tx, blockchain = ???).toOption
+                // transfer.toTransferLike(tx, blockchain = ???).toOption
+                none
               case _ => none
             }
 

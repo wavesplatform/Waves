@@ -17,9 +17,9 @@ import com.wavesplatform.protobuf.transaction.PBTransactions.{toVanillaDataEntry
 import com.wavesplatform.ride.blockchain.caches.BlockchainCaches
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, DataEntry, Height, LeaseBalance, Portfolio, TxMeta}
-import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
+import com.wavesplatform.transaction.{Asset, EthereumTransaction, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 
 import java.nio.charset.StandardCharsets
@@ -170,11 +170,28 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
     }
   }
 
-  private val transactions = RideData.anyRefMap[ByteStr, (TxMeta, Option[TransferTransactionLike]), TagT] {
-    load(caches.getTransaction, blockchainApi.getTransaction)
+  private val transactions = RideData.anyRefMap[ByteStr, (TxMeta, Option[Transaction]), TagT] {
+    load(caches.getTransaction, blockchainApi.getTransferLikeTransaction)
   }
 
-  def getTransaction(id: ByteStr, tag: TagT): Option[(TxMeta, Option[TransferTransactionLike])] = transactions.get(id, tag)
+  def getTransaction(id: ByteStr, tag: TagT): Option[(TxMeta, Option[TransferTransactionLike])] =
+    transactions
+      .get(id, tag)
+      .map { case (meta, maybeTx) =>
+        val tx = maybeTx.flatMap {
+          case tx: TransferTransactionLike => tx.some
+          case tx: EthereumTransaction =>
+            tx.payload match {
+              case payload: EthereumTransaction.Transfer =>
+                // tx.toTransferLike()
+                // payload.toTransferLike(tx, this).toOption
+                none
+              case _ => none
+            }
+          case _ => none
+        }
+        (meta, tx)
+      }
 
   // Got a transaction, got a rollback, same transaction on new height/failed/removed
   def replaceTransactionMeta(pbId: ByteString, height: Int): Set[TagT] = {
