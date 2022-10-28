@@ -73,7 +73,7 @@ class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler) extends Bl
       db.put(keyForHeight(ls.keyBlock.height), ls.solidify().protobuf.update(_.append.block.optionalBlock := None).toByteArray)
     )
 
-    val ba = BlockAppended.from(block, diff, blockchainBeforeWithMinerReward)
+    val ba = BlockAppended.from(block, diff, blockchainBeforeWithMinerReward, minerReward)
     liquidState = Some(LiquidState(ba, Seq.empty))
     handlers.forEach(_.handleUpdate(ba))
   }
