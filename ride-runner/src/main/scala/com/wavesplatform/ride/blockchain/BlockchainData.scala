@@ -26,7 +26,27 @@ object BlockchainData {
     case None    => Absence
   }
 
-  implicit final class Ops[ValueT](val self: BlockchainData[ValueT]) extends AnyVal {
-    def or(x: => BlockchainData[ValueT]): BlockchainData[ValueT] = if (self.loaded) self else x
+  implicit final class Ops[A](val self: BlockchainData[A]) extends AnyVal {
+    def or(x: => BlockchainData[A]): BlockchainData[A] = if (self.loaded) self else x
+
+    def toFoundStr(f: A => Any = x => x): String =
+      Ops.toFoundStr("", map(f))
+
+    def toFoundStr(label: String, f: A => Any): String =
+      Ops.toFoundStr(s"$label=", map(f))
+
+    def map[B](f: A => B): BlockchainData[B] = self match {
+      case Cached(a) => BlockchainData.Cached(f(a))
+      case Absence   => Absence
+      case Unknown   => Unknown
+    }
+  }
+
+  object Ops {
+    def toFoundStr(prefix: String, value: BlockchainData[Any]): String = value match {
+      case Cached(value) => s"found $prefix$value"
+      case Absence       => "found absence"
+      case Unknown       => "not found"
+    }
   }
 }

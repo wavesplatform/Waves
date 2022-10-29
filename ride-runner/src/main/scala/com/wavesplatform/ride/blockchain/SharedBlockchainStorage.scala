@@ -30,7 +30,11 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
   private val chainId = settings.addressSchemeCharacter.toByte
 
   private val data = RideData.anyRefMap[(Address, String), DataEntry[?], TagT] {
-    load[(Address, String), DataEntry[_]](Function.tupled(caches.getAccountDataEntry), Function.tupled(blockchainApi.getAccountDataEntry))
+    load[(Address, String), DataEntry[_]](
+      Function.tupled(caches.getAccountDataEntry),
+      Function.tupled(blockchainApi.getAccountDataEntry),
+      (key, value) => caches.setAccountDataEntry(key._1, key._2, value)
+    )
   }
 
   def getData(address: Address, key: String, tag: TagT): Option[DataEntry[_]] = data.get((address, key), tag)
@@ -45,7 +49,7 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
   }
 
   private val accountScripts = RideData.anyRefMap[Address, AccountScriptInfo, TagT] {
-    load(caches.getAccountScript, blockchainApi.getAccountScript(_, estimator))
+    load(caches.getAccountScript, blockchainApi.getAccountScript(_, estimator), caches.setAccountScript)
   }
 
   def getAccountScript(address: Address, tag: TagT): Option[AccountScriptInfo] = accountScripts.get(address, tag)
@@ -81,19 +85,21 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
   // It seems, we don't need to update this. Only for some optimization needs
   private val blockHeaders = RideData.mapReadOnly[Int, SignedBlockHeader, TagT] { h =>
     if (h > height) throw new RuntimeException(s"Can't receive a block with height=$h > current height=$height")
-    else load(caches.getBlockHeader, blockchainApi.getBlockHeader)(h)
+    else load(caches.getBlockHeader, blockchainApi.getBlockHeader, caches.setBlockHeader)(h)
   }
   def getBlockHeader(height: Int, tag: TagT): Option[SignedBlockHeader] = blockHeaders.get(height, tag)
 
   private val vrf = RideData.mapReadOnly[Int, ByteStr, TagT] { h =>
     if (h > height) throw new RuntimeException(s"Can't receive a block VRF with height=$h > current height=$height")
-    else load(caches.getVrf, blockchainApi.getVrf)(h)
+    else load(caches.getVrf, blockchainApi.getVrf, caches.setVrf)(h)
   }
   def getVrf(height: Int, tag: TagT): Option[ByteStr] = vrf.get(height, tag)
 
   // Ride: wavesBalance, height, lastBlock TODO: a binding in Ride?
-  private var _height: Int = caches.getHeight.getOrElse(blockchainApi.getCurrentBlockchainHeight())
-  def height: Int          = _height
+  private var _height: Int = caches.getHeight.getOrElse {
+    blockchainApi.getCurrentBlockchainHeight().tap(caches.setHeight)
+  }
+  def height: Int = _height
   // TODO How do we known that this field is used in a script?
   def setHeight(height: Int): Unit = {
     log.debug(s"Updated height = $height")
@@ -102,11 +108,16 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
   }
 
   // No way to get this from blockchain updates
-  var activatedFeatures = load[Int, Map[Short, Int]](caches.getActivatedFeatures, blockchainApi.getActivatedFeatures(_).some)(height)
-    .getOrElse(throw new RuntimeException("Impossible: activated features are empty"))
+  var activatedFeatures =
+    load[Unit, Map[Short, Int]](
+      _ => caches.getActivatedFeatures(),
+      _ => blockchainApi.getActivatedFeatures(height).some,
+      (_, xs) => xs.mayBeValue.foreach(caches.setActivatedFeatures)
+    )(())
+      .getOrElse(throw new RuntimeException("Impossible: activated features are empty"))
 
   private val assets = RideData.anyRefMap[IssuedAsset, AssetDescription, TagT] {
-    load(caches.getAssetDescription, blockchainApi.getAssetDescription)
+    load(caches.getAssetDescription, blockchainApi.getAssetDescription, caches.setAssetDescription)
   }
   def getAssetDescription(asset: IssuedAsset, tag: TagT): Option[AssetDescription] = assets.get(asset, tag)
   def replaceAssetDescription(update: StateUpdate.AssetDetails): Set[TagT] = {
@@ -137,13 +148,13 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
 
   // It seems, we don't need to update this. Only for some optimization needs
   private val aliases = RideData.anyRefMap[Alias, Address, TagT] {
-    load(caches.resolveAlias, blockchainApi.resolveAlias)
+    load(caches.resolveAlias, blockchainApi.resolveAlias, caches.setAlias)
   }
 
   def getAlias(alias: Alias, tag: TagT): Option[Address] = aliases.get(alias, tag)
 
   private val portfolios = RideData.anyRefMap[Address, Portfolio, TagT] {
-    load(caches.getBalances, blockchainApi.getBalances(_).some)
+    load(caches.getBalances, blockchainApi.getBalances(_).some, caches.setBalances)
   }
 
   def getPortfolio(address: Address, tag: TagT): Option[Portfolio] = portfolios.get(address, tag)
@@ -171,7 +182,7 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
   }
 
   private val transactions = RideData.anyRefMap[ByteStr, (TxMeta, Option[Transaction]), TagT] {
-    load(caches.getTransaction, blockchainApi.getTransferLikeTransaction)
+    load(caches.getTransaction, blockchainApi.getTransferLikeTransaction, caches.setTransaction)
   }
 
   def getTransaction(id: ByteStr, tag: TagT): Option[(TxMeta, Option[TransferTransactionLike])] =
@@ -217,6 +228,10 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
 
   private def load[KeyT, ValueT](
       fromCache: KeyT => BlockchainData[ValueT],
-      fromBlockchain: KeyT => Option[ValueT]
-  )(key: KeyT): Option[ValueT] = fromCache(key).or(BlockchainData.loaded(fromBlockchain(key))).mayBeValue
+      fromBlockchain: KeyT => Option[ValueT],
+      updateCache: (KeyT, BlockchainData[ValueT]) => Unit
+  )(key: KeyT): Option[ValueT] =
+    fromCache(key)
+      .or(BlockchainData.loaded(fromBlockchain(key)).tap(updateCache(key, _)))
+      .mayBeValue
 }

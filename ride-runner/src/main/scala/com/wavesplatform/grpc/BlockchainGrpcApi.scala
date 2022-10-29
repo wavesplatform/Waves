@@ -1,11 +1,26 @@
 package com.wavesplatform.grpc
 
 import cats.syntax.option.*
+import com.wavesplatform.collections.syntax.*
 import com.google.protobuf.empty.Empty
 import com.google.protobuf.{ByteString, UnsafeByteOperations}
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.api.grpc.BalanceResponse.Balance
-import com.wavesplatform.api.grpc.{AccountRequest, AccountsApiGrpc, ActivationStatusRequest, AssetRequest, AssetsApiGrpc, BalancesRequest, BlockRequest, BlockchainApiGrpc, BlocksApiGrpc, DataRequest, PBSignedTransactionConversions, TransactionsApiGrpc, TransactionsRequest}
+import com.wavesplatform.api.grpc.{
+  AccountRequest,
+  AccountsApiGrpc,
+  ActivationStatusRequest,
+  AssetRequest,
+  AssetsApiGrpc,
+  BalancesRequest,
+  BlockRequest,
+  BlockchainApiGrpc,
+  BlocksApiGrpc,
+  DataRequest,
+  PBSignedTransactionConversions,
+  TransactionsApiGrpc,
+  TransactionsRequest
+}
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -81,7 +96,7 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
         grpcApiChannel.newCall(BlocksApiGrpc.METHOD_GET_CURRENT_HEIGHT, CallOptions.DEFAULT),
         Empty()
       )
-      .tap(r => log.info(s"getCurrentBlockchainHeight: $r"))
+      .tap(r => log.trace(s"getCurrentBlockchainHeight: $r"))
 
   def getActivatedFeatures(height: Int): Map[Short, Int] =
     ClientCalls
@@ -92,7 +107,7 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
       .features
       .map(x => x.id.toShort -> x.activationHeight) // TODO ???
       .toMap
-      .tap(r => log.info(s"getActivatedFeatures: ${r.mkString(", ")}"))
+      .tap(r => log.trace(s"getActivatedFeatures: found ${r.mkString(", ")}"))
 
   def getAccountDataEntries(address: Address): Seq[DataEntry[_]] =
     try
@@ -105,7 +120,7 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
         .flatMap(_.entry)
         .map(toVanillaDataEntry)
         .toSeq
-        .tap(r => log.info(s"getAccountDataEntries($address): found ${r.length} elements"))
+        .tap(r => log.trace(s"getAccountDataEntries($address): found ${r.length} elements"))
     catch {
       case e: Throwable =>
         log.error(s"getAccountDataEntries($address)", e)
@@ -125,7 +140,7 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
         .take(1)
         .toSeq
         .headOption
-        .tap(r => log.info(s"getAccountDataEntry($address, '$key'):${if (r.isEmpty) " not" else ""} found"))
+        .tap(r => log.trace(s"getAccountDataEntry($address, '$key'): ${r.toFoundStr("value", _.value)}"))
     } catch {
       case e: Throwable =>
         log.error(s"getAccountDataEntry($address, '$key')", e)
@@ -146,7 +161,7 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
 
         // TODO explicitGet?
         val complexityInfo = Script.complexityInfo(script, estimator, fixEstimateOfVerifier, useContractVerifierLimit).explicitGet()
-        log.info(s"Complexities (estimator of v${estimator.version}): ${complexityInfo.callableComplexities}")
+        log.trace(s"Complexities (estimator of v${estimator.version}): ${complexityInfo.callableComplexities}")
 
         AccountScriptInfo(
           publicKey = EmptyPublicKey,
@@ -155,7 +170,7 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
           complexitiesByEstimator = Map(estimator.version -> complexityInfo.callableComplexities)
         )
       }
-      .tap(r => log.info(s"getAccountScript($address):${if (r.isEmpty) " not" else ""} found"))
+      .tap(r => log.trace(s"getAccountScript($address): ${r.toFoundStr("hash", _.script.hashCode())}"))
   }
 
   /** @return
@@ -186,7 +201,7 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
           signature = x.block.fold(ByteString.EMPTY)(_.signature).toByteStr
         )
       }
-      .tap(r => log.info(s"getBlockHeader($height):${if (r.isEmpty) " not" else ""} found"))
+      .tap(r => log.trace(s"getBlockHeader($height): ${r.toFoundStr("id", _.id())}"))
   }
 
   def getVrf(height: Int): Option[ByteStr] = none[ByteStr] // TODO It seems VRF only from REST API
@@ -222,7 +237,7 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
         case x: StatusException if x.getStatus == Status.NOT_FOUND => None
       }
 
-    log.info(s"getAssetDescription($asset):${if (r.isEmpty) " not" else ""} found")
+    log.trace(s"getAssetDescription($asset): ${r.toFoundStr(_.toString)}")
     r
   }
 
@@ -239,7 +254,7 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
         case e: StatusException if e.getStatus == Status.INVALID_ARGUMENT => None
       }
 
-    log.info(s"resolveAlias($alias):${if (r.isEmpty) " not" else ""} found")
+    log.trace(s"resolveAlias($alias): ${r.toFoundStr()}")
     r
   }
 
@@ -264,7 +279,7 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
             )
         }
       }
-      .tap(r => log.info(s"getBalances($address): found ${r.assets.size} assets"))
+      .tap(r => log.trace(s"getBalances($address): found assets=${r.assets.size}"))
   }
 
   def getTransferLikeTransaction(id: ByteStr): Option[(TxMeta, Option[Transaction])] = {
@@ -302,7 +317,7 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
       (meta, tx).some
     } else None
 
-    log.info(s"getTransaction($id):${if (r.isEmpty) " not" else ""} found")
+    log.trace(s"getTransaction($id): ${r.toFoundStr { case (meta, tx) => s"meta=${meta.height}, tpe=${tx.map(_.tpe)}" }}")
     r
   }
 

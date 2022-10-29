@@ -3,7 +3,7 @@ package com.wavesplatform.collections
 import scala.collection.mutable
 
 trait AnyRefMapSyntax {
-  @`inline` implicit final def anyRefMapSyntaxRange[K <: AnyRef, V](self: mutable.AnyRefMap[K, V]): AnyRefMapOps[K, V] = new AnyRefMapOps(self)
+  @`inline` implicit final def anyRefMapSyntax[K <: AnyRef, V](self: mutable.AnyRefMap[K, V]): AnyRefMapOps[K, V] = new AnyRefMapOps(self)
 }
 
 final class AnyRefMapOps[K <: AnyRef, V](val self: mutable.AnyRefMap[K, V]) extends AnyVal {

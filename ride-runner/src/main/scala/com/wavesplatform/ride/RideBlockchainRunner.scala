@@ -4,6 +4,7 @@ import cats.implicits.*
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.Application
 import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.database.openDB
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.grpc.BlockchainGrpcApi.Event
@@ -12,7 +13,7 @@ import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.resources.*
-import com.wavesplatform.ride.blockchain.caches.EmptyBlockchainCaches
+import com.wavesplatform.ride.blockchain.caches.LevelDbBlockchainCaches
 import com.wavesplatform.ride.blockchain.{RideBlockchain, SharedBlockchainStorage}
 import com.wavesplatform.ride.input.RunnerRequest
 import com.wavesplatform.state.Blockchain
@@ -92,7 +93,9 @@ object RideBlockchainRunner extends ScorexLogging {
         )
       )
 
-      val blockchainStorage = new SharedBlockchainStorage[Int](nodeSettings.blockchainSettings, EmptyBlockchainCaches, blockchainApi)
+      val db                = use(openDB(s"$basePath/db"))
+      val dbCaches          = new LevelDbBlockchainCaches(db)
+      val blockchainStorage = new SharedBlockchainStorage[Int](nodeSettings.blockchainSettings, dbCaches, blockchainApi)
 
       val scripts = input.zipWithIndex.map { case (input, index) => RideScript(index, blockchainStorage, input.request) }
 
