@@ -93,11 +93,14 @@ object AsBytes {
     }
 
     override def fromByteArray(xs: Array[Byte]): ((A, B), Int) = {
-      val bb        = ByteBuffer.wrap(xs)
+      val bb = ByteBuffer.wrap(xs)
+
       val aBytes    = bb.getByteArray(bb.getInt)
-      val bBytes    = bb.getByteArray(bb.getInt)
       val (a, aLen) = aAsBytes.fromByteArray(aBytes)
+
+      val bBytes    = bb.getByteArray(bb.getInt)
       val (b, bLen) = bAsBytes.fromByteArray(bBytes)
+
       ((a, b), Ints.BYTES * 2 + aLen + bLen)
     }
   }
@@ -105,25 +108,40 @@ object AsBytes {
   implicit def map[K: AsBytes, V: AsBytes]: AsBytes[Map[K, V]] = new AsBytes[Map[K, V]] {
     private implicit val kvTuple = tuple2[K, V]
 
-    override def toByteArray(x: Map[K, V]): Array[Byte] = {
-      val r = new ByteArrayOutputStream().writeInt(x.size)
-      x.foreach(kvTuple.toByteArray)
+    override def toByteArray(xs: Map[K, V]): Array[Byte] = {
+      val r = new ByteArrayOutputStream().writeInt(xs.size)
+      xs.foreach { x => r.writeWithLen(kvTuple.toByteArray(x)) }
       r.toByteArray
     }
 
     override def fromByteArray(xs: Array[Byte]): (Map[K, V], Int) = {
-      var currXs = xs.drop(Ints.BYTES)
-      var len    = Ints.BYTES
-      var items  = Ints.fromByteArray(xs)
-      var r      = Map.empty[K, V]
-      while (items >= 0) {
-        val (tuple, tupleLen) = kvTuple.fromByteArray(currXs)
+      val bb = ByteBuffer.wrap(xs)
+
+      var restItems = bb.getInt
+      var len       = Ints.BYTES
+
+      var r = Map.empty[K, V]
+      while (restItems > 0) {
+        val (tuple, tupleLen) = kvTuple.fromByteArray(bb.getByteArray(bb.getInt))
         r += tuple
-        len += tupleLen
-        items -= 1
-        currXs = currXs.drop(tupleLen)
+        len += Ints.BYTES + tupleLen
+        restItems -= 1
       }
+
       (r, len)
+
+//      var currXs = xs.drop(Ints.BYTES)
+//      var len    = Ints.BYTES
+//      var items  = Ints.fromByteArray(xs)
+//      var r      = Map.empty[K, V]
+//      while (items >= 0) {
+//        val (tuple, tupleLen) = kvTuple.fromByteArray(currXs)
+//        r += tuple
+//        len += tupleLen
+//        items -= 1
+//        currXs = currXs.drop(tupleLen)
+//      }
+//      (r, len)
     }
   }
 }

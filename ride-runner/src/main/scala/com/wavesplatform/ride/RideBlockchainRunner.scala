@@ -38,7 +38,7 @@ object RideBlockchainRunner extends ScorexLogging {
     }
 
     // TODO expr should work too
-    val input = RideRunnerInput.parseMany(Using(Source.fromFile(new File(s"$basePath/input3.json")))(_.getLines().mkString("\n")).get)
+    val input = RideRunnerInput.parseMany(Using(Source.fromFile(new File(s"$basePath/input4.json")))(_.getLines().mkString("\n")).get)
     val r = Using.Manager { use =>
       val connector = use(new GrpcConnector)
 
