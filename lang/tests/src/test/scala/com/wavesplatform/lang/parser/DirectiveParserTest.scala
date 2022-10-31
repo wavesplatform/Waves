@@ -1,9 +1,9 @@
-package com.wavesplatform.lang
+package com.wavesplatform.lang.parser
 
-import com.wavesplatform.lang.directives.DirectiveKey._
-import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.DirectiveKey.*
+import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.directives.{Directive, DirectiveParser}
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 
 class DirectiveParserTest extends PropSpec {
 

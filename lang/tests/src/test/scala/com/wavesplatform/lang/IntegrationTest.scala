@@ -21,7 +21,6 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV2}
-import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease}
@@ -51,8 +50,6 @@ class IntegrationTest extends PropSpec with Inside {
       version: StdLibVersion,
       env: C[Id]
   ): Either[String, T] = {
-    val untyped = Parser.parseExpr(code).get.value
-
     val f: BaseFunction[C] =
       NativeFunction(
         "fn1",
@@ -91,7 +88,7 @@ class IntegrationTest extends PropSpec with Inside {
         )
       )
 
-    val compiled = ExpressionCompiler(ctx.compilerContext, untyped)
+    val compiled = ExpressionCompiler.compile(code, ctx.compilerContext)
     val evalCtx  = ctx.evaluationContext(env).asInstanceOf[EvaluationContext[Environment, Id]]
     compiled.flatMap(v =>
       EvaluatorV2
@@ -121,7 +118,7 @@ class IntegrationTest extends PropSpec with Inside {
         |  case _ => throw()
         |}
       """.stripMargin
-    eval[EVALUATED](src) should produce("can't parse the expression")
+    eval[EVALUATED](src) should produce("Parse error: expected expression in 39-40")
   }
 
   property("Exception handling") {
@@ -955,7 +952,7 @@ class IntegrationTest extends PropSpec with Inside {
          |    }
          |    WriteSet(result)
          | }
-         |
+         | true
       """.stripMargin
 
     eval[EVALUATED](script, None) should produce("expected: List[T], actual: List[DataEntry]|String")
@@ -1081,6 +1078,7 @@ class IntegrationTest extends PropSpec with Inside {
          |   ScriptTransfer(Address(base58'bbbb'), 2,   base58'xxx')
          | ]
          | let ts = TransferSet(tsArr)
+         | true
        """.stripMargin
 
     val scriptResultScript =

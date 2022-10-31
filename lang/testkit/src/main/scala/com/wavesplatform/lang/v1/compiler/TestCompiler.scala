@@ -47,6 +47,15 @@ class TestCompiler(version: StdLibVersion) {
       checkSize = checkSize
     ).explicitGet()
 
+  def compileExpressionE(script: String, allowIllFormedStrings: Boolean = false, checkSize: Boolean = true): Either[String, ExprScript] =
+    ExpressionCompiler.compile(script, expressionCompilerContext, allowIllFormedStrings).map( s =>
+      ExprScript(
+        version,
+        s._1,
+        checkSize = checkSize
+      ).explicitGet()
+    )
+
   def compileAsset(script: String): Script =
     ExprScript(version, ExpressionCompiler.compile(script, assetCompilerContext).explicitGet()._1).explicitGet()
 
@@ -59,7 +68,10 @@ class TestCompiler(version: StdLibVersion) {
 object TestCompiler {
   private val compilerByVersion = mutable.HashMap.empty[StdLibVersion, TestCompiler]
   def apply(version: StdLibVersion): TestCompiler =
-    compilerByVersion.getOrElse(version, compilerByVersion.synchronized {
-      compilerByVersion.getOrElseUpdate(version, new TestCompiler(version))
-    })
+    compilerByVersion.getOrElse(
+      version,
+      compilerByVersion.synchronized {
+        compilerByVersion.getOrElseUpdate(version, new TestCompiler(version))
+      }
+    )
 }
