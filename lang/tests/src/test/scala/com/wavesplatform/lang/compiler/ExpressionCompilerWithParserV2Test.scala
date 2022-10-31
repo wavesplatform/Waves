@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.compiler
 
+import cats.implicits.toBifunctorOps
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.{Directive, DirectiveParser}
 import com.wavesplatform.lang.utils
@@ -18,7 +19,7 @@ class ExpressionCompilerWithParserV2Test extends PropSpec {
       directives <- DirectiveParser(script)
       ds         <- Directive.extractDirectives(directives)
       ctx = utils.compilerContext(ds)
-      compResult <- ExpressionCompiler.compileWithParseResult(script, ctx, saveExprContext)
+      compResult <- ExpressionCompiler.compileWithParseResult(script, ctx, saveExprContext).leftMap(_._1)
     } yield compResult
 
     result.map(_._2.expr)

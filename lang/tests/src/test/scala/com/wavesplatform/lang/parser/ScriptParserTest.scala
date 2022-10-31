@@ -1,14 +1,15 @@
-package com.wavesplatform.lang
+package com.wavesplatform.lang.parser
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.lang.v1.parser.BinaryOperation._
+import com.wavesplatform.lang.hacks.Global.MaxLiteralLength
+import com.wavesplatform.lang.v1.parser.BinaryOperation.*
+import com.wavesplatform.lang.v1.parser.Expressions.*
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
-import com.wavesplatform.lang.v1.parser.Expressions._
 import com.wavesplatform.lang.v1.parser.Parser.GenericMethod
 import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser}
 import com.wavesplatform.lang.v1.testing.ScriptGenParser
-import com.wavesplatform.test._
+import com.wavesplatform.test.*
 import fastparse.Parsed.{Failure, Success}
 import org.scalacheck.Gen
 import org.scalatest.exceptions.TestFailedException
@@ -16,8 +17,13 @@ import org.scalatest.exceptions.TestFailedException
 class ScriptParserTest extends PropSpec with ScriptGenParser {
 
   private def parse(x: String): EXPR = Parser.parseExpr(x) match {
-    case Success(r, _)      => r
-    case f: Failure => throw new TestFailedException(f.msg, 0)
+    case Success(r, _) => r
+    case f: Failure    => throw new TestFailedException(f.msg, 0)
+  }
+
+  private def parseE(x: String): Either[String, EXPR] = Parser.parseExpr(x) match {
+    case Success(r, _) => Right(r)
+    case f: Failure    => Left(f.msg)
   }
 
   private def cleanOffsets(l: LET): LET =
@@ -29,14 +35,14 @@ class ScriptParserTest extends PropSpec with ScriptGenParser {
   }
 
   private def cleanOffsets(expr: EXPR): EXPR = expr match {
-    case x: CONST_LONG                             => x.copy(position = Pos(0, 0))
-    case x: REF                                    => x.copy(position = Pos(0, 0), key = cleanOffsets(x.key))
-    case x: CONST_STRING                           => x.copy(position = Pos(0, 0), value = cleanOffsets(x.value))
-    case x: CONST_BYTESTR                          => x.copy(position = Pos(0, 0), value = cleanOffsets(x.value))
-    case x: TRUE                                   => x.copy(position = Pos(0, 0))
-    case x: FALSE                                  => x.copy(position = Pos(0, 0))
-    case x: BINARY_OP                              => x.copy(position = Pos(0, 0), a = cleanOffsets(x.a), b = cleanOffsets(x.b))
-    case x: IF                                     => x.copy(position = Pos(0, 0), cond = cleanOffsets(x.cond), ifTrue = cleanOffsets(x.ifTrue), ifFalse = cleanOffsets(x.ifFalse))
+    case x: CONST_LONG    => x.copy(position = Pos(0, 0))
+    case x: REF           => x.copy(position = Pos(0, 0), key = cleanOffsets(x.key))
+    case x: CONST_STRING  => x.copy(position = Pos(0, 0), value = cleanOffsets(x.value))
+    case x: CONST_BYTESTR => x.copy(position = Pos(0, 0), value = cleanOffsets(x.value))
+    case x: TRUE          => x.copy(position = Pos(0, 0))
+    case x: FALSE         => x.copy(position = Pos(0, 0))
+    case x: BINARY_OP     => x.copy(position = Pos(0, 0), a = cleanOffsets(x.a), b = cleanOffsets(x.b))
+    case x: IF => x.copy(position = Pos(0, 0), cond = cleanOffsets(x.cond), ifTrue = cleanOffsets(x.ifTrue), ifFalse = cleanOffsets(x.ifFalse))
     case x @ BLOCK(_, l: Expressions.LET, _, _, _) => x.copy(position = Pos(0, 0), let = cleanOffsets(l), body = cleanOffsets(x.body))
     case x: FUNCTION_CALL                          => x.copy(position = Pos(0, 0), name = cleanOffsets(x.name), args = x.args.map(cleanOffsets(_)))
     case _                                         => throw new NotImplementedError(s"toString for ${expr.getClass.getSimpleName}")
@@ -48,19 +54,17 @@ class ScriptParserTest extends PropSpec with ScriptGenParser {
       str  <- toString(expr)
     } yield (expr, str)
 
-    forAll(testGen) {
-      case (expr, str) =>
-        withClue(str) {
-          cleanOffsets(parse(str)) shouldBe expr
-        }
+    forAll(testGen) { case (expr, str) =>
+      withClue(str) {
+        cleanOffsets(parse(str)) shouldBe expr
+      }
     }
   }
 
-  private def multiLineExprTests(tests: (String, Gen[EXPR])*): Unit = tests.foreach {
-    case (label, gen) =>
-      property(s"multiline expressions: $label") {
-        genElementCheck(gen)
-      }
+  private def multiLineExprTests(tests: (String, Gen[EXPR])*): Unit = tests.foreach { case (label, gen) =>
+    property(s"multiline expressions: $label") {
+      genElementCheck(gen)
+    }
   }
 
   private val gas = 50
@@ -152,7 +156,7 @@ class ScriptParserTest extends PropSpec with ScriptGenParser {
         PART.VALID(
           AnyPos,
           ByteStr(
-            Array[Short](0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0, 0xAB, 0xCD, 0xEF, 0xfa, 0xbc,
+            Array[Short](0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, 0xab, 0xcd, 0xef, 0xfa, 0xbc,
               0xde).map(_.toByte)
           )
         )
@@ -165,7 +169,6 @@ class ScriptParserTest extends PropSpec with ScriptGenParser {
   }
 
   property("literal too long") {
-    import Global.MaxLiteralLength
     val longLiteral = "A" * (MaxLiteralLength + 1)
     val to          = 8 + MaxLiteralLength
     parse(s"base58'$longLiteral'") shouldBe
@@ -233,7 +236,10 @@ class ScriptParserTest extends PropSpec with ScriptGenParser {
         AnyPos,
         CONST_LONG(AnyPos, 42),
         PART.VALID(AnyPos, "q"),
-        Seq((PART.VALID(AnyPos, "x"), Single(PART.VALID(AnyPos, "Int"), None)), (PART.VALID(AnyPos, "y"), Single(PART.VALID(AnyPos, "Boolean"), None)))
+        Seq(
+          (PART.VALID(AnyPos, "x"), Single(PART.VALID(AnyPos, "Int"), None)),
+          (PART.VALID(AnyPos, "y"), Single(PART.VALID(AnyPos, "Boolean"), None))
+        )
       ),
       REF(AnyPos, PART.VALID(AnyPos, "c"))
     )
@@ -288,11 +294,8 @@ class ScriptParserTest extends PropSpec with ScriptGenParser {
 
   property("block: invalid") {
     val s = "let q = 1 c"
-    parse(s) shouldBe BLOCK(
-      AnyPos,
-      LET(AnyPos, PART.VALID(AnyPos, "q"), CONST_LONG(AnyPos, 1)),
-      INVALID(AnyPos, "expected ';'")
-    )
+    parseE(s) should produce("Expected expression")
+
   }
 
   property("should parse a binary operation with block operand") {
@@ -366,11 +369,7 @@ class ScriptParserTest extends PropSpec with ScriptGenParser {
 
   property("reserved keywords are invalid variable names in expr: let") {
     val script = "let + 1"
-    parse(script) shouldBe BLOCK(
-      AnyPos,
-      LET(AnyPos, PART.INVALID(AnyPos, "expected a variable's name"), INVALID(AnyPos, "expected a value")),
-      INVALID(AnyPos, "expected ';'")
-    )
+    parseE(script) should produce("Expected variable name")
   }
 
   property("reserved keywords are invalid variable names in expr: if") {
@@ -519,7 +518,11 @@ class ScriptParserTest extends PropSpec with ScriptGenParser {
   }
 
   property("array accessor with index from variable") {
-    parse("x[ind]") shouldBe FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "getElement"), List(REF(AnyPos, PART.VALID(AnyPos, "x")), REF(AnyPos, PART.VALID(AnyPos, "ind"))))
+    parse("x[ind]") shouldBe FUNCTION_CALL(
+      AnyPos,
+      PART.VALID(AnyPos, "getElement"),
+      List(REF(AnyPos, PART.VALID(AnyPos, "x")), REF(AnyPos, PART.VALID(AnyPos, "ind")))
+    )
     parse(
       """
         |x[
@@ -528,7 +531,11 @@ class ScriptParserTest extends PropSpec with ScriptGenParser {
         |#comment
         |]
         |""".stripMargin
-    ) shouldBe FUNCTION_CALL(AnyPos, PART.VALID(AnyPos, "getElement"), List(REF(AnyPos, PART.VALID(AnyPos, "x")), REF(AnyPos, PART.VALID(AnyPos, "ind"))))
+    ) shouldBe FUNCTION_CALL(
+      AnyPos,
+      PART.VALID(AnyPos, "getElement"),
+      List(REF(AnyPos, PART.VALID(AnyPos, "x")), REF(AnyPos, PART.VALID(AnyPos, "ind")))
+    )
   }
 
   property("multiple array accessors") {
@@ -922,8 +929,8 @@ class ScriptParserTest extends PropSpec with ScriptGenParser {
       FALSE(AnyPos)
     )
     parse(s"""if (10 < 15)
-                |then true
-                |else false""".stripMargin) shouldBe IF(
+             |then true
+             |else false""".stripMargin) shouldBe IF(
       AnyPos,
       BINARY_OP(AnyPos, CONST_LONG(AnyPos, 15), LT_OP, CONST_LONG(AnyPos, 10)),
       TRUE(AnyPos),
@@ -931,8 +938,8 @@ class ScriptParserTest extends PropSpec with ScriptGenParser {
     )
 
     parse(s"""if 10 < 15
-                |then true
-                |else false""".stripMargin) shouldBe IF(
+             |then true
+             |else false""".stripMargin) shouldBe IF(
       AnyPos,
       BINARY_OP(AnyPos, CONST_LONG(AnyPos, 15), LT_OP, CONST_LONG(AnyPos, 10)),
       TRUE(AnyPos),
