@@ -77,7 +77,7 @@ object AsBytes {
         case 0 => (None, 1)
         case 1 =>
           val (r, len) = underlying.fromByteArray(bb.getByteArray(bb.getInt))
-          (Some(r), 1 + len)
+          (Some(r), 1 + Ints.BYTES + len)
         case x => throw new RuntimeException(s"The invalid Option marker: expected 1, but got $x")
       }
     }
@@ -101,7 +101,7 @@ object AsBytes {
       val bBytes    = bb.getByteArray(bb.getInt)
       val (b, bLen) = bAsBytes.fromByteArray(bBytes)
 
-      ((a, b), Ints.BYTES * 2 + aLen + bLen)
+      ((a, b), Ints.BYTES + aLen + Ints.BYTES + bLen)
     }
   }
 
@@ -129,19 +129,6 @@ object AsBytes {
       }
 
       (r, len)
-
-//      var currXs = xs.drop(Ints.BYTES)
-//      var len    = Ints.BYTES
-//      var items  = Ints.fromByteArray(xs)
-//      var r      = Map.empty[K, V]
-//      while (items >= 0) {
-//        val (tuple, tupleLen) = kvTuple.fromByteArray(currXs)
-//        r += tuple
-//        len += tupleLen
-//        items -= 1
-//        currXs = currXs.drop(tupleLen)
-//      }
-//      (r, len)
     }
   }
 }
@@ -195,7 +182,7 @@ object CacheKeys {
     override def fromByteArray(xs: Array[Byte]): (String, Int) = {
       val bb  = ByteBuffer.wrap(xs)
       val len = bb.getInt
-      (new String(bb.getByteArray(len), StandardCharsets.UTF_8), len)
+      (new String(bb.getByteArray(len), StandardCharsets.UTF_8), Ints.BYTES + len)
     }
   }
 
@@ -204,7 +191,7 @@ object CacheKeys {
     override def fromByteArray(xs: Array[Byte]): (ByteStr, Int) = {
       val bb  = ByteBuffer.wrap(xs)
       val len = bb.getInt
-      (ByteStr(bb.getByteArray(len)), len)
+      (ByteStr(bb.getByteArray(len)), Ints.BYTES + len)
     }
   }
 
@@ -218,7 +205,7 @@ object CacheKeys {
     override def fromByteArray(xs: Array[Byte]): (Alias, Int) = {
       val bb  = ByteBuffer.wrap(xs)
       val len = bb.getInt
-      (Alias.fromBytes(bb.getByteArray(len)).explicitGet(), len)
+      (Alias.fromBytes(bb.getByteArray(len)).explicitGet(), Ints.BYTES + len)
     }
   }
 
@@ -228,7 +215,7 @@ object CacheKeys {
     override def fromByteArray(xs: Array[Byte]): (Asset.IssuedAsset, Int) = {
       val bb  = ByteBuffer.wrap(xs)
       val len = bb.getInt
-      (Asset.IssuedAsset(ByteStr(bb.getByteArray(len))), len)
+      (Asset.IssuedAsset(ByteStr(bb.getByteArray(len))), Ints.BYTES + len)
     }
   }
 
@@ -239,7 +226,7 @@ object CacheKeys {
     override def fromByteArray(xs: Array[Byte]): (DataEntry[_], Int) = {
       val bb  = ByteBuffer.wrap(xs)
       val len = bb.getInt
-      (DataTxSerializer.parseEntry(bb), len)
+      (DataTxSerializer.parseEntry(bb), Ints.BYTES + len)
     }
   }
 
@@ -250,7 +237,7 @@ object CacheKeys {
     override def fromByteArray(xs: Array[Byte]): (AccountScriptInfo, Int) = {
       val bb  = ByteBuffer.wrap(xs)
       val len = bb.getInt
-      (readAccountScriptInfo(bb.getByteArray(len)), len)
+      (readAccountScriptInfo(bb.getByteArray(len)), Ints.BYTES + len)
     }
   }
 
@@ -313,9 +300,9 @@ object CacheKeys {
       val (script, scriptLen) = bb.getByte match {
         case 0 => (None, 1)
         case 1 =>
-          val (scriptLen, sizeLen) = (bb.getInt, Ints.BYTES)
-          val script               = readAssetScript(bb.getByteArray(scriptLen))
-          (Some(script), 1 + sizeLen + scriptLen)
+          val scriptLen = bb.getInt
+          val script    = readAssetScript(bb.getByteArray(scriptLen))
+          (Some(script), 1 + Ints.BYTES + scriptLen)
         case x => throw new RuntimeException(s"The invalid Option marker: expected 1, but got $x")
       }
 
@@ -332,7 +319,7 @@ object CacheKeys {
         sponsorship,
         staticInfo.nft
       )
-      (r, staticInfoLen + detailsLen + Longs.BYTES + scriptLen)
+      (r, Ints.BYTES + staticInfoLen + Ints.BYTES + detailsLen + Longs.BYTES + scriptLen)
     }
   }
 
@@ -363,7 +350,7 @@ object CacheKeys {
         assets = assets
       )
 
-      (portfolio, Longs.BYTES + leaseLen + assetsLen)
+      (portfolio, Longs.BYTES + Ints.BYTES + leaseLen + Ints.BYTES + assetsLen)
     }
   }
 
@@ -399,7 +386,7 @@ object CacheKeys {
 
       def parse(parse: Array[Byte] => Transaction): (Transaction, Int) = {
         val len = bb.getInt
-        (parse(bb.getByteArray(len)), len)
+        (parse(bb.getByteArray(len)), Ints.BYTES + len)
       }
 
       val (tx, len) = bb.getByte match {
@@ -414,7 +401,7 @@ object CacheKeys {
         case x => throw new IllegalArgumentException(s"Illegal transaction data: $x")
       }
 
-      (tx, 1 + Ints.BYTES + len)
+      (tx, 1 + len)
     }
   }
 }
