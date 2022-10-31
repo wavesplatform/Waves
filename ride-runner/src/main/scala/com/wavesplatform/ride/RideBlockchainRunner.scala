@@ -38,10 +38,13 @@ object RideBlockchainRunner extends ScorexLogging {
     }
 
     // TODO expr should work too
+    log.info("Loading args...")
     val input = RideRunnerInput.parseMany(Using(Source.fromFile(new File(s"$basePath/input4.json")))(_.getLines().mkString("\n")).get)
+
     val r = Using.Manager { use =>
       val connector = use(new GrpcConnector)
 
+      log.info("Making gRPC channel to gRPC API...")
       val grpcApiChannel = use(
         connector.mkChannel(
           GrpcClientSettings(
@@ -60,6 +63,7 @@ object RideBlockchainRunner extends ScorexLogging {
         )
       )
 
+      log.info("Making gRPC channel to Blockchain Updates API...")
       val blockchainUpdatesApiChannel = use(
         connector.mkChannel(
           GrpcClientSettings(
@@ -99,7 +103,7 @@ object RideBlockchainRunner extends ScorexLogging {
 
       val scripts = input.zipWithIndex.map { case (input, index) => RideScript(index, blockchainStorage, input.request) }
 
-      // Initialization to cache required data
+      log.info("Warm up caches...") // Also helps to figure out, which data is used by a script
       scripts.foreach { script =>
         val apiResult = script.run()
         log.info(s"[Init, ${script.index}] apiResult: ${apiResult.value("result").as[JsObject].value("value")}")
@@ -108,7 +112,6 @@ object RideBlockchainRunner extends ScorexLogging {
       val start = blockchainStorage.height - 2
       val end   = blockchainStorage.height + 2
 
-      log.info("input: {}", input)
       val events = blockchainApi.stream
         .takeWhile {
           case Event.Closed      => false
@@ -182,6 +185,7 @@ object RideBlockchainRunner extends ScorexLogging {
             }
         }(Scheduler(commonScheduler))
 
+      log.info("Watching blockchain updates...")
       blockchainApi.watchBlockchainUpdates(blockchainUpdatesApiChannel, start)
 
       Await.result(events, Duration.Inf)
