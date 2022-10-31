@@ -1,4 +1,4 @@
-package com.wavesplatform.lang
+package com.wavesplatform.lang.evaluator
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.compiler.Terms

@@ -1,8 +1,8 @@
-package com.wavesplatform.lang.v1.estimator
+package com.wavesplatform.lang.estimator
 
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values.V3
-import com.wavesplatform.lang.utils._
+import com.wavesplatform.lang.utils.*
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 
 class ScriptEstimatorV2Test extends ScriptEstimatorTestBase(ScriptEstimatorV2) {

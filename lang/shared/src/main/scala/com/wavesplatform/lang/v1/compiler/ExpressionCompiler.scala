@@ -42,7 +42,7 @@ object ExpressionCompiler {
   def compile(input: String, ctx: CompilerContext, allowIllFormedStrings: Boolean = false): Either[String, (EXPR, FINAL)] = {
     Parser.parseExpr(input) match {
       case fastparse.Parsed.Success(xs, _) => ExpressionCompiler(ctx, xs, allowIllFormedStrings)
-      case f: fastparse.Parsed.Failure     => Left(f.toString)
+      case f: fastparse.Parsed.Failure     => Left(Parser.toString(input, f))
     }
   }
 
@@ -62,10 +62,10 @@ object ExpressionCompiler {
       input: String,
       ctx: CompilerContext,
       saveExprContext: Boolean = true
-  ): Either[String, (EXPR, Expressions.SCRIPT, Iterable[CompilationError])] = {
-    val res = Parser.parseExpressionWithErrorRecovery(input)
-    res match {
-      case Right((parseResult, removedCharPosOpt)) =>
+  ): Either[(String, Int, Int), (EXPR, Expressions.SCRIPT, Iterable[CompilationError])] =
+    Parser
+      .parseExpressionWithErrorRecovery(input)
+      .flatMap { case (parseResult, removedCharPosOpt) =>
         compileExprWithCtx(parseResult.expr, saveExprContext, allowIllFormedStrings = false)
           .run(ctx)
           .value
@@ -86,11 +86,8 @@ object ExpressionCompiler {
                    ))
             (compRes.expr, parseResult.copy(expr = compRes.parseNodeExpr), errorList)
           }
-          .leftMap(e => s"Compilation failed: ${Show[CompilationError].show(e)}")
-
-      case Left(error) => Left(error.toString)
-    }
-  }
+          .leftMap(e => (s"Compilation failed: ${Show[CompilationError].show(e)}", e.start, e.end))
+      }
 
   def compileDecls(input: String, ctx: CompilerContext): Either[String, EXPR] = {
     val adjustedDecls = s"$input\n${PureContext.unitVarName}"
