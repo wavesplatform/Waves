@@ -6,7 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{AddressId, DBExt, Key, RW, ReadOnlyDB}
 import com.wavesplatform.ride.blockchain.BlockchainData
 import com.wavesplatform.ride.blockchain.caches.LevelDbBlockchainCaches.{ReadOnlyDBOps, ReadWriteDBOps}
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, Portfolio, TxMeta}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, Portfolio, TransactionId, TxMeta}
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB
@@ -198,12 +198,12 @@ class LevelDbBlockchainCaches(db: DB) extends BlockchainCaches with ScorexLoggin
     log.trace(s"setBalances($address)")
   }
 
-  override def getTransaction(id: ByteStr): BlockchainData[(TxMeta, Option[Transaction])] =
+  override def getTransaction(id: TransactionId): BlockchainData[(TxMeta, Option[Transaction])] =
     db
       .readOnly { _.readFromDb(CacheKeys.Transactions.mkKey(id)) }
       .tap { r => log.trace(s"getTransaction($id): ${r.toFoundStr { case (meta, tx) => s"meta=${meta.height}, tpe=${tx.map(_.tpe)}" }}") }
 
-  override def setTransaction(id: ByteStr, data: BlockchainData[(TxMeta, Option[Transaction])]): Unit = {
+  override def setTransaction(id: TransactionId, data: BlockchainData[(TxMeta, Option[Transaction])]): Unit = {
     db.readWrite { _.writeToDb(CacheKeys.Transactions.mkKey(id), data) }
     log.trace(s"setTransaction($id)")
   }

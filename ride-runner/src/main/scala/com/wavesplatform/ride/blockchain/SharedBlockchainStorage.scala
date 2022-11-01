@@ -16,7 +16,17 @@ import com.wavesplatform.protobuf.transaction.PBAmounts.toAssetAndAmount
 import com.wavesplatform.protobuf.transaction.PBTransactions.{toVanillaDataEntry, toVanillaScript}
 import com.wavesplatform.ride.blockchain.caches.BlockchainCaches
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, DataEntry, Height, LeaseBalance, Portfolio, TxMeta}
+import com.wavesplatform.state.{
+  AccountScriptInfo,
+  AssetDescription,
+  AssetScriptInfo,
+  DataEntry,
+  Height,
+  LeaseBalance,
+  Portfolio,
+  TransactionId,
+  TxMeta
+}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{Asset, EthereumTransaction, Transaction}
@@ -192,11 +202,11 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
     }
   }
 
-  private val transactions = RideData.anyRefMap[ByteStr, (TxMeta, Option[Transaction]), TagT] {
+  private val transactions = RideData.anyRefMap[TransactionId, (TxMeta, Option[Transaction]), TagT] {
     load(caches.getTransaction, blockchainApi.getTransferLikeTransaction, caches.setTransaction)
   }
 
-  def getTransaction(id: ByteStr, tag: TagT): Option[(TxMeta, Option[TransferTransactionLike])] =
+  def getTransaction(id: TransactionId, tag: TagT): Option[(TxMeta, Option[TransferTransactionLike])] =
     transactions
       .get(id, tag)
       .map { case (meta, maybeTx) =>
@@ -217,7 +227,7 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
 
   // Got a transaction, got a rollback, same transaction on new height/failed/removed
   def replaceTransactionMeta(pbId: ByteString, height: Int): Set[TagT] = {
-    val id = pbId.toByteStr
+    val id = TransactionId(pbId.toByteStr)
     transactions.replaceIfKnown(id) { mayBeOrig =>
       log.debug(s"[$id] Updated transaction")
       val (_, tx) = mayBeOrig.getOrElse((TxMeta.empty, None))
