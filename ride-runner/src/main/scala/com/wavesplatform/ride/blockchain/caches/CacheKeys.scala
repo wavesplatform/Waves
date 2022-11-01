@@ -7,41 +7,20 @@ import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{
-  Key,
-  readAccountScriptInfo,
-  readAssetDetails,
-  readAssetScript,
-  readAssetStaticInfo,
-  readBlockMeta,
-  readLeaseBalance,
-  writeAccountScriptInfo,
-  writeAssetDetails,
-  writeAssetScript,
-  writeAssetStaticInfo,
-  writeBlockMeta,
-  writeLeaseBalance
-}
+import com.wavesplatform.database.{AddressId, Key, readAccountScriptInfo, readAssetDetails, readAssetScript, readAssetStaticInfo, readBlockMeta, readLeaseBalance, writeAccountScriptInfo, writeAssetDetails, writeAssetScript, writeAssetStaticInfo, writeBlockMeta, writeLeaseBalance}
+import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.ride.blockchain.caches.AsBytes.{ByteArrayOutputStreamOps, optional}
 import com.wavesplatform.serialization.*
-import com.wavesplatform.state.{
-  AccountScriptInfo,
-  AssetDescription,
-  AssetInfo,
-  AssetStaticInfo,
-  AssetVolumeInfo,
-  DataEntry,
-  Portfolio,
-  TransactionId,
-  TxMeta
-}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetInfo, AssetStaticInfo, AssetVolumeInfo, DataEntry, Portfolio, TransactionId, TxMeta}
 import com.wavesplatform.transaction.serialization.impl.DataTxSerializer
 import com.wavesplatform.transaction.{Asset, EthereumTransaction, GenesisTransaction, PBSince, PaymentTransaction, Transaction, TransactionParsers}
 
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
+import scala.collection.compat.immutable.ArraySeq
+import scala.reflect.ClassTag
 import scala.util.chaining.scalaUtilChainingOps
 
 trait AsBytes[T] {
@@ -58,6 +37,43 @@ object AsBytes {
     def writeBool(x: Boolean): ByteArrayOutputStream = {
       val int = if (x) 1 else 0
       self.tap(_.writeByte(int.toByte))
+    }
+  }
+
+  implicit val unitAsBytes: AsBytes[Unit] = new AsBytes[Unit] {
+    override def toByteArray(x: Unit): Array[Byte] = Array.emptyByteArray
+
+    override def fromByteArray(xs: Array[Byte]): (Unit, Int) = ((), 0)
+  }
+
+  implicit val shortAsBytes: AsBytes[Short] = new AsBytes[Short] {
+    override def toByteArray(x: Short): Array[Byte] = Shorts.toByteArray(x)
+
+    override def fromByteArray(xs: Array[Byte]): (Short, Int) = (Shorts.fromByteArray(xs), Shorts.BYTES)
+  }
+
+  implicit val intAsBytes: AsBytes[Int] = new AsBytes[Int] {
+    override def toByteArray(x: Int): Array[Byte] = Ints.toByteArray(x)
+
+    override def fromByteArray(xs: Array[Byte]): (Int, Int) = (Ints.fromByteArray(xs), Ints.BYTES) // TODO (Int, BytesLen)
+  }
+
+  implicit val longAsBytes: AsBytes[Long] = new AsBytes[Long] {
+    override def toByteArray(x: Long): Array[Byte] = Longs.toByteArray(x)
+
+    override def fromByteArray(xs: Array[Byte]): (Long, Int) = (Longs.fromByteArray(xs), Longs.BYTES)
+  }
+
+  implicit val utf8StringAsBytes: AsBytes[String] = new AsBytes[String] {
+    override def toByteArray(x: String): Array[Byte] =
+      new ByteArrayOutputStream()
+        .writeWithLen(x.getBytes(StandardCharsets.UTF_8))
+        .toByteArray
+
+    override def fromByteArray(xs: Array[Byte]): (String, Int) = {
+      val bb  = ByteBuffer.wrap(xs)
+      val len = bb.getInt
+      (new String(bb.getByteArray(len), StandardCharsets.UTF_8), Ints.BYTES + len)
     }
   }
 
@@ -105,6 +121,32 @@ object AsBytes {
     }
   }
 
+  implicit def seq[V: ClassTag](implicit vAsBytes: AsBytes[V]): AsBytes[Seq[V]] = new AsBytes[Seq[V]] {
+    override def toByteArray(xs: Seq[V]): Array[Byte] = {
+      val r = new ByteArrayOutputStream().writeInt(xs.size)
+      xs.foreach { x => r.writeWithLen(vAsBytes.toByteArray(x)) }
+      r.toByteArray
+    }
+
+    override def fromByteArray(xs: Array[Byte]): (Seq[V], Int) = {
+      val bb = ByteBuffer.wrap(xs)
+
+      val len       = bb.getInt
+      var readBytes = Ints.BYTES
+
+      val r = new Array[V](len)
+      var i = 0
+      while (i < len) {
+        val (x, xLen) = vAsBytes.fromByteArray(bb.getByteArray(bb.getInt))
+        r(i) = x
+        readBytes += Ints.BYTES + xLen
+        i += 1
+      }
+
+      (ArraySeq.unsafeWrapArray(r), readBytes)
+    }
+  }
+
   implicit def map[K: AsBytes, V: AsBytes]: AsBytes[Map[K, V]] = new AsBytes[Map[K, V]] {
     private implicit val kvTuple = tuple2[K, V]
 
@@ -133,58 +175,62 @@ object AsBytes {
   }
 }
 
-sealed abstract class CacheKey[KeyT, ValueT](prefix: Short, name: String)(implicit keyAsBytes: AsBytes[KeyT], valueAsBytes: AsBytes[ValueT]) {
+sealed abstract class CacheKey[KeyT, ValueT](prefix: Short)(implicit keyAsBytes: AsBytes[KeyT], valueAsBytes: AsBytes[ValueT]) {
+  val name = getSimpleName(this)
+
   def mkKey(key: KeyT): Key[ValueT] = new Key[ValueT](prefix, name, keyAsBytes.toByteArray(key)) {
     override def parse(bytes: Array[Byte]): ValueT = valueAsBytes.fromByteArray(bytes)._1
     override def encode(v: ValueT): Array[Byte]    = valueAsBytes.toByteArray(v)
   }
 }
 
+sealed abstract class CacheHistoryKey[KeyT: AsBytes](prefix: Short) extends CacheKey[KeyT, Seq[Int]](prefix)
+
 object CacheKeys {
-  object Addresses          extends CacheKey[Address, Int](1, "addresses")
-  object AccountDataEntries extends CacheKey[(Address, String), Option[DataEntry[?]]](2, "accountDataEntries")
-  object AccountScripts     extends CacheKey[Address, Option[AccountScriptInfo]](3, "accountScripts")
-  object SignedBlockHeaders extends CacheKey[Int, Option[SignedBlockHeader]](4, "blockHeaders")
-  object Height             extends CacheKey[Unit, Int](5, "height")
-  object VRF                extends CacheKey[Int, Option[ByteStr]](6, "vrf")
-  object ActivatedFeatures  extends CacheKey[Unit, Map[Short, Int]](7, "activatedFeatures")
-  object AssetDescriptions  extends CacheKey[Asset.IssuedAsset, Option[AssetDescription]](8, "assetDescriptions")
-  object Aliases            extends CacheKey[Alias, Option[Address]](9, "aliases")
-  object Portfolios         extends CacheKey[Address, Option[Portfolio]](10, "portfolios")
-  object Transactions       extends CacheKey[ByteStr, Option[(TxMeta, Option[Transaction])]](11, "transactions")
+  object LastAddressId extends CacheKey[Unit, AddressId](0)
+  object AddressIds extends CacheKey[Address, AddressId](1)
 
-  implicit val unitAsBytes: AsBytes[Unit] = new AsBytes[Unit] {
-    override def toByteArray(x: Unit): Array[Byte]           = Array.emptyByteArray
-    override def fromByteArray(xs: Array[Byte]): (Unit, Int) = ((), 0)
-  }
+  object AccountDataEntries        extends CacheKey[(AddressId, String), Option[DataEntry[?]]](2)
+//  object AccountDataEntriesHistory extends CacheHistoryKey[(AddressId, String)](3)
 
-  implicit val shortAsBytes: AsBytes[Short] = new AsBytes[Short] {
-    override def toByteArray(x: Short): Array[Byte]           = Shorts.toByteArray(x)
-    override def fromByteArray(xs: Array[Byte]): (Short, Int) = (Shorts.fromByteArray(xs), Shorts.BYTES)
-  }
+  object AccountScripts        extends CacheKey[AddressId, Option[AccountScriptInfo]](4)
+//  object AccountScriptsHistory extends CacheHistoryKey[AddressId](5)
 
-  implicit val intAsBytes: AsBytes[Int] = new AsBytes[Int] {
-    override def toByteArray(x: Int): Array[Byte]           = Ints.toByteArray(x)
-    override def fromByteArray(xs: Array[Byte]): (Int, Int) = (Ints.fromByteArray(xs), Ints.BYTES) // TODO (Int, BytesLen)
-  }
+  object SignedBlockHeaders extends CacheKey[Int, Option[SignedBlockHeader]](6)
+  object Height             extends CacheKey[Unit, Int](7)
+  object VRF                extends CacheKey[Int, Option[ByteStr]](8)
+  object ActivatedFeatures  extends CacheKey[Unit, Map[Short, Int]](9)
 
-  implicit val longAsBytes: AsBytes[Long] = new AsBytes[Long] {
-    override def toByteArray(x: Long): Array[Byte]           = Longs.toByteArray(x)
-    override def fromByteArray(xs: Array[Byte]): (Long, Int) = (Longs.fromByteArray(xs), Longs.BYTES)
-  }
+  /*
+  staticInfo         <- resource.get(Keys.assetStaticInfo(asset))
+  (info, volumeInfo) <- fromHistory(resource, Keys.assetDetailsHistory(asset), Keys.assetDetails(asset))
+  sponsorship = fromHistory(resource, Keys.sponsorshipHistory(asset), Keys.sponsorship(asset)).fold(0L)(_.minFee)
+  script      = fromHistory(resource, Keys.assetScriptHistory(asset), Keys.assetScript(asset)).fl
+   */
 
-  implicit val utf8StringAsBytes: AsBytes[String] = new AsBytes[String] {
-    override def toByteArray(x: String): Array[Byte] =
-      new ByteArrayOutputStream()
-        .writeWithLen(x.getBytes(StandardCharsets.UTF_8))
-        .toByteArray
+  object AssetDescriptions extends CacheKey[Asset.IssuedAsset, Option[AssetDescription]](8)
 
-    override def fromByteArray(xs: Array[Byte]): (String, Int) = {
-      val bb  = ByteBuffer.wrap(xs)
-      val len = bb.getInt
-      (new String(bb.getByteArray(len), StandardCharsets.UTF_8), Ints.BYTES + len)
-    }
-  }
+  object Aliases extends CacheKey[Alias, Option[Address]](9)
+
+  /*
+  def wavesBalanceHistory(addressId: AddressId): Key[Seq[Int]] = historyKey(WavesBalanceHistory, addressId.toByteArray)
+
+  def wavesBalance(addressId: AddressId)(height: Int): Key[Long] =
+    Key(WavesBalance, hAddr(height, addressId), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
+
+  def assetBalanceHistory(addressId: AddressId, asset: IssuedAsset): Key[Seq[Int]] =
+    historyKey(AssetBalanceHistory, addressId.toByteArray ++ asset.id.arr)
+  def assetBalance(addressId: AddressId, asset: IssuedAsset)(height: Int): Key[Long] =
+    Key(
+      AssetBalance,
+      hBytes(asset.id.arr ++ addressId.toByteArray, height),
+      Option(_).fold(0L)(Longs.fromByteArray),
+      Longs.toByteArray
+    )
+   */
+  object Portfolios extends CacheKey[AddressId, Option[Portfolio]](10)
+
+  object Transactions extends CacheKey[ByteStr, Option[(TxMeta, Option[Transaction])]](11)
 
   implicit val byteStrAsBytes: AsBytes[ByteStr] = new AsBytes[ByteStr] {
     override def toByteArray(x: ByteStr): Array[Byte] = new ByteArrayOutputStream().writeWithLen(x.arr).toByteArray
@@ -193,6 +239,11 @@ object CacheKeys {
       val len = bb.getInt
       (ByteStr(bb.getByteArray(len)), Ints.BYTES + len)
     }
+  }
+
+  implicit val addressId: AsBytes[AddressId] = new AsBytes[AddressId] {
+    override def toByteArray(x: AddressId): Array[Byte] = x.toByteArray
+    override def fromByteArray(xs: Array[Byte]): (AddressId, Int) = (AddressId.fromByteArray(xs), Longs.BYTES)
   }
 
   implicit val addressAsBytes: AsBytes[Address] = new AsBytes[Address] {
