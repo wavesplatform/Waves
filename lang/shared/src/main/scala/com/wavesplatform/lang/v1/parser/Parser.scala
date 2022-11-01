@@ -36,9 +36,6 @@ object Parser {
 
   def unusedText[A: P] = comment ~ directive ~ comment
 
-  def spaces[A: P]   = CharIn(" \t").repX()
-  def newLines[A: P] = CharIn("\n\r").repX(1)
-
   def escapedUnicodeSymbolP[A: P]: P[(Int, String, Int)] = P(Index ~~ (NoCut(unicodeSymbolP) | specialSymbols).! ~~ Index)
   def stringP[A: P]: P[EXPR] =
     P(Index ~~ "\"" ~/ Pass ~~ (escapedUnicodeSymbolP | notEndOfString).!.repX ~~ "\"" ~~ Index)
@@ -553,11 +550,12 @@ object Parser {
             }
           })
         def operator(implicit c: fastparse.P[Any]) = kindc(c)
-        def error(implicit c: fastparse.P[Any]) = Index.map(i => INVALID(Pos(i, i), "expected a second operator"))
-        val parser = P(Index ~~ operand ~~ P(!(newLines ~~ spaces ~~ numberP) ~ operator ~ (NoCut(operand) | error)).rep)
-        parser.map {
-          case (start, left: EXPR, r: Seq[(BinaryOperation, EXPR)]) =>
-            r.foldLeft(left) { case (acc, (currKind, currOperand)) => currKind.expr(start, currOperand.position.end, acc, currOperand) }
+        def error(implicit c: fastparse.P[Any])    = Index.map(i => INVALID(Pos(i, i), "expected a second operator"))
+        def spacesOpt[A: P]                        = CharIn(" \t").repX()
+        def newLines[A: P]                         = CharIn("\n\r").repX(1)
+        val parser = P(Index ~~ operand ~~ P(!(newLines ~~ spacesOpt ~~ numberP) ~ operator ~ (NoCut(operand) | error)).rep)
+        parser.map { case (start, left: EXPR, r: Seq[(BinaryOperation, EXPR)]) =>
+          r.foldLeft(left) { case (acc, (currKind, currOperand)) => currKind.expr(start, currOperand.position.end, acc, currOperand) }
         }
       case Right(kinds) :: restOps =>
         def operand(implicit c: fastparse.P[Any]) = binaryOp(atom(_), restOps)

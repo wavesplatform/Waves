@@ -1,6 +1,8 @@
-package com.wavesplatform.lang.evaluator
+package com.wavesplatform.lang.parser
+
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values.V6
+import com.wavesplatform.lang.evaluator.EvaluatorSpec
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
 
 class MultiLineOperatorTest extends EvaluatorSpec {
