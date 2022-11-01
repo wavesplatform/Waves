@@ -10,8 +10,8 @@ import com.wavesplatform.transaction.{Asset, Transaction}
 // TODO F abstraction? But getBalances?
 trait BlockchainCaches {
   // TODO There is a pattern
-  def getAccountDataEntry(address: Address, key: String): BlockchainData[DataEntry[_]]
-  def setAccountDataEntry(address: Address, key: String, data: BlockchainData[DataEntry[_]]): Unit
+  def getAccountDataEntry(address: Address, key: String, maxHeight: Int): BlockchainData[DataEntry[_]]
+  def setAccountDataEntry(address: Address, key: String, maxHeight: Int, data: BlockchainData[DataEntry[_]]): Unit
 
   def getAccountScript(address: Address): BlockchainData[AccountScriptInfo]
   def setAccountScript(address: Address, data: BlockchainData[AccountScriptInfo]): Unit
@@ -42,8 +42,8 @@ trait BlockchainCaches {
 }
 
 object EmptyBlockchainCaches extends BlockchainCaches {
-  override def getAccountDataEntry(address: Address, key: String): BlockchainData[DataEntry[_]]             = BlockchainData.Unknown
-  override def setAccountDataEntry(address: Address, key: String, data: BlockchainData[DataEntry[_]]): Unit = {}
+  override def getAccountDataEntry(address: Address, key: String, maxHeight: Int): BlockchainData[DataEntry[_]]             = BlockchainData.Unknown
+  override def setAccountDataEntry(address: Address, key: String, maxHeight: Int, data: BlockchainData[DataEntry[_]]): Unit = {}
 
   override def getAccountScript(address: Address): BlockchainData[AccountScriptInfo]             = BlockchainData.Unknown
   override def setAccountScript(address: Address, data: BlockchainData[AccountScriptInfo]): Unit = {}

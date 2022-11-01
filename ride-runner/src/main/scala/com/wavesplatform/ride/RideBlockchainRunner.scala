@@ -132,6 +132,7 @@ object RideBlockchainRunner extends ScorexLogging {
           case Event.Closed        => println("Closed")
           case Event.Next(event) =>
             val update = event.getUpdate
+            val h = update.height
             update.update match {
               case Update.Append(append) =>
                 val txs = append.body match {
@@ -141,14 +142,14 @@ object RideBlockchainRunner extends ScorexLogging {
                 }
 
 //                log.info(
-//                  s"${update.height}: assets=${stateUpdate.assets.size}, balances=${stateUpdate.balances.size}, " +
+//                  s"${h}: assets=${stateUpdate.assets.size}, balances=${stateUpdate.balances.size}, " +
 //                    s"leasingForAddress=${stateUpdate.leasingForAddress.size}, dataEntries=${stateUpdate.dataEntries.size}, " +
 //                    s"dataUpdates=${dataUpdates.size}: ${dataUpdates.map(x => s"${x.key} -> ${x.value}").mkString(", ")}"
 //                )
 
                 // Almost all scripts use the height
-                val updatedByHeight = if (update.height > blockchainStorage.height) {
-                  blockchainStorage.setHeight(update.height)
+                val updatedByHeight = if (h > blockchainStorage.height) {
+                  blockchainStorage.setHeight(h)
                   allScriptIndices
                 } else Set.empty[Int]
 
@@ -164,7 +165,7 @@ object RideBlockchainRunner extends ScorexLogging {
                     _ union blockchainStorage.replaceLeasing(_)
                   } union
                   stateUpdate.flatMap(_.dataEntries).foldLeft(Set.empty[Int]) { case (r, x) =>
-                    r union blockchainStorage.replaceAccountData(x)
+                    r union blockchainStorage.replaceAccountData(h, x)
                   } union
                   txs.view
                     .map(_.transaction)
@@ -180,19 +181,19 @@ object RideBlockchainRunner extends ScorexLogging {
                       r union blockchainStorage.replaceAccountScript(pk, script)
                     } union
                   append.transactionIds.foldLeft(Set.empty[Int]) { case (r, x) =>
-                    r union blockchainStorage.replaceTransactionMeta(x, update.height)
+                    r union blockchainStorage.replaceTransactionMeta(x, h)
                   }
 
-                if (update.height >= lastHeightAtStart) {
+                if (h >= lastHeightAtStart) {
                   if (!started) {
-                    log.debug(s"[${update.height}] Reached the current height, run all scripts")
-                    runScripts(update.height, allScriptIndices)
+                    log.debug(s"[$h] Reached the current height, run all scripts")
+                    runScripts(h, allScriptIndices)
                     started = true
                   } else if (updated.isEmpty) {
-                    log.debug(s"[${update.height}] Not updated")
+                    log.debug(s"[$h] Not updated")
                   } else {
-                    log.debug(s"[${update.height}] Updated for: ${updated.mkString(", ")}")
-                    runScripts(update.height, updated)
+                    log.debug(s"[$h] Updated for: ${updated.mkString(", ")}")
+                    runScripts(h, updated)
                   }
                 }
 

@@ -2,16 +2,16 @@ package com.wavesplatform.collections
 
 import scala.collection.mutable
 
-trait AnyRefMapSyntax {
-  @`inline` implicit final def anyRefMapSyntax[K <: AnyRef, V](self: mutable.AnyRefMap[K, V]): AnyRefMapOps[K, V] = new AnyRefMapOps(self)
+trait AbstractMapSyntax {
+  @`inline` implicit final def abstractMapSyntax[K <: AnyRef, V](self: mutable.AbstractMap[K, V]): AbstractMapOps[K, V] = new AbstractMapOps(self)
 }
 
-final class AnyRefMapOps[K <: AnyRef, V](val self: mutable.AnyRefMap[K, V]) extends AnyVal {
+final class AbstractMapOps[K <: AnyRef, V](val self: mutable.AbstractMap[K, V]) extends AnyVal {
 
   /** @return
     *   Updated?
     */
-  def replaceIfExists(key: K)(remap: V => Option[V]): Boolean = {
+  def replaceIfExists(key: K)(remap: V => Option[V]): Boolean =
     self.get(key) match {
       case Some(orig) =>
         remap(orig) match {
@@ -28,5 +28,4 @@ final class AnyRefMapOps[K <: AnyRef, V](val self: mutable.AnyRefMap[K, V]) exte
 
       case None => false
     }
-  }
 }

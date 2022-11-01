@@ -31,20 +31,21 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
 
   private val data = RideData.anyRefMap[(Address, String), DataEntry[?], TagT] {
     load[(Address, String), DataEntry[_]](
-      Function.tupled(caches.getAccountDataEntry),
-      Function.tupled(blockchainApi.getAccountDataEntry),
-      (key, value) => caches.setAccountDataEntry(key._1, key._2, value)
+      fromCache = { case (address, key) => caches.getAccountDataEntry(address, key, height) },
+      fromBlockchain = Function.tupled(blockchainApi.getAccountDataEntry),
+      updateCache = (key, value) => caches.setAccountDataEntry(key._1, key._2, height, value)
     )
   }
 
   def getData(address: Address, key: String, tag: TagT): Option[DataEntry[_]] = data.get((address, key), tag)
-  def replaceAccountData(update: StateUpdate.DataEntryUpdate): Set[TagT] = {
+
+  def replaceAccountData(height: Int, update: StateUpdate.DataEntryUpdate): Set[TagT] = {
     val address = update.address.toAddress
     val key     = update.getDataEntry.key
     data.replaceIfKnown((address, key)) { _ =>
       log.debug(s"[$address, $key] Updated data")
       Some(toVanillaDataEntry(update.getDataEntry))
-        .tap(r => caches.setAccountDataEntry(address, key, BlockchainData.loaded(r)))
+        .tap(r => caches.setAccountDataEntry(address, key, height, BlockchainData.loaded(r)))
     }
   }
 

@@ -7,12 +7,37 @@ import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{AddressId, Key, readAccountScriptInfo, readAssetDetails, readAssetScript, readAssetStaticInfo, readBlockMeta, readLeaseBalance, writeAccountScriptInfo, writeAssetDetails, writeAssetScript, writeAssetStaticInfo, writeBlockMeta, writeLeaseBalance}
+import com.wavesplatform.database.{
+  AddressId,
+  Key,
+  readAccountScriptInfo,
+  readAssetDetails,
+  readAssetScript,
+  readAssetStaticInfo,
+  readBlockMeta,
+  readLeaseBalance,
+  writeAccountScriptInfo,
+  writeAssetDetails,
+  writeAssetScript,
+  writeAssetStaticInfo,
+  writeBlockMeta,
+  writeLeaseBalance
+}
 import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.ride.blockchain.caches.AsBytes.{ByteArrayOutputStreamOps, optional}
 import com.wavesplatform.serialization.*
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetInfo, AssetStaticInfo, AssetVolumeInfo, DataEntry, Portfolio, TransactionId, TxMeta}
+import com.wavesplatform.state.{
+  AccountScriptInfo,
+  AssetDescription,
+  AssetInfo,
+  AssetStaticInfo,
+  AssetVolumeInfo,
+  DataEntry,
+  Portfolio,
+  TransactionId,
+  TxMeta
+}
 import com.wavesplatform.transaction.serialization.impl.DataTxSerializer
 import com.wavesplatform.transaction.{Asset, EthereumTransaction, GenesisTransaction, PBSince, PaymentTransaction, Transaction, TransactionParsers}
 
@@ -99,6 +124,7 @@ object AsBytes {
     }
   }
 
+  // TODO dup
   implicit def tuple2[A, B](implicit aAsBytes: AsBytes[A], bAsBytes: AsBytes[B]): AsBytes[(A, B)] = new AsBytes[(A, B)] {
     override def toByteArray(x: (A, B)): Array[Byte] = {
       val (a, b) = x
@@ -120,6 +146,33 @@ object AsBytes {
       ((a, b), Ints.BYTES + aLen + Ints.BYTES + bLen)
     }
   }
+
+  implicit def tuple3[A, B, C](implicit aAsBytes: AsBytes[A], bAsBytes: AsBytes[B], cAsBytes: AsBytes[C]): AsBytes[(A, B, C)] =
+    new AsBytes[(A, B, C)] {
+      override def toByteArray(x: (A, B, C)): Array[Byte] = {
+        val (a, b, c) = x
+        new ByteArrayOutputStream()
+          .writeWithLen(aAsBytes.toByteArray(a))
+          .writeWithLen(bAsBytes.toByteArray(b))
+          .writeWithLen(cAsBytes.toByteArray(c))
+          .toByteArray
+      }
+
+      override def fromByteArray(xs: Array[Byte]): ((A, B, C), Int) = {
+        val bb = ByteBuffer.wrap(xs)
+
+        val aBytes    = bb.getByteArray(bb.getInt)
+        val (a, aLen) = aAsBytes.fromByteArray(aBytes)
+
+        val bBytes    = bb.getByteArray(bb.getInt)
+        val (b, bLen) = bAsBytes.fromByteArray(bBytes)
+
+        val cBytes    = bb.getByteArray(bb.getInt)
+        val (c, cLen) = cAsBytes.fromByteArray(cBytes)
+
+        ((a, b, c), Ints.BYTES + aLen + Ints.BYTES + bLen + Ints.BYTES + cLen)
+      }
+    }
 
   implicit def seq[V: ClassTag](implicit vAsBytes: AsBytes[V]): AsBytes[Seq[V]] = new AsBytes[Seq[V]] {
     override def toByteArray(xs: Seq[V]): Array[Byte] = {
@@ -188,12 +241,12 @@ sealed abstract class CacheHistoryKey[KeyT: AsBytes](prefix: Short) extends Cach
 
 object CacheKeys {
   object LastAddressId extends CacheKey[Unit, AddressId](0)
-  object AddressIds extends CacheKey[Address, AddressId](1)
+  object AddressIds    extends CacheKey[Address, AddressId](1)
 
-  object AccountDataEntries        extends CacheKey[(AddressId, String), Option[DataEntry[?]]](2)
-//  object AccountDataEntriesHistory extends CacheHistoryKey[(AddressId, String)](3)
+  object AccountDataEntriesHistory extends CacheHistoryKey[(AddressId, String)](2)
+  object AccountDataEntries        extends CacheKey[(AddressId, String, Int), Option[DataEntry[?]]](3)
 
-  object AccountScripts        extends CacheKey[AddressId, Option[AccountScriptInfo]](4)
+  object AccountScripts extends CacheKey[AddressId, Option[AccountScriptInfo]](4)
 //  object AccountScriptsHistory extends CacheHistoryKey[AddressId](5)
 
   object SignedBlockHeaders extends CacheKey[Int, Option[SignedBlockHeader]](6)
@@ -208,9 +261,9 @@ object CacheKeys {
   script      = fromHistory(resource, Keys.assetScriptHistory(asset), Keys.assetScript(asset)).fl
    */
 
-  object AssetDescriptions extends CacheKey[Asset.IssuedAsset, Option[AssetDescription]](8)
+  object AssetDescriptions extends CacheKey[Asset.IssuedAsset, Option[AssetDescription]](10)
 
-  object Aliases extends CacheKey[Alias, Option[Address]](9)
+  object Aliases extends CacheKey[Alias, Option[Address]](11)
 
   /*
   def wavesBalanceHistory(addressId: AddressId): Key[Seq[Int]] = historyKey(WavesBalanceHistory, addressId.toByteArray)
@@ -228,9 +281,9 @@ object CacheKeys {
       Longs.toByteArray
     )
    */
-  object Portfolios extends CacheKey[AddressId, Option[Portfolio]](10)
+  object Portfolios extends CacheKey[AddressId, Option[Portfolio]](12)
 
-  object Transactions extends CacheKey[ByteStr, Option[(TxMeta, Option[Transaction])]](11)
+  object Transactions extends CacheKey[ByteStr, Option[(TxMeta, Option[Transaction])]](13)
 
   implicit val byteStrAsBytes: AsBytes[ByteStr] = new AsBytes[ByteStr] {
     override def toByteArray(x: ByteStr): Array[Byte] = new ByteArrayOutputStream().writeWithLen(x.arr).toByteArray
@@ -242,7 +295,7 @@ object CacheKeys {
   }
 
   implicit val addressId: AsBytes[AddressId] = new AsBytes[AddressId] {
-    override def toByteArray(x: AddressId): Array[Byte] = x.toByteArray
+    override def toByteArray(x: AddressId): Array[Byte]           = x.toByteArray
     override def fromByteArray(xs: Array[Byte]): (AddressId, Int) = (AddressId.fromByteArray(xs), Longs.BYTES)
   }
 
