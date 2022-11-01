@@ -173,13 +173,28 @@ class LevelDbBlockchainCaches(db: DB) extends BlockchainCaches with ScorexLoggin
     log.trace(s"setAlias($alias)")
   }
 
-  override def getBalances(address: Address): BlockchainData[Portfolio] =
+  override def getBalances(address: Address, maxHeight: Int): BlockchainData[Portfolio] =
     db
-      .readOnly { ro => ro.readFromDb(CacheKeys.Portfolios.mkKey(getOrMkAddressId(ro, address))) }
+      .readOnly { ro =>
+        val addressId = getOrMkAddressId(ro, address)
+        ro.readHistoricalFromDb(
+          CacheKeys.PortfoliosHistory.mkKey(addressId),
+          h => CacheKeys.Portfolios.mkKey((addressId, h)),
+          maxHeight
+        )
+      }
       .tap { r => log.trace(s"getBalances($address): ${r.toFoundStr("assets", _.assets)}") }
 
-  override def setBalances(address: Address, data: BlockchainData[Portfolio]): Unit = {
-    db.readWrite { rw => rw.writeToDb(CacheKeys.Portfolios.mkKey(getOrMkAddressId(rw, address)), data) }
+  override def setBalances(address: Address, height: Int, data: BlockchainData[Portfolio]): Unit = {
+    db.readWrite { rw =>
+      val addressId = getOrMkAddressId(rw, address)
+      rw.writeHistoricalToDb(
+        CacheKeys.PortfoliosHistory.mkKey(addressId),
+        h => CacheKeys.Portfolios.mkKey((addressId, h)),
+        height,
+        data
+      )
+    }
     log.trace(s"setBalances($address)")
   }
 

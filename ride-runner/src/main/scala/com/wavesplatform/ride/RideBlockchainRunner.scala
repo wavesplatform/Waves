@@ -159,10 +159,10 @@ object RideBlockchainRunner extends ScorexLogging {
                     r union blockchainStorage.replaceAssetDescription(h, x)
                   } union
                   stateUpdate.flatMap(_.balances).foldLeft(Set.empty[Int]) { case (r, x) =>
-                    r union blockchainStorage.replaceBalance(x)
+                    r union blockchainStorage.replaceBalance(h, x)
                   } union
                   stateUpdate.flatMap(_.leasingForAddress).foldLeft(Set.empty[Int]) {
-                    _ union blockchainStorage.replaceLeasing(_)
+                    _ union blockchainStorage.replaceLeasing(h, _)
                   } union
                   stateUpdate.flatMap(_.dataEntries).foldLeft(Set.empty[Int]) { case (r, x) =>
                     r union blockchainStorage.replaceAccountData(h, x)

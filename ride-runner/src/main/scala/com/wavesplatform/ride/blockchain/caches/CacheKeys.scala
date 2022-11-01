@@ -247,7 +247,7 @@ object CacheKeys {
   object AccountDataEntries        extends CacheKey[(AddressId, String, Int), Option[DataEntry[?]]](3)
 
   object AccountScriptsHistory extends CacheHistoryKey[AddressId](4)
-  object AccountScripts extends CacheKey[(AddressId, Int), Option[AccountScriptInfo]](5)
+  object AccountScripts        extends CacheKey[(AddressId, Int), Option[AccountScriptInfo]](5)
 
   object SignedBlockHeaders extends CacheKey[Int, Option[SignedBlockHeader]](6)
   object Height             extends CacheKey[Unit, Int](7)
@@ -255,12 +255,12 @@ object CacheKeys {
   object ActivatedFeatures  extends CacheKey[Unit, Map[Short, Int]](9)
 
   object AssetDescriptionsHistory extends CacheHistoryKey[Asset.IssuedAsset](11)
-  object AssetDescriptions extends CacheKey[(Asset.IssuedAsset, Int), Option[AssetDescription]](12)
+  object AssetDescriptions        extends CacheKey[(Asset.IssuedAsset, Int), Option[AssetDescription]](12)
 
   object Aliases extends CacheKey[Alias, Option[Address]](13)
 
-  // object PortfoliosHistory extends CacheHistoryKey[AddressId](14)
-  object Portfolios extends CacheKey[AddressId, Option[Portfolio]](15)
+  object PortfoliosHistory extends CacheHistoryKey[AddressId](14)
+  object Portfolios        extends CacheKey[(AddressId, Int), Option[Portfolio]](15)
 
   // TODO separate a height part (meta) and a body?
   object Transactions extends CacheKey[ByteStr, Option[(TxMeta, Option[Transaction])]](13)

@@ -34,8 +34,8 @@ trait BlockchainCaches {
   def resolveAlias(alias: Alias): BlockchainData[Address]
   def setAlias(alias: Alias, data: BlockchainData[Address]): Unit
 
-  def getBalances(address: Address): BlockchainData[Portfolio]
-  def setBalances(address: Address, data: BlockchainData[Portfolio]): Unit // TODO
+  def getBalances(address: Address, maxHeight: Int): BlockchainData[Portfolio]
+  def setBalances(address: Address, height: Int, data: BlockchainData[Portfolio]): Unit
 
   def getTransaction(id: ByteStr): BlockchainData[(TxMeta, Option[Transaction])]
   def setTransaction(id: ByteStr, data: BlockchainData[(TxMeta, Option[Transaction])]): Unit
@@ -66,8 +66,8 @@ object EmptyBlockchainCaches extends BlockchainCaches {
   override def resolveAlias(alias: Alias): BlockchainData[Address]         = BlockchainData.Unknown
   override def setAlias(alias: Alias, data: BlockchainData[Address]): Unit = {}
 
-  override def getBalances(address: Address): BlockchainData[Portfolio]             = BlockchainData.Unknown
-  override def setBalances(address: Address, data: BlockchainData[Portfolio]): Unit = {}
+  override def getBalances(address: Address, maxHeight: Int): BlockchainData[Portfolio]          = BlockchainData.Unknown
+  override def setBalances(address: Address, height: Int, data: BlockchainData[Portfolio]): Unit = {}
 
   override def getTransaction(id: ByteStr): BlockchainData[(TxMeta, Option[Transaction])]             = BlockchainData.Unknown
   override def setTransaction(id: ByteStr, data: BlockchainData[(TxMeta, Option[Transaction])]): Unit = {}

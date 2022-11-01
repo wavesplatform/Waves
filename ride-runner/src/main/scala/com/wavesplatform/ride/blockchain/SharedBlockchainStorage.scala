@@ -161,11 +161,15 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
   def getAlias(alias: Alias, tag: TagT): Option[Address] = aliases.get(alias, tag)
 
   private val portfolios = RideData.anyRefMap[Address, Portfolio, TagT] {
-    load(caches.getBalances, blockchainApi.getBalances(_).some, caches.setBalances)
+    load[Address, Portfolio](
+      fromCache = caches.getBalances(_, height),
+      fromBlockchain = blockchainApi.getBalances(_).some,
+      updateCache = (key, value) => caches.setBalances(key, height, value)
+    )
   }
 
   def getPortfolio(address: Address, tag: TagT): Option[Portfolio] = portfolios.get(address, tag)
-  def replaceBalance(toReplace: StateUpdate.BalanceUpdate): Set[TagT] = {
+  def replaceBalance(height: Int, toReplace: StateUpdate.BalanceUpdate): Set[TagT] = {
     val address = toReplace.address.toAddress
     portfolios.replaceIfKnown(address) { mayBeOrig =>
       val (asset, after) = toAssetAndAmount(toReplace.getAmountAfter)
@@ -176,15 +180,15 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
         case Asset.Waves        => orig.copy(balance = after)
         case asset: IssuedAsset => orig.copy(assets = orig.assets.updated(asset, after))
       })
-        .tap(r => caches.setBalances(address, BlockchainData.loaded(r)))
+        .tap(r => caches.setBalances(address, height, BlockchainData.loaded(r)))
     }
   }
-  def replaceLeasing(toReplace: StateUpdate.LeasingUpdate): Set[TagT] = {
+  def replaceLeasing(height: Int, toReplace: StateUpdate.LeasingUpdate): Set[TagT] = {
     val address = toReplace.address.toAddress
     portfolios.replaceIfKnown(address) { orig =>
       log.debug(s"[$address] Updated leasing")
       Some(orig.getOrElse(Portfolio.empty).copy(lease = LeaseBalance(toReplace.inAfter, toReplace.outAfter)))
-        .tap(r => caches.setBalances(address, BlockchainData.loaded(r)))
+        .tap(r => caches.setBalances(address, height, BlockchainData.loaded(r)))
     }
   }
 
