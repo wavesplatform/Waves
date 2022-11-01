@@ -246,8 +246,8 @@ object CacheKeys {
   object AccountDataEntriesHistory extends CacheHistoryKey[(AddressId, String)](2)
   object AccountDataEntries        extends CacheKey[(AddressId, String, Int), Option[DataEntry[?]]](3)
 
-  object AccountScripts extends CacheKey[AddressId, Option[AccountScriptInfo]](4)
-//  object AccountScriptsHistory extends CacheHistoryKey[AddressId](5)
+  object AccountScriptsHistory extends CacheHistoryKey[AddressId](4)
+  object AccountScripts extends CacheKey[(AddressId, Int), Option[AccountScriptInfo]](5)
 
   object SignedBlockHeaders extends CacheKey[Int, Option[SignedBlockHeader]](6)
   object Height             extends CacheKey[Unit, Int](7)

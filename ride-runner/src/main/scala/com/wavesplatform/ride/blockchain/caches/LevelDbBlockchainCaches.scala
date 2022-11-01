@@ -74,14 +74,29 @@ class LevelDbBlockchainCaches(db: DB) extends BlockchainCaches with ScorexLoggin
     log.trace(s"setAccountDataEntry($address, '$key', $height)")
   }
 
-  override def getAccountScript(address: Address): BlockchainData[AccountScriptInfo] =
+  override def getAccountScript(address: Address, maxHeight: Int): BlockchainData[AccountScriptInfo] =
     db
-      .readOnly { ro => ro.readFromDb(CacheKeys.AccountScripts.mkKey(getOrMkAddressId(ro, address))) }
-      .tap { r => log.trace(s"getAccountScript($address): ${r.toFoundStr("hash", _.script.hashCode())}") }
+      .readOnly { ro =>
+        val addressId = getOrMkAddressId(ro, address)
+        ro.readHistoricalFromDb(
+          CacheKeys.AccountScriptsHistory.mkKey(addressId),
+          h => CacheKeys.AccountScripts.mkKey((addressId, h)),
+          maxHeight
+        )
+      }
+      .tap { r => log.trace(s"getAccountScript($address, $maxHeight): ${r.toFoundStr("hash", _.script.hashCode())}") }
 
-  override def setAccountScript(address: Address, data: BlockchainData[AccountScriptInfo]): Unit = {
-    db.readWrite { rw => rw.writeToDb(CacheKeys.AccountScripts.mkKey(getOrMkAddressId(rw, address)), data) }
-    log.trace(s"setAccountScript($address)")
+  override def setAccountScript(address: Address, height: Int, data: BlockchainData[AccountScriptInfo]): Unit = {
+    db.readWrite { rw =>
+      val addressId = getOrMkAddressId(rw, address)
+      rw.writeHistoricalToDb(
+        CacheKeys.AccountScriptsHistory.mkKey(addressId),
+        h => CacheKeys.AccountScripts.mkKey((addressId, h)),
+        height,
+        data
+      )
+    }
+    log.trace(s"setAccountScript($address, $height)")
   }
 
   override def getBlockHeader(height: Int): BlockchainData[SignedBlockHeader] =

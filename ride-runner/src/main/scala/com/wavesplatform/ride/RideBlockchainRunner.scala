@@ -178,7 +178,7 @@ object RideBlockchainRunner extends ScorexLogging {
                       case _ => none
                     }
                     .foldLeft(Set.empty[Int]) { case (r, (pk, script)) =>
-                      r union blockchainStorage.replaceAccountScript(pk, script)
+                      r union blockchainStorage.replaceAccountScript(pk, h, script)
                     } union
                   append.transactionIds.foldLeft(Set.empty[Int]) { case (r, x) =>
                     r union blockchainStorage.replaceTransactionMeta(x, h)

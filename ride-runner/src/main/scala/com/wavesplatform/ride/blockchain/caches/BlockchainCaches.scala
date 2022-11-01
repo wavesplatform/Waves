@@ -11,10 +11,10 @@ import com.wavesplatform.transaction.{Asset, Transaction}
 trait BlockchainCaches {
   // TODO There is a pattern
   def getAccountDataEntry(address: Address, key: String, maxHeight: Int): BlockchainData[DataEntry[_]]
-  def setAccountDataEntry(address: Address, key: String, maxHeight: Int, data: BlockchainData[DataEntry[_]]): Unit
+  def setAccountDataEntry(address: Address, key: String, height: Int, data: BlockchainData[DataEntry[_]]): Unit
 
-  def getAccountScript(address: Address): BlockchainData[AccountScriptInfo]
-  def setAccountScript(address: Address, data: BlockchainData[AccountScriptInfo]): Unit
+  def getAccountScript(address: Address, maxHeight: Int): BlockchainData[AccountScriptInfo]
+  def setAccountScript(address: Address, height: Int, data: BlockchainData[AccountScriptInfo]): Unit
 
   def getBlockHeader(height: Int): BlockchainData[SignedBlockHeader]
   def setBlockHeader(height: Int, data: BlockchainData[SignedBlockHeader]): Unit
@@ -42,11 +42,11 @@ trait BlockchainCaches {
 }
 
 object EmptyBlockchainCaches extends BlockchainCaches {
-  override def getAccountDataEntry(address: Address, key: String, maxHeight: Int): BlockchainData[DataEntry[_]]             = BlockchainData.Unknown
-  override def setAccountDataEntry(address: Address, key: String, maxHeight: Int, data: BlockchainData[DataEntry[_]]): Unit = {}
+  override def getAccountDataEntry(address: Address, key: String, maxHeight: Int): BlockchainData[DataEntry[_]]          = BlockchainData.Unknown
+  override def setAccountDataEntry(address: Address, key: String, height: Int, data: BlockchainData[DataEntry[_]]): Unit = {}
 
-  override def getAccountScript(address: Address): BlockchainData[AccountScriptInfo]             = BlockchainData.Unknown
-  override def setAccountScript(address: Address, data: BlockchainData[AccountScriptInfo]): Unit = {}
+  override def getAccountScript(address: Address, maxHeight: Int): BlockchainData[AccountScriptInfo]          = BlockchainData.Unknown
+  override def setAccountScript(address: Address, height: Int, data: BlockchainData[AccountScriptInfo]): Unit = {}
 
   override def getBlockHeader(height: Int): BlockchainData[SignedBlockHeader]             = BlockchainData.Unknown
   override def setBlockHeader(height: Int, data: BlockchainData[SignedBlockHeader]): Unit = {}

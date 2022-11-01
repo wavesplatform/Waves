@@ -50,11 +50,15 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
   }
 
   private val accountScripts = RideData.anyRefMap[Address, AccountScriptInfo, TagT] {
-    load(caches.getAccountScript, blockchainApi.getAccountScript(_, estimator), caches.setAccountScript)
+    load[Address, AccountScriptInfo](
+      fromCache = caches.getAccountScript(_, height),
+      fromBlockchain = blockchainApi.getAccountScript(_, estimator),
+      updateCache = (key, value) => caches.setAccountScript(key, height, value)
+    )
   }
 
   def getAccountScript(address: Address, tag: TagT): Option[AccountScriptInfo] = accountScripts.get(address, tag)
-  def replaceAccountScript(account: PublicKey, newScript: ByteString): Set[TagT] = {
+  def replaceAccountScript(account: PublicKey, height: Int, newScript: ByteString): Set[TagT] = {
     val address = account.toAddress(chainId)
     accountScripts.replaceIfKnown(address) { _ =>
       log.debug(s"[$address] Updated account script")
@@ -79,7 +83,7 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
             complexitiesByEstimator = Map(estimator.version -> complexityInfo.callableComplexities)
           )
         }
-        .tap(r => caches.setAccountScript(address, BlockchainData.loaded(r)))
+        .tap(r => caches.setAccountScript(address, height, BlockchainData.loaded(r)))
     }
   }
 
@@ -101,9 +105,7 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
     blockchainApi.getCurrentBlockchainHeight().tap(caches.setHeight)
   }
   def height: Int = _height
-  // TODO How do we known that this field is used in a script?
   def setHeight(height: Int): Unit = {
-    log.debug(s"Updated height = $height")
     caches.setHeight(height)
     _height = height
   }
