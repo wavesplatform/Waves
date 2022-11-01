@@ -28,8 +28,8 @@ trait BlockchainCaches {
   def getActivatedFeatures(): BlockchainData[Map[Short, Int]]
   def setActivatedFeatures(data: Map[Short, Int]): Unit
 
-  def getAssetDescription(asset: Asset.IssuedAsset): BlockchainData[AssetDescription]
-  def setAssetDescription(asset: Asset.IssuedAsset, data: BlockchainData[AssetDescription]): Unit
+  def getAssetDescription(asset: Asset.IssuedAsset, maxHeight: Int): BlockchainData[AssetDescription]
+  def setAssetDescription(asset: Asset.IssuedAsset, height: Int, data: BlockchainData[AssetDescription]): Unit
 
   def resolveAlias(alias: Alias): BlockchainData[Address]
   def setAlias(alias: Alias, data: BlockchainData[Address]): Unit
@@ -60,8 +60,8 @@ object EmptyBlockchainCaches extends BlockchainCaches {
   override def getActivatedFeatures(): BlockchainData[Map[Short, Int]] = BlockchainData.Unknown
   override def setActivatedFeatures(data: Map[Short, Int]): Unit       = {}
 
-  override def getAssetDescription(asset: Asset.IssuedAsset): BlockchainData[AssetDescription]             = BlockchainData.Unknown
-  override def setAssetDescription(asset: Asset.IssuedAsset, data: BlockchainData[AssetDescription]): Unit = {}
+  override def getAssetDescription(asset: Asset.IssuedAsset, maxHeight: Int): BlockchainData[AssetDescription]          = BlockchainData.Unknown
+  override def setAssetDescription(asset: Asset.IssuedAsset, height: Int, data: BlockchainData[AssetDescription]): Unit = {}
 
   override def resolveAlias(alias: Alias): BlockchainData[Address]         = BlockchainData.Unknown
   override def setAlias(alias: Alias, data: BlockchainData[Address]): Unit = {}

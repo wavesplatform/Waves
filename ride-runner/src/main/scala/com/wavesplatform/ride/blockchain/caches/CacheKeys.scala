@@ -254,35 +254,15 @@ object CacheKeys {
   object VRF                extends CacheKey[Int, Option[ByteStr]](8)
   object ActivatedFeatures  extends CacheKey[Unit, Map[Short, Int]](9)
 
-  /*
-  staticInfo         <- resource.get(Keys.assetStaticInfo(asset))
-  (info, volumeInfo) <- fromHistory(resource, Keys.assetDetailsHistory(asset), Keys.assetDetails(asset))
-  sponsorship = fromHistory(resource, Keys.sponsorshipHistory(asset), Keys.sponsorship(asset)).fold(0L)(_.minFee)
-  script      = fromHistory(resource, Keys.assetScriptHistory(asset), Keys.assetScript(asset)).fl
-   */
+  object AssetDescriptionsHistory extends CacheHistoryKey[Asset.IssuedAsset](11)
+  object AssetDescriptions extends CacheKey[(Asset.IssuedAsset, Int), Option[AssetDescription]](12)
 
-  object AssetDescriptions extends CacheKey[Asset.IssuedAsset, Option[AssetDescription]](10)
+  object Aliases extends CacheKey[Alias, Option[Address]](13)
 
-  object Aliases extends CacheKey[Alias, Option[Address]](11)
+  // object PortfoliosHistory extends CacheHistoryKey[AddressId](14)
+  object Portfolios extends CacheKey[AddressId, Option[Portfolio]](15)
 
-  /*
-  def wavesBalanceHistory(addressId: AddressId): Key[Seq[Int]] = historyKey(WavesBalanceHistory, addressId.toByteArray)
-
-  def wavesBalance(addressId: AddressId)(height: Int): Key[Long] =
-    Key(WavesBalance, hAddr(height, addressId), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
-
-  def assetBalanceHistory(addressId: AddressId, asset: IssuedAsset): Key[Seq[Int]] =
-    historyKey(AssetBalanceHistory, addressId.toByteArray ++ asset.id.arr)
-  def assetBalance(addressId: AddressId, asset: IssuedAsset)(height: Int): Key[Long] =
-    Key(
-      AssetBalance,
-      hBytes(asset.id.arr ++ addressId.toByteArray, height),
-      Option(_).fold(0L)(Longs.fromByteArray),
-      Longs.toByteArray
-    )
-   */
-  object Portfolios extends CacheKey[AddressId, Option[Portfolio]](12)
-
+  // TODO separate a height part (meta) and a body?
   object Transactions extends CacheKey[ByteStr, Option[(TxMeta, Option[Transaction])]](13)
 
   implicit val byteStrAsBytes: AsBytes[ByteStr] = new AsBytes[ByteStr] {

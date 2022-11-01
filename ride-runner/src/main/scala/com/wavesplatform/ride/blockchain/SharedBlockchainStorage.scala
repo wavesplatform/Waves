@@ -120,10 +120,14 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
       .getOrElse(throw new RuntimeException("Impossible: activated features are empty"))
 
   private val assets = RideData.anyRefMap[IssuedAsset, AssetDescription, TagT] {
-    load(caches.getAssetDescription, blockchainApi.getAssetDescription, caches.setAssetDescription)
+    load[IssuedAsset, AssetDescription](
+      fromCache = caches.getAssetDescription(_, height),
+      fromBlockchain = blockchainApi.getAssetDescription,
+      updateCache = (key, value) => caches.setAssetDescription(key, height, value)
+    )
   }
   def getAssetDescription(asset: IssuedAsset, tag: TagT): Option[AssetDescription] = assets.get(asset, tag)
-  def replaceAssetDescription(update: StateUpdate.AssetDetails): Set[TagT] = {
+  def replaceAssetDescription(height: Int, update: StateUpdate.AssetDetails): Set[TagT] = {
     val asset = update.assetId.toIssuedAsset
     assets.replaceIfKnown(asset) { _ =>
       log.debug(s"[$asset] Updated asset")
@@ -145,7 +149,7 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
           nft = update.nft
         )
       )
-        .tap(r => caches.setAssetDescription(asset, BlockchainData.loaded(r)))
+        .tap(r => caches.setAssetDescription(asset, height, BlockchainData.loaded(r)))
     }
   }
 

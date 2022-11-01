@@ -132,7 +132,7 @@ object RideBlockchainRunner extends ScorexLogging {
           case Event.Closed        => println("Closed")
           case Event.Next(event) =>
             val update = event.getUpdate
-            val h = update.height
+            val h      = update.height
             update.update match {
               case Update.Append(append) =>
                 val txs = append.body match {
@@ -156,7 +156,7 @@ object RideBlockchainRunner extends ScorexLogging {
                 val stateUpdate = (append.getStateUpdate +: append.transactionStateUpdates).view
                 val updated = updatedByHeight union
                   stateUpdate.flatMap(_.assets).map(_.getAfter).foldLeft(Set.empty[Int]) { case (r, x) =>
-                    r union blockchainStorage.replaceAssetDescription(x)
+                    r union blockchainStorage.replaceAssetDescription(h, x)
                   } union
                   stateUpdate.flatMap(_.balances).foldLeft(Set.empty[Int]) { case (r, x) =>
                     r union blockchainStorage.replaceBalance(x)

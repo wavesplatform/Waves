@@ -140,14 +140,27 @@ class LevelDbBlockchainCaches(db: DB) extends BlockchainCaches with ScorexLoggin
     log.trace("setActivatedFeatures")
   }
 
-  override def getAssetDescription(asset: Asset.IssuedAsset): BlockchainData[AssetDescription] =
+  override def getAssetDescription(asset: Asset.IssuedAsset, maxHeight: Int): BlockchainData[AssetDescription] =
     db
-      .readOnly { _.readFromDb(CacheKeys.AssetDescriptions.mkKey(asset)) }
-      .tap { r => log.trace(s"getAssetDescription($asset): ${r.toFoundStr(_.toString)}") }
+      .readOnly { ro =>
+        ro.readHistoricalFromDb(
+          CacheKeys.AssetDescriptionsHistory.mkKey(asset),
+          h => CacheKeys.AssetDescriptions.mkKey((asset, h)),
+          maxHeight
+        )
+      }
+      .tap { r => log.trace(s"getAssetDescription($asset, $maxHeight): ${r.toFoundStr(_.toString)}") }
 
-  override def setAssetDescription(asset: Asset.IssuedAsset, data: BlockchainData[AssetDescription]): Unit = {
-    db.readWrite { _.writeToDb(CacheKeys.AssetDescriptions.mkKey(asset), data) }
-    log.trace(s"setAssetDescription($asset)")
+  override def setAssetDescription(asset: Asset.IssuedAsset, height: Int, data: BlockchainData[AssetDescription]): Unit = {
+    db.readWrite { rw =>
+      rw.writeHistoricalToDb(
+        CacheKeys.AssetDescriptionsHistory.mkKey(asset),
+        h => CacheKeys.AssetDescriptions.mkKey((asset, h)),
+        height,
+        data
+      )
+    }
+    log.trace(s"setAssetDescription($asset, $height)")
   }
 
   override def resolveAlias(alias: Alias): BlockchainData[Address] =
