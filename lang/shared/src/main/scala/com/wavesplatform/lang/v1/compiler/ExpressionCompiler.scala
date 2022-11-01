@@ -117,16 +117,16 @@ object ExpressionCompiler {
           .recover { case err => CompilationStepResultExpr(ctx, FAILED_EXPR(), NOTHING, expr, List(err)) }
 
       expr match {
-        case x: Expressions.CONST_LONG    => CompilationStepResultExpr(ctx, CONST_LONG(x.value): EXPR, LONG: FINAL, x: Expressions.EXPR).pure[CompileM]
+        case x: Expressions.CONST_LONG    => CompilationStepResultExpr(ctx, CONST_LONG(x.value), LONG, x).pure[CompileM]
         case x: Expressions.CONST_BYTESTR => handlePart(x.value).flatMap(b => liftEither(adjustByteStr(x, b)))
         case x: Expressions.CONST_STRING  => handlePart(x.value).flatMap(s => liftEither(adjustStr(x, s)))
-        case x: Expressions.TRUE          => CompilationStepResultExpr(ctx, TRUE: EXPR, BOOLEAN: FINAL, x: Expressions.EXPR).pure[CompileM]
-        case x: Expressions.FALSE         => CompilationStepResultExpr(ctx, FALSE: EXPR, BOOLEAN: FINAL, x: Expressions.EXPR).pure[CompileM]
+        case x: Expressions.TRUE          => CompilationStepResultExpr(ctx, TRUE, BOOLEAN, x).pure[CompileM]
+        case x: Expressions.FALSE         => CompilationStepResultExpr(ctx, FALSE, BOOLEAN, x).pure[CompileM]
 
         case x: Expressions.INVALID =>
           CompilationStepResultExpr(
             ctx,
-            FAILED_EXPR(): EXPR,
+            FAILED_EXPR(),
             NOTHING,
             x: Expressions.EXPR,
             List(Generic(x.position.start, x.position.end, x.message))
@@ -138,7 +138,7 @@ object ExpressionCompiler {
         case Expressions.REF(p, key, _, _)                     => compileRef(p, key, saveExprContext)
         case Expressions.FUNCTION_CALL(p, name, args, _, _)    => compileFunctionCall(p, name, args, saveExprContext, allowIllFormedStrings)
         case Expressions.MATCH(p, ex, cases, _, _)             => compileMatch(p, ex, cases.toList, saveExprContext, allowIllFormedStrings)
-        case Expressions.FOLD(p, limit, list, acc, f, _, _) => compileFold(p, limit, list, acc, f.key)
+        case f: Expressions.FOLD                               => compileFold(f)
         case Expressions.GENERIC_FUNCTION_CALL(p, e, name, t, _, _) =>
           compileGenericFunctionCall(p, e, name, t, saveExprContext, allowIllFormedStrings)
         case Expressions.BINARY_OP(p, a, op, b, _, _) =>
@@ -176,7 +176,8 @@ object ExpressionCompiler {
         condWithErr._1.parseNodeExpr,
         ifTrue.parseNodeExpr,
         ifFalse.parseNodeExpr,
-        ctxOpt = saveExprContext.toOption(ctx.getSimpleContext())
+        Some(t),
+        saveExprContext.toOption(ctx.getSimpleContext())
       )
       errorList = condWithErr._1.errors ++ ifTrue.errors ++ ifFalse.errors
 
@@ -185,7 +186,7 @@ object ExpressionCompiler {
           ctx,
           IF(condWithErr._1.expr, ifTrue.expr, ifFalse.expr),
           t,
-          parseNodeExpr.copy(resultType = Some(t)),
+          parseNodeExpr,
           errorList
         )
       } else {
@@ -507,7 +508,7 @@ object ExpressionCompiler {
         compLetResult.parseNodeExpr,
         compiledBody.parseNodeExpr,
         compiledBody.parseNodeExpr.resultType,
-        ctxOpt = saveExprContext.toOption(compiledBody.ctx.getSimpleContext())
+        saveExprContext.toOption(compiledBody.ctx.getSimpleContext())
       )
       result = if (!compLetResult.dec.isItFailed) {
         LET_BLOCK(compLetResult.dec.asInstanceOf[LET], compiledBody.expr)
@@ -604,7 +605,8 @@ object ExpressionCompiler {
         p,
         namePart,
         compiledArgs.map(_.parseNodeExpr),
-        ctxOpt = saveExprContext.toOption(ctx.getSimpleContext())
+        funcCallWithErr._1.map(_._2),
+        saveExprContext.toOption(ctx.getSimpleContext())
       )
 
       result = if (errorList.isEmpty) {
@@ -647,7 +649,7 @@ object ExpressionCompiler {
           ctx,
           REF(keyWithErr._1.get),
           typeWithErr._1.get,
-          Expressions.REF(p, keyPart, None, ctxOpt = saveExprContext.toOption(ctx.getSimpleContext()))
+          Expressions.REF(p, keyPart, typeWithErr._1, saveExprContext.toOption(ctx.getSimpleContext()))
         )
       } else {
         CompilationStepResultExpr(
@@ -660,23 +662,17 @@ object ExpressionCompiler {
       }
     } yield result
 
-  private def compileFold(
-      p: Pos,
-      limit: Int,
-      list: Expressions.EXPR,
-      acc: Expressions.EXPR,
-      func: PART[String]
-  ): CompileM[CompilationStepResultExpr] =
+  private def compileFold(fold: Expressions.FOLD): CompileM[CompilationStepResultExpr] =
     for {
-      (compiledList, listType, _, compileListErrors) <- compileExpr(list)
-      name = s"FOLD<$limit>"
+      (compiledList, listType, _, compileListErrors) <- compileExpr(fold.list)
+      name = s"FOLD<${fold.limit}>"
       listInnerType <- (listType match {
         case list: LIST => Right(list.innerType)
-        case other      => Left(Generic(p.start, p.end, s"First $name argument should be List[A], but $other found"))
+        case other      => Left(Generic(fold.position.start, fold.position.end, s"First $name argument should be List[A], but $other found"))
       }).toCompileM
-      (compiledAcc, accType, accRaw, compileAccErrors) <- compileExpr(acc)
-      funcName                       <- handlePart(func)
-      ctx                            <- get[Id, CompilerContext, CompilationError]
+      (compiledAcc, accType, _, compileAccErrors) <- compileExpr(fold.acc)
+      funcName                                    <- handlePart(fold.func.key)
+      ctx                                         <- get[Id, CompilerContext, CompilationError]
       compiledFunc <- ctx
         .functionTypeSignaturesByName(funcName, args = 2)
         .collectFirst {
@@ -686,14 +682,14 @@ object ExpressionCompiler {
         .getOrElse {
           val accTypeStr       = if (accType == NOTHING) ANY else accType
           val listInnerTypeStr = if (listInnerType == NOTHING) ANY else listInnerType
-          Left(Generic(p.start, p.end, s"Can't find suitable function $funcName(a: $accTypeStr, b: $listInnerTypeStr) for $name"))
+          Left(Generic(fold.position.start, fold.position.end, s"Can't find suitable function $funcName(a: $accTypeStr, b: $listInnerTypeStr) for $name"))
         }
         .toCompileM
       _ <- set[Id, CompilerContext, CompilationError](ctx.copy(foldIdx = ctx.foldIdx + 1))
       resultType = compiledFunc.args.head._2.asInstanceOf[FINAL]
       compiledFold <- {
-        val unwrapped = CompilerMacro.unwrapFold(ctx.foldIdx, limit, compiledList, compiledAcc, compiledFunc.header)
-        CompilationStepResultExpr(ctx, unwrapped, resultType, accRaw, compileListErrors ++ compileAccErrors)
+        val unwrapped = CompilerMacro.unwrapFold(ctx.foldIdx, fold.limit, compiledList, compiledAcc, compiledFunc.header)
+        CompilationStepResultExpr(ctx, unwrapped, resultType, fold.copy(resultType = Some(resultType)), compileListErrors ++ compileAccErrors)
           .asRight[CompilationError]
           .toCompileM
       }
