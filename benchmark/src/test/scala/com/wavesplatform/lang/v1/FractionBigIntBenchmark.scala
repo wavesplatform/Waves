@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BIGINT, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.{FRACTION_BIGINT, FRACTION_BIGINT_ROUNDS}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, Rounding}
-import org.openjdk.jmh.annotations.{State, _}
+import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
@@ -42,7 +42,7 @@ class FractionBigIntBenchmark {
 @State(Scope.Benchmark)
 class FractionBigIntSt {
   val ds  = DirectiveSet(V5, Account, Expression).fold(null, identity)
-  val ctx = lazyContexts(ds).value().evaluationContext(Common.emptyBlockchainEnvironment())
+  val ctx = lazyContexts(ds -> true).value().evaluationContext(Common.emptyBlockchainEnvironment())
 
   val max     = CONST_BIGINT(PureContext.BigIntMax)
   val halfMax = CONST_BIGINT(PureContext.BigIntMax / 2)
@@ -62,7 +62,7 @@ class FractionBigIntSt {
 
   val expr3 = FUNCTION_CALL(
     Native(FRACTION_BIGINT),
-    List(maxSqrt, maxSqrt, maxSqrt)
+    List(maxSqrt, maxSqrt, three)
   )
 
   val expr1Round = FUNCTION_CALL(

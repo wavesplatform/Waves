@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 
 import cats.Id
-import cats.syntax.bifunctor._
+import cats.syntax.bifunctor.*
 import com.wavesplatform.account
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
@@ -13,18 +13,19 @@ import com.wavesplatform.crypto.Curve25519
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, DApp, V4}
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark._
+import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.*
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_STRING, EVALUATED, EXPR, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.EnvironmentFunctions
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{Functions, WavesContext}
-import com.wavesplatform.lang.v1.traits._
+import com.wavesplatform.lang.v1.traits.*
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.{Common, Global, ValidationError}
 import com.wavesplatform.wallet.Wallet
 import monix.eval.Coeval
-import org.openjdk.jmh.annotations._
+import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
 import scala.util.Random
@@ -88,7 +89,7 @@ class EnvironmentFunctionsBenchmark {
   @Benchmark
   def addressFromString(st: AddressFromString, bh: Blackhole): Unit = {
     val i = Random.nextInt(100)
-    bh.consume(eval(st.ctx, st.expr(i), V4, true))
+    bh.consume(eval(st.ctx, st.expr(i), V4))
   }
 }
 
@@ -130,14 +131,15 @@ object EnvironmentFunctionsBenchmark {
       Right(Address(ByteStr(PublicKey(publicKey).toAddress.bytes)))
 
     override def accountScript(addressOrAlias: Recipient): Option[Script] = ???
-    override def callScript(
+
+    def callScript(
         dApp: Address,
         func: String,
         args: List[EVALUATED],
         payments: Seq[(Option[Array[Byte]], Long)],
         availableComplexity: Int,
         reentrant: Boolean
-    ): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
+    ): Coeval[Id[(Either[ValidationError, (EVALUATED, Log[Id])], Int)]] = ???
   }
 
   val environmentFunctions = new EnvironmentFunctions(environment)
