@@ -1,9 +1,10 @@
-package com.wavesplatform.lang.v1.estimator
+package com.wavesplatform.lang.estimator
 
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.utils.functionCosts
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms.{BLOCK, CONST_LONG, FUNC, FUNCTION_CALL, IF, LET, REF, TRUE}
+import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.SUM_LONG

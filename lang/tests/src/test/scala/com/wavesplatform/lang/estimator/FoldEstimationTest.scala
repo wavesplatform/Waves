@@ -1,4 +1,4 @@
-package com.wavesplatform.lang.v1.estimator
+package com.wavesplatform.lang.estimator
 
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 

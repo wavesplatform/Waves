@@ -1,8 +1,8 @@
-package com.wavesplatform.lang
+package com.wavesplatform.lang.compiler
 
 import com.wavesplatform.lang.v1.compiler.TypeInferrer
-import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.test._
+import com.wavesplatform.lang.v1.compiler.Types.*
+import com.wavesplatform.test.*
 
 class TypeInferrerTest extends FreeSpec {
 
