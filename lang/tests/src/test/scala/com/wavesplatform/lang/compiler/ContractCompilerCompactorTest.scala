@@ -406,9 +406,9 @@ class ContractCompilerCompactorTest extends PropSpec {
     def checkForV(version: StdLibVersion): Assertion = {
       //noinspection RedundantDefaultArgument
       val compilationResult = for {
-        directives <- DirectiveParser(scriptForV(version))
-        ds         <- Directive.extractDirectives(directives)
-        linked     <- ScriptPreprocessor(scriptForV(version), libraries, ds.imports)
+        directives  <- DirectiveParser(scriptForV(version))
+        ds          <- Directive.extractDirectives(directives)
+        (linked, _) <- ScriptPreprocessor(scriptForV(version), libraries, ds.imports)
         expr = Parser.parseContract(linked).get.value
         r <- compiler.ContractCompiler(ctxForV(version).compilerContext, expr, version, needCompaction = false, removeUnusedCode = true)
       } yield r.compactedSource(version)

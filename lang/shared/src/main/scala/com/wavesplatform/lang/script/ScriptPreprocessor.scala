@@ -17,7 +17,7 @@ object ScriptPreprocessor {
       scriptText: String,
       libraries: Map[String, String],
       imports: Imports
-  ): Either[String, String] =
+  ): Either[String, (String, Int)] =
     for {
       matchedLibraries <- resolveLibraries(libraries, imports)
       _                <- checkLibrariesDirectives(matchedLibraries)
@@ -59,7 +59,7 @@ object ScriptPreprocessor {
 
   private def gatherScriptText(src: String, libraries: Map[String, String]) = {
     val additionalDecls = libraries.values.map(removeDirectives).mkString("\n")
-    src.replaceFirst(importRegex, additionalDecls)
+    (src.replaceFirst(importRegex, additionalDecls), additionalDecls.length)
   }
 
   private def removeDirectives(script: String): String =

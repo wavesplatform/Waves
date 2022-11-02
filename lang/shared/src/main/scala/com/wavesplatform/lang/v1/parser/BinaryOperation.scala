@@ -1,12 +1,12 @@
 package com.wavesplatform.lang.v1.parser
 
-import com.wavesplatform.lang.v1.parser.Expressions._
-import fastparse._
+import com.wavesplatform.lang.v1.parser.Expressions.*
+import fastparse.*
 
 sealed abstract class BinaryOperation {
   val func: String
   def parser[A: P]: P[BinaryOperation] = P(func).map(_ => this)
-  def expr(start: Int, end: Int, op1: EXPR, op2: EXPR): EXPR = {
+  def expr(start: Int, end: Int, op1: EXPR, op2: EXPR)(implicit offset: Int): EXPR = {
     BINARY_OP(Pos(start, end), op1, this, op2)
   }
 }
@@ -45,7 +45,7 @@ object BinaryOperation {
     val func = ">="
   }
   case object GT_OP extends BinaryOperation {
-    val func            = ">"
+    val func                  = ">"
     override def parser[A: P] = P(">" ~ !P("=")).map(_ => this)
   }
   case object SUM_OP extends BinaryOperation {
@@ -64,22 +64,22 @@ object BinaryOperation {
     override val func: String = "%"
   }
   case object LE_OP extends BinaryOperation {
-    val func            = ">="
+    val func                  = ">="
     override def parser[A: P] = P("<=").map(_ => this)
-    override def expr(start: Int, end: Int, op1: EXPR, op2: EXPR): EXPR = {
+    override def expr(start: Int, end: Int, op1: EXPR, op2: EXPR)(implicit offset: Int): EXPR = {
       BINARY_OP(Pos(start, end), op2, LE_OP, op1)
     }
   }
   case object LT_OP extends BinaryOperation {
-    val func            = ">"
+    val func                  = ">"
     override def parser[A: P] = P("<" ~ !P("=")).map(_ => this)
-    override def expr(start: Int, end: Int, op1: EXPR, op2: EXPR): EXPR = {
+    override def expr(start: Int, end: Int, op1: EXPR, op2: EXPR)(implicit offset: Int): EXPR = {
       BINARY_OP(Pos(start, end), op2, LT_OP, op1)
     }
   }
   case object CONS_OP extends BinaryOperation {
     override val func: String = "::"
-    override def expr(start: Int, end: Int, op1: EXPR, op2: EXPR): EXPR = {
+    override def expr(start: Int, end: Int, op1: EXPR, op2: EXPR)(implicit offset: Int): EXPR = {
       val pos = Pos(start, end)
       FUNCTION_CALL(Pos(start, end), PART.VALID(pos, "cons"), List(op1, op2))
     }

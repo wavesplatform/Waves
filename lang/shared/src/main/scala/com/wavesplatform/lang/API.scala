@@ -97,15 +97,16 @@ object API {
         estimatorVersion,
         s"Version of estimator must be not greater than ${API.allEstimators.length}"
       )
-      directives  <- DirectiveParser(input)
-      ds          <- extractDirectives(directives)
-      linkedInput <- ScriptPreprocessor(input, libraries, ds.imports)
-      compiled    <- parseAndCompileScript(ds, linkedInput, API.allEstimators.toIndexedSeq(estimatorVer - 1), needCompaction, removeUnusedCode)
+      directives            <- DirectiveParser(input)
+      ds                    <- extractDirectives(directives)
+      (linkedInput, offset) <- ScriptPreprocessor(input, libraries, ds.imports)
+      compiled <- parseAndCompileScript(ds, linkedInput, offset, API.allEstimators.toIndexedSeq(estimatorVer - 1), needCompaction, removeUnusedCode)
     } yield compiled
 
   private def parseAndCompileScript(
       ds: DirectiveSet,
       input: String,
+      offset: Int,
       estimator: ScriptEstimator,
       needCompaction: Boolean,
       removeUnusedCode: Boolean
@@ -115,6 +116,7 @@ object API {
       case Expression =>
         G.parseAndCompileExpression(
           input,
+          offset,
           utils.compilerContext(ds),
           G.LetBlockVersions.contains(stdLibVer),
           stdLibVer,
@@ -136,6 +138,7 @@ object API {
       case DAppType =>
         G.parseAndCompileContract(
           input,
+          offset,
           utils.compilerContext(ds),
           stdLibVer,
           estimator,
@@ -158,10 +161,10 @@ object API {
       allowFreeCall: Boolean = true
   ): Either[String, CompileResult] =
     for {
-      directives  <- DirectiveParser(input)
-      ds          <- extractDirectives(directives, defaultStdLib)
-      linkedInput <- ScriptPreprocessor(input, libraries, ds.imports)
-      compiled    <- compileScript(ds, linkedInput, estimator, needCompaction, removeUnusedCode, allowFreeCall)
+      directives       <- DirectiveParser(input)
+      ds               <- extractDirectives(directives, defaultStdLib)
+      (linkedInput, _) <- ScriptPreprocessor(input, libraries, ds.imports)
+      compiled         <- compileScript(ds, linkedInput, estimator, needCompaction, removeUnusedCode, allowFreeCall)
     } yield compiled
 
   def estimatorByVersion(version: Int): Either[String, ScriptEstimator] =

@@ -10,18 +10,18 @@ import com.wavesplatform.lang.v1.parser.BinaryOperation.*
 import com.wavesplatform.lang.v1.parser.Expressions.*
 import com.wavesplatform.lang.v1.parser.Expressions.PART.VALID
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
+import com.wavesplatform.lang.v1.parser.Parser.*
 import com.wavesplatform.lang.v1.parser.UnaryOperation.*
 import com.wavesplatform.lang.v1.{ContractLimits, compiler}
 import fastparse.*
 import fastparse.MultiLineWhitespace.*
 import fastparse.Parsed.Failure
 
-object Parser {
+class Parser(implicit offset: Int) {
 
   private val Global                                        = com.wavesplatform.lang.hacks.Global // Hack for IDEA
   implicit def hack(p: fastparse.P[Any]): fastparse.P[Unit] = p.map(_ => ())
 
-  def keywords                 = Set("let", "strict", "base58", "base64", "true", "false", "if", "then", "else", "match", "case", "func")
   def lowerChar[A: P]          = CharIn("a-z")
   def upperChar[A: P]          = CharIn("A-Z")
   def nonLatinChar[A: P]       = (CharPred(_.isLetter) ~~/ Fail).opaque("only latin charset for definitions")
@@ -226,19 +226,6 @@ object Parser {
       byteVectorP | stringP | numberP | trueP | falseP | list |
       functionCallOrRef
   )
-
-  sealed trait Accessor
-  case class Method(name: PART[String], args: Seq[EXPR])     extends Accessor
-  case class Getter(name: PART[String])                      extends Accessor
-  case class ListIndex(index: EXPR)                          extends Accessor
-  case class GenericMethod(name: PART[String], `type`: Type) extends Accessor
-
-  object GenericMethod {
-    val ExactAs = "exactAs"
-    val As      = "as"
-
-    val KnownMethods: Set[String] = Set(ExactAs, As)
-  }
 
   def singleTypeP[A: P]: P[Single] = (anyVarName() ~~ ("[" ~~ Index ~ unionTypeP ~ Index ~~/ "]").?).map { case (t, param) =>
     Single(t, param.map { case (start, param, end) => VALID(Pos(start, end), param) })
@@ -688,4 +675,30 @@ object Parser {
 
   def toString(input: String, f: Failure): String =
     errorWithPosition(input, f)._1
+}
+
+object Parser {
+  private val defaultParser                       = new Parser()(0)
+  def parseExpr(str: String): Parsed[EXPR]        = defaultParser.parseExpr(str)
+  def parseReplExpr(str: String): Parsed[EXPR]    = defaultParser.parseReplExpr(str)
+  def parseContract(str: String): Parsed[DAPP]    = defaultParser.parseContract(str)
+  def toString(input: String, f: Failure): String = defaultParser.toString(input, f)
+  def parseExpressionWithErrorRecovery(str: String): Either[(String, Int, Int), (SCRIPT, Option[Pos])] =
+    defaultParser.parseExpressionWithErrorRecovery(str)
+  def parseDAPPWithErrorRecovery(str: String): Either[(String, Int, Int), (DAPP, Option[Pos])] =
+    defaultParser.parseDAPPWithErrorRecovery(str)
+
+  sealed trait Accessor
+  case class Method(name: PART[String], args: Seq[EXPR])     extends Accessor
+  case class Getter(name: PART[String])                      extends Accessor
+  case class ListIndex(index: EXPR)                          extends Accessor
+  case class GenericMethod(name: PART[String], `type`: Type) extends Accessor
+
+  object GenericMethod {
+    val ExactAs                   = "exactAs"
+    val As                        = "as"
+    val KnownMethods: Set[String] = Set(ExactAs, As)
+  }
+
+  val keywords = Set("let", "strict", "base58", "base64", "true", "false", "if", "then", "else", "match", "case", "func")
 }

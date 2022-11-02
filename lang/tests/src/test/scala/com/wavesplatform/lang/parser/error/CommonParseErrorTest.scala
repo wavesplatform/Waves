@@ -62,6 +62,7 @@ class CommonParseErrorTest extends ParseErrorTest {
         """
           | let 煊镕不 = []
         """.stripMargin,
+        0,
         utils.compilerContext(DirectiveSet.contractDirectiveSet),
         V6
       ) shouldBe Left(("Parse error: expected only latin charset for definitions in 6-9", 6, 9))
@@ -72,6 +73,7 @@ class CommonParseErrorTest extends ParseErrorTest {
           | let 煊镕不 = []
           | true
         """.stripMargin,
+        0,
         utils.compilerContext(V6, Expression, false)
       ) shouldBe Left(("Parse error: expected only latin charset for definitions in 6-9", 6, 9))
   }

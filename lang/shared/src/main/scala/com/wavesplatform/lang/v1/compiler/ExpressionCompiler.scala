@@ -60,10 +60,11 @@ object ExpressionCompiler {
 
   def compileWithParseResult(
       input: String,
+      offset: Int,
       ctx: CompilerContext,
       saveExprContext: Boolean = true
   ): Either[(String, Int, Int), (EXPR, Expressions.SCRIPT, Iterable[CompilationError])] =
-    Parser
+    new Parser()(offset)
       .parseExpressionWithErrorRecovery(input)
       .flatMap { case (parseResult, removedCharPosOpt) =>
         compileExprWithCtx(parseResult.expr, saveExprContext, allowIllFormedStrings = false)
