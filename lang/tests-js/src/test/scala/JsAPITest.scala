@@ -154,14 +154,14 @@ object JsAPITest extends JsTestBase {
         val let = expr.exprAst.expr.body.body.body.dec
         let.`type` ==> "LET"
         let.name.value ==> "a"
-        let.posStart ==> 33
-        let.posEnd ==> 42
+        let.posStart ==> 64
+        let.posEnd ==> 73
 
         val func = expr.exprAst.expr.body.body.body.body.dec
         func.`type` ==> "FUNC"
         func.name.value ==> "f"
-        func.posStart ==> 44
-        func.posEnd ==> 56
+        func.posStart ==> 75
+        func.posEnd ==> 87
       }
 
       checkPos(r1)
