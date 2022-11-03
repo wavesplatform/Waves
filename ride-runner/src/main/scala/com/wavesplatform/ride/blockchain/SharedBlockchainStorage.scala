@@ -68,7 +68,7 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
   }
 
   def getAccountScript(address: Address, tag: TagT): Option[AccountScriptInfo] = accountScripts.get(address, tag)
-  def replaceAccountScript(account: PublicKey, height: Int, newScript: ByteString): Set[TagT] = {
+  def replaceAccountScript(height: Int, account: PublicKey, newScript: ByteString): Set[TagT] = {
     val address = account.toAddress(chainId)
     accountScripts.replaceIfKnown(address) { _ =>
       log.debug(s"[$address] Updated account script")
@@ -179,10 +179,11 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
   }
 
   def getPortfolio(address: Address, tag: TagT): Option[Portfolio] = portfolios.get(address, tag)
-  def replaceBalance(height: Int, toReplace: StateUpdate.BalanceUpdate): Set[TagT] = {
-    val address = toReplace.address.toAddress
+  // TODO batch balance updates
+  def replaceBalance(height: Int, update: StateUpdate.BalanceUpdate): Set[TagT] = {
+    val address = update.address.toAddress
     portfolios.replaceIfKnown(address) { mayBeOrig =>
-      val (asset, after) = toAssetAndAmount(toReplace.getAmountAfter)
+      val (asset, after) = toAssetAndAmount(update.getAmountAfter)
       log.debug(s"[$address, $asset] Updated balance: $after")
 
       val orig = mayBeOrig.getOrElse(Portfolio.empty)
@@ -193,11 +194,11 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
         .tap(r => caches.setBalances(address, height, BlockchainData.loaded(r)))
     }
   }
-  def replaceLeasing(height: Int, toReplace: StateUpdate.LeasingUpdate): Set[TagT] = {
-    val address = toReplace.address.toAddress
+  def replaceLeasing(height: Int, update: StateUpdate.LeasingUpdate): Set[TagT] = {
+    val address = update.address.toAddress
     portfolios.replaceIfKnown(address) { orig =>
       log.debug(s"[$address] Updated leasing")
-      Some(orig.getOrElse(Portfolio.empty).copy(lease = LeaseBalance(toReplace.inAfter, toReplace.outAfter)))
+      Some(orig.getOrElse(Portfolio.empty).copy(lease = LeaseBalance(update.inAfter, update.outAfter)))
         .tap(r => caches.setBalances(address, height, BlockchainData.loaded(r)))
     }
   }
@@ -226,7 +227,7 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
       }
 
   // Got a transaction, got a rollback, same transaction on new height/failed/removed
-  def replaceTransactionMeta(pbTxId: ByteString, height: Int): Set[TagT] = {
+  def replaceTransactionMeta(height: Int, pbTxId: ByteString): Set[TagT] = {
     val txId = TransactionId(pbTxId.toByteStr)
     transactions.replaceIfKnown(txId) { mayBeOrig =>
       log.debug(s"[$txId] Updated transaction")
