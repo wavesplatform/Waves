@@ -218,14 +218,14 @@ class PureFunctionsRebenchmark {
 
 object PureFunctionsRebenchmark {
   val context: EvaluationContext[Environment, Id] =
-    lazyContexts(DirectiveSet(V5, Account, Expression).explicitGet())()
+    lazyContexts(DirectiveSet(V5, Account, Expression).explicitGet() -> true)()
       .evaluationContext(Common.emptyBlockchainEnvironment())
 
   val eval: EXPR => (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
-    v1.eval(context, _, V4, true)
+    v1.eval(context, _, V4)
 
   val evalV5: EXPR => (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
-    v1.eval(context, _, V5, true)
+    v1.eval(context, _, V5)
 
   def randomBytes(length: Int): Array[Byte] = {
     val bytes = new Array[Byte](length)

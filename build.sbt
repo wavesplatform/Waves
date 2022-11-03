@@ -194,7 +194,6 @@ checkPRRaw := Def
   .sequential(
     `waves-node` / clean,
     Def.task {
-      (Test / compile).value
       (`lang-tests` / Test / test).value
       (`repl-jvm` / Test / test).value
       (`lang-js` / Compile / fastOptJS).value
@@ -203,6 +202,7 @@ checkPRRaw := Def
       (node / Test / test).value
       (`repl-js` / Compile / fastOptJS).value
       (`node-it` / Test / compile).value
+      (benchmark / Test / compile).value
     }
   )
   .value

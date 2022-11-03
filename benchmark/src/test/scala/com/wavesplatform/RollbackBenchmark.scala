@@ -7,11 +7,11 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
-import com.wavesplatform.database.{openDB, LevelDBWriter}
+import com.wavesplatform.common.utils.*
+import com.wavesplatform.database.{LevelDBWriter, openDB}
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.{Diff, Portfolio}
-import com.wavesplatform.transaction.{GenesisTransaction, Proofs}
+import com.wavesplatform.transaction.{GenesisTransaction, Proofs, TxDecimals, TxPositiveAmount}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.utils.{NTP, ScorexLogging}
@@ -40,11 +40,11 @@ object RollbackBenchmark extends ScorexLogging {
         issuer.publicKey,
         ByteString.copyFromUtf8("asset-" + i),
         ByteString.EMPTY,
-        100000e2.toLong,
-        2.toByte,
+        TxPositiveAmount.unsafeFrom(100000e2.toLong),
+        TxDecimals.unsafeFrom(2.toByte),
         false,
         None,
-        1e8.toLong,
+        TxPositiveAmount.unsafeFrom(1e8.toLong),
         time.getTimestamp(),
         Proofs(ByteStr(new Array[Byte](64))),
         AddressScheme.current.chainId

@@ -1,3 +1,5 @@
+package com.wavesplatform
+
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V6}
 import utest.{TestSuite, assert}
 
