@@ -226,10 +226,10 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
       }
 
   // Got a transaction, got a rollback, same transaction on new height/failed/removed
-  def replaceTransactionMeta(pbId: ByteString, height: Int): Set[TagT] = {
-    val id = TransactionId(pbId.toByteStr)
-    transactions.replaceIfKnown(id) { mayBeOrig =>
-      log.debug(s"[$id] Updated transaction")
+  def replaceTransactionMeta(pbTxId: ByteString, height: Int): Set[TagT] = {
+    val txId = TransactionId(pbTxId.toByteStr)
+    transactions.replaceIfKnown(txId) { mayBeOrig =>
+      log.debug(s"[$txId] Updated transaction")
       val (_, tx) = mayBeOrig.getOrElse((TxMeta.empty, None))
       Some(
         (
@@ -241,7 +241,7 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
           tx
         )
       )
-        .tap(r => caches.setTransaction(id, BlockchainData.loaded(r)))
+        .tap(r => caches.setTransaction(txId, BlockchainData.loaded(r)))
     }
   }
 

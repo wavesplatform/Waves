@@ -6,7 +6,6 @@ import com.wavesplatform.collections.syntax.*
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.events.protobuf.{BlockchainUpdated, StateUpdate}
-import com.wavesplatform.protobuf.transaction.SignedTransaction
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 
@@ -14,10 +13,9 @@ case class BlockchainUpdatedDiff(
     newHeight: Int = 0,
     assets: Map[ByteString, StateUpdate.AssetStateUpdate] = Map.empty,
     balances: Map[ByteString, StateUpdate.BalanceUpdate] = Map.empty,
-    leasingUpdates: Map[ByteString, StateUpdate.LeasingUpdate] = Map.empty,
+    leasingForAddress: Map[ByteString, StateUpdate.LeasingUpdate] = Map.empty,
     dataEntries: Map[(ByteString, String), StateUpdate.DataEntryUpdate] = Map.empty,
     updatedAccountScriptsByPk: Map[ByteString, ByteString] = Map.empty, // PK -> script, TODO: txId?
-    transactions: Map[ByteString, SignedTransaction] = Map.empty,
     newTransactionIds: Seq[ByteString] = Nil,
     removedTransactionIds: Seq[ByteString] = Nil
 )
@@ -60,7 +58,7 @@ object BlockchainUpdatedDiff {
       balances = orig.balances.combineByKeys(stateUpdates.flatMap(_.balances).map(x => x.address -> x)) { (orig, update) =>
         orig.copy(amountAfter = update.amountAfter)
       },
-      leasingUpdates = orig.leasingUpdates.combineByKeys(stateUpdates.flatMap(_.leasingForAddress).map(x => x.address -> x)) { (orig, update) =>
+      leasingForAddress = orig.leasingForAddress.combineByKeys(stateUpdates.flatMap(_.leasingForAddress).map(x => x.address -> x)) { (orig, update) =>
         orig.copy(inAfter = update.inAfter, outAfter = update.outAfter)
       },
       dataEntries =
