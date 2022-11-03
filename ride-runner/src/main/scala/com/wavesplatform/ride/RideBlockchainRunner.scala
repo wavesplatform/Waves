@@ -14,9 +14,9 @@ import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.resources.*
 import com.wavesplatform.ride.blockchain.caches.LevelDbBlockchainCaches
-import com.wavesplatform.ride.blockchain.{RideBlockchain, SharedBlockchainStorage}
+import com.wavesplatform.ride.blockchain.{BlockchainState, BlockchainUpdatedDiff, RideBlockchain, SharedBlockchainStorage}
 import com.wavesplatform.ride.input.RunnerRequest
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.Scheduler
 import play.api.libs.json.JsObject
@@ -114,7 +114,7 @@ object RideBlockchainRunner extends ScorexLogging {
       log.info("Warm up caches...") // Also helps to figure out, which data is used by a script
       runScripts(blockchainStorage.height, allScriptIndices)
 
-      val start             = blockchainStorage.height - 2
+      val start             = Height(blockchainStorage.height - 2)
       val lastHeightAtStart = blockchainApi.getCurrentBlockchainHeight()
       log.info(s"Current blockchain height: $lastHeightAtStart")
 
@@ -123,23 +123,32 @@ object RideBlockchainRunner extends ScorexLogging {
 
       val events = blockchainApi.stream
         .takeWhile {
-          case Event.Closed      => false
           case Event.Next(event) => event.getUpdate.height < end
-          case _                 => false
+          case Event.Closed =>
+            log.info("Blockchain stream closed")
+            false
+          case Event.Failed(error) =>
+            log.error("Blockchain stream failed", error)
+            false
         }
-        .foreach {
-          case Event.Failed(error) => println(error)
-          case Event.Closed        => println("Closed")
-          case Event.Next(event) =>
-            val update = event.getUpdate
-            val h      = update.height
-            update.update match {
-              case Update.Append(append) =>
-                val txs = append.body match {
-                  case Body.Block(block)           => block.getBlock.transactions
-                  case Body.MicroBlock(microBlock) => microBlock.getMicroBlock.getMicroBlock.transactions
-                  case Body.Empty                  => Seq.empty
-                }
+        .collect {
+          // TODO
+          case Event.Next(event) => event
+        }
+        .mapAccumulate(BlockchainState.Working(start): BlockchainState)(BlockchainState.apply)
+        .foreach { batchedEvents =>
+          val diff = batchedEvents.map(_.getUpdate).foldLeft(BlockchainUpdatedDiff())(BlockchainUpdatedDiff.append)
+
+          val event  = batchedEvents.head
+          val update = event.getUpdate
+          val h      = update.height
+          update.update match {
+            case Update.Append(append) =>
+              val txs = append.body match {
+                case Body.Block(block)           => block.getBlock.transactions
+                case Body.MicroBlock(microBlock) => microBlock.getMicroBlock.getMicroBlock.transactions
+                case Body.Empty                  => Seq.empty
+              }
 
 //                log.info(
 //                  s"${h}: assets=${stateUpdate.assets.size}, balances=${stateUpdate.balances.size}, " +
@@ -147,59 +156,59 @@ object RideBlockchainRunner extends ScorexLogging {
 //                    s"dataUpdates=${dataUpdates.size}: ${dataUpdates.map(x => s"${x.key} -> ${x.value}").mkString(", ")}"
 //                )
 
-                // Almost all scripts use the height
-                val updatedByHeight = if (h > blockchainStorage.height) {
-                  blockchainStorage.setHeight(h)
-                  allScriptIndices
-                } else Set.empty[Int]
+              // Almost all scripts use the height
+              val updatedByHeight = if (h > blockchainStorage.height) {
+                blockchainStorage.setHeight(h)
+                allScriptIndices
+              } else Set.empty[Int]
 
-                val stateUpdate = (append.getStateUpdate +: append.transactionStateUpdates).view
-                val updated = updatedByHeight union
-                  stateUpdate.flatMap(_.assets).map(_.getAfter).foldLeft(Set.empty[Int]) { case (r, x) =>
-                    r union blockchainStorage.replaceAssetDescription(h, x)
-                  } union
-                  stateUpdate.flatMap(_.balances).foldLeft(Set.empty[Int]) { case (r, x) =>
-                    r union blockchainStorage.replaceBalance(h, x)
-                  } union
-                  stateUpdate.flatMap(_.leasingForAddress).foldLeft(Set.empty[Int]) {
-                    _ union blockchainStorage.replaceLeasing(h, _)
-                  } union
-                  stateUpdate.flatMap(_.dataEntries).foldLeft(Set.empty[Int]) { case (r, x) =>
-                    r union blockchainStorage.replaceAccountData(h, x)
-                  } union
-                  txs.view
-                    .map(_.transaction)
-                    .flatMap {
-                      case Transaction.WavesTransaction(tx) =>
-                        tx.data match {
-                          case Data.SetScript(txData) => (tx.senderPublicKey.toPublicKey, txData.script).some
-                          case _                      => none
-                        }
-                      case _ => none
-                    }
-                    .foldLeft(Set.empty[Int]) { case (r, (pk, script)) =>
-                      r union blockchainStorage.replaceAccountScript(pk, h, script)
-                    } union
-                  append.transactionIds.foldLeft(Set.empty[Int]) { case (r, x) =>
-                    r union blockchainStorage.replaceTransactionMeta(x, h)
+              val stateUpdate = (append.getStateUpdate +: append.transactionStateUpdates).view
+              val updated = updatedByHeight union
+                stateUpdate.flatMap(_.assets).map(_.getAfter).foldLeft(Set.empty[Int]) { case (r, x) =>
+                  r union blockchainStorage.replaceAssetDescription(h, x)
+                } union
+                stateUpdate.flatMap(_.balances).foldLeft(Set.empty[Int]) { case (r, x) =>
+                  r union blockchainStorage.replaceBalance(h, x)
+                } union
+                stateUpdate.flatMap(_.leasingForAddress).foldLeft(Set.empty[Int]) {
+                  _ union blockchainStorage.replaceLeasing(h, _)
+                } union
+                stateUpdate.flatMap(_.dataEntries).foldLeft(Set.empty[Int]) { case (r, x) =>
+                  r union blockchainStorage.replaceAccountData(h, x)
+                } union
+                txs.view
+                  .map(_.transaction)
+                  .flatMap {
+                    case Transaction.WavesTransaction(tx) =>
+                      tx.data match {
+                        case Data.SetScript(txData) => (tx.senderPublicKey.toPublicKey, txData.script).some
+                        case _                      => none
+                      }
+                    case _ => none
                   }
-
-                if (h >= lastHeightAtStart) {
-                  if (!started) {
-                    log.debug(s"[$h] Reached the current height, run all scripts")
-                    runScripts(h, allScriptIndices)
-                    started = true
-                  } else if (updated.isEmpty) {
-                    log.debug(s"[$h] Not updated")
-                  } else {
-                    log.debug(s"[$h] Updated for: ${updated.mkString(", ")}")
-                    runScripts(h, updated)
-                  }
+                  .foldLeft(Set.empty[Int]) { case (r, (pk, script)) =>
+                    r union blockchainStorage.replaceAccountScript(pk, h, script)
+                  } union
+                append.transactionIds.foldLeft(Set.empty[Int]) { case (r, x) =>
+                  r union blockchainStorage.replaceTransactionMeta(x, h)
                 }
 
-              case _: Update.Rollback => log.info("Rollback, ignore")
-              case Update.Empty       =>
-            }
+              if (h >= lastHeightAtStart) {
+                if (!started) {
+                  log.debug(s"[$h] Reached the current height, run all scripts")
+                  runScripts(h, allScriptIndices)
+                  started = true
+                } else if (updated.isEmpty) {
+                  log.debug(s"[$h] Not updated")
+                } else {
+                  log.debug(s"[$h] Updated for: ${updated.mkString(", ")}")
+                  runScripts(h, updated)
+                }
+              }
+
+            case _: Update.Rollback => log.info("Rollback, ignore")
+            case Update.Empty       =>
+          }
         }(Scheduler(commonScheduler))
 
       log.info(s"Watching blockchain updates from $start...")
