@@ -49,7 +49,7 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
 
   def getData(address: Address, key: String, tag: TagT): Option[DataEntry[_]] = data.get((address, key), tag)
 
-  def replaceAccountData(height: Int, update: StateUpdate.DataEntryUpdate): Set[TagT] = {
+  def setAccountData(height: Int, update: StateUpdate.DataEntryUpdate): Set[TagT] = {
     val address = update.address.toAddress
     val key     = update.getDataEntry.key
     data.replaceIfKnown((address, key)) { _ =>
@@ -68,7 +68,7 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
   }
 
   def getAccountScript(address: Address, tag: TagT): Option[AccountScriptInfo] = accountScripts.get(address, tag)
-  def replaceAccountScript(height: Int, account: PublicKey, newScript: ByteString): Set[TagT] = {
+  def setAccountScript(height: Int, account: PublicKey, newScript: ByteString): Set[TagT] = {
     val address = account.toAddress(chainId)
     accountScripts.replaceIfKnown(address) { _ =>
       log.debug(s"[$address] Updated account script")
@@ -137,7 +137,7 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
     )
   }
   def getAssetDescription(asset: IssuedAsset, tag: TagT): Option[AssetDescription] = assets.get(asset, tag)
-  def replaceAssetDescription(height: Int, update: StateUpdate.AssetDetails): Set[TagT] = {
+  def setAssetDescription(height: Int, update: StateUpdate.AssetDetails): Set[TagT] = {
     val asset = update.assetId.toIssuedAsset
     assets.replaceIfKnown(asset) { _ =>
       log.debug(s"[$asset] Updated asset")
@@ -180,7 +180,7 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
 
   def getPortfolio(address: Address, tag: TagT): Option[Portfolio] = portfolios.get(address, tag)
   // TODO batch balance updates
-  def replaceBalance(height: Int, update: StateUpdate.BalanceUpdate): Set[TagT] = {
+  def setBalance(height: Int, update: StateUpdate.BalanceUpdate): Set[TagT] = {
     val address = update.address.toAddress
     portfolios.replaceIfKnown(address) { mayBeOrig =>
       val (asset, after) = toAssetAndAmount(update.getAmountAfter)
@@ -227,7 +227,7 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
       }
 
   // Got a transaction, got a rollback, same transaction on new height/failed/removed
-  def replaceTransactionMeta(height: Int, pbTxId: ByteString): Set[TagT] = {
+  def setTransactionMeta(height: Int, pbTxId: ByteString): Set[TagT] = {
     val txId = TransactionId(pbTxId.toByteStr)
     transactions.replaceIfKnown(txId) { mayBeOrig =>
       log.debug(s"[$txId] Updated transaction")

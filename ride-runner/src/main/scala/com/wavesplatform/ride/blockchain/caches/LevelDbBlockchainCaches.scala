@@ -20,35 +20,6 @@ class LevelDbBlockchainCaches(db: DB) extends BlockchainCaches with ScorexLoggin
   private val lastAddressIdKey = CacheKeys.LastAddressId.mkKey(())
   private val lastAddressId    = new AtomicLong(db.readOnly(_.getOpt(lastAddressIdKey).getOrElse(-1L)))
 
-  // TODO caching from NODE
-  private def getOrMkAddressId(ro: ReadOnlyDB, address: Address): AddressId = {
-    val key = CacheKeys.AddressIds.mkKey(address)
-    ro.getOpt(key) match {
-      case Some(r) => r
-      case None =>
-        val newId = AddressId(lastAddressId.incrementAndGet())
-        db.readWrite { rw =>
-          log.trace(s"getOrMkAddressId($address): new $newId")
-          rw.put(key, newId)
-          rw.put(lastAddressIdKey, newId)
-        }
-        newId
-    }
-  }
-
-  private def getOrMkAddressId(rw: RW, address: Address): AddressId = {
-    val key = CacheKeys.AddressIds.mkKey(address)
-    rw.getOpt(key) match {
-      case Some(r) => r
-      case None =>
-        val newId = AddressId(lastAddressId.incrementAndGet())
-        log.trace(s"getOrMkAddressId($address): new $newId")
-        rw.put(key, newId)
-        rw.put(lastAddressIdKey, newId)
-        newId
-    }
-  }
-
   override def getAccountDataEntry(address: Address, key: String, maxHeight: Int): BlockchainData[DataEntry[_]] =
     db
       .readOnly { ro =>
@@ -206,6 +177,35 @@ class LevelDbBlockchainCaches(db: DB) extends BlockchainCaches with ScorexLoggin
   override def setTransaction(id: TransactionId, data: BlockchainData[(TxMeta, Option[Transaction])]): Unit = {
     db.readWrite { _.writeToDb(CacheKeys.Transactions.mkKey(id), data) }
     log.trace(s"setTransaction($id)")
+  }
+
+  // TODO caching from NODE
+  private def getOrMkAddressId(ro: ReadOnlyDB, address: Address): AddressId = {
+    val key = CacheKeys.AddressIds.mkKey(address)
+    ro.getOpt(key) match {
+      case Some(r) => r
+      case None =>
+        val newId = AddressId(lastAddressId.incrementAndGet())
+        db.readWrite { rw =>
+          log.trace(s"getOrMkAddressId($address): new $newId")
+          rw.put(key, newId)
+          rw.put(lastAddressIdKey, newId)
+        }
+        newId
+    }
+  }
+
+  private def getOrMkAddressId(rw: RW, address: Address): AddressId = {
+    val key = CacheKeys.AddressIds.mkKey(address)
+    rw.getOpt(key) match {
+      case Some(r) => r
+      case None =>
+        val newId = AddressId(lastAddressId.incrementAndGet())
+        log.trace(s"getOrMkAddressId($address): new $newId")
+        rw.put(key, newId)
+        rw.put(lastAddressIdKey, newId)
+        newId
+    }
   }
 }
 

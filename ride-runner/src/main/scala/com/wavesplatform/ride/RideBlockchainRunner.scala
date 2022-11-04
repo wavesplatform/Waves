@@ -143,22 +143,22 @@ object RideBlockchainRunner extends ScorexLogging {
 
           val updated = updatedByHeight union
             diff.assetDetails.values.foldLeft(Set.empty[Int]) { case (r, update) =>
-              r union blockchainStorage.replaceAssetDescription(update.height, update.value.getAfter)
+              r union blockchainStorage.setAssetDescription(update.height, update.value.getAfter)
             } union
             diff.balances.values.foldLeft(Set.empty[Int]) { case (r, update) =>
-              r union blockchainStorage.replaceBalance(update.height, update.value)
+              r union blockchainStorage.setBalance(update.height, update.value)
             } union
             diff.leasingForAddress.values.foldLeft(Set.empty[Int]) { case (r, update) =>
               r union blockchainStorage.replaceLeasing(update.height, update.value)
             } union
             diff.dataEntries.values.foldLeft(Set.empty[Int]) { case (r, update) =>
-              r union blockchainStorage.replaceAccountData(update.height, update.value)
+              r union blockchainStorage.setAccountData(update.height, update.value)
             } union
             diff.updatedAccountScriptsByPk.foldLeft(Set.empty[Int]) { case (r, (pk, script)) =>
-              r union blockchainStorage.replaceAccountScript(script.height, pk.toPublicKey, script.value)
+              r union blockchainStorage.setAccountScript(script.height, pk.toPublicKey, script.value)
             } union
             diff.newTransactionIds.foldLeft(Set.empty[Int]) { case (r, update) =>
-              r union blockchainStorage.replaceTransactionMeta(update.height, update.value)
+              r union blockchainStorage.setTransactionMeta(update.height, update.value)
             } // TODO removedTransactionIds
 
           if (h >= lastHeightAtStart) {
