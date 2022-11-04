@@ -157,7 +157,7 @@ class ExpressionCompilerV1Test extends PropSpec {
     ExpressionCompiler(compilerContextV4, expr4) should produce(
       "Can't match inferred types of T over " +
         "(((Int|String, Boolean|Int|String), (Boolean, Int|String)), Boolean|Int|String), " +
-        "(((Int, Boolean), (Int|String, Boolean|Int|String)), Int|String) in 102-154"
+        "(((Int, Boolean), (Int|String, Boolean|Int|String)), Int|String) in 102-104"
     )
   }
 
