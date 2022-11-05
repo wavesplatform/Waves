@@ -40,7 +40,7 @@ object TransactionSynchronizer extends LazyLogging {
         case (_, tx) => transactionIsNew(tx.id())
       }
       .whileBusyBuffer(OverflowStrategy.DropNew(settings.maxQueueSize))
-      .mapParallelUnorderedF(settings.maxThreads) {
+      .mapParallelUnorderedF(settings.poolSize) {
         case (channel, tx) => transactionValidator.validateAndBroadcast(tx, Some(channel))
       }
       .subscribe()
