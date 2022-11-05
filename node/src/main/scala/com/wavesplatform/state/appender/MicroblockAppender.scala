@@ -34,7 +34,7 @@ object MicroblockAppender extends ScorexLogging {
             s"Removing mined txs from ${microBlock.stringRepr(totalBlockId)}: ${microBlock.transactionData.map(_.id()).mkString(", ")}"
           }
           utxStorage.removeAll(microBlock.transactionData)
-          utxStorage.cleanUnconfirmed()
+          utxStorage.runCleanup()
           totalBlockId
         }
     }).executeOn(scheduler)
