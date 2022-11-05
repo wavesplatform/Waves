@@ -25,7 +25,5 @@ object SynchronizationSettings {
 
   case class HistoryReplierSettings(maxMicroBlockCacheSize: Int, maxBlockCacheSize: Int)
 
-  case class UtxSynchronizerSettings(networkTxCacheSize: Int, maxThreads: Option[Int], maxQueueSize: Int, allowTxRebroadcasting: Boolean) {
-    def poolSize: Int = maxThreads.getOrElse(Math.max(Runtime.getRuntime.availableProcessors() / 4, 1).min(4))
-  }
+  case class UtxSynchronizerSettings(networkTxCacheSize: Int, maxThreads: Int, maxQueueSize: Int, allowTxRebroadcasting: Boolean)
 }

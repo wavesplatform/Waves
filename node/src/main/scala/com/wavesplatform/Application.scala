@@ -133,7 +133,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       Schedulers.timeBoundedFixedPool(
         timer,
         5.seconds,
-        settings.synchronizationSettings.utxSynchronizer.poolSize,
+        settings.synchronizationSettings.utxSynchronizer.maxThreads,
         "utx-time-bounded-tx-validator",
         reporter = utxSynchronizerLogger.trace("Uncaught exception in UTX Synchronizer", _)
       )
