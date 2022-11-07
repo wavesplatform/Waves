@@ -30,13 +30,14 @@ trait BlockchainCaches {
 
   def getAssetDescription(asset: Asset.IssuedAsset, maxHeight: Int): BlockchainData[AssetDescription]
   def setAssetDescription(asset: Asset.IssuedAsset, height: Int, data: BlockchainData[AssetDescription]): Unit
-  def removeAssetDescription(asset: Asset.IssuedAsset, fromHeight: Int): Option[BlockchainData[AssetDescription]]
+  def removeAssetDescription(asset: Asset.IssuedAsset, fromHeight: Int): BlockchainData[AssetDescription]
 
   def resolveAlias(alias: Alias): BlockchainData[Address]
   def setAlias(alias: Alias, data: BlockchainData[Address]): Unit
 
   def getBalances(address: Address, maxHeight: Int): BlockchainData[Portfolio]
   def setBalances(address: Address, height: Int, data: BlockchainData[Portfolio]): Unit
+  def removeBalances(address: Address, fromHeight: Int): BlockchainData[Portfolio]
 
   def getTransaction(id: TransactionId): BlockchainData[(TxMeta, Option[Transaction])]
   def setTransaction(id: TransactionId, data: BlockchainData[(TxMeta, Option[Transaction])]): Unit
@@ -63,12 +64,14 @@ object EmptyBlockchainCaches extends BlockchainCaches {
 
   override def getAssetDescription(asset: Asset.IssuedAsset, maxHeight: Int): BlockchainData[AssetDescription]          = BlockchainData.Unknown
   override def setAssetDescription(asset: Asset.IssuedAsset, height: Int, data: BlockchainData[AssetDescription]): Unit = {}
+  override def removeAssetDescription(asset: Asset.IssuedAsset, fromHeight: Int): BlockchainData[AssetDescription]      = BlockchainData.Unknown
 
   override def resolveAlias(alias: Alias): BlockchainData[Address]         = BlockchainData.Unknown
   override def setAlias(alias: Alias, data: BlockchainData[Address]): Unit = {}
 
   override def getBalances(address: Address, maxHeight: Int): BlockchainData[Portfolio]          = BlockchainData.Unknown
   override def setBalances(address: Address, height: Int, data: BlockchainData[Portfolio]): Unit = {}
+  override def removeBalances(address: Address, fromHeight: Int): BlockchainData[Portfolio]      = BlockchainData.Unknown
 
   override def getTransaction(id: TransactionId): BlockchainData[(TxMeta, Option[Transaction])]             = BlockchainData.Unknown
   override def setTransaction(id: TransactionId, data: BlockchainData[(TxMeta, Option[Transaction])]): Unit = {}

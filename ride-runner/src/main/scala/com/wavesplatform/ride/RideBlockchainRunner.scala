@@ -226,14 +226,14 @@ object RideBlockchainRunner extends ScorexLogging {
               .flatMap(_.assets)
               .map(_.getAfter)
               .foldLeft(_) { case (r, curr) =>
-                r.withAppendResult(blockchainStorage.appendAssetDescription(h, curr))
+                r.withAppendResult(blockchainStorage.assets.append(h, curr))
               }
           )
           .pipe(stateUpdate.flatMap(_.balances).foldLeft(_) { case (r, x) =>
-            r.withAppendResult(blockchainStorage.appendBalance(h, x))
+            r.withAppendResult(blockchainStorage.portfolios.append(h, x))
           })
           .pipe(stateUpdate.flatMap(_.leasingForAddress).foldLeft(_) { case (r, x) =>
-            r.withAppendResult(blockchainStorage.appendLeasing(h, x))
+            r.withAppendResult(blockchainStorage.portfolios.append(h, x))
           })
           .pipe(stateUpdate.flatMap(_.dataEntries).foldLeft(_) { case (r, x) =>
             r.withAppendResult(blockchainStorage.appendAccountData(h, x))
@@ -261,7 +261,7 @@ object RideBlockchainRunner extends ScorexLogging {
         val stateUpdate = rollback.getRollbackStateUpdate
         withUpdatedHeight
           .pipe(stateUpdate.assets.foldLeft(_) { case (r, curr) =>
-            r.withRollbackResult(blockchainStorage.rollbackAssetDescription(h, curr.getAfter))
+            r.withRollbackResult(blockchainStorage.assets.rollback(h, curr))
           })
     }
   }

@@ -134,6 +134,17 @@ class LevelDbBlockchainCaches(db: DB) extends BlockchainCaches with ScorexLoggin
     log.trace(s"setAssetDescription($asset, $height)")
   }
 
+  override def removeAssetDescription(asset: Asset.IssuedAsset, fromHeight: Int): BlockchainData[AssetDescription] =
+    db
+      .readWrite { rw =>
+        rw.removeAfterAndGetLatestExisted(
+          CacheKeys.AssetDescriptionsHistory.mkKey(asset),
+          h => CacheKeys.AssetDescriptions.mkKey((asset, h)),
+          fromHeight
+        )
+      }
+      .tap { _ => log.trace(s"removeAssetDescription($asset, $fromHeight)") }
+
   override def resolveAlias(alias: Alias): BlockchainData[Address] =
     db
       .readOnly { _.readFromDb(CacheKeys.Aliases.mkKey(alias)) }
@@ -237,6 +248,25 @@ object LevelDbBlockchainCaches {
     ): Unit = {
       self.put(historyKey, self.getOpt(historyKey).getOrElse(Seq.empty).prepended(height))
       self.put(dataOnHeightKey(height), data.mayBeValue)
+    }
+
+    def removeAfterAndGetLatestExisted[T](
+        historyKey: Key[Seq[Int]],
+        dataOnHeightKey: Int => Key[Option[T]],
+        fromHeight: Int
+    ): BlockchainData[T] = {
+      val history = self.getOpt(historyKey).getOrElse(Seq.empty)
+      if (history.isEmpty) BlockchainData.Unknown
+      else {
+        val (removedHistory, updatedHistory) = history.partition(_ >= fromHeight) // TODO binary search
+        self.put(historyKey, updatedHistory) // not deleting, because it will be added with a high probability
+        removedHistory.foreach(h => self.delete(dataOnHeightKey(h)))
+
+        updatedHistory.headOption match {
+          case None    => BlockchainData.Unknown
+          case Some(h) => self.readFromDb(dataOnHeightKey(h))
+        }
+      }
     }
 
     def writeToDb[T](dbKey: Key[Option[T]], data: BlockchainData[T]): Unit = {

@@ -1,7 +1,7 @@
 package com.wavesplatform.ride.blockchain
 
 import cats.syntax.option.*
-import com.google.protobuf.{ByteString, UnsafeByteOperations}
+import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
@@ -12,28 +12,14 @@ import com.wavesplatform.grpc.BlockchainGrpcApi
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.protobuf.ByteStringExt
-import com.wavesplatform.protobuf.transaction.PBAmounts.toAssetAndAmount
 import com.wavesplatform.protobuf.transaction.PBTransactions.{toVanillaDataEntry, toVanillaScript}
 import com.wavesplatform.ride.blockchain.caches.BlockchainCaches
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state.{
-  AccountScriptInfo,
-  AssetDescription,
-  AssetScriptInfo,
-  DataEntry,
-  Height,
-  LeaseBalance,
-  Portfolio,
-  TransactionId,
-  TxMeta
-}
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.state.{AccountScriptInfo, DataEntry, Height, TransactionId, TxMeta}
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
-import com.wavesplatform.transaction.{Asset, EthereumTransaction, Transaction}
+import com.wavesplatform.transaction.{EthereumTransaction, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 
-import java.nio.charset.StandardCharsets
-import scala.collection.mutable
 import scala.util.chaining.scalaUtilChainingOps
 
 class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: BlockchainCaches, blockchainApi: BlockchainGrpcApi)
@@ -130,88 +116,7 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
     )(())
       .getOrElse(throw new RuntimeException("Impossible: activated features are empty"))
 
-//  private val assets = RideData.anyRefMap[IssuedAsset, AssetDescription, TagT] {
-//    load[IssuedAsset, AssetDescription](
-//      fromCache = caches.getAssetDescription(_, height),
-//      fromBlockchain = blockchainApi.getAssetDescription,
-//      updateCache = (key, value) => caches.setAssetDescription(key, height, value)
-//    )
-//  }
-  private val assets = mutable.AnyRefMap.empty[IssuedAsset, TaggedData[BlockchainData[AssetDescription], TagT]]
-  private val assetsLoader = load[IssuedAsset, AssetDescription](
-    fromCache = caches.getAssetDescription(_, height),
-    fromBlockchain = blockchainApi.getAssetDescription,
-    updateCache = (key, value) => caches.setAssetDescription(key, height, value)
-  )
-  def getAssetDescription(asset: IssuedAsset, tag: TagT): Option[AssetDescription] = {
-    assets
-      .updateWith(asset) {
-        case Some(orig) => Some(orig.withTag(tag))
-        case None       => Some(TaggedData(BlockchainData.loaded[AssetDescription](assetsLoader(asset)), Set(tag)))
-      }
-      .flatMap(_.data.mayBeValue)
-  }
-
-  def reloadAssetDescription(height: Int, asset: IssuedAsset): Unit = {
-    assets
-      .updateWith(asset) {
-        case Some(orig) =>
-          val loaded = BlockchainData.loaded[AssetDescription](blockchainApi.getAssetDescription(asset))
-          caches.setAssetDescription(asset, height, loaded)
-          orig.copy(data = loaded).some
-
-        case None => None
-      }
-  }
-
-  def appendAssetDescription(height: Int, update: StateUpdate.AssetDetails): AppendResult[TagT] = {
-    val asset = update.assetId.toIssuedAsset
-    assets.get(asset) match {
-      case None => AppendResult.ignored
-      case Some(orig) =>
-        val updated = BlockchainData.loaded {
-          log.debug(s"[$asset] Updated asset")
-          Some(
-            AssetDescription(
-              originTransactionId = asset.id,
-              issuer = update.issuer.toPublicKey,
-              name = UnsafeByteOperations.unsafeWrap(update.name.getBytes(StandardCharsets.UTF_8)),
-              description = UnsafeByteOperations.unsafeWrap(update.description.getBytes(StandardCharsets.UTF_8)),
-              decimals = update.decimals,
-              reissuable = update.reissuable,
-              totalVolume = update.volume,
-              lastUpdatedAt = Height(update.lastUpdated),
-              script = for {
-                pbScript <- update.scriptInfo
-                script   <- toVanillaScript(pbScript.script)
-              } yield AssetScriptInfo(script, pbScript.complexity),
-              sponsorship = update.sponsorship,
-              nft = update.nft
-            )
-          )
-            .tap(r => caches.setAssetDescription(asset, height, BlockchainData.loaded(r)))
-        }
-        if (updated == orig.data) AppendResult.ignored
-        else {
-          assets.update(asset, orig.copy(data = updated))
-          AppendResult.appended(DataKey.AssetDescriptionDataKey(asset), orig.tags)
-        }
-    }
-  }
-
-  def rollbackAssetDescription(rollbackHeight: Int, afterRollback: StateUpdate.AssetDetails): RollbackResult[TagT] = {
-    val asset = afterRollback.assetId.toIssuedAsset
-    assets.get(asset) match {
-      case None => RollbackResult.ignored
-      case Some(orig) =>
-        caches.removeAssetDescription(asset, rollbackHeight + 1) match {
-          case None => RollbackResult.uncertain(DataKey.AssetDescriptionDataKey(asset), orig.tags)
-          case Some(latest) =>
-            assets.update(asset, orig.copy(data = latest))
-            RollbackResult.rolledBack(orig.tags)
-        }
-    }
-  }
+  val assets = new AssetDataStorage[TagT](caches, blockchainApi)
 
   // It seems, we don't need to update this. Only for some optimization needs
   private val aliases = RideData.anyRefMap[Alias, Address, TagT] {
@@ -220,38 +125,7 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
 
   def getAlias(alias: Alias, tag: TagT): Option[Address] = aliases.get(alias, tag)
 
-  private val portfolios = RideData.anyRefMap[Address, Portfolio, TagT] {
-    load[Address, Portfolio](
-      fromCache = caches.getBalances(_, height),
-      fromBlockchain = blockchainApi.getBalances(_).some,
-      updateCache = (key, value) => caches.setBalances(key, height, value)
-    )
-  }
-
-  def getPortfolio(address: Address, tag: TagT): Option[Portfolio] = portfolios.get(address, tag)
-  // TODO batch balance updates
-  def appendBalance(height: Int, update: StateUpdate.BalanceUpdate): AppendResult[TagT] = {
-    val address = update.address.toAddress
-    portfolios.replaceIfKnown(address) { mayBeOrig =>
-      val (asset, after) = toAssetAndAmount(update.getAmountAfter)
-      log.debug(s"[$address, $asset] Updated balance: $after")
-
-      val orig = mayBeOrig.getOrElse(Portfolio.empty)
-      Some(asset match {
-        case Asset.Waves        => orig.copy(balance = after)
-        case asset: IssuedAsset => orig.copy(assets = orig.assets.updated(asset, after))
-      })
-        .tap(r => caches.setBalances(address, height, BlockchainData.loaded(r)))
-    }
-  }
-  def appendLeasing(height: Int, update: StateUpdate.LeasingUpdate): AppendResult[TagT] = {
-    val address = update.address.toAddress
-    portfolios.replaceIfKnown(address) { orig =>
-      log.debug(s"[$address] Updated leasing")
-      Some(orig.getOrElse(Portfolio.empty).copy(lease = LeaseBalance(update.inAfter, update.outAfter)))
-        .tap(r => caches.setBalances(address, height, BlockchainData.loaded(r)))
-    }
-  }
+  val portfolios = new PortfolioDataStorage[TagT](caches, blockchainApi)
 
   private val transactions = RideData.anyRefMap[TransactionId, (TxMeta, Option[Transaction]), TagT] {
     load(caches.getTransaction, blockchainApi.getTransferLikeTransaction, caches.setTransaction)

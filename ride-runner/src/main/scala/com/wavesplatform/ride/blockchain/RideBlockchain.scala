@@ -53,7 +53,7 @@ class RideBlockchain[TagT](storage: SharedBlockchainStorage[TagT], tag: TagT) ex
   override def activatedFeatures: Map[Short, Int] = storage.activatedFeatures
 
   // Ride: assetInfo
-  override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription] = storage.getAssetDescription(id, tag)
+  override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription] = storage.assets.get(height, id, tag)
 
   // Ride (indirectly): asset script validation
   override def assetScript(id: Asset.IssuedAsset): Option[AssetScriptInfo] = assetDescription(id).flatMap(_.script)
@@ -62,7 +62,7 @@ class RideBlockchain[TagT](storage: SharedBlockchainStorage[TagT], tag: TagT) ex
   override def resolveAlias(a: Alias): Either[ValidationError, Address] =
     storage.getAlias(a, tag).toRight(AliasDoesNotExist(a): ValidationError)
 
-  private def withPortfolios(address: Address): Portfolio = storage.getPortfolio(address, tag).getOrElse(Portfolio.empty)
+  private def withPortfolios(address: Address): Portfolio = storage.portfolios.get(height, address, tag).getOrElse(Portfolio.empty)
 
   // Ride: wavesBalance
   override def leaseBalance(address: Address): LeaseBalance = withPortfolios(address).lease
