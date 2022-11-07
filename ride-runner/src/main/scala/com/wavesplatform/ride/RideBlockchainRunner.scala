@@ -1,15 +1,21 @@
 package com.wavesplatform.ride
 
+import cats.syntax.option.*
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.Application
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.database.openDB
+import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
+import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
+import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.grpc.BlockchainGrpcApi.Event
 import com.wavesplatform.grpc.{BlockchainGrpcApi, GrpcClientSettings, GrpcConnector}
 import com.wavesplatform.protobuf.ByteStringExt
+import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
+import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.resources.*
 import com.wavesplatform.ride.blockchain.caches.LevelDbBlockchainCaches
-import com.wavesplatform.ride.blockchain.{BlockchainState, BlockchainUpdatedDiff, RideBlockchain, SharedBlockchainStorage}
+import com.wavesplatform.ride.blockchain.*
 import com.wavesplatform.ride.input.RunnerRequest
 import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.utils.ScorexLogging
@@ -21,6 +27,7 @@ import java.util.concurrent.Executors
 import scala.concurrent.Await
 import scala.concurrent.duration.{Duration, DurationInt}
 import scala.io.Source
+import scala.util.chaining.*
 import scala.util.{Failure, Using}
 
 object RideBlockchainRunner extends ScorexLogging {
@@ -132,45 +139,26 @@ object RideBlockchainRunner extends ScorexLogging {
         }
         .mapAccumulate(BlockchainState.Working(start): BlockchainState)(BlockchainState.apply)
         .foreach { batchedEvents =>
-          val diff = batchedEvents.map(_.getUpdate).foldLeft(BlockchainUpdatedDiff())(BlockchainUpdatedDiff.append)
-          val h    = diff.newHeight
+          val processResult = batchedEvents.foldLeft(ProcessResult()) { case (r, event) =>
+            process(blockchainStorage, allScriptIndices, r, event)
+          }
 
-          // Almost all scripts use the height
-          val updatedByHeight = if (h > blockchainStorage.height) {
-            blockchainStorage.setHeight(h)
-            allScriptIndices
-          } else Set.empty[Int]
-
-          val updated = updatedByHeight union
-            diff.assetDetails.values.foldLeft(Set.empty[Int]) { case (r, update) =>
-              r union blockchainStorage.setAssetDescription(update.height, update.value.getAfter)
-            } union
-            diff.balances.values.foldLeft(Set.empty[Int]) { case (r, update) =>
-              r union blockchainStorage.setBalance(update.height, update.value)
-            } union
-            diff.leasingForAddress.values.foldLeft(Set.empty[Int]) { case (r, update) =>
-              r union blockchainStorage.replaceLeasing(update.height, update.value)
-            } union
-            diff.dataEntries.values.foldLeft(Set.empty[Int]) { case (r, update) =>
-              r union blockchainStorage.setAccountData(update.height, update.value)
-            } union
-            diff.updatedAccountScriptsByPk.foldLeft(Set.empty[Int]) { case (r, (pk, script)) =>
-              r union blockchainStorage.setAccountScript(script.height, pk.toPublicKey, script.value)
-            } union
-            diff.newTransactionIds.foldLeft(Set.empty[Int]) { case (r, update) =>
-              r union blockchainStorage.setTransactionMeta(update.height, update.value)
-            } // TODO removedTransactionIds
+          val h = processResult.newHeight
+          if (processResult.uncertainKeys.nonEmpty) {
+            log.debug(s"Getting data for keys: ${processResult.uncertainKeys.toVector.map(_.toString).sorted.mkString(", ")}")
+            processResult.uncertainKeys.foreach { _.reload(blockchainStorage, h) }
+          }
 
           if (h >= lastHeightAtStart) {
             if (!started) {
               log.debug(s"[$h] Reached the current height, run all scripts")
               runScripts(h, allScriptIndices)
               started = true
-            } else if (updated.isEmpty) {
+            } else if (processResult.affectedScripts.isEmpty) {
               log.debug(s"[$h] Not updated")
             } else {
-              log.debug(s"[$h] Updated for: ${updated.mkString(", ")}")
-              runScripts(h, updated)
+              log.debug(s"[$h] Updated for: ${processResult.affectedScripts.mkString(", ")}")
+              runScripts(h, processResult.affectedScripts)
             }
           }
         }(Scheduler(commonScheduler))
@@ -184,6 +172,97 @@ object RideBlockchainRunner extends ScorexLogging {
     r match {
       case Failure(e) => log.error("Got an error", e)
       case _          => log.info("Done")
+    }
+  }
+
+  // TODO don't calculate affectedScripts if all scripts are affected
+  private case class ProcessResult(
+      /*allScripts: Set[Int], */ newHeight: Int = 0,
+      affectedScripts: Set[Int] = Set.empty,
+      uncertainKeys: Set[DataKey] = Set.empty
+  ) {
+    def withAppendResult(x: AppendResult[Int]): ProcessResult =
+      copy(
+        affectedScripts = affectedScripts ++ x.affectedTags,
+        uncertainKeys = x.mayBeChangedKey.foldLeft(uncertainKeys)(_ - _)
+      )
+
+    def withRollbackResult(x: RollbackResult[Int]): ProcessResult =
+      copy(
+        affectedScripts = affectedScripts ++ x.affectedTags,
+        uncertainKeys = uncertainKeys ++ x.mayBeUncertainKey
+      )
+  }
+
+  private def process(
+      blockchainStorage: SharedBlockchainStorage[Int],
+      allScriptIndices: Set[Int],
+      prev: ProcessResult,
+      event: SubscribeEvent
+  ): ProcessResult = {
+    val update = event.getUpdate
+    val h      = update.height
+
+    // TODO the height will be eventually > if this is a rollback
+    // Almost all scripts use the height
+    val withUpdatedHeight = if (h != blockchainStorage.height) {
+      blockchainStorage.setHeight(h)
+      prev.copy(affectedScripts = allScriptIndices)
+    } else prev
+
+    update.update match {
+      case Update.Empty => prev
+      case Update.Append(append) =>
+        val txs = append.body match {
+          case Body.Block(block)           => block.getBlock.transactions
+          case Body.MicroBlock(microBlock) => microBlock.getMicroBlock.getMicroBlock.transactions
+          case Body.Empty                  => Seq.empty
+        }
+
+        val stateUpdate = (append.getStateUpdate +: append.transactionStateUpdates).view
+        withUpdatedHeight
+          .pipe(
+            stateUpdate
+              .flatMap(_.assets)
+              .map(_.getAfter)
+              .foldLeft(_) { case (r, curr) =>
+                r.withAppendResult(blockchainStorage.appendAssetDescription(h, curr))
+              }
+          )
+          .pipe(stateUpdate.flatMap(_.balances).foldLeft(_) { case (r, x) =>
+            r.withAppendResult(blockchainStorage.appendBalance(h, x))
+          })
+          .pipe(stateUpdate.flatMap(_.leasingForAddress).foldLeft(_) { case (r, x) =>
+            r.withAppendResult(blockchainStorage.appendLeasing(h, x))
+          })
+          .pipe(stateUpdate.flatMap(_.dataEntries).foldLeft(_) { case (r, x) =>
+            r.withAppendResult(blockchainStorage.appendAccountData(h, x))
+          })
+          .pipe(
+            txs.view
+              .map(_.transaction)
+              .flatMap {
+                case Transaction.WavesTransaction(tx) =>
+                  tx.data match {
+                    case Data.SetScript(txData) => (tx.senderPublicKey.toPublicKey, txData.script).some
+                    case _                      => none
+                  }
+                case _ => none
+              }
+              .foldLeft(_) { case (r, (pk, script)) =>
+                r.withAppendResult(blockchainStorage.appendAccountScript(h, pk, script))
+              }
+          )
+          .pipe(append.transactionIds.foldLeft(_) { case (r, x) =>
+            r.withAppendResult(blockchainStorage.appendTransactionMeta(h, x))
+          })
+
+      case Update.Rollback(rollback) =>
+        val stateUpdate = rollback.getRollbackStateUpdate
+        withUpdatedHeight
+          .pipe(stateUpdate.assets.foldLeft(_) { case (r, curr) =>
+            r.withRollbackResult(blockchainStorage.rollbackAssetDescription(h, curr.getAfter))
+          })
     }
   }
 }

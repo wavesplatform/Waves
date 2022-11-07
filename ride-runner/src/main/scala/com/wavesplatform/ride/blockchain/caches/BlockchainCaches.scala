@@ -30,6 +30,7 @@ trait BlockchainCaches {
 
   def getAssetDescription(asset: Asset.IssuedAsset, maxHeight: Int): BlockchainData[AssetDescription]
   def setAssetDescription(asset: Asset.IssuedAsset, height: Int, data: BlockchainData[AssetDescription]): Unit
+  def removeAssetDescription(asset: Asset.IssuedAsset, fromHeight: Int): Option[BlockchainData[AssetDescription]]
 
   def resolveAlias(alias: Alias): BlockchainData[Address]
   def setAlias(alias: Alias, data: BlockchainData[Address]): Unit

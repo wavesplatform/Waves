@@ -9,6 +9,7 @@ import com.wavesplatform.events.protobuf.{BlockchainUpdated, StateUpdate}
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 
+// TODO this is wrong, because we could have the data by same keys on different heights
 case class BlockchainUpdatedDiff(
     newHeight: Int = 0,
     assetDetails: Map[ByteString, WithHeight[StateUpdate.AssetStateUpdate]] = Map.empty,
@@ -17,8 +18,18 @@ case class BlockchainUpdatedDiff(
     dataEntries: Map[(ByteString, String), WithHeight[StateUpdate.DataEntryUpdate]] = Map.empty,
     updatedAccountScriptsByPk: Map[ByteString, WithHeight[ByteString]] = Map.empty,
     newTransactionIds: Set[WithHeight[ByteString]] = Set.empty,
-    removedTransactionIds: Set[WithHeight[ByteString]] = Set.empty
+    removedTransactionIds: Set[WithHeight[ByteString]] = Set.empty,
+    blocks: Blocks = Blocks()
 )
+
+/** @param blockIds
+  *   head is the recent block
+  */
+case class Blocks(blockIds: List[(Int, ByteString)] = Nil) {
+  def removedAfter(height: Int, id: ByteString): Blocks = copy(blockIds.dropWhile { case (currHeight, currId) =>
+    currHeight >= height && currId != id
+  })
+}
 
 object BlockchainUpdatedDiff {
   val emptyByteStrSet = Set.empty[WithHeight[ByteString]]
