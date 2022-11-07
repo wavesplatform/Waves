@@ -1852,6 +1852,8 @@ paths:
                       type:
                         type: string
                       value: { }
+                  stateChanges:
+                    $ref: '#/components/schemas/StateChanges'
         '400':
           description: Conflicting request structure
           content:
