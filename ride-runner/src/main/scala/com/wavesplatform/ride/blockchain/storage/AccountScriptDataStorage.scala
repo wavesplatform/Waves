@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.blockchain
+package com.wavesplatform.ride.blockchain.storage
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, PublicKey}
@@ -7,9 +7,10 @@ import com.wavesplatform.grpc.BlockchainGrpcApi
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
-import com.wavesplatform.ride.blockchain.AccountScriptDataStorage.toAccountScriptInfo
 import com.wavesplatform.ride.blockchain.DataKey.AccountScriptDataKey
 import com.wavesplatform.ride.blockchain.caches.BlockchainCaches
+import com.wavesplatform.ride.blockchain.storage.AccountScriptDataStorage.toAccountScriptInfo
+import com.wavesplatform.ride.blockchain.{AppendResult, BlockchainData, DataKey, RollbackResult}
 import com.wavesplatform.state.AccountScriptInfo
 
 class AccountScriptDataStorage[TagT](chainId: Byte, caches: BlockchainCaches, blockchainApi: BlockchainGrpcApi, estimator: => ScriptEstimator)

@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.blockchain
+package com.wavesplatform.ride.blockchain.storage
 
 import cats.syntax.option.*
 import com.wavesplatform.account.Address
@@ -8,6 +8,7 @@ import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.PBAmounts.toAssetAndAmount
 import com.wavesplatform.ride.blockchain.DataKey.PortfolioDataKey
 import com.wavesplatform.ride.blockchain.caches.BlockchainCaches
+import com.wavesplatform.ride.blockchain.{AppendResult, BlockchainData, DataKey, RollbackResult}
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -74,7 +75,7 @@ class PortfolioDataStorage[TagT](caches: BlockchainCaches, blockchainApi: Blockc
           if (after == 0 && orig.isEmpty) none
           else
             Some(asset match {
-              case Asset.Waves => orig.copy(balance = after)
+              case Asset.Waves        => orig.copy(balance = after)
               case asset: IssuedAsset => orig.copy(assets = orig.assets.updated(asset, after))
             })
 
@@ -85,7 +86,7 @@ class PortfolioDataStorage[TagT](caches: BlockchainCaches, blockchainApi: Blockc
   def rollback(rollbackHeight: Int, update: StateUpdate.LeasingUpdate): RollbackResult[TagT] = {
     val address = update.address.toAddress
     memoryCache.get(address) match {
-      case None => RollbackResult.ignored
+      case None           => RollbackResult.ignored
       case Some(origData) =>
         // TODO copy-paste from append
         val updatedLease = LeaseBalance(update.inAfter, update.outAfter)

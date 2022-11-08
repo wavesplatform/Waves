@@ -1,11 +1,12 @@
-package com.wavesplatform.ride.blockchain
+package com.wavesplatform.ride.blockchain.storage
 
 import cats.syntax.option.*
 import com.wavesplatform.meta.getSimpleName
+import com.wavesplatform.ride.blockchain.*
 import com.wavesplatform.utils.ScorexLogging
 
 import scala.collection.mutable
-import scala.util.chaining.scalaUtilChainingOps
+import scala.util.chaining.*
 
 trait DataStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging {
   protected val memoryCache = mutable.AnyRefMap.empty[KeyT, TaggedData[BlockchainData[ValueT], TagT]]

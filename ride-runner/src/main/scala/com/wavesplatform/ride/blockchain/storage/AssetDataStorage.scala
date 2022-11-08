@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.blockchain
+package com.wavesplatform.ride.blockchain.storage
 
 import com.google.protobuf.UnsafeByteOperations
 import com.wavesplatform.events.protobuf.StateUpdate
@@ -7,6 +7,7 @@ import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
 import com.wavesplatform.ride.blockchain.DataKey.AssetDescriptionDataKey
 import com.wavesplatform.ride.blockchain.caches.BlockchainCaches
+import com.wavesplatform.ride.blockchain.{AppendResult, BlockchainData, DataKey, RollbackResult}
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 
