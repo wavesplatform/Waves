@@ -2,7 +2,7 @@ package com.wavesplatform.lang.evaluator
 
 import cats.syntax.either.*
 import com.wavesplatform.common.utils.EitherExt2.*
-import com.wavesplatform.lang.Common
+import com.wavesplatform.lang.{Common, CommonError}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.utils.lazyContexts
@@ -1281,5 +1281,59 @@ class EvaluatorV2Test extends PropSpec with Inside {
         | f(1 + 2 + 3)
       """.stripMargin
     evalNew(script3, 100)._3 shouldBe 3
+  }
+
+  property("throw with message complexity") {
+    val script =
+      """
+        |func a() = throw("xxx") # 1
+        |
+        |func f() =
+        |   if (1 == 1) # 1
+        |     then a()
+        |     else false
+        |
+        |f()
+      """.stripMargin
+
+    var r = EvaluatorV2
+      .applyLimitedCoeval(
+        compile(script),
+        LogExtraInfo(),
+        10,
+        ctx.evaluationContext(environment),
+        version,
+        correctFunctionCallScope = true,
+        newMode = true
+      )
+      .value()
+    r shouldBe Left(_: CommonError, 8, _: List[Any])
+  }
+
+  property("throw without message complexity") {
+    val script =
+      """
+        |func a() = throw() # 1
+        |
+        |func f() =
+        |   if (1 == 1) # 1
+        |     then a()
+        |     else false
+        |
+        |f()
+      """.stripMargin
+
+    var r = EvaluatorV2
+      .applyLimitedCoeval(
+        compile(script),
+        LogExtraInfo(),
+        10,
+        ctx.evaluationContext(environment),
+        version,
+        correctFunctionCallScope = true,
+        newMode = true
+      )
+      .value()
+    r shouldBe Left(_: CommonError, 8, _: List[Any])
   }
 }
