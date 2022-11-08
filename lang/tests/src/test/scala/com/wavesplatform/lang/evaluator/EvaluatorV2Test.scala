@@ -1271,7 +1271,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
         LogExtraInfo(),
         10,
         ctx.evaluationContext(environment),
-        version,
+        V6,
         correctFunctionCallScope = true,
         newMode = true
       )
@@ -1298,7 +1298,7 @@ class EvaluatorV2Test extends PropSpec with Inside {
         LogExtraInfo(),
         10,
         ctx.evaluationContext(environment),
-        version,
+        V6,
         correctFunctionCallScope = true,
         newMode = true
       )
