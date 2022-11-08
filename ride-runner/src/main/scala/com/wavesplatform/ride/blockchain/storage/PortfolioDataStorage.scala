@@ -7,24 +7,17 @@ import com.wavesplatform.grpc.BlockchainGrpcApi
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.PBAmounts.toAssetAndAmount
 import com.wavesplatform.ride.blockchain.DataKey.PortfolioDataKey
-import com.wavesplatform.ride.blockchain.caches.BlockchainCaches
-import com.wavesplatform.ride.blockchain.{AppendResult, BlockchainData, DataKey, RollbackResult}
+import com.wavesplatform.ride.blockchain.caches.PersistentCache
+import com.wavesplatform.ride.blockchain.{AppendResult, DataKey, RollbackResult}
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 
-class PortfolioDataStorage[TagT](caches: BlockchainCaches, blockchainApi: BlockchainGrpcApi) extends DataStorage[Address, Portfolio, TagT] {
+class PortfolioDataStorage[TagT](blockchainApi: BlockchainGrpcApi, override val persistentCache: PersistentCache[Address, Portfolio])
+    extends DataStorage[Address, Portfolio, TagT] {
   override def mkDataKey(key: Address): DataKey = PortfolioDataKey(key)
 
   override def getFromBlockchain(key: Address): Option[Portfolio] = blockchainApi.getBalances(key).some
-
-  override def getFromPersistentCache(maxHeight: Int, key: Address): BlockchainData[Portfolio] = caches.getBalances(key, maxHeight)
-
-  override def setPersistentCache(height: Int, key: Address, data: BlockchainData[Portfolio]): Unit =
-    caches.setBalances(key, height, data)
-
-  override def removeFromPersistentCache(fromHeight: Int, key: Address): BlockchainData[Portfolio] =
-    caches.removeBalances(key, fromHeight)
 
   def append(height: Int, update: StateUpdate.BalanceUpdate): AppendResult[TagT] = {
     val address = update.address.toAddress

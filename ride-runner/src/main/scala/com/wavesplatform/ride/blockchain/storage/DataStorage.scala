@@ -3,6 +3,7 @@ package com.wavesplatform.ride.blockchain.storage
 import cats.syntax.option.*
 import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.ride.blockchain.*
+import com.wavesplatform.ride.blockchain.caches.PersistentCache
 import com.wavesplatform.utils.ScorexLogging
 
 import scala.collection.mutable
@@ -17,22 +18,17 @@ trait DataStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging {
 
   def getFromBlockchain(key: KeyT): Option[ValueT]
 
-  // TODO one class?
-  def getFromPersistentCache(maxHeight: Int, key: KeyT): BlockchainData[ValueT]
-
-  def setPersistentCache(height: Int, key: KeyT, data: BlockchainData[ValueT]): Unit
-
-  def removeFromPersistentCache(fromHeight: Int, key: KeyT): BlockchainData[ValueT]
+  def persistentCache: PersistentCache[KeyT, ValueT]
 
   def get(height: Int, key: KeyT, tag: TagT): Option[ValueT] =
     memoryCache
       .updateWith(key) {
         case Some(orig) => Some(orig.withTag(tag))
         case None =>
-          val cached = getFromPersistentCache(height, key)
+          val cached = persistentCache.get(height, key)
           val r =
             if (cached.loaded) cached
-            else BlockchainData.loaded(getFromBlockchain(key)).tap(r => setPersistentCache(height, key, r))
+            else BlockchainData.loaded(getFromBlockchain(key)).tap(r => persistentCache.set(height, key, r))
 
           Some(TaggedData(r, Set(tag)))
       }
@@ -45,7 +41,7 @@ trait DataStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging {
         log.info(s"Reload $name($key)")
 
         val loaded = BlockchainData.loaded(getFromBlockchain(key))
-        setPersistentCache(height, key, loaded)
+        persistentCache.set(height, key, loaded)
         orig.copy(data = loaded).some
 
       case x => x
@@ -58,7 +54,7 @@ trait DataStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging {
         log.debug(s"Update $name($key)")
 
         val updated = BlockchainData.loaded(update)
-        setPersistentCache(height, key, updated)
+        persistentCache.set(height, key, updated)
 
         if (updated == orig.data) AppendResult.ignored
         else {
@@ -75,7 +71,7 @@ trait DataStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging {
       case Some(orig) =>
         log.info(s"Rollback $name($key)")
 
-        removeFromPersistentCache(rollbackHeight + 1, key) match {
+        persistentCache.remove(rollbackHeight + 1, key) match {
           case latest @ BlockchainData.Cached(_) =>
             // TODO compare with afterRollback
             memoryCache.update(key, orig.copy(data = latest))
@@ -86,7 +82,7 @@ trait DataStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging {
               case None => RollbackResult.uncertain(mkDataKey(key), orig.tags) // will be updated later
               case Some(after) =>
                 val x = BlockchainData.Cached(after)
-                setPersistentCache(rollbackHeight, key, x)
+                persistentCache.set(rollbackHeight, key, x)
                 memoryCache.update(key, orig.copy(data = x))
                 RollbackResult.rolledBack(orig.tags)
             }

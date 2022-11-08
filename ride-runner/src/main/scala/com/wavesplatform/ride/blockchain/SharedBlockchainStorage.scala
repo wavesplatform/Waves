@@ -7,20 +7,20 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.EstimatorProvider
 import com.wavesplatform.grpc.BlockchainGrpcApi
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.ride.blockchain.caches.BlockchainCaches
+import com.wavesplatform.ride.blockchain.caches.PersistentCaches
 import com.wavesplatform.ride.blockchain.storage.*
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.utils.ScorexLogging
 
 import scala.util.chaining.scalaUtilChainingOps
 
-class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: BlockchainCaches, blockchainApi: BlockchainGrpcApi)
+class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: PersistentCaches, blockchainApi: BlockchainGrpcApi)
     extends ScorexLogging {
   private val chainId = settings.addressSchemeCharacter.toByte
 
-  val data = new AccountDataDataStorage[TagT](caches, blockchainApi)
+  val data = new AccountDataDataStorage[TagT](blockchainApi, caches.accountDataEntries)
 
-  val accountScripts = new AccountScriptDataStorage[TagT](chainId, caches, blockchainApi, estimator)
+  val accountScripts = new AccountScriptDataStorage[TagT](chainId, estimator, blockchainApi, caches.accountScripts)
 
   // It seems, we don't need to update this. Only for some optimization needs
   private val blockHeaders = RideData.mapReadOnly[Int, SignedBlockHeader, TagT] { h =>
@@ -54,7 +54,7 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
     )(())
       .getOrElse(throw new RuntimeException("Impossible: activated features are empty"))
 
-  val assets = new AssetDataStorage[TagT](caches, blockchainApi)
+  val assets = new AssetDataStorage[TagT](blockchainApi, caches.assetDescriptions)
 
   // It seems, we don't need to update this. Only for some optimization needs
   private val aliases = RideData.anyRefMap[Alias, Address, TagT] {
@@ -63,9 +63,9 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
 
   def getAlias(alias: Alias, tag: TagT): Option[Address] = aliases.get(alias, tag)
 
-  val portfolios = new PortfolioDataStorage[TagT](caches, blockchainApi)
+  val portfolios = new PortfolioDataStorage[TagT](blockchainApi, caches.balances)
 
-  val transactions = new TransactionsDataStorage[TagT](caches, blockchainApi)
+  val transactions = new TransactionsDataStorage[TagT](blockchainApi, caches.transactions)
 
   private def estimator: ScriptEstimator = EstimatorProvider.byActivatedFeatures(settings.functionalitySettings, activatedFeatures, height)
 

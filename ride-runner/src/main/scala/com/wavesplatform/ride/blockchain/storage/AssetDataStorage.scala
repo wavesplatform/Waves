@@ -6,25 +6,20 @@ import com.wavesplatform.grpc.BlockchainGrpcApi
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
 import com.wavesplatform.ride.blockchain.DataKey.AssetDescriptionDataKey
-import com.wavesplatform.ride.blockchain.caches.BlockchainCaches
-import com.wavesplatform.ride.blockchain.{AppendResult, BlockchainData, DataKey, RollbackResult}
+import com.wavesplatform.ride.blockchain.caches.PersistentCache
+import com.wavesplatform.ride.blockchain.{AppendResult, DataKey, RollbackResult}
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 
 import java.nio.charset.StandardCharsets
 
-class AssetDataStorage[TagT](caches: BlockchainCaches, blockchainApi: BlockchainGrpcApi) extends DataStorage[IssuedAsset, AssetDescription, TagT] {
+class AssetDataStorage[TagT](
+    blockchainApi: BlockchainGrpcApi,
+    override val persistentCache: PersistentCache[IssuedAsset, AssetDescription]
+) extends DataStorage[IssuedAsset, AssetDescription, TagT] {
   override def mkDataKey(key: IssuedAsset): DataKey = AssetDescriptionDataKey(key)
 
   override def getFromBlockchain(key: IssuedAsset): Option[AssetDescription] = blockchainApi.getAssetDescription(key)
-
-  override def getFromPersistentCache(maxHeight: Int, key: IssuedAsset): BlockchainData[AssetDescription] = caches.getAssetDescription(key, maxHeight)
-
-  override def setPersistentCache(height: Int, key: IssuedAsset, data: BlockchainData[AssetDescription]): Unit =
-    caches.setAssetDescription(key, height, data)
-
-  override def removeFromPersistentCache(fromHeight: Int, key: IssuedAsset): BlockchainData[AssetDescription] =
-    caches.removeAssetDescription(key, fromHeight)
 
   def append(height: Int, update: StateUpdate.AssetStateUpdate): AppendResult[TagT] = {
     val asset = getAsset(update)
@@ -43,7 +38,6 @@ class AssetDataStorage[TagT](caches: BlockchainCaches, blockchainApi: Blockchain
       .getOrElse(throw new RuntimeException(s"Can't get asset id from update: $update"))
       .assetId
       .toIssuedAsset
-
 }
 
 object AssetDataStorage {

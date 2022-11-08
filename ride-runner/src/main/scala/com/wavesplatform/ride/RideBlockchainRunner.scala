@@ -15,7 +15,7 @@ import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.resources.*
 import com.wavesplatform.ride.blockchain.*
-import com.wavesplatform.ride.blockchain.caches.LevelDbBlockchainCaches
+import com.wavesplatform.ride.blockchain.caches.LevelDbPersistentCaches
 import com.wavesplatform.ride.input.RunnerRequest
 import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.utils.ScorexLogging
@@ -100,7 +100,7 @@ object RideBlockchainRunner extends ScorexLogging {
       )
 
       val db                = use(openDB(s"$basePath/db"))
-      val dbCaches          = new LevelDbBlockchainCaches(db)
+      val dbCaches          = new LevelDbPersistentCaches(db)
       val blockchainStorage = new SharedBlockchainStorage[Int](nodeSettings.blockchainSettings, dbCaches, blockchainApi)
 
       val scripts          = input.zipWithIndex.map { case (input, index) => RideScript(index, blockchainStorage, input.request) }

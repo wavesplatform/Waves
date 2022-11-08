@@ -8,25 +8,20 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
 import com.wavesplatform.ride.blockchain.DataKey.AccountScriptDataKey
-import com.wavesplatform.ride.blockchain.caches.BlockchainCaches
+import com.wavesplatform.ride.blockchain.caches.PersistentCache
 import com.wavesplatform.ride.blockchain.storage.AccountScriptDataStorage.toAccountScriptInfo
-import com.wavesplatform.ride.blockchain.{AppendResult, BlockchainData, DataKey, RollbackResult}
+import com.wavesplatform.ride.blockchain.{AppendResult, DataKey, RollbackResult}
 import com.wavesplatform.state.AccountScriptInfo
 
-class AccountScriptDataStorage[TagT](chainId: Byte, caches: BlockchainCaches, blockchainApi: BlockchainGrpcApi, estimator: => ScriptEstimator)
-    extends DataStorage[Address, AccountScriptInfo, TagT] {
+class AccountScriptDataStorage[TagT](
+    chainId: Byte,
+    estimator: => ScriptEstimator,
+    blockchainApi: BlockchainGrpcApi,
+    override val persistentCache: PersistentCache[Address, AccountScriptInfo]
+) extends DataStorage[Address, AccountScriptInfo, TagT] {
   override def mkDataKey(key: Address): DataKey = AccountScriptDataKey(key)
 
   override def getFromBlockchain(key: Address): Option[AccountScriptInfo] = blockchainApi.getAccountScript(key, estimator)
-
-  override def getFromPersistentCache(maxHeight: Int, key: Address): BlockchainData[AccountScriptInfo] =
-    caches.getAccountScript(key, maxHeight)
-
-  override def setPersistentCache(height: Int, key: Address, data: BlockchainData[AccountScriptInfo]): Unit =
-    caches.setAccountScript(key, height, data)
-
-  override def removeFromPersistentCache(fromHeight: Int, key: Address): BlockchainData[AccountScriptInfo] =
-    caches.removeAccountScript(key, fromHeight)
 
   def append(height: Int, account: PublicKey, newScript: ByteString): AppendResult[TagT] =
     append(height, account.toAddress(chainId), toVanillaScript(newScript).map(toAccountScriptInfo(estimator, account, _)))

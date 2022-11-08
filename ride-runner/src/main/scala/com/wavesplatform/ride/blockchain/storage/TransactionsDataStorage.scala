@@ -7,26 +7,19 @@ import com.wavesplatform.grpc.BlockchainGrpcApi
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.SignedTransaction
 import com.wavesplatform.ride.blockchain.DataKey.TransactionDataKey
-import com.wavesplatform.ride.blockchain.caches.BlockchainCaches
-import com.wavesplatform.ride.blockchain.{AppendResult, BlockchainData, DataKey}
+import com.wavesplatform.ride.blockchain.caches.PersistentCache
+import com.wavesplatform.ride.blockchain.{AppendResult, DataKey}
 import com.wavesplatform.state.{Height, TransactionId, TxMeta}
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{EthereumTransaction, Transaction}
 
-class TransactionsDataStorage[TagT](caches: BlockchainCaches, blockchainApi: BlockchainGrpcApi)
-    extends DataStorage[TransactionId, (TxMeta, Option[Transaction]), TagT] {
+class TransactionsDataStorage[TagT](
+    blockchainApi: BlockchainGrpcApi,
+    override val persistentCache: PersistentCache[TransactionId, (TxMeta, Option[Transaction])]
+) extends DataStorage[TransactionId, (TxMeta, Option[Transaction]), TagT] {
   override def mkDataKey(key: TransactionId): DataKey = TransactionDataKey(key)
 
   override def getFromBlockchain(key: TransactionId): Option[(TxMeta, Option[Transaction])] = blockchainApi.getTransferLikeTransaction(key)
-
-  override def getFromPersistentCache(maxHeight: Int, key: TransactionId): BlockchainData[(TxMeta, Option[Transaction])] =
-    caches.getTransaction(key) // TODO maxHeight?
-
-  override def setPersistentCache(height: Int, key: TransactionId, data: BlockchainData[(TxMeta, Option[Transaction])]): Unit =
-    caches.setTransaction(key, data) // TODO height?
-
-  override def removeFromPersistentCache(fromHeight: Int, key: TransactionId): BlockchainData[(TxMeta, Option[Transaction])] =
-    caches.removeTransaction(key) // TODO height?
 
   def getWithTransferLike(height: Int, key: TransactionId, tag: TagT): Option[(TxMeta, Option[TransferTransactionLike])] =
     get(height, key, tag).map { case (meta, maybeTx) =>
