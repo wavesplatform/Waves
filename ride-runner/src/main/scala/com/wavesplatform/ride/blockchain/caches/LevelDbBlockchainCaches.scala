@@ -45,6 +45,18 @@ class LevelDbBlockchainCaches(db: DB) extends BlockchainCaches with ScorexLoggin
     log.trace(s"setAccountDataEntry($address, '$key', $height)")
   }
 
+  override def removeAccountDataEntry(address: Address, key: String, fromHeight: Int): BlockchainData[DataEntry[_]] =
+    db
+      .readWrite { rw =>
+        val addressId = getOrMkAddressId(rw, address)
+        rw.removeAfterAndGetLatestExisted(
+          CacheKeys.AccountDataEntriesHistory.mkKey((addressId, key)),
+          h => CacheKeys.AccountDataEntries.mkKey((addressId, key, h)),
+          fromHeight
+        )
+      }
+      .tap { _ => log.trace(s"removeAccountDataEntry($address, $key, $fromHeight)") }
+
   override def getAccountScript(address: Address, maxHeight: Int): BlockchainData[AccountScriptInfo] =
     db
       .readOnly { ro =>
@@ -69,6 +81,18 @@ class LevelDbBlockchainCaches(db: DB) extends BlockchainCaches with ScorexLoggin
     }
     log.trace(s"setAccountScript($address, $height)")
   }
+
+  override def removeAccountScript(address: Address, fromHeight: Int): BlockchainData[AccountScriptInfo] =
+    db
+      .readWrite { rw =>
+        val addressId = getOrMkAddressId(rw, address)
+        rw.removeAfterAndGetLatestExisted(
+          CacheKeys.AccountScriptsHistory.mkKey(addressId),
+          h => CacheKeys.AccountScripts.mkKey((addressId, h)),
+          fromHeight
+        )
+      }
+      .tap { _ => log.trace(s"removeAccountScript($address, $fromHeight)") }
 
   override def getBlockHeader(height: Int): BlockchainData[SignedBlockHeader] =
     db
@@ -180,6 +204,18 @@ class LevelDbBlockchainCaches(db: DB) extends BlockchainCaches with ScorexLoggin
     log.trace(s"setBalances($address)")
   }
 
+  override def removeBalances(address: Address, fromHeight: Int): BlockchainData[Portfolio] =
+    db
+      .readWrite { rw =>
+        val addressId = getOrMkAddressId(rw, address)
+        rw.removeAfterAndGetLatestExisted(
+          CacheKeys.PortfoliosHistory.mkKey(addressId),
+          h => CacheKeys.Portfolios.mkKey((addressId, h)),
+          fromHeight
+        )
+      }
+      .tap { _ => log.trace(s"removeBalances($address, $fromHeight)") }
+
   override def getTransaction(id: TransactionId): BlockchainData[(TxMeta, Option[Transaction])] =
     db
       .readOnly { _.readFromDb(CacheKeys.Transactions.mkKey(id)) }
@@ -189,6 +225,9 @@ class LevelDbBlockchainCaches(db: DB) extends BlockchainCaches with ScorexLoggin
     db.readWrite { _.writeToDb(CacheKeys.Transactions.mkKey(id), data) }
     log.trace(s"setTransaction($id)")
   }
+
+  // TODO
+  override def removeTransaction(id: TransactionId): BlockchainData[(TxMeta, Option[Transaction])] = BlockchainData.Unknown
 
   // TODO caching from NODE
   private def getOrMkAddressId(ro: ReadOnlyDB, address: Address): AddressId = {

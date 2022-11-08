@@ -16,7 +16,7 @@ trait BlockchainCaches {
 
   def getAccountScript(address: Address, maxHeight: Int): BlockchainData[AccountScriptInfo]
   def setAccountScript(address: Address, height: Int, data: BlockchainData[AccountScriptInfo]): Unit
-  def removeAccountScript(address: Address, romHeight: Int): BlockchainData[AccountScriptInfo]
+  def removeAccountScript(address: Address, fromHeight: Int): BlockchainData[AccountScriptInfo]
 
   def getBlockHeader(height: Int): BlockchainData[SignedBlockHeader]
   def setBlockHeader(height: Int, data: BlockchainData[SignedBlockHeader]): Unit
@@ -53,7 +53,7 @@ object EmptyBlockchainCaches extends BlockchainCaches {
 
   override def getAccountScript(address: Address, maxHeight: Int): BlockchainData[AccountScriptInfo]          = BlockchainData.Unknown
   override def setAccountScript(address: Address, height: Int, data: BlockchainData[AccountScriptInfo]): Unit = {}
-  override def removeAccountScript(address: Address, romHeight: Int): BlockchainData[AccountScriptInfo]       = BlockchainData.Unknown
+  override def removeAccountScript(address: Address, fromHeight: Int): BlockchainData[AccountScriptInfo]      = BlockchainData.Unknown
 
   override def getBlockHeader(height: Int): BlockchainData[SignedBlockHeader]             = BlockchainData.Unknown
   override def setBlockHeader(height: Int, data: BlockchainData[SignedBlockHeader]): Unit = {}
