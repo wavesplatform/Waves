@@ -1,20 +1,15 @@
 package com.wavesplatform.ride.blockchain
 
 import cats.syntax.option.*
-import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.EstimatorProvider
 import com.wavesplatform.grpc.BlockchainGrpcApi
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.ride.blockchain.caches.BlockchainCaches
-import com.wavesplatform.ride.blockchain.storage.{AccountDataDataStorage, AccountScriptDataStorage, AssetDataStorage, PortfolioDataStorage}
+import com.wavesplatform.ride.blockchain.storage.*
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state.{Height, TransactionId, TxMeta}
-import com.wavesplatform.transaction.transfer.TransferTransactionLike
-import com.wavesplatform.transaction.{EthereumTransaction, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 
 import scala.util.chaining.scalaUtilChainingOps
@@ -70,48 +65,7 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
 
   val portfolios = new PortfolioDataStorage[TagT](caches, blockchainApi)
 
-  private val transactions = RideData.anyRefMap[TransactionId, (TxMeta, Option[Transaction]), TagT] {
-    load(caches.getTransaction, blockchainApi.getTransferLikeTransaction, caches.setTransaction)
-  }
-
-  def getTransaction(id: TransactionId, tag: TagT): Option[(TxMeta, Option[TransferTransactionLike])] =
-    transactions
-      .get(id, tag)
-      .map { case (meta, maybeTx) =>
-        val tx = maybeTx.flatMap {
-          case tx: TransferTransactionLike => tx.some
-          case tx: EthereumTransaction =>
-            tx.payload match {
-              case payload: EthereumTransaction.Transfer =>
-                // tx.toTransferLike()
-                // payload.toTransferLike(tx, this).toOption
-                none
-              case _ => none
-            }
-          case _ => none
-        }
-        (meta, tx)
-      }
-
-  // Got a transaction, got a rollback, same transaction on new height/failed/removed
-  def appendTransactionMeta(height: Int, pbTxId: ByteString): AppendResult[TagT] = {
-    val txId = TransactionId(pbTxId.toByteStr)
-    transactions.replaceIfKnown(txId) { mayBeOrig =>
-      log.debug(s"[$txId] Updated transaction")
-      val (_, tx) = mayBeOrig.getOrElse((TxMeta.empty, None))
-      Some(
-        (
-          TxMeta(
-            height = Height(height),
-            succeeded = true,
-            spentComplexity = 0
-          ),
-          tx
-        )
-      )
-        .tap(r => caches.setTransaction(txId, BlockchainData.loaded(r)))
-    }
-  }
+  val transactions = new TransactionsDataStorage[TagT](caches, blockchainApi)
 
   private def estimator: ScriptEstimator = EstimatorProvider.byActivatedFeatures(settings.functionalitySettings, activatedFeatures, height)
 

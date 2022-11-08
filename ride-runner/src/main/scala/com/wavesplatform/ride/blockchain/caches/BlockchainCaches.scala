@@ -43,6 +43,7 @@ trait BlockchainCaches {
 
   def getTransaction(id: TransactionId): BlockchainData[(TxMeta, Option[Transaction])]
   def setTransaction(id: TransactionId, data: BlockchainData[(TxMeta, Option[Transaction])]): Unit
+  def removeTransaction(id: TransactionId): BlockchainData[(TxMeta, Option[Transaction])]
 }
 
 object EmptyBlockchainCaches extends BlockchainCaches {
@@ -79,4 +80,5 @@ object EmptyBlockchainCaches extends BlockchainCaches {
 
   override def getTransaction(id: TransactionId): BlockchainData[(TxMeta, Option[Transaction])]             = BlockchainData.Unknown
   override def setTransaction(id: TransactionId, data: BlockchainData[(TxMeta, Option[Transaction])]): Unit = {}
+  override def removeTransaction(id: TransactionId): BlockchainData[(TxMeta, Option[Transaction])]          = BlockchainData.Unknown
 }

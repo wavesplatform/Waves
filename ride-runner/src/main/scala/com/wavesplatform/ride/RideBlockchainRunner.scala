@@ -14,8 +14,8 @@ import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.resources.*
-import com.wavesplatform.ride.blockchain.caches.LevelDbBlockchainCaches
 import com.wavesplatform.ride.blockchain.*
+import com.wavesplatform.ride.blockchain.caches.LevelDbBlockchainCaches
 import com.wavesplatform.ride.input.RunnerRequest
 import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.utils.ScorexLogging
@@ -248,8 +248,8 @@ object RideBlockchainRunner extends ScorexLogging {
                 r.withAppendResult(blockchainStorage.accountScripts.append(h, pk, script))
               }
           )
-          .pipe(append.transactionIds.foldLeft(_) { case (r, x) =>
-            r.withAppendResult(blockchainStorage.appendTransactionMeta(h, x))
+          .pipe(append.transactionIds.view.zip(txs).foldLeft(_) { case (r, (txId, tx)) =>
+            r.withAppendResult(blockchainStorage.transactions.append(h, txId, tx))
           })
 
       case Update.Rollback(rollback) =>
@@ -267,11 +267,15 @@ object RideBlockchainRunner extends ScorexLogging {
           .pipe(stateUpdate.dataEntries.foldLeft(_) { case (r, x) =>
             r.withRollbackResult(blockchainStorage.data.rollback(h, x))
           })
-        /* TODO:
+      /* TODO:
         .pipe(stateUpdate.accountScripts.foldLeft(_) { case (r, x) =>
           r.withRollbackResult(blockchainStorage.accountScripts.rollback(h, x))
         })
-         */
+        // TODO Remove?
+        .pipe(append.transactionIds.view.zip(txs).foldLeft(_) { case (r, txId) =>
+          r.withRollbackResult(blockchainStorage.transactions.rollback(h, txId)
+        })
+       */
     }
   }
 }

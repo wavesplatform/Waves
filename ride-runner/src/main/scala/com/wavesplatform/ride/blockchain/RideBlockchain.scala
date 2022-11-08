@@ -79,7 +79,7 @@ class RideBlockchain[TagT](storage: SharedBlockchainStorage[TagT], tag: TagT) ex
   // input.balanceSnapshots.getOrElse(address, Seq(BalanceSnapshot(height, 0, 0, 0))).filter(_.height >= from)
 
   private def withTransactions(id: ByteStr): Option[(TxMeta, Option[TransferTransactionLike])] =
-    storage.getTransaction(TransactionId(id), tag)
+    storage.transactions.getWithTransferLike(height, TransactionId(id), tag)
 
   // Ride: transactionHeightById
   override def transactionMeta(id: ByteStr): Option[TxMeta] = withTransactions(id).map(_._1)
