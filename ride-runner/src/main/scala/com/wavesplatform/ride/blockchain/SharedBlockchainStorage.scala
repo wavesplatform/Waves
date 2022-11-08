@@ -2,19 +2,16 @@ package com.wavesplatform.ride.blockchain
 
 import cats.syntax.option.*
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, Alias, PublicKey}
+import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.EstimatorProvider
 import com.wavesplatform.grpc.BlockchainGrpcApi
-import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.protobuf.ByteStringExt
-import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
 import com.wavesplatform.ride.blockchain.caches.BlockchainCaches
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state.{AccountScriptInfo, Height, TransactionId, TxMeta}
+import com.wavesplatform.state.{Height, TransactionId, TxMeta}
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{EthereumTransaction, Transaction}
 import com.wavesplatform.utils.ScorexLogging
@@ -27,43 +24,7 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
 
   val data = new AccountDataDataStorage[TagT](caches, blockchainApi)
 
-  private val accountScripts = RideData.anyRefMap[Address, AccountScriptInfo, TagT] {
-    load[Address, AccountScriptInfo](
-      fromCache = caches.getAccountScript(_, height),
-      fromBlockchain = blockchainApi.getAccountScript(_, estimator),
-      updateCache = (key, value) => caches.setAccountScript(key, height, value)
-    )
-  }
-
-  def getAccountScript(address: Address, tag: TagT): Option[AccountScriptInfo] = accountScripts.get(address, tag)
-  def appendAccountScript(height: Int, account: PublicKey, newScript: ByteString): AppendResult[TagT] = {
-    val address = account.toAddress(chainId)
-    accountScripts.replaceIfKnown(address) { _ =>
-      log.debug(s"[$address] Updated account script")
-
-      val script = toVanillaScript(newScript)
-
-      // TODO dup, see BlockchainGrpcApi
-
-      // DiffCommons
-      val fixEstimateOfVerifier    = true // blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
-      val useContractVerifierLimit = true // !isAsset && blockchain.useReducedVerifierComplexityLimit
-
-      script
-        .map { script =>
-          // TODO explicitGet?
-          val complexityInfo = Script.complexityInfo(script, estimator, fixEstimateOfVerifier, useContractVerifierLimit).explicitGet()
-
-          AccountScriptInfo(
-            publicKey = account,
-            script = script, // Only this field matters in Ride Runner, see MutableBlockchain.accountScript
-            verifierComplexity = complexityInfo.verifierComplexity,
-            complexitiesByEstimator = Map(estimator.version -> complexityInfo.callableComplexities)
-          )
-        }
-        .tap(r => caches.setAccountScript(address, height, BlockchainData.loaded(r)))
-    }
-  }
+  val accountScripts = new AccountScriptDataStorage[TagT](chainId, caches, blockchainApi, estimator)
 
   // It seems, we don't need to update this. Only for some optimization needs
   private val blockHeaders = RideData.mapReadOnly[Int, SignedBlockHeader, TagT] { h =>

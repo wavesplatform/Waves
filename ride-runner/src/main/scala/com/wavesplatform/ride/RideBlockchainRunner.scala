@@ -245,7 +245,7 @@ object RideBlockchainRunner extends ScorexLogging {
                 case _ => none
               }
               .foldLeft(_) { case (r, (pk, script)) =>
-                r.withAppendResult(blockchainStorage.appendAccountScript(h, pk, script))
+                r.withAppendResult(blockchainStorage.accountScripts.append(h, pk, script))
               }
           )
           .pipe(append.transactionIds.foldLeft(_) { case (r, x) =>
@@ -267,6 +267,11 @@ object RideBlockchainRunner extends ScorexLogging {
           .pipe(stateUpdate.dataEntries.foldLeft(_) { case (r, x) =>
             r.withRollbackResult(blockchainStorage.data.rollback(h, x))
           })
+        /* TODO:
+        .pipe(stateUpdate.accountScripts.foldLeft(_) { case (r, x) =>
+          r.withRollbackResult(blockchainStorage.accountScripts.rollback(h, x))
+        })
+         */
     }
   }
 }

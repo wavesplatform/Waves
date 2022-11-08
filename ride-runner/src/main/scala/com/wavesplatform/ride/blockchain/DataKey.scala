@@ -1,7 +1,7 @@
 package com.wavesplatform.ride.blockchain
 
 import com.wavesplatform.account.Address
-import com.wavesplatform.state.{AssetDescription, DataEntry, Portfolio}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 
 sealed trait DataKey extends Product with Serializable {
@@ -25,6 +25,13 @@ object DataKey {
   case class AccountDataDataKey(address: Address, key: String) extends DataKey {
     override type Value = DataEntry[?]
     override def reload[TagT](blockchainStorage: SharedBlockchainStorage[TagT], height: Int): Unit =
-      ??? // blockchainStorage
+      blockchainStorage.data.reload(height, (address, key))
+  }
+
+  case class AccountScriptDataKey(address: Address) extends DataKey {
+    override type Value = AccountScriptInfo
+
+    override def reload[TagT](blockchainStorage: SharedBlockchainStorage[TagT], height: Int): Unit =
+      blockchainStorage.accountScripts.reload(height, address)
   }
 }

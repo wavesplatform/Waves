@@ -36,7 +36,7 @@ class RideBlockchain[TagT](storage: SharedBlockchainStorage[TagT], tag: TagT) ex
   override def accountData(address: Address, key: String): Option[DataEntry[?]] = storage.data.get(height, (address, key), tag)
 
   // Ride: scriptHash
-  override def accountScript(address: Address): Option[AccountScriptInfo] = storage.getAccountScript(address, tag)
+  override def accountScript(address: Address): Option[AccountScriptInfo] = storage.accountScripts.get(height, address, tag)
 
   // Indirectly
   override def hasAccountScript(address: Address): Boolean = accountScript(address).nonEmpty
