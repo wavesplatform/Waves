@@ -6,16 +6,15 @@ import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.features.EstimatorProvider
 import com.wavesplatform.grpc.BlockchainGrpcApi
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.protobuf.ByteStringExt
-import com.wavesplatform.protobuf.transaction.PBTransactions.{toVanillaDataEntry, toVanillaScript}
+import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
 import com.wavesplatform.ride.blockchain.caches.BlockchainCaches
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state.{AccountScriptInfo, DataEntry, Height, TransactionId, TxMeta}
+import com.wavesplatform.state.{AccountScriptInfo, Height, TransactionId, TxMeta}
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{EthereumTransaction, Transaction}
 import com.wavesplatform.utils.ScorexLogging
@@ -26,25 +25,7 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Bl
     extends ScorexLogging {
   private val chainId = settings.addressSchemeCharacter.toByte
 
-  private val data = RideData.anyRefMap[(Address, String), DataEntry[?], TagT] {
-    load[(Address, String), DataEntry[_]](
-      fromCache = { case (address, key) => caches.getAccountDataEntry(address, key, height) },
-      fromBlockchain = Function.tupled(blockchainApi.getAccountDataEntry),
-      updateCache = (key, value) => caches.setAccountDataEntry(key._1, key._2, height, value)
-    )
-  }
-
-  def getData(address: Address, key: String, tag: TagT): Option[DataEntry[_]] = data.get((address, key), tag)
-
-  def appendAccountData(height: Int, update: StateUpdate.DataEntryUpdate): AppendResult[TagT] = {
-    val address = update.address.toAddress
-    val key     = update.getDataEntry.key
-    data.replaceIfKnown((address, key)) { _ =>
-      log.debug(s"[$address, $key] Updated data")
-      Some(toVanillaDataEntry(update.getDataEntry))
-        .tap(r => caches.setAccountDataEntry(address, key, height, BlockchainData.loaded(r)))
-    }
-  }
+  val data = new AccountDataDataStorage[TagT](caches, blockchainApi)
 
   private val accountScripts = RideData.anyRefMap[Address, AccountScriptInfo, TagT] {
     load[Address, AccountScriptInfo](

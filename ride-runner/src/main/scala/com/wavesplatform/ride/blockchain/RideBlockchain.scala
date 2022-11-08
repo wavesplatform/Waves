@@ -33,7 +33,7 @@ class RideBlockchain[TagT](storage: SharedBlockchainStorage[TagT], tag: TagT) ex
   override def hasData(address: Address): Boolean = kill(s"hasData($address)") // data.contains(address)
 
   // Ride: get*Value (data), get* (data)
-  override def accountData(address: Address, key: String): Option[DataEntry[_]] = storage.getData(address, key, tag)
+  override def accountData(address: Address, key: String): Option[DataEntry[?]] = storage.data.get(height, (address, key), tag)
 
   // Ride: scriptHash
   override def accountScript(address: Address): Option[AccountScriptInfo] = storage.getAccountScript(address, tag)

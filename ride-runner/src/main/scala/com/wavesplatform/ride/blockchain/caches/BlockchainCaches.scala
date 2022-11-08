@@ -10,8 +10,9 @@ import com.wavesplatform.transaction.{Asset, Transaction}
 // TODO F abstraction? But getBalances?
 trait BlockchainCaches {
   // TODO There is a pattern
-  def getAccountDataEntry(address: Address, key: String, maxHeight: Int): BlockchainData[DataEntry[_]]
-  def setAccountDataEntry(address: Address, key: String, height: Int, data: BlockchainData[DataEntry[_]]): Unit
+  def getAccountDataEntry(address: Address, key: String, maxHeight: Int): BlockchainData[DataEntry[?]]
+  def setAccountDataEntry(address: Address, key: String, height: Int, data: BlockchainData[DataEntry[?]]): Unit
+  def removeAccountDataEntry(address: Address, key: String, fromHeight: Int): BlockchainData[DataEntry[?]]
 
   def getAccountScript(address: Address, maxHeight: Int): BlockchainData[AccountScriptInfo]
   def setAccountScript(address: Address, height: Int, data: BlockchainData[AccountScriptInfo]): Unit
@@ -44,8 +45,9 @@ trait BlockchainCaches {
 }
 
 object EmptyBlockchainCaches extends BlockchainCaches {
-  override def getAccountDataEntry(address: Address, key: String, maxHeight: Int): BlockchainData[DataEntry[_]]          = BlockchainData.Unknown
-  override def setAccountDataEntry(address: Address, key: String, height: Int, data: BlockchainData[DataEntry[_]]): Unit = {}
+  override def getAccountDataEntry(address: Address, key: String, maxHeight: Int): BlockchainData[DataEntry[?]]          = BlockchainData.Unknown
+  override def setAccountDataEntry(address: Address, key: String, height: Int, data: BlockchainData[DataEntry[?]]): Unit = {}
+  override def removeAccountDataEntry(address: Address, key: String, fromHeight: Int): BlockchainData[DataEntry[?]]      = BlockchainData.Unknown
 
   override def getAccountScript(address: Address, maxHeight: Int): BlockchainData[AccountScriptInfo]          = BlockchainData.Unknown
   override def setAccountScript(address: Address, height: Int, data: BlockchainData[AccountScriptInfo]): Unit = {}

@@ -221,14 +221,9 @@ object RideBlockchainRunner extends ScorexLogging {
 
         val stateUpdate = (append.getStateUpdate +: append.transactionStateUpdates).view
         withUpdatedHeight
-          .pipe(
-            stateUpdate
-              .flatMap(_.assets)
-              .map(_.getAfter)
-              .foldLeft(_) { case (r, curr) =>
-                r.withAppendResult(blockchainStorage.assets.append(h, curr))
-              }
-          )
+          .pipe(stateUpdate.flatMap(_.assets).foldLeft(_) { case (r, x) =>
+            r.withAppendResult(blockchainStorage.assets.append(h, x))
+          })
           .pipe(stateUpdate.flatMap(_.balances).foldLeft(_) { case (r, x) =>
             r.withAppendResult(blockchainStorage.portfolios.append(h, x))
           })
@@ -236,7 +231,7 @@ object RideBlockchainRunner extends ScorexLogging {
             r.withAppendResult(blockchainStorage.portfolios.append(h, x))
           })
           .pipe(stateUpdate.flatMap(_.dataEntries).foldLeft(_) { case (r, x) =>
-            r.withAppendResult(blockchainStorage.appendAccountData(h, x))
+            r.withAppendResult(blockchainStorage.data.append(h, x))
           })
           .pipe(
             txs.view
@@ -260,8 +255,17 @@ object RideBlockchainRunner extends ScorexLogging {
       case Update.Rollback(rollback) =>
         val stateUpdate = rollback.getRollbackStateUpdate
         withUpdatedHeight
-          .pipe(stateUpdate.assets.foldLeft(_) { case (r, curr) =>
-            r.withRollbackResult(blockchainStorage.assets.rollback(h, curr))
+          .pipe(stateUpdate.assets.foldLeft(_) { case (r, x) =>
+            r.withRollbackResult(blockchainStorage.assets.rollback(h, x))
+          })
+          .pipe(stateUpdate.balances.foldLeft(_) { case (r, x) =>
+            r.withRollbackResult(blockchainStorage.portfolios.rollback(h, x))
+          })
+          .pipe(stateUpdate.leasingForAddress.foldLeft(_) { case (r, x) =>
+            r.withRollbackResult(blockchainStorage.portfolios.rollback(h, x))
+          })
+          .pipe(stateUpdate.dataEntries.foldLeft(_) { case (r, x) =>
+            r.withRollbackResult(blockchainStorage.data.rollback(h, x))
           })
     }
   }

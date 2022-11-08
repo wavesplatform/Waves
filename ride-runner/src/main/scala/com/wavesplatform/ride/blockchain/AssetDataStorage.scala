@@ -1,6 +1,5 @@
 package com.wavesplatform.ride.blockchain
 
-import cats.syntax.option.*
 import com.google.protobuf.UnsafeByteOperations
 import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.grpc.BlockchainGrpcApi
@@ -26,20 +25,23 @@ class AssetDataStorage[TagT](caches: BlockchainCaches, blockchainApi: Blockchain
   override def removeFromPersistentCache(fromHeight: Int, key: IssuedAsset): BlockchainData[AssetDescription] =
     caches.removeAssetDescription(key, fromHeight)
 
-  def append(height: Int, update: StateUpdate.AssetDetails): AppendResult[TagT] = {
-    val asset = update.assetId.toIssuedAsset
-    append(height, asset, AssetDataStorage.toAssetDescription(asset, update).some)
+  def append(height: Int, update: StateUpdate.AssetStateUpdate): AppendResult[TagT] = {
+    val asset = getAsset(update)
+    append(height, asset, update.after.map(AssetDataStorage.toAssetDescription(asset, _)))
   }
 
+  // TODO looks similar to append
   def rollback(rollbackHeight: Int, update: StateUpdate.AssetStateUpdate): RollbackResult[TagT] = {
-    val asset = update.before
+    val asset = getAsset(update)
+    rollback(rollbackHeight, asset, update.after.map(AssetDataStorage.toAssetDescription(asset, _)))
+  }
+
+  def getAsset(update: StateUpdate.AssetStateUpdate): IssuedAsset =
+    update.before
       .orElse(update.after)
       .getOrElse(throw new RuntimeException(s"Can't get asset id from update: $update"))
       .assetId
       .toIssuedAsset
-
-    rollback(rollbackHeight, asset, update.after.map(AssetDataStorage.toAssetDescription(asset, _)))
-  }
 
 }
 

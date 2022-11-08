@@ -20,7 +20,7 @@ class LevelDbBlockchainCaches(db: DB) extends BlockchainCaches with ScorexLoggin
   private val lastAddressIdKey = CacheKeys.LastAddressId.mkKey(())
   private val lastAddressId    = new AtomicLong(db.readOnly(_.getOpt(lastAddressIdKey).getOrElse(-1L)))
 
-  override def getAccountDataEntry(address: Address, key: String, maxHeight: Int): BlockchainData[DataEntry[_]] =
+  override def getAccountDataEntry(address: Address, key: String, maxHeight: Int): BlockchainData[DataEntry[?]] =
     db
       .readOnly { ro =>
         val addressId = getOrMkAddressId(ro, address)
@@ -32,7 +32,7 @@ class LevelDbBlockchainCaches(db: DB) extends BlockchainCaches with ScorexLoggin
       }
       .tap { r => log.trace(s"getAccountDataEntry($address, '$key', $maxHeight): ${r.toFoundStr("value", _.value)}") }
 
-  override def setAccountDataEntry(address: Address, key: String, height: Int, data: BlockchainData[DataEntry[_]]): Unit = {
+  override def setAccountDataEntry(address: Address, key: String, height: Int, data: BlockchainData[DataEntry[?]]): Unit = {
     db.readWrite { rw =>
       val addressId = getOrMkAddressId(rw, address)
       rw.writeHistoricalToDb(
