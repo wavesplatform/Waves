@@ -42,6 +42,8 @@ trait DataStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging {
   def reload(height: Int, key: KeyT): Unit =
     memoryCache.updateWith(key) {
       case Some(orig) =>
+        log.info(s"Reload $name($key)")
+
         val loaded = BlockchainData.loaded(getFromBlockchain(key))
         setPersistentCache(height, key, loaded)
         orig.copy(data = loaded).some
@@ -53,7 +55,7 @@ trait DataStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging {
     memoryCache.get(key) match {
       case None => AppendResult.ignored
       case Some(orig) =>
-        log.debug(s"Updated $name($key)")
+        log.debug(s"Update $name($key)")
 
         val updated = BlockchainData.loaded(update)
         setPersistentCache(height, key, updated)
@@ -71,6 +73,8 @@ trait DataStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging {
     memoryCache.get(key) match {
       case None => RollbackResult.ignored
       case Some(orig) =>
+        log.info(s"Rollback $name($key)")
+
         removeFromPersistentCache(rollbackHeight + 1, key) match {
           case latest @ BlockchainData.Cached(_) =>
             // TODO compare with afterRollback

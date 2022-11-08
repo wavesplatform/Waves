@@ -120,7 +120,7 @@ object RideBlockchainRunner extends ScorexLogging {
       val lastHeightAtStart = blockchainApi.getCurrentBlockchainHeight()
       log.info(s"Current blockchain height: $lastHeightAtStart")
 
-      val end               = lastHeightAtStart + 1
+      val end               = lastHeightAtStart + 5
       @volatile var started = false
 
       val events = blockchainApi.stream
@@ -138,8 +138,10 @@ object RideBlockchainRunner extends ScorexLogging {
           case Event.Next(event) => event
         }
         .mapAccumulate(BlockchainState.Working(start): BlockchainState)(BlockchainState.apply)
+        .filter(_.nonEmpty)
         .foreach { batchedEvents =>
           val processResult = batchedEvents.foldLeft(ProcessResult()) { case (r, event) =>
+            log.info(s"Processing ${event.getUpdate.height}")
             process(blockchainStorage, allScriptIndices, r, event)
           }
 
@@ -149,6 +151,7 @@ object RideBlockchainRunner extends ScorexLogging {
             processResult.uncertainKeys.foreach { _.reload(blockchainStorage, h) }
           }
 
+          log.info(s"==> $h >= $lastHeightAtStart, started: $started, affectedScripts: ${processResult.affectedScripts}, batchedEvents for heights: {${batchedEvents.map(_.getUpdate.height).mkString(", ")}}")
           if (h >= lastHeightAtStart) {
             if (!started) {
               log.debug(s"[$h] Reached the current height, run all scripts")
@@ -207,8 +210,8 @@ object RideBlockchainRunner extends ScorexLogging {
     // Almost all scripts use the height
     val withUpdatedHeight = if (h != blockchainStorage.height) {
       blockchainStorage.setHeight(h)
-      prev.copy(affectedScripts = allScriptIndices)
-    } else prev
+      prev.copy(affectedScripts = allScriptIndices, newHeight = h)
+    } else prev.copy(newHeight = h)
 
     update.update match {
       case Update.Empty => prev
