@@ -13,8 +13,8 @@ import com.wavesplatform.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 
-class PortfolioDataStorage[TagT](blockchainApi: BlockchainGrpcApi, override val persistentCache: PersistentCache[Address, Portfolio])
-    extends DataStorage[Address, Portfolio, TagT] {
+class PortfolioStorage[TagT](blockchainApi: BlockchainGrpcApi, override val persistentCache: PersistentCache[Address, Portfolio])
+    extends Storage[Address, Portfolio, TagT] {
   override def mkDataKey(key: Address): DataKey = PortfolioDataKey(key)
 
   override def getFromBlockchain(key: Address): Option[Portfolio] = blockchainApi.getBalances(key).some

@@ -11,14 +11,14 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
 import com.wavesplatform.state.AccountScriptInfo
-import com.wavesplatform.storage.AccountScriptDataStorage.toAccountScriptInfo
+import com.wavesplatform.storage.AccountScriptStorage.toAccountScriptInfo
 
-class AccountScriptDataStorage[TagT](
+class AccountScriptStorage[TagT](
     chainId: Byte,
     estimator: => ScriptEstimator,
     blockchainApi: BlockchainGrpcApi,
     override val persistentCache: PersistentCache[Address, AccountScriptInfo]
-) extends DataStorage[Address, AccountScriptInfo, TagT] {
+) extends Storage[Address, AccountScriptInfo, TagT] {
   override def mkDataKey(key: Address): DataKey = AccountScriptDataKey(key)
 
   override def getFromBlockchain(key: Address): Option[AccountScriptInfo] = blockchainApi.getAccountScript(key, estimator)
@@ -30,7 +30,7 @@ class AccountScriptDataStorage[TagT](
     rollback(height, account.toAddress(chainId), toVanillaScript(newScript).map(toAccountScriptInfo(estimator, account, _)))
 }
 
-object AccountScriptDataStorage {
+object AccountScriptStorage {
   def toAccountScriptInfo(estimator: ScriptEstimator, account: PublicKey, script: Script): AccountScriptInfo = {
     // TODO dup, see BlockchainGrpcApi
 

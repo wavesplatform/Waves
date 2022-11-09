@@ -18,9 +18,9 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Pe
     extends ScorexLogging {
   private val chainId = settings.addressSchemeCharacter.toByte
 
-  val data = new AccountDataDataStorage[TagT](blockchainApi, caches.accountDataEntries)
+  val data = new AccountDataStorage[TagT](blockchainApi, caches.accountDataEntries)
 
-  val accountScripts = new AccountScriptDataStorage[TagT](chainId, estimator, blockchainApi, caches.accountScripts)
+  val accountScripts = new AccountScriptStorage[TagT](chainId, estimator, blockchainApi, caches.accountScripts)
 
   // It seems, we don't need to update this. Only for some optimization needs
   private val blockHeaders = RideData.mapReadOnly[Int, SignedBlockHeader, TagT] { h =>
@@ -54,7 +54,7 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Pe
     )(())
       .getOrElse(throw new RuntimeException("Impossible: activated features are empty"))
 
-  val assets = new AssetDataStorage[TagT](blockchainApi, caches.assetDescriptions)
+  val assets = new AssetStorage[TagT](blockchainApi, caches.assetDescriptions)
 
   // It seems, we don't need to update this. Only for some optimization needs
   private val aliases = RideData.anyRefMap[Alias, Address, TagT] {
@@ -63,9 +63,9 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Pe
 
   def getAlias(alias: Alias, tag: TagT): Option[Address] = aliases.get(alias, tag)
 
-  val portfolios = new PortfolioDataStorage[TagT](blockchainApi, caches.balances)
+  val portfolios = new PortfolioStorage[TagT](blockchainApi, caches.balances)
 
-  val transactions = new TransactionsDataStorage[TagT](blockchainApi, caches.transactions)
+  val transactions = new TransactionsStorage[TagT](blockchainApi, caches.transactions)
 
   private def estimator: ScriptEstimator = EstimatorProvider.byActivatedFeatures(settings.functionalitySettings, activatedFeatures, height)
 

@@ -9,8 +9,8 @@ import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaDataEntry
 import com.wavesplatform.state.DataEntry
 
-class AccountDataDataStorage[TagT](blockchainApi: BlockchainGrpcApi, override val persistentCache: PersistentCache[AccountDataKey, DataEntry[?]])
-    extends DataStorage[AccountDataKey, DataEntry[?], TagT] {
+class AccountDataStorage[TagT](blockchainApi: BlockchainGrpcApi, override val persistentCache: PersistentCache[AccountDataKey, DataEntry[?]])
+    extends Storage[AccountDataKey, DataEntry[?], TagT] {
   override def mkDataKey(key: AccountDataKey): DataKey = AccountDataDataKey(key._1, key._2)
 
   override def getFromBlockchain(key: AccountDataKey): Option[DataEntry[?]] = blockchainApi.getAccountDataEntry(key._1, key._2)

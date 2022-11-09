@@ -13,23 +13,23 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 
 import java.nio.charset.StandardCharsets
 
-class AssetDataStorage[TagT](
+class AssetStorage[TagT](
     blockchainApi: BlockchainGrpcApi,
     override val persistentCache: PersistentCache[IssuedAsset, AssetDescription]
-) extends DataStorage[IssuedAsset, AssetDescription, TagT] {
+) extends Storage[IssuedAsset, AssetDescription, TagT] {
   override def mkDataKey(key: IssuedAsset): DataKey = AssetDescriptionDataKey(key)
 
   override def getFromBlockchain(key: IssuedAsset): Option[AssetDescription] = blockchainApi.getAssetDescription(key)
 
   def append(height: Int, update: StateUpdate.AssetStateUpdate): AppendResult[TagT] = {
     val asset = getAsset(update)
-    append(height, asset, update.after.map(AssetDataStorage.toAssetDescription(asset, _)))
+    append(height, asset, update.after.map(AssetStorage.toAssetDescription(asset, _)))
   }
 
   // TODO looks similar to append
   def rollback(rollbackHeight: Int, update: StateUpdate.AssetStateUpdate): RollbackResult[TagT] = {
     val asset = getAsset(update)
-    rollback(rollbackHeight, asset, update.after.map(AssetDataStorage.toAssetDescription(asset, _)))
+    rollback(rollbackHeight, asset, update.after.map(AssetStorage.toAssetDescription(asset, _)))
   }
 
   def getAsset(update: StateUpdate.AssetStateUpdate): IssuedAsset =
@@ -40,7 +40,7 @@ class AssetDataStorage[TagT](
       .toIssuedAsset
 }
 
-object AssetDataStorage {
+object AssetStorage {
   def toAssetDescription(asset: IssuedAsset, update: StateUpdate.AssetDetails): AssetDescription = AssetDescription(
     originTransactionId = asset.id,
     issuer = update.issuer.toPublicKey,

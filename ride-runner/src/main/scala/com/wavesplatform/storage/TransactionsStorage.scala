@@ -13,10 +13,10 @@ import com.wavesplatform.state.{Height, TransactionId, TxMeta}
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{EthereumTransaction, Transaction}
 
-class TransactionsDataStorage[TagT](
+class TransactionsStorage[TagT](
     blockchainApi: BlockchainGrpcApi,
     override val persistentCache: PersistentCache[TransactionId, (TxMeta, Option[Transaction])]
-) extends DataStorage[TransactionId, (TxMeta, Option[Transaction]), TagT] {
+) extends Storage[TransactionId, (TxMeta, Option[Transaction]), TagT] {
   override def mkDataKey(key: TransactionId): DataKey = TransactionDataKey(key)
 
   override def getFromBlockchain(key: TransactionId): Option[(TxMeta, Option[Transaction])] = blockchainApi.getTransferLikeTransaction(key)

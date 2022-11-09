@@ -9,7 +9,7 @@ import com.wavesplatform.utils.ScorexLogging
 import scala.collection.mutable
 import scala.util.chaining.*
 
-trait DataStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging {
+trait Storage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging {
   protected val memoryCache = mutable.AnyRefMap.empty[KeyT, TaggedData[RemoteData[ValueT], TagT]]
 
   lazy val name = getSimpleName(this)
