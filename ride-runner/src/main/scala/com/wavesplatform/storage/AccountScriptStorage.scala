@@ -2,7 +2,6 @@ package com.wavesplatform.storage
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.blockchain.caches.PersistentCache
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.grpc.BlockchainGrpcApi
 import com.wavesplatform.lang.script.Script
@@ -11,6 +10,7 @@ import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
 import com.wavesplatform.state.AccountScriptInfo
 import com.wavesplatform.storage.AccountScriptStorage.toAccountScriptInfo
 import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
+import com.wavesplatform.storage.persistent.PersistentCache
 
 class AccountScriptStorage[TagT](
     chainId: Byte,

@@ -1,13 +1,13 @@
 package com.wavesplatform.storage
 
 import com.wavesplatform.blockchain.*
-import com.wavesplatform.blockchain.caches.PersistentCache
 import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.grpc.BlockchainGrpcApi
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaDataEntry
 import com.wavesplatform.state.DataEntry
 import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
+import com.wavesplatform.storage.persistent.PersistentCache
 
 class AccountDataStorage[TagT](blockchainApi: BlockchainGrpcApi, override val persistentCache: PersistentCache[AccountDataKey, DataEntry[?]])
     extends Storage[AccountDataKey, DataEntry[?], TagT] { storage =>

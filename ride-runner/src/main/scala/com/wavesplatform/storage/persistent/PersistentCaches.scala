@@ -1,4 +1,4 @@
-package com.wavesplatform.blockchain.caches
+package com.wavesplatform.storage.persistent
 
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.SignedBlockHeader
@@ -7,7 +7,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, Portfolio, TransactionId, TxMeta}
 import com.wavesplatform.transaction.{Asset, Transaction}
 
-// TODO F abstraction? But getBalances?
 trait PersistentCaches {
   def accountDataEntries: PersistentCache[AccountDataKey, DataEntry[?]]
   def accountScripts: PersistentCache[Address, AccountScriptInfo]

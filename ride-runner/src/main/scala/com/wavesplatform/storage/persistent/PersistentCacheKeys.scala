@@ -1,4 +1,4 @@
-package com.wavesplatform.blockchain.caches
+package com.wavesplatform.storage.persistent
 
 import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.google.protobuf.CodedInputStream
@@ -10,9 +10,9 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.{AddressId, Key, readAccountScriptInfo, readAssetDetails, readAssetScript, readAssetStaticInfo, readBlockMeta, readLeaseBalance, writeAccountScriptInfo, writeAssetDetails, writeAssetScript, writeAssetStaticInfo, writeBlockMeta, writeLeaseBalance}
 import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
-import AsBytes.{ByteArrayOutputStreamOps, optional}
 import com.wavesplatform.serialization.*
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetInfo, AssetStaticInfo, AssetVolumeInfo, DataEntry, Portfolio, TransactionId, TxMeta}
+import com.wavesplatform.storage.persistent.AsBytes.{ByteArrayOutputStreamOps, optional}
 import com.wavesplatform.transaction.serialization.impl.DataTxSerializer
 import com.wavesplatform.transaction.{Asset, EthereumTransaction, GenesisTransaction, PBSince, PaymentTransaction, Transaction, TransactionParsers}
 

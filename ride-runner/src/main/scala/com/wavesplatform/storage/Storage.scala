@@ -1,11 +1,11 @@
 package com.wavesplatform.storage
 
 import cats.syntax.option.*
-import com.wavesplatform.blockchain.caches.PersistentCache
 import com.wavesplatform.blockchain.{RemoteData, TaggedData}
 import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.storage.Storage.DataKey
 import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
+import com.wavesplatform.storage.persistent.PersistentCache
 import com.wavesplatform.utils.ScorexLogging
 
 import scala.collection.mutable

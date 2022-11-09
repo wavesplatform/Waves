@@ -3,13 +3,13 @@ package com.wavesplatform.blockchain
 import cats.syntax.option.*
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.SignedBlockHeader
-import com.wavesplatform.blockchain.caches.PersistentCaches
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.EstimatorProvider
 import com.wavesplatform.grpc.BlockchainGrpcApi
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.storage.*
+import com.wavesplatform.storage.persistent.PersistentCaches
 import com.wavesplatform.utils.ScorexLogging
 
 import scala.util.chaining.scalaUtilChainingOps

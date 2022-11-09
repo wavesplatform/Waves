@@ -2,13 +2,13 @@ package com.wavesplatform.storage
 
 import cats.syntax.option.*
 import com.wavesplatform.account.Address
-import com.wavesplatform.blockchain.caches.PersistentCache
 import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.grpc.BlockchainGrpcApi
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.PBAmounts.toAssetAndAmount
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
+import com.wavesplatform.storage.persistent.PersistentCache
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 

@@ -3,12 +3,12 @@ package com.wavesplatform.storage
 import cats.syntax.option.*
 import com.google.protobuf.ByteString
 import com.wavesplatform.api.grpc.*
-import com.wavesplatform.blockchain.caches.PersistentCache
 import com.wavesplatform.grpc.BlockchainGrpcApi
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.SignedTransaction
 import com.wavesplatform.state.{Height, TransactionId, TxMeta}
 import com.wavesplatform.storage.actions.AppendResult
+import com.wavesplatform.storage.persistent.PersistentCache
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{EthereumTransaction, Transaction}
 

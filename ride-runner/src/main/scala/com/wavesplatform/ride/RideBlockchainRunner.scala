@@ -4,7 +4,6 @@ import cats.syntax.option.*
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.Application
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.blockchain.caches.LevelDbPersistentCaches
 import com.wavesplatform.blockchain.{BlockchainState, RideBlockchain, SharedBlockchainStorage}
 import com.wavesplatform.database.openDB
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
@@ -20,6 +19,7 @@ import com.wavesplatform.ride.input.RunnerRequest
 import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.storage.Storage.DataKey
 import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
+import com.wavesplatform.storage.persistent.LevelDbPersistentCaches
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.Scheduler
 import play.api.libs.json.JsObject

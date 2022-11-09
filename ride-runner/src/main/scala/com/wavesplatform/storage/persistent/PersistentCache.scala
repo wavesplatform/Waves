@@ -1,4 +1,4 @@
-package com.wavesplatform.blockchain.caches
+package com.wavesplatform.storage.persistent
 
 import com.wavesplatform.blockchain.RemoteData
 

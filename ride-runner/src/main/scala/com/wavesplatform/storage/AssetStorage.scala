@@ -1,13 +1,13 @@
 package com.wavesplatform.storage
 
 import com.google.protobuf.UnsafeByteOperations
-import com.wavesplatform.blockchain.caches.PersistentCache
 import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.grpc.BlockchainGrpcApi
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Height}
 import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
+import com.wavesplatform.storage.persistent.PersistentCache
 import com.wavesplatform.transaction.Asset.IssuedAsset
 
 import java.nio.charset.StandardCharsets
