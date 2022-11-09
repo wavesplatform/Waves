@@ -2,7 +2,6 @@ package com.wavesplatform.storage
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.blockchain.SharedBlockchainStorage
 import com.wavesplatform.blockchain.caches.PersistentCache
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.grpc.BlockchainGrpcApi
@@ -10,7 +9,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
 import com.wavesplatform.state.AccountScriptInfo
-import com.wavesplatform.storage.AccountScriptStorage.{AccountScriptDataKey, toAccountScriptInfo}
+import com.wavesplatform.storage.AccountScriptStorage.toAccountScriptInfo
 import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
 
 class AccountScriptStorage[TagT](
@@ -18,7 +17,7 @@ class AccountScriptStorage[TagT](
     estimator: => ScriptEstimator,
     blockchainApi: BlockchainGrpcApi,
     override val persistentCache: PersistentCache[Address, AccountScriptInfo]
-) extends Storage[Address, AccountScriptInfo, TagT] {
+) extends Storage[Address, AccountScriptInfo, TagT] { storage =>
   override def mkDataKey(key: Address): DataKey = AccountScriptDataKey(key)
 
   override def getFromBlockchain(key: Address): Option[AccountScriptInfo] = blockchainApi.getAccountScript(key, estimator)
@@ -28,6 +27,10 @@ class AccountScriptStorage[TagT](
 
   def rollback(height: Int, account: PublicKey, newScript: ByteString): RollbackResult[TagT] =
     rollback(height, account.toAddress(chainId), toVanillaScript(newScript).map(toAccountScriptInfo(estimator, account, _)))
+
+  private case class AccountScriptDataKey(address: Address) extends DataKey {
+    override def reload(height: Int): Unit = storage.reload(height, address)
+  }
 }
 
 object AccountScriptStorage {
@@ -46,12 +49,5 @@ object AccountScriptStorage {
       verifierComplexity = complexityInfo.verifierComplexity,
       complexitiesByEstimator = Map(estimator.version -> complexityInfo.callableComplexities)
     )
-  }
-
-  case class AccountScriptDataKey(address: Address) extends DataKey {
-    override type Value = AccountScriptInfo
-
-    override def reload[TagT](blockchainStorage: SharedBlockchainStorage[TagT], height: Int): Unit =
-      blockchainStorage.accountScripts.reload(height, address)
   }
 }

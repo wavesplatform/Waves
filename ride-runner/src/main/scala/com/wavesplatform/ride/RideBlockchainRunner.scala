@@ -150,7 +150,7 @@ object RideBlockchainRunner extends ScorexLogging {
           val h = processResult.newHeight
           if (processResult.uncertainKeys.nonEmpty) {
             log.debug(s"Getting data for keys: ${processResult.uncertainKeys.toVector.map(_.toString).sorted.mkString(", ")}")
-            processResult.uncertainKeys.foreach { _.reload(blockchainStorage, h) }
+            processResult.uncertainKeys.foreach { _.reload(h) }
           }
 
           log.info(
