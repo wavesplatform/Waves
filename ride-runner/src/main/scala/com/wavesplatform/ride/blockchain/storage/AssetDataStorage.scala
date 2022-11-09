@@ -5,9 +5,9 @@ import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.grpc.BlockchainGrpcApi
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
+import com.wavesplatform.ride.blockchain.DataKey
 import com.wavesplatform.ride.blockchain.DataKey.AssetDescriptionDataKey
 import com.wavesplatform.ride.blockchain.caches.PersistentCache
-import com.wavesplatform.ride.blockchain.{AppendResult, DataKey, RollbackResult}
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 

@@ -16,6 +16,7 @@ import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.resources.*
 import com.wavesplatform.ride.blockchain.*
 import com.wavesplatform.ride.blockchain.caches.LevelDbPersistentCaches
+import com.wavesplatform.ride.blockchain.storage.{AppendResult, RollbackResult}
 import com.wavesplatform.ride.input.RunnerRequest
 import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.utils.ScorexLogging
@@ -151,7 +152,11 @@ object RideBlockchainRunner extends ScorexLogging {
             processResult.uncertainKeys.foreach { _.reload(blockchainStorage, h) }
           }
 
-          log.info(s"==> $h >= $lastHeightAtStart, started: $started, affectedScripts: ${processResult.affectedScripts}, batchedEvents for heights: {${batchedEvents.map(_.getUpdate.height).mkString(", ")}}")
+          log.info(
+            s"==> $h >= $lastHeightAtStart, started: $started, affectedScripts: ${processResult.affectedScripts}, batchedEvents for heights: {${batchedEvents
+              .map(_.getUpdate.height)
+              .mkString(", ")}}"
+          )
           if (h >= lastHeightAtStart) {
             if (!started) {
               log.debug(s"[$h] Reached the current height, run all scripts")

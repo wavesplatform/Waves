@@ -2,6 +2,7 @@ package com.wavesplatform.ride.blockchain
 
 import scala.collection.mutable
 
+// TODO refactor, see DataStorage
 final class RideData[KeyT, ValueT, TagT](
     map: mutable.AbstractMap[KeyT, TaggedData[BlockchainData[ValueT], TagT]],
     loader: KeyT => Option[ValueT]

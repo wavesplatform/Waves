@@ -78,17 +78,3 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Pe
       .or(BlockchainData.loaded(fromBlockchain(key)).tap(updateCache(key, _)))
       .mayBeValue
 }
-
-case class AppendResult[TagT](mayBeChangedKey: Option[DataKey], affectedTags: Set[TagT])
-object AppendResult {
-  def appended[TagT](changedKey: DataKey, affectedTags: Set[TagT]): AppendResult[TagT] = new AppendResult[TagT](changedKey.some, affectedTags)
-  def ignored[TagT]: AppendResult[TagT]                                                = new AppendResult[TagT](none, Set.empty)
-}
-
-case class RollbackResult[TagT](mayBeUncertainKey: Option[DataKey], affectedTags: Set[TagT])
-object RollbackResult {
-  def uncertain[TagT](uncertainKey: DataKey, affectedTags: Set[TagT]): RollbackResult[TagT] =
-    new RollbackResult[TagT](uncertainKey.some, affectedTags)
-  def ignored[TagT]: RollbackResult[TagT]                             = new RollbackResult[TagT](none, Set.empty)
-  def rolledBack[TagT](affectedTags: Set[TagT]): RollbackResult[TagT] = new RollbackResult[TagT](none, affectedTags)
-}

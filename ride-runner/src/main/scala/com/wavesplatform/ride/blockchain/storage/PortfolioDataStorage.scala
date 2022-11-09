@@ -6,9 +6,9 @@ import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.grpc.BlockchainGrpcApi
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.PBAmounts.toAssetAndAmount
+import com.wavesplatform.ride.blockchain.DataKey
 import com.wavesplatform.ride.blockchain.DataKey.PortfolioDataKey
 import com.wavesplatform.ride.blockchain.caches.PersistentCache
-import com.wavesplatform.ride.blockchain.{AppendResult, DataKey, RollbackResult}
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset

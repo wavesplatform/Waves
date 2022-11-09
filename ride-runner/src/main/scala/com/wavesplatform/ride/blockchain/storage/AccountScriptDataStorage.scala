@@ -7,10 +7,10 @@ import com.wavesplatform.grpc.BlockchainGrpcApi
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
+import com.wavesplatform.ride.blockchain.DataKey
 import com.wavesplatform.ride.blockchain.DataKey.AccountScriptDataKey
 import com.wavesplatform.ride.blockchain.caches.PersistentCache
 import com.wavesplatform.ride.blockchain.storage.AccountScriptDataStorage.toAccountScriptInfo
-import com.wavesplatform.ride.blockchain.{AppendResult, DataKey, RollbackResult}
 import com.wavesplatform.state.AccountScriptInfo
 
 class AccountScriptDataStorage[TagT](
@@ -27,7 +27,6 @@ class AccountScriptDataStorage[TagT](
     append(height, account.toAddress(chainId), toVanillaScript(newScript).map(toAccountScriptInfo(estimator, account, _)))
 
   def rollback(height: Int, account: PublicKey, newScript: ByteString): RollbackResult[TagT] =
-    // TODO copy-paste from append
     rollback(height, account.toAddress(chainId), toVanillaScript(newScript).map(toAccountScriptInfo(estimator, account, _)))
 }
 

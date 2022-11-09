@@ -18,8 +18,6 @@ class AccountDataDataStorage[TagT](blockchainApi: BlockchainGrpcApi, override va
   def append(height: Int, update: StateUpdate.DataEntryUpdate): AppendResult[TagT] =
     append(height, (update.address.toAddress, update.getDataEntry.key), update.dataEntry.map(toVanillaDataEntry))
 
-  def rollback(height: Int, update: StateUpdate.DataEntryUpdate): RollbackResult[TagT] = {
-    // TODO copy-paste from append
+  def rollback(height: Int, update: StateUpdate.DataEntryUpdate): RollbackResult[TagT] =
     rollback(height, (update.address.toAddress, update.getDataEntry.key), update.dataEntry.map(toVanillaDataEntry))
-  }
 }
