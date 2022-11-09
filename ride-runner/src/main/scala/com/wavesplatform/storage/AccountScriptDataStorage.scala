@@ -1,17 +1,17 @@
-package com.wavesplatform.blockchain.storage
+package com.wavesplatform.storage
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.blockchain.DataKey
+import com.wavesplatform.blockchain.DataKey.AccountScriptDataKey
 import com.wavesplatform.blockchain.caches.PersistentCache
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.grpc.BlockchainGrpcApi
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
-import DataKey.AccountScriptDataKey
-import AccountScriptDataStorage.toAccountScriptInfo
 import com.wavesplatform.state.AccountScriptInfo
+import com.wavesplatform.storage.AccountScriptDataStorage.toAccountScriptInfo
 
 class AccountScriptDataStorage[TagT](
     chainId: Byte,

@@ -1,4 +1,4 @@
-package com.wavesplatform.blockchain.storage
+package com.wavesplatform.storage
 
 import com.wavesplatform.blockchain.*
 import com.wavesplatform.blockchain.DataKey.AccountDataDataKey

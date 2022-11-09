@@ -2,8 +2,8 @@ package com.wavesplatform.blockchain.caches
 
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.SignedBlockHeader
-import com.wavesplatform.blockchain.{AccountDataKey, BlockchainData}
 import com.wavesplatform.blockchain.caches.LevelDbPersistentCaches.{ReadOnlyDBOps, ReadWriteDBOps}
+import com.wavesplatform.blockchain.{AccountDataKey, RemoteData}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{AddressId, DBExt, Key, RW, ReadOnlyDB}
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, Portfolio, TransactionId, TxMeta}
@@ -22,7 +22,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
 
   override val accountDataEntries: PersistentCache[AccountDataKey, DataEntry[?]] = new PersistentCache[AccountDataKey, DataEntry[?]]
     with ScorexLogging {
-    override def get(maxHeight: Int, key: (Address, String)): BlockchainData[DataEntry[?]] =
+    override def get(maxHeight: Int, key: (Address, String)): RemoteData[DataEntry[?]] =
       db
         .readOnly { ro =>
           val addressId = getOrMkAddressId(ro, key._1)
@@ -34,7 +34,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
         }
         .tap { r => log.trace(s"get($key, $maxHeight): ${r.toFoundStr("value", _.value)}") }
 
-    override def set(atHeight: Int, key: (Address, String), data: BlockchainData[DataEntry[?]]): Unit = {
+    override def set(atHeight: Int, key: (Address, String), data: RemoteData[DataEntry[?]]): Unit = {
       db.readWrite { rw =>
         val addressId = getOrMkAddressId(rw, key._1)
         rw.writeHistoricalToDb(
@@ -47,7 +47,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
       log.trace(s"set($key, $atHeight)")
     }
 
-    override def remove(fromHeight: Int, key: (Address, String)): BlockchainData[DataEntry[?]] =
+    override def remove(fromHeight: Int, key: (Address, String)): RemoteData[DataEntry[?]] =
       db
         .readWrite { rw =>
           val addressId = getOrMkAddressId(rw, key._1)
@@ -61,7 +61,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
   }
 
   override val accountScripts: PersistentCache[Address, AccountScriptInfo] = new PersistentCache[Address, AccountScriptInfo] with ScorexLogging {
-    override def get(maxHeight: Int, key: Address): BlockchainData[AccountScriptInfo] =
+    override def get(maxHeight: Int, key: Address): RemoteData[AccountScriptInfo] =
       db
         .readOnly { ro =>
           val addressId = getOrMkAddressId(ro, key)
@@ -73,7 +73,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
         }
         .tap { r => log.trace(s"get($key, $maxHeight): ${r.toFoundStr("hash", _.script.hashCode())}") }
 
-    override def set(atHeight: Int, key: Address, data: BlockchainData[AccountScriptInfo]): Unit = {
+    override def set(atHeight: Int, key: Address, data: RemoteData[AccountScriptInfo]): Unit = {
       db.readWrite { rw =>
         val addressId = getOrMkAddressId(rw, key)
         rw.writeHistoricalToDb(
@@ -86,7 +86,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
       log.trace(s"setAccountScript($key, $atHeight)")
     }
 
-    override def remove(fromHeight: Int, key: Address): BlockchainData[AccountScriptInfo] =
+    override def remove(fromHeight: Int, key: Address): RemoteData[AccountScriptInfo] =
       db
         .readWrite { rw =>
           val addressId = getOrMkAddressId(rw, key)
@@ -101,7 +101,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
 
   override val assetDescriptions: PersistentCache[Asset.IssuedAsset, AssetDescription] = new PersistentCache[Asset.IssuedAsset, AssetDescription]
     with ScorexLogging {
-    override def get(maxHeight: Int, key: Asset.IssuedAsset): BlockchainData[AssetDescription] =
+    override def get(maxHeight: Int, key: Asset.IssuedAsset): RemoteData[AssetDescription] =
       db
         .readOnly { ro =>
           ro.readHistoricalFromDb(
@@ -112,7 +112,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
         }
         .tap { r => log.trace(s"get($key, $maxHeight): ${r.toFoundStr(_.toString)}") }
 
-    override def set(atHeight: Int, key: Asset.IssuedAsset, data: BlockchainData[AssetDescription]): Unit = {
+    override def set(atHeight: Int, key: Asset.IssuedAsset, data: RemoteData[AssetDescription]): Unit = {
       db.readWrite { rw =>
         rw.writeHistoricalToDb(
           CacheKeys.AssetDescriptionsHistory.mkKey(key),
@@ -124,7 +124,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
       log.trace(s"set($key, $atHeight)")
     }
 
-    override def remove(fromHeight: Int, key: Asset.IssuedAsset): BlockchainData[AssetDescription] =
+    override def remove(fromHeight: Int, key: Asset.IssuedAsset): RemoteData[AssetDescription] =
       db
         .readWrite { rw =>
           rw.removeAfterAndGetLatestExisted(
@@ -137,7 +137,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
   }
 
   override val balances: PersistentCache[Address, Portfolio] = new PersistentCache[Address, Portfolio] with ScorexLogging {
-    override def get(maxHeight: Int, key: Address): BlockchainData[Portfolio] =
+    override def get(maxHeight: Int, key: Address): RemoteData[Portfolio] =
       db
         .readOnly { ro =>
           val addressId = getOrMkAddressId(ro, key)
@@ -149,7 +149,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
         }
         .tap { r => log.trace(s"get($key): ${r.toFoundStr("assets", _.assets)}") }
 
-    override def set(atHeight: Int, key: Address, data: BlockchainData[Portfolio]): Unit = {
+    override def set(atHeight: Int, key: Address, data: RemoteData[Portfolio]): Unit = {
       db.readWrite { rw =>
         val addressId = getOrMkAddressId(rw, key)
         rw.writeHistoricalToDb(
@@ -162,7 +162,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
       log.trace(s"set($key)")
     }
 
-    override def remove(fromHeight: Int, key: Address): BlockchainData[Portfolio] =
+    override def remove(fromHeight: Int, key: Address): RemoteData[Portfolio] =
       db
         .readWrite { rw =>
           val addressId = getOrMkAddressId(rw, key)
@@ -177,7 +177,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
 
   override val transactions: PersistentCache[TransactionId, (TxMeta, Option[Transaction])] =
     new PersistentCache[TransactionId, (TxMeta, Option[Transaction])] with ScorexLogging {
-      override def get(maxHeight: Int, key: TransactionId): BlockchainData[(TxMeta, Option[Transaction])] =
+      override def get(maxHeight: Int, key: TransactionId): RemoteData[(TxMeta, Option[Transaction])] =
         db
           .readOnly {
             _.readFromDb(CacheKeys.Transactions.mkKey(key))
@@ -185,7 +185,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
           .tap { r => log.trace(s"get($key): ${r.toFoundStr { case (meta, tx) => s"meta=${meta.height}, tpe=${tx.map(_.tpe)}" }}") }
 
       // TODO atHeight
-      override def set(atHeight: Int, key: TransactionId, data: BlockchainData[(TxMeta, Option[Transaction])]): Unit = {
+      override def set(atHeight: Int, key: TransactionId, data: RemoteData[(TxMeta, Option[Transaction])]): Unit = {
         db.readWrite {
           _.writeToDb(CacheKeys.Transactions.mkKey(key), data)
         }
@@ -193,15 +193,15 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
       }
 
       // TODO
-      override def remove(fromHeight: Int, key: TransactionId): BlockchainData[(TxMeta, Option[Transaction])] = BlockchainData.Unknown
+      override def remove(fromHeight: Int, key: TransactionId): RemoteData[(TxMeta, Option[Transaction])] = RemoteData.Unknown
     }
 
-  override def getBlockHeader(height: Int): BlockchainData[SignedBlockHeader] =
+  override def getBlockHeader(height: Int): RemoteData[SignedBlockHeader] =
     db
       .readOnly { _.readFromDb(CacheKeys.SignedBlockHeaders.mkKey(height)) }
       .tap { r => log.trace(s"getBlockHeader($height): ${r.toFoundStr("id", _.id())}") }
 
-  override def setBlockHeader(height: Int, data: BlockchainData[SignedBlockHeader]): Unit = {
+  override def setBlockHeader(height: Int, data: RemoteData[SignedBlockHeader]): Unit = {
     db.readWrite { _.writeToDb(CacheKeys.SignedBlockHeaders.mkKey(height), data) }
     log.trace(s"setBlockHeader($height)")
   }
@@ -213,19 +213,19 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
     log.trace(s"setHeight($data)")
   }
 
-  override def getVrf(height: Int): BlockchainData[ByteStr] =
+  override def getVrf(height: Int): RemoteData[ByteStr] =
     db.readOnly(_.readFromDb(CacheKeys.VRF.mkKey(height))).tap { r => log.trace(s"getVrf($height): $r") }
 
-  override def setVrf(height: Int, data: BlockchainData[ByteStr]): Unit = {
+  override def setVrf(height: Int, data: RemoteData[ByteStr]): Unit = {
     db.readWrite { _.writeToDb(CacheKeys.VRF.mkKey(height), data) }
     log.trace(s"setVrf($height)")
   }
 
   private val activatedFeaturesDbKey = CacheKeys.ActivatedFeatures.mkKey(())
-  override def getActivatedFeatures(): BlockchainData[Map[Short, Int]] = {
+  override def getActivatedFeatures(): RemoteData[Map[Short, Int]] = {
     val r = db.readOnly(_.getOpt(activatedFeaturesDbKey)) match {
-      case None     => BlockchainData.Unknown
-      case Some(xs) => BlockchainData.Cached(xs)
+      case None     => RemoteData.Unknown
+      case Some(xs) => RemoteData.Cached(xs)
     }
 
     log.trace(s"getActivatedFeatures: ${r.toFoundStr(_.mkString(", "))}")
@@ -237,12 +237,12 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
     log.trace("setActivatedFeatures")
   }
 
-  override def resolveAlias(alias: Alias): BlockchainData[Address] =
+  override def resolveAlias(alias: Alias): RemoteData[Address] =
     db
       .readOnly { _.readFromDb(CacheKeys.Aliases.mkKey(alias)) }
       .tap { r => log.trace(s"resolveAlias($alias): ${r.toFoundStr()}") }
 
-  override def setAlias(alias: Alias, data: BlockchainData[Address]): Unit = {
+  override def setAlias(alias: Alias, data: RemoteData[Address]): Unit = {
     db.readWrite { _.writeToDb(CacheKeys.Aliases.mkKey(alias), data) }
     log.trace(s"setAlias($alias)")
   }
@@ -283,16 +283,16 @@ object LevelDbPersistentCaches {
         historyKey: Key[Seq[Int]],
         dataOnHeightKey: Int => Key[Option[T]],
         maxHeight: Int
-    ): BlockchainData[T] = {
+    ): RemoteData[T] = {
       val height = self.getOpt(historyKey).getOrElse(Seq.empty).find(_ <= maxHeight) // ordered from the newest to the oldest
       height
         .flatMap(height => self.getOpt(dataOnHeightKey(height)))
-        .fold[BlockchainData[T]](BlockchainData.Unknown)(BlockchainData.loaded)
+        .fold[RemoteData[T]](RemoteData.Unknown)(RemoteData.loaded)
     }
 
-    def readFromDb[T](dbKey: Key[Option[T]]): BlockchainData[T] = {
+    def readFromDb[T](dbKey: Key[Option[T]]): RemoteData[T] = {
       val x = self.getOpt(dbKey)
-      x.fold[BlockchainData[T]](BlockchainData.Unknown)(BlockchainData.loaded)
+      x.fold[RemoteData[T]](RemoteData.Unknown)(RemoteData.loaded)
     }
   }
 
@@ -301,7 +301,7 @@ object LevelDbPersistentCaches {
         historyKey: Key[Seq[Int]],
         dataOnHeightKey: Int => Key[Option[T]],
         height: Int,
-        data: BlockchainData[T]
+        data: RemoteData[T]
     ): Unit = {
       self.put(historyKey, self.getOpt(historyKey).getOrElse(Seq.empty).prepended(height))
       self.put(dataOnHeightKey(height), data.mayBeValue)
@@ -311,22 +311,22 @@ object LevelDbPersistentCaches {
         historyKey: Key[Seq[Int]],
         dataOnHeightKey: Int => Key[Option[T]],
         fromHeight: Int
-    ): BlockchainData[T] = {
+    ): RemoteData[T] = {
       val history = self.getOpt(historyKey).getOrElse(Seq.empty)
-      if (history.isEmpty) BlockchainData.Unknown
+      if (history.isEmpty) RemoteData.Unknown
       else {
         val (removedHistory, updatedHistory) = history.partition(_ >= fromHeight) // TODO binary search
         self.put(historyKey, updatedHistory) // not deleting, because it will be added with a high probability
         removedHistory.foreach(h => self.delete(dataOnHeightKey(h)))
 
         updatedHistory.headOption match {
-          case None    => BlockchainData.Unknown
+          case None    => RemoteData.Unknown
           case Some(h) => self.readFromDb(dataOnHeightKey(h))
         }
       }
     }
 
-    def writeToDb[T](dbKey: Key[Option[T]], data: BlockchainData[T]): Unit = {
+    def writeToDb[T](dbKey: Key[Option[T]], data: RemoteData[T]): Unit = {
       if (data.loaded) self.put(dbKey, data.mayBeValue)
       else self.delete(dbKey)
     }

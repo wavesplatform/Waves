@@ -1,13 +1,13 @@
-package com.wavesplatform.blockchain.storage
+package com.wavesplatform.storage
 
 import com.google.protobuf.UnsafeByteOperations
 import com.wavesplatform.blockchain.DataKey
+import com.wavesplatform.blockchain.DataKey.AssetDescriptionDataKey
 import com.wavesplatform.blockchain.caches.PersistentCache
 import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.grpc.BlockchainGrpcApi
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
-import DataKey.AssetDescriptionDataKey
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 

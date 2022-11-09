@@ -1,9 +1,9 @@
-package com.wavesplatform.blockchain.storage
+package com.wavesplatform.storage
 
 import com.wavesplatform.blockchain.DataKey
 
-/**
-  * @param mayBeUncertainKey We will request the data from the Node if Some
+/** @param mayBeUncertainKey
+  *   We will request the data from the Node if Some
   */
 case class RollbackResult[TagT](mayBeUncertainKey: Option[DataKey], affectedTags: Set[TagT])
 object RollbackResult {

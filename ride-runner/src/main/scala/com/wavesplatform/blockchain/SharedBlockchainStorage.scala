@@ -4,12 +4,12 @@ import cats.syntax.option.*
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.blockchain.caches.PersistentCaches
-import com.wavesplatform.blockchain.storage.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.EstimatorProvider
 import com.wavesplatform.grpc.BlockchainGrpcApi
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.settings.BlockchainSettings
+import com.wavesplatform.storage.*
 import com.wavesplatform.utils.ScorexLogging
 
 import scala.util.chaining.scalaUtilChainingOps
@@ -70,11 +70,11 @@ class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: Pe
   private def estimator: ScriptEstimator = EstimatorProvider.byActivatedFeatures(settings.functionalitySettings, activatedFeatures, height)
 
   private def load[KeyT, ValueT](
-      fromCache: KeyT => BlockchainData[ValueT],
+      fromCache: KeyT => RemoteData[ValueT],
       fromBlockchain: KeyT => Option[ValueT],
-      updateCache: (KeyT, BlockchainData[ValueT]) => Unit
+      updateCache: (KeyT, RemoteData[ValueT]) => Unit
   )(key: KeyT): Option[ValueT] =
     fromCache(key)
-      .or(BlockchainData.loaded(fromBlockchain(key)).tap(updateCache(key, _)))
+      .or(RemoteData.loaded(fromBlockchain(key)).tap(updateCache(key, _)))
       .mayBeValue
 }
