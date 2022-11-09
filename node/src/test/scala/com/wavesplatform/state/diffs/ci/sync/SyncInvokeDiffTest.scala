@@ -1352,6 +1352,31 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     }
   }
 
+  property("Throw with message inside callable") {
+    val script =
+      TestCompiler(V6).compileContract(
+        s"""
+           | @Callable(i)
+           | func foo() = {
+           |    let a = 1${" + 1" * 1000} # 1000 (+)
+           |    if (a == 1) then [] else throw("xxx") # 2 = 1 (==) + 1 (throw)
+           | }
+         """.stripMargin
+      )
+
+    val gTx1 = TxHelpers.genesis(dAppAddress)
+    val gTx2 = TxHelpers.genesis(invokerAddress)
+
+    val ssTx = TxHelpers.setScript(dApp, script)
+    val invoke = TxHelpers.invoke(dAppAddress, Some("foo"), Nil, Nil, fee = TestValues.invokeFee(issues = 0))
+    val genesisTxs = Seq(gTx1, gTx2, ssTx)
+
+    assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV6) {
+      case (diff, _) =>
+        diff.scriptsComplexity shouldBe 1002
+    }
+  }
+
   property("Throw without message inside invoke") {
     val script =
       TestCompiler(V6).compileContract(
@@ -1386,6 +1411,31 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
     assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV6) {
       case (diff, _) =>
         diff.scriptsComplexity shouldBe 1079
+    }
+  }
+
+  property("Throw without message inside callable") {
+    val script =
+      TestCompiler(V6).compileContract(
+        s"""
+           | @Callable(i)
+           | func foo() = {
+           |    let a = 1${" + 1" * 1000} # 1000 (+)
+           |    if (a == 1) then [] else throw() # 2 = 1 (==) + 1 (throw)
+           | }
+           """.stripMargin
+      )
+
+    val gTx1 = TxHelpers.genesis(dAppAddress)
+    val gTx2 = TxHelpers.genesis(invokerAddress)
+
+    val ssTx = TxHelpers.setScript(dApp, script)
+    val invoke = TxHelpers.invoke(dAppAddress, Some("foo"), Nil, Nil, fee = TestValues.invokeFee(issues = 0))
+    val genesisTxs = Seq(gTx1, gTx2, ssTx)
+
+    assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), fsWithV6) {
+      case (diff, _) =>
+        diff.scriptsComplexity shouldBe 1002
     }
   }
 }
