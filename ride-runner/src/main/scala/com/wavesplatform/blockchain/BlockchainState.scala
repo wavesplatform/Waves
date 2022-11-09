@@ -33,7 +33,12 @@ object BlockchainState extends ScorexLogging {
 
     def withHeight(currHeight: Height): RollingBack = copy(currHeight = currHeight, microBlockNumber = 0)
 
-    def isRollbackResolved: Boolean = currHeight > origHeight && microBlockNumber >= 1
+    def isRollbackResolved: Boolean = {
+      val resolveHeight = origHeight + 1
+      // Rollback is resolved, when the new fork height > an old fork height. But we will wait a micro block or a next block.
+      currHeight > resolveHeight ||
+      currHeight == resolveHeight && microBlockNumber >= 1
+    }
 
     override def toString: String = s"Rollback($origHeight->$currHeight, events: ${deferReverted.size})"
   }
