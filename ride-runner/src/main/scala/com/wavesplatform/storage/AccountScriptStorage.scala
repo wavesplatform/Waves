@@ -2,8 +2,7 @@ package com.wavesplatform.storage
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.blockchain.DataKey
-import com.wavesplatform.blockchain.DataKey.AccountScriptDataKey
+import com.wavesplatform.blockchain.SharedBlockchainStorage
 import com.wavesplatform.blockchain.caches.PersistentCache
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.grpc.BlockchainGrpcApi
@@ -11,7 +10,8 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
 import com.wavesplatform.state.AccountScriptInfo
-import com.wavesplatform.storage.AccountScriptStorage.toAccountScriptInfo
+import com.wavesplatform.storage.AccountScriptStorage.{AccountScriptDataKey, toAccountScriptInfo}
+import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
 
 class AccountScriptStorage[TagT](
     chainId: Byte,
@@ -46,5 +46,12 @@ object AccountScriptStorage {
       verifierComplexity = complexityInfo.verifierComplexity,
       complexitiesByEstimator = Map(estimator.version -> complexityInfo.callableComplexities)
     )
+  }
+
+  case class AccountScriptDataKey(address: Address) extends DataKey {
+    override type Value = AccountScriptInfo
+
+    override def reload[TagT](blockchainStorage: SharedBlockchainStorage[TagT], height: Int): Unit =
+      blockchainStorage.accountScripts.reload(height, address)
   }
 }

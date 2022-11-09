@@ -3,13 +3,14 @@ package com.wavesplatform.storage
 import cats.syntax.option.*
 import com.google.protobuf.ByteString
 import com.wavesplatform.api.grpc.*
-import com.wavesplatform.blockchain.DataKey
-import com.wavesplatform.blockchain.DataKey.TransactionDataKey
+import com.wavesplatform.blockchain.SharedBlockchainStorage
 import com.wavesplatform.blockchain.caches.PersistentCache
 import com.wavesplatform.grpc.BlockchainGrpcApi
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.SignedTransaction
 import com.wavesplatform.state.{Height, TransactionId, TxMeta}
+import com.wavesplatform.storage.TransactionsStorage.TransactionDataKey
+import com.wavesplatform.storage.actions.AppendResult
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{EthereumTransaction, Transaction}
 
@@ -66,5 +67,14 @@ class TransactionsStorage[TagT](
         }
       ).some
     )
+  }
+}
+
+object TransactionsStorage {
+  case class TransactionDataKey(txId: TransactionId) extends DataKey {
+    override type Value = (TxMeta, Option[Transaction])
+
+    override def reload[TagT](blockchainStorage: SharedBlockchainStorage[TagT], height: Int): Unit =
+      blockchainStorage.transactions.reload(height, txId)
   }
 }
