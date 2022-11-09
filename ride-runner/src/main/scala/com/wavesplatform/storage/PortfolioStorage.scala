@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 
 class PortfolioStorage[TagT](blockchainApi: BlockchainGrpcApi, override val persistentCache: PersistentCache[Address, Portfolio])
-    extends Storage[Address, Portfolio, TagT] { storage =>
+    extends Storage[Address, Portfolio, TagT] {
   override def getFromBlockchain(key: Address): Option[Portfolio] = blockchainApi.getBalances(key).some
 
   def append(height: Int, update: StateUpdate.BalanceUpdate): AppendResult[TagT] = {

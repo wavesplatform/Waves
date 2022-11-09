@@ -25,7 +25,7 @@ import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 
-class RideBlockchain[TagT](storage: SharedBlockchainStorage[TagT], tag: TagT) extends Blockchain with ScorexLogging {
+class ScriptBlockchain[TagT](storage: SharedBlockchainData[TagT], tag: TagT) extends Blockchain with ScorexLogging {
   override def settings: BlockchainSettings = storage.settings
 
   // TODO use utils/evaluate through REST API
@@ -60,7 +60,7 @@ class RideBlockchain[TagT](storage: SharedBlockchainStorage[TagT], tag: TagT) ex
 
   // Ride: get*Value (data), get* (data), isDataStorageUntouched, balance, scriptHash, wavesBalance
   override def resolveAlias(a: Alias): Either[ValidationError, Address] =
-    storage.getAlias(a, tag).toRight(AliasDoesNotExist(a): ValidationError)
+    storage.aliases.get(height, a, tag).toRight(AliasDoesNotExist(a): ValidationError)
 
   private def withPortfolios(address: Address): Portfolio = storage.portfolios.get(height, address, tag).getOrElse(Portfolio.empty)
 

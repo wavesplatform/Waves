@@ -4,7 +4,7 @@ import cats.syntax.option.*
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.Application
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.blockchain.{BlockchainState, RideBlockchain, SharedBlockchainStorage}
+import com.wavesplatform.blockchain.{BlockchainState, ScriptBlockchain, SharedBlockchainData}
 import com.wavesplatform.database.openDB
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
@@ -103,7 +103,7 @@ object RideBlockchainRunner extends ScorexLogging {
 
       val db                = use(openDB(s"$basePath/db"))
       val dbCaches          = new LevelDbPersistentCaches(db)
-      val blockchainStorage = new SharedBlockchainStorage[Int](nodeSettings.blockchainSettings, dbCaches, blockchainApi)
+      val blockchainStorage = new SharedBlockchainData[Int](nodeSettings.blockchainSettings, dbCaches, blockchainApi)
 
       val scripts          = input.zipWithIndex.map { case (input, index) => RideScript(index, blockchainStorage, input.request) }
       val allScriptIndices = scripts.indices.toSet
@@ -204,7 +204,7 @@ object RideBlockchainRunner extends ScorexLogging {
   }
 
   private def process(
-      blockchainStorage: SharedBlockchainStorage[Int],
+      blockchainStorage: SharedBlockchainData[Int],
       allScriptIndices: Set[Int],
       prev: ProcessResult,
       event: SubscribeEvent
@@ -229,6 +229,7 @@ object RideBlockchainRunner extends ScorexLogging {
         }
 
         val stateUpdate = (append.getStateUpdate +: append.transactionStateUpdates).view
+        val txsView     = txs.view.map(_.transaction)
         withUpdatedHeight
           .pipe(stateUpdate.flatMap(_.assets).foldLeft(_) { case (r, x) =>
             r.withAppendResult(blockchainStorage.assets.append(h, x))
@@ -243,8 +244,7 @@ object RideBlockchainRunner extends ScorexLogging {
             r.withAppendResult(blockchainStorage.data.append(h, x))
           })
           .pipe(
-            txs.view
-              .map(_.transaction)
+            txsView
               .flatMap {
                 case Transaction.WavesTransaction(tx) =>
                   tx.data match {
@@ -257,6 +257,20 @@ object RideBlockchainRunner extends ScorexLogging {
                 r.withAppendResult(blockchainStorage.accountScripts.append(h, pk, script))
               }
           )
+          .pipe(
+            txsView
+              .flatMap {
+                case Transaction.WavesTransaction(tx) =>
+                  tx.data match {
+                    case Data.CreateAlias(txData) => (txData.alias, tx.senderPublicKey.toPublicKey).some
+                    case _                        => none
+                  }
+                case _ => none
+              }
+              .foldLeft(_) { case (r, (alias, pk)) =>
+                r.withAppendResult(blockchainStorage.aliases.append(h, alias, pk))
+              }
+          )
           .pipe(append.transactionIds.view.zip(txs).foldLeft(_) { case (r, (txId, tx)) =>
             r.withAppendResult(blockchainStorage.transactions.append(h, txId, tx))
           })
@@ -267,6 +281,10 @@ object RideBlockchainRunner extends ScorexLogging {
           .pipe(stateUpdate.assets.foldLeft(_) { case (r, x) =>
             r.withRollbackResult(blockchainStorage.assets.rollback(h, x))
           })
+          /* TODO:
+          .pipe(stateUpdate.aliases.foldLeft(_) { case (r, x) =>
+            r.withRollbackResult(blockchainStorage.aliases.rollback(h, x))
+          })*/
           .pipe(stateUpdate.balances.foldLeft(_) { case (r, x) =>
             r.withRollbackResult(blockchainStorage.portfolios.rollback(h, x))
           })
@@ -277,14 +295,13 @@ object RideBlockchainRunner extends ScorexLogging {
             r.withRollbackResult(blockchainStorage.data.rollback(h, x))
           })
       /* TODO:
-        .pipe(stateUpdate.accountScripts.foldLeft(_) { case (r, x) =>
-          r.withRollbackResult(blockchainStorage.accountScripts.rollback(h, x))
-        })
-        // TODO Remove?
-        .pipe(append.transactionIds.view.zip(txs).foldLeft(_) { case (r, txId) =>
-          r.withRollbackResult(blockchainStorage.transactions.rollback(h, txId)
-        })
-       */
+          .pipe(stateUpdate.accountScripts.foldLeft(_) { case (r, x) =>
+            r.withRollbackResult(blockchainStorage.accountScripts.rollback(h, x))
+          })
+          // TODO Remove?
+          .pipe(append.transactionIds.view.zip(txs).foldLeft(_) { case (r, txId) =>
+            r.withRollbackResult(blockchainStorage.transactions.rollback(h, txId)
+          })*/
     }
   }
 }
@@ -297,6 +314,6 @@ class RideScript(val index: Int, blockchain: Blockchain, runnerRequest: RunnerRe
 }
 
 object RideScript {
-  def apply(index: Int, blockchainStorage: SharedBlockchainStorage[Int], runnerRequest: RunnerRequest): RideScript =
-    new RideScript(index, new RideBlockchain[Int](blockchainStorage, index), runnerRequest)
+  def apply(index: Int, blockchainStorage: SharedBlockchainData[Int], runnerRequest: RunnerRequest): RideScript =
+    new RideScript(index, new ScriptBlockchain[Int](blockchainStorage, index), runnerRequest)
 }

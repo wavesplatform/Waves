@@ -247,6 +247,7 @@ object CacheKeys {
   object AssetDescriptionsHistory extends CacheHistoryKey[Asset.IssuedAsset](11)
   object AssetDescriptions        extends CacheKey[(Asset.IssuedAsset, Int), Option[AssetDescription]](12)
 
+  // TODO Store AddressId
   object Aliases extends CacheKey[Alias, Option[Address]](13)
 
   object PortfoliosHistory extends CacheHistoryKey[AddressId](14)

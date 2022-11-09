@@ -17,7 +17,7 @@ class AccountScriptStorage[TagT](
     estimator: => ScriptEstimator,
     blockchainApi: BlockchainGrpcApi,
     override val persistentCache: PersistentCache[Address, AccountScriptInfo]
-) extends Storage[Address, AccountScriptInfo, TagT] { storage =>
+) extends Storage[Address, AccountScriptInfo, TagT] {
   override def getFromBlockchain(key: Address): Option[AccountScriptInfo] = blockchainApi.getAccountScript(key, estimator)
 
   def append(height: Int, account: PublicKey, newScript: ByteString): AppendResult[TagT] =

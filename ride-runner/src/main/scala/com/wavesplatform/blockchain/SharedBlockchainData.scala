@@ -1,7 +1,6 @@
 package com.wavesplatform.blockchain
 
 import cats.syntax.option.*
-import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.EstimatorProvider
@@ -14,58 +13,53 @@ import com.wavesplatform.utils.ScorexLogging
 
 import scala.util.chaining.scalaUtilChainingOps
 
-class SharedBlockchainStorage[TagT](val settings: BlockchainSettings, caches: PersistentCaches, blockchainApi: BlockchainGrpcApi)
+class SharedBlockchainData[TagT](val settings: BlockchainSettings, persistentCaches: PersistentCaches, blockchainApi: BlockchainGrpcApi)
     extends ScorexLogging {
   private val chainId = settings.addressSchemeCharacter.toByte
 
-  val data = new AccountDataStorage[TagT](blockchainApi, caches.accountDataEntries)
+  val data = new AccountDataStorage[TagT](blockchainApi, persistentCaches.accountDataEntries)
 
-  val accountScripts = new AccountScriptStorage[TagT](chainId, estimator, blockchainApi, caches.accountScripts)
+  val accountScripts = new AccountScriptStorage[TagT](chainId, estimator, blockchainApi, persistentCaches.accountScripts)
 
   // It seems, we don't need to update this. Only for some optimization needs
   private val blockHeaders = RideData.mapReadOnly[Int, SignedBlockHeader, TagT] { h =>
     if (h > height) throw new RuntimeException(s"Can't receive a block with height=$h > current height=$height")
-    else load(caches.getBlockHeader, blockchainApi.getBlockHeader, caches.setBlockHeader)(h)
+    else load(persistentCaches.getBlockHeader, blockchainApi.getBlockHeader, persistentCaches.setBlockHeader)(h)
   }
   def getBlockHeader(height: Int, tag: TagT): Option[SignedBlockHeader] = blockHeaders.get(height, tag)
 
   private val vrf = RideData.mapReadOnly[Int, ByteStr, TagT] { h =>
     if (h > height) throw new RuntimeException(s"Can't receive a block VRF with height=$h > current height=$height")
-    else load(caches.getVrf, blockchainApi.getVrf, caches.setVrf)(h)
+    else load(persistentCaches.getVrf, blockchainApi.getVrf, persistentCaches.setVrf)(h)
   }
   def getVrf(height: Int, tag: TagT): Option[ByteStr] = vrf.get(height, tag)
 
   // Ride: wavesBalance, height, lastBlock TODO: a binding in Ride?
-  private var _height: Int = caches.getHeight.getOrElse {
-    blockchainApi.getCurrentBlockchainHeight().tap(caches.setHeight)
+  private var _height: Int = persistentCaches.getHeight.getOrElse {
+    blockchainApi.getCurrentBlockchainHeight().tap(persistentCaches.setHeight)
   }
   def height: Int = _height
   def setHeight(height: Int): Unit = {
-    caches.setHeight(height)
+    persistentCaches.setHeight(height)
     _height = height
   }
 
   // No way to get this from blockchain updates
   var activatedFeatures =
     load[Unit, Map[Short, Int]](
-      _ => caches.getActivatedFeatures(),
+      _ => persistentCaches.getActivatedFeatures(),
       _ => blockchainApi.getActivatedFeatures(height).some,
-      (_, xs) => xs.mayBeValue.foreach(caches.setActivatedFeatures)
+      (_, xs) => xs.mayBeValue.foreach(persistentCaches.setActivatedFeatures)
     )(())
       .getOrElse(throw new RuntimeException("Impossible: activated features are empty"))
 
-  val assets = new AssetStorage[TagT](blockchainApi, caches.assetDescriptions)
+  val assets = new AssetStorage[TagT](blockchainApi, persistentCaches.assetDescriptions)
 
-  // It seems, we don't need to update this. Only for some optimization needs
-  private val aliases = RideData.anyRefMap[Alias, Address, TagT] {
-    load(caches.resolveAlias, blockchainApi.resolveAlias, caches.setAlias)
-  }
+  val aliases = new AliasesStorage[TagT](chainId, blockchainApi, persistentCaches.aliases)
 
-  def getAlias(alias: Alias, tag: TagT): Option[Address] = aliases.get(alias, tag)
+  val portfolios = new PortfolioStorage[TagT](blockchainApi, persistentCaches.balances)
 
-  val portfolios = new PortfolioStorage[TagT](blockchainApi, caches.balances)
-
-  val transactions = new TransactionsStorage[TagT](blockchainApi, caches.transactions)
+  val transactions = new TransactionsStorage[TagT](blockchainApi, persistentCaches.transactions)
 
   private def estimator: ScriptEstimator = EstimatorProvider.byActivatedFeatures(settings.functionalitySettings, activatedFeatures, height)
 
