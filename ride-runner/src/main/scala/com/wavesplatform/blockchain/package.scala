@@ -1,4 +1,4 @@
-package com.wavesplatform.ride
+package com.wavesplatform
 
 import com.wavesplatform.account.Address
 

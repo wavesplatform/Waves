@@ -1,6 +1,6 @@
-package com.wavesplatform.ride.blockchain.storage
+package com.wavesplatform.blockchain.storage
 
-import com.wavesplatform.ride.blockchain.DataKey
+import com.wavesplatform.blockchain.DataKey
 
 case class AppendResult[TagT](mayBeChangedKey: Option[DataKey], affectedTags: Set[TagT])
 object AppendResult {

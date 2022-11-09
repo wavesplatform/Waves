@@ -1,14 +1,14 @@
-package com.wavesplatform.ride.blockchain
+package com.wavesplatform.blockchain
 
 import cats.syntax.option.*
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.SignedBlockHeader
+import com.wavesplatform.blockchain.caches.PersistentCaches
+import com.wavesplatform.blockchain.storage.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.EstimatorProvider
 import com.wavesplatform.grpc.BlockchainGrpcApi
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.ride.blockchain.caches.PersistentCaches
-import com.wavesplatform.ride.blockchain.storage.*
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.utils.ScorexLogging
 

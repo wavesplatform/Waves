@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.blockchain
+package com.wavesplatform.blockchain
 
 sealed trait BlockchainData[+ValueT] extends Product with Serializable {
   def loaded: Boolean

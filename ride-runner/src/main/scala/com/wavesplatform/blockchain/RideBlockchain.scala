@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.blockchain
+package com.wavesplatform.blockchain
 
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId

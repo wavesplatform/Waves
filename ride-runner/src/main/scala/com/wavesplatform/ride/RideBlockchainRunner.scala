@@ -4,6 +4,9 @@ import cats.syntax.option.*
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.Application
 import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.blockchain.caches.LevelDbPersistentCaches
+import com.wavesplatform.blockchain.storage.{AppendResult, RollbackResult}
+import com.wavesplatform.blockchain.{BlockchainState, DataKey, RideBlockchain, SharedBlockchainStorage}
 import com.wavesplatform.database.openDB
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
@@ -14,9 +17,6 @@ import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.resources.*
-import com.wavesplatform.ride.blockchain.*
-import com.wavesplatform.ride.blockchain.caches.LevelDbPersistentCaches
-import com.wavesplatform.ride.blockchain.storage.{AppendResult, RollbackResult}
 import com.wavesplatform.ride.input.RunnerRequest
 import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.utils.ScorexLogging

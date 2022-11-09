@@ -2,6 +2,7 @@ package com.wavesplatform.collections
 
 import scala.collection.mutable
 
+// TODO remove?
 trait AbstractMapSyntax {
   @`inline` implicit final def abstractMapSyntax[K <: AnyRef, V](self: mutable.AbstractMap[K, V]): AbstractMapOps[K, V] = new AbstractMapOps(self)
 }

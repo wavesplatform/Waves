@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.blockchain
+package com.wavesplatform.blockchain
 
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body

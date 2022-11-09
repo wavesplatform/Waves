@@ -1,11 +1,11 @@
-package com.wavesplatform.ride.blockchain.caches
+package com.wavesplatform.blockchain.caches
 
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.SignedBlockHeader
+import com.wavesplatform.blockchain.{AccountDataKey, BlockchainData}
+import com.wavesplatform.blockchain.caches.LevelDbPersistentCaches.{ReadOnlyDBOps, ReadWriteDBOps}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{AddressId, DBExt, Key, RW, ReadOnlyDB}
-import com.wavesplatform.ride.blockchain.caches.LevelDbPersistentCaches.{ReadOnlyDBOps, ReadWriteDBOps}
-import com.wavesplatform.ride.blockchain.{AccountDataKey, BlockchainData}
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, Portfolio, TransactionId, TxMeta}
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.ScorexLogging

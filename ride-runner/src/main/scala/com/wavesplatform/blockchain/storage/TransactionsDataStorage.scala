@@ -1,14 +1,14 @@
-package com.wavesplatform.ride.blockchain.storage
+package com.wavesplatform.blockchain.storage
 
 import cats.syntax.option.*
 import com.google.protobuf.ByteString
 import com.wavesplatform.api.grpc.*
+import com.wavesplatform.blockchain.DataKey
+import com.wavesplatform.blockchain.caches.PersistentCache
 import com.wavesplatform.grpc.BlockchainGrpcApi
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.SignedTransaction
-import com.wavesplatform.ride.blockchain.DataKey
-import com.wavesplatform.ride.blockchain.DataKey.TransactionDataKey
-import com.wavesplatform.ride.blockchain.caches.PersistentCache
+import DataKey.TransactionDataKey
 import com.wavesplatform.state.{Height, TransactionId, TxMeta}
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{EthereumTransaction, Transaction}

@@ -1,6 +1,6 @@
-package com.wavesplatform.ride.blockchain.caches
+package com.wavesplatform.blockchain.caches
 
-import com.wavesplatform.ride.blockchain.BlockchainData
+import com.wavesplatform.blockchain.BlockchainData
 
 trait PersistentCache[KeyT, ValueT] {
   def get(maxHeight: Int, key: KeyT): BlockchainData[ValueT]

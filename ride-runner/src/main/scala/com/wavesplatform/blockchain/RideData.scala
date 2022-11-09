@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.blockchain
+package com.wavesplatform.blockchain
 
 import scala.collection.mutable
 

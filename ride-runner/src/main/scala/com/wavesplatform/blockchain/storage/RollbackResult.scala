@@ -1,6 +1,6 @@
-package com.wavesplatform.ride.blockchain.storage
+package com.wavesplatform.blockchain.storage
 
-import com.wavesplatform.ride.blockchain.DataKey
+import com.wavesplatform.blockchain.DataKey
 
 /**
   * @param mayBeUncertainKey We will request the data from the Node if Some

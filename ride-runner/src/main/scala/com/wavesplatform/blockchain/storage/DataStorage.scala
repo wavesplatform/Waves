@@ -1,9 +1,9 @@
-package com.wavesplatform.ride.blockchain.storage
+package com.wavesplatform.blockchain.storage
 
 import cats.syntax.option.*
+import com.wavesplatform.blockchain.caches.PersistentCache
+import com.wavesplatform.blockchain.{BlockchainData, DataKey, TaggedData}
 import com.wavesplatform.meta.getSimpleName
-import com.wavesplatform.ride.blockchain.*
-import com.wavesplatform.ride.blockchain.caches.PersistentCache
 import com.wavesplatform.utils.ScorexLogging
 
 import scala.collection.mutable
