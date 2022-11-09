@@ -18,5 +18,6 @@ object StdLibVersion {
   implicit object VersionDic extends DirectiveDictionary[StdLibVersion] {
     override val default: StdLibVersion       = V3
     override val all: Iterable[StdLibVersion] = Seq(V1, V2, V3, V4, V5, V6)
+    val actualVersions: Iterable[StdLibVersion] = Seq(V3, V4, V5, V6)
   }
 }

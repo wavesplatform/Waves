@@ -11,8 +11,18 @@ abstract class JsTestBase extends TestSuite {
     assert(error.toString.contains(expectingError))
   }
 
+  protected def assertCompileErrorDApp(code: String, version: StdLibVersion, expectingError: String, estimator: Int = 3): Unit = {
+    val error = JsAPI.compile(dApp(code, version), estimator).error
+    assert(error.toString.contains(expectingError))
+  }
+
   protected def assertCompileSuccess(code: String, estimator: Int = 3): Unit = {
     val error = JsAPI.compile(code, estimator).error
+    assert(isUndefined(error))
+  }
+
+  protected def assertCompileSuccessDApp(code: String, version: StdLibVersion, estimator: Int = 3): Unit = {
+    val error = JsAPI.compile(dApp(code, version), estimator).error
     assert(isUndefined(error))
   }
 
