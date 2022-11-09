@@ -16,8 +16,6 @@ class TransactionsStorage[TagT](
     blockchainApi: BlockchainGrpcApi,
     override val persistentCache: PersistentCache[TransactionId, (TxMeta, Option[Transaction])]
 ) extends Storage[TransactionId, (TxMeta, Option[Transaction]), TagT] { storage =>
-  override def mkDataKey(key: TransactionId): DataKey = TransactionDataKey(key)
-
   override def getFromBlockchain(key: TransactionId): Option[(TxMeta, Option[Transaction])] = blockchainApi.getTransferLikeTransaction(key)
 
   def getWithTransferLike(height: Int, key: TransactionId, tag: TagT): Option[(TxMeta, Option[TransferTransactionLike])] =
@@ -65,9 +63,5 @@ class TransactionsStorage[TagT](
         }
       ).some
     )
-  }
-
-  private case class TransactionDataKey(txId: TransactionId) extends DataKey {
-    override def reload(height: Int): Unit = storage.reload(height, txId)
   }
 }

@@ -18,8 +18,6 @@ class AccountScriptStorage[TagT](
     blockchainApi: BlockchainGrpcApi,
     override val persistentCache: PersistentCache[Address, AccountScriptInfo]
 ) extends Storage[Address, AccountScriptInfo, TagT] { storage =>
-  override def mkDataKey(key: Address): DataKey = AccountScriptDataKey(key)
-
   override def getFromBlockchain(key: Address): Option[AccountScriptInfo] = blockchainApi.getAccountScript(key, estimator)
 
   def append(height: Int, account: PublicKey, newScript: ByteString): AppendResult[TagT] =
@@ -27,10 +25,6 @@ class AccountScriptStorage[TagT](
 
   def rollback(height: Int, account: PublicKey, newScript: ByteString): RollbackResult[TagT] =
     rollback(height, account.toAddress(chainId), toVanillaScript(newScript).map(toAccountScriptInfo(estimator, account, _)))
-
-  private case class AccountScriptDataKey(address: Address) extends DataKey {
-    override def reload(height: Int): Unit = storage.reload(height, address)
-  }
 }
 
 object AccountScriptStorage {

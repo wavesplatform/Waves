@@ -16,8 +16,6 @@ class AssetStorage[TagT](
     blockchainApi: BlockchainGrpcApi,
     override val persistentCache: PersistentCache[IssuedAsset, AssetDescription]
 ) extends Storage[IssuedAsset, AssetDescription, TagT] { storage =>
-  override def mkDataKey(key: IssuedAsset): DataKey = AssetDataKey(key)
-
   override def getFromBlockchain(key: IssuedAsset): Option[AssetDescription] = blockchainApi.getAssetDescription(key)
 
   def append(height: Int, update: StateUpdate.AssetStateUpdate): AppendResult[TagT] = {
@@ -37,10 +35,6 @@ class AssetStorage[TagT](
       .getOrElse(throw new RuntimeException(s"Can't get asset id from update: $update"))
       .assetId
       .toIssuedAsset
-
-  private case class AssetDataKey(asset: IssuedAsset) extends DataKey {
-    override def reload(height: Int): Unit = storage.reload(height, asset)
-  }
 }
 
 object AssetStorage {

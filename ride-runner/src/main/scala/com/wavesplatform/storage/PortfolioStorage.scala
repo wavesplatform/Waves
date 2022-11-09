@@ -14,8 +14,6 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 
 class PortfolioStorage[TagT](blockchainApi: BlockchainGrpcApi, override val persistentCache: PersistentCache[Address, Portfolio])
     extends Storage[Address, Portfolio, TagT] { storage =>
-  override def mkDataKey(key: Address): DataKey = PortfolioDataKey(key)
-
   override def getFromBlockchain(key: Address): Option[Portfolio] = blockchainApi.getBalances(key).some
 
   def append(height: Int, update: StateUpdate.BalanceUpdate): AppendResult[TagT] = {
@@ -90,9 +88,5 @@ class PortfolioStorage[TagT](blockchainApi: BlockchainGrpcApi, override val pers
 
         super.rollback(rollbackHeight, update.address.toAddress, updated)
     }
-  }
-
-  private case class PortfolioDataKey(address: Address) extends DataKey {
-    override def reload(height: Int): Unit = storage.reload(height, address)
   }
 }

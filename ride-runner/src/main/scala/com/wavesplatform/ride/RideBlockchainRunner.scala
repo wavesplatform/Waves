@@ -18,7 +18,7 @@ import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.resources.*
 import com.wavesplatform.ride.input.RunnerRequest
 import com.wavesplatform.state.{Blockchain, Height}
-import com.wavesplatform.storage.DataKey
+import com.wavesplatform.storage.Storage.DataKey
 import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.Scheduler

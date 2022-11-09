@@ -1,6 +1,6 @@
 package com.wavesplatform.storage.actions
 
-import com.wavesplatform.storage.DataKey
+import com.wavesplatform.storage.Storage.DataKey
 
 case class AppendResult[TagT](mayBeChangedKey: Option[DataKey], affectedTags: Set[TagT])
 object AppendResult {

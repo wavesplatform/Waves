@@ -4,18 +4,17 @@ import cats.syntax.option.*
 import com.wavesplatform.blockchain.caches.PersistentCache
 import com.wavesplatform.blockchain.{RemoteData, TaggedData}
 import com.wavesplatform.meta.getSimpleName
+import com.wavesplatform.storage.Storage.DataKey
 import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
 import com.wavesplatform.utils.ScorexLogging
 
 import scala.collection.mutable
 import scala.util.chaining.*
 
-trait Storage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging {
+trait Storage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging { storage =>
   protected val memoryCache = mutable.AnyRefMap.empty[KeyT, TaggedData[RemoteData[ValueT], TagT]]
 
   lazy val name = getSimpleName(this)
-
-  def mkDataKey(key: KeyT): DataKey
 
   def getFromBlockchain(key: KeyT): Option[ValueT]
 
@@ -89,5 +88,17 @@ trait Storage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging {
             }
         }
     }
+  }
+
+  final def mkDataKey(key: KeyT): DataKey = StorageDataKey(key)
+
+  private case class StorageDataKey(key: KeyT) extends DataKey {
+    override def reload(height: Int): Unit = storage.reload(height, key)
+  }
+}
+
+object Storage {
+  trait DataKey {
+    def reload(height: Int): Unit
   }
 }
