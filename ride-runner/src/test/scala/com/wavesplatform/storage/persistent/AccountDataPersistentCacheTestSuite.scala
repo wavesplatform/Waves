@@ -10,7 +10,7 @@ class AccountDataPersistentCacheTestSuite extends PersistentCacheTestSuite[Accou
   private val alice = Wallet.generateNewAccount("test".getBytes(StandardCharsets.UTF_8), 0)
 
   private val defaultPairDataKey      = "foo"
-  protected override val defaultPair  = (alice.publicKey.toAddress, defaultPairDataKey)
+  protected override val defaultKey   = (alice.publicKey.toAddress, defaultPairDataKey)
   protected override val defaultValue = BooleanDataEntry(defaultPairDataKey, value = true)
 
   protected override def test(f: PersistentCache[AccountDataKey, DataEntry[?]] => Unit): Unit = withDb { db =>

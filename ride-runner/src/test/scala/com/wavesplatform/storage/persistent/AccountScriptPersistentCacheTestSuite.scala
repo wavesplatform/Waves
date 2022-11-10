@@ -11,7 +11,7 @@ import java.nio.charset.StandardCharsets
 class AccountScriptPersistentCacheTestSuite extends PersistentCacheTestSuite[Address, AccountScriptInfo] {
   private val alice = Wallet.generateNewAccount("test".getBytes(StandardCharsets.UTF_8), 0)
 
-  protected override val defaultPair = alice.toAddress
+  protected override val defaultKey = alice.toAddress
   protected override val defaultValue = AccountScriptInfo(
     publicKey = alice.publicKey,
     script = Script.fromBase64String("base64:BQkAAGYAAAACBQAAAAZoZWlnaHQAAAAAAAAAAABXs1wV").explicitGet(),

@@ -134,7 +134,7 @@ object Dependencies {
     akkaModule("slf4j") % Runtime
   )
 
-  private def leveldbJava(module: String = "") = "org.iq80.leveldb" % s"leveldb${if (module.nonEmpty) "-" else ""}$module" % "0.12"
+  def leveldbJava(module: String = "") = "org.iq80.leveldb" % s"leveldb${if (module.nonEmpty) "-" else ""}$module" % "0.12"
 
   private[this] val levelDBJNA = {
     val levelDbVersion = "1.23.1"
