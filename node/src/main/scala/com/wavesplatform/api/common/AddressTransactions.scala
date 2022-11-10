@@ -2,29 +2,27 @@ package com.wavesplatform.api.common
 
 import com.google.common.collect.AbstractIterator
 import com.wavesplatform.account.Address
+import com.wavesplatform.api.common.AddressTransactions.TxByAddressIterator.BatchSize
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
-import com.wavesplatform.database.{AddressId, DBExt, DBResource, KeyTags, Keys, readTransactionHNSeqAndType}
+import com.wavesplatform.database.{AddressId, DBExt, DBResource, Key, KeyTags, Keys, readTransactionHNSeqAndType}
 import com.wavesplatform.state.{Diff, Height, InvokeScriptResult, TransactionId, TxMeta, TxNum}
 import com.wavesplatform.transaction.{Authorized, EthereumTransaction, GenesisTransaction, Transaction, TransactionType}
 import monix.eval.Task
 import monix.reactive.Observable
-import org.rocksdb.{ReadOptions, RocksDB}
+import org.rocksdb.{ReadOptions, RocksDB, RocksIterator}
 
 import scala.jdk.CollectionConverters.*
 import scala.annotation.tailrec
+import scala.collection.mutable.ArrayBuffer
 
 object AddressTransactions {
-  private def loadTransaction(db: RocksDB, height: Height, txNum: TxNum, sender: Option[Address]): Option[(TxMeta, Transaction)] =
-    db.get(Keys.transactionAt(height, txNum)) match {
-      case Some((m, tx: Authorized)) if sender.forall(_ == tx.sender.toAddress)         => Some(m -> tx)
-      case Some((m, gt: GenesisTransaction)) if sender.isEmpty                          => Some(m -> gt)
-      case Some((m, et: EthereumTransaction)) if sender.forall(_ == et.senderAddress()) => Some(m -> et)
-      case _                                                                            => None
-    }
-
-  private def loadTransactions(db: RocksDB, txs: Seq[(Height, TxNum)], sender: Option[Address]): Seq[(TxMeta, Transaction, Option[TxNum])] =
-    db.multiGet(txs.map { case (h, n) => Keys.transactionAt(h, n) -> n })
+  private def loadTransactions(
+      db: DBResource,
+      keys: ArrayBuffer[(Key[Option[(TxMeta, Transaction)]], TxNum)],
+      sender: Option[Address]
+  ): Seq[(TxMeta, Transaction, Option[TxNum])] =
+    db.multiGet(keys)
       .flatMap {
         case (Some((m, tx: Authorized)), txNum) if sender.forall(_ == tx.sender.toAddress)         => Some((m, tx, Some(txNum)))
         case (Some((m, gt: GenesisTransaction)), txNum) if sender.isEmpty                          => Some((m, gt, Some(txNum)))
@@ -78,8 +76,9 @@ object AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Observable[(TxMeta, Transaction, Option[TxNum])] = {
-    db.get(Keys.addressId(subject))
+  ): Observable[(TxMeta, Transaction, Option[TxNum])] = db.resourceObservable.flatMap { dbResource =>
+    dbResource
+      .get(Keys.addressId(subject))
       .fold(Observable.empty[(TxMeta, Transaction, Option[TxNum])]) { addressId =>
         val (maxHeight, maxTxNum) =
           fromId
@@ -90,11 +89,9 @@ object AddressTransactions {
 
         Observable
           .fromIterator(
-            Task(new TxByAddressIterator(db, addressId, maxHeight, maxTxNum, types).asScala)
+            Task(new TxByAddressIterator(dbResource, addressId, maxHeight, maxTxNum, sender, types).asScala)
           )
           .concatMapIterable(identity)
-          .bufferTumbling(100)
-          .concatMapIterable(loadTransactions(db, _, sender))
       }
   }
 
@@ -121,30 +118,43 @@ object AddressTransactions {
     )
   }
 
-  class TxByAddressIterator(db: RocksDB, addressId: AddressId, maxHeight: Int, maxTxNum: Int, types: Set[Transaction.Type])
-      extends AbstractIterator[Seq[(Height, TxNum)]] {
-    val dbIterator = db.newIterator(new ReadOptions().setTotalOrderSeek(false).setPrefixSameAsStart(true))
-    val prefix     = KeyTags.AddressTransactionHeightTypeAndNums.prefixBytes ++ addressId.toByteArray
-    val seqNr      = db.get(Keys.addressTransactionSeqNr(addressId))
+  class TxByAddressIterator(
+      db: DBResource,
+      addressId: AddressId,
+      maxHeight: Int,
+      maxTxNum: Int,
+      sender: Option[Address],
+      types: Set[Transaction.Type]
+  ) extends AbstractIterator[Seq[(TxMeta, Transaction, Option[TxNum])]] {
+    val dbIterator: RocksIterator = db.prefixIterator
+    val prefix: Array[Byte]       = KeyTags.AddressTransactionHeightTypeAndNums.prefixBytes ++ addressId.toByteArray
+    val seqNr: Int                = db.get(Keys.addressTransactionSeqNr(addressId))
 
     dbIterator.seekForPrev(Keys.addressTransactionHN(addressId, seqNr).keyBytes)
 
-    @tailrec
-    final override def computeNext(): Seq[(Height, TxNum)] = {
-      if (dbIterator.isValid) {
+    final override def computeNext(): Seq[(TxMeta, Transaction, Option[TxNum])] = {
+      val buffer = new ArrayBuffer[(Key[Option[(TxMeta, Transaction)]], TxNum)]()
+      while (dbIterator.isValid && buffer.length < BatchSize) {
         val (height, txs) = readTransactionHNSeqAndType(dbIterator.value())
         dbIterator.prev()
         if (height > maxHeight) {
-          computeNext()
+          ()
         } else if (height == maxHeight) {
-          txs.view
+          buffer ++= txs.view
             .dropWhile { case (_, txNum) => txNum >= maxTxNum }
-            .collect { case (tp, txNum) if types.isEmpty || types(TransactionType(tp)) => (height, txNum) }
-            .toSeq
+            .collect { case (tp, txNum) if types.isEmpty || types(TransactionType(tp)) => Keys.transactionAt(height, txNum) -> txNum }
         } else {
-          txs.collect { case (tp, txNum) if types.isEmpty || types(TransactionType(tp)) => (height, txNum) }
+          buffer ++= txs.collect { case (tp, txNum) if types.isEmpty || types(TransactionType(tp)) => Keys.transactionAt(height, txNum) -> txNum }
         }
-      } else endOfData()
+      }
+      if (buffer.nonEmpty) {
+        loadTransactions(db, buffer, sender)
+      } else
+        endOfData()
     }
+  }
+
+  object TxByAddressIterator {
+    val BatchSize = 50
   }
 }

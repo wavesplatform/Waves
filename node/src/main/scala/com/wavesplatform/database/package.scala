@@ -47,12 +47,15 @@ import org.slf4j.LoggerFactory
 import supertagged.TaggedType
 
 import scala.annotation.tailrec
+import scala.collection.mutable.ArrayBuffer
 import scala.collection.{View, mutable}
 import scala.util.Using
 
 //noinspection UnstableApiUsage
 package object database {
   private lazy val logger: Logger = Logger(LoggerFactory.getLogger(getClass.getName))
+
+  lazy val readOptions = new ReadOptions().setVerifyChecksums(false)
 
   def openDB(path: String): RocksDB = {
     logger.debug(s"Open DB at $path")
@@ -491,7 +494,7 @@ package object database {
   implicit class DBExt(val db: RocksDB) extends AnyVal {
     def readOnly[A](f: ReadOnlyDB => A): A = {
       Using.resource(db.getSnapshot) { s =>
-        Using.resource(new ReadOptions().setSnapshot(s)) { ro =>
+        Using.resource(new ReadOptions().setSnapshot(s).setVerifyChecksums(false)) { ro =>
           f(new ReadOnlyDB(db, ro))
         }
       }
@@ -502,7 +505,7 @@ package object database {
       */
     def readWrite[A](f: RW => A): A = {
       val snapshot    = db.getSnapshot
-      val readOptions = new ReadOptions().setSnapshot(snapshot)
+      val readOptions = new ReadOptions().setSnapshot(snapshot).setVerifyChecksums(false)
       val batch       = new SortedBatch
       val rw          = new RW(db, readOptions, batch)
       val nativeBatch = new WriteBatch()
@@ -520,10 +523,19 @@ package object database {
 
     import scala.jdk.CollectionConverters.*
 
-    def multiGet[A, B](keys: Seq[(Key[A], B)]): View[(A, B)] =
-      keys.view.zip(db.multiGetAsList(keys.map(_._1.keyBytes).asJava).asScala).map { case ((k, av), v) =>
+    def multiGet[A, B](readOptions: ReadOptions, keys: ArrayBuffer[(Key[A], B)]): View[(A, B)] =
+      keys.view.zip(db.multiGetAsList(readOptions, keys.map(_._1.keyBytes).asJava).asScala).map { case ((k, av), v) =>
         k.parse(v) -> av
       }
+
+    def multiGet[A](keys: ArrayBuffer[Key[Option[A]]]): Seq[A] =
+      keys.view
+        .zip(db.multiGetAsList(readOptions, keys.map(_.keyBytes).asJava).asScala)
+        .flatMap { case (parser, value) =>
+          parser.parse(value)
+        }
+        .toSeq
+
     def get[A](key: Key[A]): A                           = key.parse(db.get(key.keyBytes))
     def get[A](key: Key[A], readOptions: ReadOptions): A = key.parse(db.get(readOptions, key.keyBytes))
     def has(key: Key[?]): Boolean                        = db.get(key.keyBytes) != null

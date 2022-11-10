@@ -4,6 +4,7 @@ import com.google.common.base.Charsets
 import com.google.common.collect.AbstractIterator
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.AddressPortfolio.{assetBalanceIterator, nftIterator}
+import com.wavesplatform.api.common.CommonAccountsApi.AddressDataIterator.BatchSize
 import com.wavesplatform.api.common.TransactionMeta.Ethereum
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -24,6 +25,7 @@ import monix.reactive.Observable
 import org.rocksdb.{ReadOptions, RocksDB, RocksIterator}
 
 import scala.annotation.tailrec
+import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 
 trait CommonAccountsApi {
@@ -205,48 +207,53 @@ object CommonAccountsApi {
       entriesFromDiff: Array[DataEntry[?]],
       regex: Option[String]
   ) extends AbstractIterator[DataEntry[?]] {
-    val dbIterator: RocksIterator = db.newIterator(new ReadOptions().setTotalOrderSeek(false).setPrefixSameAsStart(true))
+    val dbIterator: RocksIterator = db.newIterator(new ReadOptions().setTotalOrderSeek(false).setPrefixSameAsStart(true).setVerifyChecksums(false))
     val prefix: Array[Byte]       = KeyTags.DataHistory.prefixBytes ++ PBRecipients.publicKeyHash(address)
 
     val length: Int = entriesFromDiff.length
 
     dbIterator.seek(prefix)
 
-    var nextIndex                         = 0
-    var nextDbEntry: Option[DataEntry[?]] = None
+    var nextIndex                        = 0
+    var nextDbEntries: Seq[DataEntry[?]] = Seq.empty
 
     def matches(key: String): Boolean = regex.forall(_.r.pattern.matcher(key).matches())
 
     @tailrec
     final override def computeNext(): DataEntry[?] = {
-      nextDbEntry match {
+      nextDbEntries.headOption match {
         case Some(dbEntry) =>
           if (nextIndex < length) {
             val entryFromDiff = entriesFromDiff(nextIndex)
             if (entryFromDiff.key < dbEntry.key) {
               nextIndex += 1
-              entriesFromDiff(nextIndex - 1)
+              entryFromDiff
             } else if (entryFromDiff.key == dbEntry.key) {
               nextIndex += 1
-              nextDbEntry = None
-              entriesFromDiff(nextIndex - 1)
+              nextDbEntries = nextDbEntries.tail
+              entryFromDiff
             } else {
-              nextDbEntry = None
+              nextDbEntries = nextDbEntries.tail
               dbEntry
             }
           } else {
-            nextDbEntry = None
+            nextDbEntries = nextDbEntries.tail
             dbEntry
           }
         case None =>
-          if (dbIterator.isValid) {
+          val buffer = new ArrayBuffer[(String, Int)]()
+          while (dbIterator.isValid && buffer.length < BatchSize) {
             val key = new String(dbIterator.key().drop(2 + Address.HashLength), Charsets.UTF_8)
             if (matches(key)) {
-              val newNextEntry = readIntSeq(dbIterator.value()).headOption
-                .flatMap(h => db.get(Keys.data(addressId, key)(h)))
-              nextDbEntry = newNextEntry
+              readIntSeq(dbIterator.value()).headOption match {
+                case Some(h) => buffer.addOne(key -> h)
+                case None    => ()
+              }
             }
             dbIterator.next()
+          }
+          if (buffer.nonEmpty) {
+            nextDbEntries = db.multiGet(buffer.map { case (key, h) => Keys.data(addressId, key)(h) })
             computeNext()
           } else if (nextIndex < length) {
             nextIndex += 1
@@ -257,5 +264,9 @@ object CommonAccountsApi {
           }
       }
     }
+  }
+
+  object AddressDataIterator {
+    val BatchSize = 1000
   }
 }

@@ -51,11 +51,10 @@ case class AliasApiRoute(
   private implicit val ess: JsonEntityStreamingSupport = EntityStreamingSupport.json()
 
   def aliasOfAddress: Route = (get & path("by-address" / AddrSegment)) { address =>
-    routeTimeout.executeStreamed {
+    routeTimeout.executeFromObservable {
       commonApi
         .aliasesOfAddress(address)
         .map { case (_, tx) => JsString(tx.alias.toString) }
-        .toListL
-    }(identity)
+    }
   }
 }
