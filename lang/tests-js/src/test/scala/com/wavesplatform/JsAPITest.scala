@@ -1,7 +1,7 @@
 package com.wavesplatform
 
 import com.wavesplatform.lang.directives.values.{V5, V6}
-import utest.{Tests, test}
+import utest.*
 
 import scala.scalajs.js.{Array, Dynamic, JSON}
 
