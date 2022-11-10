@@ -223,6 +223,7 @@ object RideBlockchainRunner extends ScorexLogging {
       case Update.Empty => prev
       case Update.Append(append) =>
         val txs = append.body match {
+          // PBBlocks.vanilla(block.getBlock.getHeader)
           case Body.Block(block)           => block.getBlock.transactions
           case Body.MicroBlock(microBlock) => microBlock.getMicroBlock.getMicroBlock.transactions
           case Body.Empty                  => Seq.empty

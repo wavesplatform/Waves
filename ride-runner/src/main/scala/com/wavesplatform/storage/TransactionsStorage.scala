@@ -15,7 +15,8 @@ import com.wavesplatform.transaction.{EthereumTransaction, Transaction}
 class TransactionsStorage[TagT](
     blockchainApi: BlockchainGrpcApi,
     override val persistentCache: PersistentCache[TransactionId, (TxMeta, Option[Transaction])]
-) extends Storage[TransactionId, (TxMeta, Option[Transaction]), TagT] {
+) extends Storage[TransactionId, (TxMeta, Option[Transaction]), TagT]
+    with HasAnyRefMap[TransactionId, (TxMeta, Option[Transaction]), TagT] {
   override def getFromBlockchain(key: TransactionId): Option[(TxMeta, Option[Transaction])] = blockchainApi.getTransferLikeTransaction(key)
 
   def getWithTransferLike(height: Int, key: TransactionId, tag: TagT): Option[(TxMeta, Option[TransferTransactionLike])] =
