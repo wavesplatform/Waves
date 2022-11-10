@@ -31,7 +31,7 @@ object JsAPI {
         js.Dynamic.literal(
           "name" -> name,
           "type" -> typeRepr(ft),
-          "doc" -> DocSource.varData((name, ver))
+          "doc"  -> DocSource.varData((name, ver))
         )
       }
       .toJSArray
@@ -44,8 +44,8 @@ object JsAPI {
         val (funcDoc, paramsDoc, _) = DocSource.funcData((name, signature.args.map(_._2.toString).toList, ver))
 
         js.Dynamic.literal(
-          "name" -> name,
-          "doc" -> funcDoc,
+          "name"       -> name,
+          "doc"        -> funcDoc,
           "resultType" -> typeRepr(signature.result),
           "args" -> (args zip signature.args zip paramsDoc).map { arg =>
             js.Dynamic.literal("name" -> arg._1._1, "type" -> typeRepr(arg._1._2._2), "doc" -> arg._2)
@@ -58,17 +58,17 @@ object JsAPI {
   def contractLimits(): js.Dynamic = {
     import ContractLimits.*
     js.Dynamic.literal(
-      "MaxComplexityByVersion" -> ((ver: Int) => MaxComplexityByVersion(DirectiveDictionary[StdLibVersion].idMap(ver))),
-      "MaxAssetVerifierComplexityByVersion" -> ((ver: Int) => MaxComplexityByVersion(DirectiveDictionary[StdLibVersion].idMap(ver))),
+      "MaxComplexityByVersion"                -> ((ver: Int) => MaxComplexityByVersion(DirectiveDictionary[StdLibVersion].idMap(ver))),
+      "MaxAssetVerifierComplexityByVersion"   -> ((ver: Int) => MaxComplexityByVersion(DirectiveDictionary[StdLibVersion].idMap(ver))),
       "MaxAccountVerifierComplexityByVersion" -> ((ver: Int) => MaxAccountVerifierComplexityByVersion(DirectiveDictionary[StdLibVersion].idMap(ver))),
-      "MaxCallableComplexityByVersion" -> ((ver: Int) => MaxCallableComplexityByVersion(DirectiveDictionary[StdLibVersion].idMap(ver))),
-      "MaxExprSizeInBytes" -> MaxExprSizeInBytes,
-      "MaxContractSizeInBytes" -> MaxContractSizeInBytesV6,
-      "MaxInvokeScriptArgs" -> MaxInvokeScriptArgs,
-      "MaxInvokeScriptSizeInBytes" -> MaxInvokeScriptSizeInBytes,
-      "MaxWriteSetSizeInBytes" -> MaxWriteSetSizeInBytes,
-      "MaxPaymentAmount" -> MaxCallableActionsAmountBeforeV6(V4),
-      "MaxAttachedPaymentAmount" -> MaxAttachedPaymentAmount
+      "MaxCallableComplexityByVersion"        -> ((ver: Int) => MaxCallableComplexityByVersion(DirectiveDictionary[StdLibVersion].idMap(ver))),
+      "MaxExprSizeInBytes"                    -> MaxExprSizeInBytes,
+      "MaxContractSizeInBytes"                -> MaxContractSizeInBytesV6,
+      "MaxInvokeScriptArgs"                   -> MaxInvokeScriptArgs,
+      "MaxInvokeScriptSizeInBytes"            -> MaxInvokeScriptSizeInBytes,
+      "MaxWriteSetSizeInBytes"                -> MaxWriteSetSizeInBytes,
+      "MaxPaymentAmount"                      -> MaxCallableActionsAmountBeforeV6(V4),
+      "MaxAttachedPaymentAmount"              -> MaxAttachedPaymentAmount
     )
   }
 
@@ -79,9 +79,9 @@ object JsAPI {
       .map { case DirectiveSet(ver, scriptType, contentType, imports) =>
         js.Dynamic.literal(
           "stdLibVersion" -> ver.id,
-          "contentType" -> contentType.id,
-          "scriptType" -> scriptType.id,
-          "imports" -> imports.fileNames.toJSArray
+          "contentType"   -> contentType.id,
+          "scriptType"    -> scriptType.id,
+          "imports"       -> imports.fileNames.toJSArray
         )
       }
     info.fold(
@@ -92,12 +92,12 @@ object JsAPI {
 
   @JSExportTopLevel("parseAndCompile")
   def parseAndCompile(
-                       input: String,
-                       estimatorVersion: Int,
-                       needCompaction: Boolean = false,
-                       removeUnusedCode: Boolean = false,
-                       libraries: Dictionary[String] = Dictionary.empty
-                     ): js.Dynamic =
+      input: String,
+      estimatorVersion: Int,
+      needCompaction: Boolean = false,
+      removeUnusedCode: Boolean = false,
+      libraries: Dictionary[String] = Dictionary.empty
+  ): js.Dynamic =
     API
       .parseAndCompile(input, estimatorVersion, needCompaction, removeUnusedCode, libraries.toMap)
       .fold(
@@ -105,23 +105,23 @@ object JsAPI {
         {
           case CompileAndParseResult.Expression(bytes, complexity, expr, errors) =>
             js.Dynamic.literal(
-              "result" -> Global.toBuffer(bytes),
+              "result"     -> Global.toBuffer(bytes),
               "complexity" -> complexity.toDouble,
-              "exprAst" -> expressionScriptToJs(expr),
-              "errorList" -> errors.map(compilationErrToJs).toJSArray
+              "exprAst"    -> expressionScriptToJs(expr),
+              "errorList"  -> errors.map(compilationErrToJs).toJSArray
             )
           case CompileAndParseResult.Contract(bytes, verifierComplexity, callableComplexities, expr, errors) =>
             js.Dynamic.literal(
-              "result" -> Global.toBuffer(bytes),
-              "complexity" -> verifierComplexity.toDouble,
+              "result"           -> Global.toBuffer(bytes),
+              "complexity"       -> verifierComplexity.toDouble,
               "complexityByFunc" -> callableComplexities.view.mapValues(_.toDouble).toMap.toJSDictionary,
-              "dAppAst" -> dAppToJs(expr),
-              "errorList" -> errors.map(compilationErrToJs).toJSArray
+              "dAppAst"          -> dAppToJs(expr),
+              "errorList"        -> errors.map(compilationErrToJs).toJSArray
             )
           case CompileAndParseResult.Library(bytes, complexity, expr) =>
             js.Dynamic.literal(
-              "result" -> Global.toBuffer(bytes),
-              "ast" -> toJs(expr),
+              "result"     -> Global.toBuffer(bytes),
+              "ast"        -> toJs(expr),
               "complexity" -> complexity.toDouble
             )
         }
@@ -129,23 +129,23 @@ object JsAPI {
 
   @JSExportTopLevel("compile")
   def compile(
-               input: String,
-               estimatorVersion: Int,
-               needCompaction: Boolean = false,
-               removeUnusedCode: Boolean = false,
-               libraries: Dictionary[String] = Dictionary.empty
-             ): js.Dynamic =
+      input: String,
+      estimatorVersion: Int,
+      needCompaction: Boolean = false,
+      removeUnusedCode: Boolean = false,
+      libraries: Dictionary[String] = Dictionary.empty
+  ): js.Dynamic =
     (for {
       estimator <- API.estimatorByVersion(estimatorVersion)
-      result <- API.compile(input, estimator, needCompaction, removeUnusedCode, libraries.toMap)
+      result    <- API.compile(input, estimator, needCompaction, removeUnusedCode, libraries.toMap)
     } yield result)
       .fold(
         e => js.Dynamic.literal("error" -> e),
         {
           case CompileResult.Expression(_, bytes, complexity, expr, error, _) =>
             val resultFields: Seq[(String, Any)] = Seq(
-              "result" -> Global.toBuffer(bytes),
-              "ast" -> toJs(expr),
+              "result"     -> Global.toBuffer(bytes),
+              "ast"        -> toJs(expr),
               "complexity" -> complexity.toDouble
             )
             val errorFieldOpt: Seq[(String, Any)] =
@@ -157,8 +157,8 @@ object JsAPI {
             js.Dynamic.literal.applyDynamic("apply")(resultFields ++ errorFieldOpt: _*)
           case CompileResult.Library(_, bytes, complexity, expr) =>
             js.Dynamic.literal(
-              "result" -> Global.toBuffer(bytes),
-              "ast" -> toJs(expr),
+              "result"     -> Global.toBuffer(bytes),
+              "ast"        -> toJs(expr),
               "complexity" -> complexity.toDouble
             )
           case CompileResult.DApp(_, di, meta, error) =>
@@ -171,11 +171,11 @@ object JsAPI {
               di.dApp.meta.compactNameAndOriginalNamePairList.map(pair => pair.compactName -> pair.originalName).toMap
 
             val resultFields: Seq[(String, Any)] = Seq(
-              "result" -> Global.toBuffer(di.bytes),
-              "ast" -> toJs(di.dApp),
-              "meta" -> mappedMeta,
-              "complexity" -> di.maxComplexity._2.toDouble,
-              "verifierComplexity" -> di.verifierComplexity.toDouble,
+              "result"               -> Global.toBuffer(di.bytes),
+              "ast"                  -> toJs(di.dApp),
+              "meta"                 -> mappedMeta,
+              "complexity"           -> di.maxComplexity._2.toDouble,
+              "verifierComplexity"   -> di.verifierComplexity.toDouble,
               "callableComplexities" -> di.callableComplexities.view.mapValues(_.toDouble).toMap.toJSDictionary,
               "userFunctionComplexities" -> di.userFunctionComplexities.map { case (name, complexity) =>
                 compactNameToOriginalName.getOrElse(name, name) -> complexity.toDouble
@@ -190,7 +190,7 @@ object JsAPI {
                   error => Seq("error" -> error),
                   _ => Seq()
                 )
-            js.Dynamic.literal.applyDynamic("apply")((resultFields ++ errorFieldOpt) *)
+            js.Dynamic.literal.applyDynamic("apply")((resultFields ++ errorFieldOpt)*)
         }
       )
 
