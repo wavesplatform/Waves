@@ -91,14 +91,18 @@ object CommonAccountsApi {
     override def portfolio(address: Address): Observable[(IssuedAsset, Long)] = {
       val currentDiff = diff()
       db.resourceObservable.flatMap { resource =>
-        Observable.fromIterator(Task(assetBalanceIterator(resource, address, currentDiff, includeNft(blockchain))))
+        Observable
+          .fromIterator(Task(assetBalanceIterator(resource, address, currentDiff, includeNft(blockchain))))
+          .concatMapIterable(identity)
       }
     }
 
     override def nftList(address: Address, after: Option[IssuedAsset]): Observable[(IssuedAsset, AssetDescription)] = {
       val currentDiff = diff()
       db.resourceObservable.flatMap { resource =>
-        Observable.fromIterator(Task(nftIterator(resource, address, currentDiff, after, blockchain.assetDescription)))
+        Observable
+          .fromIterator(Task(nftIterator(resource, address, currentDiff, after, blockchain.assetDescription)))
+          .concatMapIterable(identity)
       }
     }
 
@@ -254,7 +258,7 @@ object CommonAccountsApi {
             dbIterator.next()
           }
           if (buffer.nonEmpty) {
-            nextDbEntries = db.multiGet(buffer.map { case (key, h) => Keys.data(addressId, key)(h) })
+            nextDbEntries = db.multiGetFlat(buffer.map { case (key, h) => Keys.data(addressId, key)(h) })
             computeNext()
           } else if (nextIndex < length) {
             nextIndex += 1

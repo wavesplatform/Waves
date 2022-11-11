@@ -9,7 +9,9 @@ trait DBResource extends AutoCloseable {
   def get[V](key: Key[V]): V
   def get(key: Array[Byte]): Array[Byte]
   def multiGet[V, K](keys: ArrayBuffer[(Key[V], K)]): View[(V, K)]
-  def multiGet[A](keys: ArrayBuffer[Key[Option[A]]]): Seq[A]
+  def multiGetFlat[A](keys: ArrayBuffer[Key[Option[A]]]): Seq[A]
+  def multiGet(keys: ArrayBuffer[Array[Byte]]): Seq[Array[Byte]]
+  def multiGet(keys: Seq[Array[Byte]]): Seq[Array[Byte]]
   def prefixIterator: RocksIterator // Should have a single instance
   def fullIterator: RocksIterator
   def withSafePrefixIterator[A](ifNotClosed: RocksIterator => A)(ifClosed: => A = ()): A
@@ -27,7 +29,11 @@ object DBResource {
 
     override def multiGet[V, K](keys: ArrayBuffer[(Key[V], K)]): View[(V, K)] = db.multiGet(readOptions, keys)
 
-    override def multiGet[A](keys: ArrayBuffer[Key[Option[A]]]): Seq[A] = db.multiGet(readOptions, keys)
+    override def multiGetFlat[A](keys: ArrayBuffer[Key[Option[A]]]): Seq[A] = db.multiGetFlat(readOptions, keys)
+
+    override def multiGet(keys: ArrayBuffer[Array[Byte]]): Seq[Array[Byte]] = db.multiGet(readOptions, keys)
+
+    override def multiGet(keys: Seq[Array[Byte]]): Seq[Array[Byte]] = db.multiGet(readOptions, keys)
 
     override lazy val prefixIterator: RocksIterator = db.newIterator(readOptions.setTotalOrderSeek(false).setPrefixSameAsStart(true))
 

@@ -528,13 +528,19 @@ package object database {
         k.parse(v) -> av
       }
 
-    def multiGet[A](readOptions: ReadOptions, keys: ArrayBuffer[Key[Option[A]]]): Seq[A] =
+    def multiGetFlat[A](readOptions: ReadOptions, keys: ArrayBuffer[Key[Option[A]]]): Seq[A] =
       keys.view
         .zip(db.multiGetAsList(readOptions, keys.map(_.keyBytes).asJava).asScala)
         .flatMap { case (parser, value) =>
           parser.parse(value)
         }
         .toSeq
+
+    def multiGet(readOptions: ReadOptions, keys: ArrayBuffer[Array[Byte]]): Seq[Array[Byte]] =
+      db.multiGetAsList(readOptions, keys.asJava).asScala.toSeq
+
+    def multiGet(readOptions: ReadOptions, keys: Seq[Array[Byte]]): Seq[Array[Byte]] =
+      db.multiGetAsList(readOptions, keys.asJava).asScala.toSeq
 
     def get[A](key: Key[A]): A                           = key.parse(db.get(key.keyBytes))
     def get[A](key: Key[A], readOptions: ReadOptions): A = key.parse(db.get(readOptions, key.keyBytes))
