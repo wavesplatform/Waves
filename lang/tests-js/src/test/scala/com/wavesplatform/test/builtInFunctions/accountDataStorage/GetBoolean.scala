@@ -1,27 +1,26 @@
 package com.wavesplatform.test.builtInFunctions.accountDataStorage
 
 import com.wavesplatform.JsTestBase
-import com.wavesplatform.test.builtInFunctions.accountDataStorage.GetBoolean.{assertCompileErrorDApp, testData}
 import _root_.testData.{GeneratorContractsForBuiltInFunctions, TestDataConstantsAndMethods}
 import _root_.testData.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomInt, randomStringArrayElement}
 import utest.{Tests, test}
 
 object GetBoolean extends JsTestBase {
   // getBoolean
-  val getBoolean = s"getBoolean(callerTestData, $randomStringArrayElement)"
-  val getBooleanArgBeforeFunc = s"callerTestData.getBoolean($randomStringArrayElement)"
-  val ownDataGetBoolean = s"getBoolean($randomStringArrayElement)"
-  val ownDataGetBooleanArgBeforeFunc = s"$randomStringArrayElement.getBoolean()"
+  private val getBoolean = s"getBoolean(callerTestData, $randomStringArrayElement)"
+  private val getBooleanArgBeforeFunc = s"callerTestData.getBoolean($randomStringArrayElement)"
+  private val ownDataGetBoolean = s"getBoolean($randomStringArrayElement)"
+  private val ownDataGetBooleanArgBeforeFunc = s"$randomStringArrayElement.getBoolean()"
 
   // getBooleanValue
-  val getBooleanValue = s"getBooleanValue(callerTestData, $randomStringArrayElement)"
-  val getBooleanValueArgBeforeFunc = s"callerTestData.getBooleanValue($randomStringArrayElement)"
-  val ownDataGetBooleanValue = s"getBooleanValue($randomStringArrayElement)"
-  val ownDataGetBooleanValueArgBeforeFunc = s"$randomStringArrayElement.getBooleanValue()"
+  private val getBooleanValue = s"getBooleanValue(callerTestData, $randomStringArrayElement)"
+  private val getBooleanValueArgBeforeFunc = s"callerTestData.getBooleanValue($randomStringArrayElement)"
+  private val ownDataGetBooleanValue = s"getBooleanValue($randomStringArrayElement)"
+  private val ownDataGetBooleanValueArgBeforeFunc = s"$randomStringArrayElement.getBooleanValue()"
 
-  val invalidGetBoolean = s"getBoolean(callerTestData)"
-  val invalidGetBooleanValue = s"getBooleanValue(callerTestData)"
-  val testData = new TestDataConstantsAndMethods
+  private val invalidGetBoolean = s"getBoolean(callerTestData)"
+  private val invalidGetBooleanValue = s"getBooleanValue(callerTestData)"
+  private val testData = new TestDataConstantsAndMethods
 
   val tests: Tests = Tests {
     test.apply("check: function getBoolean compiles for address") {

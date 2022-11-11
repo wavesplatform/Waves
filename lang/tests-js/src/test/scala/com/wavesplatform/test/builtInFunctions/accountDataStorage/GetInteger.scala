@@ -7,20 +7,20 @@ import utest.{Tests, test}
 
 object GetInteger extends JsTestBase {
   // getInteger
-  val getInteger = s"getInteger(callerTestData, $randomStringArrayElement)"
-  val getIntegerArgBeforeFunc = s"callerTestData.getInteger($randomStringArrayElement)"
-  val ownDataGetInt = s"getInteger($randomStringArrayElement)"
-  val ownDataGetIntArgBeforeFunc = s"$randomStringArrayElement.getInteger()"
+  private val getInteger = s"getInteger(callerTestData, $randomStringArrayElement)"
+  private val getIntegerArgBeforeFunc = s"callerTestData.getInteger($randomStringArrayElement)"
+  private val ownDataGetInt = s"getInteger($randomStringArrayElement)"
+  private val ownDataGetIntArgBeforeFunc = s"$randomStringArrayElement.getInteger()"
 
   // getIntegerValue
-  val getIntegerValue = s"getIntegerValue(callerTestData, $randomStringArrayElement)"
-  val getIntegerValueArgBeforeFunc = s"callerTestData.getIntegerValue($randomStringArrayElement)"
-  val ownDataGetIntValue = s"getIntegerValue($randomStringArrayElement)"
-  val ownDataGetIntValueArgBeforeFunc = s"$randomStringArrayElement.getIntegerValue()"
+  private val getIntegerValue = s"getIntegerValue(callerTestData, $randomStringArrayElement)"
+  private val getIntegerValueArgBeforeFunc = s"callerTestData.getIntegerValue($randomStringArrayElement)"
+  private val ownDataGetIntValue = s"getIntegerValue($randomStringArrayElement)"
+  private val ownDataGetIntValueArgBeforeFunc = s"$randomStringArrayElement.getIntegerValue()"
 
-  val invalidGetInt = s"getInteger(callerTestData)"
-  val invalidGetIntValue = s"getIntegerValue(callerTestData)"
-  val testData = new TestDataConstantsAndMethods
+  private val invalidGetInt = s"getInteger(callerTestData)"
+  private val invalidGetIntValue = s"getIntegerValue(callerTestData)"
+  private val testData = new TestDataConstantsAndMethods
 
   val tests: Tests = Tests {
     test.apply("check: function getInteger compiles for address") {

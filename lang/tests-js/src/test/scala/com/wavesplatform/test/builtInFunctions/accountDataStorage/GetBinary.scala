@@ -7,20 +7,20 @@ import utest.{Tests, test}
 
 object GetBinary extends JsTestBase {
   // getBinary
-  val getBinary = s"getBinary(callerTestData, $randomStringArrayElement)"
-  val getBinaryArgBeforeFunc = s"callerTestData.getBinary($randomStringArrayElement)"
-  val ownDataGetBinary = s"getBinary($randomStringArrayElement)"
-  val ownDataGetBinaryArgBeforeFunc = s"$randomStringArrayElement.getBinary()"
+  private val getBinary = s"getBinary(callerTestData, $randomStringArrayElement)"
+  private val getBinaryArgBeforeFunc = s"callerTestData.getBinary($randomStringArrayElement)"
+  private val ownDataGetBinary = s"getBinary($randomStringArrayElement)"
+  private val ownDataGetBinaryArgBeforeFunc = s"$randomStringArrayElement.getBinary()"
 
   // getBinaryValue
-  val getBinaryValue = s"getBinaryValue(callerTestData, $randomStringArrayElement)"
-  val getBinaryValueArgBeforeFunc = s"callerTestData.getBinaryValue($randomStringArrayElement)"
-  val ownDataGetBinaryValue = s"getBinaryValue($randomStringArrayElement)"
-  val ownDataGetBinaryValueArgBeforeFunc = s"$randomStringArrayElement.getBinaryValue()"
+  private val getBinaryValue = s"getBinaryValue(callerTestData, $randomStringArrayElement)"
+  private val getBinaryValueArgBeforeFunc = s"callerTestData.getBinaryValue($randomStringArrayElement)"
+  private val ownDataGetBinaryValue = s"getBinaryValue($randomStringArrayElement)"
+  private val ownDataGetBinaryValueArgBeforeFunc = s"$randomStringArrayElement.getBinaryValue()"
 
-  val invalidGetBinary = s"getBinary(callerTestData)"
-  val invalidGetBinaryValue = s"getBinaryValue(callerTestData)"
-  val testData = new TestDataConstantsAndMethods
+  private val invalidGetBinary = s"getBinary(callerTestData)"
+  private val invalidGetBinaryValue = s"getBinaryValue(callerTestData)"
+  private val testData = new TestDataConstantsAndMethods
 
   val tests: Tests = Tests {
     test.apply("check: function getBinary compiles for address") {

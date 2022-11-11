@@ -6,12 +6,12 @@ import _root_.testData.RandomDataGenerator.{randomAddressDataArrayElement, rando
 import utest.{Tests, test}
 
 object IsDataStorageUntouched extends JsTestBase {
-  val isDataStorageUntouched = "isDataStorageUntouched(callerTestData)"
-  val isDataStorageUntouchedArgBeforeFunc = "callerTestData.isDataStorageUntouched()"
-  val invalidFunction = "isDataStorageUntouched()"
+  private val isDataStorageUntouched = "isDataStorageUntouched(callerTestData)"
+  private val isDataStorageUntouchedArgBeforeFunc = "callerTestData.isDataStorageUntouched()"
+  private val invalidFunction = "isDataStorageUntouched()"
 
-  val testData = new TestDataConstantsAndMethods
-  val invalidFunctionErrorResult: String = testData.invalidFunctionError("isDataStorageUntouched")
+  private val testData = new TestDataConstantsAndMethods
+  private val invalidFunctionErrorResult: String = testData.invalidFunctionError("isDataStorageUntouched", 1)
 
   val tests: Tests = Tests {
     test.apply("check: function isDataStorageUntouched compiles for address") {
@@ -127,7 +127,7 @@ object IsDataStorageUntouched extends JsTestBase {
           testData.rideV3Result,
           testData.GreaterV3ResultBooleanEntry
         )
-        assertCompileErrorDApp(script, version, testData.NON_MATCHING_TYPES)
+        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("Address|Alias"))
       }
     }
 
@@ -140,7 +140,7 @@ object IsDataStorageUntouched extends JsTestBase {
           testData.rideV3Result,
           testData.GreaterV3ResultBooleanEntry
         )
-        assertCompileErrorDApp(script, version, testData.NON_MATCHING_TYPES)
+        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("Address|Alias"))
       }
     }
   }
