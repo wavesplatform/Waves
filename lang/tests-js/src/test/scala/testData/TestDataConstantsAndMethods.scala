@@ -1,7 +1,16 @@
 package testData
 
-class TestDataConstants {
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5, V6}
+
+class TestDataConstantsAndMethods {
+  val actualVersions: Iterable[StdLibVersion] = Seq(V3, V4, V5, V6)
+  val oldVersions: Iterable[StdLibVersion] = Seq(V3, V4)
+  val versionsSupportingTheNewFeatures: Iterable[StdLibVersion] = Seq(V5, V6)
+
   val CANT_FIND_A_FUNCTION_OVERLOAD = "Can't find a function overload"
+  val CANT_FIND_FUNCTION = "Can't find a function"
+  val NON_MATCHING_TYPES = "Non-matching types: expected: Address|Alias"
+
   val LATEST_ESTIMATOR = 3
   val STDLIB_INVALID_VERSION = 44
   val stringList = "[\"a\", \"b\", \"c\", \"d\", \"e\", \"f\", \"g\"]"
@@ -41,4 +50,5 @@ class TestDataConstants {
     |    StringEntry("String", val)
     |]
     |""".stripMargin
+  def invalidFunctionError(functionName: String): String = s"Function '$functionName' requires 1 arguments"
 }

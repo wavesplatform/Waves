@@ -1,0 +1,285 @@
+package com.wavesplatform.test.builtInFunctions.accountDataStorage
+
+import com.wavesplatform.JsTestBase
+import com.wavesplatform.test.builtInFunctions.accountDataStorage.GetBoolean.{assertCompileErrorDApp, testData}
+import _root_.testData.{GeneratorContractsForBuiltInFunctions, TestDataConstantsAndMethods}
+import _root_.testData.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomInt, randomStringArrayElement}
+import utest.{Tests, test}
+
+object GetBoolean extends JsTestBase {
+  // getBoolean
+  val getBoolean = s"getBoolean(callerTestData, $randomStringArrayElement)"
+  val getBooleanArgBeforeFunc = s"callerTestData.getBoolean($randomStringArrayElement)"
+  val ownDataGetBoolean = s"getBoolean($randomStringArrayElement)"
+  val ownDataGetBooleanArgBeforeFunc = s"$randomStringArrayElement.getBoolean()"
+
+  // getBooleanValue
+  val getBooleanValue = s"getBooleanValue(callerTestData, $randomStringArrayElement)"
+  val getBooleanValueArgBeforeFunc = s"callerTestData.getBooleanValue($randomStringArrayElement)"
+  val ownDataGetBooleanValue = s"getBooleanValue($randomStringArrayElement)"
+  val ownDataGetBooleanValueArgBeforeFunc = s"$randomStringArrayElement.getBooleanValue()"
+
+  val invalidGetBoolean = s"getBoolean(callerTestData)"
+  val invalidGetBooleanValue = s"getBooleanValue(callerTestData)"
+  val testData = new TestDataConstantsAndMethods
+
+  val tests: Tests = Tests {
+    test.apply("check: function getBoolean compiles for address") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomAddressDataArrayElement,
+          getBoolean,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getBoolean compiles (argument before function) for address") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomAddressDataArrayElement,
+          getBooleanArgBeforeFunc,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getBoolean compiles for alias") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomAliasDataArrayElement,
+          getBoolean,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getBoolean compiles (argument before function) for alias") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomAliasDataArrayElement,
+          getBooleanArgBeforeFunc,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function own data getBoolean compiles") {
+      for (version <- testData.versionsSupportingTheNewFeatures) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        val script = precondition.codeOwnData(
+          ownDataGetBoolean,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function own data getBoolean (argument before function) compiles") {
+      for (version <- testData.versionsSupportingTheNewFeatures) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        val script = precondition.codeOwnData(
+          ownDataGetBooleanArgBeforeFunc,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getBooleanValue compiles for address") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomAddressDataArrayElement,
+          getBooleanValue,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getBooleanValue compiles (argument before function) for address") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomAddressDataArrayElement,
+          getBooleanValueArgBeforeFunc,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getBooleanValue compiles for alias") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomAliasDataArrayElement,
+          getBooleanValue,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getBooleanValue compiles (argument before function) for alias") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomAliasDataArrayElement,
+          getBooleanValueArgBeforeFunc,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function own data getBooleanValue (argument before function) compiles") {
+      for (version <- testData.versionsSupportingTheNewFeatures) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        val script = precondition.codeOwnData(
+          ownDataGetBooleanValueArgBeforeFunc,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function own data getBooleanValue compiles") {
+      for (version <- testData.versionsSupportingTheNewFeatures) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        val script = precondition.codeOwnData(
+          ownDataGetBooleanValue,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("compilation error: Can't find a function overload getBoolean") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomAddressDataArrayElement,
+          invalidGetBoolean,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+      }
+    }
+
+    test.apply("compilation error: Can't find a function overload getBooleanValue") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomAliasDataArrayElement,
+          invalidGetBooleanValue,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+      }
+    }
+
+    test.apply("compilation error: Can't find a own data function overload getBoolean") {
+      for (version <- testData.oldVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomAddressDataArrayElement,
+          ownDataGetBooleanValue,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+      }
+    }
+
+    test.apply("compilation error: Can't find a own data function overload getBooleanValue") {
+      for (version <- testData.oldVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomAliasDataArrayElement,
+          ownDataGetBooleanValueArgBeforeFunc,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+      }
+    }
+
+    test.apply("compilation error: Can't find a function overload getBoolean - invalid data") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomInt.toString,
+          getBoolean,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+      }
+    }
+
+    test.apply("compilation error: Can't find a function overload getBooleanValue - invalid data") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomInt.toString,
+          getBooleanValue,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+      }
+    }
+
+    test.apply("compilation error: Can't find a own data function overload getBoolean - invalid data") {
+      for (version <- testData.actualVersions) {
+        val invalidFunction = s"getBooleanValue($randomInt)"
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomInt.toString,
+          invalidFunction,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+      }
+    }
+
+    test.apply("compilation error: Can't find a own data function overload getBooleanValue - invalid data") {
+      for (version <- testData.actualVersions) {
+        val invalidFunction = s"$randomInt.getBooleanValue()"
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomInt.toString,
+          invalidFunction,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+      }
+    }
+  }
+}

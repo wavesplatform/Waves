@@ -4,23 +4,8 @@ import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
 
 class GeneratorContractsForBuiltInFunctions(val dataType: String, version: StdLibVersion) {
 
-  def contractWithMatchingAndCase(data: String, function: String, testDataForV3: String, testDataForGreaterV3: String): String = {
-    if (version.id == V3.id) {
-      codeFromMatchingAndCase(
-        data, function, testDataForV3
-      )
-    } else {
-      codeFromMatchingAndCase(
-        data, function, testDataForGreaterV3
-      )
-    }
-  }
-/*
-  def contractOwnData(): String ={
-
-  }*/
-
-  private def codeFromMatchingAndCase(testData: String, function: String, caseForVersions: String): String = {
+  def codeFromMatchingAndCase(testData: String, function: String, testDataForV3: String, testDataForGreaterV3: String): String = {
+    val version = caseForVersions(testDataForV3, testDataForGreaterV3)
     s"""\n
        |@Callable(i)
        |        func expression() = {
@@ -31,12 +16,13 @@ class GeneratorContractsForBuiltInFunctions(val dataType: String, version: StdLi
        |              case b:$dataType => b
        |              case _ => throwMessage.throw()
        |            }
-       |            $caseForVersions
+       |            $version
        |        }
        |""".stripMargin
   }
 
-  def codeOwnData(ownDataFunction: String, caseForVersions: String): String = {
+  def codeOwnData(ownDataFunction: String, testDataForV3: String, testDataForGreaterV3: String): String = {
+    val version = caseForVersions(testDataForV3, testDataForGreaterV3)
     s"""\n
        |@Callable(i)
        |        func expression() = {
@@ -45,18 +31,19 @@ class GeneratorContractsForBuiltInFunctions(val dataType: String, version: StdLi
        |              case b:$dataType => b
        |              case _ => throw("not $dataType")
        |            }
-       |            $caseForVersions
+       |            $version
        |        }
        |""".stripMargin
   }
 
-  def codeWithoutMatcher(testData: String, function: String, caseForVersions: String): String = {
+  def codeWithoutMatcher(testData: String, function: String, testDataForV3: String, testDataForGreaterV3: String): String = {
+    val version = caseForVersions(testDataForV3, testDataForGreaterV3)
     s"""\n
        |@Callable(i)
        |        func expression() = {
        |            let callerTestData = $testData
        |            let val = $function
-       |            $caseForVersions
+       |            $version
        |        }
        |""".stripMargin
   }
@@ -118,5 +105,23 @@ class GeneratorContractsForBuiltInFunctions(val dataType: String, version: StdLi
        |            )
        |        }
        |""".stripMargin
+  }
+
+  def codeForAddressFromRecipient(addressOrAlias: String, func: String, address: String): String = {
+    s"""
+      |let addressOrAlias = $addressOrAlias;
+      |        match (tx) {
+      |            case t: TransferTransaction => $func == $address
+      |            case _ => false
+      |        };
+      |""".stripMargin
+  }
+
+  private def caseForVersions(testDataForV3: String, testDataForGreaterV3: String): String = {
+    if (version.id > V3.id) {
+      testDataForGreaterV3
+    } else {
+      testDataForV3
+    }
   }
 }

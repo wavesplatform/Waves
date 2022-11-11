@@ -1,0 +1,300 @@
+package com.wavesplatform.test.builtInFunctions.accountDataStorage
+
+import com.wavesplatform.JsTestBase
+import _root_.testData.{GeneratorContractsForBuiltInFunctions, TestDataConstantsAndMethods}
+import _root_.testData.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomInt, randomStringArrayElement}
+import utest.{Tests, test}
+
+object GetInteger extends JsTestBase {
+  // getInteger
+  val getInteger = s"getInteger(callerTestData, $randomStringArrayElement)"
+  val getIntegerArgBeforeFunc = s"callerTestData.getInteger($randomStringArrayElement)"
+  val ownDataGetInt = s"getInteger($randomStringArrayElement)"
+  val ownDataGetIntArgBeforeFunc = s"$randomStringArrayElement.getInteger()"
+
+  // getIntegerValue
+  val getIntegerValue = s"getIntegerValue(callerTestData, $randomStringArrayElement)"
+  val getIntegerValueArgBeforeFunc = s"callerTestData.getIntegerValue($randomStringArrayElement)"
+  val ownDataGetIntValue = s"getIntegerValue($randomStringArrayElement)"
+  val ownDataGetIntValueArgBeforeFunc = s"$randomStringArrayElement.getIntegerValue()"
+
+  val invalidGetInt = s"getInteger(callerTestData)"
+  val invalidGetIntValue = s"getIntegerValue(callerTestData)"
+  val testData = new TestDataConstantsAndMethods
+
+  val tests: Tests = Tests {
+    test.apply("check: function getInteger compiles for address") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomAddressDataArrayElement,
+          getInteger,
+          testData.rideV3Result,
+          testData.GreaterV3ResultIntegerEntry
+        )
+
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getInteger compiles (argument before function) for address") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomAddressDataArrayElement,
+          getIntegerArgBeforeFunc,
+          testData.rideV3Result,
+          testData.GreaterV3ResultIntegerEntry
+        )
+
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getInteger compiles for alias") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomAliasDataArrayElement,
+          getInteger,
+          testData.rideV3Result,
+          testData.GreaterV3ResultIntegerEntry
+        )
+
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getInteger compiles (argument before function) for alias") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomAliasDataArrayElement,
+          getIntegerArgBeforeFunc,
+          testData.rideV3Result,
+          testData.GreaterV3ResultIntegerEntry
+        )
+
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function own data getInteger compiles") {
+      for (version <- testData.versionsSupportingTheNewFeatures) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeOwnData(
+          ownDataGetInt,
+          testData.rideV3Result,
+          testData.GreaterV3ResultIntegerEntry
+        )
+
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function own data getInteger (argument before function) compiles") {
+      for (version <- testData.versionsSupportingTheNewFeatures) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeOwnData(
+          ownDataGetIntArgBeforeFunc,
+          testData.rideV3Result,
+          testData.GreaterV3ResultIntegerEntry
+        )
+
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getIntegerValue compiles for address") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomAddressDataArrayElement,
+          getIntegerValue,
+          testData.rideV3Result,
+          testData.GreaterV3ResultIntegerEntry
+        )
+
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getIntegerValue compiles (argument before function) for address") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomAddressDataArrayElement,
+          getIntegerValueArgBeforeFunc,
+          testData.rideV3Result,
+          testData.GreaterV3ResultIntegerEntry
+        )
+
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getIntegerValue compiles for alias") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomAliasDataArrayElement,
+          getIntegerValue,
+          testData.rideV3Result,
+          testData.GreaterV3ResultIntegerEntry
+        )
+
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getIntegerValue compiles (argument before function) for alias") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomAliasDataArrayElement,
+          getIntegerValueArgBeforeFunc,
+          testData.rideV3Result,
+          testData.GreaterV3ResultIntegerEntry
+        )
+
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function own data getIntegerValue (argument before function) compiles") {
+      for (version <- testData.versionsSupportingTheNewFeatures) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeOwnData(
+          ownDataGetIntValueArgBeforeFunc,
+          testData.rideV3Result,
+          testData.GreaterV3ResultIntegerEntry
+        )
+
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function own data getIntegerValue compiles") {
+      for (version <- testData.versionsSupportingTheNewFeatures) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeOwnData(
+          ownDataGetIntValue,
+          testData.rideV3Result,
+          testData.GreaterV3ResultIntegerEntry
+        )
+
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("compilation error: Can't find a function overload getInteger") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomAddressDataArrayElement,
+          invalidGetInt,
+          testData.rideV3Result,
+          testData.GreaterV3ResultIntegerEntry
+        )
+
+        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+      }
+    }
+
+    test.apply("compilation error: Can't find a function overload getIntegerValue") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomAliasDataArrayElement,
+          invalidGetIntValue,
+          testData.rideV3Result,
+          testData.GreaterV3ResultIntegerEntry
+        )
+
+        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+      }
+    }
+
+    test.apply("compilation error: Can't find a own data function overload getInteger") {
+      for (version <- testData.oldVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomAddressDataArrayElement,
+          ownDataGetIntValue,
+          testData.rideV3Result,
+          testData.GreaterV3ResultIntegerEntry
+        )
+
+        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+      }
+    }
+
+    test.apply("compilation error: Can't find a own data function overload getIntegerValue") {
+      for (version <- testData.oldVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomAliasDataArrayElement,
+          ownDataGetIntValueArgBeforeFunc,
+          testData.rideV3Result,
+          testData.GreaterV3ResultIntegerEntry
+        )
+
+        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+      }
+    }
+
+    test.apply("compilation error: Can't find a function overload getInteger - invalid data") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomInt.toString,
+          getInteger,
+          testData.rideV3Result,
+          testData.GreaterV3ResultIntegerEntry
+        )
+        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+      }
+    }
+
+    test.apply("compilation error: Can't find a function overload getIntegerValue - invalid data") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomInt.toString,
+          getIntegerValue,
+          testData.rideV3Result,
+          testData.GreaterV3ResultIntegerEntry
+        )
+        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+      }
+    }
+
+    test.apply("compilation error: Can't find a own data function overload getInteger - invalid data") {
+      for (version <- testData.actualVersions) {
+        val invalidFunction = s"getIntegerValue($randomInt)"
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomInt.toString,
+          invalidFunction,
+          testData.rideV3Result,
+          testData.GreaterV3ResultIntegerEntry
+        )
+        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+      }
+    }
+
+    test.apply("compilation error: Can't find a own data function overload getIntegerValue - invalid data") {
+      for (version <- testData.actualVersions) {
+        val invalidFunction = s"$randomInt.getIntegerValue()"
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeFromMatchingAndCase(
+          randomInt.toString,
+          invalidFunction,
+          testData.rideV3Result,
+          testData.GreaterV3ResultIntegerEntry
+        )
+        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+      }
+    }
+  }
+}
