@@ -29,10 +29,12 @@ class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
 
   def iterateOver(tag: KeyTags.KeyTag)(f: DBEntry => Unit): Unit = iterateOver(tag.prefixBytes)(f)
 
-  def iterateOver(prefix: Array[Byte])(f: DBEntry => Unit): Unit = {
+  def iterateOver(prefix: Array[Byte])(f: DBEntry => Unit): Unit = iterateFrom(prefix, prefix)(f)
+
+  def iterateFrom(prefix: Array[Byte], first: Array[Byte])(f: DBEntry => Unit): Unit = {
     val iterator = db.iterator(readOptions)
     try {
-      iterator.seek(prefix)
+      iterator.seek(first)
       while (iterator.hasNext && iterator.peekNext().getKey.startsWith(prefix)) f(iterator.next())
     } finally iterator.close()
   }

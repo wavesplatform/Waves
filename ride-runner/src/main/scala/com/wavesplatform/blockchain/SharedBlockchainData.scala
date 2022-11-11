@@ -1,7 +1,6 @@
 package com.wavesplatform.blockchain
 
 import cats.syntax.option.*
-import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.EstimatorProvider
 import com.wavesplatform.grpc.BlockchainGrpcApi
@@ -21,12 +20,7 @@ class SharedBlockchainData[TagT](val settings: BlockchainSettings, persistentCac
 
   val accountScripts = new AccountScriptStorage[TagT](chainId, estimator, blockchainApi, persistentCaches.accountScripts)
 
-  // It seems, we don't need to update this. Only for some optimization needs
-  private val blockHeaders = RideData.mapReadOnly[Int, SignedBlockHeader, TagT] { h =>
-    if (h > height) throw new RuntimeException(s"Can't receive a block with height=$h > current height=$height")
-    else load(persistentCaches.getBlockHeader, blockchainApi.getBlockHeader, persistentCaches.setBlockHeader)(h)
-  }
-  def getBlockHeader(height: Int, tag: TagT): Option[SignedBlockHeader] = blockHeaders.get(height, tag)
+  val blockHeaders = new BlockHeadersStorage(blockchainApi, persistentCaches.blockHeaders)
 
   private val vrf = RideData.mapReadOnly[Int, ByteStr, TagT] { h =>
     if (h > height) throw new RuntimeException(s"Can't receive a block VRF with height=$h > current height=$height")
@@ -35,14 +29,7 @@ class SharedBlockchainData[TagT](val settings: BlockchainSettings, persistentCac
   def getVrf(height: Int, tag: TagT): Option[ByteStr] = vrf.get(height, tag)
 
   // Ride: wavesBalance, height, lastBlock TODO: a binding in Ride?
-  private var _height: Int = persistentCaches.getHeight.getOrElse {
-    blockchainApi.getCurrentBlockchainHeight().tap(persistentCaches.setHeight)
-  }
-  def height: Int = _height
-  def setHeight(height: Int): Unit = {
-    persistentCaches.setHeight(height)
-    _height = height
-  }
+  def height: Int = blockHeaders.last.height
 
   // No way to get this from blockchain updates
   var activatedFeatures =
@@ -55,7 +42,7 @@ class SharedBlockchainData[TagT](val settings: BlockchainSettings, persistentCac
 
   val assets = new AssetStorage[TagT](blockchainApi, persistentCaches.assetDescriptions)
 
-  val aliases = new AliasesStorage[TagT](chainId, blockchainApi, persistentCaches.aliases)
+  val aliases = new AliasStorage[TagT](chainId, blockchainApi, persistentCaches.aliases)
 
   val portfolios = new PortfolioStorage[TagT](blockchainApi, persistentCaches.balances)
 

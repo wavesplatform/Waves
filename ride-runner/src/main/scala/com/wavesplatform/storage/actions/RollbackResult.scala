@@ -1,6 +1,6 @@
 package com.wavesplatform.storage.actions
 
-import com.wavesplatform.storage.Storage.DataKey
+import com.wavesplatform.storage.DataKey
 
 /** @param mayBeUncertainKey
   *   We will request the data from the Node if Some

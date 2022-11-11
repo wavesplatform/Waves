@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 
 class PortfolioStorage[TagT](blockchainApi: BlockchainGrpcApi, override val persistentCache: PersistentCache[Address, Portfolio])
-    extends Storage[Address, Portfolio, TagT]
+    extends HeightStorage[Address, Portfolio, TagT]
     with HasAnyRefMap[Address, Portfolio, TagT] {
   override def getFromBlockchain(key: Address): Option[Portfolio] = blockchainApi.getBalances(key).some
 

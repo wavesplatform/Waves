@@ -3,6 +3,7 @@ package com.wavesplatform.storage.persistent
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.blockchain.RemoteData
+import com.wavesplatform.collections.syntax.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{AddressId, DBExt, Key, RW, ReadOnlyDB}
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, Portfolio, TransactionId, TxMeta}
@@ -215,21 +216,40 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
       override def remove(fromHeight: Int, key: TransactionId): RemoteData[(TxMeta, Option[Transaction])] = RemoteData.Unknown
     }
 
-  override def getBlockHeader(height: Int): RemoteData[SignedBlockHeader] =
-    db
-      .readOnly { _.readFromDb(CacheKeys.SignedBlockHeaders.mkKey(height)) }
-      .tap { r => log.trace(s"getBlockHeader($height): ${r.toFoundStr("id", _.id())}") }
+  override val blockHeaders: BlockPersistentCache = new BlockPersistentCache {
+    private val heightKey            = CacheKeys.Height.mkKey(())
+    @volatile private var lastHeight = db.readOnly(_.getOpt(heightKey))
 
-  override def setBlockHeader(height: Int, data: RemoteData[SignedBlockHeader]): Unit = {
-    db.readWrite { _.writeToDb(CacheKeys.SignedBlockHeaders.mkKey(height), data) }
-    log.trace(s"setBlockHeader($height)")
-  }
+    override def getLastHeight: Option[Int] = lastHeight
 
-  private val heightDbKey             = CacheKeys.Height.mkKey(())
-  override def getHeight: Option[Int] = db.readOnly(_.getOpt(heightDbKey)).tap { r => log.trace(s"getHeight: $r") }
-  override def setHeight(data: Int): Unit = {
-    db.readWrite(_.put(heightDbKey, data))
-    log.trace(s"setHeight($data)")
+    override def get(height: Int): Option[SignedBlockHeader] =
+      db
+        .readOnly { _.getOpt(CacheKeys.SignedBlockHeaders.mkKey(height)) }
+        .tap { r => log.trace(s"get($height): ${r.toFoundStr("id", _.id())}") }
+
+    override def set(height: Int, data: SignedBlockHeader): Unit = {
+      db.readWrite { rw =>
+        rw.put(CacheKeys.SignedBlockHeaders.mkKey(height), data)
+        if (lastHeight.forall(_ < height)) {
+          lastHeight = Some(height)
+          rw.put(heightKey, height)
+        }
+      }
+      log.trace(s"set($height)")
+    }
+
+    override def remove(fromHeight: Int): Unit = {
+      val first = CacheKeys.SignedBlockHeaders.mkKey(fromHeight)
+      db.readWrite { rw =>
+        rw.iterateFrom(CacheKeys.SignedBlockHeaders.prefixBytes, first.keyBytes) { x =>
+          rw.delete(x.getKey)
+        }
+
+        val newLastHeight = fromHeight - 1
+        lastHeight = Some(newLastHeight)
+        rw.put(heightKey, newLastHeight)
+      }
+    }
   }
 
   override def getVrf(height: Int): RemoteData[ByteStr] =

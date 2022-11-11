@@ -17,7 +17,7 @@ import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.resources.*
 import com.wavesplatform.ride.input.RunnerRequest
 import com.wavesplatform.state.{Blockchain, Height}
-import com.wavesplatform.storage.Storage.DataKey
+import com.wavesplatform.storage.DataKey
 import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
 import com.wavesplatform.storage.persistent.LevelDbPersistentCaches
 import com.wavesplatform.utils.ScorexLogging
@@ -215,7 +215,7 @@ object RideBlockchainRunner extends ScorexLogging {
     // TODO the height will be eventually > if this is a rollback
     // Almost all scripts use the height
     val withUpdatedHeight = if (h != blockchainStorage.height) {
-      blockchainStorage.setHeight(h)
+      blockchainStorage.blockHeaders.update(update)
       prev.copy(affectedScripts = allScriptIndices, newHeight = h)
     } else prev.copy(newHeight = h)
 

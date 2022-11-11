@@ -3,7 +3,6 @@ package com.wavesplatform.storage
 import cats.syntax.option.*
 import com.wavesplatform.blockchain.{RemoteData, TaggedData}
 import com.wavesplatform.meta.getSimpleName
-import com.wavesplatform.storage.Storage.DataKey
 import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
 import com.wavesplatform.storage.persistent.PersistentCache
 import com.wavesplatform.utils.ScorexLogging
@@ -11,7 +10,7 @@ import com.wavesplatform.utils.ScorexLogging
 import scala.collection.mutable
 import scala.util.chaining.*
 
-trait Storage[KeyT, ValueT, TagT] extends ScorexLogging { storage =>
+trait HeightStorage[KeyT, ValueT, TagT] extends ScorexLogging { storage =>
   protected val memoryCache: mutable.Map[KeyT, TaggedData[RemoteData[ValueT], TagT]]
 
   lazy val name = getSimpleName(this)
@@ -94,11 +93,5 @@ trait Storage[KeyT, ValueT, TagT] extends ScorexLogging { storage =>
 
   private case class StorageDataKey(key: KeyT) extends DataKey {
     override def reload(height: Int): Unit = storage.reload(height, key)
-  }
-}
-
-object Storage {
-  trait DataKey {
-    def reload(height: Int): Unit
   }
 }

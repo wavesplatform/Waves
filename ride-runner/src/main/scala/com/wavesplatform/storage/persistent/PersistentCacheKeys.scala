@@ -217,7 +217,8 @@ object AsBytes {
 }
 
 sealed abstract class CacheKey[KeyT, ValueT](prefix: Short)(implicit keyAsBytes: AsBytes[KeyT], valueAsBytes: AsBytes[ValueT]) {
-  val name = getSimpleName(this)
+  val name        = getSimpleName(this)
+  val prefixBytes = Shorts.toByteArray(prefix)
 
   def mkKey(key: KeyT): Key[ValueT] = new Key[ValueT](prefix, name, keyAsBytes.toByteArray(key)) {
     override def parse(bytes: Array[Byte]): ValueT = valueAsBytes.fromByteArray(bytes)._1
@@ -237,7 +238,7 @@ object CacheKeys {
   object AccountScriptsHistory extends CacheHistoryKey[AddressId](4)
   object AccountScripts        extends CacheKey[(AddressId, Int), Option[AccountScriptInfo]](5)
 
-  object SignedBlockHeaders extends CacheKey[Int, Option[SignedBlockHeader]](6)
+  object SignedBlockHeaders extends CacheKey[Int, SignedBlockHeader](6)
   object Height             extends CacheKey[Unit, Int](7)
   object VRF                extends CacheKey[Int, Option[ByteStr]](8)
 
@@ -273,11 +274,11 @@ object CacheKeys {
 
   implicit val issuedAssetAsBytes: AsBytes[Asset.IssuedAsset] = AsBytes[ByteStr].transform(Asset.IssuedAsset(_), _.id)
 
-  implicit val dataEntryAsBytes: AsBytes[DataEntry[_]] = new AsBytes[DataEntry[_]] {
-    override def toByteArray(x: DataEntry[_]): Array[Byte] =
+  implicit val dataEntryAsBytes: AsBytes[DataEntry[?]] = new AsBytes[DataEntry[?]] {
+    override def toByteArray(x: DataEntry[?]): Array[Byte] =
       new ByteArrayOutputStream().writeWithLen(DataTxSerializer.serializeEntry(x)).toByteArray
 
-    override def fromByteArray(xs: Array[Byte]): (DataEntry[_], Int) = {
+    override def fromByteArray(xs: Array[Byte]): (DataEntry[?], Int) = {
       val bb  = ByteBuffer.wrap(xs)
       val len = bb.getInt
       (DataTxSerializer.parseEntry(bb), Ints.BYTES + len)

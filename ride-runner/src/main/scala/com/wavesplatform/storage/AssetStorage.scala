@@ -15,7 +15,7 @@ import java.nio.charset.StandardCharsets
 class AssetStorage[TagT](
     blockchainApi: BlockchainGrpcApi,
     override val persistentCache: PersistentCache[IssuedAsset, AssetDescription]
-) extends Storage[IssuedAsset, AssetDescription, TagT]
+) extends HeightStorage[IssuedAsset, AssetDescription, TagT]
     with HasAnyRefMap[IssuedAsset, AssetDescription, TagT] {
   override def getFromBlockchain(key: IssuedAsset): Option[AssetDescription] = blockchainApi.getAssetDescription(key)
 
