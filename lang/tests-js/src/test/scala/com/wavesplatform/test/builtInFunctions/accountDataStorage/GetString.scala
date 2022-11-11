@@ -1,7 +1,6 @@
 package com.wavesplatform.test.builtInFunctions.accountDataStorage
 
 import com.wavesplatform.JsTestBase
-import com.wavesplatform.test.builtInFunctions.accountDataStorage.GetString.{assertCompileErrorDApp, assertCompileSuccessDApp}
 import testData.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomInt, randomStringArrayElement}
 import testData.{GeneratorContractsForBuiltInFunctions, TestDataConstantsAndMethods}
 import utest.{Tests, test}
@@ -33,7 +32,6 @@ object GetString extends JsTestBase {
           testData.rideV3Result,
           testData.GreaterV3ResultStringEntry
         )
-
         assertCompileSuccessDApp(script, version)
       }
     }
@@ -47,7 +45,6 @@ object GetString extends JsTestBase {
           testData.rideV3Result,
           testData.GreaterV3ResultStringEntry
         )
-
         assertCompileSuccessDApp(script, version)
       }
     }
@@ -61,7 +58,6 @@ object GetString extends JsTestBase {
           testData.rideV3Result,
           testData.GreaterV3ResultStringEntry
         )
-
         assertCompileSuccessDApp(script, version)
       }
     }
@@ -75,7 +71,6 @@ object GetString extends JsTestBase {
           testData.rideV3Result,
           testData.GreaterV3ResultStringEntry
         )
-
         assertCompileSuccessDApp(script, version)
       }
     }
@@ -88,7 +83,6 @@ object GetString extends JsTestBase {
           testData.rideV3Result,
           testData.GreaterV3ResultStringEntry
         )
-
         assertCompileSuccessDApp(script, version)
       }
     }
@@ -101,7 +95,6 @@ object GetString extends JsTestBase {
           testData.rideV3Result,
           testData.GreaterV3ResultStringEntry
         )
-
         assertCompileSuccessDApp(script, version)
       }
     }
@@ -115,7 +108,6 @@ object GetString extends JsTestBase {
           testData.rideV3Result,
           testData.GreaterV3ResultStringEntry
         )
-
         assertCompileSuccessDApp(script, version)
       }
     }
@@ -129,7 +121,6 @@ object GetString extends JsTestBase {
           testData.rideV3Result,
           testData.GreaterV3ResultStringEntry
         )
-
         assertCompileSuccessDApp(script, version)
       }
     }
@@ -143,7 +134,6 @@ object GetString extends JsTestBase {
           testData.rideV3Result,
           testData.GreaterV3ResultStringEntry
         )
-
         assertCompileSuccessDApp(script, version)
       }
     }
@@ -157,7 +147,6 @@ object GetString extends JsTestBase {
           testData.rideV3Result,
           testData.GreaterV3ResultStringEntry
         )
-
         assertCompileSuccessDApp(script, version)
       }
     }
@@ -170,7 +159,6 @@ object GetString extends JsTestBase {
           testData.rideV3Result,
           testData.GreaterV3ResultStringEntry
         )
-
         assertCompileSuccessDApp(script, version)
       }
     }
@@ -183,7 +171,6 @@ object GetString extends JsTestBase {
           testData.rideV3Result,
           testData.GreaterV3ResultStringEntry
         )
-
         assertCompileSuccessDApp(script, version)
       }
     }
@@ -197,7 +184,6 @@ object GetString extends JsTestBase {
           testData.rideV3Result,
           testData.GreaterV3ResultStringEntry
         )
-
         assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
       }
     }
@@ -211,7 +197,6 @@ object GetString extends JsTestBase {
           testData.rideV3Result,
           testData.GreaterV3ResultStringEntry
         )
-
         assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
       }
     }
@@ -225,7 +210,6 @@ object GetString extends JsTestBase {
           testData.rideV3Result,
           testData.GreaterV3ResultStringEntry
         )
-
         assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
       }
     }
@@ -239,7 +223,6 @@ object GetString extends JsTestBase {
           testData.rideV3Result,
           testData.GreaterV3ResultStringEntry
         )
-
         assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
       }
     }

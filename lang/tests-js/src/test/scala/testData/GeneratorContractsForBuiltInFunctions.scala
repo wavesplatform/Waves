@@ -113,7 +113,7 @@ class GeneratorContractsForBuiltInFunctions(val dataType: String, version: StdLi
       |        match (tx) {
       |            case t: TransferTransaction => $func == $address
       |            case _ => false
-      |        };
+      |        }
       |""".stripMargin
   }
 
