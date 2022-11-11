@@ -528,7 +528,7 @@ package object database {
         k.parse(v) -> av
       }
 
-    def multiGet[A](keys: ArrayBuffer[Key[Option[A]]]): Seq[A] =
+    def multiGet[A](readOptions: ReadOptions, keys: ArrayBuffer[Key[Option[A]]]): Seq[A] =
       keys.view
         .zip(db.multiGetAsList(readOptions, keys.map(_.keyBytes).asJava).asScala)
         .flatMap { case (parser, value) =>

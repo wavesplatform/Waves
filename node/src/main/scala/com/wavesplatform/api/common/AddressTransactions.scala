@@ -126,13 +126,12 @@ object AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type]
   ) extends AbstractIterator[Seq[(TxMeta, Transaction, Option[TxNum])]] {
-    val dbIterator: RocksIterator = db.prefixIterator
-    val prefix: Array[Byte]       = KeyTags.AddressTransactionHeightTypeAndNums.prefixBytes ++ addressId.toByteArray
-    val seqNr: Int                = db.get(Keys.addressTransactionSeqNr(addressId))
+    val prefix: Array[Byte] = KeyTags.AddressTransactionHeightTypeAndNums.prefixBytes ++ addressId.toByteArray
+    val seqNr: Int          = db.get(Keys.addressTransactionSeqNr(addressId))
 
-    dbIterator.seekForPrev(Keys.addressTransactionHN(addressId, seqNr).keyBytes)
+    db.withSafePrefixIterator(_.seekForPrev(Keys.addressTransactionHN(addressId, seqNr).keyBytes))()
 
-    final override def computeNext(): Seq[(TxMeta, Transaction, Option[TxNum])] = {
+    final override def computeNext(): Seq[(TxMeta, Transaction, Option[TxNum])] = db.withSafePrefixIterator { dbIterator =>
       val buffer = new ArrayBuffer[(Key[Option[(TxMeta, Transaction)]], TxNum)]()
       while (dbIterator.isValid && buffer.length < BatchSize) {
         val (height, txs) = readTransactionHNSeqAndType(dbIterator.value())
@@ -151,7 +150,7 @@ object AddressTransactions {
         loadTransactions(db, buffer, sender)
       } else
         endOfData()
-    }
+    }(endOfData())
   }
 
   object TxByAddressIterator {

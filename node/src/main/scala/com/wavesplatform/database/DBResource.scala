@@ -9,8 +9,11 @@ trait DBResource extends AutoCloseable {
   def get[V](key: Key[V]): V
   def get(key: Array[Byte]): Array[Byte]
   def multiGet[V, K](keys: ArrayBuffer[(Key[V], K)]): View[(V, K)]
+  def multiGet[A](keys: ArrayBuffer[Key[Option[A]]]): Seq[A]
   def prefixIterator: RocksIterator // Should have a single instance
   def fullIterator: RocksIterator
+  def withSafePrefixIterator[A](ifNotClosed: RocksIterator => A)(ifClosed: => A = ()): A
+  def withSafeFullIterator[A](ifNotClosed: RocksIterator => A)(ifClosed: => A = ()): A
 }
 
 object DBResource {
@@ -24,13 +27,23 @@ object DBResource {
 
     override def multiGet[V, K](keys: ArrayBuffer[(Key[V], K)]): View[(V, K)] = db.multiGet(readOptions, keys)
 
+    override def multiGet[A](keys: ArrayBuffer[Key[Option[A]]]): Seq[A] = db.multiGet(readOptions, keys)
+
     override lazy val prefixIterator: RocksIterator = db.newIterator(readOptions.setTotalOrderSeek(false).setPrefixSameAsStart(true))
 
     override lazy val fullIterator: RocksIterator = db.newIterator(readOptions.setTotalOrderSeek(true))
 
+    override def withSafePrefixIterator[A](ifNotClosed: RocksIterator => A)(ifClosed: => A): A = prefixIterator.synchronized {
+      if (prefixIterator.isOwningHandle) ifNotClosed(prefixIterator) else ifClosed
+    }
+
+    override def withSafeFullIterator[A](ifNotClosed: RocksIterator => A)(ifClosed: => A): A = fullIterator.synchronized {
+      if (fullIterator.isOwningHandle) ifNotClosed(fullIterator) else ifClosed
+    }
+
     override def close(): Unit = {
-      prefixIterator.close()
-      fullIterator.close()
+      prefixIterator.synchronized(prefixIterator.close())
+      fullIterator.synchronized(fullIterator.close())
       snapshot.close()
     }
   }

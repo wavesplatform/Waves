@@ -8,7 +8,7 @@ import com.wavesplatform.api.common.CommonAccountsApi.AddressDataIterator.BatchS
 import com.wavesplatform.api.common.TransactionMeta.Ethereum
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{AddressId, DBExt, KeyTags, Keys, readIntSeq}
+import com.wavesplatform.database.{AddressId, DBExt, DBResource, KeyTags, Keys, readIntSeq}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBRecipients
@@ -112,14 +112,17 @@ object CommonAccountsApi {
         .get(address)
         .fold(Array.empty[DataEntry[?]])(_.data.filter { case (k, _) => regex.forall(_.r.pattern.matcher(k).matches()) }.values.toArray.sortBy(_.key))
 
-      db.readOnly { ro =>
-        ro.get(Keys.addressId(address)).map { addressId =>
-          Observable.fromIterator(
-            Task(new AddressDataIterator(db, address, addressId, entriesFromDiff, regex).asScala)
-          )
-        }
-      }.getOrElse(Observable.empty)
-        .filterNot(_.isEmpty)
+      db.resourceObservable.flatMap { dbResource =>
+        dbResource
+          .get(Keys.addressId(address))
+          .map { addressId =>
+            Observable.fromIterator(
+              Task(new AddressDataIterator(dbResource, address, addressId, entriesFromDiff, regex).asScala)
+            )
+          }
+          .getOrElse(Observable.empty)
+          .filterNot(_.isEmpty)
+      }
     }
 
     override def resolveAlias(alias: Alias): Either[ValidationError, Address] = blockchain.resolveAlias(alias)
@@ -201,26 +204,24 @@ object CommonAccountsApi {
   }
 
   class AddressDataIterator(
-      db: RocksDB,
+      db: DBResource,
       address: Address,
       addressId: AddressId,
       entriesFromDiff: Array[DataEntry[?]],
       regex: Option[String]
   ) extends AbstractIterator[DataEntry[?]] {
-    val dbIterator: RocksIterator = db.newIterator(new ReadOptions().setTotalOrderSeek(false).setPrefixSameAsStart(true).setVerifyChecksums(false))
-    val prefix: Array[Byte]       = KeyTags.DataHistory.prefixBytes ++ PBRecipients.publicKeyHash(address)
+    val prefix: Array[Byte] = KeyTags.DataHistory.prefixBytes ++ PBRecipients.publicKeyHash(address)
 
     val length: Int = entriesFromDiff.length
 
-    dbIterator.seek(prefix)
+    db.withSafePrefixIterator(_.seek(prefix))()
 
     var nextIndex                        = 0
     var nextDbEntries: Seq[DataEntry[?]] = Seq.empty
 
     def matches(key: String): Boolean = regex.forall(_.r.pattern.matcher(key).matches())
 
-    @tailrec
-    final override def computeNext(): DataEntry[?] = {
+    final override def computeNext(): DataEntry[?] = db.withSafePrefixIterator { dbIterator =>
       nextDbEntries.headOption match {
         case Some(dbEntry) =>
           if (nextIndex < length) {
@@ -259,11 +260,10 @@ object CommonAccountsApi {
             nextIndex += 1
             entriesFromDiff(nextIndex - 1)
           } else {
-            dbIterator.close()
             endOfData()
           }
       }
-    }
+    }(endOfData())
   }
 
   object AddressDataIterator {
