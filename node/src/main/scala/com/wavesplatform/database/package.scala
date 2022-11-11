@@ -44,6 +44,7 @@ import monix.eval.Task
 import monix.reactive.Observable
 import org.rocksdb.{BloomFilter as RBloomFilter, *}
 import org.slf4j.LoggerFactory
+import sun.nio.ch.Util
 import supertagged.TaggedType
 
 import scala.annotation.tailrec
@@ -541,6 +542,96 @@ package object database {
 
     def multiGet(readOptions: ReadOptions, keys: Seq[Array[Byte]]): Seq[Array[Byte]] =
       db.multiGetAsList(readOptions, keys.asJava).asScala.toSeq
+
+    def multiGetInts(readOptions: ReadOptions, keys: ArrayBuffer[Array[Byte]]): View[Option[Int]] = {
+      val keyBufs = keys.map { k =>
+        val b = Util.getTemporaryDirectBuffer(k.length)
+        b.put(k).flip()
+        b
+      }.asJava
+      val valBufs = List
+        .fill(keys.size) {
+          val buf = Util.getTemporaryDirectBuffer(4)
+          buf.limit(buf.capacity())
+          buf
+        }
+        .asJava
+
+      val result = db
+        .multiGetByteBuffers(readOptions, keyBufs, valBufs)
+        .asScala
+        .view
+        .map { value =>
+          if (value.status.getCode == Status.Code.Ok) {
+            val h = Some(value.value.getInt)
+            Util.releaseTemporaryDirectBuffer(value.value)
+            h
+          } else None
+        }
+
+      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
+      result
+    }
+
+    def multiGetLongs(readOptions: ReadOptions, keys: Seq[Array[Byte]]): View[Long] = {
+      val keyBufs = keys.map { k =>
+        val b = Util.getTemporaryDirectBuffer(k.length)
+        b.put(k).flip()
+        b
+      }.asJava
+      val valBufs = List
+        .fill(keys.size) {
+          val buf = Util.getTemporaryDirectBuffer(8)
+          buf.limit(buf.capacity())
+          buf
+        }
+        .asJava
+
+      val result = db
+        .multiGetByteBuffers(readOptions, keyBufs, valBufs)
+        .asScala
+        .view
+        .map { value =>
+          if (value.status.getCode == Status.Code.Ok) {
+            val res = value.value.getLong
+            Util.releaseTemporaryDirectBuffer(value.value)
+            res
+          } else 0
+        }
+
+      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
+      result
+    }
+
+    def multiGetLongs(readOptions: ReadOptions, keys: ArrayBuffer[Array[Byte]]): View[Long] = {
+      val keyBufs = keys.map { k =>
+        val b = Util.getTemporaryDirectBuffer(k.length)
+        b.put(k).flip()
+        b
+      }.asJava
+      val valBufs = List
+        .fill(keys.size) {
+          val buf = Util.getTemporaryDirectBuffer(8)
+          buf.limit(buf.capacity())
+          buf
+        }
+        .asJava
+
+      val result = db
+        .multiGetByteBuffers(readOptions, keyBufs, valBufs)
+        .asScala
+        .view
+        .map { value =>
+          if (value.status.getCode == Status.Code.Ok) {
+            val res = value.value.getLong
+            Util.releaseTemporaryDirectBuffer(value.value)
+            res
+          } else 0
+        }
+
+      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
+      result
+    }
 
     def get[A](key: Key[A]): A                           = key.parse(db.get(key.keyBytes))
     def get[A](key: Key[A], readOptions: ReadOptions): A = key.parse(db.get(readOptions, key.keyBytes))

@@ -46,21 +46,16 @@ class NFTIterator(addressId: AddressId, maybeAfter: Option[IssuedAsset], resourc
     }
     if (keysBuffer.nonEmpty) {
       val assetBalanceKeys = resource
-        .multiGet(keysBuffer)
-        .view
+        .multiGetInts(keysBuffer)
         .zip(assetsBuffer)
-        .map { case (historyBytes, assetId) =>
-          val height = Option(historyBytes).map(arr => ByteBuffer.wrap(arr).getInt).getOrElse(0)
-          Keys.assetBalance(addressId, assetId)(height).keyBytes
+        .map { case (heightOpt, assetId) =>
+          Keys.assetBalance(addressId, assetId)(heightOpt.getOrElse(0)).keyBytes
         }
         .toSeq
       resource
-        .multiGet(assetBalanceKeys)
-        .view
+        .multiGetLongs(assetBalanceKeys)
         .zip(assetsBuffer)
-        .map { case (balanceBytes, asset) =>
-          asset -> ByteBuffer.wrap(balanceBytes).getLong
-        }
+        .map(_.swap)
         .toSeq
     } else endOfData()
   }(endOfData())
@@ -100,12 +95,9 @@ class AssetBalanceIterator(addressId: AddressId, resource: DBResource) extends A
     loop()
     if (keysBuffer.nonEmpty) {
       resource
-        .multiGet(keysBuffer)
-        .view
+        .multiGetLongs(keysBuffer)
         .zip(assetsBuffer)
-        .map { case (balanceBytes, asset) =>
-          asset -> ByteBuffer.wrap(balanceBytes).getLong
-        }
+        .map(_.swap)
         .toSeq
     } else endOfData()
   }(endOfData())

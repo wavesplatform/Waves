@@ -12,6 +12,9 @@ trait DBResource extends AutoCloseable {
   def multiGetFlat[A](keys: ArrayBuffer[Key[Option[A]]]): Seq[A]
   def multiGet(keys: ArrayBuffer[Array[Byte]]): Seq[Array[Byte]]
   def multiGet(keys: Seq[Array[Byte]]): Seq[Array[Byte]]
+  def multiGetInts(keys: ArrayBuffer[Array[Byte]]): View[Option[Int]]
+  def multiGetLongs(keys: Seq[Array[Byte]]): View[Long]
+  def multiGetLongs(keys: ArrayBuffer[Array[Byte]]): View[Long]
   def prefixIterator: RocksIterator // Should have a single instance
   def fullIterator: RocksIterator
   def withSafePrefixIterator[A](ifNotClosed: RocksIterator => A)(ifClosed: => A = ()): A
@@ -34,6 +37,12 @@ object DBResource {
     override def multiGet(keys: ArrayBuffer[Array[Byte]]): Seq[Array[Byte]] = db.multiGet(readOptions, keys)
 
     override def multiGet(keys: Seq[Array[Byte]]): Seq[Array[Byte]] = db.multiGet(readOptions, keys)
+
+    override def multiGetInts(keys: ArrayBuffer[Array[Byte]]): View[Option[Int]] = db.multiGetInts(readOptions, keys)
+
+    override def multiGetLongs(keys: Seq[Array[Byte]]): View[Long] = db.multiGetLongs(readOptions, keys)
+
+    override def multiGetLongs(keys: ArrayBuffer[Array[Byte]]): View[Long] = db.multiGetLongs(readOptions, keys)
 
     override lazy val prefixIterator: RocksIterator = db.newIterator(readOptions.setTotalOrderSeek(false).setPrefixSameAsStart(true))
 
