@@ -1,7 +1,6 @@
 package com.wavesplatform.grpc
 
 import cats.syntax.option.*
-import com.wavesplatform.collections.syntax.*
 import com.google.protobuf.empty.Empty
 import com.google.protobuf.{ByteString, UnsafeByteOperations}
 import com.wavesplatform.account.{Address, Alias, PublicKey}
@@ -22,6 +21,7 @@ import com.wavesplatform.api.grpc.{
   TransactionsRequest
 }
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
+import com.wavesplatform.collections.syntax.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.events.api.grpc.protobuf.*
@@ -39,8 +39,8 @@ import com.wavesplatform.utils.ScorexLogging
 import io.grpc.*
 import io.grpc.stub.ClientCalls
 import monix.execution.Scheduler
-import monix.reactive.MulticastStrategy
 import monix.reactive.subjects.ConcurrentSubject
+import monix.reactive.{MulticastStrategy, Observable}
 import org.slf4j.LoggerFactory
 
 import java.nio.charset.StandardCharsets
@@ -49,25 +49,29 @@ import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters.IteratorHasAsScala
 import scala.util.chaining.scalaUtilChainingOps
 
-class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hangScheduler: ScheduledExecutorService)
-    extends AutoCloseable
-    with ScorexLogging {
+trait ControlledStream {
+  val stream: Observable[Event]
+  def start(): Unit
+  def close(): Unit
+}
 
-  @volatile private var currentObserver = none[RichGrpcObserver[SubscribeRequest, SubscribeEvent]]
+class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hangScheduler: ScheduledExecutorService) extends ScorexLogging {
 
-  val stream = ConcurrentSubject[Event](MulticastStrategy.publish)(Scheduler(hangScheduler))
+  def watchBlockchainUpdates(blockchainUpdatesApiChannel: ManagedChannel, fromHeight: Int, toHeight: Int = 0): ControlledStream = {
+    val s = ConcurrentSubject[Event](MulticastStrategy.publish)(Scheduler(hangScheduler))
 
-  def watchBlockchainUpdates(blockchainUpdatesApiChannel: ManagedChannel, fromHeight: Int, toHeight: Int = 0): Unit = {
     def mkObserver(call: ClientCall[SubscribeRequest, SubscribeEvent]): RichGrpcObserver[SubscribeRequest, SubscribeEvent] =
       new RichGrpcObserver[SubscribeRequest, SubscribeEvent](settings.noDataTimeout, hangScheduler) {
-        private val log = LoggerFactory.getLogger(s"DefaultBlockchainApi[$hashCode]")
+        private val log = LoggerFactory.getLogger(s"RichGrpcObserver[$hashCode]")
 
         override def onReceived(event: SubscribeEvent): Boolean = {
-          stream.onNext(Event.Next(event))
+          s.onNext(Event.Next(event))
           true // TODO
         }
 
-        override def onFailed(error: Throwable): Unit = stream.onNext(Event.Failed(error))
+        override def onFailed(error: Throwable): Unit = {
+          s.onNext(Event.Failed(error))
+        }
 
         // We can't obtain IP earlier, it's a netty-grpc limitation
         override def onReady(): Unit = {
@@ -77,17 +81,27 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
 
         override def onClosedByRemotePart(): Unit = {
           log.error("Unexpected onCompleted by a remote part")
-          stream.onNext(Event.Closed)
+          s.onNext(Event.Closed)
         }
       }
 
     val call = blockchainUpdatesApiChannel.newCall(BlockchainUpdatesApiGrpc.METHOD_SUBSCRIBE, CallOptions.DEFAULT)
 
-    val observer = mkObserver(call)
+    @volatile var currentObserver = none[RichGrpcObserver[SubscribeRequest, SubscribeEvent]]
+    val observer                  = mkObserver(call)
     currentObserver = observer.some
 
-    log.info("Start receiving updates from {}", fromHeight)
-    ClientCalls.asyncServerStreamingCall(call, SubscribeRequest(fromHeight = fromHeight, toHeight = toHeight), observer.underlying)
+    new ControlledStream {
+      override val stream = s
+      override def start(): Unit = { // TODO height
+        log.info("Start receiving updates from {}", fromHeight)
+        ClientCalls.asyncServerStreamingCall(call, SubscribeRequest(fromHeight = fromHeight, toHeight = toHeight), observer.underlying)
+      }
+      override def close(): Unit = {
+        currentObserver.foreach(_.close())
+        stream.onComplete()
+      }
+    }
   }
 
   def getCurrentBlockchainHeight(): Int =
@@ -319,11 +333,6 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
 
     log.trace(s"getTransaction($id): ${r.toFoundStr { case (meta, tx) => s"meta=${meta.height}, tpe=${tx.map(_.tpe)}" }}")
     r
-  }
-
-  override def close(): Unit = {
-    currentObserver.foreach(_.close())
-    stream.onComplete()
   }
 
   private def toPb(address: Address): ByteString = UnsafeByteOperations.unsafeWrap(address.bytes)

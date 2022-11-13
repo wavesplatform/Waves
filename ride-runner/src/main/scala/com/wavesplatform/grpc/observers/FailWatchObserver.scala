@@ -61,6 +61,7 @@ abstract class RichGrpcObserver[RequestT, EventT](noDataTimeout: FiniteDuration,
 
   override def underlying: StreamObserver[EventT] = new ClientResponseObserver[RequestT, EventT] {
 
+    // TODO: replace with .timeoutOnSlowUpstream()
     private val timeout = new AtomicReference[Option[java.util.concurrent.Future[Unit]]](None)
 
     override def beforeStart(requestStream: ClientCallStreamObserver[RequestT]): Unit = {

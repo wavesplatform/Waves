@@ -21,6 +21,7 @@ import com.wavesplatform.storage.DataKey
 import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
 import com.wavesplatform.storage.persistent.LevelDbPersistentCaches
 import com.wavesplatform.utils.ScorexLogging
+import monix.eval.Task
 import monix.execution.Scheduler
 import play.api.libs.json.JsObject
 
@@ -93,12 +94,10 @@ object RideBlockchainRunner extends ScorexLogging {
         )
       )
 
-      val blockchainApi = use(
-        new BlockchainGrpcApi(
-          settings = BlockchainGrpcApi.Settings(1.minute),
-          grpcApiChannel = grpcApiChannel,
-          hangScheduler = commonScheduler
-        )
+      val blockchainApi = new BlockchainGrpcApi(
+        settings = BlockchainGrpcApi.Settings(1.minute),
+        grpcApiChannel = grpcApiChannel,
+        hangScheduler = commonScheduler
       )
 
       val db                = use(openDB(s"$basePath/db"))
@@ -125,9 +124,11 @@ object RideBlockchainRunner extends ScorexLogging {
       val end               = lastHeightAtStart + 1
       @volatile var started = false
 
-      val events = blockchainApi.stream
+      val blockchainUpdates = blockchainApi.watchBlockchainUpdates(blockchainUpdatesApiChannel, start, end) // TODO end
+      val events = blockchainUpdates.stream
+        .doOnError(e => Task { log.error("Error!", e) })
         .takeWhile {
-          case Event.Next(event) => event.getUpdate.height < end
+          case _: Event.Next => true
           case Event.Closed =>
             log.info("Blockchain stream closed")
             false
@@ -172,8 +173,8 @@ object RideBlockchainRunner extends ScorexLogging {
           }
         }(Scheduler(commonScheduler))
 
-      log.info(s"Watching blockchain updates from $start...")
-      blockchainApi.watchBlockchainUpdates(blockchainUpdatesApiChannel, start)
+      log.info(s"Watching blockchain updates...")
+      blockchainUpdates.start()
 
       Await.result(events, Duration.Inf)
     }
