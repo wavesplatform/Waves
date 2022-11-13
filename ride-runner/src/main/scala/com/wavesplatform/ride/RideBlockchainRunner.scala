@@ -10,7 +10,7 @@ import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.grpc.BlockchainGrpcApi.Event
-import com.wavesplatform.grpc.{BlockchainGrpcApi, GrpcClientSettings, GrpcConnector}
+import com.wavesplatform.grpc.{DefaultBlockchainGrpcApi, GrpcClientSettings, GrpcConnector}
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
@@ -94,9 +94,10 @@ object RideBlockchainRunner extends ScorexLogging {
         )
       )
 
-      val blockchainApi = new BlockchainGrpcApi(
-        settings = BlockchainGrpcApi.Settings(1.minute),
+      val blockchainApi = new DefaultBlockchainGrpcApi(
+        settings = DefaultBlockchainGrpcApi.Settings(1.minute),
         grpcApiChannel = grpcApiChannel,
+        blockchainUpdatesApiChannel = blockchainUpdatesApiChannel,
         hangScheduler = commonScheduler
       )
 
@@ -123,7 +124,7 @@ object RideBlockchainRunner extends ScorexLogging {
 
       @volatile var started = false
 
-      val blockchainUpdates = blockchainApi.mkBlockchainUpdatesStream()
+      val blockchainUpdates = use(blockchainApi.mkBlockchainUpdatesStream())
       val events = blockchainUpdates.stream
         .doOnError(e => Task { log.error("Error!", e) })
         .takeWhile {
@@ -141,7 +142,6 @@ object RideBlockchainRunner extends ScorexLogging {
         }
         .mapAccumulate(BlockchainState.Working(start): BlockchainState)(BlockchainState.apply)
         .filter(_.nonEmpty)
-
         .foreach { batchedEvents =>
           val processResult = batchedEvents.foldLeft(ProcessResult()) { case (r, event) =>
             log.info(s"Processing ${event.getUpdate.height}")
@@ -174,7 +174,7 @@ object RideBlockchainRunner extends ScorexLogging {
         }(Scheduler(commonScheduler))
 
       log.info(s"Watching blockchain updates...")
-      blockchainUpdates.start(blockchainUpdatesApiChannel, start, lastHeightAtStart + 1) // TODO end
+      blockchainUpdates.start(start, lastHeightAtStart + 1) // TODO end
 
       Await.result(events, Duration.Inf)
     }
