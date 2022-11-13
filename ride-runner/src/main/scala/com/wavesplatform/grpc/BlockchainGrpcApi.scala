@@ -45,19 +45,20 @@ import org.slf4j.LoggerFactory
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters.IteratorHasAsScala
 import scala.util.chaining.scalaUtilChainingOps
 
-trait ControlledStream {
+trait BlockchainUpdatesStream {
   val stream: Observable[Event]
-  def start(): Unit
+  def start(blockchainUpdatesApiChannel: ManagedChannel, fromHeight: Int, toHeight: Int = 0): Unit
   def close(): Unit
 }
 
 class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hangScheduler: ScheduledExecutorService) extends ScorexLogging {
 
-  def watchBlockchainUpdates(blockchainUpdatesApiChannel: ManagedChannel, fromHeight: Int, toHeight: Int = 0): ControlledStream = {
+  def mkBlockchainUpdatesStream(): BlockchainUpdatesStream = {
     val s = ConcurrentSubject[Event](MulticastStrategy.publish)(Scheduler(hangScheduler))
 
     def mkObserver(call: ClientCall[SubscribeRequest, SubscribeEvent]): RichGrpcObserver[SubscribeRequest, SubscribeEvent] =
@@ -80,25 +81,25 @@ class BlockchainGrpcApi(settings: Settings, grpcApiChannel: ManagedChannel, hang
         }
 
         override def onClosedByRemotePart(): Unit = {
-          log.error("Unexpected onCompleted by a remote part")
           s.onNext(Event.Closed)
         }
       }
 
-    val call = blockchainUpdatesApiChannel.newCall(BlockchainUpdatesApiGrpc.METHOD_SUBSCRIBE, CallOptions.DEFAULT)
+    new BlockchainUpdatesStream {
+      private val currentObserver = new AtomicReference[RichGrpcObserver[SubscribeRequest, SubscribeEvent]]
+      override val stream         = s
 
-    @volatile var currentObserver = none[RichGrpcObserver[SubscribeRequest, SubscribeEvent]]
-    val observer                  = mkObserver(call)
-    currentObserver = observer.some
+      override def start(blockchainUpdatesApiChannel: ManagedChannel, fromHeight: Int, toHeight: Int): Unit = {
+        val call     = blockchainUpdatesApiChannel.newCall(BlockchainUpdatesApiGrpc.METHOD_SUBSCRIBE, CallOptions.DEFAULT)
+        val observer = mkObserver(call)
+        Option(currentObserver.getAndSet(observer)).foreach(_.close())
 
-    new ControlledStream {
-      override val stream = s
-      override def start(): Unit = { // TODO height
         log.info("Start receiving updates from {}", fromHeight)
         ClientCalls.asyncServerStreamingCall(call, SubscribeRequest(fromHeight = fromHeight, toHeight = toHeight), observer.underlying)
       }
+
       override def close(): Unit = {
-        currentObserver.foreach(_.close())
+        Option(currentObserver.get()).foreach(_.close()) // Closes if failed
         stream.onComplete()
       }
     }

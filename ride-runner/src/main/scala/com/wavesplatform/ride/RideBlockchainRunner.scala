@@ -121,10 +121,9 @@ object RideBlockchainRunner extends ScorexLogging {
       val lastHeightAtStart = blockchainApi.getCurrentBlockchainHeight()
       log.info(s"Current height: $lastHeightAtStart")
 
-      val end               = lastHeightAtStart + 1
       @volatile var started = false
 
-      val blockchainUpdates = blockchainApi.watchBlockchainUpdates(blockchainUpdatesApiChannel, start, end) // TODO end
+      val blockchainUpdates = blockchainApi.mkBlockchainUpdatesStream()
       val events = blockchainUpdates.stream
         .doOnError(e => Task { log.error("Error!", e) })
         .takeWhile {
@@ -142,6 +141,7 @@ object RideBlockchainRunner extends ScorexLogging {
         }
         .mapAccumulate(BlockchainState.Working(start): BlockchainState)(BlockchainState.apply)
         .filter(_.nonEmpty)
+
         .foreach { batchedEvents =>
           val processResult = batchedEvents.foldLeft(ProcessResult()) { case (r, event) =>
             log.info(s"Processing ${event.getUpdate.height}")
@@ -174,7 +174,7 @@ object RideBlockchainRunner extends ScorexLogging {
         }(Scheduler(commonScheduler))
 
       log.info(s"Watching blockchain updates...")
-      blockchainUpdates.start()
+      blockchainUpdates.start(blockchainUpdatesApiChannel, start, lastHeightAtStart + 1) // TODO end
 
       Await.result(events, Duration.Inf)
     }
