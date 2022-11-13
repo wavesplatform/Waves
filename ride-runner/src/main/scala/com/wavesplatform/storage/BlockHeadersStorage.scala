@@ -52,7 +52,7 @@ class BlockHeadersStorage(blockchainApi: BlockchainGrpcApi, persistentCache: Blo
               event.id.toByteStr,
               SignedBlockHeader(PBBlocks.vanilla(block.getBlock.getHeader), block.getBlock.signature.toByteStr)
             )
-            log.debug(s"Update at ${newFullBlock.height} with ${newFullBlock.id.toString.take(5)})")
+            log.debug(s"Update at ${newFullBlock.height} with ${newFullBlock.id.toString.take(5)}")
             persistentCache.set(newFullBlock.height, newFullBlock.header)
             liquidBlocks = NonEmptyList.one(newFullBlock)
 
@@ -61,6 +61,7 @@ class BlockHeadersStorage(blockchainApi: BlockchainGrpcApi, persistentCache: Blo
             // See NgState.forgeBlock and Block.Create
             val newLiquidBlock = BlockInfo(
               event.height,
+              // Same as newLiquidBlock.header.id() and event.id.toByteStr
               microBlock.getMicroBlock.totalBlockId.toByteStr,
               SignedBlockHeader(
                 last.header.header.copy(transactionsRoot = microBlock.updatedTransactionsRoot.toByteStr),
@@ -69,10 +70,6 @@ class BlockHeadersStorage(blockchainApi: BlockchainGrpcApi, persistentCache: Blo
             )
             persistentCache.set(newLiquidBlock.height, newLiquidBlock.header)
             liquidBlocks = newLiquidBlock :: liquidBlocks
-            log.debug(
-              s"==> Compare ids: signedBlockHeader.id=${newLiquidBlock.header
-                .id()} vs event.id=${event.id.toByteStr} vs microBlock.getMicroBlock.totalBlockId=${microBlock.getMicroBlock.totalBlockId}"
-            )
         }
 
       case _: Update.Rollback =>
