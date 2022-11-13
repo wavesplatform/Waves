@@ -216,7 +216,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
       override def remove(fromHeight: Int, key: TransactionId): RemoteData[(TxMeta, Option[Transaction])] = RemoteData.Unknown
     }
 
-  override val blockHeaders: BlockPersistentCache = new BlockPersistentCache {
+  override val blockHeaders = new BlockPersistentCache {
     private val heightKey            = CacheKeys.Height.mkKey(())
     @volatile private var lastHeight = db.readOnly(_.getOpt(heightKey))
 
@@ -244,10 +244,18 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
         rw.iterateFrom(CacheKeys.SignedBlockHeaders.prefixBytes, first.keyBytes) { x =>
           rw.delete(x.getKey)
         }
+      }
 
-        val newLastHeight = fromHeight - 1
-        lastHeight = Some(newLastHeight)
-        rw.put(heightKey, newLastHeight)
+      // TODO
+      db.readWrite { rw =>
+        lastHeight = if (rw.prefixExists(CacheKeys.SignedBlockHeaders.prefixBytes)) {
+          val newLastHeight = fromHeight - 1
+          rw.put(heightKey, newLastHeight)
+          Some(newLastHeight)
+        } else {
+          rw.delete(heightKey)
+          None
+        }
       }
     }
   }
