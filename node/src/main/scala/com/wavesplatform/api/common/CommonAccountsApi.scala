@@ -42,7 +42,7 @@ trait CommonAccountsApi {
 
   def portfolio(address: Address): Observable[Seq[(IssuedAsset, Long)]]
 
-  def nftList(address: Address, after: Option[IssuedAsset]): Observable[(IssuedAsset, AssetDescription)]
+  def nftList(address: Address, after: Option[IssuedAsset]): Observable[Seq[(IssuedAsset, AssetDescription)]]
 
   def script(address: Address): Option[AccountScriptInfo]
 
@@ -102,12 +102,11 @@ object CommonAccountsApi {
       }
     }
 
-    override def nftList(address: Address, after: Option[IssuedAsset]): Observable[(IssuedAsset, AssetDescription)] = {
+    override def nftList(address: Address, after: Option[IssuedAsset]): Observable[Seq[(IssuedAsset, AssetDescription)]] = {
       val currentDiff = diff()
       db.resourceObservable.flatMap { resource =>
         Observable
           .fromIterator(Task(nftIterator(resource, address, currentDiff, after, blockchain.assetDescription)))
-          .concatMapIterable(identity)
       }
     }
 

@@ -25,10 +25,10 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain}
+import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.EthereumTransaction.Invocation
-import com.wavesplatform.transaction.{EthereumTransaction, TransactionFactory, TxVersion}
+import com.wavesplatform.transaction.{EthereumTransaction, TransactionFactory, TxTimestamp, TxVersion}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
@@ -303,16 +303,18 @@ case class AssetsApiRoute(
 //      implicit val jsonStreamingSupport: ToResponseMarshaller[Source[JsValue, NotUsed]] = jsonStreamMarshaller()
       implicit val jsonStreamingSupport: ToResponseMarshaller[Source[ByteString, NotUsed]] = jsonStreamMarshallerNew()
 
+      val compositeBlockchain = blockchain.compositeBlockchain
       routeTimeout.executeStreamed {
         commonAccountApi
           .nftList(address, after)
+          .concatMapIterable(
+            AssetsApiRoute
+              .jsonDetailsNew(compositeBlockchain)(_, full = true)
+              .valueOr(err => throw new IllegalArgumentException(err))
+          )
           .take(limit)
           .toListL
-      } { case (assetId, assetDesc) =>
-        AssetsApiRoute
-          .jsonDetailsNew(blockchain)(assetId, assetDesc, full = true)
-          .valueOr(err => throw new IllegalArgumentException(err))
-      }
+      }(identity)
     }
   }
 
@@ -382,60 +384,56 @@ object AssetsApiRoute {
     } yield limit
   }
 
-  def jsonDetailsNew(blockchain: Blockchain)(id: IssuedAsset, description: AssetDescription, full: Boolean): Either[String, ByteString] = {
-    // (timestamp, height)
-    def additionalInfo(id: ByteStr): Either[String, (Long, Int)] =
-      for {
-        tt <- blockchain
-          .transactionInfo(id)
-          .filter { case (tm, _) => tm.succeeded }
-          .toRight("Failed to find issue/invokeScript/invokeExpression transaction by ID")
-        (txm, tx) = tt
-        ts <- (tx match {
-          case tx: IssueTransaction                             => Some(tx.timestamp)
-          case tx: InvokeScriptTransaction                      => Some(tx.timestamp)
-          case tx: InvokeExpressionTransaction                  => Some(tx.timestamp)
-          case tx @ EthereumTransaction(_: Invocation, _, _, _) => Some(tx.timestamp)
-          case _                                                => None
-        }).toRight("No issue/invokeScript/invokeExpression transaction found with the given asset ID")
-      } yield (ts, txm.height)
+  def jsonDetailsNew(blockchain: Blockchain)(assets: Seq[(IssuedAsset, AssetDescription)], full: Boolean): Either[String, Seq[ByteString]] = {
+    def additionalInfo(ids: Seq[ByteStr]): Either[String, Seq[(TxTimestamp, Height)]] =
+      blockchain.transactionInfos(ids).traverse { infoOpt =>
+        for {
+          tt <- infoOpt
+            .filter { case (tm, _) => tm.succeeded }
+            .toRight("Failed to find issue/invokeScript/invokeExpression transaction by ID")
+          (txm, tx) = tt
+          ts <- (tx match {
+            case tx: IssueTransaction                             => Some(tx.timestamp)
+            case tx: InvokeScriptTransaction                      => Some(tx.timestamp)
+            case tx: InvokeExpressionTransaction                  => Some(tx.timestamp)
+            case tx @ EthereumTransaction(_: Invocation, _, _, _) => Some(tx.timestamp)
+            case _                                                => None
+          }).toRight("No issue/invokeScript/invokeExpression transaction found with the given asset ID")
+        } yield (ts, txm.height)
+      }
 
-    for {
-      tsh <- additionalInfo(description.originTransactionId)
-      (timestamp, height) = tsh
-      script              = description.script.filter(_ => full)
-      name                = description.name.toStringUtf8
-      desc                = description.description.toStringUtf8
-    } yield {
-      ByteString.fromArrayUnsafe(
-        writeToArray(
-          AssetDetails(
-            assetId = id.id.toString,
-            issueHeight = height,
-            issueTimestamp = timestamp,
-            issuer = description.issuer.toAddress.toString,
-            issuerPublicKey = description.issuer.toString,
-            name = name,
-            description = desc,
-            decimals = description.decimals,
-            reissuable = description.reissuable,
-            quantity = BigDecimal(description.totalVolume),
-            scripted = description.script.nonEmpty,
-            minSponsoredAssetFee = description.sponsorship match {
-              case 0           => None
-              case sponsorship => Some(sponsorship)
-            },
-            originTransactionId = description.originTransactionId.toString,
-            scriptDetails = script.map { case AssetScriptInfo(script, complexity) =>
-              AssetScriptDetails(
-                scriptComplexity = BigDecimal(complexity),
-                script = script.bytes().base64,
-                scriptText = script.expr.toString // [WAIT] JsString(Script.decompile(script))
-              )
-            }
+    additionalInfo(assets.map { case (_, description) => description.originTransactionId }).map { infos =>
+      assets.zip(infos).map { case ((id, description), (timestamp, height)) =>
+        ByteString.fromArrayUnsafe(
+          writeToArray(
+            AssetDetails(
+              assetId = id.id.toString,
+              issueHeight = height,
+              issueTimestamp = timestamp,
+              issuer = description.issuer.toAddress.toString,
+              issuerPublicKey = description.issuer.toString,
+              name = description.name.toStringUtf8,
+              description = description.description.toStringUtf8,
+              decimals = description.decimals,
+              reissuable = description.reissuable,
+              quantity = BigDecimal(description.totalVolume),
+              scripted = description.script.nonEmpty,
+              minSponsoredAssetFee = description.sponsorship match {
+                case 0           => None
+                case sponsorship => Some(sponsorship)
+              },
+              originTransactionId = description.originTransactionId.toString,
+              scriptDetails = description.script.filter(_ => full).map { case AssetScriptInfo(script, complexity) =>
+                AssetScriptDetails(
+                  scriptComplexity = BigDecimal(complexity),
+                  script = script.bytes().base64,
+                  scriptText = script.expr.toString // [WAIT] Script.decompile(script)
+                )
+              }
+            )
           )
         )
-      )
+      }
     }
   }
 
