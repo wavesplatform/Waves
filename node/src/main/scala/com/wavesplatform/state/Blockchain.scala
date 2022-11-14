@@ -44,6 +44,7 @@ trait Blockchain {
 
   def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)]
   def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)]
+  def transactionInfos(ids: Seq[ByteStr]): Seq[Option[(TxMeta, Transaction)]]
   def transactionMeta(id: ByteStr): Option[TxMeta]
 
   def containsTransaction(tx: Transaction): Boolean

@@ -44,7 +44,7 @@ class AccountsApiGrpcImpl(commonApi: CommonAccountsApi)(implicit sc: Scheduler) 
 
     val responseStream = (addressOption, assetIds) match {
       case (Some(address), Seq()) =>
-        Observable(loadWavesBalance(address)) ++ commonApi.portfolio(address).map(assetBalanceResponse)
+        Observable(loadWavesBalance(address)) ++ commonApi.portfolio(address).concatMapIterable(identity).map(assetBalanceResponse)
       case (Some(address), nonEmptyList) =>
         Observable
           .fromIterable(nonEmptyList)
@@ -74,17 +74,16 @@ class AccountsApiGrpcImpl(commonApi: CommonAccountsApi)(implicit sc: Scheduler) 
       val result =
         commonApi
           .activeLeases(request.address.toAddress)
-          .map {
-            case LeaseInfo(leaseId, originTransactionId, sender, recipient, amount, height, status, _, _) =>
-              assert(status == LeaseInfo.Status.Active)
-              LeaseResponse(
-                leaseId.toByteString,
-                originTransactionId.toByteString,
-                ByteString.copyFrom(sender.bytes),
-                Some(PBRecipients.create(recipient)),
-                amount,
-                height
-              )
+          .map { case LeaseInfo(leaseId, originTransactionId, sender, recipient, amount, height, status, _, _) =>
+            assert(status == LeaseInfo.Status.Active)
+            LeaseResponse(
+              leaseId.toByteString,
+              originTransactionId.toByteString,
+              ByteString.copyFrom(sender.bytes),
+              Some(PBRecipients.create(recipient)),
+              amount,
+              height
+            )
           }
       responseObserver.completeWith(result)
     }

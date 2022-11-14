@@ -15,6 +15,9 @@ class ReadOnlyDB(db: RocksDB, readOptions: ReadOptions) {
     key.parse(bytes)
   }
 
+  def multiGet[V](keys: Seq[Key[V]]): Seq[V] =
+    db.multiGet(readOptions, keys).toSeq
+
   def has[V](key: Key[V]): Boolean = {
     val bytes = db.get(readOptions, key.keyBytes)
     LevelDBStats.read.recordTagged(key, bytes)

@@ -543,6 +543,11 @@ package object database {
     def multiGet(readOptions: ReadOptions, keys: Seq[Array[Byte]]): Seq[Array[Byte]] =
       db.multiGetAsList(readOptions, keys.asJava).asScala.toSeq
 
+    def multiGet[A, B](readOptions: ReadOptions, keys: Seq[Key[A]]): View[A] =
+      keys.view.zip(db.multiGetAsList(readOptions, keys.map(_.keyBytes).asJava).asScala).map { case (k, v) =>
+        k.parse(v)
+      }
+
     def multiGetInts(readOptions: ReadOptions, keys: ArrayBuffer[Array[Byte]]): View[Option[Int]] = {
       val keyBufs = keys.map { k =>
         val b = Util.getTemporaryDirectBuffer(k.length)

@@ -15,6 +15,8 @@ trait CommonAssetsApi {
 
   def fullInfo(assetId: IssuedAsset): Option[AssetInfo]
 
+  def fullInfos(assetIds: Seq[IssuedAsset]): Seq[Option[AssetInfo]]
+
   def wavesDistribution(height: Int, after: Option[Address]): Observable[(Address, Long)]
 
   def assetDistribution(asset: IssuedAsset, height: Int, after: Option[Address]): Observable[(Address, Long)]
@@ -36,6 +38,23 @@ object CommonAssetsApi {
         blockchain.transactionInfo(assetId.id).collect { case (tm, it: IssueTransaction) if tm.succeeded => it },
         sponsorBalance
       )
+
+    override def fullInfos(assetIds: Seq[IssuedAsset]): Seq[Option[AssetInfo]] = {
+      blockchain
+        .transactionInfos(assetIds.map(_.id))
+        .view
+        .zip(assetIds)
+        .map { case (tx, assetId) =>
+          blockchain.assetDescription(assetId).map { desc =>
+            AssetInfo(
+              desc,
+              tx.collect { case (tm, it: IssueTransaction) if tm.succeeded => it },
+              if (desc.sponsorship != 0) Some(blockchain.wavesPortfolio(desc.issuer.toAddress).spendableBalance) else None
+            )
+          }
+        }
+        .toSeq
+    }
 
     override def wavesDistribution(height: Int, after: Option[Address]): Observable[(Address, Long)] =
       balanceDistribution(

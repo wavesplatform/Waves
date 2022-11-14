@@ -646,6 +646,10 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.transactionInfo(id)
   }
 
+  override def transactionInfos(ids: Seq[BlockId]): Seq[Option[(TxMeta, Transaction)]] = readLock {
+    compositeBlockchain.transactionInfos(ids)
+  }
+
   override def containsTransaction(tx: Transaction): Boolean = readLock {
     compositeBlockchain.containsTransaction(tx)
   }

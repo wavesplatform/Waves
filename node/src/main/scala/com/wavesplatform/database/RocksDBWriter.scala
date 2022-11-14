@@ -820,6 +820,14 @@ abstract class RocksDBWriter private[database] (
 
   override def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)] = readOnly(transactionInfo(id, _))
 
+  override def transactionInfos(ids: Seq[ByteStr]): Seq[Option[(TxMeta, Transaction)]] = readOnly { db =>
+    val tms = db.multiGet(ids.map(id => Keys.transactionMetaById(TransactionId(id))))
+    db.multiGet(tms.map {
+      case Some(tm) => Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort))
+      case None     => Keys.transactionAt(Height(0), TxNum(0.toShort))
+    })
+  }
+
   protected def transactionInfo(id: ByteStr, db: ReadOnlyDB): Option[(TxMeta, Transaction)] =
     for {
       tm        <- db.get(Keys.transactionMetaById(TransactionId(id)))

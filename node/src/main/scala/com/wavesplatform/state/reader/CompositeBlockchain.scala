@@ -66,6 +66,15 @@ final class CompositeBlockchain private (
       .map(t => (TxMeta(Height(this.height), t.applied, t.spentComplexity), t.transaction))
       .orElse(inner.transactionInfo(id))
 
+  override def transactionInfos(ids: Seq[ByteStr]): Seq[Option[(TxMeta, Transaction)]] = {
+    inner.transactionInfos(ids).zip(ids).map { case (info, id) =>
+      diff.transactions
+        .get(id)
+        .map(t => (TxMeta(Height(this.height), t.applied, t.spentComplexity), t.transaction))
+        .orElse(info)
+    }
+  }
+
   override def transactionMeta(id: ByteStr): Option[TxMeta] =
     diff.transactions
       .get(id)

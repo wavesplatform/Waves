@@ -40,7 +40,7 @@ trait CommonAccountsApi {
 
   def assetBalance(address: Address, asset: IssuedAsset): Long
 
-  def portfolio(address: Address): Observable[(IssuedAsset, Long)]
+  def portfolio(address: Address): Observable[Seq[(IssuedAsset, Long)]]
 
   def nftList(address: Address, after: Option[IssuedAsset]): Observable[(IssuedAsset, AssetDescription)]
 
@@ -89,12 +89,16 @@ object CommonAccountsApi {
 
     override def assetBalance(address: Address, asset: IssuedAsset): Long = blockchain.balance(address, asset)
 
-    override def portfolio(address: Address): Observable[(IssuedAsset, Long)] = {
+    override def portfolio(address: Address): Observable[Seq[(IssuedAsset, Long)]] = {
+      val featureNotActivated = !blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee)
+      val compositeBlockchain = blockchain.compositeBlockchain
+      def includeNft(assetId: IssuedAsset): Boolean =
+        featureNotActivated || !compositeBlockchain.assetDescription(assetId).exists(_.nft)
+
       val currentDiff = diff()
       db.resourceObservable.flatMap { resource =>
         Observable
-          .fromIterator(Task(assetBalanceIterator(resource, address, currentDiff, includeNft(blockchain))))
-          .concatMapIterable(identity)
+          .fromIterator(Task(assetBalanceIterator(resource, address, currentDiff, includeNft)))
       }
     }
 

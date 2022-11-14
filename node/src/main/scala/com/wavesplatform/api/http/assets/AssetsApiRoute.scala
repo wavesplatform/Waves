@@ -39,6 +39,7 @@ import com.wavesplatform.wallet.Wallet
 import io.netty.util.concurrent.DefaultThreadFactory
 import monix.eval.Task
 import monix.execution.Scheduler
+import monix.reactive.Observable
 import play.api.libs.json.*
 
 import scala.concurrent.Future
@@ -147,48 +148,54 @@ case class AssetsApiRoute(
       case (errors, _)     => InvalidIds(errors)
     }
 
-  def fullAssetInfoJsonNew(asset: IssuedAsset, balance: Long): ByteString = commonAssetsApi.fullInfo(asset) match {
-    case Some(CommonAssetsApi.AssetInfo(assetInfo, issueTransaction, sponsorBalance)) =>
-      ByteString.fromArrayUnsafe(
-        writeToArray(
-          FullAssetInfo(
-            assetId = asset.id.toString,
-            reissuable = assetInfo.reissuable,
-            minSponsoredAssetFee = assetInfo.sponsorship match {
-              case 0           => None
-              case sponsorship => Some(sponsorship)
-            },
-            sponsorBalance = sponsorBalance,
-            quantity = BigDecimal(assetInfo.totalVolume),
-            issueTransaction = issueTransaction.map { tx =>
-              IssueTransactionInfo(
-                tx.tpe.id,
-                tx.id().toString,
-                tx.assetFee._2,
-                tx.assetFee._1.maybeBase58Repr,
-                tx.timestamp,
-                tx.version,
-                if (tx.version >= TxVersion.V2) Some(tx.chainId) else None,
-                tx.sender.toAddress(tx.chainId).toString,
-                tx.sender.toString,
-                tx.proofs.proofs.map(_.toString),
-                if (tx.usesLegacySignature) Some(tx.signature.toString) else None,
-                tx.assetId.toString,
-                tx.name.toStringUtf8,
-                tx.quantity.value,
-                tx.reissuable,
-                tx.decimals.value,
-                tx.description.toStringUtf8,
-                if (tx.version >= TxVersion.V2) tx.script.map(_.bytes().base64) else None
+  def fullAssetInfoJsonNew(balances: Seq[(IssuedAsset, Long)]): Seq[ByteString] =
+    balances.view
+      .zip(commonAssetsApi.fullInfos(balances.map(_._1)))
+      .map { case ((asset, balance), infoOpt) =>
+        infoOpt match {
+          case Some(CommonAssetsApi.AssetInfo(assetInfo, issueTransaction, sponsorBalance)) =>
+            ByteString.fromArrayUnsafe(
+              writeToArray(
+                FullAssetInfo(
+                  assetId = asset.id.toString,
+                  reissuable = assetInfo.reissuable,
+                  minSponsoredAssetFee = assetInfo.sponsorship match {
+                    case 0           => None
+                    case sponsorship => Some(sponsorship)
+                  },
+                  sponsorBalance = sponsorBalance,
+                  quantity = BigDecimal(assetInfo.totalVolume),
+                  issueTransaction = issueTransaction.map { tx =>
+                    IssueTransactionInfo(
+                      tx.tpe.id,
+                      tx.id().toString,
+                      tx.assetFee._2,
+                      tx.assetFee._1.maybeBase58Repr,
+                      tx.timestamp,
+                      tx.version,
+                      if (tx.version >= TxVersion.V2) Some(tx.chainId) else None,
+                      tx.sender.toAddress(tx.chainId).toString,
+                      tx.sender.toString,
+                      tx.proofs.proofs.map(_.toString),
+                      if (tx.usesLegacySignature) Some(tx.signature.toString) else None,
+                      tx.assetId.toString,
+                      tx.name.toStringUtf8,
+                      tx.quantity.value,
+                      tx.reissuable,
+                      tx.decimals.value,
+                      tx.description.toStringUtf8,
+                      if (tx.version >= TxVersion.V2) tx.script.map(_.bytes().base64) else None
+                    )
+                  },
+                  balance = balance
+                )
               )
-            },
-            balance = balance
-          )
-        )
-      )
-    case None =>
-      ByteString.fromArrayUnsafe(writeToArray(AssetsApiRoute.AssetId(asset.id.toString)))
-  }
+            )
+          case None =>
+            ByteString.fromArrayUnsafe(writeToArray(AssetsApiRoute.AssetId(asset.id.toString)))
+        }
+      }
+      .toSeq
 
   def fullAssetInfoJson(asset: IssuedAsset): JsObject = commonAssetsApi.fullInfo(asset) match {
     case Some(CommonAssetsApi.AssetInfo(assetInfo, issueTransaction, sponsorBalance)) =>
@@ -215,21 +222,15 @@ case class AssetsApiRoute(
     implicit val jsonStreamingSupport: ToResponseMarshaller[Source[ByteString, NotUsed]] =
       jsonStreamMarshallerNew(s"""{"address":"$address","balances":[""", ",", "]}")
 
-    routeTimeout.executeStreamed {
-      assets match {
+    routeTimeout.executeFromObservable(
+      (assets match {
         case Some(assets) =>
-          Task {
-            assets.map(asset => asset -> blockchain.balance(address, asset))
-          }
+          Observable.eval(assets.map(asset => asset -> blockchain.balance(address, asset)))
         case None =>
           commonAccountApi
             .portfolio(address)
-            .toListL // FIXME: Strict loading because of segfault in leveldb
-      }
-    } { case (assetId, balance) =>
-      fullAssetInfoJsonNew(assetId, balance)
-//      fullAssetInfoJson(assetId) ++ Json.obj("balance" -> balance)
-    }
+      }).concatMapIterable(fullAssetInfoJsonNew)
+    )
   }
 
   def balance(address: Address, assetId: IssuedAsset): Route = complete(balanceJson(address, assetId))
