@@ -24,6 +24,7 @@ import monix.eval.Task
 import monix.reactive.Observable
 import org.rocksdb.{ReadOptions, RocksDB, RocksIterator}
 
+import java.util.regex.Pattern
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
@@ -112,16 +113,17 @@ object CommonAccountsApi {
       blockchain.accountData(address, key)
 
     override def dataStream(address: Address, regex: Option[String]): Observable[DataEntry[?]] = Observable.defer {
+      val pattern = regex.map(_.r.pattern)
       val entriesFromDiff = diff().accountData
         .get(address)
-        .fold(Array.empty[DataEntry[?]])(_.data.filter { case (k, _) => regex.forall(_.r.pattern.matcher(k).matches()) }.values.toArray.sortBy(_.key))
+        .fold(Array.empty[DataEntry[?]])(_.data.filter { case (k, _) => pattern.forall(_.matcher(k).matches()) }.values.toArray.sortBy(_.key))
 
       db.resourceObservable.flatMap { dbResource =>
         dbResource
           .get(Keys.addressId(address))
           .map { addressId =>
             Observable.fromIterator(
-              Task(new AddressDataIterator(dbResource, address, addressId, entriesFromDiff, regex).asScala)
+              Task(new AddressDataIterator(dbResource, address, addressId, entriesFromDiff, pattern).asScala)
             )
           }
           .getOrElse(Observable.empty)
@@ -212,7 +214,7 @@ object CommonAccountsApi {
       address: Address,
       addressId: AddressId,
       entriesFromDiff: Array[DataEntry[?]],
-      regex: Option[String]
+      pattern: Option[Pattern]
   ) extends AbstractIterator[DataEntry[?]] {
     val prefix: Array[Byte] = KeyTags.DataHistory.prefixBytes ++ PBRecipients.publicKeyHash(address)
 
@@ -223,7 +225,7 @@ object CommonAccountsApi {
     var nextIndex                        = 0
     var nextDbEntries: Seq[DataEntry[?]] = Seq.empty
 
-    def matches(key: String): Boolean = regex.forall(_.r.pattern.matcher(key).matches())
+    def matches(key: String): Boolean = pattern.forall(_.matcher(key).matches())
 
     final override def computeNext(): DataEntry[?] = db.withSafePrefixIterator { dbIterator =>
       nextDbEntries.headOption match {

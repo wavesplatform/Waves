@@ -6,17 +6,20 @@ import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshal
 import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.Source
+import akka.util.ByteString
 import cats.data.Validated
 import cats.instances.either.*
 import cats.instances.list.*
 import cats.syntax.alternative.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
+import com.github.plokhotnyuk.jsoniter_scala.core.{JsonValueCodec, writeToArray}
+import com.github.plokhotnyuk.jsoniter_scala.macros.JsonCodecMaker
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.api.http.*
-import com.wavesplatform.api.http.assets.AssetsApiRoute.DistributionParams
+import com.wavesplatform.api.http.assets.AssetsApiRoute.{DistributionParams, FullAssetInfo, IssueTransactionInfo}
 import com.wavesplatform.api.http.requests.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
@@ -25,7 +28,7 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.EthereumTransaction.Invocation
-import com.wavesplatform.transaction.{EthereumTransaction, TransactionFactory}
+import com.wavesplatform.transaction.{EthereumTransaction, TransactionFactory, TxVersion}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
@@ -144,6 +147,49 @@ case class AssetsApiRoute(
       case (errors, _)     => InvalidIds(errors)
     }
 
+  def fullAssetInfoJsonNew(asset: IssuedAsset, balance: Long): ByteString = commonAssetsApi.fullInfo(asset) match {
+    case Some(CommonAssetsApi.AssetInfo(assetInfo, issueTransaction, sponsorBalance)) =>
+      ByteString.fromArrayUnsafe(
+        writeToArray(
+          FullAssetInfo(
+            assetId = asset.id.toString,
+            reissuable = assetInfo.reissuable,
+            minSponsoredAssetFee = assetInfo.sponsorship match {
+              case 0           => None
+              case sponsorship => Some(sponsorship)
+            },
+            sponsorBalance = sponsorBalance,
+            quantity = BigDecimal(assetInfo.totalVolume),
+            issueTransaction = issueTransaction.map { tx =>
+              IssueTransactionInfo(
+                tx.tpe.id,
+                tx.id().toString,
+                tx.assetFee._2,
+                tx.assetFee._1.maybeBase58Repr,
+                tx.timestamp,
+                tx.version,
+                if (tx.version >= TxVersion.V2) Some(tx.chainId) else None,
+                tx.sender.toAddress(tx.chainId).toString,
+                tx.sender.toString,
+                tx.proofs.proofs.map(_.toString),
+                if (tx.usesLegacySignature) Some(tx.signature.toString) else None,
+                tx.assetId.toString,
+                tx.name.toStringUtf8,
+                tx.quantity.value,
+                tx.reissuable,
+                tx.decimals.value,
+                tx.description.toStringUtf8,
+                if (tx.version >= TxVersion.V2) tx.script.map(_.bytes().base64) else None
+              )
+            },
+            balance = balance
+          )
+        )
+      )
+    case None =>
+      ByteString.fromArrayUnsafe(writeToArray(AssetsApiRoute.AssetId(asset.id.toString)))
+  }
+
   def fullAssetInfoJson(asset: IssuedAsset): JsObject = commonAssetsApi.fullInfo(asset) match {
     case Some(CommonAssetsApi.AssetInfo(assetInfo, issueTransaction, sponsorBalance)) =>
       Json.obj(
@@ -166,8 +212,8 @@ case class AssetsApiRoute(
     *   Some(assets) for specific asset balances, None for a full portfolio
     */
   def balances(address: Address, assets: Option[Seq[IssuedAsset]] = None): Route = {
-    implicit val jsonStreamingSupport: ToResponseMarshaller[Source[JsObject, NotUsed]] =
-      jsonStreamMarshaller(s"""{"address":"$address","balances":[""", ",", "]}")
+    implicit val jsonStreamingSupport: ToResponseMarshaller[Source[ByteString, NotUsed]] =
+      jsonStreamMarshallerNew(s"""{"address":"$address","balances":[""", ",", "]}")
 
     routeTimeout.executeStreamed {
       assets match {
@@ -181,7 +227,8 @@ case class AssetsApiRoute(
             .toListL // FIXME: Strict loading because of segfault in leveldb
       }
     } { case (assetId, balance) =>
-      fullAssetInfoJson(assetId) ++ Json.obj("balance" -> balance)
+      fullAssetInfoJsonNew(assetId, balance)
+//      fullAssetInfoJson(assetId) ++ Json.obj("balance" -> balance)
     }
   }
 
@@ -252,7 +299,8 @@ case class AssetsApiRoute(
     if (limit > settings.transactionsByAddressLimit) complete(TooBigArrayAllocation)
     else {
       import cats.syntax.either.*
-      implicit val jsonStreamingSupport: ToResponseMarshaller[Source[JsValue, NotUsed]] = jsonStreamMarshaller()
+//      implicit val jsonStreamingSupport: ToResponseMarshaller[Source[JsValue, NotUsed]] = jsonStreamMarshaller()
+      implicit val jsonStreamingSupport: ToResponseMarshaller[Source[ByteString, NotUsed]] = jsonStreamMarshallerNew()
 
       routeTimeout.executeStreamed {
         commonAccountApi
@@ -261,7 +309,7 @@ case class AssetsApiRoute(
           .toListL
       } { case (assetId, assetDesc) =>
         AssetsApiRoute
-          .jsonDetails(blockchain)(assetId, assetDesc, full = true)
+          .jsonDetailsNew(blockchain)(assetId, assetDesc, full = true)
           .valueOr(err => throw new IllegalArgumentException(err))
       }
     }
@@ -333,6 +381,63 @@ object AssetsApiRoute {
     } yield limit
   }
 
+  def jsonDetailsNew(blockchain: Blockchain)(id: IssuedAsset, description: AssetDescription, full: Boolean): Either[String, ByteString] = {
+    // (timestamp, height)
+    def additionalInfo(id: ByteStr): Either[String, (Long, Int)] =
+      for {
+        tt <- blockchain
+          .transactionInfo(id)
+          .filter { case (tm, _) => tm.succeeded }
+          .toRight("Failed to find issue/invokeScript/invokeExpression transaction by ID")
+        (txm, tx) = tt
+        ts <- (tx match {
+          case tx: IssueTransaction                             => Some(tx.timestamp)
+          case tx: InvokeScriptTransaction                      => Some(tx.timestamp)
+          case tx: InvokeExpressionTransaction                  => Some(tx.timestamp)
+          case tx @ EthereumTransaction(_: Invocation, _, _, _) => Some(tx.timestamp)
+          case _                                                => None
+        }).toRight("No issue/invokeScript/invokeExpression transaction found with the given asset ID")
+      } yield (ts, txm.height)
+
+    for {
+      tsh <- additionalInfo(description.originTransactionId)
+      (timestamp, height) = tsh
+      script              = description.script.filter(_ => full)
+      name                = description.name.toStringUtf8
+      desc                = description.description.toStringUtf8
+    } yield {
+      ByteString.fromArrayUnsafe(
+        writeToArray(
+          AssetDetails(
+            assetId = id.id.toString,
+            issueHeight = height,
+            issueTimestamp = timestamp,
+            issuer = description.issuer.toAddress.toString,
+            issuerPublicKey = description.issuer.toString,
+            name = name,
+            description = desc,
+            decimals = description.decimals,
+            reissuable = description.reissuable,
+            quantity = BigDecimal(description.totalVolume),
+            scripted = description.script.nonEmpty,
+            minSponsoredAssetFee = description.sponsorship match {
+              case 0           => None
+              case sponsorship => Some(sponsorship)
+            },
+            originTransactionId = description.originTransactionId.toString,
+            scriptDetails = script.map { case AssetScriptInfo(script, complexity) =>
+              AssetScriptDetails(
+                scriptComplexity = BigDecimal(complexity),
+                script = script.bytes().base64,
+                scriptText = script.expr.toString // [WAIT] JsString(Script.decompile(script))
+              )
+            }
+          )
+        )
+      )
+    }
+  }
+
   def jsonDetails(blockchain: Blockchain)(id: IssuedAsset, description: AssetDescription, full: Boolean): Either[String, JsObject] = {
     // (timestamp, height)
     def additionalInfo(id: ByteStr): Either[String, (Long, Int)] =
@@ -384,4 +489,64 @@ object AssetsApiRoute {
       }
     )
   }
+
+  case class AssetScriptDetails(
+      scriptComplexity: BigDecimal,
+      script: String,
+      scriptText: String
+  )
+
+  case class AssetDetails(
+      assetId: String,
+      issueHeight: Int,
+      issueTimestamp: Long,
+      issuer: String,
+      issuerPublicKey: String,
+      name: String,
+      description: String,
+      decimals: Int,
+      reissuable: Boolean,
+      quantity: BigDecimal,
+      scripted: Boolean,
+      minSponsoredAssetFee: Option[Long],
+      originTransactionId: String,
+      scriptDetails: Option[AssetScriptDetails]
+  )
+
+  case class IssueTransactionInfo(
+      `type`: Int,
+      id: String,
+      fee: Long,
+      feeAssetId: Option[String],
+      timestamp: Long,
+      version: Byte,
+      chainId: Option[Byte],
+      sender: String,
+      senderPublicKey: String,
+      proofs: Seq[String],
+      signature: Option[String],
+      assetId: String,
+      name: String,
+      quantity: Long,
+      reissuable: Boolean,
+      decimals: Byte,
+      description: String,
+      script: Option[String]
+  )
+
+  case class FullAssetInfo(
+      assetId: String,
+      reissuable: Boolean,
+      minSponsoredAssetFee: Option[Long],
+      sponsorBalance: Option[Long],
+      quantity: BigDecimal,
+      issueTransaction: Option[IssueTransactionInfo],
+      balance: Long
+  )
+
+  case class AssetId(assetId: String)
+
+  implicit val assetDetailCodec: JsonValueCodec[AssetDetails]    = JsonCodecMaker.make
+  implicit val fullAssetInfoCodec: JsonValueCodec[FullAssetInfo] = JsonCodecMaker.make
+  implicit val assetIdCodec: JsonValueCodec[AssetId]             = JsonCodecMaker.make
 }

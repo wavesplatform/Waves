@@ -145,7 +145,7 @@ object AddressPortfolio {
     new BalanceIterator(
       resource
         .get(Keys.addressId(address))
-        .fold[Iterator[Seq[(IssuedAsset, Long)]]](Iterator(Seq.empty))(addressId => new NFTIterator(addressId, maybeAfter, resource).asScala),
+        .fold[Iterator[Seq[(IssuedAsset, Long)]]](Iterator.empty)(addressId => new NFTIterator(addressId, maybeAfter, resource).asScala),
       asset => loadAssetDescription(asset).exists(_.nft),
       diff.portfolios.getOrElse(address, Portfolio.empty).assets
     ).asScala
@@ -161,7 +161,7 @@ object AddressPortfolio {
     new BalanceIterator(
       resource
         .get(Keys.addressId(address))
-        .fold[Iterator[Seq[(IssuedAsset, Long)]]](Iterator(Seq.empty))(addressId => new AssetBalanceIterator(addressId, resource).asScala),
+        .fold[Iterator[Seq[(IssuedAsset, Long)]]](Iterator.empty)(addressId => new AssetBalanceIterator(addressId, resource).asScala),
       includeAsset,
       diff.portfolios.getOrElse(address, Portfolio.empty).assets
     ).asScala
