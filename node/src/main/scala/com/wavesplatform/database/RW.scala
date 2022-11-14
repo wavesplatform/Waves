@@ -5,10 +5,11 @@ import com.wavesplatform.metrics.LevelDBStats.DbHistogramExt
 import org.rocksdb.{ReadOptions, RocksDB, WriteBatch}
 
 class RW(db: RocksDB, readOptions: ReadOptions, batch: WriteBatch) extends ReadOnlyDB(db, readOptions) {
-  def put[V](key: Key[V], value: V): Unit = {
+  def put[V](key: Key[V], value: V): Int = {
     val bytes = key.encode(value)
     LevelDBStats.write.recordTagged(key, bytes)
     batch.put(key.keyBytes, bytes)
+    bytes.length
   }
 
   def put(key: Array[Byte], value: Array[Byte]): Unit = batch.put(key, value)
@@ -30,6 +31,12 @@ class RW(db: RocksDB, readOptions: ReadOptions, batch: WriteBatch) extends ReadO
 
   def filterHistory(key: Key[Seq[Int]], heightToRemove: Int): Unit = {
     val newValue = get(key).filterNot(_ == heightToRemove)
+    if (newValue.nonEmpty) put(key, newValue)
+    else delete(key)
+  }
+
+  def filterMetaHistory(key: Key[Seq[(Int, Int)]], heightToRemove: Int): Unit = {
+    val newValue = get(key).filterNot(_._1 == heightToRemove)
     if (newValue.nonEmpty) put(key, newValue)
     else delete(key)
   }

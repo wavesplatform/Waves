@@ -150,6 +150,19 @@ package object database {
     Seq.fill(d.length / 4)(in.getInt)
   }
 
+  def writeTupleIntSeq(values: Seq[(Int, Int)]): Array[Byte] = {
+    values
+      .foldLeft(ByteBuffer.allocate((4 + 4) * values.length)) { case (buf, (first, second)) =>
+        buf.putInt(first).putInt(second)
+      }
+      .array()
+  }
+
+  def readTupleIntSeq(data: Array[Byte]): Seq[(Int, Int)] = Option(data).fold(Seq.empty[(Int, Int)]) { d =>
+    val in = ByteBuffer.wrap(data)
+    Seq.fill(d.length / (4 + 4))(in.getInt -> in.getInt)
+  }
+
   def readAddressIds(data: Array[Byte]): Seq[AddressId] = Option(data).fold(Seq.empty[AddressId]) { d =>
     require(d.length % java.lang.Long.BYTES == 0, s"Invalid data length: ${d.length}")
     val buffer = ByteBuffer.wrap(data)
@@ -409,7 +422,23 @@ package object database {
     )
   }
 
-  def readTransactionHNSeqAndType(bs: Array[Byte]): (Height, Seq[(Byte, TxNum)]) = {
+  def readTransactionHNSeqAndType(bs: Array[Byte]): (Height, Seq[(Byte, TxNum, Int)]) = {
+    val ndi          = newDataInput(bs)
+    val height       = Height(ndi.readInt())
+    val numSeqLength = ndi.readInt()
+
+    (
+      height,
+      List.fill(numSeqLength) {
+        val tp   = ndi.readByte()
+        val num  = TxNum(ndi.readShort())
+        val size = ndi.readInt()
+        (tp, num, size)
+      }
+    )
+  }
+
+  def oldReadTransactionHNSeqAndType(bs: Array[Byte]): (Height, Seq[(Byte, TxNum)]) = {
     val ndi          = newDataInput(bs)
     val height       = Height(ndi.readInt())
     val numSeqLength = ndi.readInt()
@@ -424,7 +453,25 @@ package object database {
     )
   }
 
-  def writeTransactionHNSeqAndType(v: (Height, Seq[(Byte, TxNum)])): Array[Byte] = {
+  def writeTransactionHNSeqAndType(v: (Height, Seq[(Byte, TxNum, Int)])): Array[Byte] = {
+    val (height, numSeq) = v
+    val numSeqLength     = numSeq.length
+
+    val outputLength = 4 + 4 + numSeqLength * (1 + 2 + 4)
+    val ndo          = newDataOutput(outputLength)
+
+    ndo.writeInt(height)
+    ndo.writeInt(numSeqLength)
+    numSeq.foreach { case (tp, num, size) =>
+      ndo.writeByte(tp)
+      ndo.writeShort(num)
+      ndo.writeInt(size)
+    }
+
+    ndo.toByteArray
+  }
+
+  def oldWriteTransactionHNSeqAndType(v: (Height, Seq[(Byte, TxNum)])): Array[Byte] = {
     val (height, numSeq) = v
     val numSeqLength     = numSeq.length
 
@@ -633,6 +680,155 @@ package object database {
             res
           } else 0
         }
+
+      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
+      result
+    }
+
+    def multiGetBuffered[A](readOptions: ReadOptions, keys: Seq[Key[A]], valBufferSize: Int): Seq[A] = {
+      val keyBufs = keys.map { k =>
+        val arr = k.keyBytes
+        val b   = Util.getTemporaryDirectBuffer(arr.length)
+        b.put(k.keyBytes).flip()
+        b
+      }.asJava
+      val valBufs = List
+        .fill(keys.size) {
+          val buf = Util.getTemporaryDirectBuffer(valBufferSize)
+          buf.limit(buf.capacity())
+          buf
+        }
+        .asJava
+
+      val result = keys.view
+        .zip(db.multiGetByteBuffers(readOptions, keyBufs, valBufs).asScala)
+        .flatMap { case (parser, value) =>
+          if (value.status.getCode == Status.Code.Ok) {
+            val arr = new Array[Byte](value.requiredSize)
+            value.value.get(arr)
+            Util.releaseTemporaryDirectBuffer(value.value)
+            Some(parser.parse(arr))
+          } else None
+        }
+        .toSeq
+
+      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
+      result
+    }
+
+    def multiGetBuffered[A](readOptions: ReadOptions, keys: Seq[Key[A]], valBufSizes: Seq[Int]): Seq[A] = {
+      val keyBufs = keys.map { k =>
+        val arr = k.keyBytes
+        val b   = Util.getTemporaryDirectBuffer(arr.length)
+        b.put(k.keyBytes).flip()
+        b
+      }.asJava
+      val valBufs = valBufSizes.map { size =>
+        val buf = Util.getTemporaryDirectBuffer(size)
+        buf.limit(buf.capacity())
+        buf
+      }.asJava
+
+      val result = keys.view
+        .zip(db.multiGetByteBuffers(readOptions, keyBufs, valBufs).asScala)
+        .flatMap { case (parser, value) =>
+          if (value.status.getCode == Status.Code.Ok) {
+            val arr = new Array[Byte](value.requiredSize)
+            value.value.get(arr)
+            Util.releaseTemporaryDirectBuffer(value.value)
+            Some(parser.parse(arr))
+          } else None
+        }
+        .toSeq
+
+      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
+      result
+    }
+
+    def multiGetBufferedFlat[A](readOptions: ReadOptions, keys: ArrayBuffer[Key[Option[A]]], valBufferSize: Int): Seq[A] = {
+      val keyBufs = keys.map { k =>
+        val arr = k.keyBytes
+        val b   = Util.getTemporaryDirectBuffer(arr.length)
+        b.put(k.keyBytes).flip()
+        b
+      }.asJava
+      val valBufs = List
+        .fill(keys.size) {
+          val buf = Util.getTemporaryDirectBuffer(valBufferSize)
+          buf.limit(buf.capacity())
+          buf
+        }
+        .asJava
+
+      val result = keys.view
+        .zip(db.multiGetByteBuffers(readOptions, keyBufs, valBufs).asScala)
+        .flatMap { case (parser, value) =>
+          if (value.status.getCode == Status.Code.Ok) {
+            val arr = new Array[Byte](value.requiredSize)
+            value.value.get(arr)
+            Util.releaseTemporaryDirectBuffer(value.value)
+            parser.parse(arr)
+          } else None
+        }
+        .toSeq
+
+      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
+      result
+    }
+
+    def multiGetBufferedFlat[A](readOptions: ReadOptions, keys: ArrayBuffer[Key[Option[A]]], valBufSizes: ArrayBuffer[Int]): Seq[A] = {
+      val keyBufs = keys.map { k =>
+        val arr = k.keyBytes
+        val b   = Util.getTemporaryDirectBuffer(arr.length)
+        b.put(k.keyBytes).flip()
+        b
+      }.asJava
+      val valBufs = valBufSizes.map { size =>
+        val buf = Util.getTemporaryDirectBuffer(size)
+        buf.limit(buf.capacity())
+        buf
+      }.asJava
+
+      val result = keys.view
+        .zip(db.multiGetByteBuffers(readOptions, keyBufs, valBufs).asScala)
+        .flatMap { case (parser, value) =>
+          if (value.status.getCode == Status.Code.Ok) {
+            val arr = new Array[Byte](value.requiredSize)
+            value.value.get(arr)
+            Util.releaseTemporaryDirectBuffer(value.value)
+            parser.parse(arr)
+          } else None
+        }
+        .toSeq
+
+      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
+      result
+    }
+
+    def multiGetBuffered[A](readOptions: ReadOptions, keys: ArrayBuffer[Key[A]], valBufSizes: ArrayBuffer[Int]): Seq[A] = {
+      val keyBufs = keys.map { k =>
+        val arr = k.keyBytes
+        val b   = Util.getTemporaryDirectBuffer(arr.length)
+        b.put(k.keyBytes).flip()
+        b
+      }.asJava
+      val valBufs = valBufSizes.map { size =>
+        val buf = Util.getTemporaryDirectBuffer(size)
+        buf.limit(buf.capacity())
+        buf
+      }.asJava
+
+      val result = keys.view
+        .zip(db.multiGetByteBuffers(readOptions, keyBufs, valBufs).asScala)
+        .flatMap { case (parser, value) =>
+          if (value.status.getCode == Status.Code.Ok) {
+            val arr = new Array[Byte](value.requiredSize)
+            value.value.get(arr)
+            Util.releaseTemporaryDirectBuffer(value.value)
+            Some(parser.parse(arr))
+          } else None
+        }
+        .toSeq
 
       keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
       result

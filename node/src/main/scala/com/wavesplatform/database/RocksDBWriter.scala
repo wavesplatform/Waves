@@ -223,11 +223,11 @@ abstract class RocksDBWriter private[database] (
   override def carryFee: Long = readOnly(_.get(Keys.carryFee(height)))
 
   override protected def loadAccountData(address: Address, key: String): Option[DataEntry[?]] =
-    loadWithFilter(dataKeyFilter, Keys.dataHistory(address, key)) { (ro, history) =>
+    loadWithFilter(dataKeyFilter, Keys.dataMetaHistory(address, key)) { (ro, history) =>
       for {
-        aid <- addressId(address)
-        h   <- history.headOption
-        e   <- ro.get(Keys.data(aid, key)(h))
+        aid    <- addressId(address)
+        (h, _) <- history.headOption
+        e      <- ro.get(Keys.data(aid, key)(h))
       } yield e
     }
 
@@ -300,6 +300,22 @@ abstract class RocksDBWriter private[database] (
     val (c1, c2) = history.partition(_ >= threshold)
     rw.put(key, (height +: c1) ++ c2.headOption)
     c2.drop(1).map(kf(_).keyBytes)
+  }
+
+  private def updateMetaHistory(rw: RW, key: Key[Seq[(Int, Int)]], threshold: Int, kf: Int => Key[?], size: Int): Seq[Array[Byte]] =
+    updateMetaHistory(rw, rw.get(key), key, threshold, kf, size)
+
+  private def updateMetaHistory(
+      rw: RW,
+      history: Seq[(Int, Int)],
+      key: Key[Seq[(Int, Int)]],
+      threshold: Int,
+      kf: Int => Key[?],
+      size: Int
+  ): Seq[Array[Byte]] = {
+    val (c1, c2) = history.partition(_._1 >= threshold)
+    rw.put(key, ((height, size) +: c1) ++ c2.headOption)
+    c2.drop(1).map { case (h, _) => kf(h).keyBytes }
   }
 
   private def appendBalances(
@@ -482,11 +498,17 @@ abstract class RocksDBWriter private[database] (
         rw.put(Keys.changedDataKeys(height, addressId), addressData.data.keys.toSeq)
 
         for ((key, value) <- addressData.data) {
-          val kdh = Keys.dataHistory(address, key)
-          rw.put(Keys.data(addressId, key)(height), Some(value))
+          val kdh  = Keys.dataMetaHistory(address, key)
+          val size = rw.put(Keys.data(addressId, key)(height), Some(value))
           dataKeyFilter.put(kdh.suffix)
-          expiredKeys ++= updateHistory(rw, kdh, threshold, Keys.data(addressId, key))
+          expiredKeys ++= updateMetaHistory(rw, kdh, threshold, Keys.data(addressId, key), size)
         }
+      }
+
+      val txSizes = transactions.map { case (id, (txm, tx, num)) =>
+        val size = rw.put(Keys.transactionAt(Height(height), num), Some((txm, tx)))
+        rw.put(Keys.transactionMetaById(id), Some(TransactionMeta(height, num, tx.tpe.id, !txm.succeeded, 0, size)))
+        id -> size
       }
 
       if (dbSettings.storeTransactionsByAddress) for ((addressId, txIds) <- addressTransactions.asScala) {
@@ -494,7 +516,8 @@ abstract class RocksDBWriter private[database] (
         val nextSeqNr = rw.get(kk) + 1
         val txTypeNumSeq = txIds.asScala.map { txId =>
           val (_, tx, num) = transactions(txId)
-          (tx.tpe.id.toByte, num)
+          val size         = txSizes(txId)
+          (tx.tpe.id.toByte, num, size)
         }.toSeq
         rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq.sortBy(-_._2))))
         rw.put(kk, nextSeqNr)
@@ -502,11 +525,6 @@ abstract class RocksDBWriter private[database] (
 
       for ((alias, addressId) <- aliases) {
         rw.put(Keys.addressIdOfAlias(alias), Some(addressId))
-      }
-
-      for ((id, (txm, tx, num)) <- transactions) {
-        rw.put(Keys.transactionAt(Height(height), num), Some((txm, tx)))
-        rw.put(Keys.transactionMetaById(id), Some(TransactionMeta(height, num, tx.tpe.id, !txm.succeeded)))
       }
 
       val activationWindowSize = settings.functionalitySettings.activationWindowSize(height)
@@ -644,7 +662,7 @@ abstract class RocksDBWriter private[database] (
               log.trace(s"Discarding $k for $address at $currentHeight")
               accountDataToInvalidate += (address -> k)
               rw.delete(Keys.data(addressId, k)(currentHeight))
-              rw.filterHistory(Keys.dataHistory(address, k), currentHeight)
+              rw.filterMetaHistory(Keys.dataMetaHistory(address, k), currentHeight)
             }
             rw.delete(Keys.changedDataKeys(currentHeight, addressId))
 
@@ -821,11 +839,13 @@ abstract class RocksDBWriter private[database] (
   override def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)] = readOnly(transactionInfo(id, _))
 
   override def transactionInfos(ids: Seq[ByteStr]): Seq[Option[(TxMeta, Transaction)]] = readOnly { db =>
-    val tms = db.multiGet(ids.map(id => Keys.transactionMetaById(TransactionId(id))))
-    db.multiGet(tms.map {
-      case Some(tm) => Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort))
-      case None     => Keys.transactionAt(Height(0), TxNum(0.toShort))
-    })
+    val tms = db.multiGetBuffered(ids.map(id => Keys.transactionMetaById(TransactionId(id))), 36)
+    val (keys, sizes) = tms.map {
+      case Some(tm) => Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort)) -> tm.size
+      case None     => Keys.transactionAt(Height(0), TxNum(0.toShort))              -> 0
+    }.unzip
+
+    db.multiGetBuffered(keys, sizes)
   }
 
   protected def transactionInfo(id: ByteStr, db: ReadOnlyDB): Option[(TxMeta, Transaction)] =

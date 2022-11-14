@@ -8,7 +8,7 @@ import com.wavesplatform.api.common.CommonAccountsApi.AddressDataIterator.BatchS
 import com.wavesplatform.api.common.TransactionMeta.Ethereum
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{AddressId, DBExt, DBResource, KeyTags, Keys, readIntSeq}
+import com.wavesplatform.database.{AddressId, DBExt, DBResource, Key, KeyTags, Keys, readIntSeq}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBRecipients
@@ -24,6 +24,7 @@ import monix.eval.Task
 import monix.reactive.Observable
 import org.rocksdb.{ReadOptions, RocksDB, RocksIterator}
 
+import java.nio.ByteBuffer
 import java.util.regex.Pattern
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
@@ -251,19 +252,21 @@ object CommonAccountsApi {
             dbEntry
           }
         case None =>
-          val buffer = new ArrayBuffer[(String, Int)]()
-          while (dbIterator.isValid && buffer.length < BatchSize) {
+          val keysBuffer  = new ArrayBuffer[Key[Option[DataEntry[?]]]]()
+          val sizesBuffer = new ArrayBuffer[Int]()
+          while (dbIterator.isValid && keysBuffer.length < BatchSize) {
             val key = new String(dbIterator.key().drop(2 + Address.HashLength), Charsets.UTF_8)
             if (matches(key)) {
-              readIntSeq(dbIterator.value()).headOption match {
-                case Some(h) => buffer.addOne(key -> h)
-                case None    => ()
-              }
+              Option(dbIterator.value()).foreach { arr =>
+                val buf = ByteBuffer.wrap(arr)
+                keysBuffer.addOne(Keys.data(addressId, key)(buf.getInt))
+                sizesBuffer.addOne(buf.getInt)
+              } // FIXME: refactor
             }
             dbIterator.next()
           }
-          if (buffer.nonEmpty) {
-            nextDbEntries = db.multiGetFlat(buffer.map { case (key, h) => Keys.data(addressId, key)(h) })
+          if (keysBuffer.nonEmpty) {
+            nextDbEntries = db.multiGetBufferedFlat(keysBuffer, sizesBuffer)
             computeNext()
           } else if (nextIndex < length) {
             nextIndex += 1

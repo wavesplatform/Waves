@@ -5,7 +5,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, TransactionMeta}
+import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, OldTransactionMeta, TransactionMeta}
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.*
 import com.wavesplatform.state.reader.LeaseDetails
@@ -15,7 +15,13 @@ import com.wavesplatform.utils.*
 
 object Keys {
   import KeyHelpers.*
-  import KeyTags.{AddressId as AddressIdTag, EthereumTransactionMeta as EthereumTransactionMetaTag, InvokeScriptResult as InvokeScriptResultTag, LeaseDetails as LeaseDetailsTag, *}
+  import KeyTags.{
+    AddressId as AddressIdTag,
+    EthereumTransactionMeta as EthereumTransactionMetaTag,
+    InvokeScriptResult as InvokeScriptResultTag,
+    LeaseDetails as LeaseDetailsTag,
+    *
+  }
 
   val version: Key[Int]               = intKey(Version, default = 1)
   val height: Key[Int]                = intKey(Height)
@@ -82,6 +88,8 @@ object Keys {
   // public key hash is used here so it's possible to populate bloom filter by just scanning all the history keys
   def dataHistory(address: Address, key: String): Key[Seq[Int]] =
     historyKey(DataHistory, PBRecipients.publicKeyHash(address) ++ key.utf8Bytes)
+  def dataMetaHistory(address: Address, key: String): Key[Seq[(Int, Int)]] =
+    Key(DataHistory, PBRecipients.publicKeyHash(address) ++ key.utf8Bytes, readTupleIntSeq, writeTupleIntSeq)
   def data(addressId: AddressId, key: String)(height: Int): Key[Option[DataEntry[?]]] =
     Key.opt(Data, hBytes(addressId.toByteArray ++ key.utf8Bytes, height), readDataEntry(key), writeDataEntry)
 
@@ -124,7 +132,7 @@ object Keys {
   def addressTransactionSeqNr(addressId: AddressId): Key[Int] =
     bytesSeqNr(AddressTransactionSeqNr, addressId.toByteArray)
 
-  def addressTransactionHN(addressId: AddressId, seqNr: Int): Key[Option[(Height, Seq[(Byte, TxNum)])]] =
+  def addressTransactionHN(addressId: AddressId, seqNr: Int): Key[Option[(Height, Seq[(Byte, TxNum, Int)])]] =
     Key.opt(
       AddressTransactionHeightTypeAndNums,
       hBytes(addressId.toByteArray, seqNr),
@@ -132,11 +140,27 @@ object Keys {
       writeTransactionHNSeqAndType
     )
 
+  def oldAddressTransactionHN(addressId: AddressId, seqNr: Int): Key[Option[(Height, Seq[(Byte, TxNum)])]] =
+    Key.opt(
+      AddressTransactionHeightTypeAndNums,
+      hBytes(addressId.toByteArray, seqNr),
+      oldReadTransactionHNSeqAndType,
+      oldWriteTransactionHNSeqAndType
+    )
+
   def transactionMetaById(txId: TransactionId): Key[Option[TransactionMeta]] =
     Key.opt(
       TransactionMetaById,
       txId.arr,
       TransactionMeta.parseFrom,
+      _.toByteArray
+    )
+
+  def oldTransactionMetaById(txId: TransactionId): Key[Option[OldTransactionMeta]] =
+    Key.opt(
+      TransactionMetaById,
+      txId.arr,
+      OldTransactionMeta.parseFrom,
       _.toByteArray
     )
 

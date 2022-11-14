@@ -19,10 +19,14 @@ import scala.collection.mutable.ArrayBuffer
 object AddressTransactions {
   private def loadTransactions(
       db: DBResource,
-      keys: ArrayBuffer[(Key[Option[(TxMeta, Transaction)]], TxNum)],
+      keys: ArrayBuffer[Key[Option[(TxMeta, Transaction)]]],
+      nums: ArrayBuffer[TxNum],
+      sizes: ArrayBuffer[Int],
       sender: Option[Address]
   ): Seq[(TxMeta, Transaction, Option[TxNum])] =
-    db.multiGet(keys)
+    db.multiGetBuffered(keys, sizes)
+      .view
+      .zip(nums)
       .flatMap {
         case (Some((m, tx: Authorized)), txNum) if sender.forall(_ == tx.sender.toAddress)         => Some((m, tx, Some(txNum)))
         case (Some((m, gt: GenesisTransaction)), txNum) if sender.isEmpty                          => Some((m, gt, Some(txNum)))
@@ -132,22 +136,36 @@ object AddressTransactions {
     db.withSafePrefixIterator(_.seekForPrev(Keys.addressTransactionHN(addressId, seqNr).keyBytes))()
 
     final override def computeNext(): Seq[(TxMeta, Transaction, Option[TxNum])] = db.withSafePrefixIterator { dbIterator =>
-      val buffer = new ArrayBuffer[(Key[Option[(TxMeta, Transaction)]], TxNum)]()
-      while (dbIterator.isValid && buffer.length < BatchSize) {
+      val keysBuffer  = new ArrayBuffer[Key[Option[(TxMeta, Transaction)]]]()
+      val numsBuffer  = new ArrayBuffer[TxNum]()
+      val sizesBuffer = new ArrayBuffer[Int]()
+      while (dbIterator.isValid && keysBuffer.length < BatchSize) {
         val (height, txs) = readTransactionHNSeqAndType(dbIterator.value())
         dbIterator.prev()
         if (height > maxHeight) {
           ()
         } else if (height == maxHeight) {
-          buffer ++= txs.view
-            .dropWhile { case (_, txNum) => txNum >= maxTxNum }
-            .collect { case (tp, txNum) if types.isEmpty || types(TransactionType(tp)) => Keys.transactionAt(height, txNum) -> txNum }
+          txs
+            .dropWhile { case (_, txNum, _) => txNum >= maxTxNum }
+            .foreach { case (tp, txNum, size) =>
+              if (types.isEmpty || types(TransactionType(tp))) {
+                keysBuffer.addOne(Keys.transactionAt(height, txNum))
+                numsBuffer.addOne(txNum)
+                sizesBuffer.addOne(size)
+              }
+            }
         } else {
-          buffer ++= txs.collect { case (tp, txNum) if types.isEmpty || types(TransactionType(tp)) => Keys.transactionAt(height, txNum) -> txNum }
+          txs.foreach { case (tp, txNum, size) =>
+            if (types.isEmpty || types(TransactionType(tp))) {
+              keysBuffer.addOne(Keys.transactionAt(height, txNum))
+              numsBuffer.addOne(txNum)
+              sizesBuffer.addOne(size)
+            }
+          }
         }
       }
-      if (buffer.nonEmpty) {
-        loadTransactions(db, buffer, sender)
+      if (keysBuffer.nonEmpty) {
+        loadTransactions(db, keysBuffer, numsBuffer, sizesBuffer, sender)
       } else
         endOfData()
     }(endOfData())
