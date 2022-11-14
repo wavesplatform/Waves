@@ -18,6 +18,7 @@ trait BlockchainGrpcApi {
   def getAccountDataEntry(address: Address, key: String): Option[DataEntry[_]]
   def getAccountScript(address: Address, estimator: ScriptEstimator): Option[AccountScriptInfo]
   def getBlockHeader(height: Int): Option[SignedBlockHeader]
+  def getBlockHeaderRange(fromHeight: Int, toHeight: Int): List[SignedBlockHeader]
   def getVrf(height: Int): Option[ByteStr]
   def getAssetDescription(asset: Asset.IssuedAsset): Option[AssetDescription]
   def resolveAlias(alias: Alias): Option[Address]

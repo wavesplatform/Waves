@@ -12,6 +12,7 @@ import com.wavesplatform.api.grpc.{
   AssetRequest,
   AssetsApiGrpc,
   BalancesRequest,
+  BlockRangeRequest,
   BlockRequest,
   BlockchainApiGrpc,
   BlocksApiGrpc,
@@ -31,6 +32,7 @@ import com.wavesplatform.grpc.observers.RichGrpcObserver
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.protobuf.ByteStringExt
+import com.wavesplatform.protobuf.block.Block
 import com.wavesplatform.protobuf.transaction.PBTransactions.{toVanillaDataEntry, toVanillaScript}
 import com.wavesplatform.ride.input.EmptyPublicKey
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, DataEntry, Height, LeaseBalance, Portfolio, TxMeta}
@@ -198,26 +200,19 @@ class DefaultBlockchainGrpcApi(
       BlockRequest(request = BlockRequest.Request.Height(height))
     )
 
-    x.block
-      .flatMap(_.header)
-      .map { header =>
-        // TODO toVanilla
-        SignedBlockHeader(
-          header = BlockHeader(
-            version = header.version.toByte,
-            timestamp = header.timestamp,
-            reference = header.reference.toByteStr,
-            baseTarget = header.baseTarget,
-            generationSignature = header.generationSignature.toByteStr,
-            generator = PublicKey(header.generator.toByteArray),
-            featureVotes = header.featureVotes.map(_.toShort),
-            rewardVote = header.rewardVote,
-            transactionsRoot = header.transactionsRoot.toByteStr
-          ),
-          signature = x.block.fold(ByteString.EMPTY)(_.signature).toByteStr
-        )
-      }
-      .tap(r => log.trace(s"getBlockHeader($height): ${r.toFoundStr("id", _.id())}"))
+    x.block.map(toVanilla).tap(r => log.trace(s"getBlockHeader($height): ${r.toFoundStr("id", _.id())}"))
+  }
+
+  override def getBlockHeaderRange(fromHeight: Int, toHeight: Int): List[SignedBlockHeader] = {
+    val xs = ClientCalls.blockingServerStreamingCall(
+      grpcApiChannel.newCall(BlocksApiGrpc.METHOD_GET_BLOCK_RANGE, CallOptions.DEFAULT),
+      BlockRangeRequest(fromHeight = fromHeight, toHeight = toHeight)
+    )
+
+    xs.asScala
+      .map(x => toVanilla(x.getBlock))
+      .toList
+      .tap(_ => log.trace(s"getBlockHeaderRange($fromHeight, $toHeight)"))
   }
 
   override def getVrf(height: Int): Option[ByteStr] = none[ByteStr] // TODO It seems VRF only from REST API
@@ -338,6 +333,23 @@ class DefaultBlockchainGrpcApi(
   }
 
   private def toPb(address: Address): ByteString = UnsafeByteOperations.unsafeWrap(address.bytes)
+  private def toVanilla(block: Block): SignedBlockHeader = {
+    val header = block.getHeader
+    SignedBlockHeader(
+      header = BlockHeader(
+        version = header.version.toByte,
+        timestamp = header.timestamp,
+        reference = header.reference.toByteStr,
+        baseTarget = header.baseTarget,
+        generationSignature = header.generationSignature.toByteStr,
+        generator = PublicKey(header.generator.toByteArray),
+        featureVotes = header.featureVotes.map(_.toShort),
+        rewardVote = header.rewardVote,
+        transactionsRoot = header.transactionsRoot.toByteStr
+      ),
+      signature = block.signature.toByteStr
+    )
+  }
 
 }
 

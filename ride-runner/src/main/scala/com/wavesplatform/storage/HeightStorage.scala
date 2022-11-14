@@ -27,7 +27,10 @@ trait HeightStorage[KeyT, ValueT, TagT] extends ScorexLogging { storage =>
           val cached = persistentCache.get(height, key)
           val r =
             if (cached.loaded) cached
-            else RemoteData.loaded(getFromBlockchain(key)).tap(r => persistentCache.set(height, key, r))
+            else
+              RemoteData
+                .loaded(getFromBlockchain(key))
+                .tap(r => persistentCache.set(height, key, r)) // TODO double check before set, because we could have an update
 
           Some(TaggedData(r, Set(tag)))
       }

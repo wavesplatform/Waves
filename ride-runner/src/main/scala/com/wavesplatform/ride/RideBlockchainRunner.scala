@@ -1,36 +1,24 @@
 package com.wavesplatform.ride
 
-import cats.syntax.option.*
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.Application
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.blockchain.{BlockchainState, ScriptBlockchain, SharedBlockchainData}
+import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
-import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
-import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
-import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.grpc.BlockchainGrpcApi.Event
 import com.wavesplatform.grpc.{DefaultBlockchainGrpcApi, GrpcClientSettings, GrpcConnector}
-import com.wavesplatform.protobuf.ByteStringExt
-import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
-import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.resources.*
-import com.wavesplatform.ride.input.RunnerRequest
-import com.wavesplatform.state.{Blockchain, Height}
-import com.wavesplatform.storage.DataKey
-import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
+import com.wavesplatform.state.Height
 import com.wavesplatform.storage.persistent.LevelDbPersistentCaches
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.execution.Scheduler
-import play.api.libs.json.JsObject
 
 import java.io.File
 import java.util.concurrent.Executors
 import scala.concurrent.Await
 import scala.concurrent.duration.{Duration, DurationInt}
 import scala.io.Source
-import scala.util.chaining.*
 import scala.util.{Failure, Using}
 
 object RideBlockchainRunner extends ScorexLogging {
@@ -105,25 +93,16 @@ object RideBlockchainRunner extends ScorexLogging {
       val dbCaches          = new LevelDbPersistentCaches(db)
       val blockchainStorage = new SharedBlockchainData[Int](nodeSettings.blockchainSettings, dbCaches, blockchainApi)
 
-      val scripts          = input.zipWithIndex.map { case (input, index) => RideScript(index, blockchainStorage, input.request) }
-      val allScriptIndices = scripts.indices.toSet
-
-      def runScripts(height: Int, updated: Set[Int]): Unit = {
-        updated.foreach { index =>
-          val apiResult = scripts(index).run()
-          log.info(s"[$height, $index] apiResult: ${apiResult.value("result").as[JsObject].value("value")}")
-        }
-      }
-
-      log.info("Warm up caches...") // Also helps to figure out, which data is used by a script
-      runScripts(blockchainStorage.height, allScriptIndices)
-
-      val start             = Height(blockchainStorage.height - 2)
-      val lastHeightAtStart = blockchainApi.getCurrentBlockchainHeight()
+      val scripts           = input.zipWithIndex.map { case (input, index) => RideScript(index, blockchainStorage, input.request) }
+      val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
       log.info(s"Current height: $lastHeightAtStart")
 
-      @volatile var started = false
+      val processor = new BlockchainProcessor(blockchainStorage, dbCaches.blockHeaders, scripts)
 
+      log.info("Warm up caches...") // Also helps to figure out, which data is used by a script
+      processor.runScripts(forceAll = true)
+
+      val start             = Height(math.max(0, blockchainStorage.height - 100 - 1))
       val blockchainUpdates = use(blockchainApi.mkBlockchainUpdatesStream())
       val events = blockchainUpdates.stream
         .doOnError(e => Task { log.error("Error!", e) })
@@ -140,41 +119,11 @@ object RideBlockchainRunner extends ScorexLogging {
           // TODO
           case Event.Next(event) => event
         }
-        .mapAccumulate(BlockchainState.Working(start): BlockchainState)(BlockchainState.apply)
-        .filter(_.nonEmpty)
-        .foreach { batchedEvents =>
-          val processResult = batchedEvents.foldLeft(ProcessResult()) { case (r, event) =>
-            log.info(s"Processing ${event.getUpdate.height}")
-            process(blockchainStorage, allScriptIndices, r, event)
-          }
-
-          val h = processResult.newHeight
-          if (processResult.uncertainKeys.nonEmpty) {
-            log.debug(s"Getting data for keys: ${processResult.uncertainKeys.toVector.map(_.toString).sorted.mkString(", ")}")
-            processResult.uncertainKeys.foreach { _.reload(h) }
-          }
-
-          // log.info(
-          //   s"==> $h >= $lastHeightAtStart, started: $started, affectedScripts: ${processResult.affectedScripts}, batchedEvents for heights: {${batchedEvents
-          //     .map(_.getUpdate.height)
-          //     .mkString(", ")}}"
-          // )
-          if (h >= lastHeightAtStart) {
-            if (!started) {
-              log.debug(s"[$h] Reached the current height, run all scripts")
-              runScripts(h, allScriptIndices)
-              started = true
-            } else if (processResult.affectedScripts.isEmpty) {
-              log.debug(s"[$h] Not updated")
-            } else {
-              log.debug(s"[$h] Updated for: ${processResult.affectedScripts.mkString(", ")}")
-              runScripts(h, processResult.affectedScripts)
-            }
-          }
-        }(Scheduler(commonScheduler))
+        .foldLeftL(BlockchainState.Starting(lastHeightAtStart): BlockchainState)(BlockchainState(processor, _, _))
+        .runToFuture(Scheduler(commonScheduler))
 
       log.info(s"Watching blockchain updates...")
-      blockchainUpdates.start(start, lastHeightAtStart + 1) // TODO end
+      blockchainUpdates.start(start + 1, lastHeightAtStart + 1) // TODO end
 
       Await.result(events, Duration.Inf)
     }
@@ -184,136 +133,4 @@ object RideBlockchainRunner extends ScorexLogging {
       case _          => log.info("Done")
     }
   }
-
-  // TODO don't calculate affectedScripts if all scripts are affected
-  private case class ProcessResult(
-      /*allScripts: Set[Int], */ newHeight: Int = 0,
-      affectedScripts: Set[Int] = Set.empty,
-      uncertainKeys: Set[DataKey] = Set.empty
-  ) {
-    def withAppendResult(x: AppendResult[Int]): ProcessResult =
-      copy(
-        affectedScripts = affectedScripts ++ x.affectedTags,
-        uncertainKeys = x.mayBeChangedKey.foldLeft(uncertainKeys)(_ - _)
-      )
-
-    def withRollbackResult(x: RollbackResult[Int]): ProcessResult =
-      copy(
-        affectedScripts = affectedScripts ++ x.affectedTags,
-        uncertainKeys = uncertainKeys ++ x.mayBeUncertainKey
-      )
-  }
-
-  private def process(
-      blockchainStorage: SharedBlockchainData[Int],
-      allScriptIndices: Set[Int],
-      prev: ProcessResult,
-      event: SubscribeEvent
-  ): ProcessResult = {
-    val update = event.getUpdate
-    val h      = update.height
-
-    // TODO the height will be eventually > if this is a rollback
-    // Almost all scripts use the height
-    blockchainStorage.blockHeaders.update(update)
-    val withUpdatedHeight = prev.copy(newHeight = h) // TODO
-
-    update.update match {
-      case Update.Empty => prev
-      case Update.Append(append) =>
-        val txs = append.body match {
-          // PBBlocks.vanilla(block.getBlock.getHeader)
-          case Body.Block(block)           => block.getBlock.transactions
-          case Body.MicroBlock(microBlock) => microBlock.getMicroBlock.getMicroBlock.transactions
-          case Body.Empty                  => Seq.empty
-        }
-
-        val stateUpdate = (append.getStateUpdate +: append.transactionStateUpdates).view
-        val txsView     = txs.view.map(_.transaction)
-        withUpdatedHeight
-          .pipe(stateUpdate.flatMap(_.assets).foldLeft(_) { case (r, x) =>
-            r.withAppendResult(blockchainStorage.assets.append(h, x))
-          })
-          .pipe(stateUpdate.flatMap(_.balances).foldLeft(_) { case (r, x) =>
-            r.withAppendResult(blockchainStorage.portfolios.append(h, x))
-          })
-          .pipe(stateUpdate.flatMap(_.leasingForAddress).foldLeft(_) { case (r, x) =>
-            r.withAppendResult(blockchainStorage.portfolios.append(h, x))
-          })
-          .pipe(stateUpdate.flatMap(_.dataEntries).foldLeft(_) { case (r, x) =>
-            r.withAppendResult(blockchainStorage.data.append(h, x))
-          })
-          .pipe(
-            txsView
-              .flatMap {
-                case Transaction.WavesTransaction(tx) =>
-                  tx.data match {
-                    case Data.SetScript(txData) => (tx.senderPublicKey.toPublicKey, txData.script).some
-                    case _                      => none
-                  }
-                case _ => none
-              }
-              .foldLeft(_) { case (r, (pk, script)) =>
-                r.withAppendResult(blockchainStorage.accountScripts.append(h, pk, script))
-              }
-          )
-          .pipe(
-            txsView
-              .flatMap {
-                case Transaction.WavesTransaction(tx) =>
-                  tx.data match {
-                    case Data.CreateAlias(txData) => (txData.alias, tx.senderPublicKey.toPublicKey).some
-                    case _                        => none
-                  }
-                case _ => none
-              }
-              .foldLeft(_) { case (r, (alias, pk)) =>
-                r.withAppendResult(blockchainStorage.aliases.append(h, alias, pk))
-              }
-          )
-          .pipe(append.transactionIds.view.zip(txs).foldLeft(_) { case (r, (txId, tx)) =>
-            r.withAppendResult(blockchainStorage.transactions.append(h, txId, tx))
-          })
-
-      case Update.Rollback(rollback) =>
-        val stateUpdate = rollback.getRollbackStateUpdate
-        withUpdatedHeight
-          .pipe(stateUpdate.assets.foldLeft(_) { case (r, x) =>
-            r.withRollbackResult(blockchainStorage.assets.rollback(h, x))
-          })
-          /* TODO:
-          .pipe(stateUpdate.aliases.foldLeft(_) { case (r, x) =>
-            r.withRollbackResult(blockchainStorage.aliases.rollback(h, x))
-          })*/
-          .pipe(stateUpdate.balances.foldLeft(_) { case (r, x) =>
-            r.withRollbackResult(blockchainStorage.portfolios.rollback(h, x))
-          })
-          .pipe(stateUpdate.leasingForAddress.foldLeft(_) { case (r, x) =>
-            r.withRollbackResult(blockchainStorage.portfolios.rollback(h, x))
-          })
-          .pipe(stateUpdate.dataEntries.foldLeft(_) { case (r, x) =>
-            r.withRollbackResult(blockchainStorage.data.rollback(h, x))
-          })
-      /* TODO:
-          .pipe(stateUpdate.accountScripts.foldLeft(_) { case (r, x) =>
-            r.withRollbackResult(blockchainStorage.accountScripts.rollback(h, x))
-          })
-          // TODO Remove?
-          .pipe(append.transactionIds.view.zip(txs).foldLeft(_) { case (r, txId) =>
-            r.withRollbackResult(blockchainStorage.transactions.rollback(h, txId)
-          })*/
-    }
-  }
-}
-
-class RideScript(val index: Int, blockchain: Blockchain, runnerRequest: RunnerRequest) {
-  def run(): JsObject = executeUtilsEvaluate(
-    blockchain,
-    runnerRequest
-  )
-}
-
-object RideScript {
-  def apply(index: Int, blockchainStorage: SharedBlockchainData[Int], runnerRequest: RunnerRequest): RideScript =
-    new RideScript(index, new ScriptBlockchain[Int](blockchainStorage, index), runnerRequest)
 }

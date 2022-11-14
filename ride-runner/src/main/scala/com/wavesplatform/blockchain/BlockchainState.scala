@@ -7,17 +7,23 @@ import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
 
+// TODO doesn't relate to blockchain itself, move to the business domain
 sealed trait BlockchainState extends Product with Serializable
+
 object BlockchainState extends ScorexLogging {
-  case class Working(height: Height) extends BlockchainState {
-    def withHeight(height: Height): Working = copy(height = height)
-    override def toString: String           = s"Working($height)"
+  case class Starting(blockchainHeight: Height, foundDifference: Boolean = false) extends BlockchainState {
+    def withFoundDifference: Starting = copy(foundDifference = true)
   }
 
-  case class RollingBack(origHeight: Height, currHeight: Height, microBlockNumber: Int, deferReverted: List[SubscribeEvent]) extends BlockchainState {
+  case class Working(height: Height) extends BlockchainState {
+    def withHeight(height: Height): Working = copy(height = height)
+
+    override def toString: String = s"Working($height)"
+  }
+
+  case class RollingBack(origHeight: Height, currHeight: Height, microBlockNumber: Int) extends BlockchainState {
     def withAction(action: SubscribeEvent): RollingBack =
       copy(
-        deferReverted = action :: deferReverted,
         currHeight = Height(action.getUpdate.height),
         microBlockNumber = action.getUpdate.update match {
           case Update.Empty       => microBlockNumber
@@ -40,7 +46,7 @@ object BlockchainState extends ScorexLogging {
       currHeight == resolveHeight && microBlockNumber >= 1
     }
 
-    override def toString: String = s"Rollback($origHeight->$currHeight, events: ${deferReverted.size})"
+    override def toString: String = s"Rollback($origHeight->$currHeight, mbn: $microBlockNumber)"
   }
 
   object RollingBack {
@@ -48,12 +54,11 @@ object BlockchainState extends ScorexLogging {
       new RollingBack(
         origHeight = origHeight,
         currHeight = Height(event.getUpdate.height),
-        microBlockNumber = 0,
-        deferReverted = List(event)
+        microBlockNumber = 0
       )
   }
 
-  def apply(orig: BlockchainState, event: SubscribeEvent): (BlockchainState, Seq[SubscribeEvent]) = {
+  def apply(processor: Processor, orig: BlockchainState, event: SubscribeEvent): BlockchainState = {
     val update = event.getUpdate.update
     val h      = Height(event.getUpdate.height)
 
@@ -67,25 +72,56 @@ object BlockchainState extends ScorexLogging {
       case _: Update.Rollback => "rollback to"
       case Update.Empty       => "unknown append"
     }
-    log.info(s"$orig + $tpe(id=${event.getUpdate.id.toByteStr.take(5)}, h=$h)")
+    val currBlockId = event.getUpdate.id.toByteStr
+    log.info(s"$orig + $tpe(id=${currBlockId.take(5)}, h=$h)")
 
     orig match {
+      case orig: Starting =>
+        val comparedBlocks =
+          if (processor.hasLocalBlockAt(h, currBlockId) || orig.foundDifference) orig
+          else {
+            processor.removeFrom(h)
+            orig.withFoundDifference
+          }
+
+        processor.process(h, event.getUpdate)
+        if (h >= comparedBlocks.blockchainHeight) {
+          log.debug(s"[$h] Reached the current height, run all scripts")
+          processor.runScripts()
+          Working(h)
+        } else comparedBlocks
+
       case orig: Working =>
         update match {
-          case _: Update.Append   => (orig.withHeight(h), List(event))
-          case _: Update.Rollback => (RollingBack.from(orig.height, event), Nil)
-          case Update.Empty       => (orig.withHeight(h), Nil)
+          case _: Update.Append =>
+            processor.process(h, event.getUpdate)
+            processor.runScripts()
+            orig.withHeight(h)
+
+          case _: Update.Rollback =>
+            processor.removeFrom(Height(h + 1))
+            processor.process(h, event.getUpdate)
+            RollingBack.from(orig.height, event)
+
+          case Update.Empty => orig.withHeight(h)
         }
 
       case orig: RollingBack =>
         update match {
           case _: Update.Append =>
+            processor.process(h, event.getUpdate)
             val updated = orig.withAction(event)
-            if (updated.isRollbackResolved) (Working(updated.currHeight), updated.deferReverted.reverse)
-            else (updated, Nil)
+            if (updated.isRollbackResolved) {
+              processor.runScripts()
+              Working(updated.currHeight)
+            } else updated
 
-          case _: Update.Rollback => (orig.withAction(event), Nil)
-          case Update.Empty       => (orig.withHeight(h), Nil)
+          case _: Update.Rollback =>
+            processor.removeFrom(Height(h + 1))
+            processor.process(h, event.getUpdate)
+            orig.withAction(event)
+
+          case Update.Empty => orig.withHeight(h)
         }
     }
   }
