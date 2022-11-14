@@ -1,4 +1,4 @@
-package testData
+package testHelpers
 
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
 

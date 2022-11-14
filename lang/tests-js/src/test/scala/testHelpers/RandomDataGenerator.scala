@@ -1,4 +1,4 @@
-package testData
+package testHelpers
 
 object RandomDataGenerator {
   val rnd = new scala.util.Random
@@ -7,13 +7,13 @@ object RandomDataGenerator {
     "Address(base58'')",
     "Address(base58'3MDaMwqLtwBGcJrTA5tstJfY95GqnNnDDAS')",
     "Address(base58'3PDaScqLtwBGcJrTA5tstJfY95GqnNnLxGA')",
-    "Address(base58'3P3aScAJsxBGcJrTA5tstJfY95GqnNnHLGA')",
+    "Address(base58'3P3aScAJsxBGcJrTA5tstJfY95GqnNnHLGA')"
   )
   val aliasDataArray: Array[String] = Array(
     "Alias(\"merry_1312@pro\")",
     "Alias(\"four\")",
     "Alias(\"1111this_alias_30@long-symbols\")",
-    "Alias(\"\")",
+    "Alias(\"\")"
   )
   val byteVectorArray: Array[String] = Array(
     "base16'52696465'",
@@ -32,19 +32,29 @@ object RandomDataGenerator {
     "Issue(\"superToken\", \"token for super humans\", 1000, 2, true)",
     "Issue(\"trueToken\", \"real token in real life\", 5_000_000_000, 5, false)",
     "Issue(\"oneMoreToken\", \"just one more token in this crypto world\", 1_500_000_000, 5, true)",
-    "Issue(\"assetForAll\", \"asset for all peoples\", 1_500_000_000, 5, true)",
+    "Issue(\"assetForAll\", \"asset for all peoples\", 1_500_000_000, 5, true)"
   )
   val unionArray: Array[String] = Array("DOWN", "CEILING", "FLOOR", "HALFUP", "HALFEVEN")
   val digestAlgorithmTypeArray: Array[String] = Array(
-    "NOALG", "MD5", "SHA1", "SHA224", "SHA256", "SHA384", "SHA512", "SHA3224", "SHA3256", "SHA3384", "SHA3512",
+    "NOALG",
+    "MD5",
+    "SHA1",
+    "SHA224",
+    "SHA256",
+    "SHA384",
+    "SHA512",
+    "SHA3224",
+    "SHA3256",
+    "SHA3384",
+    "SHA3512"
   )
 
-  def randomAddressDataArrayElement: String = addressDataArray(rnd.nextInt(addressDataArray.length))
-  def randomAliasDataArrayElement: String = aliasDataArray(rnd.nextInt(aliasDataArray.length))
-  def randomByteVectorArrayElement: String = byteVectorArray(rnd.nextInt(byteVectorArray.length))
-  def randomStringArrayElement: String = stringArray(rnd.nextInt(stringArray.length))
-  def randomIssuesArrayElement: String = issuesArray(rnd.nextInt(issuesArray.length))
-  def randomUnionArrayElement: String = unionArray(rnd.nextInt(unionArray.length))
+  def randomAddressDataArrayElement: String         = addressDataArray(rnd.nextInt(addressDataArray.length))
+  def randomAliasDataArrayElement: String           = aliasDataArray(rnd.nextInt(aliasDataArray.length))
+  def randomByteVectorArrayElement: String          = byteVectorArray(rnd.nextInt(byteVectorArray.length))
+  def randomStringArrayElement: String              = stringArray(rnd.nextInt(stringArray.length))
+  def randomIssuesArrayElement: String              = issuesArray(rnd.nextInt(issuesArray.length))
+  def randomUnionArrayElement: String               = unionArray(rnd.nextInt(unionArray.length))
   def randomDigestAlgorithmTypeArrayElement: String = digestAlgorithmTypeArray(rnd.nextInt(digestAlgorithmTypeArray.length))
-  def randomInt: Integer = rnd.nextInt(90000000)
+  def randomInt: Integer                            = rnd.nextInt(90000000)
 }
