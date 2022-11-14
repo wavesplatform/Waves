@@ -1,8 +1,8 @@
 package com.wavesplatform.test.builtInFunctions.blockchain
 
 import com.wavesplatform.JsTestBase
-import testData.RandomDataGenerator.{randomAliasDataArrayElement, randomInt}
-import testData.{GeneratorContractsForBuiltInFunctions, TestDataConstantsAndMethods}
+import testHelpers.RandomDataGenerator.{randomAliasDataArrayElement, randomInt}
+import testHelpers.GeneratorContractsForBuiltInFunctions
 import utest.{Tests, test}
 
 object BlockInfoByHeight extends JsTestBase {
@@ -11,8 +11,6 @@ object BlockInfoByHeight extends JsTestBase {
 
   private val invalidBlockInfoByHeight = "blockInfoByHeight()"
   private val invalidBlockInfoByHeightArg = s"$randomAliasDataArrayElement.blockInfoByHeight()"
-  private val testData = new TestDataConstantsAndMethods
-
 
   val tests: Tests = Tests {
     test.apply("check: function blockInfoByHeight compiles") {

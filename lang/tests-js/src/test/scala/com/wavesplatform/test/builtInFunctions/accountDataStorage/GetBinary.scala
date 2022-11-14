@@ -1,8 +1,8 @@
 package com.wavesplatform.test.builtInFunctions.accountDataStorage
 
 import com.wavesplatform.JsTestBase
-import testData.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomInt, randomStringArrayElement, randomUnionArrayElement}
-import testData.{GeneratorContractsForBuiltInFunctions, TestDataConstantsAndMethods}
+import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomInt, randomStringArrayElement, randomUnionArrayElement}
+import testHelpers.GeneratorContractsForBuiltInFunctions
 import utest.{Tests, test}
 
 object GetBinary extends JsTestBase {
@@ -20,7 +20,7 @@ object GetBinary extends JsTestBase {
 
   private val invalidGetBinary = s"getBinary(callerTestData)"
   private val invalidGetBinaryValue = s"getBinaryValue(callerTestData)"
-  private val testData = new TestDataConstantsAndMethods
+
 
   val tests: Tests = Tests {
     test.apply("check: function getBinary compiles for address") {

@@ -1,14 +1,14 @@
 package com.wavesplatform.test.builtInFunctions.blockchain
 
 import com.wavesplatform.JsTestBase
-import testData.RandomDataGenerator.{
+import testHelpers.RandomDataGenerator.{
   randomAddressDataArrayElement,
   randomAliasDataArrayElement,
   randomDigestAlgorithmTypeArrayElement,
   randomIssuesArrayElement,
   randomStringArrayElement
 }
-import testData.{GeneratorContractsForBuiltInFunctions, TestDataConstantsAndMethods}
+import testHelpers.GeneratorContractsForBuiltInFunctions
 import utest.{Tests, test}
 
 object ScriptHash extends JsTestBase {
@@ -16,7 +16,6 @@ object ScriptHash extends JsTestBase {
   private val scriptHashArgBeforeFunc        = "callerTestData.scriptHash()"
   private val invalidScriptHash              = "scriptHash()"
   private val invalidScriptHashArgBeforeFunc = s"callerTestData.scriptHash($randomStringArrayElement)"
-  private val testData                       = new TestDataConstantsAndMethods
 
   val tests: Tests = Tests {
     test.apply("check: function scriptHash for V5 and more compiles for address") {

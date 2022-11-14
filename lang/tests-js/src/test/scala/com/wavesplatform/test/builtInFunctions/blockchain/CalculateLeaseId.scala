@@ -1,15 +1,14 @@
 package com.wavesplatform.test.builtInFunctions.blockchain
 
 import com.wavesplatform.JsTestBase
-import testData.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomDigestAlgorithmTypeArrayElement, randomIssuesArrayElement, randomStringArrayElement}
-import testData.{GeneratorContractsForBuiltInFunctions, TestDataConstantsAndMethods}
+import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomDigestAlgorithmTypeArrayElement, randomIssuesArrayElement, randomStringArrayElement}
+import testHelpers.GeneratorContractsForBuiltInFunctions
 import utest.{Tests, test}
 
 object CalculateLeaseId extends JsTestBase {
   private val calculateLeaseId              = "calculateLeaseId(lease)"
   private val calculateLeaseIdArgBeforeFunc = "lease.calculateLeaseId()"
   private val invalidCalculateLeaseId       = "calculateLeaseId()"
-  private val testData                  = new TestDataConstantsAndMethods
 
   val tests: Tests = Tests {
     test.apply("check: function calculateLeaseId for V5 and more compiles for address") {

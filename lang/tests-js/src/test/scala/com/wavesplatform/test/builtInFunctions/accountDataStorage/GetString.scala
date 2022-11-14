@@ -1,8 +1,8 @@
 package com.wavesplatform.test.builtInFunctions.accountDataStorage
 
 import com.wavesplatform.JsTestBase
-import testData.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomInt, randomStringArrayElement}
-import testData.{GeneratorContractsForBuiltInFunctions, TestDataConstantsAndMethods}
+import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomInt, randomStringArrayElement}
+import testHelpers.GeneratorContractsForBuiltInFunctions
 import utest.{Tests, test}
 
 object GetString extends JsTestBase {
@@ -20,7 +20,6 @@ object GetString extends JsTestBase {
 
   private val invalidGetString = s"getString(callerTestData)"
   private val invalidGetStringValue = s"getStringValue(callerTestData)"
-  private val testData = new TestDataConstantsAndMethods
 
   val tests: Tests = Tests {
     test.apply("check: function getString compiles for address") {

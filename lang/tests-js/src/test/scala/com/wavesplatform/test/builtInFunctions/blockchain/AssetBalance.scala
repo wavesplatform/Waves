@@ -1,8 +1,8 @@
 package com.wavesplatform.test.builtInFunctions.blockchain
 
 import com.wavesplatform.JsTestBase
-import testData.{GeneratorContractsForBuiltInFunctions, TestDataConstantsAndMethods}
-import testData.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomByteVectorArrayElement, randomUnionArrayElement}
+import testHelpers.GeneratorContractsForBuiltInFunctions
+import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomByteVectorArrayElement, randomUnionArrayElement}
 import utest.{Tests, test}
 
 object AssetBalance extends JsTestBase {
@@ -13,7 +13,6 @@ object AssetBalance extends JsTestBase {
   private val assetBalance = s"assetBalance(callerTestData, $byteVector)"
   private val assetBalanceArgBeforeFunc = s"callerTestData.assetBalance($byteVector)"
   private val invalidAssetBalanceFunc = "assetBalance()"
-  private val testData = new TestDataConstantsAndMethods
 
   val tests: Tests = Tests {
     test.apply("check: function AssetBalance compiles for address") {

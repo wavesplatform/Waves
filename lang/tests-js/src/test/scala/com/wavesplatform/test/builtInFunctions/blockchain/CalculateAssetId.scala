@@ -2,15 +2,14 @@ package com.wavesplatform.test.builtInFunctions.blockchain
 
 import com.wavesplatform.JsTestBase
 import com.wavesplatform.lang.directives.values.V3
-import testData.RandomDataGenerator.{randomIssuesArrayElement, randomDigestAlgorithmTypeArrayElement}
-import testData.{GeneratorContractsForBuiltInFunctions, TestDataConstantsAndMethods}
+import testHelpers.RandomDataGenerator.{randomIssuesArrayElement, randomDigestAlgorithmTypeArrayElement}
+import testHelpers.GeneratorContractsForBuiltInFunctions
 import utest.{Tests, test}
 
 object CalculateAssetId extends JsTestBase {
   private val calculateAssetId              = "calculateAssetId(issue)"
   private val calculateAssetIdArgBeforeFunc = "issue.calculateAssetId()"
   private val invalidCalculateAssetId       = "calculateAssetId()"
-  private val testData                  = new TestDataConstantsAndMethods
 
   val tests: Tests = Tests {
     test.apply("check: function calculateAssetId for version V4 and more compiles for Issue") {

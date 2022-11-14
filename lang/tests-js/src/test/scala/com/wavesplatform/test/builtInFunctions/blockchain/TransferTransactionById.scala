@@ -1,8 +1,8 @@
 package com.wavesplatform.test.builtInFunctions.blockchain
 
 import com.wavesplatform.JsTestBase
-import testData.RandomDataGenerator.{randomAliasDataArrayElement, randomByteVectorArrayElement, randomDigestAlgorithmTypeArrayElement, randomInt}
-import testData.{GeneratorContractsForBuiltInFunctions, TestDataConstantsAndMethods}
+import testHelpers.RandomDataGenerator.{randomAliasDataArrayElement, randomByteVectorArrayElement, randomDigestAlgorithmTypeArrayElement, randomInt}
+import testHelpers.GeneratorContractsForBuiltInFunctions
 import utest.{Tests, test}
 
 object TransferTransactionById extends JsTestBase {
@@ -11,8 +11,6 @@ object TransferTransactionById extends JsTestBase {
 
   private val invalidTransferTransactionById = "transferTransactionById()"
   private val invalidTransferTransactionByIdArg = s"$randomAliasDataArrayElement.transferTransactionById()"
-  private val testData = new TestDataConstantsAndMethods
-
 
   val tests: Tests = Tests {
     test.apply("check: function transferTransactionById compiles") {

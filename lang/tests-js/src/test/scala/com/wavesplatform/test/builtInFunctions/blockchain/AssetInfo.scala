@@ -1,7 +1,7 @@
 package com.wavesplatform.test.builtInFunctions.blockchain
 
-import _root_.testData.{GeneratorContractsForBuiltInFunctions, TestDataConstantsAndMethods}
-import _root_.testData.RandomDataGenerator.{randomAliasDataArrayElement, randomByteVectorArrayElement, randomInt}
+import _root_.testHelpers.GeneratorContractsForBuiltInFunctions
+import _root_.testHelpers.RandomDataGenerator.{randomAliasDataArrayElement, randomByteVectorArrayElement, randomInt}
 import com.wavesplatform.JsTestBase
 import utest.{Tests, test}
 
@@ -12,7 +12,6 @@ object AssetInfo extends JsTestBase {
 
   private val invalidAssetInfo = "assetInfo()"
   private val invalidAssetInfoArg = s"$randomInt.assetInfo()"
-  private val testData = new TestDataConstantsAndMethods
 
 
   val tests: Tests = Tests {

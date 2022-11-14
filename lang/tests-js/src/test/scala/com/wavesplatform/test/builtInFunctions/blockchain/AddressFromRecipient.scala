@@ -1,7 +1,7 @@
 package com.wavesplatform.test.builtInFunctions.blockchain
 
-import _root_.testData.{GeneratorContractsForBuiltInFunctions, TestDataConstantsAndMethods}
-import _root_.testData.RandomDataGenerator.*
+import _root_.testHelpers.GeneratorContractsForBuiltInFunctions
+import _root_.testHelpers.RandomDataGenerator.*
 import com.wavesplatform.JsTestBase
 import utest.{Tests, test}
 
@@ -9,7 +9,6 @@ object AddressFromRecipient extends JsTestBase {
   private val addressFromRecipient = "addressFromRecipient(addressOrAlias)"
   private val addressFromRecipientArgBeforeFunc = "addressOrAlias.addressFromRecipient()"
   private val invalidFunc = "addressFromRecipient()"
-  private val testData = new TestDataConstantsAndMethods
 
   val tests: Tests = Tests {
     test.apply("check: function addressFromRecipient compiles for address") {

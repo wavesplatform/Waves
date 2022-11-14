@@ -2,8 +2,8 @@ package com.wavesplatform.test.builtInFunctions.blockchain
 
 import com.wavesplatform.JsTestBase
 import com.wavesplatform.lang.directives.values.V3
-import testData.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomDigestAlgorithmTypeArrayElement, randomInt}
-import testData.{GeneratorContractsForBuiltInFunctions, TestDataConstantsAndMethods}
+import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomDigestAlgorithmTypeArrayElement, randomInt}
+import testHelpers.GeneratorContractsForBuiltInFunctions
 import utest.{Tests, test}
 
 object WavesBalance extends JsTestBase {
@@ -11,7 +11,6 @@ object WavesBalance extends JsTestBase {
   private val wavesBalanceArgBeforeFunc = "callerTestData.wavesBalance()"
   private val invalidWavesBalance       = "wavesBalance()"
   private val invalidWavesBalanceArg    = s"$randomInt.wavesBalance()"
-  private val testData                  = new TestDataConstantsAndMethods
 
   val tests: Tests = Tests {
     test.apply("check: function wavesBalance for version V4 and more compiles for address") {

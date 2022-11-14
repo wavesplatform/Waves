@@ -1,8 +1,8 @@
 package com.wavesplatform.test.builtInFunctions.blockchain
 
 import com.wavesplatform.JsTestBase
-import testData.{GeneratorContractsForBuiltInFunctions, TestDataConstantsAndMethods}
-import testData.RandomDataGenerator.{randomAliasDataArrayElement, randomByteVectorArrayElement, randomDigestAlgorithmTypeArrayElement}
+import testHelpers.GeneratorContractsForBuiltInFunctions
+import testHelpers.RandomDataGenerator.{randomAliasDataArrayElement, randomByteVectorArrayElement, randomDigestAlgorithmTypeArrayElement}
 import utest.{Tests, test}
 
 object TransactionHeightById extends JsTestBase {
@@ -11,7 +11,6 @@ object TransactionHeightById extends JsTestBase {
 
   private val invalidTransactionHeightById = "transactionHeightById()"
   private val invalidTransactionHeightByIdArg = s"$randomAliasDataArrayElement.transactionHeightById()"
-  private val testData = new TestDataConstantsAndMethods
 
 
   val tests: Tests = Tests {

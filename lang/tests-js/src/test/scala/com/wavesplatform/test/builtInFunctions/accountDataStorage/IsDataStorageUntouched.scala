@@ -1,8 +1,8 @@
 package com.wavesplatform.test.builtInFunctions.accountDataStorage
 
 import com.wavesplatform.JsTestBase
-import _root_.testData.{GeneratorContractsForBuiltInFunctions, TestDataConstantsAndMethods}
-import _root_.testData.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomInt}
+import _root_.testHelpers.GeneratorContractsForBuiltInFunctions
+import _root_.testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomInt}
 import utest.{Tests, test}
 
 object IsDataStorageUntouched extends JsTestBase {
@@ -10,7 +10,6 @@ object IsDataStorageUntouched extends JsTestBase {
   private val isDataStorageUntouchedArgBeforeFunc = "callerTestData.isDataStorageUntouched()"
   private val invalidFunction = "isDataStorageUntouched()"
 
-  private val testData = new TestDataConstantsAndMethods
   private val invalidFunctionErrorResult: String = testData.invalidFunctionError("isDataStorageUntouched", 1)
 
   val tests: Tests = Tests {

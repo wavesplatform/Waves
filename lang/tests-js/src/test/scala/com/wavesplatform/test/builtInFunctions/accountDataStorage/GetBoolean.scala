@@ -1,8 +1,8 @@
 package com.wavesplatform.test.builtInFunctions.accountDataStorage
 
 import com.wavesplatform.JsTestBase
-import _root_.testData.{GeneratorContractsForBuiltInFunctions, TestDataConstantsAndMethods}
-import _root_.testData.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomInt, randomStringArrayElement}
+import _root_.testHelpers.GeneratorContractsForBuiltInFunctions
+import _root_.testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomInt, randomStringArrayElement}
 import utest.{Tests, test}
 
 object GetBoolean extends JsTestBase {
@@ -20,7 +20,6 @@ object GetBoolean extends JsTestBase {
 
   private val invalidGetBoolean = s"getBoolean(callerTestData)"
   private val invalidGetBooleanValue = s"getBooleanValue(callerTestData)"
-  private val testData = new TestDataConstantsAndMethods
 
   val tests: Tests = Tests {
     test.apply("check: function getBoolean compiles for address") {
