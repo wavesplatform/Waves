@@ -224,6 +224,9 @@ sealed abstract class CacheKey[KeyT, ValueT](prefix: Short)(implicit keyAsBytes:
     override def parse(bytes: Array[Byte]): ValueT = valueAsBytes.fromByteArray(bytes)._1
     override def encode(v: ValueT): Array[Byte]    = valueAsBytes.toByteArray(v)
   }
+
+  def parseKey(xs: Array[Byte]): KeyT = keyAsBytes.fromByteArray(xs.drop(Shorts.BYTES))._1
+  def parseValue(xs: Array[Byte]): ValueT = valueAsBytes.fromByteArray(xs)._1
 }
 
 sealed abstract class CacheHistoryKey[KeyT: AsBytes](prefix: Short) extends CacheKey[KeyT, Seq[Int]](prefix)

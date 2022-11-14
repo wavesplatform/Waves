@@ -109,11 +109,24 @@ class BlockPersistentCacheTestSuite extends BaseTestSuite with HasLevelDb {
         }
       }
     }
+
+    "getFrom" - {
+      "returns Nil if empty" in test { cache =>
+        cache.getFrom(1, 100) shouldBe empty
+      }
+
+      "returns headers if non empty" in test { cache =>
+        (1 to 25).foreach(i => cache.set(i, defaultHeader(i)))
+
+        val expected = (5L until 15).map(defaultHeader).toList
+        cache.getFrom(5, 10) shouldBe expected
+      }
+    }
   }
 
   private def defaultHeader(ts: Long = 0) =
     SignedBlockHeader(
-      BlockHeader(0, ts, ByteStr.empty, 0, ByteStr.empty, EmptyPublicKey, Nil, 0, ByteStr.empty),
+      BlockHeader(0, ts, ByteStr.empty, 0, ByteStr.empty, EmptyPublicKey, Vector.empty, 0, ByteStr.empty),
       ByteStr.empty
     )
 

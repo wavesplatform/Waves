@@ -227,6 +227,21 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
         .readOnly { _.getOpt(CacheKeys.SignedBlockHeaders.mkKey(height)) }
         .tap { r => log.trace(s"get($height): ${r.toFoundStr("id", _.id())}") }
 
+    override def getFrom(height: Int, n: Int): List[SignedBlockHeader] = {
+      val lastHeight = height + n - 1
+      val startKey   = CacheKeys.SignedBlockHeaders.mkKey(height)
+      val result     = List.newBuilder[SignedBlockHeader]
+      db.readOnly { ro =>
+        ro.iterateFrom(CacheKeys.SignedBlockHeaders.prefixBytes, startKey.keyBytes) { entry =>
+          val currentHeight = CacheKeys.SignedBlockHeaders.parseKey(entry.getKey)
+          val goNext        = currentHeight <= lastHeight
+          if (goNext) result.addOne(CacheKeys.SignedBlockHeaders.parseValue(entry.getValue))
+          goNext
+        }
+      }
+      result.result()
+    }
+
     override def set(height: Int, data: SignedBlockHeader): Unit = {
       db.readWrite { rw =>
         rw.put(CacheKeys.SignedBlockHeaders.mkKey(height), data)
@@ -243,6 +258,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
       db.readWrite { rw =>
         rw.iterateFrom(CacheKeys.SignedBlockHeaders.prefixBytes, first.keyBytes) { x =>
           rw.delete(x.getKey)
+          true
         }
       }
 
