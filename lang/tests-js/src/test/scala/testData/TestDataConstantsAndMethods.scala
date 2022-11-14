@@ -3,13 +3,22 @@ package testData
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5, V6}
 
 class TestDataConstantsAndMethods {
-  val actualVersions: Iterable[StdLibVersion] = Seq(V3, V4, V5, V6)
   val oldVersions: Iterable[StdLibVersion] = Seq(V3, V4)
   val versionsSupportingTheNewFeatures: Iterable[StdLibVersion] = Seq(V5, V6)
 
+  val actualVersionsWithoutV3: Iterable[StdLibVersion] = Seq(V4, V5, V6)
+  val actualVersions: Iterable[StdLibVersion] = Seq(V3, V4, V5, V6)
+
   val CANT_FIND_A_FUNCTION_OVERLOAD = "Can't find a function overload"
   val CANT_FIND_FUNCTION = "Can't find a function"
-  val NON_MATCHING_TYPES = "Non-matching types: expected: Address|Alias"
+
+  def nonMatchingTypes(expectType: String): String = {
+    s"Non-matching types: expected: $expectType"
+  }
+
+  def invalidFunctionError(functionName: String, numberOfArguments: Integer): String = {
+    s"Function '$functionName' requires $numberOfArguments arguments"
+  }
 
   val LATEST_ESTIMATOR = 3
   val STDLIB_INVALID_VERSION = 44
@@ -50,5 +59,4 @@ class TestDataConstantsAndMethods {
     |    StringEntry("String", val)
     |]
     |""".stripMargin
-  def invalidFunctionError(functionName: String): String = s"Function '$functionName' requires 1 arguments"
 }

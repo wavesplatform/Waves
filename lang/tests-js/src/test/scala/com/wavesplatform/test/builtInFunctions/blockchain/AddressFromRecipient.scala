@@ -1,15 +1,15 @@
 package com.wavesplatform.test.builtInFunctions.blockchain
 
-import com.wavesplatform.test.builtInFunctions.accountDataStorage.GetBinary.testData
-import _root_.testData.GeneratorContractsForBuiltInFunctions
+import _root_.testData.{GeneratorContractsForBuiltInFunctions, TestDataConstantsAndMethods}
 import _root_.testData.RandomDataGenerator.*
 import com.wavesplatform.JsTestBase
 import utest.{Tests, test}
 
 object AddressFromRecipient extends JsTestBase {
-  val addressFromRecipient = "addressFromRecipient(addressOrAlias)"
-  val addressFromRecipientArgBeforeFunc = "addressOrAlias.addressFromRecipient()"
-  val invalidFunc = "addressFromRecipient()"
+  private val addressFromRecipient = "addressFromRecipient(addressOrAlias)"
+  private val addressFromRecipientArgBeforeFunc = "addressOrAlias.addressFromRecipient()"
+  private val invalidFunc = "addressFromRecipient()"
+  private val testData = new TestDataConstantsAndMethods
 
   val tests: Tests = Tests {
     test.apply("check: function addressFromRecipient compiles for address") {
@@ -68,7 +68,7 @@ object AddressFromRecipient extends JsTestBase {
           addressFromRecipient,
           randomAddressDataArrayElement
         )
-        assertCompileErrorExpression(script, version, testData.NON_MATCHING_TYPES)
+        assertCompileErrorExpression(script, version, testData.nonMatchingTypes("Address|Alias"))
       }
     }
 
@@ -80,7 +80,7 @@ object AddressFromRecipient extends JsTestBase {
           addressFromRecipientArgBeforeFunc,
           randomAddressDataArrayElement
         )
-        assertCompileErrorExpression(script, version, testData.NON_MATCHING_TYPES)
+        assertCompileErrorExpression(script, version, testData.nonMatchingTypes("Address|Alias"))
       }
     }
 
@@ -92,7 +92,7 @@ object AddressFromRecipient extends JsTestBase {
           invalidFunc,
           randomAddressDataArrayElement
         )
-        assertCompileErrorExpression(script, version, testData.invalidFunctionError("addressFromRecipient"))
+        assertCompileErrorExpression(script, version, testData.invalidFunctionError("addressFromRecipient", 1))
       }
     }
 
