@@ -11,8 +11,8 @@ import com.wavesplatform.utils.ScorexLogging
 sealed trait BlockchainState extends Product with Serializable
 
 object BlockchainState extends ScorexLogging {
-  case class Starting(blockchainHeight: Height, foundDifference: Boolean = false) extends BlockchainState {
-    def withFoundDifference: Starting = copy(foundDifference = true)
+  case class Starting(blockchainHeight: Height, foundDiffentBlocks: Boolean = false) extends BlockchainState {
+    def withDifferentBlocks: Starting = copy(foundDiffentBlocks = true)
   }
 
   case class Working(height: Height) extends BlockchainState {
@@ -81,27 +81,32 @@ object BlockchainState extends ScorexLogging {
 
     val r = orig match {
       case orig: Starting =>
-        val comparedBlocks =
-          if (orig.foundDifference) orig
-          else
-            processor.hasLocalBlockAt(h, currBlockId) match {
-              case Some(true) | None => orig // true - same blocks
-              case _ =>
-                processor.removeFrom(h)
-                orig.withFoundDifference
-            }
-
         update match {
-          case _: Update.Append   => processor.process(event.getUpdate)
-          case _: Update.Rollback => throw new IllegalStateException("Found a rollback during starting, contact with developers!")
-          case Update.Empty       => // Ignore
-        }
+          case _: Update.Append =>
+            val comparedBlocks =
+              if (orig.foundDiffentBlocks) orig
+              else
+                processor.hasLocalBlockAt(h, currBlockId) match {
+                  case Some(true) | None => orig // true - same blocks
+                  case _ =>
+                    processor.removeFrom(h)
+                    orig.withDifferentBlocks
+                }
 
-        if (h >= comparedBlocks.blockchainHeight) {
-          log.debug(s"[$h] Reached the current height, run all scripts")
-          processor.runScripts()
-          Working(h)
-        } else comparedBlocks
+            processor.process(event.getUpdate)
+            if (h >= comparedBlocks.blockchainHeight) {
+              log.debug(s"[$h] Reached the current height, run all scripts")
+              processor.runScripts()
+              Working(h)
+            } else comparedBlocks
+
+          case _: Update.Rollback =>
+            processor.removeFrom(Height(h + 1))
+            processor.process(event.getUpdate)
+            orig
+
+          case Update.Empty => orig // Ignore
+        }
 
       case orig: Working =>
         update match {

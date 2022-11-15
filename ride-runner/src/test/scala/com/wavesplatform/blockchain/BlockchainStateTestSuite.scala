@@ -12,8 +12,8 @@ class BlockchainStateTestSuite extends BaseTestSuite {
   "BlockchainState.apply" - {
     "Starting" - {
       "append" - {
-        "reaching the blockchain height - become Working, process the event and run all scripts" in {
-          val event = mkBlockAppendEvent(10)
+        "reaching the blockchain height - become Working, process the event and run scripts" in {
+          val event     = mkBlockAppendEvent(10)
           val processor = new EmptyProcessor
 
           val updatedState = BlockchainState(processor, BlockchainState.Starting(Height(10)), event)
@@ -25,13 +25,13 @@ class BlockchainStateTestSuite extends BaseTestSuite {
         }
 
         "not reaching the blockchain height - still Starting" in {
-          val event = mkBlockAppendEvent(9)
+          val event        = mkBlockAppendEvent(9)
           val updatedState = BlockchainState(new EmptyProcessor, BlockchainState.Starting(Height(10)), event)
           updatedState shouldBe a[BlockchainState.Starting]
         }
 
         "not found a block - only process the event" in {
-          val event = mkBlockAppendEvent(9)
+          val event     = mkBlockAppendEvent(9)
           val processor = new EmptyProcessor
 
           val _ = BlockchainState(processor, BlockchainState.Starting(Height(10)), event)
@@ -62,70 +62,127 @@ class BlockchainStateTestSuite extends BaseTestSuite {
         }
       }
 
-      "rollback - throwing an exception" in {
-        val event = mkRollbackEvent(1)
-        assertThrows[IllegalStateException] {
-          BlockchainState(new EmptyProcessor, BlockchainState.Starting(Height(10)), event)
-        }
+      "rollback - remove old fork data and process the event" in {
+        val event     = mkRollbackEvent(1)
+        val processor = new EmptyProcessor
+
+        val updatedState = BlockchainState(processor, BlockchainState.Starting(Height(10)), event)
+        updatedState shouldBe a[BlockchainState.Starting]
+        processor.actions shouldBe Vector(
+          RemoveFrom.next(event),
+          Process(event)
+        )
       }
     }
 
-    "Working" - {}
-    "ResolvingFork" - {}
+    "Working" - {
+      "append" - {
+        "block - process the event and run scripts" in {
+          val event     = mkBlockAppendEvent(11)
+          val processor = new EmptyProcessor
 
-    //    "Append" - {
-    //      "block" in {
-    //        val event = mkBlockAppendEvent(11)
-    //        val (updated, events) = BlockchainState(BlockchainState.Working(Height(10)), event)
-    //
-    //        updated shouldBe a[BlockchainState.Working]
-    //        events shouldBe List(event)
-    //      }
-    //
-    //      "micro block" in {
-    //        val event = mkMicroBlockAppendEvent(11)
-    //        val (updated, events) = BlockchainState(BlockchainState.Working(Height(10)), event)
-    //
-    //        updated shouldBe a[BlockchainState.Working]
-    //        events shouldBe List(event)
-    //      }
-    //    }
-    //
-    //    "Rollback" - {
-    //      "doesn't resolve after reaching an origin fork height + 1" in {
-    //        val origEvents = List(mkBlockAppendEvent(10), mkRollbackEvent(9))
-    //        val orig       = BlockchainState.RollingBack(Height(10), Height(11), 0, origEvents)
-    //
-    //        val event        = mkBlockAppendEvent(11)
-    //        val (updated, _) = BlockchainState(orig, event)
-    //
-    //        updated shouldBe a[BlockchainState.ResolvingFork]
-    //      }
-    //
-    //      "resolve after" - {
-    //        "reaching an origin fork height + 2" in {
-    //          val origEvents = List(mkBlockAppendEvent(11), mkBlockAppendEvent(10), mkRollbackEvent(9))
-    //          val orig       = BlockchainState.RollingBack(Height(10), Height(11), 0, origEvents)
-    //
-    //          val event             = mkBlockAppendEvent(12)
-    //          val (updated, events) = BlockchainState(orig, event)
-    //
-    //          updated shouldBe a[BlockchainState.Working]
-    //          events shouldBe (event :: origEvents).reverse
-    //        }
-    //
-    //        "reaching an origin fork height + 1 and getting a micro block" in {
-    //          val origEvents = List(mkBlockAppendEvent(11), mkBlockAppendEvent(10), mkRollbackEvent(9))
-    //          val orig       = BlockchainState.RollingBack(Height(10), Height(11), 0, origEvents)
-    //
-    //          val event             = mkMicroBlockAppendEvent(11)
-    //          val (updated, events) = BlockchainState(orig, event)
-    //
-    //          updated shouldBe a[BlockchainState.Working]
-    //          events shouldBe (event :: origEvents).reverse
-    //        }
-    //      }
-    //    }
+          val updatedState = BlockchainState(processor, BlockchainState.Working(Height(10)), event)
+          updatedState shouldBe a[BlockchainState.Working]
+          processor.actions shouldBe Vector(
+            Process(event),
+            RunScripts(forceAll = false)
+          )
+        }
+
+        "micro block - process the event and run scripts" in {
+          val event     = mkMicroBlockAppendEvent(10)
+          val processor = new EmptyProcessor
+
+          val updatedState = BlockchainState(processor, BlockchainState.Working(Height(10)), event)
+          updatedState shouldBe a[BlockchainState.Working]
+          processor.actions shouldBe Vector(
+            Process(event),
+            RunScripts(forceAll = false)
+          )
+        }
+      }
+
+      "rollback - become ResolvingFork, remove old fork data and process the event" in {
+        val event     = mkRollbackEvent(1)
+        val processor = new EmptyProcessor
+
+        val updatedState = BlockchainState(processor, BlockchainState.Working(Height(10)), event)
+        updatedState shouldBe a[BlockchainState.ResolvingFork]
+        processor.actions shouldBe Vector(
+          RemoveFrom.next(event),
+          Process(event)
+        )
+      }
+    }
+
+    "ResolvingFork" - {
+      "append" - {
+        "block - process the event" in {
+          val event     = mkBlockAppendEvent(11)
+          val processor = new EmptyProcessor
+
+          val _ = BlockchainState(processor, BlockchainState.ResolvingFork(Height(10), Height(10), 0), event)
+          processor.actions shouldBe Vector(Process(event))
+        }
+
+        "micro block - process the event" in {
+          val event     = mkMicroBlockAppendEvent(10)
+          val processor = new EmptyProcessor
+
+          val _ = BlockchainState(processor, BlockchainState.ResolvingFork(Height(10), Height(10), 0), event)
+          processor.actions shouldBe Vector(Process(event))
+        }
+      }
+
+      "rollback - remove old fork data and process the event" in {
+        val event     = mkRollbackEvent(1)
+        val processor = new EmptyProcessor
+
+        val updatedState = BlockchainState(processor, BlockchainState.ResolvingFork(Height(10), Height(10), 0), event)
+        updatedState shouldBe a[BlockchainState.ResolvingFork]
+        processor.actions shouldBe Vector(
+          RemoveFrom.next(event),
+          Process(event)
+        )
+      }
+
+      "fork resolution" - {
+        "doesn't resolve after reaching an origin fork height + 1" in {
+          val event     = mkBlockAppendEvent(11)
+          val processor = new EmptyProcessor
+
+          val updatedState = BlockchainState(processor, BlockchainState.ResolvingFork(Height(10), Height(10), 0), event)
+          updatedState shouldBe a[BlockchainState.ResolvingFork]
+          processor.actions shouldBe Vector(Process(event))
+        }
+
+        "resolve after and run scripts" - {
+          "reaching an origin fork height + 2" in {
+            val event     = mkBlockAppendEvent(12)
+            val processor = new EmptyProcessor
+
+            val updatedState = BlockchainState(processor, BlockchainState.ResolvingFork(Height(10), Height(11), 0), event)
+            updatedState shouldBe a[BlockchainState.Working]
+            processor.actions shouldBe Vector(
+              Process(event),
+              RunScripts(forceAll = false)
+            )
+          }
+
+          "reaching an origin fork height + 1 and getting a micro block" in {
+            val event     = mkMicroBlockAppendEvent(11)
+            val processor = new EmptyProcessor
+
+            val updatedState = BlockchainState(processor, BlockchainState.ResolvingFork(Height(10), Height(11), 0), event)
+            updatedState shouldBe a[BlockchainState.Working]
+            processor.actions shouldBe Vector(
+              Process(event),
+              RunScripts(forceAll = false)
+            )
+          }
+        }
+      }
+    }
   }
 
   private def mkRollbackEvent(height: Int): SubscribeEvent = SubscribeEvent().withUpdate(
@@ -195,6 +252,8 @@ object BlockchainStateTestSuite {
 
   private object RemoveFrom {
     def apply(event: SubscribeEvent): RemoveFrom = RemoveFrom(event.getUpdate.height)
+
+    def next(event: SubscribeEvent): RemoveFrom = RemoveFrom(event.getUpdate.height + 1)
   }
 
   private case class Process(updated: BlockchainUpdated) extends ProcessorAction
