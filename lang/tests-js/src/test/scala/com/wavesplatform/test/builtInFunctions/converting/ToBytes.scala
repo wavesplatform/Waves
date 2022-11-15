@@ -52,7 +52,7 @@ object ToBytes extends JsTestBase {
       }
     }
 
-    test.apply("check: toBytes function compiles with a Boolean data type") {
+    test.apply("check: toBytes function compiles with a BigInt data type") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -104,7 +104,7 @@ object ToBytes extends JsTestBase {
       }
     }
 
-    test.apply("check: toBytes function compiles with a Boolean data type (argument before function)") {
+    test.apply("check: toBytes function compiles with a BigInt data type (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
