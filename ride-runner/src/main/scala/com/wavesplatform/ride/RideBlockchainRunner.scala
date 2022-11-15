@@ -115,10 +115,7 @@ object RideBlockchainRunner extends ScorexLogging {
             log.error("Blockchain stream failed", error)
             false
         }
-        .collect {
-          // TODO
-          case Event.Next(event) => event
-        }
+        .collect { case Event.Next(event) => event }
         .foldLeftL(BlockchainState.Starting(lastHeightAtStart): BlockchainState)(BlockchainState(processor, _, _))
         .runToFuture(Scheduler(commonScheduler))
 

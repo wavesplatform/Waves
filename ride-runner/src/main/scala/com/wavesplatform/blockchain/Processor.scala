@@ -20,9 +20,13 @@ import play.api.libs.json.JsObject
 import scala.util.chaining.scalaUtilChainingOps
 
 trait Processor {
-  def hasLocalBlockAt(height: Height, id: ByteStr): Boolean
+
+  /** @return
+    *   None if has no block at this height
+    */
+  def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean]
   def removeFrom(height: Height): Unit
-  def process(height: Height, event: BlockchainUpdated): Unit
+  def process(event: BlockchainUpdated): Unit
   def runScripts(forceAll: Boolean = false): Unit
 }
 
@@ -36,7 +40,8 @@ class BlockchainProcessor(
   private val allScriptIndices              = scripts.indices.toSet
   @volatile private var curr: ProcessResult = ProcessResult()
 
-  override def process(height: Height, event: BlockchainUpdated): Unit = {
+  override def process(event: BlockchainUpdated): Unit = {
+    val height = Height(event.height)
     curr = event.update match {
       case Update.Empty              => curr // Ignore
       case Update.Append(append)     => process(height, append)
@@ -167,7 +172,7 @@ class BlockchainProcessor(
     curr = ProcessResult()
   }
 
-  override def hasLocalBlockAt(height: Height, id: ByteStr): Boolean = localBlocksCache.get(height).exists(_.id() == id)
+  override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] = localBlocksCache.get(height).map(_.id() == id)
 
   override def removeFrom(height: Height): Unit = localBlocksCache.remove(height)
 
