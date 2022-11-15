@@ -57,5 +57,5 @@ object RandomDataGenerator {
   def randomUnionArrayElement: String               = unionArray(rnd.nextInt(unionArray.length))
   def randomDigestAlgorithmTypeArrayElement: String = digestAlgorithmTypeArray(rnd.nextInt(digestAlgorithmTypeArray.length))
   def randomInt: Integer                            = rnd.nextInt(90000000)
-  def randomBoolean: Boolean = randomInt % 2 == 0
+  def randomBoolean: Boolean                        = randomInt % 2 == 0
 }
