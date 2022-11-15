@@ -1,4 +1,4 @@
-package com.wavesplatform.ride
+package com.wavesplatform.ride.input
 
 import cats.syntax.either.*
 import com.google.protobuf.ByteString
@@ -11,7 +11,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.ride.input.*
 import com.wavesplatform.state.InvokeScriptResult.DataEntry
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, Height, LeaseBalance, TxMeta}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -287,6 +286,6 @@ object RideRunnerInput {
     else if (str.startsWith(Base64.Prefix)) Base64.decode(str)
     else Base58.decode(str)
 
-  def parse(str: String): RideRunnerInput = Json.configured.parse(str).as[RideRunnerInput]
+  def parse(str: String): RideRunnerInput             = Json.configured.parse(str).as[RideRunnerInput]
   def parseMany(str: String): Vector[RideRunnerInput] = Json.configured.parse(str).as[Vector[RideRunnerInput]]
 }

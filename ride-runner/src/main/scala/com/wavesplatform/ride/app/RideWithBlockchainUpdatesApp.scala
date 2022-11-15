@@ -1,4 +1,4 @@
-package com.wavesplatform.ride
+package com.wavesplatform.ride.app
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.Application
@@ -8,6 +8,8 @@ import com.wavesplatform.database.openDB
 import com.wavesplatform.grpc.BlockchainGrpcApi.Event
 import com.wavesplatform.grpc.{DefaultBlockchainGrpcApi, GrpcClientSettings, GrpcConnector}
 import com.wavesplatform.resources.*
+import com.wavesplatform.ride.RideScript
+import com.wavesplatform.ride.input.RideRunnerInput
 import com.wavesplatform.state.Height
 import com.wavesplatform.storage.persistent.LevelDbPersistentCaches
 import com.wavesplatform.utils.ScorexLogging
@@ -21,7 +23,7 @@ import scala.concurrent.duration.{Duration, DurationInt}
 import scala.io.Source
 import scala.util.{Failure, Using}
 
-object RideBlockchainRunner extends ScorexLogging {
+object RideWithBlockchainUpdatesApp extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     val basePath     = args(0)
     val nodeSettings = Application.loadApplicationConfig(Some(new File(s"$basePath/node/waves.conf")))

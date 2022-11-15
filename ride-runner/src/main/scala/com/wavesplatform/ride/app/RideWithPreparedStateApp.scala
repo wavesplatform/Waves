@@ -1,4 +1,4 @@
-package com.wavesplatform.ride
+package com.wavesplatform.ride.app
 
 import com.google.protobuf.UnsafeByteOperations
 import com.wavesplatform.Application
@@ -15,7 +15,8 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.ride.input.decodeStringLikeBytes
+import com.wavesplatform.ride.input.{RideRunnerInput, decodeStringLikeBytes}
+import com.wavesplatform.ride.{compiledScript, execute}
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{
@@ -40,7 +41,7 @@ import scala.io.Source
 import scala.util.Using
 import scala.util.chaining.scalaUtilChainingOps
 
-object RideRunner {
+object RideWithPreparedStateApp {
   /*
   seed: test
 
