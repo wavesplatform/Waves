@@ -1,6 +1,7 @@
 package testHelpers
 
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5, V6}
+import testHelpers.RandomDataGenerator.entryMap
 
 object TestDataConstantsAndMethods {
   val oldVersions: Iterable[StdLibVersion]                      = Seq(V3, V4)
@@ -20,6 +21,11 @@ object TestDataConstantsAndMethods {
   def invalidFunctionError(functionName: String, numberOfArguments: Integer): String = {
     s"Function '$functionName' requires $numberOfArguments arguments"
   }
+
+  val binaryEntryForTests: String = entryMap("BinaryEntry")
+  val integerEntryForTests: String = entryMap("IntegerEntry")
+  val stringEntryForTests: String = entryMap("StringEntry")
+  val booleanEntryForTests: String = entryMap("BooleanEntry")
 
   val rideV3Result: String =
     """
