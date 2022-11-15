@@ -90,5 +90,4 @@ object Size extends JsTestBase {
       }
     }
   }
-
 }

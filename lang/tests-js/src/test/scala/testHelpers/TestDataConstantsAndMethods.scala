@@ -3,15 +3,15 @@ package testHelpers
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5, V6}
 
 object TestDataConstantsAndMethods {
-
   val oldVersions: Iterable[StdLibVersion]                      = Seq(V3, V4)
   val versionsSupportingTheNewFeatures: Iterable[StdLibVersion] = Seq(V5, V6)
-
-  val actualVersionsWithoutV3: Iterable[StdLibVersion] = Seq(V4, V5, V6)
-  val actualVersions: Iterable[StdLibVersion]          = Seq(V3, V4, V5, V6)
-
-  val CANT_FIND_A_FUNCTION_OVERLOAD = "Can't find a function overload"
-  val CANT_FIND_FUNCTION            = "Can't find a function"
+  val actualVersionsWithoutV3: Iterable[StdLibVersion]          = Seq(V4, V5, V6)
+  val actualVersions: Iterable[StdLibVersion]                   = Seq(V3, V4, V5, V6)
+  val CANT_FIND_A_FUNCTION_OVERLOAD                             = "Can't find a function overload"
+  val CANT_FIND_FUNCTION                                        = "Can't find a function"
+  val UNDEFINED_TYPE                                            = "Undefined type: `BigInt`"
+  val stringList                                                = "[\"a\", \"b\", \"c\", \"d\", \"e\", \"f\", \"g\"]"
+  val intList                                                   = "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]"
 
   def nonMatchingTypes(expectType: String): String = {
     s"Non-matching types: expected: $expectType"
@@ -20,11 +20,6 @@ object TestDataConstantsAndMethods {
   def invalidFunctionError(functionName: String, numberOfArguments: Integer): String = {
     s"Function '$functionName' requires $numberOfArguments arguments"
   }
-
-  val LATEST_ESTIMATOR       = 3
-  val STDLIB_INVALID_VERSION = 44
-  val stringList             = "[\"a\", \"b\", \"c\", \"d\", \"e\", \"f\", \"g\"]"
-  val intList                = "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]"
 
   val rideV3Result: String =
     """
