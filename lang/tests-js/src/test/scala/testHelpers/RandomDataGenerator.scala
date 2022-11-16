@@ -1,10 +1,6 @@
 package testHelpers
 
-import shapeless.PolyDefns.->
-
-import java.util
 import scala.collection.immutable.HashMap
-import scala.collection.mutable
 
 object RandomDataGenerator {
   val rnd = new scala.util.Random
@@ -63,16 +59,15 @@ object RandomDataGenerator {
 
   def entryMap(key: String): String = {
     val entryArray: HashMap[String, String] = HashMap(
-      "BinaryEntry" -> s"[BinaryEntry(\"key\", $randomByteVectorArrayElement)]",
+      "BinaryEntry"  -> s"[BinaryEntry(\"key\", $randomByteVectorArrayElement)]",
       "IntegerEntry" -> s"[IntegerEntry(\"key\", $randomInt)]",
-      "StringEntry" -> s"[StringEntry(\"key\", $randomStringArrayElement)]",
+      "StringEntry"  -> s"[StringEntry(\"key\", $randomStringArrayElement)]",
       "BooleanEntry" -> s"[BooleanEntry(\"key\", $randomBoolean)]"
     )
     entryArray(key)
   }
 
-  def dataEntryForTests(value: String) = s"[DataEntry(\"key\", $value)]"
-
+  def dataEntryForTests(value: String)              = s"[DataEntry(\"key\", $value)]"
   def randomAddressDataArrayElement: String         = addressDataArray(rnd.nextInt(addressDataArray.length))
   def randomAliasDataArrayElement: String           = aliasDataArray(rnd.nextInt(aliasDataArray.length))
   def randomByteVectorArrayElement: String          = byteVectorArray(rnd.nextInt(byteVectorArray.length))
