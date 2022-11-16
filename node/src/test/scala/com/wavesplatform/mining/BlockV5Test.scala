@@ -1,7 +1,5 @@
 package com.wavesplatform.mining
 
-import java.util.concurrent.atomic.AtomicReference
-
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
 import com.wavesplatform.block.serialization.{BlockHeaderSerializer, BlockSerializer}
@@ -36,12 +34,13 @@ import org.scalacheck.Gen
 import org.scalatest.*
 import org.scalatest.enablers.Length
 
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Await
 import scala.concurrent.duration.*
 class BlockV5Test extends FlatSpec with WithDomain with OptionValues with EitherValues with BlocksTransactionsHelpers {
   import BlockV5Test.*
 
-  private val testTime = new TestTime(1)
+  private val testTime = TestTime(1)
   def shiftTime(miner: MinerImpl, minerAcc: KeyPair): Unit = {
     val offset = miner.getNextBlockGenerationOffset(minerAcc).explicitGet()
     testTime.advance(offset + 1.milli)
@@ -392,14 +391,8 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
         d =>
           def applyBlock(txs: Transaction*): SignedBlockHeader = {
             d.appendBlock(
-              TestBlock.create(
-                System.currentTimeMillis(),
-                d.blockchainUpdater.lastBlockId.getOrElse(TestBlock.randomSignature()),
-                txs,
-                version =
-                  if (d.blockchainUpdater.height >= 1) Block.ProtoBlockVersion
-                  else Block.PlainBlockVersion
-              )
+              if (d.blockchainUpdater.height >= 1) Block.ProtoBlockVersion else Block.PlainBlockVersion,
+              txs: _*
             )
             lastBlock
           }
@@ -419,19 +412,11 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
           block3.header.reference shouldBe block2.id()
           block3.id() should have length crypto.DigestLength
 
-          val (keyBlock, microBlocks) =
-            UnsafeBlocks.unsafeChainBaseAndMicro(
-              block3.id(),
-              Nil,
-              Seq(Seq(TxHelpers.transfer()), Seq(TxHelpers.transfer())),
-              acc,
-              Block.ProtoBlockVersion,
-              System.currentTimeMillis()
-            )
-          d.appendBlock(keyBlock)
-          microBlocks.foreach(d.appendMicroBlock)
+          val keyBlock = d.appendKeyBlock()
+          val mb1      = d.createMicroBlock(TxHelpers.transfer())
+          d.blockchain.processMicroBlock(mb1)
+          d.appendMicroBlock(TxHelpers.transfer())
 
-          val mb1 = d.microBlocks.head
           mb1.totalResBlockSig should have length crypto.SignatureLength
           mb1.reference should not be keyBlock.signature
           mb1.reference shouldBe keyBlock.id()
