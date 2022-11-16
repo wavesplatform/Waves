@@ -13,7 +13,6 @@ import com.wavesplatform.ride.RideScript
 import com.wavesplatform.state.Height
 import com.wavesplatform.storage.DataKey
 import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
-import com.wavesplatform.storage.persistent.BlockPersistentCache
 import com.wavesplatform.utils.ScorexLogging
 import play.api.libs.json.JsObject
 
@@ -30,10 +29,8 @@ trait Processor {
   def runScripts(forceAll: Boolean = false): Unit
 }
 
-// TODO localBlocksCache
 class BlockchainProcessor(
     blockchainStorage: SharedBlockchainData[Int],
-    localBlocksCache: BlockPersistentCache,
     scripts: Vector[RideScript]
 ) extends Processor
     with ScorexLogging {
@@ -172,9 +169,9 @@ class BlockchainProcessor(
     curr = ProcessResult()
   }
 
-  override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] = localBlocksCache.get(height).map(_.id() == id)
+  override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] = blockchainStorage.blockHeaders.getLocal(height).map(_.id() == id)
 
-  override def removeFrom(height: Height): Unit = localBlocksCache.remove(height)
+  override def removeFrom(height: Height): Unit = blockchainStorage.blockHeaders.removeFrom(height)
 
   private def runScripts(height: Int, updated: Set[Int]): Unit = updated.foreach { index =>
     val apiResult = scripts(index).run()

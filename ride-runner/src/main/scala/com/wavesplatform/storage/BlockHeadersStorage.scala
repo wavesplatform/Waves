@@ -25,6 +25,8 @@ class BlockHeadersStorage(blockchainApi: BlockchainGrpcApi, persistentCache: Blo
 
   def last: BlockInfo = liquidBlocks.last
 
+  def getLocal(height: Int): Option[SignedBlockHeader] = persistentCache.get(height)
+
   def get(height: Int): Option[SignedBlockHeader] = {
     if (liquidBlocks.head.height == height) liquidBlocks.head.header.some
     else getInternal(height)
@@ -79,7 +81,7 @@ class BlockHeadersStorage(blockchainApi: BlockchainGrpcApi, persistentCache: Blo
         dropped match {
           case Nil =>
             log.debug(s"Remove from ${toHeight + 1}")
-            persistentCache.remove(toHeight + 1)
+            persistentCache.removeFrom(toHeight + 1)
             liquidBlocks = NonEmptyList.one {
               val header = getInternal(toHeight).getOrElse(throw new RuntimeException(s"Can't get block at $toHeight"))
               BlockInfo(toHeight, header.id(), header)
@@ -92,6 +94,8 @@ class BlockHeadersStorage(blockchainApi: BlockchainGrpcApi, persistentCache: Blo
         }
     }
   }
+
+  def removeFrom(height: Int): Unit = persistentCache.removeFrom(height)
 }
 
 object BlockHeadersStorage {

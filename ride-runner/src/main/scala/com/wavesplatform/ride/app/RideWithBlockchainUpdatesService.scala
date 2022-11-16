@@ -1,42 +1,47 @@
 package com.wavesplatform.ride.app
 
+import akka.actor.ActorSystem
+import akka.http.scaladsl.Http
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.Application
 import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.api.http.{CompositeHttpService, RouteTimeout}
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
 import com.wavesplatform.grpc.BlockchainGrpcApi.Event
 import com.wavesplatform.grpc.{DefaultBlockchainGrpcApi, GrpcClientSettings, GrpcConnector}
+import com.wavesplatform.http.EvaluateApiRoute
 import com.wavesplatform.resources.*
 import com.wavesplatform.ride.RideScript
 import com.wavesplatform.ride.input.RideRunnerInput
 import com.wavesplatform.state.Height
 import com.wavesplatform.storage.persistent.LevelDbPersistentCaches
 import com.wavesplatform.utils.ScorexLogging
+import io.netty.util.concurrent.DefaultThreadFactory
+import kamon.instrumentation.executor.ExecutorInstrumentation
 import monix.eval.Task
-import monix.execution.Scheduler
+import monix.execution.{ExecutionModel, Scheduler}
 
 import java.io.File
-import java.util.concurrent.Executors
+import java.util.concurrent.*
 import scala.concurrent.Await
-import scala.concurrent.duration.{Duration, DurationInt}
+import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
 import scala.io.Source
-import scala.util.{Failure, Using}
+import scala.util.Failure
 
-object RideWithBlockchainUpdatesApp extends ScorexLogging {
+object RideWithBlockchainUpdatesService extends ScorexLogging {
   def main(args: Array[String]): Unit = {
-    val basePath     = args(0)
-    val nodeSettings = Application.loadApplicationConfig(Some(new File(s"$basePath/node/waves.conf")))
+    val basePath = args(0)
+    val settings = Application.loadApplicationConfig(Some(new File(s"$basePath/node/waves.conf")))
 
     AddressScheme.current = new AddressScheme {
       override val chainId: Byte = 'W'.toByte
     }
 
-    // TODO expr should work too
-    log.info("Loading args...")
-    val input = RideRunnerInput.parseMany(Using(Source.fromFile(new File(s"$basePath/input4.json")))(_.getLines().mkString("\n")).get)
-
     val r = Using.Manager { use =>
+      log.info("Loading args...")
+      val input = RideRunnerInput.parseMany(use(Source.fromFile(new File(s"$basePath/input4.json"))).getLines().mkString("\n"))
+
       val connector = use(new GrpcConnector)
 
       log.info("Making gRPC channel to gRPC API...")
@@ -93,7 +98,7 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
 
       val db                = use(openDB(s"$basePath/db"))
       val dbCaches          = new LevelDbPersistentCaches(db)
-      val blockchainStorage = new SharedBlockchainData[Int](nodeSettings.blockchainSettings, dbCaches, blockchainApi)
+      val blockchainStorage = new SharedBlockchainData[Int](settings.blockchainSettings, dbCaches, blockchainApi)
 
       val scripts           = input.zipWithIndex.map { case (input, index) => RideScript(index, blockchainStorage, input.request) }
       val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
@@ -107,7 +112,11 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
       val start             = Height(math.max(0, blockchainStorage.height - 100 - 1))
       val blockchainUpdates = use(blockchainApi.mkBlockchainUpdatesStream())
       val events = blockchainUpdates.stream
-        .doOnError(e => Task { log.error("Error!", e) })
+        .doOnError(e =>
+          Task {
+            log.error("Error!", e)
+          }
+        )
         .takeWhile {
           case _: Event.Next => true
           case Event.Closed =>
@@ -124,6 +133,53 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
       log.info(s"Watching blockchain updates...")
       blockchainUpdates.start(start + 1, lastHeightAtStart + 1) // TODO end
 
+      // ====
+      val heavyRequestProcessorPoolThreads =
+        settings.restAPISettings.heavyRequestProcessorPoolThreads.getOrElse((Runtime.getRuntime.availableProcessors() * 2).min(4))
+      val heavyRequestExecutor = use(
+        new ThreadPoolExecutor(
+          heavyRequestProcessorPoolThreads,
+          heavyRequestProcessorPoolThreads,
+          0,
+          TimeUnit.MILLISECONDS,
+          new LinkedBlockingQueue[Runnable],
+          new DefaultThreadFactory("rest-heavy-request-processor", true),
+          { (r: Runnable, executor: ThreadPoolExecutor) =>
+            log.error(s"$r has been rejected from $executor")
+            throw new RejectedExecutionException
+          }
+        )
+      )
+
+      val heavyRequestScheduler = use.acquireWithShutdown(
+        Scheduler(
+          if (settings.config.getBoolean("kamon.enable"))
+            ExecutorInstrumentation.instrument(heavyRequestExecutor, "heavy-request-executor")
+          else heavyRequestExecutor,
+          ExecutionModel.AlwaysAsyncExecution
+        )
+      ) { resource =>
+        resource.shutdown()
+        resource.awaitTermination(5.seconds)
+      }
+
+      // TODO ?
+      val routeTimeout = new RouteTimeout(
+        FiniteDuration(settings.config.getDuration("akka.http.server.request-timeout").getSeconds, TimeUnit.SECONDS)
+      )(heavyRequestScheduler)
+
+      val apiRoutes = Seq(new EvaluateApiRoute(settings.restAPISettings))
+
+      implicit val actorSystem = use.acquireWithShutdown(ActorSystem("ride-runner", settings.config)) { x =>
+        Await.ready(x.terminate(), 20.seconds)
+      }
+      val httpService = CompositeHttpService(apiRoutes, settings.restAPISettings)
+      val httpFuture = Http()
+        .newServerAt(settings.restAPISettings.bindAddress, settings.restAPISettings.port)
+        .bindFlow(httpService.loggingCompositeRoute)
+
+      val _ = Await.result(httpFuture, 20.seconds)
+      log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
       Await.result(events, Duration.Inf)
     }
 

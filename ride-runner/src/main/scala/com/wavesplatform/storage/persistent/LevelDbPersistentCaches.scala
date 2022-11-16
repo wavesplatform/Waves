@@ -253,7 +253,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
       log.trace(s"set($height)")
     }
 
-    override def remove(fromHeight: Int): Unit = {
+    override def removeFrom(fromHeight: Int): Unit = {
       val first = CacheKeys.SignedBlockHeaders.mkKey(fromHeight)
       db.readWrite { rw =>
         rw.iterateFrom(CacheKeys.SignedBlockHeaders.prefixBytes, first.keyBytes) { x =>

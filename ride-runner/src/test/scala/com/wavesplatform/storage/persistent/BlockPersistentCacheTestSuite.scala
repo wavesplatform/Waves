@@ -62,7 +62,7 @@ class BlockPersistentCacheTestSuite extends BaseTestSuite with HasLevelDb {
         "affects get" in test { cache =>
           cache.set(1, defaultHeader(2))
           cache.set(2, defaultHeader(4))
-          cache.remove(2)
+          cache.removeFrom(2)
 
           cache.get(2) shouldBe empty
           cache.get(1).value.header.timestamp shouldBe 2
@@ -71,7 +71,7 @@ class BlockPersistentCacheTestSuite extends BaseTestSuite with HasLevelDb {
         "affects getLastHeight" in test { cache =>
           cache.set(1, defaultHeader(2))
           cache.set(2, defaultHeader(4))
-          cache.remove(2)
+          cache.removeFrom(2)
 
           cache.getLastHeight.value shouldBe 1
         }
@@ -80,14 +80,14 @@ class BlockPersistentCacheTestSuite extends BaseTestSuite with HasLevelDb {
       "new height" - {
         "doesn't affect get" in test { cache =>
           cache.set(1, defaultHeader(2))
-          cache.remove(2)
+          cache.removeFrom(2)
 
           cache.get(1).value.header.timestamp shouldBe 2
         }
 
         "doesn't affect getLastHeight" in test { cache =>
           cache.set(1, defaultHeader(2))
-          cache.remove(2)
+          cache.removeFrom(2)
 
           cache.getLastHeight.value shouldBe 1
         }
@@ -96,14 +96,14 @@ class BlockPersistentCacheTestSuite extends BaseTestSuite with HasLevelDb {
       "clears" - {
         "affects get" in test { cache =>
           cache.set(1, defaultHeader(2))
-          cache.remove(1)
+          cache.removeFrom(1)
 
           cache.get(1) shouldBe empty
         }
 
         "affects getLastHeight" in test { cache =>
           cache.set(1, defaultHeader(2))
-          cache.remove(1)
+          cache.removeFrom(1)
 
           cache.getLastHeight shouldBe empty
         }
