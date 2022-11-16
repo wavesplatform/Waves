@@ -9,24 +9,24 @@ import utest.{Tests, test}
 
 object GetInteger extends JsTestBase {
   // getIntegerKey
-  val getIntegerKey = s"getInteger(callerTestData, \"key\")"
-  val getIntegerKeyArgBeforeFunc = s"callerTestData.getInteger(\"key\")"
+  private val getIntegerKey = s"getInteger(callerTestData, \"key\")"
+  private val getIntegerKeyArgBeforeFunc = s"callerTestData.getInteger(\"key\")"
   // getIntegerIndex
-  val getIntegerIndex = s"getInteger(callerTestData, $randomInt)"
-  val getIntegerIndexArgBeforeFunc = s"callerTestData.getInteger($randomInt)"
+  private val getIntegerIndex = s"getInteger(callerTestData, $randomInt)"
+  private val getIntegerIndexArgBeforeFunc = s"callerTestData.getInteger($randomInt)"
   // getIntegerValueKey
-  val getIntegerValueKey = s"getIntegerValue(callerTestData, \"key\")"
-  val getIntegerValueKeyArgBeforeFunc = s"callerTestData.getIntegerValue(\"key\")"
+  private val getIntegerValueKey = s"getIntegerValue(callerTestData, \"key\")"
+  private val getIntegerValueKeyArgBeforeFunc = s"callerTestData.getIntegerValue(\"key\")"
   // getIntegerValueIndex
-  val getIntegerValueIndex = s"getIntegerValue(callerTestData, $randomInt)"
-  val getIntegerValueIndexArgBeforeFunc = s"callerTestData.getIntegerValue($randomInt)"
+  private val getIntegerValueIndex = s"getIntegerValue(callerTestData, $randomInt)"
+  private val getIntegerValueIndexArgBeforeFunc = s"callerTestData.getIntegerValue($randomInt)"
 
   // invalid getInteger
-  val invalidGetIntegerKey = s"getInteger()"
-  val invalidGetIntegerArgBeforeFunc = s"callerTestData.getInteger()"
+  private val invalidGetIntegerKey = s"getInteger()"
+  private val invalidGetIntegerArgBeforeFunc = s"callerTestData.getInteger()"
   // invalid getIntegerValue
-  val invalidGetIntegerValue = s"getIntegerValue()"
-  val invalidGetIntegerValueArgBeforeFunc = s"callerTestData.getIntegerValue()"
+  private val invalidGetIntegerValue = s"getIntegerValue()"
+  private val invalidGetIntegerValueArgBeforeFunc = s"callerTestData.getIntegerValue()"
 
   val tests: Tests = Tests {
     // getInteger

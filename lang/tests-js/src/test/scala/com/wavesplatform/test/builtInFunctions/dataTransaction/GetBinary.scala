@@ -9,24 +9,24 @@ import utest.{Tests, test}
 
 object GetBinary extends JsTestBase {
   // getBinaryKey
-  val getBinaryKey = s"getBinary(callerTestData, \"key\")"
-  val getBinaryKeyArgBeforeFunc = s"callerTestData.getBinary(\"key\")"
+  private val getBinaryKey = s"getBinary(callerTestData, \"key\")"
+  private val getBinaryKeyArgBeforeFunc = s"callerTestData.getBinary(\"key\")"
   // getBinaryIndex
-  val getBinaryIndex = s"getBinary(callerTestData, $randomInt)"
-  val getBinaryIndexArgBeforeFunc = s"callerTestData.getBinary($randomInt)"
+  private val getBinaryIndex = s"getBinary(callerTestData, $randomInt)"
+  private val getBinaryIndexArgBeforeFunc = s"callerTestData.getBinary($randomInt)"
   // getBinaryValueKey
-  val getBinaryValueKey = s"getBinaryValue(callerTestData, \"key\")"
-  val getBinaryValueKeyArgBeforeFunc = s"callerTestData.getBinaryValue(\"key\")"
+  private val getBinaryValueKey = s"getBinaryValue(callerTestData, \"key\")"
+  private val getBinaryValueKeyArgBeforeFunc = s"callerTestData.getBinaryValue(\"key\")"
   // getBinaryValueIndex
-  val getBinaryValueIndex = s"getBinaryValue(callerTestData, $randomInt)"
-  val getBinaryValueIndexArgBeforeFunc = s"callerTestData.getBinaryValue($randomInt)"
+  private val getBinaryValueIndex = s"getBinaryValue(callerTestData, $randomInt)"
+  private val getBinaryValueIndexArgBeforeFunc = s"callerTestData.getBinaryValue($randomInt)"
 
   // invalid getBinary
-  val invalidGetBinaryKey = s"getBinary()"
-  val invalidGetBinaryArgBeforeFunc = s"callerTestData.getBinary()"
+  private val invalidGetBinaryKey = s"getBinary()"
+  private val invalidGetBinaryArgBeforeFunc = s"callerTestData.getBinary()"
   // invalid getBinaryValue
-  val invalidGetBinaryValue = s"getBinaryValue()"
-  val invalidGetBinaryValueArgBeforeFunc = s"callerTestData.getBinaryValue()"
+  private val invalidGetBinaryValue = s"getBinaryValue()"
+  private val invalidGetBinaryValueArgBeforeFunc = s"callerTestData.getBinaryValue()"
 
   val tests: Tests = Tests {
     // getBinary

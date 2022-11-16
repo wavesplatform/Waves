@@ -9,24 +9,24 @@ import utest.{Tests, test}
 
 object GetBoolean extends JsTestBase {
   // getBooleanKey
-  val getBooleanKey = s"getBoolean(callerTestData, \"key\")"
-  val getBooleanKeyArgBeforeFunc = s"callerTestData.getBoolean(\"key\")"
+  private val getBooleanKey = s"getBoolean(callerTestData, \"key\")"
+  private val getBooleanKeyArgBeforeFunc = s"callerTestData.getBoolean(\"key\")"
   // getBooleanIndex
-  val getBooleanIndex = s"getBoolean(callerTestData, $randomInt)"
-  val getBooleanIndexArgBeforeFunc = s"callerTestData.getBoolean($randomInt)"
+  private val getBooleanIndex = s"getBoolean(callerTestData, $randomInt)"
+  private val getBooleanIndexArgBeforeFunc = s"callerTestData.getBoolean($randomInt)"
   // getBooleanValueKey
-  val getBooleanValueKey = s"getBooleanValue(callerTestData, \"key\")"
-  val getBooleanValueKeyArgBeforeFunc = s"callerTestData.getBooleanValue(\"key\")"
+  private val getBooleanValueKey = s"getBooleanValue(callerTestData, \"key\")"
+  private val getBooleanValueKeyArgBeforeFunc = s"callerTestData.getBooleanValue(\"key\")"
   // getBooleanValueIndex
-  val getBooleanValueIndex = s"getBooleanValue(callerTestData, $randomInt)"
-  val getBooleanValueIndexArgBeforeFunc = s"callerTestData.getBooleanValue($randomInt)"
+  private val getBooleanValueIndex = s"getBooleanValue(callerTestData, $randomInt)"
+  private val getBooleanValueIndexArgBeforeFunc = s"callerTestData.getBooleanValue($randomInt)"
 
   // invalid getBoolean
-  val invalidGetBooleanKey = s"getBoolean()"
-  val invalidGetBooleanArgBeforeFunc = s"callerTestData.getBoolean()"
+  private val invalidGetBooleanKey = s"getBoolean()"
+  private val invalidGetBooleanArgBeforeFunc = s"callerTestData.getBoolean()"
   // invalid getBooleanValue
-  val invalidGetBooleanValue = s"getBooleanValue()"
-  val invalidGetBooleanValueArgBeforeFunc = s"callerTestData.getBooleanValue()"
+  private val invalidGetBooleanValue = s"getBooleanValue()"
+  private val invalidGetBooleanValueArgBeforeFunc = s"callerTestData.getBooleanValue()"
 
   val tests: Tests = Tests {
     // getBoolean

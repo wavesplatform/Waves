@@ -9,24 +9,24 @@ import utest.{Tests, test}
 
 object GetString extends JsTestBase {
   // getStringKey
-  val getStringKey = s"getString(callerTestData, \"key\")"
-  val getStringKeyArgBeforeFunc = s"callerTestData.getString(\"key\")"
+  private val getStringKey = s"getString(callerTestData, \"key\")"
+  private val getStringKeyArgBeforeFunc = s"callerTestData.getString(\"key\")"
   // getStringIndex
-  val getStringIndex = s"getString(callerTestData, $randomInt)"
-  val getStringIndexArgBeforeFunc = s"callerTestData.getString($randomInt)"
+  private val getStringIndex = s"getString(callerTestData, $randomInt)"
+  private val getStringIndexArgBeforeFunc = s"callerTestData.getString($randomInt)"
   // getStringValueKey
-  val getStringValueKey = s"getStringValue(callerTestData, \"key\")"
-  val getStringValueKeyArgBeforeFunc = s"callerTestData.getStringValue(\"key\")"
+  private val getStringValueKey = s"getStringValue(callerTestData, \"key\")"
+  private val getStringValueKeyArgBeforeFunc = s"callerTestData.getStringValue(\"key\")"
   // getStringValueIndex
-  val getStringValueIndex = s"getStringValue(callerTestData, $randomInt)"
-  val getStringValueIndexArgBeforeFunc = s"callerTestData.getStringValue($randomInt)"
+  private val getStringValueIndex = s"getStringValue(callerTestData, $randomInt)"
+  private val getStringValueIndexArgBeforeFunc = s"callerTestData.getStringValue($randomInt)"
 
   // invalid getString
-  val invalidGetStringKey = s"getString()"
-  val invalidGetStringArgBeforeFunc = s"callerTestData.getString()"
+  private val invalidGetStringKey = s"getString()"
+  private val invalidGetStringArgBeforeFunc = s"callerTestData.getString()"
   // invalid getStringValue
-  val invalidGetStringValue = s"getStringValue()"
-  val invalidGetStringValueArgBeforeFunc = s"callerTestData.getStringValue()"
+  private val invalidGetStringValue = s"getStringValue()"
+  private val invalidGetStringValueArgBeforeFunc = s"callerTestData.getStringValue()"
 
   val tests: Tests = Tests {
     // getString
