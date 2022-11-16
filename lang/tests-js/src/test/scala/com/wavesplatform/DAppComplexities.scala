@@ -1,3 +1,5 @@
+package com.wavesplatform
+
 case class DAppComplexities(
     complexity: Int,
     verifierComplexity: Int,

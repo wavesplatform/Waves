@@ -1,3 +1,5 @@
+package com.wavesplatform
+
 import scala.scalajs.js.annotation.JSExportTopLevel
 import scala.scalajs.js.typedarray.ArrayBuffer
 
