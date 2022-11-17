@@ -11,6 +11,8 @@ object TestDataConstantsAndMethods {
   val actualVersions: Iterable[StdLibVersion]                   = Seq(V3, V4, V5, V6)
   val CANT_FIND_A_FUNCTION_OVERLOAD                             = "Can't find a function overload"
   val CANT_FIND_FUNCTION                                        = "Can't find a function"
+  val CANT_MATCH_INFERRED_TYPE                                  = "Can't match inferred types of T over"
+  val MATCHING_NOT_EXHAUSTIVE                                   = "Matching not exhaustive:"
   val UNDEFINED_TYPE                                            = "Undefined type: `BigInt`"
   val stringList                                                = "[\"a\", \"b\", \"c\", \"d\", \"e\", \"f\", \"g\"]"
   val intList                                                   = "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]"

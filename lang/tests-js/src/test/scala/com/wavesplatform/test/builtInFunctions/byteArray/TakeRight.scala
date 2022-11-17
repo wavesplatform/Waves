@@ -90,5 +90,4 @@ object TakeRight extends JsTestBase {
       }
     }
   }
-
 }
