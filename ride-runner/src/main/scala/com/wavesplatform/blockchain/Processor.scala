@@ -1,7 +1,11 @@
 package com.wavesplatform.blockchain
 
 import cats.syntax.option.*
-import com.wavesplatform.blockchain.BlockchainProcessor.ProcessResult
+import com.wavesplatform.account.Address
+import com.wavesplatform.api.http.ApiError.CustomValidationError
+import com.wavesplatform.api.http.ApiException
+import com.wavesplatform.api.http.utils.UtilsApiRoute
+import com.wavesplatform.blockchain.BlockchainProcessor.{ProcessResult, RequestKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
@@ -9,13 +13,14 @@ import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
-import com.wavesplatform.ride.RideScript
-import com.wavesplatform.state.Height
+import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.storage.DataKey
 import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
 import com.wavesplatform.utils.ScorexLogging
+import monix.eval.Task
 import play.api.libs.json.JsObject
 
+import scala.collection.concurrent.TrieMap
 import scala.util.chaining.scalaUtilChainingOps
 
 trait Processor {
@@ -27,20 +32,22 @@ trait Processor {
   def removeFrom(height: Height): Unit
   def process(event: BlockchainUpdated): Unit
   def runScripts(forceAll: Boolean = false): Unit
+
+  // TODO move to another place?
+  def getLastResultOrRun(address: Address, request: JsObject): Task[JsObject]
 }
 
-class BlockchainProcessor(
-    blockchainStorage: SharedBlockchainData[Int],
-    scripts: Vector[RideScript]
+class BlockchainProcessor private (
+    blockchainStorage: SharedBlockchainData[RequestKey],
+    private val storage: TrieMap[RequestKey, RestApiScript]
 ) extends Processor
     with ScorexLogging {
-  private val allScriptIndices              = scripts.indices.toSet
-  @volatile private var curr: ProcessResult = ProcessResult()
+  @volatile private var accumulatedChanges = new ProcessResult[RequestKey]()
 
   override def process(event: BlockchainUpdated): Unit = {
     val height = Height(event.height)
-    curr = event.update match {
-      case Update.Empty              => curr // Ignore
+    accumulatedChanges = event.update match {
+      case Update.Empty              => accumulatedChanges // Ignore
       case Update.Append(append)     => process(height, append)
       case Update.Rollback(rollback) => process(height, rollback)
     }
@@ -49,10 +56,10 @@ class BlockchainProcessor(
     blockchainStorage.blockHeaders.update(event)
   }
 
-  private def process(h: Height, append: BlockchainUpdated.Append): ProcessResult = {
+  private def process(h: Height, append: BlockchainUpdated.Append): ProcessResult[RequestKey] = {
     // TODO the height will be eventually > if this is a rollback
     // Almost all scripts use the height
-    val withUpdatedHeight = curr.copy(newHeight = h) // TODO
+    val withUpdatedHeight = accumulatedChanges.copy(newHeight = h) // TODO
 
     val txs = append.body match {
       // PBBlocks.vanilla(block.getBlock.getHeader)
@@ -109,10 +116,10 @@ class BlockchainProcessor(
       })
   }
 
-  private def process(h: Height, rollback: BlockchainUpdated.Rollback): ProcessResult = {
+  private def process(h: Height, rollback: BlockchainUpdated.Rollback): ProcessResult[RequestKey] = {
     // TODO the height will be eventually > if this is a rollback
     // Almost all scripts use the height
-    val withUpdatedHeight = curr.copy(newHeight = h) // TODO
+    val withUpdatedHeight = accumulatedChanges.copy(newHeight = h) // TODO
 
     val stateUpdate = rollback.getRollbackStateUpdate
     withUpdatedHeight
@@ -144,15 +151,11 @@ class BlockchainProcessor(
   }
 
   override def runScripts(forceAll: Boolean = false): Unit = {
-    val height = curr.newHeight
-    if (curr.uncertainKeys.nonEmpty) {
-      log.debug(s"Getting data for keys: ${curr.uncertainKeys.toVector.map(_.toString).sorted.mkString(", ")}")
-      curr.uncertainKeys.foreach {
-        _.reload(height)
-      }
+    val height = accumulatedChanges.newHeight
+    if (accumulatedChanges.uncertainKeys.nonEmpty) {
+      log.debug(s"Getting data for keys: ${accumulatedChanges.uncertainKeys.toVector.map(_.toString).sorted.mkString(", ")}")
+      accumulatedChanges.uncertainKeys.foreach(_.reload(height))
     }
-
-    val affectedScripts = if (forceAll) allScriptIndices else curr.affectedScripts
 
     // log.info(
     //   s"==> $h >= $lastHeightAtStart, started: $started, affectedScripts: ${curr.affectedScripts}, batchedEvents for heights: {${batchedEvents
@@ -160,42 +163,84 @@ class BlockchainProcessor(
     //     .mkString(", ")}}"
     // )
 
-    if (affectedScripts.isEmpty) log.debug(s"[$height] Not updated")
-    else {
-      log.debug(s"[$height] Updated for: ${affectedScripts.mkString(", ")}")
-      runScripts(height, affectedScripts)
-    }
+    if (forceAll) storage.values.foreach(runScript(height, _))
+    else if (accumulatedChanges.affectedScripts.isEmpty) log.debug(s"[$height] Not updated")
+    else accumulatedChanges.affectedScripts.flatMap(storage.get).foreach(runScript(height, _))
 
-    curr = ProcessResult()
+    accumulatedChanges = ProcessResult()
   }
 
   override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] = blockchainStorage.blockHeaders.getLocal(height).map(_.id() == id)
 
   override def removeFrom(height: Height): Unit = blockchainStorage.blockHeaders.removeFrom(height)
 
-  private def runScripts(height: Int, updated: Set[Int]): Unit = updated.foreach { index =>
-    val apiResult = scripts(index).run()
-    log.info(s"[$height, $index] apiResult: ${apiResult.value("result").as[JsObject].value("value")}")
+  private def runScript(height: Int, script: RestApiScript): Unit = {
+    val refreshed = script.refreshed
+    val key       = script.key
+    storage.put(key, refreshed)
+    log.info(s"[$height, $key] apiResult: ${refreshed.lastResult.value("result").as[JsObject].value("value")}")
+  }
+
+  override def getLastResultOrRun(address: Address, request: JsObject): Task[JsObject] = {
+    val key = (address, request)
+    storage.get(key) match {
+      case Some(r) => Task.now(r.lastResult)
+      case None =>
+        blockchainStorage.accountScripts.getUntagged(blockchainStorage.height, address) match {
+          case None =>
+            // TODO should not be in business logic
+            Task.raiseError(ApiException(CustomValidationError(s"Address $address is not dApp")))
+
+          case _ =>
+            // TODO settings.evaluateScriptComplexityLimit = 52000
+            val script = RestApiScript(address, blockchainStorage, request).refreshed
+            storage.putIfAbsent(key, script)
+            Task.now(script.lastResult)
+        }
+    }
   }
 }
 
 object BlockchainProcessor {
+  type RequestKey = (Address, JsObject)
+
+  def mk(blockchainStorage: SharedBlockchainData[RequestKey], scripts: List[RequestKey] = Nil): BlockchainProcessor =
+    new BlockchainProcessor(blockchainStorage, TrieMap.from(scripts.map(k => (k, RestApiScript(k._1, blockchainStorage, k._2)))))
+
+  // TODO get rid of TagT
   // TODO don't calculate affectedScripts if all scripts are affected
-  private case class ProcessResult(
+  private case class ProcessResult[TagT](
       /*allScripts: Set[Int], */ newHeight: Int = 0,
-      affectedScripts: Set[Int] = Set.empty,
-      uncertainKeys: Set[DataKey] = Set.empty
+      affectedScripts: Set[TagT] = Set.empty[TagT],
+      uncertainKeys: Set[DataKey] = Set.empty[DataKey]
   ) {
-    def withAppendResult(x: AppendResult[Int]): ProcessResult =
+    def withAppendResult(x: AppendResult[TagT]): ProcessResult[TagT] =
       copy(
         affectedScripts = affectedScripts ++ x.affectedTags,
         uncertainKeys = x.mayBeChangedKey.foldLeft(uncertainKeys)(_ - _)
       )
 
-    def withRollbackResult(x: RollbackResult[Int]): ProcessResult =
+    def withRollbackResult(x: RollbackResult[TagT]): ProcessResult[TagT] =
       copy(
         affectedScripts = affectedScripts ++ x.affectedTags,
         uncertainKeys = uncertainKeys ++ x.mayBeUncertainKey
       )
+  }
+}
+
+case class RestApiScript(address: Address, blockchain: Blockchain, request: JsObject, lastResult: JsObject) {
+  def key: RequestKey = (address, request)
+
+  def refreshed: RestApiScript = {
+    // TODO settings.evaluateScriptComplexityLimit = 52000
+    // TODO enable / disable traces
+    val result = UtilsApiRoute.evaluate(52000, blockchain, address, request, trace = true)
+    copy(lastResult = result)
+  }
+}
+
+object RestApiScript {
+  def apply(address: Address, blockchainStorage: SharedBlockchainData[RequestKey], request: JsObject): RestApiScript = {
+    new RestApiScript(address, new ScriptBlockchain[RequestKey](blockchainStorage, (address, request)), request, JsObject.empty)
   }
 }

@@ -5,15 +5,14 @@ import akka.http.scaladsl.Http
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.Application
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.api.http.{CompositeHttpService, RouteTimeout}
+import com.wavesplatform.api.http.CompositeHttpService
+import com.wavesplatform.blockchain.BlockchainProcessor.RequestKey
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
 import com.wavesplatform.grpc.BlockchainGrpcApi.Event
 import com.wavesplatform.grpc.{DefaultBlockchainGrpcApi, GrpcClientSettings, GrpcConnector}
 import com.wavesplatform.http.EvaluateApiRoute
 import com.wavesplatform.resources.*
-import com.wavesplatform.ride.RideScript
-import com.wavesplatform.ride.input.RideRunnerInput
 import com.wavesplatform.state.Height
 import com.wavesplatform.storage.persistent.LevelDbPersistentCaches
 import com.wavesplatform.utils.ScorexLogging
@@ -25,8 +24,7 @@ import monix.execution.{ExecutionModel, Scheduler}
 import java.io.File
 import java.util.concurrent.*
 import scala.concurrent.Await
-import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
-import scala.io.Source
+import scala.concurrent.duration.{Duration, DurationInt}
 import scala.util.Failure
 
 object RideWithBlockchainUpdatesService extends ScorexLogging {
@@ -39,9 +37,6 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     }
 
     val r = Using.Manager { use =>
-      log.info("Loading args...")
-      val input = RideRunnerInput.parseMany(use(Source.fromFile(new File(s"$basePath/input4.json"))).getLines().mkString("\n"))
-
       val connector = use(new GrpcConnector)
 
       log.info("Making gRPC channel to gRPC API...")
@@ -98,13 +93,12 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
 
       val db                = use(openDB(s"$basePath/db"))
       val dbCaches          = new LevelDbPersistentCaches(db)
-      val blockchainStorage = new SharedBlockchainData[Int](settings.blockchainSettings, dbCaches, blockchainApi)
+      val blockchainStorage = new SharedBlockchainData[RequestKey](settings.blockchainSettings, dbCaches, blockchainApi)
 
-      val scripts           = input.zipWithIndex.map { case (input, index) => RideScript(index, blockchainStorage, input.request) }
       val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
       log.info(s"Current height: $lastHeightAtStart")
 
-      val processor = new BlockchainProcessor(blockchainStorage, scripts)
+      val processor = BlockchainProcessor.mk(blockchainStorage)
 
       log.info("Warm up caches...") // Also helps to figure out, which data is used by a script
       processor.runScripts(forceAll = true)
@@ -164,11 +158,11 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
       }
 
       // TODO ?
-      val routeTimeout = new RouteTimeout(
-        FiniteDuration(settings.config.getDuration("akka.http.server.request-timeout").getSeconds, TimeUnit.SECONDS)
-      )(heavyRequestScheduler)
+//      val routeTimeout = new RouteTimeout(
+//        FiniteDuration(settings.config.getDuration("akka.http.server.request-timeout").getSeconds, TimeUnit.SECONDS)
+//      )(heavyRequestScheduler)
 
-      val apiRoutes = Seq(new EvaluateApiRoute(settings.restAPISettings))
+      val apiRoutes = Seq(new EvaluateApiRoute(settings.restAPISettings, heavyRequestScheduler, processor))
 
       implicit val actorSystem = use.acquireWithShutdown(ActorSystem("ride-runner", settings.config)) { x =>
         Await.ready(x.terminate(), 20.seconds)

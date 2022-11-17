@@ -3,18 +3,18 @@ package com.wavesplatform.ride.app
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.Application
 import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.blockchain.BlockchainProcessor.RequestKey
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
 import com.wavesplatform.grpc.BlockchainGrpcApi.Event
 import com.wavesplatform.grpc.{DefaultBlockchainGrpcApi, GrpcClientSettings, GrpcConnector}
 import com.wavesplatform.resources.*
-import com.wavesplatform.ride.RideScript
-import com.wavesplatform.ride.input.RideRunnerInput
 import com.wavesplatform.state.Height
 import com.wavesplatform.storage.persistent.LevelDbPersistentCaches
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.execution.Scheduler
+import play.api.libs.json.Json
 
 import java.io.File
 import java.util.concurrent.Executors
@@ -32,9 +32,10 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
       override val chainId: Byte = 'W'.toByte
     }
 
-    // TODO expr should work too
     log.info("Loading args...")
-    val input = RideRunnerInput.parseMany(Using(Source.fromFile(new File(s"$basePath/input4.json")))(_.getLines().mkString("\n")).get)
+    val scripts = Json
+      .parse(Using(Source.fromFile(new File(s"$basePath/input5.json")))(_.getLines().mkString("\n")).get)
+      .as[List[RequestKey]]
 
     val r = Using.Manager { use =>
       val connector = use(new GrpcConnector)
@@ -93,13 +94,12 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
 
       val db                = use(openDB(s"$basePath/db"))
       val dbCaches          = new LevelDbPersistentCaches(db)
-      val blockchainStorage = new SharedBlockchainData[Int](nodeSettings.blockchainSettings, dbCaches, blockchainApi)
+      val blockchainStorage = new SharedBlockchainData[RequestKey](nodeSettings.blockchainSettings, dbCaches, blockchainApi)
 
-      val scripts           = input.zipWithIndex.map { case (input, index) => RideScript(index, blockchainStorage, input.request) }
       val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
       log.info(s"Current height: $lastHeightAtStart")
 
-      val processor = new BlockchainProcessor(blockchainStorage, scripts)
+      val processor = BlockchainProcessor.mk(blockchainStorage, scripts)
 
       log.info("Warm up caches...") // Also helps to figure out, which data is used by a script
       processor.runScripts(forceAll = true)

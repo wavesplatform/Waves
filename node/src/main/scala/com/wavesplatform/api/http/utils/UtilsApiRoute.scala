@@ -262,7 +262,7 @@ case class UtilsApiRoute(
 
   def evaluate: Route =
     (path("script" / "evaluate" / ScriptedAddress) & jsonPostD[JsObject] & parameter("trace".as[Boolean] ? false)) { (address, request, trace) =>
-      val apiResult = UtilsApiRoute.evaluate(settings, blockchain, address, request, trace)
+      val apiResult = UtilsApiRoute.evaluate(settings.evaluateScriptComplexityLimit, blockchain, address, request, trace)
       complete(apiResult ++ request ++ Json.obj("address" -> address.toString))
     }
 
@@ -277,16 +277,16 @@ object UtilsApiRoute {
   val DefaultSeedSize = 32
 
   def evaluate(
-      settings: RestAPISettings,
+      evaluateScriptComplexityLimit: Int,
       blockchain: Blockchain,
       address: Address,
       request: JsObject,
       trace: Boolean
   ): JsObject =
-    evaluate(settings, _ => blockchain, blockchain.accountScript(_).get, address, request, trace)
+    evaluate(evaluateScriptComplexityLimit, _ => blockchain, blockchain.accountScript(_).get, address, request, trace)
 
   def evaluate(
-      settings: RestAPISettings,
+      evaluateScriptComplexityLimit: Int,
       blockchain: Terms.EXPR => Blockchain, // TODO this looks bad!
       getAccountScript: Address => AccountScriptInfo,
       address: Address,
@@ -313,9 +313,8 @@ object UtilsApiRoute {
 
     val apiResult = exprE.flatMap { exprE =>
       val evaluated = for {
-        expr <- exprE
-        limit = settings.evaluateScriptComplexityLimit
-        (result, complexity, log) <- UtilsEvaluator.executeExpression(blockchain(expr), script, address, pk, limit)(expr)
+        expr                      <- exprE
+        (result, complexity, log) <- UtilsEvaluator.executeExpression(blockchain(expr), script, address, pk, evaluateScriptComplexityLimit)(expr)
       } yield Json.obj(
         "result"     -> ScriptValuesJson.serializeValue(result),
         "complexity" -> complexity

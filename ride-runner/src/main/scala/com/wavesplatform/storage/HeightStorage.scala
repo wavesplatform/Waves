@@ -19,10 +19,12 @@ trait HeightStorage[KeyT, ValueT, TagT] extends ScorexLogging { storage =>
 
   def persistentCache: PersistentCache[KeyT, ValueT]
 
-  def get(height: Int, key: KeyT, tag: TagT): Option[ValueT] =
+  def getUntagged(height: Int, key: KeyT): Option[ValueT]    = get(height, key, None)
+  def get(height: Int, key: KeyT, tag: TagT): Option[ValueT] = get(height, key, tag)
+  private def get(height: Int, key: KeyT, tag: Option[TagT]): Option[ValueT] =
     memoryCache
       .updateWith(key) {
-        case Some(orig) => Some(orig.withTag(tag))
+        case Some(orig) => Some(tag.foldLeft(orig)(_.withTag(_)))
         case None =>
           val cached = persistentCache.get(height, key)
           val r =
@@ -32,7 +34,7 @@ trait HeightStorage[KeyT, ValueT, TagT] extends ScorexLogging { storage =>
                 .loaded(getFromBlockchain(key))
                 .tap(r => persistentCache.set(height, key, r)) // TODO double check before set, because we could have an update
 
-          Some(TaggedData(r, Set(tag)))
+          Some(TaggedData(r, tag.toSet))
       }
       .flatMap(_.data.mayBeValue)
 
