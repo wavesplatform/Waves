@@ -3,7 +3,7 @@ package com.wavesplatform.test.builtInFunctions.list
 import com.wavesplatform.JsTestBase
 import testHelpers.GeneratorContractsForBuiltInFunctions
 import testHelpers.RandomDataGenerator.{randomAliasDataArrayElement, randomInt, randomIssuesArrayElement}
-import testHelpers.TestDataConstantsAndMethods.{intList, stringList}
+import testHelpers.TestDataConstantsAndMethods.stringList
 import utest.{Tests, test}
 
 object RemoveByIndex extends JsTestBase {
@@ -67,5 +67,4 @@ object RemoveByIndex extends JsTestBase {
       }
     }
   }
-
 }
