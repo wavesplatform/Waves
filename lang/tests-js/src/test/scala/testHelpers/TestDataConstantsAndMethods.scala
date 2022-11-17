@@ -6,6 +6,7 @@ import testHelpers.RandomDataGenerator.entryMap
 object TestDataConstantsAndMethods {
   val oldVersions: Iterable[StdLibVersion]                      = Seq(V3, V4)
   val versionsSupportingTheNewFeatures: Iterable[StdLibVersion] = Seq(V5, V6)
+  val versionsWithoutV6: Iterable[StdLibVersion]                = Seq(V3, V4, V5)
   val actualVersionsWithoutV3: Iterable[StdLibVersion]          = Seq(V4, V5, V6)
   val actualVersions: Iterable[StdLibVersion]                   = Seq(V3, V4, V5, V6)
   val CANT_FIND_A_FUNCTION_OVERLOAD                             = "Can't find a function overload"
@@ -22,9 +23,9 @@ object TestDataConstantsAndMethods {
     s"Function '$functionName' requires $numberOfArguments arguments"
   }
 
-  val binaryEntryForTests: String = entryMap("BinaryEntry")
+  val binaryEntryForTests: String  = entryMap("BinaryEntry")
   val integerEntryForTests: String = entryMap("IntegerEntry")
-  val stringEntryForTests: String = entryMap("StringEntry")
+  val stringEntryForTests: String  = entryMap("StringEntry")
   val booleanEntryForTests: String = entryMap("BooleanEntry")
 
   val rideV3Result: String =
