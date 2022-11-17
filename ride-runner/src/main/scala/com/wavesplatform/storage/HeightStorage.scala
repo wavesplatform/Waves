@@ -19,9 +19,9 @@ trait HeightStorage[KeyT, ValueT, TagT] extends ScorexLogging { storage =>
 
   def persistentCache: PersistentCache[KeyT, ValueT]
 
-  def getUntagged(height: Int, key: KeyT): Option[ValueT]    = get(height, key, None)
-  def get(height: Int, key: KeyT, tag: TagT): Option[ValueT] = get(height, key, tag)
-  private def get(height: Int, key: KeyT, tag: Option[TagT]): Option[ValueT] =
+  def getUntagged(height: Int, key: KeyT): Option[ValueT]    = getInternal(height, key, None)
+  def get(height: Int, key: KeyT, tag: TagT): Option[ValueT] = getInternal(height, key, Some(tag))
+  private def getInternal(height: Int, key: KeyT, tag: Option[TagT]): Option[ValueT] =
     memoryCache
       .updateWith(key) {
         case Some(orig) => Some(tag.foldLeft(orig)(_.withTag(_)))
