@@ -8,7 +8,7 @@ import scala.scalajs.js.{Dictionary, isUndefined}
 
 abstract class JsTestBase extends TestSuite {
 
-  val testData: TestDataConstantsAndMethods.type = TestDataConstantsAndMethods
+  protected val testData: TestDataConstantsAndMethods.type = TestDataConstantsAndMethods
   protected def assertCompileError(code: String, expectingError: String, estimator: Int = 3): Unit = {
     val error = JsAPI.compile(code, estimator).error
     assert(error.toString.contains(expectingError))
