@@ -13,15 +13,15 @@ import testHelpers.RandomDataGenerator.{
 import utest.{Tests, test}
 
 object Log extends JsTestBase {
-  var union: String          = randomUnionArrayElement
-  val logInt                 = s"log(callerTestData, $randomInt, $randomInt, 4, 2, $union)"
-  val logIntArgBeforeFunc    = s"callerTestData.log($randomInt, $randomInt, 4, 2, $union)"
-  val logBigInt              = s"log(callerTestData, 6, callerTestData, $randomInt, 2, $union)"
-  val logBigIntArgBeforeFunc = s"callerTestData.log(6, callerTestData, $randomInt, 2, $union)"
+  private val union: String          = randomUnionArrayElement
+  private val logInt                 = s"log(callerTestData, $randomInt, $randomInt, 4, 2, $union)"
+  private val logIntArgBeforeFunc    = s"callerTestData.log($randomInt, $randomInt, 4, 2, $union)"
+  private val logBigInt              = s"log(callerTestData, 6, callerTestData, $randomInt, 2, $union)"
+  private val logBigIntArgBeforeFunc = s"callerTestData.log(6, callerTestData, $randomInt, 2, $union)"
 
-  val invalidLogInt              = s"log(callerTestData, 10, $union)"
-  val invalidLogIntArgBeforeFunc = s"callerTestData.log(10, $union)"
-  private val fractionError: String = testData.invalidFunctionError("log", 6)
+  private val invalidLogInt              = s"log(callerTestData, 10, $union)"
+  private val invalidLogIntArgBeforeFunc = s"callerTestData.log(10, $union)"
+  private val logError: String = testData.invalidFunctionError("log", 6)
 
   val tests: Tests = Tests {
     test.apply("check: log Int function compiles") {
@@ -61,7 +61,7 @@ object Log extends JsTestBase {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.onlyMatcherContract(randomInt.toString, invalidLogInt)
         if (version < V5) {
-          assertCompileErrorDApp(script, version, fractionError)
+          assertCompileErrorDApp(script, version, logError)
         } else {
           assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
         }
@@ -73,7 +73,7 @@ object Log extends JsTestBase {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.onlyMatcherContract(randomInt.toString, invalidLogIntArgBeforeFunc)
         if (version < V5) {
-          assertCompileErrorDApp(script, version, fractionError)
+          assertCompileErrorDApp(script, version, logError)
         } else {
           assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
         }
