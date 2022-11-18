@@ -69,5 +69,4 @@ object Ecrecover extends JsTestBase {
       assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
     }
   }
-
 }
