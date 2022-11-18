@@ -68,6 +68,5 @@ object Extract extends JsTestBase {
         assertCompileErrorDApp(script, version, testData.CANT_FIND_FUNCTION)
       }
     }
-
   }
 }
