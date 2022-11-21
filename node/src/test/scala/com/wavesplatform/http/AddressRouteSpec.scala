@@ -287,7 +287,6 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(3).toString
       (response \ "meta" \ "version").as[String] shouldBe "1"
-      (response \ "meta" \ "isArrayArguments").as[Boolean] shouldBe true
       (response \ "meta" \ "callableFuncTypes" \ "call1" \ 0 \ "name").as[String] shouldBe "a"
       (response \ "meta" \ "callableFuncTypes" \ "call1" \ 0 \ "type").as[String] shouldBe "Int"
       (response \ "meta" \ "callableFuncTypes" \ "call1" \ 1 \ "name").as[String] shouldBe "b"

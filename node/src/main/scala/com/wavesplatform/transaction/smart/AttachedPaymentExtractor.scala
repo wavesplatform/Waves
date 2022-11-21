@@ -1,12 +1,13 @@
 package com.wavesplatform.transaction.smart
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.state.diffs.invoke.InvokeScriptLike
-import com.wavesplatform.features.MultiPaymentPolicyProvider._
+import com.wavesplatform.features.MultiPaymentPolicyProvider.*
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.traits.domain.AttachedPayments
-import com.wavesplatform.lang.v1.traits.domain.AttachedPayments._
+import com.wavesplatform.lang.v1.traits.domain.AttachedPayments.*
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.diffs.invoke.InvokeScriptLike
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 
 object AttachedPaymentExtractor {
   def extractPayments(
@@ -15,25 +16,33 @@ object AttachedPaymentExtractor {
       blockchain: Blockchain,
       targetScript: AttachedPaymentTarget
   ): Either[String, AttachedPayments] =
-    if (tx.payments.size <= 1)
+    extractPayments(tx.payments, version, blockchain.allowsMultiPayment, targetScript)
+
+  def extractPayments(
+      payments: Seq[Payment],
+      version: StdLibVersion,
+      blockchainAllowsMultiPayment: Boolean,
+      targetScript: AttachedPaymentTarget
+  ): Either[String, AttachedPayments] =
+    if (payments.size <= 1)
       if (version.supportsMultiPayment)
-        multiple(tx)
+        multiple(payments)
       else
-        single(tx)
-    else if (!blockchain.allowsMultiPayment)
+        single(payments)
+    else if (!blockchainAllowsMultiPayment)
       Left("Multiple payments isn't allowed now")
     else if (!version.supportsMultiPayment)
       Left(scriptErrorMessage(targetScript, version))
-    else if (tx.payments.size > version.maxPayments)
-      Left(s"Script payment amount=${tx.payments.size} should not exceed ${version.maxPayments}")
+    else if (payments.size > version.maxPayments)
+      Left(s"Script payment amount=${payments.size} should not exceed ${version.maxPayments}")
     else
-      multiple(tx)
+      multiple(payments)
 
-  private def single(tx: InvokeScriptLike) =
-    Right(AttachedPayments.Single(tx.payments.headOption.map(p => (p.amount, p.assetId.compatId))))
+  private def single(payments: Seq[Payment]) =
+    Right(AttachedPayments.Single(payments.headOption.map(p => (p.amount, p.assetId.compatId))))
 
-  private def multiple(tx: InvokeScriptLike) =
-    Right(AttachedPayments.Multi(tx.payments.map(p => (p.amount, p.assetId.compatId))))
+  private def multiple(payments: Seq[Payment]) =
+    Right(AttachedPayments.Multi(payments.map(p => (p.amount, p.assetId.compatId))))
 
   private def scriptErrorMessage(apt: AttachedPaymentTarget, version: StdLibVersion): String = {
     val name = (apt: @unchecked) match {

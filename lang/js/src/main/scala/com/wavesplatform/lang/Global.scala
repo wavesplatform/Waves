@@ -1,38 +1,30 @@
 package com.wavesplatform.lang
 
-import java.math.{BigInteger, BigDecimal => BD}
-
-import cats.syntax.either._
+import cats.syntax.either.*
+import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.lang.v1.BaseGlobal
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 
+import java.math.{BigInteger, BigDecimal as BD}
 import scala.collection.mutable
-import scala.scalajs.js.JSConverters._
+import scala.scalajs.js.JSConverters.*
 import scala.scalajs.js.typedarray.{ArrayBuffer, Int8Array}
 import scala.util.Try
 
 object Global extends BaseGlobal {
-  def base58Encode(input: Array[Byte]): Either[String, String] = Right(impl.Global.base58Encode(toBuffer(input)))
+  def base58Encode(input: Array[Byte]): Either[String, String] = Right(Base58.encode(input))
   override def base58Decode(input: String, limit: Int): Either[String, Array[Byte]] =
     for {
       _ <- Either.cond(input.length <= limit, {}, s"Input is too long (${input.length}), limit is $limit")
-      x <- impl.Global
-        .base58Decode(input)
-        .toOption
-        .map(toArray)
-        .toRight("Cannot decode")
+      x <- Try(Base58.decode(input)).toEither.leftMap(_.getMessage)
     } yield x
 
-  override def base64Encode(input: Array[Byte]): Either[String, String] = Right(impl.Global.base64Encode(toBuffer(input)))
+  override def base64Encode(input: Array[Byte]): Either[String, String] = Right(Base64.encode(input))
   override def base64Decode(input: String, limit: Int): Either[String, Array[Byte]] =
     for {
       _ <- Either.cond(input.length <= limit, {}, s"Input is too long (${input.length}), limit is $limit")
-      x <- impl.Global
-        .base64Decode(input)
-        .toOption
-        .map(toArray)
-        .toRight("Cannot decode")
+      x <- Try(Base64.decode(input)).toEither.leftMap(_.getMessage)
     } yield x
 
   private val hex: Array[Char] = Array('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f')

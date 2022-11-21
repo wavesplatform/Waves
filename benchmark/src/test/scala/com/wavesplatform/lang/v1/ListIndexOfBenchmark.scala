@@ -6,7 +6,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.ListIndexOfBenchmark.ListIndexOfSt
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_STRING, EVALUATED}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import org.openjdk.jmh.annotations._
+import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
@@ -41,10 +41,10 @@ object ListIndexOfBenchmark {
     val listWithMaxCmpWeightElements = IndexedSeq.fill(1000)(CONST_STRING("a" * (ContractLimits.MaxCmpWeight.toInt - 1) + "b").explicitGet())
     val listWithMaxSizeElements      = IndexedSeq.fill(1000)(CONST_STRING(("a" * (150 * 1024 - 1)) + "b").explicitGet())
 
-    def indexOf(list: Seq[EVALUATED], element: EVALUATED): Either[String, EVALUATED] =
+    def indexOf(list: Seq[EVALUATED], element: EVALUATED) =
       PureContext.genericListIndexOf(element, list.indexOf, list.indexWhere)
 
-    def lastIndexOf(list: Seq[EVALUATED], element: EVALUATED): Either[String, EVALUATED] =
+    def lastIndexOf(list: Seq[EVALUATED], element: EVALUATED) =
       PureContext.genericListIndexOf(element, list.lastIndexOf(_), list.lastIndexWhere)
   }
 }

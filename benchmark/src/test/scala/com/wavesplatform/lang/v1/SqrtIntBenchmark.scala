@@ -8,7 +8,7 @@ import com.wavesplatform.lang.directives.values.{Account, Expression, V5}
 import com.wavesplatform.lang.utils.lazyContexts
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import org.openjdk.jmh.annotations.{State, _}
+import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
@@ -28,7 +28,7 @@ class SqrtIntBenchmark {
 @State(Scope.Benchmark)
 class SqrtIntSt {
   val ds  = DirectiveSet(V5, Account, Expression).fold(null, identity)
-  val ctx = lazyContexts(ds).value().evaluationContext(Common.emptyBlockchainEnvironment())
+  val ctx = lazyContexts(ds -> true).value().evaluationContext(Common.emptyBlockchainEnvironment())
 
   val expr1 = compile(s"pow(${Long.MaxValue}, 0, 5, 1, 8, DOWN)")
   val expr2 = compile(s"pow(${Long.MaxValue}, 8, 5, 1, 8, DOWN)")

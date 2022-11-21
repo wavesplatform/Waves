@@ -55,11 +55,11 @@ object JsApiUtils {
     }
 
     jObj.applyDynamic("apply")(
-      "type"        -> "DAPP",
-      "posStart"    -> ast.position.start,
-      "posEnd"      -> ast.position.end,
-      "decList"     -> ast.decs.map(serDec).toJSArray,
-      "annFuncList" -> ast.fs.map(serAnnFunc)
+      "type"         -> "DAPP",
+      "posStart"     -> ast.position.start,
+      "posEnd"       -> ast.position.end,
+      "decList"      -> ast.decs.map(serDec).toJSArray,
+      "annFuncList"  -> ast.fs.map(serAnnFunc).toJSArray
     )
   }
 
@@ -143,6 +143,13 @@ object JsApiUtils {
         )
         mergeJSObjects(commonDataObj, additionalDataObj)
       }
+
+      case Expressions.FOLD(_, limit, value, acc, func, _, _) =>
+        val additionalDataObj = jObj.applyDynamic("apply")(
+          "name"  -> s"FOLD<$limit>",
+          "args"  -> js.Array(serExpr(value), serExpr(acc), func.key.toString: js.Any)
+        )
+        mergeJSObjects(commonDataObj, additionalDataObj)
 
       case Expressions.MATCH(_, expr, cases, _, ctxOpt) => {
         val additionalDataObj = jObj.applyDynamic("apply")(
