@@ -156,11 +156,10 @@ class UtxPoolImpl(
         log.trace(s"putIfNew(${tx.id()}) succeeded, isNew = $isNew")
       case Left(err) =>
         log.debug(s"putIfNew(${tx.id()}) failed with ${extractErrorMessage(err)}")
-        val errMsg = err match {
+        traceLogger.trace(err match {
           case w: WithLog => w.toStringWithLog(maxTxErrorLogSize)
           case err        => err.toString
-        }
-        traceLogger.trace(errMsg)
+        })
     }
     tracedIsNew
   }
@@ -528,12 +527,12 @@ class UtxPoolImpl(
   }
 
   /** DOES NOT verify transactions */
-  def addAndCleanup(transactions: Iterable[Transaction]): Unit = {
+  def addAndScheduleCleanup(transactions: Iterable[Transaction]): Unit = {
     transactions.foreach(addTransaction(_, verify = false))
     TxCleanup.runCleanupAsync()
   }
 
-  def runCleanup(): Unit = {
+  def scheduleCleanup(): Unit = {
     TxCleanup.runCleanupAsync()
   }
 

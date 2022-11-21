@@ -12,6 +12,7 @@ import com.wavesplatform.consensus.{PoSCalculator, PoSSelector}
 import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
 import com.wavesplatform.db.TestUtxPool
 import com.wavesplatform.events.BlockchainUpdateTriggers
+import com.wavesplatform.features.BlockchainFeatures.{BlockV5, RideV6}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
@@ -24,7 +25,7 @@ import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{BlockchainUpdater, *}
 import com.wavesplatform.utils.{EthEncoding, SystemTime}
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{TestValues, database}
+import com.wavesplatform.{TestValues, crypto, database}
 import monix.execution.Scheduler.Implicits.global
 import org.iq80.leveldb.DB
 import org.scalatest.matchers.should.Matchers.*
@@ -60,7 +61,7 @@ case class Domain(
 
   lazy val utxPool =
     new TestUtxPool(SystemTime, blockchain, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable, beforeSetPriorityDiffs)
-  lazy val wallet: Wallet = Wallet(settings.walletSettings.copy(file = None))
+  lazy val wallet: Wallet       = Wallet(settings.walletSettings.copy(file = None))
 
   def blockchainWithDiscardedDiffs(): CompositeBlockchain = {
     def bc = CompositeBlockchain(blockchain, utxPool.discardedMicrosDiff())
@@ -230,11 +231,14 @@ case class Domain(
   def appendBlockE(txs: Transaction*): Either[ValidationError, Seq[Diff]] =
     appendBlockE(createBlock(Block.PlainBlockVersion, txs))
 
-  def appendBlock(txs: Transaction*): Block = {
-    val block = createBlock(Block.PlainBlockVersion, txs)
+  def appendBlock(version: Byte, txs: Transaction*): Block = {
+    val block = createBlock(version, txs)
     appendBlock(block)
     lastBlock
   }
+
+  def appendBlock(txs: Transaction*): Block =
+    appendBlock(Block.PlainBlockVersion, txs: _*)
 
   def appendKeyBlock(ref: Option[ByteStr] = None): Block = {
     val block          = createBlock(Block.NgBlockVersion, Nil, ref.orElse(Some(lastBlockId)))
@@ -247,7 +251,7 @@ case class Domain(
   def appendMicroBlockE(txs: Transaction*): Either[Throwable, BlockId] =
     Try(appendMicroBlock(txs*)).toEither
 
-  def appendMicroBlock(txs: Transaction*): BlockId = {
+  def createMicroBlock(txs: Transaction*): MicroBlock = {
     val lastBlock = this.lastBlock
     val block = Block
       .buildAndSign(
@@ -262,7 +266,11 @@ case class Domain(
         lastBlock.header.rewardVote
       )
       .explicitGet()
-    val mb = MicroBlock.buildAndSign(lastBlock.header.version, defaultSigner, txs, blockchainUpdater.lastBlockId.get, block.signature).explicitGet()
+    MicroBlock.buildAndSign(lastBlock.header.version, defaultSigner, txs, blockchainUpdater.lastBlockId.get, block.signature).explicitGet()
+  }
+
+  def appendMicroBlock(txs: Transaction*): BlockId = {
+    val mb = createMicroBlock(txs: _*)
     blockchainUpdater.processMicroBlock(mb).explicitGet()
   }
 
@@ -416,8 +424,16 @@ case class Domain(
 }
 
 object Domain {
-  implicit class BlockchainUpdaterExt[A <: BlockchainUpdater](bcu: A) {
-    def processBlock(block: Block): Either[ValidationError, Seq[Diff]] =
-      bcu.processBlock(block, block.header.generationSignature)
+  implicit class BlockchainUpdaterExt[A <: BlockchainUpdater with Blockchain](bcu: A) {
+    def processBlock(block: Block): Either[ValidationError, Seq[Diff]] = {
+      val hitSource =
+        if (bcu.height == 0 || !bcu.activatedFeaturesAt(bcu.height + 1).contains(BlockV5.id))
+          block.header.generationSignature
+        else {
+          val hs = bcu.hitSource(bcu.height).get
+          crypto.verifyVRF(block.header.generationSignature, hs.arr, block.header.generator, bcu.isFeatureActivated(RideV6)).explicitGet()
+        }
+      bcu.processBlock(block, hitSource)
+    }
   }
 }
