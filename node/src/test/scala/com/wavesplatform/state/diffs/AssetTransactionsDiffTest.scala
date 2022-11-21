@@ -333,23 +333,14 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
   }
 
   property(s"Can update with CompositeBlockchain") {
-    val (gen, issues, signer, update1) = genesisIssueUpdateWithSecondAsset
+    val (gen, issues, _, update1) = genesisIssueUpdateWithSecondAsset
     withDomain(domainSettingsWithFS(assetInfoUpdateEnabled.copy(minAssetInfoUpdateInterval = 0))) { d =>
       val blockchain   = d.blockchainUpdater
       val genesisBlock = TestBlock.create(gen ++ issues)
       d.appendBlock(genesisBlock)
 
-      val (keyBlock, mbs) =
-        UnsafeBlocks.unsafeChainBaseAndMicro(
-          genesisBlock.id(),
-          Nil,
-          Seq(Seq(update1)),
-          signer,
-          Block.ProtoBlockVersion,
-          genesisBlock.header.timestamp + 100
-        )
-      d.appendBlock(keyBlock)
-      val microBlockId = d.appendMicroBlock(mbs.head)
+      d.appendBlock()
+      d.appendMicroBlock(update1)
 
       val issue  = issues(0)
       val issue1 = issues(1)
@@ -367,9 +358,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
         desc1.lastUpdatedAt shouldBe blockchain.height
       }
 
-      val (keyBlock1, _) =
-        UnsafeBlocks.unsafeChainBaseAndMicro(microBlockId, Nil, Nil, signer, Block.ProtoBlockVersion, keyBlock.header.timestamp + 100)
-      d.appendBlock(keyBlock1)
+      d.appendKeyBlock()
 
       { // Check after new key block
         val desc = blockchain.assetDescription(issue.asset).get

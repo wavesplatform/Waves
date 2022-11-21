@@ -203,7 +203,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         .map {
           case Right(discardedBlocks) =>
             allChannels.broadcast(LocalScoreChanged(blockchainUpdater.score))
-            if (returnTxsToUtx) utxStorage.addAndCleanup(discardedBlocks.view.flatMap(_._1.transactionData))
+            if (returnTxsToUtx) utxStorage.addAndScheduleCleanup(discardedBlocks.view.flatMap(_._1.transactionData))
             Right(discardedBlocks)
           case Left(error) => Left(error)
         }

@@ -8,7 +8,7 @@ import com.wavesplatform.lang.directives.values.{Account, Expression, V5}
 import com.wavesplatform.lang.utils.lazyContexts
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import org.openjdk.jmh.annotations.{State, _}
+import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
@@ -52,7 +52,7 @@ class PowIntBenchmark {
 @State(Scope.Benchmark)
 class PowIntSt {
   val ds  = DirectiveSet(V5, Account, Expression).fold(null, identity)
-  val ctx = lazyContexts(ds).value().evaluationContext(Common.emptyBlockchainEnvironment())
+  val ctx = lazyContexts((ds, true)).value().evaluationContext(Common.emptyBlockchainEnvironment())
 
   val max = Long.MaxValue
 
