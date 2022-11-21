@@ -7,18 +7,20 @@ import com.wavesplatform.settings.RestAPISettings
 import monix.execution.Scheduler
 import play.api.libs.json.*
 
-class EvaluateApiRoute(settings: RestAPISettings, override val limitedScheduler: Scheduler, processor: Processor)
+case class EvaluateApiRoute(settings: RestAPISettings, override val limitedScheduler: Scheduler, processor: Processor)
     extends ApiRoute
     with TimeLimitedRoute {
   override val route: Route = pathPrefix("utils") { evaluate }
 
-  // TODO support traces flag for auto tests
   def evaluate: Route =
-    (path("script" / "evaluate" / AddrSegment) & jsonPostD[JsObject]) { case (address, request) =>
+    (path("script" / "evaluate" / AddrSegment) & jsonPostD[JsObject] & parameter("trace".as[Boolean] ? false)) { case (address, request, trace) =>
       complete {
         processor
           .getLastResultOrRun(address, request)
-          .map(_ ++ request ++ Json.obj("address" -> address.toString))
+          .map { orig =>
+            val withoutTraces = if (trace) orig else orig - "vars"
+            withoutTraces ++ request ++ Json.obj("address" -> address.toString)
+          }
           .runToFuture(limitedScheduler)
       }
     }

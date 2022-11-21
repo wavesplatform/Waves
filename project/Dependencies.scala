@@ -10,7 +10,7 @@ object Dependencies {
 
   def akkaModule(module: String): ModuleID = "com.typesafe.akka" %% s"akka-$module" % "2.6.19"
 
-  private def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.2.9"
+  def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.2.9"
 
   private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.5.6"
 

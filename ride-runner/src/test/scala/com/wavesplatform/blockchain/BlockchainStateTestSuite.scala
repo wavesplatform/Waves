@@ -1,12 +1,10 @@
 package com.wavesplatform.blockchain
 
 import com.wavesplatform.BaseTestSuite
-import com.wavesplatform.blockchain.BlockchainStateTestSuite.EmptyProcessor
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.state.Height
-import BlockchainStateTestSuite.*
 
 class BlockchainStateTestSuite extends BaseTestSuite {
   "BlockchainState.apply" - {
@@ -222,45 +220,4 @@ class BlockchainStateTestSuite extends BaseTestSuite {
         )
       )
   )
-}
-
-object BlockchainStateTestSuite {
-  private class EmptyProcessor extends Processor {
-    override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] = {
-      // events = events.appended(HasLocalBlockAt(height, id))
-      None
-    }
-
-    override def removeFrom(height: Height): Unit = {
-      actions = actions.appended(RemoveFrom(height))
-    }
-
-    override def process(event: BlockchainUpdated): Unit = {
-      actions = actions.appended(Process(event))
-    }
-
-    override def runScripts(forceAll: Boolean): Unit = {
-      actions = actions.appended(RunScripts(forceAll))
-    }
-
-    var actions: Vector[ProcessorAction] = Vector.empty
-  }
-
-  private sealed trait ProcessorAction extends Product with Serializable
-
-  private case class RemoveFrom(height: Int) extends ProcessorAction
-
-  private object RemoveFrom {
-    def apply(event: SubscribeEvent): RemoveFrom = RemoveFrom(event.getUpdate.height)
-
-    def next(event: SubscribeEvent): RemoveFrom = RemoveFrom(event.getUpdate.height + 1)
-  }
-
-  private case class Process(updated: BlockchainUpdated) extends ProcessorAction
-
-  private object Process {
-    def apply(event: SubscribeEvent): Process = Process(event.getUpdate)
-  }
-
-  private case class RunScripts(forceAll: Boolean) extends ProcessorAction
 }

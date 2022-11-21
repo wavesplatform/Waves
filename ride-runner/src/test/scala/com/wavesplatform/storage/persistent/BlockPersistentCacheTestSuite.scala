@@ -124,7 +124,7 @@ class BlockPersistentCacheTestSuite extends BaseTestSuite with HasLevelDb {
     }
   }
 
-  private def defaultHeader(ts: Long = 0) =
+  private def defaultHeader(ts: Long) =
     SignedBlockHeader(
       BlockHeader(0, ts, ByteStr.empty, 0, ByteStr.empty, EmptyPublicKey, Vector.empty, 0, ByteStr.empty),
       ByteStr.empty
