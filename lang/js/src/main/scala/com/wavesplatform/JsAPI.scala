@@ -1,3 +1,5 @@
+package com.wavesplatform
+
 import JsApiUtils.*
 import com.wavesplatform.DocSource
 import com.wavesplatform.lang.*

@@ -102,7 +102,7 @@ object ExtensionAppender extends ScorexLogging {
 
                       val newTransactions = newBlocks.view.flatMap(_.transactionData).toSet
                       utxStorage.removeAll(newTransactions)
-                      utxStorage.addAndCleanup(droppedBlocks.flatMap(_._1.transactionData).filterNot(newTransactions))
+                      utxStorage.addAndScheduleCleanup(droppedBlocks.flatMap(_._1.transactionData).filterNot(newTransactions))
                       Right(Some(blockchainUpdater.score))
                   }
                 }
