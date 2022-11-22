@@ -652,15 +652,16 @@ class Parser(implicit offset: Int) {
 
   private def errorPosition(input: String, f: Failure): (Int, Int) =
     if (moveRightKeywords.exists(f.label.contains)) {
-      val end = input.indexWhere(_.isWhitespace, f.index)
-      (f.index, if (end == -1) f.index else end)
+      val lastSpace = input.indexWhere(_.isWhitespace, f.index)
+      val end       = if (lastSpace == -1) f.index else lastSpace
+      (f.index - offset, end - offset)
     } else {
       val start =
         if (input(f.index - 1).isWhitespace)
           input.lastIndexWhere(!_.isWhitespace, f.index - 1)
         else
           input.lastIndexWhere(_.isWhitespace, f.index - 1) + 1
-      (start, f.index)
+      (start - offset, f.index - offset)
     }
 
   private def errorWithPosition(input: String, f: Failure): (String, Int, Int) = {
