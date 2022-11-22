@@ -91,7 +91,11 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
       val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
       log.info(s"Current height: $lastHeightAtStart")
 
-      val processor = BlockchainProcessor.mk(settings.rideRunner.processor, blockchainStorage)
+      val processor = BlockchainProcessor.mk(
+        settings.rideRunner.processor,
+        use.acquireWithShutdown(Scheduler(commonScheduler).withExecutionModel(ExecutionModel.AlwaysAsyncExecution))(_.shutdown()), // TODO
+        blockchainStorage
+      )
 
       log.info("Warm up caches...") // Also helps to figure out, which data is used by a script
       processor.runScripts(forceAll = true)

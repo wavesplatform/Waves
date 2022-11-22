@@ -142,7 +142,7 @@ object BlockchainState extends ScorexLogging {
         }
     }
 
-    log.debug(f"Processed in ${(System.nanoTime() - start) / 100_000_000d}%5f s")
+    log.debug(f"Processed in ${(System.nanoTime() - start) / 1e9d}%5f s")
     r
   }
 }

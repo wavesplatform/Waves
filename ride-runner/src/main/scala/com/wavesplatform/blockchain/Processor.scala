@@ -18,9 +18,12 @@ import com.wavesplatform.storage.DataKey
 import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
+import monix.execution.Scheduler
 import play.api.libs.json.JsObject
 
 import scala.collection.concurrent.TrieMap
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
 import scala.util.chaining.scalaUtilChainingOps
 
 trait Processor {
@@ -29,8 +32,11 @@ trait Processor {
     *   None if has no block at this height
     */
   def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean]
+
   def removeFrom(height: Height): Unit
+
   def process(event: BlockchainUpdated): Unit
+
   def runScripts(forceAll: Boolean = false): Unit
 
   // TODO move to another place?
@@ -40,6 +46,7 @@ trait Processor {
 class BlockchainProcessor private (
     settings: Settings,
     blockchainStorage: SharedBlockchainData[RequestKey],
+    scheduler: Scheduler,
     private val storage: TrieMap[RequestKey, RestApiScript]
 ) extends Processor
     with ScorexLogging {
@@ -164,10 +171,21 @@ class BlockchainProcessor private (
     //     .mkString(", ")}}"
     // )
 
-    if (forceAll) storage.values.foreach(runScript(height, _))
-    else if (accumulatedChanges.affectedScripts.isEmpty) log.debug(s"[$height] Not updated")
-    else accumulatedChanges.affectedScripts.flatMap(storage.get).foreach(runScript(height, _))
+    val xs =
+      if (forceAll) storage.values
+      else if (accumulatedChanges.affectedScripts.isEmpty) {
+        log.debug(s"[$height] Not updated"); Nil
+      } else accumulatedChanges.affectedScripts.flatMap(storage.get)
 
+    val r = Task
+      .parTraverseUnordered(xs) { s =>
+        Task(runScript(height, s)).tapError { e =>
+          Task(log.error(s"An error during running ${s.key}", e))
+        }
+      }
+      .runToFuture(scheduler)
+
+    Await.result(r, Duration.Inf)
     accumulatedChanges = ProcessResult()
   }
 
@@ -179,7 +197,10 @@ class BlockchainProcessor private (
     val refreshed = script.refreshed(settings.enableTraces)
     val key       = script.key
     storage.put(key, refreshed)
-    log.info(s"[$height, $key] apiResult: ${refreshed.lastResult.value("result").as[JsObject].value("value")}")
+
+    val complexity = refreshed.lastResult.value("complexity").as[Int]
+    val result     = refreshed.lastResult.value("result").as[JsObject].value("value")
+    log.info(s"[$height, $key] complexity: $complexity, apiResult: $result")
   }
 
   override def getLastResultOrRun(address: Address, request: JsObject): Task[JsObject] = {
@@ -207,8 +228,13 @@ object BlockchainProcessor {
 
   case class Settings(enableTraces: Boolean)
 
-  def mk(settings: Settings, blockchainStorage: SharedBlockchainData[RequestKey], scripts: List[RequestKey] = Nil): BlockchainProcessor =
-    new BlockchainProcessor(settings, blockchainStorage, TrieMap.from(scripts.map(k => (k, RestApiScript(k._1, blockchainStorage, k._2)))))
+  def mk(
+      settings: Settings,
+      scheduler: Scheduler,
+      blockchainStorage: SharedBlockchainData[RequestKey],
+      scripts: List[RequestKey] = Nil
+  ): BlockchainProcessor =
+    new BlockchainProcessor(settings, blockchainStorage, scheduler, TrieMap.from(scripts.map(k => (k, RestApiScript(k._1, blockchainStorage, k._2)))))
 
   // TODO get rid of TagT
   // TODO don't calculate affectedScripts if all scripts are affected

@@ -12,7 +12,7 @@ import com.wavesplatform.state.Height
 import com.wavesplatform.storage.persistent.LevelDbPersistentCaches
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
-import monix.execution.Scheduler
+import monix.execution.{ExecutionModel, Scheduler}
 import play.api.libs.json.Json
 
 import java.io.File
@@ -20,23 +20,24 @@ import java.util.concurrent.Executors
 import scala.concurrent.Await
 import scala.concurrent.duration.{Duration, DurationInt}
 import scala.io.Source
-import scala.util.{Failure, Using}
+import scala.util.Failure
 
 object RideWithBlockchainUpdatesApp extends ScorexLogging {
   def main(args: Array[String]): Unit = {
-    val basePath      = args(0)
+    val startTs = System.nanoTime()
+    val basePath = args(0)
     val (_, settings) = AppInitializer.init(Some(new File(s"$basePath/node/waves.conf")))
 
     AddressScheme.current = new AddressScheme {
       override val chainId: Byte = 'W'.toByte
     }
 
-    log.info("Loading args...")
-    val scripts = Json
-      .parse(Using(Source.fromFile(new File(s"$basePath/input5.json")))(_.getLines().mkString("\n")).get)
-      .as[List[RequestKey]]
-
     val r = Using.Manager { use =>
+      log.info("Loading args...")
+      val scripts = Json
+        .parse(use(Source.fromFile(new File(s"$basePath/input5.json"))).getLines().mkString("\n"))
+        .as[List[RequestKey]]
+
       val connector = use(new GrpcConnector)
 
       log.info("Making gRPC channel to gRPC API...")
@@ -79,7 +80,7 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
 
       val commonScheduler = use(
         Executors.newScheduledThreadPool(
-          2,
+          8,
           new ThreadFactoryBuilder().setNameFormat("common-scheduler-%d").setDaemon(false).build()
         )
       )
@@ -91,22 +92,33 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
         hangScheduler = commonScheduler
       )
 
-      val db                = use(openDB(s"$basePath/db"))
-      val dbCaches          = new LevelDbPersistentCaches(db)
+      val db = use(openDB(s"$basePath/db"))
+      val dbCaches = new LevelDbPersistentCaches(db)
       val blockchainStorage = new SharedBlockchainData[RequestKey](settings.blockchain, dbCaches, blockchainApi)
 
       val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
       log.info(s"Current height: $lastHeightAtStart")
 
-      val processor = BlockchainProcessor.mk(settings.rideRunner.processor, blockchainStorage, scripts)
+      val processor = BlockchainProcessor.mk(
+        settings.rideRunner.processor,
+        use.acquireWithShutdown(Scheduler(commonScheduler).withExecutionModel(ExecutionModel.AlwaysAsyncExecution))(_.shutdown()), // TODO
+        blockchainStorage,
+        scripts
+      )
 
       log.info("Warm up caches...") // Also helps to figure out, which data is used by a script
       processor.runScripts(forceAll = true)
 
-      val start             = Height(math.max(0, blockchainStorage.height - 100 - 1))
+      val start = Height(3393500) // math.max(0, blockchainStorage.height - 100 - 1))
+      val end = Height(start + 101) // lastHeightAtStart
+
       val blockchainUpdates = use(blockchainApi.mkBlockchainUpdatesStream())
       val events = blockchainUpdates.stream
-        .doOnError(e => Task { log.error("Error!", e) })
+        .doOnError(e =>
+          Task {
+            log.error("Error!", e)
+          }
+        )
         .takeWhile {
           case _: Event.Next => true
           case Event.Closed =>
@@ -117,18 +129,20 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
             false
         }
         .collect { case Event.Next(event) => event }
-        .foldLeftL(BlockchainState.Starting(lastHeightAtStart): BlockchainState)(BlockchainState(processor, _, _))
+        .foldLeftL(BlockchainState.Starting(end): BlockchainState)(BlockchainState(processor, _, _))
         .runToFuture(Scheduler(commonScheduler))
 
       log.info(s"Watching blockchain updates...")
-      blockchainUpdates.start(start + 1, lastHeightAtStart + 1) // TODO end
+
+      blockchainUpdates.start(start + 1, end) // TODO end
 
       Await.result(events, Duration.Inf)
     }
 
+    val duration = System.nanoTime() - startTs
     r match {
       case Failure(e) => log.error("Got an error", e)
-      case _          => log.info("Done")
+      case _ => log.info(f"Done in ${duration / 1e9d}%5f s")
     }
   }
 }
