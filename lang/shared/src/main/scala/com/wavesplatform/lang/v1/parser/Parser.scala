@@ -539,7 +539,7 @@ class Parser(implicit offset: Int) {
         def kind(implicit c: fastparse.P[Any]) = kindc(c)
         P(Index ~~ operand ~ P(kind ~ (NoCut(operand) | Index.map(i => INVALID(Pos(i, i), "expected a second operator")))).rep).map {
           case (start, left: EXPR, r: Seq[(BinaryOperation, EXPR)]) =>
-            r.foldLeft(left) { case (acc, (currKind, currOperand)) => currKind.expr(start, start + currKind.func.length, acc, currOperand) }
+            r.foldLeft(left) { case (acc, (currKind, currOperand)) => currKind.expr(start, currOperand.position.end, acc, currOperand) }
         }
       case Right(kinds) :: restOps =>
         def operand(implicit c: fastparse.P[Any]) = binaryOp(atom(_), restOps)
@@ -558,7 +558,7 @@ class Parser(implicit offset: Int) {
         P(Index ~~ operand ~ P(kind ~ (NoCut(operand) | Index.map(i => INVALID(Pos(i, i), "expected a second operator")))).rep).map {
           case (start, left: EXPR, r: Seq[(BinaryOperation, EXPR)]) =>
             val (ops, s) = revp(left, r)
-            ops.foldLeft(s) { case (acc, (currOperand, currKind)) => currKind.expr(start, start + currKind.func.length, currOperand, acc) }
+            ops.foldLeft(s) { case (acc, (currOperand, currKind)) => currKind.expr(start, currOperand.position.end, currOperand, acc) }
         }
     }
   }
