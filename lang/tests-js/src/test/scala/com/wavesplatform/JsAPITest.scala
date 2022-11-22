@@ -169,5 +169,16 @@ object JsAPITest extends JsTestBase {
       checkPos(r1)
       checkPos(r2)
     }
+
+    test("correct AST for library") {
+      val library =
+        """
+          | {-# SCRIPT_TYPE  ACCOUNT #-}
+          | {-# CONTENT_TYPE LIBRARY #-}
+          | func f() = 1
+        """.stripMargin
+      val result = JSON.stringify(JsAPI.parseAndCompile(library, 3).ast)
+      result ==> """{"type":"BLOCK","func":{"name":"f","args":[],"body":{"type":"LONG","value":1}},"body":{"type":"REF","key":"unit"}}"""
+    }
   }
 }

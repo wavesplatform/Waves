@@ -3,15 +3,15 @@ package com.wavesplatform
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.CompilationError
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL, LIST, NOTHING, TYPE, UNION}
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.{PART, Pos, Type}
 
 import scala.scalajs.js
 import scala.scalajs.js.Any
-import scala.scalajs.js.Dynamic.{literal => jObj}
-import scala.scalajs.js.JSConverters._
+import scala.scalajs.js.Dynamic.literal as jObj
+import scala.scalajs.js.JSConverters.*
 
 object JsApiUtils {
 
@@ -108,43 +108,38 @@ object JsApiUtils {
       case x: Expressions.TRUE          => commonDataObj
       case x: Expressions.FALSE         => commonDataObj
 
-      case x: Expressions.REF => {
+      case x: Expressions.REF =>
         val additionalDataObj = jObj.applyDynamic("apply")("name" -> Expressions.PART.toOption[String](x.key).getOrElse("").toString)
         mergeJSObjects(commonDataObj, additionalDataObj)
-      }
 
-      case Expressions.GETTER(_, ref, field, _, _, _) => {
+      case Expressions.GETTER(_, ref, field, _, _, _) =>
         val additionalDataObj = jObj.applyDynamic("apply")(
           "ref"   -> serExpr(ref),
           "field" -> serPartStr(field)
         )
         mergeJSObjects(commonDataObj, additionalDataObj)
-      }
 
-      case Expressions.BLOCK(_, dec, body, _, _) => {
+      case Expressions.BLOCK(_, dec, body, _, _) =>
         val additionalDataObj = jObj.applyDynamic("apply")(
           "dec"  -> serDec(dec),
           "body" -> serExpr(body)
         )
         mergeJSObjects(commonDataObj, additionalDataObj)
-      }
 
-      case Expressions.IF(_, cond, ifTrue, ifFalse, _, _) => {
+      case Expressions.IF(_, cond, ifTrue, ifFalse, _, _) =>
         val additionalDataObj = jObj.applyDynamic("apply")(
           "cond"    -> serExpr(cond),
           "ifTrue"  -> serExpr(ifTrue),
           "ifFalse" -> serExpr(ifFalse)
         )
         mergeJSObjects(commonDataObj, additionalDataObj)
-      }
 
-      case Expressions.FUNCTION_CALL(_, name, args, _, _) => {
+      case Expressions.FUNCTION_CALL(_, name, args, _, _) =>
         val additionalDataObj = jObj.applyDynamic("apply")(
           "name" -> serPartStr(name),
           "args" -> args.map(serExpr).toJSArray
         )
         mergeJSObjects(commonDataObj, additionalDataObj)
-      }
 
       case Expressions.FOLD(_, limit, value, acc, func, _, _) =>
         val additionalDataObj = jObj.applyDynamic("apply")(
@@ -153,13 +148,12 @@ object JsApiUtils {
         )
         mergeJSObjects(commonDataObj, additionalDataObj)
 
-      case Expressions.MATCH(_, expr, cases, _, ctxOpt) => {
+      case Expressions.MATCH(_, expr, cases, _, ctxOpt) =>
         val additionalDataObj = jObj.applyDynamic("apply")(
           "expr"  -> serExpr(expr),
           "cases" -> cases.map(serMatchCase(_, ctxOpt.getOrElse(Map.empty))).toJSArray
         )
         mergeJSObjects(commonDataObj, additionalDataObj)
-      }
 
       case t => jObj.applyDynamic("apply")("[not_supported]stringRepr" -> t.toString)
     }
@@ -265,6 +259,14 @@ object JsApiUtils {
         case CONST_STRING(s)    => jObj.applyDynamic("apply")("type" -> "STRING", "value" -> s)
         case LET_BLOCK(let, body) =>
           jObj.applyDynamic("apply")("type" -> "BLOCK", "let" -> jObj("name" -> let.name, "value" -> r(let.value)), "body" -> r(body))
+        case BLOCK(LET(name, value), body) =>
+          jObj.applyDynamic("apply")("type" -> "BLOCK", "let" -> jObj("name" -> name, "value" -> r(value)), "body" -> r(body))
+        case BLOCK(FUNC(name, args, body), nextBody) =>
+          jObj.applyDynamic("apply")(
+            "type" -> "BLOCK",
+            "func" -> jObj("name" -> name, "args" -> args.toJSArray, "body" -> r(body)),
+            "body" -> r(nextBody)
+          )
         case IF(cond, ifTrue, ifFalse) =>
           jObj.applyDynamic("apply")("type" -> "IF", "condition" -> r(cond), "true" -> r(ifTrue), "false" -> r(ifFalse))
         case REF(key)         => jObj.applyDynamic("apply")("type" -> "REF", "key" -> key)
