@@ -1,7 +1,6 @@
 package com.wavesplatform.ride.app
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder
-import com.wavesplatform.Application
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.blockchain.BlockchainProcessor.RequestKey
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
@@ -25,8 +24,8 @@ import scala.util.{Failure, Using}
 
 object RideWithBlockchainUpdatesApp extends ScorexLogging {
   def main(args: Array[String]): Unit = {
-    val basePath     = args(0)
-    val nodeSettings = Application.loadApplicationConfig(Some(new File(s"$basePath/node/waves.conf")))
+    val basePath      = args(0)
+    val (_, settings) = AppInitializer.init(Some(new File(s"$basePath/node/waves.conf")))
 
     AddressScheme.current = new AddressScheme {
       override val chainId: Byte = 'W'.toByte
@@ -94,12 +93,12 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
 
       val db                = use(openDB(s"$basePath/db"))
       val dbCaches          = new LevelDbPersistentCaches(db)
-      val blockchainStorage = new SharedBlockchainData[RequestKey](nodeSettings.blockchainSettings, dbCaches, blockchainApi)
+      val blockchainStorage = new SharedBlockchainData[RequestKey](settings.blockchain, dbCaches, blockchainApi)
 
       val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
       log.info(s"Current height: $lastHeightAtStart")
 
-      val processor = BlockchainProcessor.mk(blockchainStorage, scripts)
+      val processor = BlockchainProcessor.mk(settings.rideRunner.processor, blockchainStorage, scripts)
 
       log.info("Warm up caches...") // Also helps to figure out, which data is used by a script
       processor.runScripts(forceAll = true)

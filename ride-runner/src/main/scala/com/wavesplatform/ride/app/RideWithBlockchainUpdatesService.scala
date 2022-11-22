@@ -3,8 +3,6 @@ package com.wavesplatform.ride.app
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import com.google.common.util.concurrent.ThreadFactoryBuilder
-import com.wavesplatform.Application
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.blockchain.BlockchainProcessor.RequestKey
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
@@ -17,7 +15,6 @@ import com.wavesplatform.state.Height
 import com.wavesplatform.storage.persistent.LevelDbPersistentCaches
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.util.concurrent.DefaultThreadFactory
-import kamon.instrumentation.executor.ExecutorInstrumentation
 import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
 
@@ -29,12 +26,8 @@ import scala.util.Failure
 
 object RideWithBlockchainUpdatesService extends ScorexLogging {
   def main(args: Array[String]): Unit = {
-    val basePath = args(0)
-    val settings = Application.loadApplicationConfig(Some(new File(s"$basePath/node/waves.conf")))
-
-    AddressScheme.current = new AddressScheme {
-      override val chainId: Byte = 'W'.toByte
-    }
+    val basePath                 = args(0)
+    val (globalConfig, settings) = AppInitializer.init(Some(new File(s"$basePath/node/waves.conf")))
 
     val r = Using.Manager { use =>
       val connector = use(new GrpcConnector)
@@ -93,12 +86,12 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
 
       val db                = use(openDB(s"$basePath/db"))
       val dbCaches          = new LevelDbPersistentCaches(db)
-      val blockchainStorage = new SharedBlockchainData[RequestKey](settings.blockchainSettings, dbCaches, blockchainApi)
+      val blockchainStorage = new SharedBlockchainData[RequestKey](settings.blockchain, dbCaches, blockchainApi)
 
       val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
       log.info(s"Current height: $lastHeightAtStart")
 
-      val processor = BlockchainProcessor.mk(blockchainStorage)
+      val processor = BlockchainProcessor.mk(settings.rideRunner.processor, blockchainStorage)
 
       log.info("Warm up caches...") // Also helps to figure out, which data is used by a script
       processor.runScripts(forceAll = true)
@@ -129,7 +122,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
 
       // ====
       val heavyRequestProcessorPoolThreads =
-        settings.restAPISettings.heavyRequestProcessorPoolThreads.getOrElse((Runtime.getRuntime.availableProcessors() * 2).min(4))
+        /*settings.restAPISettings.heavyRequestProcessorPoolThreads*/ None.getOrElse((Runtime.getRuntime.availableProcessors() * 2).min(4))
       val heavyRequestExecutor = use(
         new ThreadPoolExecutor(
           heavyRequestProcessorPoolThreads,
@@ -147,9 +140,9 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
 
       val heavyRequestScheduler = use.acquireWithShutdown(
         Scheduler(
-          if (settings.config.getBoolean("kamon.enable"))
+          /*if (settings.config.getBoolean("kamon.enable"))
             ExecutorInstrumentation.instrument(heavyRequestExecutor, "heavy-request-executor")
-          else heavyRequestExecutor,
+          else*/ heavyRequestExecutor,
           ExecutionModel.AlwaysAsyncExecution
         )
       ) { resource =>
@@ -162,18 +155,18 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
 //        FiniteDuration(settings.config.getDuration("akka.http.server.request-timeout").getSeconds, TimeUnit.SECONDS)
 //      )(heavyRequestScheduler)
 
-      val apiRoutes = Seq(new EvaluateApiRoute(settings.restAPISettings, heavyRequestScheduler, processor))
+      val apiRoutes = Seq(EvaluateApiRoute(heavyRequestScheduler, processor))
 
-      implicit val actorSystem = use.acquireWithShutdown(ActorSystem("ride-runner", settings.config)) { x =>
+      implicit val actorSystem = use.acquireWithShutdown(ActorSystem("ride-runner", globalConfig)) { x =>
         Await.ready(x.terminate(), 20.seconds)
       }
-      val httpService = CompositeHttpService(apiRoutes, settings.restAPISettings)
+      val httpService = CompositeHttpService(apiRoutes, settings.restApi)
       val httpFuture = Http()
-        .newServerAt(settings.restAPISettings.bindAddress, settings.restAPISettings.port)
+        .newServerAt(settings.restApi.bindAddress, settings.restApi.port)
         .bindFlow(httpService.loggingCompositeRoute)
 
       val _ = Await.result(httpFuture, 20.seconds)
-      log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
+      log.info(s"REST API was bound on ${settings.restApi.bindAddress}:${settings.restApi.port}")
       Await.result(events, Duration.Inf)
     }
 

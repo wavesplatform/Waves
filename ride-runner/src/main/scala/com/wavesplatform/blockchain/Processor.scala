@@ -5,7 +5,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.api.http.ApiException
 import com.wavesplatform.api.http.utils.UtilsApiRoute
-import com.wavesplatform.blockchain.BlockchainProcessor.{ProcessResult, RequestKey}
+import com.wavesplatform.blockchain.BlockchainProcessor.{ProcessResult, RequestKey, Settings}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
@@ -38,6 +38,7 @@ trait Processor {
 }
 
 class BlockchainProcessor private (
+    settings: Settings,
     blockchainStorage: SharedBlockchainData[RequestKey],
     private val storage: TrieMap[RequestKey, RestApiScript]
 ) extends Processor
@@ -175,7 +176,7 @@ class BlockchainProcessor private (
   override def removeFrom(height: Height): Unit = blockchainStorage.blockHeaders.removeFrom(height)
 
   private def runScript(height: Int, script: RestApiScript): Unit = {
-    val refreshed = script.refreshed
+    val refreshed = script.refreshed(settings.enableTraces)
     val key       = script.key
     storage.put(key, refreshed)
     log.info(s"[$height, $key] apiResult: ${refreshed.lastResult.value("result").as[JsObject].value("value")}")
@@ -193,7 +194,7 @@ class BlockchainProcessor private (
 
           case _ =>
             // TODO settings.evaluateScriptComplexityLimit = 52000
-            val script = RestApiScript(address, blockchainStorage, request).refreshed
+            val script = RestApiScript(address, blockchainStorage, request).refreshed(settings.enableTraces)
             storage.putIfAbsent(key, script)
             Task.now(script.lastResult)
         }
@@ -204,8 +205,10 @@ class BlockchainProcessor private (
 object BlockchainProcessor {
   type RequestKey = (Address, JsObject)
 
-  def mk(blockchainStorage: SharedBlockchainData[RequestKey], scripts: List[RequestKey] = Nil): BlockchainProcessor =
-    new BlockchainProcessor(blockchainStorage, TrieMap.from(scripts.map(k => (k, RestApiScript(k._1, blockchainStorage, k._2)))))
+  case class Settings(enableTraces: Boolean)
+
+  def mk(settings: Settings, blockchainStorage: SharedBlockchainData[RequestKey], scripts: List[RequestKey] = Nil): BlockchainProcessor =
+    new BlockchainProcessor(settings, blockchainStorage, TrieMap.from(scripts.map(k => (k, RestApiScript(k._1, blockchainStorage, k._2)))))
 
   // TODO get rid of TagT
   // TODO don't calculate affectedScripts if all scripts are affected
@@ -231,10 +234,10 @@ object BlockchainProcessor {
 case class RestApiScript(address: Address, blockchain: Blockchain, request: JsObject, lastResult: JsObject) {
   def key: RequestKey = (address, request)
 
-  def refreshed: RestApiScript = {
+  def refreshed(trace: Boolean): RestApiScript = {
     // TODO settings.evaluateScriptComplexityLimit = 52000
     // TODO enable / disable traces
-    val result = UtilsApiRoute.evaluate(52000, blockchain, address, request, trace = true)
+    val result = UtilsApiRoute.evaluate(52000, blockchain, address, request, trace)
     copy(lastResult = result)
   }
 }

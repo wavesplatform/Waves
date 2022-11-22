@@ -3,11 +3,10 @@ package com.wavesplatform.http
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.api.http.*
 import com.wavesplatform.blockchain.Processor
-import com.wavesplatform.settings.RestAPISettings
 import monix.execution.Scheduler
 import play.api.libs.json.*
 
-case class EvaluateApiRoute(settings: RestAPISettings, override val limitedScheduler: Scheduler, processor: Processor)
+case class EvaluateApiRoute(override val limitedScheduler: Scheduler, processor: Processor)
     extends ApiRoute
     with TimeLimitedRoute {
   override val route: Route = pathPrefix("utils") { evaluate }
