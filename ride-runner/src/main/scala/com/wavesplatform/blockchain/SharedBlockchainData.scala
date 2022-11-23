@@ -22,11 +22,7 @@ class SharedBlockchainData[TagT](val settings: BlockchainSettings, persistentCac
 
   val blockHeaders = new BlockHeadersStorage(blockchainApi, persistentCaches.blockHeaders)
 
-  private val vrf = RideData.mapReadOnly[Int, ByteStr, TagT] { h =>
-    if (h > height) throw new RuntimeException(s"Can't receive a block VRF with height=$h > current height=$height")
-    else load(persistentCaches.getVrf, blockchainApi.getVrf, persistentCaches.setVrf)(h)
-  }
-  def getVrf(height: Int, tag: TagT): Option[ByteStr] = vrf.get(height, tag)
+  val vrf = new VrfStorage(blockchainApi, persistentCaches.vrf, height)
 
   // Ride: wavesBalance, height, lastBlock TODO: a binding in Ride?
   def height: Int = blockHeaders.last.height

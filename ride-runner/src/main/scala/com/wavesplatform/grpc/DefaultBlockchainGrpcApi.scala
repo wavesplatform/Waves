@@ -191,9 +191,6 @@ class DefaultBlockchainGrpcApi(
       .tap(r => log.trace(s"getAccountScript($address): ${r.toFoundStr("hash", _.script.hashCode())}"))
   }
 
-  /** @return
-    *   (header, VRF)
-    */
   override def getBlockHeader(height: Int): Option[SignedBlockHeader] = {
     val x = ClientCalls.blockingUnaryCall(
       grpcApiChannel.newCall(BlocksApiGrpc.METHOD_GET_BLOCK, CallOptions.DEFAULT),

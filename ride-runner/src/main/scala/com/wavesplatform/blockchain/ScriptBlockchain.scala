@@ -45,7 +45,7 @@ class ScriptBlockchain[TagT](storage: SharedBlockchainData[TagT], tag: TagT) ext
   override def blockHeader(height: Int): Option[SignedBlockHeader] = storage.blockHeaders.get(height)
 
   // Ride: blockInfoByHeight
-  override def hitSource(height: Int): Option[ByteStr] = storage.getVrf(height, tag)
+  override def hitSource(height: Int): Option[ByteStr] = storage.vrf.get(height)
 
   // Ride: wavesBalance, height, lastBlock TODO: a binding in Ride?
   override def height: Int = storage.height

@@ -141,11 +141,15 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
   override def aliases: PersistentCache[Alias, Address] = new PersistentCache[Alias, Address] with ScorexLogging {
     override def get(maxHeight: Int, key: Alias): RemoteData[Address] =
       db
-        .readOnly { _.readFromDb(CacheKeys.Aliases.mkKey(key)) }
+        .readOnly {
+          _.readFromDb(CacheKeys.Aliases.mkKey(key))
+        }
         .tap { r => log.trace(s"get($key): ${r.toFoundStr()}") }
 
     override def set(atHeight: Int, key: Alias, data: RemoteData[Address]): Unit = {
-      db.readWrite { _.writeToDb(CacheKeys.Aliases.mkKey(key), data) }
+      db.readWrite {
+        _.writeToDb(CacheKeys.Aliases.mkKey(key), data)
+      }
       log.trace(s"set($key)")
     }
 
@@ -217,6 +221,8 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
     }
 
   override val blockHeaders = new BlockPersistentCache {
+    private val Key = CacheKeys.SignedBlockHeaders
+
     private val heightKey            = CacheKeys.Height.mkKey(())
     @volatile private var lastHeight = db.readOnly(_.getOpt(heightKey))
 
@@ -224,18 +230,20 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
 
     override def get(height: Int): Option[SignedBlockHeader] =
       db
-        .readOnly { _.getOpt(CacheKeys.SignedBlockHeaders.mkKey(height)) }
+        .readOnly {
+          _.getOpt(Key.mkKey(height))
+        }
         .tap { r => log.trace(s"get($height): ${r.toFoundStr("id", _.id())}") }
 
     override def getFrom(height: Int, n: Int): List[SignedBlockHeader] = {
       val lastHeight = height + n - 1
-      val startKey   = CacheKeys.SignedBlockHeaders.mkKey(height)
+      val startKey   = Key.mkKey(height)
       val result     = List.newBuilder[SignedBlockHeader]
       db.readOnly { ro =>
-        ro.iterateFrom(CacheKeys.SignedBlockHeaders.prefixBytes, startKey.keyBytes) { entry =>
-          val currentHeight = CacheKeys.SignedBlockHeaders.parseKey(entry.getKey)
+        ro.iterateFrom(Key.prefixBytes, startKey.keyBytes) { entry =>
+          val currentHeight = Key.parseKey(entry.getKey)
           val goNext        = currentHeight <= lastHeight
-          if (goNext) result.addOne(CacheKeys.SignedBlockHeaders.parseValue(entry.getValue))
+          if (goNext) result.addOne(Key.parseValue(entry.getValue))
           goNext
         }
       }
@@ -244,7 +252,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
 
     override def set(height: Int, data: SignedBlockHeader): Unit = {
       db.readWrite { rw =>
-        rw.put(CacheKeys.SignedBlockHeaders.mkKey(height), data)
+        rw.put(Key.mkKey(height), data)
         if (lastHeight.forall(_ < height)) {
           lastHeight = Some(height)
           rw.put(heightKey, height)
@@ -254,9 +262,9 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
     }
 
     override def removeFrom(fromHeight: Int): Unit = {
-      val first = CacheKeys.SignedBlockHeaders.mkKey(fromHeight)
+      val first = Key.mkKey(fromHeight)
       db.readWrite { rw =>
-        rw.iterateFrom(CacheKeys.SignedBlockHeaders.prefixBytes, first.keyBytes) { x =>
+        rw.iterateFrom(Key.prefixBytes, first.keyBytes) { x =>
           rw.delete(x.getKey)
           true
         }
@@ -264,7 +272,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
 
       // TODO
       db.readWrite { rw =>
-        lastHeight = if (rw.prefixExists(CacheKeys.SignedBlockHeaders.prefixBytes)) {
+        lastHeight = if (rw.prefixExists(Key.prefixBytes)) {
           val newLastHeight = fromHeight - 1
           rw.put(heightKey, newLastHeight)
           Some(newLastHeight)
@@ -276,15 +284,33 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
     }
   }
 
-  override def getVrf(height: Int): RemoteData[ByteStr] =
-    db.readOnly(_.readFromDb(CacheKeys.VRF.mkKey(height))).tap { r => log.trace(s"getVrf($height): $r") }
+  override def vrf: VrfPersistentCache = new VrfPersistentCache with ScorexLogging {
+    val Key = CacheKeys.VRF
 
-  override def setVrf(height: Int, data: RemoteData[ByteStr]): Unit = {
-    db.readWrite { _.writeToDb(CacheKeys.VRF.mkKey(height), data) }
-    log.trace(s"setVrf($height)")
+    override def get(height: Int): RemoteData[ByteStr] =
+      db
+        .readOnly { ro => ro.getOpt(Key.mkKey(height)) }
+        .fold[RemoteData[ByteStr]](RemoteData.Unknown)(RemoteData.loaded)
+        .tap { r => log.trace(s"get($height): $r") }
+
+    override def set(height: Int, vrf: Option[ByteStr]): Unit = {
+      db.readWrite(_.put(Key.mkKey(height), vrf))
+      log.trace(s"set($height)")
+    }
+
+    override def removeFrom(height: Int): Unit = {
+      val first = Key.mkKey(height)
+      db.readWrite { rw =>
+        rw.iterateFrom(Key.prefixBytes, first.keyBytes) { x =>
+          rw.delete(x.getKey)
+          true
+        }
+      }
+    }
   }
 
   private val activatedFeaturesDbKey = CacheKeys.ActivatedFeatures.mkKey(())
+
   override def getActivatedFeatures(): RemoteData[Map[Short, Int]] = {
     val r = db.readOnly(_.getOpt(activatedFeaturesDbKey)) match {
       case None     => RemoteData.Unknown
@@ -296,17 +322,23 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
   }
 
   override def setActivatedFeatures(data: Map[Short, Int]): Unit = {
-    db.readWrite { _.put(activatedFeaturesDbKey, data) }
+    db.readWrite {
+      _.put(activatedFeaturesDbKey, data)
+    }
     log.trace("setActivatedFeatures")
   }
 
   override def resolveAlias(alias: Alias): RemoteData[Address] =
     db
-      .readOnly { _.readFromDb(CacheKeys.Aliases.mkKey(alias)) }
+      .readOnly {
+        _.readFromDb(CacheKeys.Aliases.mkKey(alias))
+      }
       .tap { r => log.trace(s"resolveAlias($alias): ${r.toFoundStr()}") }
 
   override def setAlias(alias: Alias, data: RemoteData[Address]): Unit = {
-    db.readWrite { _.writeToDb(CacheKeys.Aliases.mkKey(alias), data) }
+    db.readWrite {
+      _.writeToDb(CacheKeys.Aliases.mkKey(alias), data)
+    }
     log.trace(s"setAlias($alias)")
   }
 
