@@ -2,7 +2,6 @@ package com.wavesplatform.database
 
 import com.google.common.hash.{Funnels, BloomFilter as GBloomFilter}
 import com.wavesplatform.account.Address
-import com.wavesplatform.database.RocksDBWriter.RocksDBWriter
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.BlockchainUpdaterImpl

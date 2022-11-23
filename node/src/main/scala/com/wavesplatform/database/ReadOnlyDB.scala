@@ -1,8 +1,8 @@
 package com.wavesplatform.database
 
 import com.google.common.collect.Maps
-import com.wavesplatform.metrics.LevelDBStats
-import com.wavesplatform.metrics.LevelDBStats.DbHistogramExt
+import com.wavesplatform.metrics.RocksDBStats
+import com.wavesplatform.metrics.RocksDBStats.DbHistogramExt
 import org.rocksdb.{ReadOptions, RocksDB, RocksIterator}
 
 import scala.annotation.tailrec
@@ -11,7 +11,7 @@ import scala.util.Using
 class ReadOnlyDB(db: RocksDB, readOptions: ReadOptions) {
   def get[V](key: Key[V]): V = {
     val bytes = db.get(readOptions, key.keyBytes)
-    LevelDBStats.read.recordTagged(key, bytes)
+    RocksDBStats.read.recordTagged(key, bytes)
     key.parse(bytes)
   }
 
@@ -26,7 +26,7 @@ class ReadOnlyDB(db: RocksDB, readOptions: ReadOptions) {
 
   def has[V](key: Key[V]): Boolean = {
     val bytes = db.get(readOptions, key.keyBytes)
-    LevelDBStats.read.recordTagged(key, bytes)
+    RocksDBStats.read.recordTagged(key, bytes)
     bytes != null
   }
 

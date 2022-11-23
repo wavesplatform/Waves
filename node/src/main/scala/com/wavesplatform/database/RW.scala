@@ -1,13 +1,13 @@
 package com.wavesplatform.database
 
-import com.wavesplatform.metrics.LevelDBStats
-import com.wavesplatform.metrics.LevelDBStats.DbHistogramExt
+import com.wavesplatform.metrics.RocksDBStats
+import com.wavesplatform.metrics.RocksDBStats.DbHistogramExt
 import org.rocksdb.{ReadOptions, RocksDB, WriteBatch}
 
 class RW(db: RocksDB, readOptions: ReadOptions, batch: WriteBatch) extends ReadOnlyDB(db, readOptions) {
   def put[V](key: Key[V], value: V): Int = {
     val bytes = key.encode(value)
-    LevelDBStats.write.recordTagged(key, bytes)
+    RocksDBStats.write.recordTagged(key, bytes)
     batch.put(key.keyBytes, bytes)
     bytes.length
   }

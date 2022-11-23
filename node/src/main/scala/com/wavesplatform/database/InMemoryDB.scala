@@ -8,7 +8,7 @@ import com.wavesplatform.database.InMemoryDB.ByteArrayHashingStrategy
 import com.wavesplatform.settings.InMemorySettings
 import org.eclipse.collections.api.block.HashingStrategy
 import org.eclipse.collections.impl.factory.{HashingStrategyMaps, HashingStrategySets}
-import org.rocksdb.{ReadOptions, RocksDB, Snapshot, WriteBatch, WriteOptions}
+import org.rocksdb.{RocksDB, WriteBatch, WriteOptions}
 
 import scala.compat.java8.FunctionConverters.*
 
@@ -33,16 +33,14 @@ class TestBatch extends WriteBatch {
   val newEntries     = HashingStrategyMaps.mutable.`with`[Array[Byte], Array[Byte]](ByteArrayHashingStrategy)
   val deletedEntries = HashingStrategySets.mutable.`with`[Array[Byte]](ByteArrayHashingStrategy)
 
-  override def put(key: Array[Byte], value: Array[Byte]): WriteBatch = {
+  override def put(key: Array[Byte], value: Array[Byte]): Unit = {
     deletedEntries.remove(key)
     newEntries.put(key, value)
-    this
   }
 
-  override def delete(key: Array[Byte]): WriteBatch = {
+  override def delete(key: Array[Byte]): Unit = {
     newEntries.remove(key)
     deletedEntries.add(key)
-    this
   }
 
   override def close(): Unit = {}
@@ -102,7 +100,7 @@ class InMemoryDB(underlying: RocksDB, settings: InMemorySettings) extends RocksD
 
   override def put(key: Array[Byte], value: Array[Byte]): Unit = putAndCountBytes(key, value)
 
-  private def delete(key: Array[Byte]): Unit = deleteAndCountBytes(key)
+  override def delete(key: Array[Byte]): Unit = deleteAndCountBytes(key)
 
   private def flush(): Unit = {
     logger.info(s"${toDelete.size} keys to delete, ${entries.size} to add")

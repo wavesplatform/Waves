@@ -69,7 +69,7 @@ final class CompositeBlockchain private (
   override def transactionInfos(ids: Seq[ByteStr]): Seq[Option[(TxMeta, Transaction)]] = {
     inner.transactionInfos(ids).zip(ids).map { case (info, id) =>
       diff.transactions
-        .get(id)
+        .find(_.transaction.id() == id)
         .map(t => (TxMeta(Height(this.height), t.applied, t.spentComplexity), t.transaction))
         .orElse(info)
     }

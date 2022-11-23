@@ -13,7 +13,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, BlockMeta as PBBlockMeta}
-import com.wavesplatform.metrics.LevelDBStats
+import com.wavesplatform.metrics.RocksDBStats
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.DBSettings
@@ -164,7 +164,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
   override def append(diff: Diff, carryFee: Long, totalFee: Long, reward: Option[Long], hitSource: ByteStr, block: Block): Unit = {
     val newHeight = current.height + 1
-    val newScore = block.blockScore() + current.score
+    val newScore  = block.blockScore() + current.score
     val newMeta = PBBlockMeta(
       Some(PBBlocks.protobuf(block.header)),
       ByteString.copyFrom(block.signature.arr),

@@ -161,7 +161,7 @@ abstract class RocksDBWriter private[database] (
 
   private[this] val log = LoggerFacade(LoggerFactory.getLogger(classOf[RocksDBWriter]))
 
-  val txdb = new TXDB(new File(dbSettings.directory).getCanonicalPath + "/../transactions")
+//  val txdb = new TXDB(new File(dbSettings.directory).getCanonicalPath + "/../transactions")
 
   def orderFilter: BloomFilter
   def dataKeyFilter: BloomFilter
@@ -750,15 +750,26 @@ abstract class RocksDBWriter private[database] (
     for {
       tm <- db.get(Keys.transactionMetaById(TransactionId @@ id))
       if tm.`type` == TransferTransaction.typeId || tm.`type` == TransactionType.Ethereum.id
-      tx = txdb.load(id) match {
-        case t: TransferTransaction if !tm.failed => t
-        case e @ EthereumTransaction(_: Transfer, _, _, _) if !tm.failed =>
-          val meta     = db.get(Keys.ethereumTransactionMeta(Height(tm.height), TxNum(tm.num.toShort))).get
-          val transfer = meta.payload.transfer.get
-          val tAmount  = transfer.amount.get
-          val asset    = PBAmounts.toVanillaAssetId(tAmount.assetId)
-          e.toTransferLike(TxPositiveAmount.unsafeFrom(tAmount.amount), Address(transfer.publicKeyHash.toByteArray), asset)
-      }
+      tx <- db
+        .get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort)))
+        .collect {
+          case (tm, t: TransferTransaction) if tm.succeeded => t
+          case (m, e @ EthereumTransaction(_: Transfer, _, _, _)) if m.succeeded =>
+            val meta     = db.get(Keys.ethereumTransactionMeta(m.height, TxNum(tm.num.toShort))).get
+            val transfer = meta.payload.transfer.get
+            val tAmount  = transfer.amount.get
+            val asset    = PBAmounts.toVanillaAssetId(tAmount.assetId)
+            e.toTransferLike(TxPositiveAmount.unsafeFrom(tAmount.amount), Address(transfer.publicKeyHash.toByteArray), asset)
+        }
+      //      tx = txdb.load(id) match {
+//        case t: TransferTransaction if !tm.failed => t
+//        case e @ EthereumTransaction(_: Transfer, _, _, _) if !tm.failed =>
+//          val meta     = db.get(Keys.ethereumTransactionMeta(Height(tm.height), TxNum(tm.num.toShort))).get
+//          val transfer = meta.payload.transfer.get
+//          val tAmount  = transfer.amount.get
+//          val asset    = PBAmounts.toVanillaAssetId(tAmount.assetId)
+//          e.toTransferLike(TxPositiveAmount.unsafeFrom(tAmount.amount), Address(transfer.publicKeyHash.toByteArray), asset)
+//      }
     } yield (height, tx)
   }
 
@@ -775,7 +786,11 @@ abstract class RocksDBWriter private[database] (
   }
 
   protected def transactionInfo(id: ByteStr, db: ReadOnlyDB): Option[(TxMeta, Transaction)] =
-    transactionMeta(id).map(tm => tm -> txdb.load(id))
+    for {
+      tm        <- db.get(Keys.transactionMetaById(TransactionId(id)))
+      (txm, tx) <- db.get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort)))
+    } yield (txm, tx)
+//    transactionMeta(id).map(tm => tm -> txdb.load(id))
 
   override def transactionMeta(id: ByteStr): Option[TxMeta] = readOnly { db =>
     db.get(Keys.transactionMetaById(TransactionId(id))).map { tm =>

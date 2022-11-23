@@ -4,8 +4,7 @@ import java.nio.file.Files
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.RocksDBWriter.RocksDBWriter
-import com.wavesplatform.database.{TestStorageFactory, loadActiveLeases}
+import com.wavesplatform.database.{RocksDBWriter, TestStorageFactory, loadActiveLeases}
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures

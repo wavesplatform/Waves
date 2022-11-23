@@ -224,7 +224,7 @@ class FPPoSSelectorTest extends FreeSpec with WithDB with DBCacheSettings {
   def withEnv(gen: Time => Gen[(Seq[KeyPair], Seq[Block])], VRFActivated: Boolean = false)(f: Env => Unit): Unit = {
     // we are not using the db instance from WithDB trait as it should be recreated between property checks
     val path = Files.createTempDirectory("lvl").toAbsolutePath
-    val db   = database.openDB(path.toAbsolutePath.toString)
+    val db   = database.openDB(dbSettings.copy(directory = path.toAbsolutePath.toString))
     val defaultWriter = TestRocksDB.withFunctionalitySettings(
       db,
       ignoreSpendableBalanceChanged,

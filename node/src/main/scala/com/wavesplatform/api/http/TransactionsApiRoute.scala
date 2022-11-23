@@ -34,7 +34,6 @@ import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
 import play.api.libs.json.*
 
-import scala.util.Success
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta.Payload
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{

@@ -195,7 +195,7 @@ case class Diff(
           ethereumTransactionMeta = ethereumTransactionMeta ++ newer.ethereumTransactionMeta,
           transactionFilter = transactionFilter match {
             case Some(bf) =>
-              newer.transactions.foreach(_.transaction.id().arr)
+              newer.transactions.foreach(nti => bf.put(nti.transaction.id().arr))
               Some(bf)
             case None if newer.transactions.nonEmpty =>
               newer.transactionFilter

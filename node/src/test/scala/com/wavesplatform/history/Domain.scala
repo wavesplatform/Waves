@@ -331,8 +331,9 @@ case class Domain(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDB
   }
 
   val blocksApi: CommonBlocksApi = {
-    def loadBlockMetaAt(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] =
-      blockchainUpdater.liquidBlockMeta.filter(_ => blockchainUpdater.height == height).orElse(db.get(Keys.blockMetaAt(Height(height))))
+    // FIXME: implement?
+    def loadBlockMetaAt(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] = ???
+//      blockchainUpdater.liquidBlockMeta.filter(_ => blockchainUpdater.height == height).orElse(db.get(Keys.blockMetaAt(Height(height))))
 
     def loadBlockInfoAt(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl)(
         height: Int

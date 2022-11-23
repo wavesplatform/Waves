@@ -143,8 +143,6 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
   private def resources(settings: WavesSettings): Resource[Task, (BlockchainUpdaterImpl, RocksDB)] =
     Resource.make {
       val (bcu, _) = TestStorageFactory(settings, db, ntpTime, ignoreSpendableBalanceChanged, ignoreBlockchainUpdateTriggers)
-      import com.wavesplatform.database.DBExt
-      db.readWrite(_.put(Keys.blockReward(0), Some(settings.blockchainSettings.rewardsSettings.initial)))
       Task.now((bcu, db))
     } { case (blockchainUpdater, _) =>
       Task {
