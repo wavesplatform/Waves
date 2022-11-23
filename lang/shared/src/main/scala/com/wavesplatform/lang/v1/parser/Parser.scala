@@ -17,6 +17,8 @@ import fastparse.*
 import fastparse.MultiLineWhitespace.*
 import fastparse.Parsed.Failure
 
+import scala.annotation.tailrec
+
 class Parser(implicit offset: Int) {
 
   private val Global                                        = com.wavesplatform.lang.hacks.Global // Hack for IDEA
@@ -615,8 +617,9 @@ class Parser(implicit offset: Int) {
       }
 
     parseWithError[SCRIPT](
-      scriptStr,
-      parse
+      new StringBuilder(scriptStr),
+      parse,
+      SCRIPT(Pos(0, scriptStr.length - 1), INVALID(Pos(0, scriptStr.length - 1), "Parsing failed. Unknown error."))
     ).map { exprAndErrorIndexes =>
       val removedCharPosOpt = if (exprAndErrorIndexes._2.isEmpty) None else Some(Pos(exprAndErrorIndexes._2.min, exprAndErrorIndexes._2.max))
       (exprAndErrorIndexes._1, removedCharPosOpt)
@@ -631,8 +634,9 @@ class Parser(implicit offset: Int) {
       }
 
     parseWithError[DAPP](
-      scriptStr,
-      parse
+      new StringBuilder(scriptStr),
+      parse,
+      DAPP(Pos(0, scriptStr.length - 1), Nil, Nil,)
     ).map { dAppAndErrorIndexes =>
       val removedCharPosOpt = if (dAppAndErrorIndexes._2.isEmpty) None else Some(Pos(dAppAndErrorIndexes._2.min, dAppAndErrorIndexes._2.max))
       (dAppAndErrorIndexes._1, removedCharPosOpt)
@@ -640,12 +644,36 @@ class Parser(implicit offset: Int) {
   }
 
   private def parseWithError[T](
-      source: String,
-      parse: String => Either[Parsed.Failure, T]
+      source: StringBuilder,
+      parse: String => Either[Parsed.Failure, T],
+      defaultResult: T
   ): Either[(String, Int, Int), (T, Iterable[Int])] =
-    parse(source)
-      .map(dApp => (dApp, Nil))
-      .leftMap(errorWithPosition(source, _))
+    parse(source.toString())
+      .map((_, Nil))
+      .leftFlatMap {
+        case failure: Parsed.Failure =>
+          val lastRemovedCharPos = clearChar(source, failure.index - 1)
+          val baseErrorIndexes   = Set(failure.index, lastRemovedCharPos)
+          if (lastRemovedCharPos > 0)
+            parseWithError(source, parse, defaultResult)
+              .map { case (parsed, errorIndexes) => (parsed, baseErrorIndexes ++ errorIndexes) }
+          else
+            Right((defaultResult, baseErrorIndexes))
+        case _ =>
+          Left(("Unknown parsing error.", 0, 0))
+      }
+
+  @tailrec
+  private def clearChar(source: StringBuilder, pos: Int): Int =
+    if (pos >= 0)
+      if (" \n\r".contains(source.charAt(pos)))
+        clearChar(source, pos - 1)
+      else {
+        source.setCharAt(pos, ' ')
+        pos
+      }
+    else
+      0
 
   private val moveRightKeywords =
     Seq(""""func"""", """"let"""", " expression", "1 underscore", "end-of-input", "latin charset", "definition")
