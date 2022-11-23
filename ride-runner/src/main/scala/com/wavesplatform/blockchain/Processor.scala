@@ -129,6 +129,8 @@ class BlockchainProcessor private (
     // Almost all scripts use the height
     val withUpdatedHeight = accumulatedChanges.copy(newHeight = h) // TODO
 
+    blockchainStorage.vrf.removeFrom(h + 1)
+
     val stateUpdate = rollback.getRollbackStateUpdate
     withUpdatedHeight
       .pipe(stateUpdate.assets.foldLeft(_) { case (r, x) =>
