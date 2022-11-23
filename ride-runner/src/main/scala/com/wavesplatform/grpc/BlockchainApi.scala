@@ -4,18 +4,18 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
-import com.wavesplatform.grpc.BlockchainGrpcApi.*
+import com.wavesplatform.grpc.BlockchainApi.*
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, Portfolio, TxMeta}
 import com.wavesplatform.transaction.{Asset, Transaction}
 import monix.reactive.Observable
 
-trait BlockchainGrpcApi {
+trait BlockchainApi {
   def mkBlockchainUpdatesStream(): BlockchainUpdatesStream
   def getCurrentBlockchainHeight(): Int
   def getActivatedFeatures(height: Int): Map[Short, Int]
-  def getAccountDataEntries(address: Address): Seq[DataEntry[_]]
-  def getAccountDataEntry(address: Address, key: String): Option[DataEntry[_]]
+  def getAccountDataEntries(address: Address): Seq[DataEntry[?]]
+  def getAccountDataEntry(address: Address, key: String): Option[DataEntry[?]]
   def getAccountScript(address: Address, estimator: ScriptEstimator): Option[AccountScriptInfo]
   def getBlockHeader(height: Int): Option[SignedBlockHeader]
   def getBlockHeaderRange(fromHeight: Int, toHeight: Int): List[SignedBlockHeader]
@@ -26,7 +26,7 @@ trait BlockchainGrpcApi {
   def getTransferLikeTransaction(id: ByteStr): Option[(TxMeta, Option[Transaction])]
 }
 
-object BlockchainGrpcApi {
+object BlockchainApi {
   sealed trait Event extends Product with Serializable
   object Event {
     case class Next(event: SubscribeEvent) extends Event

@@ -7,8 +7,8 @@ import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.blockchain.BlockchainProcessor.RequestKey
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
-import com.wavesplatform.grpc.BlockchainGrpcApi.Event
-import com.wavesplatform.grpc.{DefaultBlockchainGrpcApi, GrpcClientSettings, GrpcConnector}
+import com.wavesplatform.grpc.BlockchainApi.Event
+import com.wavesplatform.grpc.{DefaultBlockchainApi, GrpcClientSettings, GrpcConnector}
 import com.wavesplatform.http.EvaluateApiRoute
 import com.wavesplatform.resources.*
 import com.wavesplatform.state.Height
@@ -17,6 +17,7 @@ import com.wavesplatform.utils.ScorexLogging
 import io.netty.util.concurrent.DefaultThreadFactory
 import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
+import sttp.client3.HttpURLConnectionBackend
 
 import java.io.File
 import java.util.concurrent.*
@@ -77,10 +78,13 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
         )
       )
 
-      val blockchainApi = new DefaultBlockchainGrpcApi(
-        settings = DefaultBlockchainGrpcApi.Settings(1.minute),
+      val httpBackend = use.acquireWithShutdown(HttpURLConnectionBackend())(_.close())
+
+      val blockchainApi = new DefaultBlockchainApi(
+        settings = settings.rideRunner.blockchainApi,
         grpcApiChannel = grpcApiChannel,
         blockchainUpdatesApiChannel = blockchainUpdatesApiChannel,
+        httpBackend = httpBackend,
         hangScheduler = commonScheduler
       )
 

@@ -3,7 +3,7 @@ package com.wavesplatform.storage
 import cats.syntax.option.*
 import com.google.protobuf.ByteString
 import com.wavesplatform.api.grpc.*
-import com.wavesplatform.grpc.BlockchainGrpcApi
+import com.wavesplatform.grpc.BlockchainApi
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.SignedTransaction
 import com.wavesplatform.state.{Height, TransactionId, TxMeta}
@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{EthereumTransaction, Transaction}
 
 class TransactionsStorage[TagT](
-    blockchainApi: BlockchainGrpcApi,
+    blockchainApi: BlockchainApi,
     override val persistentCache: PersistentCache[TransactionId, (TxMeta, Option[Transaction])]
 ) extends HeightStorage[TransactionId, (TxMeta, Option[Transaction]), TagT] {
   override def getFromBlockchain(key: TransactionId): Option[(TxMeta, Option[Transaction])] = blockchainApi.getTransferLikeTransaction(key)

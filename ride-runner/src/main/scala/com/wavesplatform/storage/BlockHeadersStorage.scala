@@ -7,7 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
-import com.wavesplatform.grpc.BlockchainGrpcApi
+import com.wavesplatform.grpc.BlockchainApi
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.storage.BlockHeadersStorage.BlockInfo
@@ -16,7 +16,7 @@ import com.wavesplatform.utils.ScorexLogging
 
 import scala.util.chaining.scalaUtilChainingOps
 
-class BlockHeadersStorage(blockchainApi: BlockchainGrpcApi, persistentCache: BlockPersistentCache) extends ScorexLogging {
+class BlockHeadersStorage(blockchainApi: BlockchainApi, persistentCache: BlockPersistentCache) extends ScorexLogging {
   @volatile private var liquidBlocks: NonEmptyList[BlockInfo] = NonEmptyList.one {
     val height = persistentCache.getLastHeight.getOrElse(blockchainApi.getCurrentBlockchainHeight() - 1)
     val x      = getInternal(height).getOrElse(throw new RuntimeException(s"Can't find a block at $height"))

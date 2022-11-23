@@ -26,8 +26,8 @@ import com.wavesplatform.collections.syntax.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.events.api.grpc.protobuf.*
-import com.wavesplatform.grpc.BlockchainGrpcApi.{BlockchainUpdatesStream, Event}
-import com.wavesplatform.grpc.DefaultBlockchainGrpcApi.Settings
+import com.wavesplatform.grpc.BlockchainApi.{BlockchainUpdatesStream, Event}
+import com.wavesplatform.grpc.DefaultBlockchainApi.{HttpBlockHeader, Settings}
 import com.wavesplatform.grpc.observers.RichGrpcObserver
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
@@ -44,6 +44,8 @@ import io.grpc.stub.ClientCalls
 import monix.execution.Scheduler
 import monix.reactive.MulticastStrategy
 import monix.reactive.subjects.ConcurrentSubject
+import play.api.libs.json.{Json, Reads}
+import sttp.client3.{Identity, SttpBackend, UriContext, asString, basicRequest}
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ScheduledExecutorService
@@ -52,13 +54,14 @@ import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters.IteratorHasAsScala
 import scala.util.chaining.scalaUtilChainingOps
 
-class DefaultBlockchainGrpcApi(
+class DefaultBlockchainApi(
     settings: Settings,
     grpcApiChannel: ManagedChannel,
     blockchainUpdatesApiChannel: ManagedChannel,
+    httpBackend: SttpBackend[Identity, Any],
     hangScheduler: ScheduledExecutorService
 ) extends ScorexLogging
-    with BlockchainGrpcApi {
+    with BlockchainApi {
 
   override def mkBlockchainUpdatesStream(): BlockchainUpdatesStream = {
     val s = ConcurrentSubject[Event](MulticastStrategy.publish)(Scheduler(hangScheduler))
@@ -90,6 +93,7 @@ class DefaultBlockchainGrpcApi(
       override val stream         = s
 
       override def start(fromHeight: Int): Unit = start(fromHeight, toHeight = 0)
+
       override def start(fromHeight: Int, toHeight: Int): Unit = {
         val call     = blockchainUpdatesApiChannel.newCall(BlockchainUpdatesApiGrpc.METHOD_SUBSCRIBE, CallOptions.DEFAULT)
         val observer = mkObserver(call)
@@ -99,8 +103,10 @@ class DefaultBlockchainGrpcApi(
         ClientCalls.asyncServerStreamingCall(call, SubscribeRequest(fromHeight = fromHeight, toHeight = toHeight), observer.underlying)
       }
 
-      override def closeUpstream(): Unit   = Option(currentObserver.get()).foreach(_.close()) // Closes if failed
+      override def closeUpstream(): Unit = Option(currentObserver.get()).foreach(_.close()) // Closes if failed
+
       override def closeDownstream(): Unit = stream.onComplete()
+
       override def close(): Unit = {
         closeDownstream()
         closeUpstream()
@@ -212,7 +218,21 @@ class DefaultBlockchainGrpcApi(
       .tap(_ => log.trace(s"getBlockHeaderRange($fromHeight, $toHeight)"))
   }
 
-  override def getVrf(height: Int): Option[ByteStr] = none[ByteStr] // TODO It seems VRF only from REST API
+  // TODO It seems VRF only from REST API
+  override def getVrf(height: Int): Option[ByteStr] = {
+    basicRequest
+      .get(uri"${settings.nodeApiBaseUri}/blocks/headers/at/$height")
+      .response(asString)
+      .send(httpBackend)
+      .body match {
+      case Left(e) =>
+        log.warn(s"Can't get VRF for $height: ${e.take(100)}")
+        None
+
+      case Right(rawJson) =>
+        Json.parse(rawJson).as[HttpBlockHeader].VRF
+    }
+  }
 
   override def getAssetDescription(asset: Asset.IssuedAsset): Option[AssetDescription] = {
     val r =
@@ -330,6 +350,7 @@ class DefaultBlockchainGrpcApi(
   }
 
   private def toPb(address: Address): ByteString = UnsafeByteOperations.unsafeWrap(address.bytes)
+
   private def toVanilla(block: Block): SignedBlockHeader = {
     val header = block.getHeader
     SignedBlockHeader(
@@ -350,6 +371,15 @@ class DefaultBlockchainGrpcApi(
 
 }
 
-object DefaultBlockchainGrpcApi {
-  case class Settings(noDataTimeout: FiniteDuration)
+object DefaultBlockchainApi {
+  case class Settings(nodeApiBaseUri: String, noDataTimeout: FiniteDuration)
+
+  private case class HttpBlockHeader(VRF: Option[ByteStr] = None)
+
+  private object HttpBlockHeader {
+
+    import com.wavesplatform.utils.byteStrFormat
+
+    implicit val httpBlockHeaderReads: Reads[HttpBlockHeader] = Json.using[Json.WithDefaultValues].reads
+  }
 }

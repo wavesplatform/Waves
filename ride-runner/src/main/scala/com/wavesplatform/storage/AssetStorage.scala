@@ -2,7 +2,7 @@ package com.wavesplatform.storage
 
 import com.google.protobuf.UnsafeByteOperations
 import com.wavesplatform.events.protobuf.StateUpdate
-import com.wavesplatform.grpc.BlockchainGrpcApi
+import com.wavesplatform.grpc.BlockchainApi
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Height}
@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import java.nio.charset.StandardCharsets
 
 class AssetStorage[TagT](
-    blockchainApi: BlockchainGrpcApi,
+    blockchainApi: BlockchainApi,
     override val persistentCache: PersistentCache[IssuedAsset, AssetDescription]
 ) extends HeightStorage[IssuedAsset, AssetDescription, TagT] {
   override def getFromBlockchain(key: IssuedAsset): Option[AssetDescription] = blockchainApi.getAssetDescription(key)

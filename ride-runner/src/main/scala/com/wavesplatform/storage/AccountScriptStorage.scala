@@ -3,7 +3,7 @@ package com.wavesplatform.storage
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.grpc.BlockchainGrpcApi
+import com.wavesplatform.grpc.BlockchainApi
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
@@ -15,7 +15,7 @@ import com.wavesplatform.storage.persistent.PersistentCache
 class AccountScriptStorage[TagT](
     chainId: Byte,
     estimator: => ScriptEstimator,
-    blockchainApi: BlockchainGrpcApi,
+    blockchainApi: BlockchainApi,
     override val persistentCache: PersistentCache[Address, AccountScriptInfo]
 ) extends HeightStorage[Address, AccountScriptInfo, TagT] {
   override def getFromBlockchain(key: Address): Option[AccountScriptInfo] = blockchainApi.getAccountScript(key, estimator)

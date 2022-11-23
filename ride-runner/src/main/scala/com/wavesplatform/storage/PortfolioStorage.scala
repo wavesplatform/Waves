@@ -3,7 +3,7 @@ package com.wavesplatform.storage
 import cats.syntax.option.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.events.protobuf.StateUpdate
-import com.wavesplatform.grpc.BlockchainGrpcApi
+import com.wavesplatform.grpc.BlockchainApi
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.PBAmounts.toAssetAndAmount
 import com.wavesplatform.state.{LeaseBalance, Portfolio}
@@ -12,7 +12,7 @@ import com.wavesplatform.storage.persistent.PersistentCache
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 
-class PortfolioStorage[TagT](blockchainApi: BlockchainGrpcApi, override val persistentCache: PersistentCache[Address, Portfolio])
+class PortfolioStorage[TagT](blockchainApi: BlockchainApi, override val persistentCache: PersistentCache[Address, Portfolio])
     extends HeightStorage[Address, Portfolio, TagT] {
   override def getFromBlockchain(key: Address): Option[Portfolio] = blockchainApi.getBalances(key).some
 

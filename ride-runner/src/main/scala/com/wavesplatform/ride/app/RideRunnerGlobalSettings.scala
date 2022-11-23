@@ -2,6 +2,7 @@ package com.wavesplatform.ride.app
 
 import com.typesafe.config.Config
 import com.wavesplatform.blockchain.BlockchainProcessor
+import com.wavesplatform.grpc.DefaultBlockchainApi
 import com.wavesplatform.settings.*
 import net.ceedubs.ficus.Ficus.*
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
@@ -17,5 +18,6 @@ object RideRunnerGlobalSettings {
 }
 
 case class RideRunnerSettings(
-    processor: BlockchainProcessor.Settings
+    processor: BlockchainProcessor.Settings,
+    blockchainApi: DefaultBlockchainApi.Settings
 )

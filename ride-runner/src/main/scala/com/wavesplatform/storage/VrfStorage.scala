@@ -1,13 +1,13 @@
 package com.wavesplatform.storage
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.grpc.BlockchainGrpcApi
+import com.wavesplatform.grpc.BlockchainApi
 import com.wavesplatform.storage.persistent.VrfPersistentCache
 import com.wavesplatform.utils.ScorexLogging
 
 import scala.util.chaining.scalaUtilChainingOps
 
-class VrfStorage(blockchainApi: BlockchainGrpcApi, persistentCache: VrfPersistentCache, currHeight: => Int) extends ScorexLogging {
+class VrfStorage(blockchainApi: BlockchainApi, persistentCache: VrfPersistentCache, currHeight: => Int) extends ScorexLogging {
   // TODO LRU cache
 
   // TODO if height > current
@@ -19,7 +19,7 @@ class VrfStorage(blockchainApi: BlockchainGrpcApi, persistentCache: VrfPersisten
       else
         blockchainApi.getVrf(height).tap { x =>
           set(height, x)
-          log.debug(s"Set VRF at $height: $x")
+          log.info(s"Set VRF at $height: $x")
         }
     }
 

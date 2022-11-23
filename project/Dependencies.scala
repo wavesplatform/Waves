@@ -41,7 +41,8 @@ object Dependencies {
 
   val scalaTest = "org.scalatest" %% "scalatest" % "3.2.13" % Test
 
-  val sttp3 = "com.softwaremill.sttp.client3" % "core_2.13" % "3.5.2" // 3.6.x and later is built for Java 11
+  val sttp3      = "com.softwaremill.sttp.client3"  % "core_2.13" % "3.5.2" // 3.6.x and later is built for Java 11
+  val sttp3Monix = "com.softwaremill.sttp.client3" %% "monix"     % "3.5.2"
 
   val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk15on" % "1.70"
 

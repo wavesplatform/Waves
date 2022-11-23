@@ -5,8 +5,8 @@ import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.blockchain.BlockchainProcessor.RequestKey
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
-import com.wavesplatform.grpc.BlockchainGrpcApi.Event
-import com.wavesplatform.grpc.{DefaultBlockchainGrpcApi, GrpcClientSettings, GrpcConnector}
+import com.wavesplatform.grpc.BlockchainApi.Event
+import com.wavesplatform.grpc.{DefaultBlockchainApi, GrpcClientSettings, GrpcConnector}
 import com.wavesplatform.resources.*
 import com.wavesplatform.state.Height
 import com.wavesplatform.storage.persistent.LevelDbPersistentCaches
@@ -14,6 +14,7 @@ import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
 import play.api.libs.json.Json
+import sttp.client3.HttpURLConnectionBackend
 
 import java.io.File
 import java.util.concurrent.Executors
@@ -24,8 +25,8 @@ import scala.util.Failure
 
 object RideWithBlockchainUpdatesApp extends ScorexLogging {
   def main(args: Array[String]): Unit = {
-    val startTs = System.nanoTime()
-    val basePath = args(0)
+    val startTs       = System.nanoTime()
+    val basePath      = args(0)
     val (_, settings) = AppInitializer.init(Some(new File(s"$basePath/node/waves.conf")))
 
     AddressScheme.current = new AddressScheme {
@@ -85,15 +86,18 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
         )
       )
 
-      val blockchainApi = new DefaultBlockchainGrpcApi(
-        settings = DefaultBlockchainGrpcApi.Settings(1.minute),
+      val httpBackend = use.acquireWithShutdown(HttpURLConnectionBackend())(_.close())
+
+      val blockchainApi = new DefaultBlockchainApi(
+        settings = settings.rideRunner.blockchainApi,
         grpcApiChannel = grpcApiChannel,
         blockchainUpdatesApiChannel = blockchainUpdatesApiChannel,
+        httpBackend = httpBackend,
         hangScheduler = commonScheduler
       )
 
-      val db = use(openDB(s"$basePath/db"))
-      val dbCaches = new LevelDbPersistentCaches(db)
+      val db                = use(openDB(s"$basePath/db"))
+      val dbCaches          = new LevelDbPersistentCaches(db)
       val blockchainStorage = new SharedBlockchainData[RequestKey](settings.blockchain, dbCaches, blockchainApi)
 
       val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
@@ -109,8 +113,8 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
       log.info("Warm up caches...") // Also helps to figure out, which data is used by a script
       processor.runScripts(forceAll = true)
 
-      val start = Height(3393500) // math.max(0, blockchainStorage.height - 100 - 1))
-      val end = Height(start + 101) // lastHeightAtStart
+      val start = Height(3393500)     // math.max(0, blockchainStorage.height - 100 - 1))
+      val end   = Height(start + 101) // lastHeightAtStart
 
       val blockchainUpdates = use(blockchainApi.mkBlockchainUpdatesStream())
       val events = blockchainUpdates.stream
@@ -142,7 +146,7 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
     val duration = System.nanoTime() - startTs
     r match {
       case Failure(e) => log.error("Got an error", e)
-      case _ => log.info(f"Done in ${duration / 1e9d}%5f s")
+      case _          => log.info(f"Done in ${duration / 1e9d}%5f s")
     }
   }
 }
