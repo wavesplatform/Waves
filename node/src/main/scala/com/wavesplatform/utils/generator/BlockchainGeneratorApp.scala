@@ -117,13 +117,13 @@ object BlockchainGeneratorApp extends ScorexLogging {
 
     val spendableBalance = ConcurrentSubject.publish[(Address, Asset)]
     val blockchain = {
-      val db = openDB(wavesSettings.dbSettings.directory)
-      val (blockchainUpdater, leveldb) =
+      val db = openDB(wavesSettings.dbSettings)
+      val (blockchainUpdater, rocksdb) =
         StorageFactory(wavesSettings, db, fakeTime, spendableBalance, BlockchainUpdateTriggers.noop)
       com.wavesplatform.checkGenesis(wavesSettings, blockchainUpdater, Miner.Disabled)
       sys.addShutdownHook(synchronized {
         blockchainUpdater.shutdown()
-        leveldb.close()
+        rocksdb.close()
         db.close()
       })
       blockchainUpdater

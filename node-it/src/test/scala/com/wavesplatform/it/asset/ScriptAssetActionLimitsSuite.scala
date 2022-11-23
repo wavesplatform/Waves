@@ -14,7 +14,8 @@ trait ScriptAssetActionLimitsSuite extends BaseFreeSpec {
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs
-      .Builder(Default, 2, Seq.empty)
+      .Builder(Default, 1, Seq.empty)
+      .overrideBase(_.quorum(0))
       .overrideBase(_.preactivatedFeatures((SynchronousCalls.id, 0), (RideV6.id, 0)))
       .buildNonConflicting()
 

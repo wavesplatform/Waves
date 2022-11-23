@@ -19,7 +19,6 @@ import play.api.libs.json.*
 
 case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi, time: Time, routeTimeout: RouteTimeout) extends ApiRoute {
   import BlocksApiRoute.*
-  private[this] val MaxBlocksPerRequest = 100 // todo: make this configurable and fix integration tests
 
   override lazy val route: Route = (pathPrefix("blocks") & get) {
     path("at" / IntNumber) { height =>
@@ -33,12 +32,16 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
     } ~ path("height") {
       complete(Json.obj("height" -> commonApi.currentHeight))
     } ~ path("delay" / BlockId / IntNumber) { (blockId, count) =>
-      complete(
-        commonApi
-          .blockDelay(blockId, count)
-          .map(delay => Json.obj("delay" -> delay))
-          .toRight(BlockDoesNotExist)
-      )
+      if (count > MaxBlocksForDelay) {
+        complete(TooBigArrayAllocation(MaxBlocksForDelay))
+      } else {
+        complete(
+          commonApi
+            .blockDelay(blockId, count)
+            .map(delay => Json.obj("delay" -> delay))
+            .toRight(BlockDoesNotExist)
+        )
+      }
     } ~ path("height" / BlockId) { signature =>
       complete(for {
         meta <- commonApi.meta(signature).toRight(BlockDoesNotExist)
@@ -46,7 +49,7 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
     } ~ path("signature" / BlockId) { signature => // TODO: Delete
       complete(commonApi.block(signature).map(toJson).toRight(BlockDoesNotExist))
     } ~ path("address" / AddrSegment / IntNumber / IntNumber) { (address, start, end) =>
-      if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
+      if (end >= 0 && start >= 0 && end - start >= 0 && end - start < settings.blocksRequestLimit) {
         routeTimeout.executeToFuture {
           commonApi
             .blocksRange(start, end, address)
@@ -91,7 +94,7 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
   }
 
   private def seq(start: Int, end: Int, includeTransactions: Boolean): Route = {
-    if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
+    if (end >= 0 && start >= 0 && end - start >= 0 && end - start < settings.blocksRequestLimit) {
       routeTimeout.executeToFuture {
         val blocks = if (includeTransactions) {
           commonApi
@@ -148,6 +151,8 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi,
 }
 
 object BlocksApiRoute {
+  val MaxBlocksForDelay = 10000
+
   private def toJson(v: (BlockMeta, Seq[(TxMeta, Transaction)])): JsObject = v match {
     case (meta, transactions) =>
       meta.json() ++ transactionField(meta.header.version, transactions)

@@ -9,6 +9,7 @@ import akka.http.scaladsl.server.RouteResult.Complete
 import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.utils.ScorexLogging
+import kamon.Kamon
 
 import scala.io.Source
 
@@ -23,10 +24,15 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
           getFromResourceDirectory("swagger-ui")
       }
 
-  val compositeRoute: Route =
+  val compositeRoute: Route = extractRequest { _ =>
+    Kamon
+      .currentSpan()
+      .mark("processing.start")
+
     extendRoute(routes.map(_.route).reduce(_ ~ _)) ~ swaggerRoute ~ complete(
       StatusCodes.NotFound
     )
+  }
 
   val loggingCompositeRoute: Route = Route.seal(DebuggingDirectives.logRequestResult(LoggingMagnet(_ => logRequestResponse))(compositeRoute))
 

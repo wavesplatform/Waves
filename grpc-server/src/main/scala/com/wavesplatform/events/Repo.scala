@@ -37,6 +37,9 @@ class Repo(db: RocksDB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
   private[this] var liquidState = Option.empty[LiquidState]
   private[this] val handlers    = ConcurrentHashMap.newKeySet[Handler]()
 
+  def newHandler(id: String, maybeLiquidState: Option[LiquidState], subject: PublishToOneSubject[BlockchainUpdated], maxQueueSize: Int): Handler =
+    new Handler(id, maybeLiquidState, subject, maxQueueSize)
+
   def shutdownHandlers(): Unit = monitor.synchronized {
     handlers.forEach(_.shutdown())
   }
@@ -229,7 +232,7 @@ class Repo(db: RocksDB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
     require(toHeight == 0 || toHeight >= fromHeight, "fromHeight must not exceed toHeight")
     monitor.synchronized {
       val subject = PublishToOneSubject[BlockchainUpdated]()
-      val handler = new Handler(streamId, liquidState, subject, 250)
+      val handler = newHandler(streamId, liquidState, subject, 250)
       handlers.add(handler)
 
       val removeHandler = Task {

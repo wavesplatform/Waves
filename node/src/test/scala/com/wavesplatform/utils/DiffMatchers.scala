@@ -2,7 +2,7 @@ package com.wavesplatform.utils
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.Diff
-import org.scalatest.matchers.{Matcher, MatchResult}
+import org.scalatest.matchers.{MatchResult, Matcher}
 
 trait DiffMatchers {
   def containAppliedTx(transactionId: ByteStr) = new DiffAppliedTxMatcher(transactionId, true)
@@ -10,10 +10,10 @@ trait DiffMatchers {
 
   class DiffAppliedTxMatcher(transactionId: ByteStr, shouldBeApplied: Boolean) extends Matcher[Diff] {
     override def apply(diff: Diff): MatchResult = {
-      val isApplied = diff.transactions.get(transactionId) match {
+      val isApplied = diff.containsTransaction(transactionId) && (diff.transactions.find(_.transaction.id() == transactionId) match {
         case Some(nt) if nt.applied => true
         case _                      => false
-      }
+      })
 
       MatchResult(
         shouldBeApplied == isApplied,

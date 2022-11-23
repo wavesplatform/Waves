@@ -1,9 +1,5 @@
 package com.wavesplatform
 
-import java.io.File
-import java.security.Security
-import java.util.concurrent.{ConcurrentHashMap, LinkedBlockingQueue, RejectedExecutionException, ThreadPoolExecutor, TimeUnit}
-import java.util.concurrent.atomic.AtomicBoolean
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
@@ -22,10 +18,9 @@ import com.wavesplatform.api.http.eth.EthRpcRoute
 import com.wavesplatform.api.http.leasing.LeaseApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.database.{DBExt, Keys, openDB}
+import com.wavesplatform.database.{DBExt, openDB}
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.{History, StorageFactory}
@@ -48,6 +43,7 @@ import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.HashedWheelTimer
 import io.netty.util.concurrent.{DefaultThreadFactory, GlobalEventExecutor}
 import kamon.Kamon
+import kamon.instrumentation.executor.ExecutorInstrumentation
 import monix.eval.{Coeval, Task}
 import monix.execution.{Scheduler, UncaughtExceptionReporter}
 import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
@@ -57,6 +53,10 @@ import org.influxdb.dto.Point
 import org.rocksdb.RocksDB
 import org.slf4j.LoggerFactory
 
+import java.io.File
+import java.security.Security
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.{TimeUnit, *}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
@@ -68,7 +68,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   import Application.*
   import monix.execution.Scheduler.Implicits.global as scheduler
 
-  private[this] val db = openDB(settings.dbSettings.directory)
+  private[this] val db = openDB(settings.dbSettings)
 
   private[this] val spendableBalanceChanged = ConcurrentSubject.publish[(Address, Asset)]
 
@@ -226,7 +226,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         db,
         blockchainUpdater,
         utxStorage,
-        wallet,
         tx => transactionPublisher.validateAndBroadcast(tx, None),
         loadBlockAt(db, blockchainUpdater)
       )
@@ -256,11 +255,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         settings,
         lastBlockInfo,
         historyReplier,
-        utxStorage,
         peerDatabase,
         allChannels,
-        establishedConnections,
-        () => blockchainUpdater.isFeatureActivated(BlockchainFeatures.BlockV5)
+        establishedConnections
       )
     maybeNetworkServer = Some(networkServer)
     val (signatures, blocks, blockchainScores, microblockInvs, microblockResponses, transactions) = networkServer.messages
@@ -320,13 +317,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     // API start
     if (settings.restAPISettings.enable) {
-      def loadBalanceHistory(address: Address): Seq[(Int, Long)] = db.readOnly { rdb =>
-        rdb.get(Keys.addressId(address)).fold(Seq.empty[(Int, Long)]) { aid =>
-          rdb.get(Keys.wavesBalanceHistory(aid)).map { h =>
-            h -> rdb.get(Keys.wavesBalance(aid)(h))
-          }
-        }
-      }
+      def loadBalanceHistory(address: Address): Seq[(Int, Long)] = Seq.empty // FIXME: implement?
 
       val limitedScheduler =
         Schedulers.timeBoundedFixedPool(
@@ -341,8 +332,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       val heavyRequestExecutor = new ThreadPoolExecutor(
         heavyRequestProcessorPoolThreads,
         heavyRequestProcessorPoolThreads,
-        60,
-        TimeUnit.SECONDS,
+        0,
+        TimeUnit.MILLISECONDS,
         new LinkedBlockingQueue[Runnable],
         new DefaultThreadFactory("rest-heavy-request-processor", true),
         { (r: Runnable, executor: ThreadPoolExecutor) =>
@@ -351,7 +342,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         }
       )
 
-      val heavyRequestScheduler = Scheduler(heavyRequestExecutor)
+      val heavyRequestScheduler = Scheduler(
+        if (settings.config.getBoolean("kamon.enable"))
+          ExecutorInstrumentation.instrument(heavyRequestExecutor, "heavy-request-executor")
+        else heavyRequestExecutor
+      )
 
       val routeTimeout = new RouteTimeout(
         FiniteDuration(settings.config.getDuration("akka.http.server.request-timeout").getSeconds, TimeUnit.SECONDS)
@@ -592,11 +587,9 @@ object Application extends ScorexLogging {
         .getOrElse(db.readOnly(ro => database.loadTransactions(Height(height), ro)))
     }
 
+  // FIXME: implement?
   private[wavesplatform] def loadBlockMetaAt(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] = {
-    val result = blockchainUpdater.liquidBlockMeta
-      .filter(_ => blockchainUpdater.height == height)
-      .orElse(db.get(Keys.blockMetaAt(Height(height))))
-    result
+    None
   }
 
   def main(args: Array[String]): Unit = {

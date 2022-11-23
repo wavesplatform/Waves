@@ -10,8 +10,9 @@ import net.ceedubs.ficus.Ficus.traversableReader
 import net.ceedubs.ficus.readers.namemappers.HyphenNameMapper
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 import org.apache.commons.lang3.SystemUtils
+import supertagged.TaggedType
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
 package object settings {
@@ -52,6 +53,13 @@ package object settings {
     case x :: xs => NonEmptyList(x, xs)
   }
 
+  object SizeInBytes extends TaggedType[Long]
+  type SizeInBytes = SizeInBytes.Type
+
+  implicit val sizeInBytesReader: ValueReader[SizeInBytes] = {(cfg: Config, path: String) =>
+    SizeInBytes(cfg.getBytes(path).toLong)
+  }
+
   def loadConfig(userConfig: Config): Config = {
     loadConfig(Some(userConfig))
   }
@@ -86,7 +94,7 @@ package object settings {
     def osxDefaultDirectory: String =
       s"$${user.home}/Library/Application Support"
 
-    //noinspection SpellCheckingInspection
+    // noinspection SpellCheckingInspection
     def winDefaultDirectory: String =
       s"$${LOCALAPPDATA}"
 

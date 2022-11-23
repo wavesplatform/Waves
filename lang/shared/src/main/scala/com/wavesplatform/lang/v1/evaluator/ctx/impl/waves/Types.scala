@@ -43,9 +43,6 @@ object Types {
     ) ::: (if (version >= V4) List("vrf" -> optionByteVector) else Nil)
   )
 
-  def optionAsset(version: StdLibVersion): UNIONLIKE =
-    UNION(assetType(version), UNIT)
-
   val transfer: CASETYPEREF = CASETYPEREF("Transfer", List("recipient" -> addressOrAliasType, "amount" -> LONG))
 
   val optionAddress: UNIONLIKE = UNION(addressType, UNIT)

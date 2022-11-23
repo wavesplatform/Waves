@@ -26,6 +26,8 @@ message BlockMeta {
   int64 total_fee_in_waves = 7;
   int64 reward = 8;
   bytes vrf = 9;
+  bytes total_score = 10;
+  int64 total_waves_amount = 11;
 }
 
 message TransactionMeta {

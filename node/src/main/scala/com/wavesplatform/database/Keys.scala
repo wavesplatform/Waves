@@ -2,16 +2,26 @@ package com.wavesplatform.database
 
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, OldTransactionMeta, TransactionMeta}
+import com.wavesplatform.database.protobuf.{BlockMeta as PBBlockMeta, EthereumTransactionMeta, OldTransactionMeta, TransactionMeta}
 import com.wavesplatform.protobuf.transaction.PBRecipients
+import com.wavesplatform.state
 import com.wavesplatform.state.*
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.*
+
+case class CurrentBalance(balance: Long, height: Height, prevHeight: Height)
+object CurrentBalance {
+  val Unavailable: CurrentBalance = CurrentBalance(0L, Height(0), Height(0))
+}
+
+case class BalanceNode(balance: Long, prevHeight: Height)
+object BalanceNode {
+  val Empty: BalanceNode = BalanceNode(0, Height(0))
+}
 
 object Keys {
   import KeyHelpers.*
@@ -23,26 +33,25 @@ object Keys {
     *
   }
 
-  val version: Key[Int]               = intKey(Version, default = 1)
-  val height: Key[Int]                = intKey(Height)
-  def score(height: Int): Key[BigInt] = Key(Score, h(height), Option(_).fold(BigInt(0))(BigInt(_)), _.toByteArray)
+  val version: Key[Int] = intKey(Version, default = 1)
+  val height: Key[Height] =
+    Key(Height, Array.emptyByteArray, v => state.Height @@ (if (v != null && v.length >= Ints.BYTES) Ints.fromByteArray(v) else 0), Ints.toByteArray)
 
   def heightOf(blockId: ByteStr): Key[Option[Int]] = Key.opt[Int](HeightOf, blockId.arr, Ints.fromByteArray, Ints.toByteArray)
 
   def wavesBalanceHistory(addressId: AddressId): Key[Seq[Int]] = historyKey(WavesBalanceHistory, addressId.toByteArray)
 
-  def wavesBalance(addressId: AddressId)(height: Int): Key[Long] =
-    Key(WavesBalance, hAddr(height, addressId), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
+  def wavesBalance(addressId: AddressId): Key[CurrentBalance] =
+    Key(WavesBalance, addressId.toByteArray, readCurrentBalance, writeCurrentBalance)
 
-  def assetBalanceHistory(addressId: AddressId, asset: IssuedAsset): Key[Seq[Int]] =
-    historyKey(AssetBalanceHistory, addressId.toByteArray ++ asset.id.arr)
-  def assetBalance(addressId: AddressId, asset: IssuedAsset)(height: Int): Key[Long] =
-    Key(
-      AssetBalance,
-      hBytes(asset.id.arr ++ addressId.toByteArray, height),
-      Option(_).fold(0L)(Longs.fromByteArray),
-      Longs.toByteArray
-    )
+  def wavesBalanceAt(addressId: AddressId, height: Height): Key[BalanceNode] =
+    Key(WavesBalanceHistory, hBytes(addressId.toByteArray, height), readBalanceNode, writeBalanceNode)
+
+  def assetBalance(addressId: AddressId, asset: IssuedAsset): Key[CurrentBalance] =
+    Key(AssetBalance, asset.id.arr ++ addressId.toByteArray, readCurrentBalance, writeCurrentBalance)
+
+  def assetBalanceAt(addressId: AddressId, asset: IssuedAsset, height: Height): Key[BalanceNode] =
+    Key(AssetBalanceHistory, hBytes(addressId.toByteArray ++ asset.id.arr, height), readBalanceNode, writeBalanceNode)
 
   def assetDetailsHistory(asset: IssuedAsset): Key[Seq[Int]] = historyKey(AssetDetailsHistory, asset.id.arr)
   def assetDetails(asset: IssuedAsset)(height: Int): Key[(AssetInfo, AssetVolumeInfo)] =
@@ -110,7 +119,7 @@ object Keys {
   def changedDataKeys(height: Int, addressId: AddressId): Key[Seq[String]] =
     Key(ChangedDataKeys, hBytes(addressId.toByteArray, height), readStrings, writeStrings)
 
-  def blockMetaAt(height: Height): Key[Option[BlockMeta]] =
+  def blockMetaAt(height: Height): Key[Option[PBBlockMeta]] =
     Key.opt(BlockInfoAtHeight, h(height), readBlockMeta, writeBlockMeta)
 
   def blockInfoBytesAt(height: Height): Key[Option[Array[Byte]]] =
@@ -174,13 +183,6 @@ object Keys {
 
   def invokeScriptResult(height: Int, txNum: TxNum): Key[Option[InvokeScriptResult]] =
     Key.opt(InvokeScriptResultTag, hNum(height, txNum), InvokeScriptResult.fromBytes, InvokeScriptResult.toBytes)
-
-  def blockReward(height: Int): Key[Option[Long]] =
-    Key.opt(BlockReward, h(height), Longs.fromByteArray, Longs.toByteArray)
-
-  def wavesAmount(height: Int): Key[BigInt] = Key(WavesAmount, h(height), Option(_).fold(BigInt(0))(BigInt(_)), _.toByteArray)
-
-  def hitSource(height: Int): Key[Option[ByteStr]] = Key.opt(HitSource, h(height), ByteStr(_), _.arr)
 
   val disabledAliases: Key[Set[Alias]] = Key(
     DisabledAliases,

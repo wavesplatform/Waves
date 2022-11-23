@@ -12,7 +12,6 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.Logger
 import com.wavesplatform.account.{AddressScheme, PublicKey}
-import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.validation.Validators
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -25,6 +24,7 @@ import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
+import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.reader.LeaseDetails
@@ -56,11 +56,9 @@ import scala.util.Using
 package object database {
   private lazy val logger: Logger = Logger(LoggerFactory.getLogger(getClass.getName))
 
-  lazy val readOptions = new ReadOptions().setVerifyChecksums(false)
-
-  def openDB(path: String): RocksDB = {
-    logger.debug(s"Open DB at $path")
-    val file = new File(path)
+  def openDB(settings: DBSettings): RocksDB = {
+    logger.debug(s"Open DB at ${settings.directory}")
+    val file = new File(settings.directory)
     val options = new DBOptions()
       .setStatistics(new Statistics())
       .setStatsDumpPeriodSec(300)
@@ -92,11 +90,15 @@ package object database {
       .setCompressionType(CompressionType.LZ4_COMPRESSION)
 
     file.getAbsoluteFile.getParentFile.mkdirs()
-    RocksDB.open(
-      options,
-      path,
-      Collections.singletonList(new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfo)),
-      new util.ArrayList[ColumnFamilyHandle]()
+
+    new InMemoryDB(
+      RocksDB.open(
+        options,
+        settings.directory,
+        Collections.singletonList(new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfo)),
+        new util.ArrayList[ColumnFamilyHandle]()
+      ),
+      settings.inMemory
     )
   }
 
@@ -394,33 +396,9 @@ package object database {
     )
   }
 
-  def writeBlockMeta(data: BlockMeta): Array[Byte] =
-    pb.BlockMeta(
-      Some(PBBlocks.protobuf(data.header)),
-      ByteString.copyFrom(data.signature.arr),
-      data.headerHash.fold(ByteString.EMPTY)(hh => ByteString.copyFrom(hh.arr)),
-      data.height,
-      data.size,
-      data.transactionCount,
-      data.totalFeeInWaves,
-      data.reward.getOrElse(-1L),
-      data.vrf.fold(ByteString.EMPTY)(vrf => ByteString.copyFrom(vrf.arr))
-    ).toByteArray
+  def writeBlockMeta(data: pb.BlockMeta): Array[Byte] = data.toByteArray
 
-  def readBlockMeta(bs: Array[Byte]): BlockMeta = {
-    val pbbm = pb.BlockMeta.parseFrom(bs)
-    BlockMeta(
-      PBBlocks.vanilla(pbbm.header.get),
-      pbbm.signature.toByteStr,
-      Option(pbbm.headerHash).collect { case bs if !bs.isEmpty => bs.toByteStr },
-      pbbm.height,
-      pbbm.size,
-      pbbm.transactionCount,
-      pbbm.totalFeeInWaves,
-      Option(pbbm.reward).filter(_ >= 0),
-      Option(pbbm.vrf).collect { case bs if !bs.isEmpty => bs.toByteStr }
-    )
-  }
+  def readBlockMeta(bs: Array[Byte]): pb.BlockMeta = pb.BlockMeta.parseFrom(bs)
 
   def readTransactionHNSeqAndType(bs: Array[Byte]): (Height, Seq[(Byte, TxNum, Int)]) = {
     val ndi          = newDataInput(bs)
@@ -530,6 +508,20 @@ package object database {
       case _: EmptyDataEntry          => pb.DataEntry.Value.Empty
     }).toByteArray
 
+  def readCurrentBalance(bs: Array[Byte]): CurrentBalance = if (bs != null && bs.length == 16)
+    CurrentBalance(Longs.fromByteArray(bs.take(8)), Height(Ints.fromByteArray(bs.slice(8, 12))), Height(Ints.fromByteArray(bs.takeRight(4))))
+  else CurrentBalance.Unavailable
+
+  def writeCurrentBalance(balance: CurrentBalance): Array[Byte] =
+    Longs.toByteArray(balance.balance) ++ Ints.toByteArray(balance.height) ++ Ints.toByteArray(balance.prevHeight)
+
+  def readBalanceNode(bs: Array[Byte]): BalanceNode = if (bs != null && bs.length == 12)
+    BalanceNode(Longs.fromByteArray(bs.take(8)), Height(Ints.fromByteArray(bs.takeRight(4))))
+  else BalanceNode.Empty
+
+  def writeBalanceNode(balance: BalanceNode): Array[Byte] =
+    Longs.toByteArray(balance.balance) ++ Ints.toByteArray(balance.prevHeight)
+
   implicit class EntryExt(val e: JMap.Entry[Array[Byte], Array[Byte]]) extends AnyVal {
     import com.wavesplatform.crypto.DigestLength
     def extractId(offset: Int = 2, length: Int = DigestLength): ByteStr = {
@@ -559,8 +551,8 @@ package object database {
       val nativeBatch = new WriteBatch()
       try {
         val r = f(rw)
-        batch.addedEntries.foreach { case (k, v) => nativeBatch.put(k.arr, v) }
-        batch.deletedEntries.foreach(k => nativeBatch.delete(k.arr))
+        batch.addedEntries.forEach { case (k, v) => nativeBatch.put(k.arr, v) }
+        batch.deletedEntries.forEach(k => nativeBatch.delete(k.arr))
         db.write(new WriteOptions().setSync(false), nativeBatch)
         r
       } finally {
@@ -933,7 +925,7 @@ package object database {
   def loadBlock(height: Height, db: ReadOnlyDB): Option[Block] =
     for {
       meta  <- db.get(Keys.blockMetaAt(height))
-      block <- createBlock(meta.header, meta.signature, loadTransactions(height, db).map(_._2)).toOption
+      block <- createBlock(PBBlocks.vanilla(meta.getHeader), meta.signature.toByteStr, loadTransactions(height, db).map(_._2)).toOption
     } yield block
 
   def fromHistory[A](resource: DBResource, historyKey: Key[Seq[Int]], valueKey: Int => Key[A]): Option[A] =

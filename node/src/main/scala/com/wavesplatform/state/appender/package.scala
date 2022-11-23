@@ -11,7 +11,7 @@ import com.wavesplatform.mining.Miner
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, BlockFromFuture, GenericError}
 import com.wavesplatform.utils.Time
-import com.wavesplatform.utx.UtxPoolImpl
+import com.wavesplatform.utx.UtxForAppender
 import kamon.Kamon
 
 package object appender {
@@ -26,23 +26,21 @@ package object appender {
 
   private[appender] def appendKeyBlock(
       blockchainUpdater: BlockchainUpdater & Blockchain,
-      utx: UtxPoolImpl,
+      utx: UtxForAppender,
       pos: PoSSelector,
       time: Time,
       verify: Boolean
   )(block: Block): Either[ValidationError, Option[Int]] =
     for {
       hitSource <- if (verify) validateBlock(blockchainUpdater, pos, time)(block) else pos.validateGenerationSignature(block)
-      newHeight <- utx.priorityPool.lockedWrite {
+      newHeight <-
         metrics.appendBlock
           .measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify))
           .map { discardedDiffs =>
-            utx.removeAll(block.transactionData)
             utx.setPriorityDiffs(discardedDiffs)
-            utx.runCleanup()
             Some(blockchainUpdater.height)
           }
-      }
+
     } yield newHeight
 
   private[appender] def appendExtensionBlock(

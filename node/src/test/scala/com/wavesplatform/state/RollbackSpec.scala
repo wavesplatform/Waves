@@ -678,16 +678,16 @@ class RollbackSpec extends FreeSpec with WithDomain {
             d.blockchain.leaseBalance(leaseRecipientAddress.toAddress) shouldBe LeaseBalance(in = leaseAmount, out = 0)
             d.blockchain.leaseBalance(checkAddress) shouldBe LeaseBalance(in = 0, out = leaseAmount)
             d.blockchain.leaseDetails(leaseId1) shouldBe leaseDetails(invokeId1)
-            d.levelDBWriter.leaseDetails(leaseId1) shouldBe None
+            d.rocksDBWriter.leaseDetails(leaseId1) shouldBe None
             d.appendBlock()
-            d.levelDBWriter.leaseDetails(leaseId1) shouldBe leaseDetails(invokeId1)
+            d.rocksDBWriter.leaseDetails(leaseId1) shouldBe leaseDetails(invokeId1)
 
             d.blockchain.removeAfter(beforeInvoke1).explicitGet()
 
             d.blockchain.leaseBalance(leaseRecipientAddress.toAddress) shouldBe LeaseBalance.empty
             d.blockchain.leaseBalance(checkAddress) shouldBe LeaseBalance.empty
             d.blockchain.leaseDetails(leaseId1) shouldBe None
-            d.levelDBWriter.leaseDetails(leaseId1) shouldBe None
+            d.rocksDBWriter.leaseDetails(leaseId1) shouldBe None
 
             // hardened block rollback
             val beforeInvoke2 = d.lastBlockId
@@ -697,9 +697,9 @@ class RollbackSpec extends FreeSpec with WithDomain {
             d.blockchain.leaseBalance(leaseRecipientAddress.toAddress) shouldBe LeaseBalance(in = leaseAmount, out = 0)
             d.blockchain.leaseBalance(checkAddress) shouldBe LeaseBalance(in = 0, out = leaseAmount)
             d.blockchain.leaseDetails(leaseId2) shouldBe leaseDetails(invokeId2)
-            d.levelDBWriter.leaseDetails(leaseId2) shouldBe None
+            d.rocksDBWriter.leaseDetails(leaseId2) shouldBe None
             d.appendBlock()
-            d.levelDBWriter.leaseDetails(leaseId2) shouldBe leaseDetails(invokeId2)
+            d.rocksDBWriter.leaseDetails(leaseId2) shouldBe leaseDetails(invokeId2)
 
             d.appendBlock()
             d.blockchain.removeAfter(beforeInvoke2).explicitGet()
@@ -707,7 +707,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
             d.blockchain.leaseBalance(leaseRecipientAddress.toAddress) shouldBe LeaseBalance.empty
             d.blockchain.leaseBalance(checkAddress) shouldBe LeaseBalance.empty
             d.blockchain.leaseDetails(leaseId2) shouldBe None
-            d.levelDBWriter.leaseDetails(leaseId2) shouldBe None
+            d.rocksDBWriter.leaseDetails(leaseId2) shouldBe None
           }
         }
       }
@@ -750,16 +750,16 @@ class RollbackSpec extends FreeSpec with WithDomain {
         d.blockchain.leaseBalance(leaseRecipientAddress) shouldBe LeaseBalance.empty
         d.blockchain.leaseBalance(checkAddress) shouldBe LeaseBalance.empty
         d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight, cancelHeight, leaseCancelId)
-        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight)
+        d.rocksDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight)
         d.appendBlock()
-        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight, cancelHeight, leaseCancelId)
+        d.rocksDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight, cancelHeight, leaseCancelId)
 
         d.blockchain.removeAfter(beforeInvoke1).explicitGet()
 
         d.blockchain.leaseBalance(leaseRecipientAddress) shouldBe LeaseBalance(in = leaseAmount, 0)
         d.blockchain.leaseBalance(checkAddress) shouldBe LeaseBalance(0, out = leaseAmount)
         d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight)
-        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight)
+        d.rocksDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight)
 
         // hardened block rollback
         val beforeInvoke2  = d.lastBlockId
@@ -768,9 +768,9 @@ class RollbackSpec extends FreeSpec with WithDomain {
         d.blockchain.leaseBalance(leaseRecipientAddress) shouldBe LeaseBalance.empty
         d.blockchain.leaseBalance(checkAddress) shouldBe LeaseBalance.empty
         d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight, cancelHeight, leaseCancelId1)
-        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight)
+        d.rocksDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight)
         d.appendBlock()
-        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight, cancelHeight, leaseCancelId1)
+        d.rocksDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight, cancelHeight, leaseCancelId1)
 
         d.appendBlock()
         d.blockchain.removeAfter(beforeInvoke2).explicitGet()
@@ -778,7 +778,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
         d.blockchain.leaseBalance(leaseRecipientAddress) shouldBe LeaseBalance(in = leaseAmount, 0)
         d.blockchain.leaseBalance(checkAddress) shouldBe LeaseBalance(0, out = leaseAmount)
         d.blockchain.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight)
-        d.levelDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight)
+        d.rocksDBWriter.leaseDetails(leaseId) shouldBe leaseDetails(leaseHeight)
       }
 
       "leaseCancel with lease tx" in {
@@ -804,7 +804,9 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
             val leaseAmount = smallFeeGen.sample.get
             val leaseTx =
-              LeaseTransaction.selfSigned(2.toByte, leaseSender, leaseRecipientAddress.toAddress, leaseAmount, setScript.fee.value, nextTs).explicitGet()
+              LeaseTransaction
+                .selfSigned(2.toByte, leaseSender, leaseRecipientAddress.toAddress, leaseAmount, setScript.fee.value, nextTs)
+                .explicitGet()
             val leaseId = leaseTx.id()
 
             d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq(setScript, leaseTx)))

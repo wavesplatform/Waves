@@ -83,6 +83,9 @@ object Blockchain {
   implicit class BlockchainExt(private val blockchain: Blockchain) extends AnyVal {
     def isEmpty: Boolean = blockchain.height == 0
 
+    def isSponsorshipActive: Boolean = blockchain.height >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
+    def isNGActive: Boolean = blockchain.isFeatureActivated(BlockchainFeatures.NG, blockchain.height - 1)
+
     def parentHeader(block: BlockHeader, back: Int = 1): Option[BlockHeader] =
       blockchain
         .heightOf(block.reference)

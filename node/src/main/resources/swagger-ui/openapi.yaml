@@ -204,6 +204,12 @@ paths:
             default
           schema:
             type: integer
+        - name: asset
+          in: query
+          description: >-
+            Base58 encoded asset ID. Not defined for WAVES asset
+          schema:
+            $ref: '#/components/schemas/AssetId'
       responses:
         '200':
           description: successful operation
@@ -246,6 +252,10 @@ paths:
                     For balance at height requests. Max number of blocks back
                     from the current height is set by
                     `waves.db.max-rollback-depth`, 2000 by default
+                asset:
+                  allOf:
+                    - $ref: '#/components/schemas/AssetId'
+                  description: Base58 encoded asset ID. Not defined for WAVES asset
       responses:
         '200':
           description: successful operation
@@ -1074,6 +1084,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RewardStatus'
+  '/transactions/status/{id}':
+    get:
+      tags:
+        - transactions
+      summary: Transaction status
+      description: Get transaction status by ID
+      operationId: getTxStatusById
+      parameters:
+        - $ref: '#/components/parameters/txId'
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionStatus'
   /transactions/status:
     get:
       tags:
@@ -1102,7 +1128,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TransactionStatus'
+                type: array
+                items:
+                  $ref: '#/components/schemas/TransactionStatus'
     post:
       tags:
         - transactions
@@ -1166,7 +1194,7 @@ paths:
     get:
       tags:
         - transactions
-      summary: Transaction info
+      summary: Transactions info
       description: Get transactions by IDs
       operationId: getMultipleTxs
       parameters:
@@ -1190,6 +1218,49 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Transaction'
+    post:
+      tags:
+        - transactions
+      summary: Transactions info
+      description: >-
+        Get transactions by IDs. Max number of transactions is set
+        by `waves.rest-api.transactions-by-address-limit`, 1000 by
+        default.<br>Transactions in the response are in the same order as in the
+        request.
+      operationId: getTxsViaPost
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                ids:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/TransactionId'
+                  minItems: 1
+                  maxItems: 1000
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/TransactionId'
+            encoding:
+              id:
+                style: form
+                explode: true
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Transaction'
+      x-codegen-request-body-name: ids
   /transactions/sign:
     post:
       tags:
@@ -1273,7 +1344,9 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Transaction'
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Transaction'
   /transactions/unconfirmed/size:
     get:
       tags:
@@ -1474,7 +1547,19 @@ paths:
                 ids:
                   type: array
                   items:
-                    type: string
+                    $ref: '#/components/schemas/TransactionId'
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/TransactionId'
+            encoding:
+              id:
+                style: form
+                explode: true
         required: false
       responses:
         '200':
@@ -2550,6 +2635,45 @@ paths:
           required: true
           schema:
             type: integer
+      responses:
+        '200':
+          description: State hash
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  blockId:
+                    type: string
+                  wavesBalanceHash:
+                    type: string
+                  assetsBalanceHash:
+                    type: string
+                  dataEntryHash:
+                    type: string
+                  accountScriptHash:
+                    type: string
+                  assetScriptHash:
+                    type: string
+                  leaseBalanceHash:
+                    type: string
+                  leaseStatusHash:
+                    type: string
+                  sponsorshipHash:
+                    type: string
+                  aliasHash:
+                    type: string
+                  stateHash:
+                    type: string
+  '/debug/stateHash/last':
+    get:
+      tags:
+        - debug
+      summary: Last block state hash
+      description: >-
+        Get state hash of the last block. Available only if node configuration contains
+        `waves.db.store-state-hashes = true` option
+      operationId: getStateHashLast
       responses:
         '200':
           description: State hash

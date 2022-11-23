@@ -56,8 +56,8 @@ private object UtxPoolSpecification {
   private val ignoreSpendableBalanceChanged = PublishSubject[(Address, Asset)]()
 
   final case class TempDB(fs: FunctionalitySettings, dbSettings: DBSettings) {
-    val path: Path            = Files.createTempDirectory("leveldb-test")
-    val db: RocksDB           = openDB(path.toAbsolutePath.toString)
+    val path: Path            = Files.createTempDirectory("rocksdb-test")
+    val db: RocksDB           = openDB(dbSettings.copy(directory = path.toAbsolutePath.toString))
     val writer: RocksDBWriter = TestRocksDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, fs)
 
     sys.addShutdownHook {
@@ -655,6 +655,25 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         val (packed, _) = utx.packUnconfirmed(constraint, PackStrategy.Unlimited)
         packed.get.size shouldBe (unscripted.size + 1)
         packed.get.count(scripted.contains) shouldBe 1
+      }
+    }
+
+    "processes transaction fees" in {
+      val blockMiner    = TxHelpers.signer(1200)
+      val recipient     = TxHelpers.signer(1201)
+      val initialAmount = 10000.waves
+      val minerBalance  = initialAmount + 0.001.waves * 2
+
+      withDomain(DomainPresets.NG, balances = Seq(AddrWithBalance(blockMiner.toAddress, minerBalance))) { d =>
+        val transfer1 = TxHelpers.transfer(blockMiner, recipient.toAddress, version = 1.toByte, amount = initialAmount, fee = 0.001.waves)
+        val transfer2 = TxHelpers.transfer(blockMiner, recipient.toAddress, version = 1.toByte, amount = 0.0004.waves, fee = 0.001.waves)
+        d.appendBlock(
+          d.createBlock(Block.NgBlockVersion, Seq.empty, generator = blockMiner)
+        )
+        d.utxPool.addTransaction(transfer1, verify = true)
+        d.utxPool.addTransaction(transfer2, verify = true)
+
+        d.utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1.get shouldEqual Seq(transfer1, transfer2)
       }
     }
 

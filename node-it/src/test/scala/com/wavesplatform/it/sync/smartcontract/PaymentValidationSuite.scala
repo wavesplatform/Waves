@@ -23,7 +23,7 @@ class PaymentValidationSuite extends BaseTransactionSuite {
          |{-# CONTENT_TYPE DAPP #-}
          |{-# SCRIPT_TYPE ACCOUNT #-}
          |
-        |@Callable(i)
+         |@Callable(i)
          |func write() = {
          |  [StringEntry("$wrKey", "$wrValue")]
          |}
@@ -53,7 +53,7 @@ class PaymentValidationSuite extends BaseTransactionSuite {
         fee = issueFee
       )
     ) { err =>
-      err.message should include regex "called on unit"
+      err.message should include regex "value by key 'key' not found for the address"
       err.id shouldBe ScriptExecutionError.Id
     }
 

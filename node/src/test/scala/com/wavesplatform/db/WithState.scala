@@ -4,7 +4,8 @@ import java.nio.file.Files
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{RocksDBWriter, TestStorageFactory, loadActiveLeases}
+import com.wavesplatform.database.RocksDBWriter.RocksDBWriter
+import com.wavesplatform.database.{TestStorageFactory, loadActiveLeases}
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
@@ -38,7 +39,7 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
 
   protected def tempDb[A](f: RocksDB => A): A = {
     val path = Files.createTempDirectory("rocks-temp").toAbsolutePath
-    val db   = database.openDB(path.toAbsolutePath.toString)
+    val db   = database.openDB(dbSettings.copy(directory = path.toAbsolutePath.toString))
     currentDbInstance.set(db)
     try {
       f(db)
@@ -166,7 +167,8 @@ trait WithDomain extends WithState { _: Suite =>
   def withDomain[A](
       settings: WavesSettings =
         DomainPresets.SettingsFromDefaultConfig.addFeatures(BlockchainFeatures.SmartAccounts), // SmartAccounts to allow V2 transfers by default
-      balances: Seq[AddrWithBalance] = Seq.empty
+      balances: Seq[AddrWithBalance] = Seq.empty,
+      wrapDB: RocksDB => RocksDB = identity
   )(test: Domain => A): A =
     withRocksDBWriter(settings) { blockchain =>
       var domain: Domain = null
@@ -178,7 +180,7 @@ trait WithDomain extends WithState { _: Suite =>
         BlockchainUpdateTriggers.combined(domain.triggers),
         loadActiveLeases(db, _, _)
       )
-      domain = Domain(db, bcu, blockchain, settings)
+      domain = Domain(wrapDB(db), bcu, blockchain, settings)
       val genesis = balances.map { case AddrWithBalance(address, amount) =>
         TxHelpers.genesis(address, amount)
       }

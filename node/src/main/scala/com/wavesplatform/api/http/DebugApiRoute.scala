@@ -1,28 +1,23 @@
 package com.wavesplatform.api.http
 
-import java.net.{InetAddress, InetSocketAddress, URI}
-import java.util.concurrent.ConcurrentMap
-import scala.concurrent.duration.*
-import scala.util.{Failure, Success}
-import scala.util.control.NonFatal
 import akka.http.scaladsl.common.{EntityStreamingSupport, JsonEntityStreamingSupport}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
 import cats.syntax.either.*
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
+import com.wavesplatform.Version
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.common.TransactionMeta
-import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonTransactionsApi}
+import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.http.TransactionsApiRoute.TransactionJsonSerializer
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{PeerDatabase, PeerInfo, *}
 import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
-import com.wavesplatform.state.{Blockchain, Height, LeaseBalance, NG, Portfolio, StateHash}
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.state.{Blockchain, Height, LeaseBalance, NG, Portfolio, StateHash}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidRequestSignature}
@@ -37,7 +32,12 @@ import monix.execution.Scheduler
 import play.api.libs.json.*
 import play.api.libs.json.Json.JsValueWrapper
 
+import java.net.{InetAddress, InetSocketAddress, URI}
+import java.util.concurrent.ConcurrentMap
+import scala.concurrent.duration.*
 import scala.concurrent.Future
+import scala.util.control.NonFatal
+import scala.util.{Failure, Success}
 
 case class DebugApiRoute(
     ws: WavesSettings,
@@ -74,8 +74,8 @@ case class DebugApiRoute(
 
   override val settings: RestAPISettings = ws.restAPISettings
 
-  private[this] val serializer                     = TransactionJsonSerializer(blockchain, transactionsApi)
-  private[this] implicit val transactionMetaWrites = OWrites[TransactionMeta](serializer.transactionWithMetaJson)
+  private[this] val serializer                                               = TransactionJsonSerializer(blockchain, transactionsApi)
+  private[this] implicit val transactionMetaWrites: OWrites[TransactionMeta] = OWrites[TransactionMeta](serializer.transactionWithMetaJson)
 
   override lazy val route: Route = pathPrefix("debug") {
     stateChanges ~ balanceHistory ~ stateHash ~ validate ~ withAuth {
@@ -268,11 +268,7 @@ case class DebugApiRoute(
   def stateChanges: Route = stateChangesById ~ stateChangesByAddress
 
   def stateChangesById: Route = (get & path("stateChanges" / "info" / TransactionId)) { id =>
-    transactionsApi.transactionById(id) match {
-      case Some(meta: TransactionMeta.Invoke) => complete(meta: TransactionMeta)
-      case Some(_)                            => complete(ApiError.UnsupportedTransactionType)
-      case None                               => complete(ApiError.TransactionDoesNotExist)
-    }
+    redirect(s"/transactions/info/$id", StatusCodes.MovedPermanently)
   }
 
   def stateChangesByAddress: Route =
@@ -288,18 +284,25 @@ case class DebugApiRoute(
       }
     }
 
-  def stateHash: Route =
-    (get & path("stateHash" / IntNumber)) { height =>
-      val result = for {
-        sh <- loadStateHash(height)
-        h  <- blockchain.blockHeader(height)
-      } yield Json.toJson(sh).as[JsObject] ++ Json.obj("blockId" -> h.id().toString)
+  def stateHash: Route = (get & pathPrefix("stateHash")) {
+    path("last")(stateHashAt(blockchain.height - 1)) ~ path(IntNumber)(stateHashAt)
+  }
 
-      result match {
-        case Some(value) => complete(value)
-        case None        => complete(StatusCodes.NotFound)
-      }
+  private def stateHashAt(height: Int): Route = {
+    val result = for {
+      sh <- loadStateHash(height)
+      h  <- blockchain.blockHeader(height)
+    } yield Json.toJson(sh).as[JsObject] ++ Json.obj(
+      "blockId" -> h.id().toString,
+      "height"  -> height,
+      "version" -> Version.VersionString
+    )
+
+    result match {
+      case Some(value) => complete(value)
+      case None        => complete(StatusCodes.NotFound)
     }
+  }
 }
 
 object DebugApiRoute {

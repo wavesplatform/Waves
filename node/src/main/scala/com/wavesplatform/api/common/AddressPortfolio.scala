@@ -35,30 +35,32 @@ class NFTIterator(addressId: AddressId, maybeAfter: Option[IssuedAsset], resourc
     }
   }(())
 
-  override def computeNext(): Seq[(IssuedAsset, Long)] = resource.withSafePrefixIterator { dbIterator =>
-    val keysBuffer   = new ArrayBuffer[Array[Byte]]()
-    val assetsBuffer = new ArrayBuffer[IssuedAsset]()
-    while (dbIterator.isValid && keysBuffer.length < BatchSize) {
-      val assetId = IssuedAsset(ByteStr(dbIterator.key().takeRight(crypto.DigestLength)))
-      keysBuffer.addOne(Keys.assetBalanceHistory(addressId, assetId).keyBytes)
-      assetsBuffer.addOne(assetId)
-      dbIterator.next()
-    }
-    if (keysBuffer.nonEmpty) {
-      val assetBalanceKeys = resource
-        .multiGetInts(keysBuffer)
-        .zip(assetsBuffer)
-        .map { case (heightOpt, assetId) =>
-          Keys.assetBalance(addressId, assetId)(heightOpt.getOrElse(0)).keyBytes
-        }
-        .toSeq
-      resource
-        .multiGetLongs(assetBalanceKeys)
-        .zip(assetsBuffer)
-        .map(_.swap)
-        .toSeq
-    } else endOfData()
-  }(endOfData())
+  // FIXME: implement
+  override def computeNext(): Seq[(IssuedAsset, Long)] = ???
+//    resource.withSafePrefixIterator { dbIterator =>
+//      val keysBuffer   = new ArrayBuffer[Array[Byte]]()
+//      val assetsBuffer = new ArrayBuffer[IssuedAsset]()
+//      while (dbIterator.isValid && keysBuffer.length < BatchSize) {
+//        val assetId = IssuedAsset(ByteStr(dbIterator.key().takeRight(crypto.DigestLength)))
+//        keysBuffer.addOne(Keys.assetBalanceHistory(addressId, assetId).keyBytes)
+//        assetsBuffer.addOne(assetId)
+//        dbIterator.next()
+//      }
+//      if (keysBuffer.nonEmpty) {
+//        val assetBalanceKeys = resource
+//          .multiGetInts(keysBuffer)
+//          .zip(assetsBuffer)
+//          .map { case (heightOpt, assetId) =>
+//            Keys.assetBalance(addressId, assetId)(heightOpt.getOrElse(0)).keyBytes
+//          }
+//          .toSeq
+//        resource
+//          .multiGetLongs(assetBalanceKeys)
+//          .zip(assetsBuffer)
+//          .map(_.swap)
+//          .toSeq
+//      } else endOfData()
+//    }(endOfData())
 }
 
 object NFTIterator {
@@ -73,34 +75,36 @@ class AssetBalanceIterator(addressId: AddressId, resource: DBResource) extends A
   private def stillSameAddress(k: Array[Byte]): Boolean =
     k.length == (prefixBytes.length + crypto.DigestLength)
 
-  override def computeNext(): Seq[(IssuedAsset, Long)] = resource.withSafePrefixIterator { dbIterator =>
-    val keysBuffer   = new ArrayBuffer[Array[Byte]]()
-    val assetsBuffer = new ArrayBuffer[IssuedAsset]()
-
-    @tailrec
-    def loop(): Unit = {
-      if (dbIterator.isValid) {
-        val key = dbIterator.key()
-        if (stillSameAddress(key) && keysBuffer.length < BatchSize) {
-          val assetId = IssuedAsset(ByteStr(key.takeRight(crypto.DigestLength)))
-          val history = Option(dbIterator.value()).fold(0)(arr => ByteBuffer.wrap(arr).getInt) // FIXME: refactor
-          keysBuffer.addOne(Keys.assetBalance(addressId, assetId)(history).keyBytes)
-          assetsBuffer.addOne(assetId)
-          dbIterator.next()
-          loop()
-        } else ()
-      } else ()
-    }
-
-    loop()
-    if (keysBuffer.nonEmpty) {
-      resource
-        .multiGetLongs(keysBuffer)
-        .zip(assetsBuffer)
-        .map(_.swap)
-        .toSeq
-    } else endOfData()
-  }(endOfData())
+  // FIXME: implement
+  override def computeNext(): Seq[(IssuedAsset, Long)] = ???
+//    resource.withSafePrefixIterator { dbIterator =>
+//      val keysBuffer   = new ArrayBuffer[Array[Byte]]()
+//      val assetsBuffer = new ArrayBuffer[IssuedAsset]()
+//
+//      @tailrec
+//      def loop(): Unit = {
+//        if (dbIterator.isValid) {
+//          val key = dbIterator.key()
+//          if (stillSameAddress(key) && keysBuffer.length < BatchSize) {
+//            val assetId = IssuedAsset(ByteStr(key.takeRight(crypto.DigestLength)))
+//            val history = Option(dbIterator.value()).fold(0)(arr => ByteBuffer.wrap(arr).getInt) // FIXME: refactor
+//            keysBuffer.addOne(Keys.assetBalance(addressId, assetId)(history).keyBytes)
+//            assetsBuffer.addOne(assetId)
+//            dbIterator.next()
+//            loop()
+//          } else ()
+//        } else ()
+//      }
+//
+//      loop()
+//      if (keysBuffer.nonEmpty) {
+//        resource
+//          .multiGetLongs(keysBuffer)
+//          .zip(assetsBuffer)
+//          .map(_.swap)
+//          .toSeq
+//      } else endOfData()
+//    }(endOfData())
 }
 
 object AssetBalanceIterator {

@@ -1,13 +1,15 @@
 package com.wavesplatform.database
 
+import java.util
+import java.util.Comparator
+
+import com.wavesplatform.common.ByteStrComparator
 import com.wavesplatform.common.state.ByteStr
 import org.rocksdb.WriteBatch
 
-import scala.collection.mutable
-
 class SortedBatch extends WriteBatch {
-  val addedEntries: mutable.Map[ByteStr, Array[Byte]] = mutable.TreeMap[ByteStr, Array[Byte]]()
-  val deletedEntries: mutable.Set[ByteStr]            = mutable.TreeSet[ByteStr]()
+  val addedEntries   = new util.TreeMap[ByteStr, Array[Byte]](SortedBatch.byteStrComparator)
+  val deletedEntries = new util.TreeSet[ByteStr](SortedBatch.byteStrComparator)
 
   override def put(bytes: Array[Byte], bytes1: Array[Byte]): Unit = {
     val k = ByteStr(bytes)
@@ -21,4 +23,8 @@ class SortedBatch extends WriteBatch {
     deletedEntries.add(k)
   }
 
+}
+
+object SortedBatch {
+  val byteStrComparator: Comparator[ByteStr] = (o1: ByteStr, o2: ByteStr) => ByteStrComparator.compare(o1, o2)
 }

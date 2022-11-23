@@ -4,6 +4,7 @@ import java.io.*
 import java.net.{MalformedURLException, URL}
 
 import akka.actor.ActorSystem
+import cats.implicits.catsSyntaxEitherId
 import com.google.common.io.ByteStreams
 import com.google.common.primitives.Ints
 import com.wavesplatform.Exporter.Formats
@@ -25,13 +26,13 @@ import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
+import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Proven, Signed, Transaction}
 import com.wavesplatform.utils.*
-import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
+import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import kamon.Kamon
 import monix.eval.Task
-import monix.execution.Scheduler
+import monix.execution.{ExecutionModel, Scheduler}
 import monix.reactive.{Observable, Observer}
 import org.rocksdb.RocksDB
 import scopt.OParser
@@ -136,7 +137,6 @@ object Importer extends ScorexLogging {
               db,
               blockchainUpdater,
               utxPool,
-              wallet,
               _ => Future.successful(TracedResult.wrapE(Left(GenericError("Not implemented during import")))),
               Application.loadBlockAt(db, blockchainUpdater)
             )
@@ -178,6 +178,8 @@ object Importer extends ScorexLogging {
       importOptions: ImportOptions,
       skipBlocks: Boolean
   ): Unit = {
+    val sigverify = Schedulers.fixedPool(4, "sigverify", executionModel = ExecutionModel.BatchedExecution(5))
+
     val lenBytes = new Array[Byte](Ints.BYTES)
     val start    = System.nanoTime()
     var counter  = 0
@@ -187,6 +189,8 @@ object Importer extends ScorexLogging {
     val blocksToApply = importOptions.importHeight - startHeight + 1
 
     if (blocksToSkip > 0) log.info(s"Skipping $blocksToSkip block(s)")
+
+    var prevAppendTask = Future.successful(Option(BigInt(0)).asRight[ValidationError])
 
     sys.addShutdownHook {
       import scala.concurrent.duration.*
@@ -215,24 +219,33 @@ object Importer extends ScorexLogging {
           if (blocksToSkip > 0) {
             blocksToSkip -= 1
           } else {
-            val blockV5 = blockchain.isFeatureActivated(
-              BlockchainFeatures.BlockV5,
-              blockchain.height + 1
-            )
-            val block =
-              (if (importOptions.format == Formats.Binary && !blockV5) Block.parseBytes(blockBytes)
-               else PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(blockBytes)), unsafe = true)).get
-            if (blockchain.lastBlockId.contains(block.header.reference)) {
-              Await.result(appendBlock(block).runAsyncLogErr, Duration.Inf) match {
-                case Left(ve) =>
-                  log.error(s"Error appending block: $ve")
-                  quit = true
-                case _ =>
-                  counter = counter + 1
+            val blockV5               = blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, blockchain.height + 1)
+            lazy val parsedProtoBlock = PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(blockBytes)), unsafe = true)
+
+            val block = (if (!blockV5) Block.parseBytes(blockBytes) else parsedProtoBlock).orElse(parsedProtoBlock).get
+
+            Task
+              .parTraverse(block.transactionData) {
+                case p: Proven => Task(p.firstProofIsValidSignature)
+                case s: Signed => Task(s.signaturesValid())
+                case _         => Task.unit
               }
-            } else {
-              log.warn(s"Block $block is not a child of the last block ${blockchain.lastBlockId.get}")
+              .executeOn(sigverify)
+              .runSyncUnsafe()
+
+            Await.result(prevAppendTask, Duration.Inf) match {
+              case Left(ve) =>
+                log.error(s"Error appending block: $ve")
+                quit = true
+              case _ =>
+                counter = counter + 1
+                if (blockchain.lastBlockId.contains(block.header.reference)) {
+                  prevAppendTask = appendBlock(block).runAsyncLogErr
+                } else {
+                  log.warn(s"Block $block is not a child of the last block ${blockchain.lastBlockId.get}")
+                }
             }
+
           }
         } else {
           log.info(s"$factReadSize != expected $blockSize")
@@ -275,15 +288,13 @@ object Importer extends ScorexLogging {
     val scheduler = Schedulers.singleThread("appender")
     val time      = new NTP(settings.ntpServer)
 
-    val actorSystem = ActorSystem("wavesplatform-import")
-    val db          = openDB(settings.dbSettings.directory)
+    val db = openDB(settings.dbSettings)
     val (blockchainUpdater, levelDb) =
       StorageFactory(settings, db, time, Observer.empty, BlockchainUpdateTriggers.combined(triggers))
-    val utxPool     = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.minerSettings.enable)
     val pos         = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
-    val extAppender = BlockAppender(blockchainUpdater, time, utxPool, pos, scheduler, importOptions.verify) _
+    val extAppender = BlockAppender(blockchainUpdater, time, (_: Seq[Diff]) => {}, pos, scheduler, importOptions.verify) _
 
-    val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, db, actorSystem)
+    val extensions = Seq.empty[Extension]
     checkGenesis(settings, blockchainUpdater, Miner.Disabled)
 
     val importFileOffset =
@@ -319,7 +330,6 @@ object Importer extends ScorexLogging {
 
     sys.addShutdownHook {
       quit = true
-      Await.result(actorSystem.terminate(), 10.second)
       lock.synchronized {
         if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG) && blockchainUpdater.liquidBlockMeta.nonEmpty) {
           // Force store liquid block in leveldb

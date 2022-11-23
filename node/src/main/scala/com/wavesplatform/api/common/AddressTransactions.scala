@@ -63,15 +63,18 @@ object AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Observable[(TxMeta, Transaction, Option[TxNum])] =
-    transactionsFromDiff(maybeDiff, subject, sender, types, fromId) ++
-      transactionsFromDB(
-        db,
-        subject,
-        sender,
-        types,
-        fromId.filter(id => maybeDiff.exists { case (_, diff) => !diff.transactions.contains(id) })
-      )
+  ): Observable[(TxMeta, Transaction, Option[TxNum])] = {
+    val diffTxs = transactionsFromDiff(maybeDiff, subject, sender, types, fromId)
+
+    val dbTxs = transactionsFromDB(
+      db,
+      subject,
+      sender,
+      types,
+      fromId.filter(id => maybeDiff.exists { case (_, diff) => !diff.containsTransaction(id) })
+    )
+    Observable.fromIterable(diffTxs) ++ dbTxs.filterNot(diffTxs.contains)
+  }
 
   def transactionsFromDB(
       db: RocksDB,
@@ -98,28 +101,22 @@ object AddressTransactions {
       }
   }
 
-  def transactionsFromDiff(
+  private def transactionsFromDiff(
       maybeDiff: Option[(Height, Diff)],
       subject: Address,
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Observable[(TxMeta, Transaction, Option[TxNum])] = {
-    Observable.fromIterator(
-      Task {
-        (for {
-          (height, diff) <- maybeDiff.toSeq
-          nti            <- diff.transactions.values.toSeq.reverse
-          if nti.affected(subject)
-        } yield (TxMeta(height, nti.applied, nti.spentComplexity), nti.transaction))
-          .dropWhile { case (_, tx) => fromId.isDefined && !fromId.contains(tx.id()) }
-          .dropWhile { case (_, tx) => fromId.contains(tx.id()) }
-          .filter { case (_, tx) => types.isEmpty || types.contains(tx.tpe) }
-          .collect { case (m, tx: Authorized) if sender.forall(_ == tx.sender.toAddress) => (m, tx, None) }
-          .iterator
-      }
-    )
-  }
+  ): Seq[(TxMeta, Transaction, Option[TxNum])] =
+    (for {
+      (height, diff) <- maybeDiff.toSeq
+      nti            <- diff.transactions.reverse
+      if nti.affected(subject)
+    } yield (TxMeta(height, nti.applied, nti.spentComplexity), nti.transaction))
+      .dropWhile { case (_, tx) => fromId.isDefined && !fromId.contains(tx.id()) }
+      .dropWhile { case (_, tx) => fromId.contains(tx.id()) }
+      .filter { case (_, tx) => types.isEmpty || types.contains(tx.tpe) }
+      .collect { case (m, tx: Authorized) if sender.forall(_ == tx.sender.toAddress) => (m, tx, None) }
 
   class TxByAddressIterator(
       db: DBResource,

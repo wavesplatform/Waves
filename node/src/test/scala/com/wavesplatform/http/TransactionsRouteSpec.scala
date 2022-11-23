@@ -13,7 +13,7 @@ import com.wavesplatform.common.utils.{Base58, *}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures as BF
-import com.wavesplatform.history.{Domain, settingsWithFeatures}
+import com.wavesplatform.history.{Domain, defaultSigner, settingsWithFeatures}
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL}
@@ -30,8 +30,9 @@ import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AccountVerifierTrace, TracedResult}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.{EthTxGenerator, Signed}
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{Asset, AssetIdLength, CreateAliasTransaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.{EthEncoding, EthHelpers, Schedulers}
 import com.wavesplatform.{BlockGen, BlockchainStubHelpers, TestValues, TestWallet}
 import monix.reactive.Observable
@@ -782,31 +783,64 @@ class TransactionsRouteSpec
     }
 
     "handles multiple ids" in {
+      val inputLimitErrMsg = TooBigArrayAllocation(transactionsApiRoute.settings.transactionsByAddressLimit).message
+      val emptyInputErrMsg = "Transaction ID was not specified"
+
       val txCount = 5
       val txs     = (1 to txCount).map(_ => TxHelpers.invoke(TxHelpers.defaultSigner.toAddress))
       txs.foreach(tx =>
         (addressTransactions.transactionById _)
           .expects(tx.id())
           .returns(Some(TransactionMeta.Invoke(Height(1), tx, succeeded = true, 85L, Some(InvokeScriptResult()))))
-          .repeat(3)
+          .anyNumberOfTimes()
       )
 
       (() => blockchain.activatedFeatures).expects().returns(Map(BF.BlockV5.id -> 1)).anyNumberOfTimes()
 
-      def checkResponse(): Unit = txs.zip(responseAs[JsArray].value) foreach { case (tx, json) =>
+      def checkResponse(txs: Seq[InvokeScriptTransaction]): Unit = txs.zip(responseAs[JsArray].value) foreach { case (tx, json) =>
         val extraFields =
           Json.obj("height" -> 1, "spentComplexity" -> 85, "applicationStatus" -> "succeeded", "stateChanges" -> InvokeScriptResult())
         json shouldBe (tx.json() ++ extraFields)
       }
 
-      Get(routePath(s"/info?${txs.map("id=" + _.id()).mkString("&")}")) ~> route ~> check(checkResponse())
-      Post(routePath("/info"), FormData(txs.map("id" -> _.id().toString)*)) ~> route ~> check(checkResponse())
+      def checkErrorResponse(errMsg: String): Unit = {
+        response.status shouldBe StatusCodes.BadRequest
+        (responseAs[JsObject] \ "message").as[String] shouldBe errMsg
+      }
+
+      val maxLimitTxs      = Seq.fill(transactionsApiRoute.settings.transactionsByAddressLimit)(txs.head)
+      val moreThanLimitTxs = txs.head +: maxLimitTxs
+
+      Get(routePath(s"/info?${txs.map("id=" + _.id()).mkString("&")}")) ~> route ~> check(checkResponse(txs))
+      Get(routePath(s"/info?${maxLimitTxs.map("id=" + _.id()).mkString("&")}")) ~> route ~> check(checkResponse(maxLimitTxs))
+      Get(routePath(s"/info?${moreThanLimitTxs.map("id=" + _.id()).mkString("&")}")) ~> route ~> check(checkErrorResponse(inputLimitErrMsg))
+      Get(routePath("/info")) ~> route ~> check(checkErrorResponse(emptyInputErrMsg))
+
+      Post(routePath("/info"), FormData(txs.map("id" -> _.id().toString)*)) ~> route ~> check(checkResponse(txs))
+      Post(routePath("/info"), FormData(maxLimitTxs.map("id" -> _.id().toString)*)) ~> route ~> check(checkResponse(maxLimitTxs))
+      Post(routePath("/info"), FormData(moreThanLimitTxs.map("id" -> _.id().toString)*)) ~> route ~> check(checkErrorResponse(inputLimitErrMsg))
+      Post(routePath("/info"), FormData()) ~> route ~> check(checkErrorResponse(emptyInputErrMsg))
+
       Post(
         routePath("/info"),
         HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Json.arr(txs.map(_.id().toString: JsValueWrapper)*)).toString())
       ) ~> route ~> check(
-        checkResponse()
+        checkResponse(txs)
       )
+      Post(
+        routePath("/info"),
+        HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Json.arr(maxLimitTxs.map(_.id().toString: JsValueWrapper)*)).toString())
+      ) ~> route ~> check(
+        checkResponse(maxLimitTxs)
+      )
+      Post(
+        routePath("/info"),
+        HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Json.arr(moreThanLimitTxs.map(_.id().toString: JsValueWrapper)*)).toString())
+      ) ~> route ~> check(checkErrorResponse(inputLimitErrMsg))
+      Post(
+        routePath("/info"),
+        HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> JsArray.empty).toString())
+      ) ~> route ~> check(checkErrorResponse(emptyInputErrMsg))
     }
   }
 
@@ -1066,6 +1100,43 @@ class TransactionsRouteSpec
         }
       }
     }
+
+    "checks the length of base58 attachment in symbols" in {
+      val attachmentSizeInSymbols = TransferTransaction.MaxAttachmentStringSize + 1
+      val attachmentStr           = "1" * attachmentSizeInSymbols
+
+      val tx = TxHelpers
+        .transfer()
+        .copy(attachment = ByteStr(Base58.decode(attachmentStr))) // to bypass a validation
+        .signWith(defaultSigner.privateKey)
+
+      Post(routePath("/broadcast"), tx.json()) ~> route should produce(
+        WrongJson(errors =
+          Seq(
+            JsPath \ "attachment" -> Seq(
+              JsonValidationError(s"base58-encoded string length ($attachmentSizeInSymbols) exceeds maximum length of 192")
+            )
+          )
+        )
+      )
+    }
+
+    "checks the length of base58 attachment in bytes" in {
+      val attachmentSizeInSymbols = TransferTransaction.MaxAttachmentSize + 1
+      val attachmentStr           = "1" * attachmentSizeInSymbols
+      val attachment              = ByteStr(Base58.decode(attachmentStr))
+
+      val tx = TxHelpers
+        .transfer()
+        .copy(attachment = attachment)
+        .signWith(defaultSigner.privateKey)
+
+      Post(routePath("/broadcast"), tx.json()) ~> route should produce(
+        TooBigInBytes(
+          s"Invalid attachment. Length ${attachment.size} bytes exceeds maximum of ${TransferTransaction.MaxAttachmentSize} bytes."
+        )
+      )
+    }
   }
 
   routePath("/merkleProof") - {
@@ -1154,19 +1225,70 @@ class TransactionsRouteSpec
       }
     }
 
-    "handles invalid signatures" in {
-      val invalidIdsGen = for {
-        ids       <- Gen.nonEmptyListOf(randomTransactionGen.map(_.id().toString))
-        invalidId <- Gen.nonEmptyListOf(invalidBase58Gen)
-      } yield Random.shuffle(ids ++ invalidId)
+    "handles invalid ids" in {
+      val invalidIds = Seq(
+        ByteStr.fill(AssetIdLength)(1),
+        ByteStr.fill(AssetIdLength)(2)
+      ).map(bs => s"${bs}0")
 
-      forAll(invalidIdsGen) { invalidIds =>
-        val queryParams = invalidIds.map(id => s"id=$id").mkString("?", "&", "")
-        val requestBody = Json.obj("ids" -> invalidIds)
+      Get(routePath(s"/merkleProof?${invalidIds.map("id=" + _).mkString("&")}")) ~> route should produce(InvalidIds(invalidIds))
 
-        Get(routePath(s"/merkleProof$queryParams")) ~> route should produce(InvalidSignature)
+      Post(routePath("/merkleProof"), FormData(invalidIds.map("id" -> _)*)) ~> route should produce(InvalidIds(invalidIds))
 
-        Post(routePath("/merkleProof"), requestBody) ~> route should produce(InvalidSignature)
+      Post(routePath("/merkleProof"), Json.obj("ids" -> invalidIds)) ~> route should produce(InvalidIds(invalidIds))
+    }
+
+    "handles transactions ids limit" in {
+      val inputLimitErrMsg = TooBigArrayAllocation(transactionsApiRoute.settings.transactionsByAddressLimit).message
+      val emptyInputErrMsg = "Transaction ID was not specified"
+
+      def checkErrorResponse(errMsg: String): Unit = {
+        response.status shouldBe StatusCodes.BadRequest
+        (responseAs[JsObject] \ "message").as[String] shouldBe errMsg
+      }
+
+      def checkResponse(tx: TransferTransaction, idsCount: Int): Unit = {
+        response.status shouldBe StatusCodes.OK
+
+        val result = responseAs[JsArray].value
+        result.size shouldBe idsCount
+        (1 to idsCount).zip(responseAs[JsArray].value) foreach { case (_, json) =>
+          (json \ "id").as[String] shouldBe tx.id().toString
+          (json \ "transactionIndex").as[Int] shouldBe 0
+        }
+      }
+
+      val sender = TxHelpers.signer(1)
+
+      withDomain(DomainPresets.RideV5, balances = AddrWithBalance.enoughBalances(sender)) { d =>
+        val transferTx = TxHelpers.transfer(from = sender)
+        d.appendBlock(transferTx)
+
+        val route = mkRoute(d)
+
+        val maxLimitIds      = Seq.fill(transactionsApiRoute.settings.transactionsByAddressLimit)(transferTx.id().toString)
+        val moreThanLimitIds = transferTx.id().toString +: maxLimitIds
+
+        Get(routePath(s"/merkleProof?${maxLimitIds.map("id=" + _).mkString("&")}")) ~> route ~> check(checkResponse(transferTx, maxLimitIds.size))
+        Get(routePath(s"/merkleProof?${moreThanLimitIds.map("id=" + _).mkString("&")}")) ~> route ~> check(checkErrorResponse(inputLimitErrMsg))
+        Get(routePath("/merkleProof")) ~> route ~> check(checkErrorResponse(emptyInputErrMsg))
+
+        Post(routePath("/merkleProof"), FormData(maxLimitIds.map("id" -> _)*)) ~> route ~> check(checkResponse(transferTx, maxLimitIds.size))
+        Post(routePath("/merkleProof"), FormData(moreThanLimitIds.map("id" -> _)*)) ~> route ~> check(checkErrorResponse(inputLimitErrMsg))
+        Post(routePath("/merkleProof"), FormData()) ~> route ~> check(checkErrorResponse(emptyInputErrMsg))
+
+        Post(
+          routePath(s"/merkleProof"),
+          HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Json.arr(maxLimitIds.map(id => id: JsValueWrapper)*)).toString())
+        ) ~> route ~> check(checkResponse(transferTx, maxLimitIds.size))
+        Post(
+          routePath(s"/merkleProof"),
+          HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> Json.arr(moreThanLimitIds.map(id => id: JsValueWrapper)*)).toString())
+        ) ~> route ~> check(checkErrorResponse(inputLimitErrMsg))
+        Post(
+          routePath("/merkleProof"),
+          HttpEntity(ContentTypes.`application/json`, Json.obj("ids" -> JsArray.empty).toString())
+        ) ~> route ~> check(checkErrorResponse(emptyInputErrMsg))
       }
     }
   }
