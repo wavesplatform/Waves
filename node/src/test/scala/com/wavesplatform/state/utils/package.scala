@@ -24,11 +24,11 @@ package object utils {
   )(implicit s: Scheduler): Seq[(Height, Transaction)] =
     AddressTransactions
       .allAddressTransactions(db, diff, address, None, types, fromId)
-      .map { case (tm, tx) => tm.height -> tx }
+      .map { case (tm, tx, _) => tm.height -> tx }
       .toListL
       .runSyncUnsafe()
 
-  object TestLevelDB {
+  object TestRocksDB {
     def withFunctionalitySettings(
         writableDB: RocksDB,
         spendableBalanceChanged: Observer[(Address, Asset)],

@@ -160,6 +160,7 @@ case class Domain(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl, levelDB
     AddressPortfolio
       .nftIterator(resource, address, blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), None, blockchainUpdater.assetDescription)
       .toSeq
+      .flatten
   }
 
   def addressTransactions(address: Address, from: Option[ByteStr] = None): Seq[(Height, Transaction)] =
@@ -172,7 +173,7 @@ case class Domain(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl, levelDB
         Set.empty,
         from
       )
-      .map { case (m, tx) => m.height -> tx }
+      .map { case (m, tx, _) => m.height -> tx }
       .toListL
       .runSyncUnsafe()
 
@@ -413,5 +414,6 @@ object Domain {
         id => blockchainUpdater.assetDescription(id).exists(!_.nft)
       )
       .toSeq
+      .flatten
   }
 }

@@ -32,9 +32,9 @@ class AssetsApiGrpcImpl(assetsApi: CommonAssetsApi, accountsApi: CommonAccountsA
       case Some(address) =>
         accountsApi
           .nftList(address, afterAssetId)
-          .map {
-            case (a, d) => NFTResponse(a.id.toByteString, Some(assetInfoResponse(d)))
-          }
+          .concatMapIterable(_.map { case (a, d) =>
+            NFTResponse(a.id.toByteString, Some(assetInfoResponse(d)))
+          })
           .take(request.limit)
       case _ => Observable.empty
     }
@@ -50,13 +50,12 @@ class AssetsApiGrpcImpl(assetsApi: CommonAssetsApi, accountsApi: CommonAccountsA
       d.decimals,
       d.reissuable,
       d.totalVolume.longValue,
-      d.script.map {
-        case AssetScriptInfo(script, complexity) =>
-          ScriptData(
-            PBTransactions.toPBScript(Some(script)),
-            script.expr.toString,
-            complexity
-          )
+      d.script.map { case AssetScriptInfo(script, complexity) =>
+        ScriptData(
+          PBTransactions.toPBScript(Some(script)),
+          script.expr.toString,
+          complexity
+        )
       },
       d.sponsorship
     )

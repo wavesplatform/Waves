@@ -10,10 +10,9 @@ import com.wavesplatform.state.{Diff, Height, InvokeScriptResult, TransactionId,
 import com.wavesplatform.transaction.{Authorized, EthereumTransaction, GenesisTransaction, Transaction, TransactionType}
 import monix.eval.Task
 import monix.reactive.Observable
-import org.rocksdb.{ReadOptions, RocksDB, RocksIterator}
+import org.rocksdb.RocksDB
 
 import scala.jdk.CollectionConverters.*
-import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 
 object AddressTransactions {

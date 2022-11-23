@@ -46,6 +46,8 @@ trait EmptyBlockchain extends Blockchain {
 
   override def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)] = None
 
+  override def transactionInfos(ids: Seq[ByteStr]): Seq[Option[(TxMeta, Transaction)]] = Seq.empty
+
   override def transactionMeta(id: ByteStr): Option[TxMeta] = None
 
   override def containsTransaction(tx: Transaction): Boolean = false
@@ -77,6 +79,8 @@ trait EmptyBlockchain extends Blockchain {
   override def leaseBalance(address: Address): LeaseBalance = LeaseBalance.empty
 
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] = None
+
+  override def compositeBlockchain: Blockchain = this
 }
 
 object EmptyBlockchain extends EmptyBlockchain

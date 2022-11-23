@@ -238,6 +238,8 @@ class TransactionsRouteSpec
         forAll(addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect")) { case (address, limit) =>
           (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
           (addressTransactions.transactionsByAddress _).expects(*, *, *, None).returning(Observable.empty).once()
+          (() => blockchain.compositeBlockchain).expects().returns(blockchain)
+          (() => blockchain.activatedFeatures).expects().returns(Map.empty)
           Get(routePath(s"/address/$address/limit/$limit")) ~> route ~> check {
             status shouldEqual StatusCodes.OK
           }
@@ -248,6 +250,8 @@ class TransactionsRouteSpec
         forAll(addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect"), bytes32StrGen) { case (address, limit, txId) =>
           (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
           (addressTransactions.transactionsByAddress _).expects(*, *, *, *).returning(Observable.empty).once()
+          (() => blockchain.compositeBlockchain).expects().returns(blockchain)
+          (() => blockchain.activatedFeatures).expects().returns(Map.empty)
           Get(routePath(s"/address/$address/limit/$limit?after=$txId")) ~> route ~> check {
             status shouldEqual StatusCodes.OK
           }
@@ -259,6 +263,7 @@ class TransactionsRouteSpec
       val transaction = TxHelpers.invoke(account.toAddress)
 
       (() => blockchain.activatedFeatures).expects().returns(Map.empty).anyNumberOfTimes()
+      (() => blockchain.compositeBlockchain).expects().returns(blockchain).anyNumberOfTimes()
       (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
       (addressTransactions.transactionsByAddress _)
         .expects(account.toAddress, *, *, None)
@@ -312,6 +317,7 @@ class TransactionsRouteSpec
       (blockchain.transactionMeta _).expects(leaseCancelId).returning(Some(TxMeta(Height(1), true, 0L))).anyNumberOfTimes()
 
       (() => blockchain.activatedFeatures).expects().returning(Map.empty).anyNumberOfTimes()
+      (() => blockchain.compositeBlockchain).expects().returns(blockchain).anyNumberOfTimes()
       (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
       (addressTransactions.transactionsByAddress _)
         .expects(invokeAddress, *, *, None)

@@ -49,7 +49,7 @@ import io.netty.util.HashedWheelTimer
 import io.netty.util.concurrent.{DefaultThreadFactory, GlobalEventExecutor}
 import kamon.Kamon
 import monix.eval.{Coeval, Task}
-import monix.execution.{ExecutionModel, Scheduler, UncaughtExceptionReporter}
+import monix.execution.{Scheduler, UncaughtExceptionReporter}
 import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject

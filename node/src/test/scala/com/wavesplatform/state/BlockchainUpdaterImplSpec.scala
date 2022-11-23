@@ -300,7 +300,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
     }
 
     "spendableBalanceChanged" in {
-      withLevelDBWriter(RideV6) { levelDb =>
+      withRocksDBWriter(RideV6) { levelDb =>
         val ps    = PublishToOneSubject[(Address, Asset)]()
         val items = ps.toListL.runToFuture
 

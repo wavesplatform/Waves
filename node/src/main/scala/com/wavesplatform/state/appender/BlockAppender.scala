@@ -30,9 +30,9 @@ object BlockAppender extends ScorexLogging {
       verify: Boolean = true
   )(newBlock: Block): Task[Either[ValidationError, Option[BigInt]]] =
     Task {
-      if (blockchainUpdater.isLastBlockId(newBlock.header.reference))
+      if (blockchainUpdater.isLastBlockId(newBlock.header.reference)) {
         appendKeyBlock(blockchainUpdater, utxStorage, pos, time, verify)(newBlock).map(_ => Some(blockchainUpdater.score))
-      else if (blockchainUpdater.contains(newBlock.id()) || blockchainUpdater.isLastBlockId(newBlock.id()))
+      } else if (blockchainUpdater.contains(newBlock.id()) || blockchainUpdater.isLastBlockId(newBlock.id()))
         Right(None)
       else
         Left(BlockAppendError("Block is not a child of the last block", newBlock))
@@ -88,7 +88,7 @@ object BlockAppender extends ScorexLogging {
       .onErrorHandle(e => log.warn("Error happened after block appending", e))
   }
 
-  //noinspection TypeAnnotation,ScalaStyle
+  // noinspection TypeAnnotation,ScalaStyle
   private[this] object metrics {
     def createApplySpan(block: Block) = {
       Kamon

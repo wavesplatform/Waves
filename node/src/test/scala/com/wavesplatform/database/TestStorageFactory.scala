@@ -22,15 +22,15 @@ object TestStorageFactory {
       blockchainUpdateTriggers: BlockchainUpdateTriggers
   ): (BlockchainUpdaterImpl, RocksDBWriter) = {
     val useBloomFilter = settings.dbSettings.useBloomFilter
-    val levelDBWriter: RocksDBWriter = new RocksDBWriter(db, spendableBalanceChanged, settings.blockchainSettings, settings.dbSettings) {
+    val rocksDBWriter: RocksDBWriter = new RocksDBWriter(db, spendableBalanceChanged, settings.blockchainSettings, settings.dbSettings) {
       override val orderFilter: BloomFilter        = wrappedFilter(useBloomFilter)
       override val dataKeyFilter: BloomFilter      = wrappedFilter(useBloomFilter)
       override val wavesBalanceFilter: BloomFilter = wrappedFilter(useBloomFilter)
       override val assetBalanceFilter: BloomFilter = wrappedFilter(useBloomFilter)
     }
     (
-      new BlockchainUpdaterImpl(levelDBWriter, spendableBalanceChanged, settings, time, blockchainUpdateTriggers, loadActiveLeases(db, _, _)),
-      levelDBWriter
+      new BlockchainUpdaterImpl(rocksDBWriter, spendableBalanceChanged, settings, time, blockchainUpdateTriggers, loadActiveLeases(db, _, _)),
+      rocksDBWriter
     )
   }
 }

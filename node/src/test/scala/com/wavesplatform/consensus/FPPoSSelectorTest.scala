@@ -12,7 +12,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{WavesSettings, *}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.utils.TestLevelDB
+import com.wavesplatform.state.utils.TestRocksDB
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction}
 import com.wavesplatform.utils.Time
@@ -225,7 +225,7 @@ class FPPoSSelectorTest extends FreeSpec with WithDB with DBCacheSettings {
     // we are not using the db instance from WithDB trait as it should be recreated between property checks
     val path = Files.createTempDirectory("lvl").toAbsolutePath
     val db   = database.openDB(path.toAbsolutePath.toString)
-    val defaultWriter = TestLevelDB.withFunctionalitySettings(
+    val defaultWriter = TestRocksDB.withFunctionalitySettings(
       db,
       ignoreSpendableBalanceChanged,
       TestFunctionalitySettings.Stub.copy(preActivatedFeatures =

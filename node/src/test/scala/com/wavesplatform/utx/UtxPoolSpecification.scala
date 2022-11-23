@@ -27,7 +27,7 @@ import com.wavesplatform.mining.*
 import com.wavesplatform.settings.*
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.{invoke as _, *}
-import com.wavesplatform.state.utils.TestLevelDB
+import com.wavesplatform.state.utils.TestRocksDB
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers.*
@@ -58,7 +58,7 @@ private object UtxPoolSpecification {
   final case class TempDB(fs: FunctionalitySettings, dbSettings: DBSettings) {
     val path: Path            = Files.createTempDirectory("leveldb-test")
     val db: RocksDB           = openDB(path.toAbsolutePath.toString)
-    val writer: RocksDBWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, fs)
+    val writer: RocksDBWriter = TestRocksDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, fs)
 
     sys.addShutdownHook {
       db.close()

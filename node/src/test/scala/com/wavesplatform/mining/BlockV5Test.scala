@@ -116,213 +116,207 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
     }
   }
 
-  "Miner" should "generate valid blocks" in forAll(genesis) {
-    case (minerAcc1, minerAcc2, genesis) =>
-      val disabledFeatures = new AtomicReference(Set[Short]())
-      withBlockchain(disabledFeatures, testTime) { blockchain =>
-        blockchain.processBlock(genesis, genesis.header.generationSignature) should beRight
-        withMiner(blockchain, testTime) {
-          case (miner, appender, scheduler) =>
-            for (h <- 2 until BlockV5ActivationHeight) {
+  "Miner" should "generate valid blocks" in forAll(genesis) { case (minerAcc1, minerAcc2, genesis) =>
+    val disabledFeatures = new AtomicReference(Set[Short]())
+    withBlockchain(disabledFeatures, testTime) { blockchain =>
+      blockchain.processBlock(genesis, genesis.header.generationSignature) should beRight
+      withMiner(blockchain, testTime) { case (miner, appender, scheduler) =>
+        for (h <- 2 until BlockV5ActivationHeight) {
 
-              shiftTime(miner, minerAcc1)
+          shiftTime(miner, minerAcc1)
 
-              val forge = miner.forgeBlock(minerAcc1)
-              val block = forge.explicitGet()._1
-              Await.result(appender(block).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
-              blockchain.height shouldBe h
-            }
+          val forge = miner.forgeBlock(minerAcc1)
+          val block = forge.explicitGet()._1
+          Await.result(appender(block).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
+          blockchain.height shouldBe h
+        }
 
-            blockchain.height shouldBe BlockV5ActivationHeight - 1
+        blockchain.height shouldBe BlockV5ActivationHeight - 1
 
-            shiftTime(miner, minerAcc2)
+        shiftTime(miner, minerAcc2)
 
-            val forgedAtActivationHeight = miner.forgeBlock(minerAcc2)
-            val blockAtActivationHeight  = forgedAtActivationHeight.explicitGet()._1
-            blockAtActivationHeight.header.version shouldBe Block.ProtoBlockVersion
+        val forgedAtActivationHeight = miner.forgeBlock(minerAcc2)
+        val blockAtActivationHeight  = forgedAtActivationHeight.explicitGet()._1
+        blockAtActivationHeight.header.version shouldBe Block.ProtoBlockVersion
 
-            Await.result(appender(blockAtActivationHeight).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
-            blockchain.height shouldBe BlockV5ActivationHeight
-            blockchain.lastBlockHeader.value.header.version shouldBe Block.ProtoBlockVersion
-            blockAtActivationHeight.signature shouldBe blockchain.lastBlockHeader.value.signature
+        Await.result(appender(blockAtActivationHeight).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
+        blockchain.height shouldBe BlockV5ActivationHeight
+        blockchain.lastBlockHeader.value.header.version shouldBe Block.ProtoBlockVersion
+        blockAtActivationHeight.signature shouldBe blockchain.lastBlockHeader.value.signature
 
-            val hitSourceBeforeActivationHeight = blockchain.hitSource(BlockV5ActivationHeight - 1).get
-            hitSourceBeforeActivationHeight shouldBe blockchain.blockHeader(BlockV5ActivationHeight - 1).get.header.generationSignature
+        val hitSourceBeforeActivationHeight = blockchain.hitSource(BlockV5ActivationHeight - 1).get
+        hitSourceBeforeActivationHeight shouldBe blockchain.blockHeader(BlockV5ActivationHeight - 1).get.header.generationSignature
 
-            val hitSourceAtActivationHeight = blockchain.hitSource(BlockV5ActivationHeight).get
-            hitSourceAtActivationHeight shouldBe crypto
-              .verifyVRF(
-                blockAtActivationHeight.header.generationSignature,
-                hitSourceBeforeActivationHeight.arr,
-                minerAcc2.publicKey
-              )
-              .explicitGet()
+        val hitSourceAtActivationHeight = blockchain.hitSource(BlockV5ActivationHeight).get
+        hitSourceAtActivationHeight shouldBe crypto
+          .verifyVRF(
+            blockAtActivationHeight.header.generationSignature,
+            hitSourceBeforeActivationHeight.arr,
+            minerAcc2.publicKey
+          )
+          .explicitGet()
 
-            shiftTime(miner, minerAcc1)
+        shiftTime(miner, minerAcc1)
 
-            val forgedAfterActivationHeight = miner.forgeBlock(minerAcc1)
-            val blockAfterActivationHeight  = forgedAfterActivationHeight.explicitGet()._1
-            blockAfterActivationHeight.header.version shouldBe Block.ProtoBlockVersion
+        val forgedAfterActivationHeight = miner.forgeBlock(minerAcc1)
+        val blockAfterActivationHeight  = forgedAfterActivationHeight.explicitGet()._1
+        blockAfterActivationHeight.header.version shouldBe Block.ProtoBlockVersion
 
-            Await.result(appender(blockAfterActivationHeight).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
-            blockchain.height shouldBe BlockV5ActivationHeight + 1
-            blockchain.lastBlockHeader.value.header.version shouldBe Block.ProtoBlockVersion
-            blockAfterActivationHeight.signature shouldBe blockchain.lastBlockHeader.value.signature
+        Await.result(appender(blockAfterActivationHeight).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
+        blockchain.height shouldBe BlockV5ActivationHeight + 1
+        blockchain.lastBlockHeader.value.header.version shouldBe Block.ProtoBlockVersion
+        blockAfterActivationHeight.signature shouldBe blockchain.lastBlockHeader.value.signature
 
-            val hitSourceAfterActivationHeight = blockchain.hitSource(BlockV5ActivationHeight + 1).get
-            hitSourceAfterActivationHeight shouldBe crypto
-              .verifyVRF(
-                blockAfterActivationHeight.header.generationSignature,
-                hitSourceAtActivationHeight.arr,
-                minerAcc1.publicKey
-              )
-              .explicitGet()
+        val hitSourceAfterActivationHeight = blockchain.hitSource(BlockV5ActivationHeight + 1).get
+        hitSourceAfterActivationHeight shouldBe crypto
+          .verifyVRF(
+            blockAfterActivationHeight.header.generationSignature,
+            hitSourceAtActivationHeight.arr,
+            minerAcc1.publicKey
+          )
+          .explicitGet()
 
-            shiftTime(miner, minerAcc2)
+        shiftTime(miner, minerAcc2)
 
-            val forgedAfterVRFUsing = miner.forgeBlock(minerAcc2)
-            val blockAfterVRFUsing  = forgedAfterVRFUsing.explicitGet()._1
-            blockAfterVRFUsing.header.version shouldBe Block.ProtoBlockVersion
+        val forgedAfterVRFUsing = miner.forgeBlock(minerAcc2)
+        val blockAfterVRFUsing  = forgedAfterVRFUsing.explicitGet()._1
+        blockAfterVRFUsing.header.version shouldBe Block.ProtoBlockVersion
 
-            Await.result(appender(blockAfterVRFUsing).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
-            blockchain.height shouldBe BlockV5ActivationHeight + 2
-            blockchain.lastBlockHeader.value.header.version shouldBe Block.ProtoBlockVersion
-            blockAfterVRFUsing.signature shouldBe blockchain.lastBlockHeader.value.signature
+        Await.result(appender(blockAfterVRFUsing).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
+        blockchain.height shouldBe BlockV5ActivationHeight + 2
+        blockchain.lastBlockHeader.value.header.version shouldBe Block.ProtoBlockVersion
+        blockAfterVRFUsing.signature shouldBe blockchain.lastBlockHeader.value.signature
 
-            val hitSourceAfterVRFUsing = blockchain.hitSource(BlockV5ActivationHeight + 2).get
-            hitSourceAfterVRFUsing shouldBe crypto
-              .verifyVRF(
-                blockAfterVRFUsing.header.generationSignature,
-                hitSourceAfterActivationHeight.arr,
-                minerAcc2.publicKey
-              )
-              .explicitGet()
+        val hitSourceAfterVRFUsing = blockchain.hitSource(BlockV5ActivationHeight + 2).get
+        hitSourceAfterVRFUsing shouldBe crypto
+          .verifyVRF(
+            blockAfterVRFUsing.header.generationSignature,
+            hitSourceAfterActivationHeight.arr,
+            minerAcc2.publicKey
+          )
+          .explicitGet()
 
-            blockchain.blockHeader(BlockV5ActivationHeight).value.signature shouldBe blockAtActivationHeight.signature
-            blockchain.blockHeader(BlockV5ActivationHeight + 1).value.signature shouldBe blockAfterActivationHeight.signature
-            blockchain.blockHeader(BlockV5ActivationHeight + 2).value.signature shouldBe blockAfterVRFUsing.signature
+        blockchain.blockHeader(BlockV5ActivationHeight).value.signature shouldBe blockAtActivationHeight.signature
+        blockchain.blockHeader(BlockV5ActivationHeight + 1).value.signature shouldBe blockAfterActivationHeight.signature
+        blockchain.blockHeader(BlockV5ActivationHeight + 2).value.signature shouldBe blockAfterVRFUsing.signature
 
-            blockchain.parentHeader(blockAfterVRFUsing.header).value shouldBe blockAfterActivationHeight.header
-            blockchain.parentHeader(blockAfterVRFUsing.header, 2).value shouldBe blockAtActivationHeight.header
+        blockchain.parentHeader(blockAfterVRFUsing.header).value shouldBe blockAfterActivationHeight.header
+        blockchain.parentHeader(blockAfterVRFUsing.header, 2).value shouldBe blockAtActivationHeight.header
 
-            disabledFeatures.set(Set(BlockchainFeatures.BlockV5.id))
+        disabledFeatures.set(Set(BlockchainFeatures.BlockV5.id))
 
-            shiftTime(miner, minerAcc2)
+        shiftTime(miner, minerAcc2)
 
-            val oldVersionBlockForge = miner.forgeBlock(minerAcc2)
-            val oldVersionBlock      = oldVersionBlockForge.explicitGet()._1
-            oldVersionBlock.header.version shouldBe Block.RewardBlockVersion
+        val oldVersionBlockForge = miner.forgeBlock(minerAcc2)
+        val oldVersionBlock      = oldVersionBlockForge.explicitGet()._1
+        oldVersionBlock.header.version shouldBe Block.RewardBlockVersion
 
-            disabledFeatures.set(Set())
-            Await.result(appender(oldVersionBlock).runToFuture(scheduler), 10.seconds).left.value
+        disabledFeatures.set(Set())
+        Await.result(appender(oldVersionBlock).runToFuture(scheduler), 10.seconds).left.value
 
-            for (h <- blockchain.height to 110) {
+        for (h <- blockchain.height to 110) {
 
-              shiftTime(miner, minerAcc1)
+          shiftTime(miner, minerAcc1)
 
-              val forged = miner.forgeBlock(minerAcc1)
-              val block  = forged.explicitGet()._1
-              block.header.version shouldBe Block.ProtoBlockVersion
+          val forged = miner.forgeBlock(minerAcc1)
+          val block  = forged.explicitGet()._1
+          block.header.version shouldBe Block.ProtoBlockVersion
 
-              Await.result(appender(block).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
-              blockchain.height shouldBe (h + 1)
+          Await.result(appender(block).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
+          blockchain.height shouldBe (h + 1)
 
-              val hitSource     = blockchain.hitSource(if (h > 100) h - 100 else h).value
-              val nextHitSource = blockchain.hitSource(h + 1).value
-              val lastBlock     = blockchain.lastBlockHeader.value
+          val hitSource     = blockchain.hitSource(if (h > 100) h - 100 else h).value
+          val nextHitSource = blockchain.hitSource(h + 1).value
+          val lastBlock     = blockchain.lastBlockHeader.value
 
-              nextHitSource shouldBe crypto
-                .verifyVRF(
-                  lastBlock.header.generationSignature,
-                  hitSource.arr,
-                  minerAcc1.publicKey
-                )
-                .explicitGet()
-            }
+          nextHitSource shouldBe crypto
+            .verifyVRF(
+              lastBlock.header.generationSignature,
+              hitSource.arr,
+              minerAcc1.publicKey
+            )
+            .explicitGet()
         }
       }
+    }
   }
 
-  "Miner" should "generate valid blocks when feature pre-activated" in forAll(genesis) {
-    case (minerAcc1, _, genesis) =>
-      withBlockchain(new AtomicReference(Set()), testTime, preActivatedTestSettings) { blockchain =>
-        blockchain.processBlock(genesis, genesis.header.generationSignature) should beRight
-        withMiner(blockchain, testTime) {
-          case (miner, appender, scheduler) =>
-            for (h <- blockchain.height to 110) {
+  "Miner" should "generate valid blocks when feature pre-activated" in forAll(genesis) { case (minerAcc1, _, genesis) =>
+    withBlockchain(new AtomicReference(Set()), testTime, preActivatedTestSettings) { blockchain =>
+      blockchain.processBlock(genesis, genesis.header.generationSignature) should beRight
+      withMiner(blockchain, testTime) { case (miner, appender, scheduler) =>
+        for (h <- blockchain.height to 110) {
 
-              shiftTime(miner, minerAcc1)
+          shiftTime(miner, minerAcc1)
 
-              val forged = miner.forgeBlock(minerAcc1)
-              val block  = forged.explicitGet()._1
-              block.header.version shouldBe Block.ProtoBlockVersion
+          val forged = miner.forgeBlock(minerAcc1)
+          val block  = forged.explicitGet()._1
+          block.header.version shouldBe Block.ProtoBlockVersion
 
-              Await.result(appender(block).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
-              blockchain.height shouldBe (h + 1)
-            }
+          Await.result(appender(block).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
+          blockchain.height shouldBe (h + 1)
         }
       }
+    }
   }
 
-  "Block version" should "be validated accordingly features activation" in forAll(genesis) {
-    case (minerAcc, _, genesis) =>
-      val disabledFeatures = new AtomicReference(Set.empty[Short])
-      withBlockchain(disabledFeatures, testTime) { blockchain =>
-        blockchain.processBlock(genesis, genesis.header.generationSignature) should beRight
-        withMiner(blockchain, testTime) {
-          case (miner, appender, scheduler) =>
-            def forge(): Block = {
-              val forge = miner.forgeBlock(minerAcc)
-              forge.explicitGet()._1
-            }
-
-            def forgeAppendAndValidate(version: Byte, height: Int): Unit = {
-              val block = forge()
-              block.header.version shouldBe version
-              Await.result(appender(block).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
-              blockchain.height shouldBe height
-            }
-
-            for (h <- 2 to NGActivationHeight + 1) {
-              shiftTime(miner, minerAcc)
-              forgeAppendAndValidate(Block.PlainBlockVersion, h)
-            }
-
-            shiftTime(miner, minerAcc)
-            forgeAppendAndValidate(Block.NgBlockVersion, NGActivationHeight + 2)
-
-            for (h <- blockchain.height + 1 to BlockRewardActivationHeight) {
-              shiftTime(miner, minerAcc)
-              forgeAppendAndValidate(Block.NgBlockVersion, h)
-            }
-
-            disabledFeatures.set(Set(BlockchainFeatures.BlockReward.id))
-            shiftTime(miner, minerAcc)
-            val badNgBlock = forge()
-            badNgBlock.header.version shouldBe Block.NgBlockVersion
-            disabledFeatures.set(Set())
-            Await.result(appender(badNgBlock).runToFuture(scheduler), 10.seconds).left.value
-
-            shiftTime(miner, minerAcc)
-            forgeAppendAndValidate(Block.RewardBlockVersion, BlockRewardActivationHeight + 1)
-
-            for (h <- blockchain.height + 1 until BlockV5ActivationHeight) {
-              shiftTime(miner, minerAcc)
-              forgeAppendAndValidate(Block.RewardBlockVersion, h)
-            }
-
-            disabledFeatures.set(Set(BlockchainFeatures.BlockV5.id))
-            shiftTime(miner, minerAcc)
-            val badRewardBlock = forge()
-            badRewardBlock.header.version shouldBe Block.RewardBlockVersion
-            disabledFeatures.set(Set())
-            Await.result(appender(badNgBlock).runToFuture(scheduler), 10.seconds).left.value
-            Await.result(appender(badRewardBlock).runToFuture(scheduler), 10.seconds).left.value
-
-            shiftTime(miner, minerAcc)
-            forgeAppendAndValidate(Block.ProtoBlockVersion, BlockV5ActivationHeight)
+  "Block version" should "be validated accordingly features activation" in forAll(genesis) { case (minerAcc, _, genesis) =>
+    val disabledFeatures = new AtomicReference(Set.empty[Short])
+    withBlockchain(disabledFeatures, testTime) { blockchain =>
+      blockchain.processBlock(genesis, genesis.header.generationSignature) should beRight
+      withMiner(blockchain, testTime) { case (miner, appender, scheduler) =>
+        def forge(): Block = {
+          val forge = miner.forgeBlock(minerAcc)
+          forge.explicitGet()._1
         }
+
+        def forgeAppendAndValidate(version: Byte, height: Int): Unit = {
+          val block = forge()
+          block.header.version shouldBe version
+          Await.result(appender(block).runToFuture(scheduler), 10.seconds).explicitGet() shouldBe defined
+          blockchain.height shouldBe height
+        }
+
+        for (h <- 2 to NGActivationHeight + 1) {
+          shiftTime(miner, minerAcc)
+          forgeAppendAndValidate(Block.PlainBlockVersion, h)
+        }
+
+        shiftTime(miner, minerAcc)
+        forgeAppendAndValidate(Block.NgBlockVersion, NGActivationHeight + 2)
+
+        for (h <- blockchain.height + 1 to BlockRewardActivationHeight) {
+          shiftTime(miner, minerAcc)
+          forgeAppendAndValidate(Block.NgBlockVersion, h)
+        }
+
+        disabledFeatures.set(Set(BlockchainFeatures.BlockReward.id))
+        shiftTime(miner, minerAcc)
+        val badNgBlock = forge()
+        badNgBlock.header.version shouldBe Block.NgBlockVersion
+        disabledFeatures.set(Set())
+        Await.result(appender(badNgBlock).runToFuture(scheduler), 10.seconds).left.value
+
+        shiftTime(miner, minerAcc)
+        forgeAppendAndValidate(Block.RewardBlockVersion, BlockRewardActivationHeight + 1)
+
+        for (h <- blockchain.height + 1 until BlockV5ActivationHeight) {
+          shiftTime(miner, minerAcc)
+          forgeAppendAndValidate(Block.RewardBlockVersion, h)
+        }
+
+        disabledFeatures.set(Set(BlockchainFeatures.BlockV5.id))
+        shiftTime(miner, minerAcc)
+        val badRewardBlock = forge()
+        badRewardBlock.header.version shouldBe Block.RewardBlockVersion
+        disabledFeatures.set(Set())
+        Await.result(appender(badNgBlock).runToFuture(scheduler), 10.seconds).left.value
+        Await.result(appender(badRewardBlock).runToFuture(scheduler), 10.seconds).left.value
+
+        shiftTime(miner, minerAcc)
+        forgeAppendAndValidate(Block.ProtoBlockVersion, BlockV5ActivationHeight)
       }
+    }
   }
 
   private def createTx(sender: KeyPair, recipient: AddressOrAlias): Transaction =
@@ -373,62 +367,63 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
       genesis = GenesisTransaction.create(acc.toAddress, diffs.ENOUGH_AMT, ts).explicitGet()
     } yield (acc, genesis)
 
-    forAll(preconditions) {
-      case (acc, genesis) =>
-        val fs = TestFunctionalitySettings.Stub.copy(preActivatedFeatures = Map(
-            BlockchainFeatures.NG.id            -> 0,
-            BlockchainFeatures.BlockV5.id       -> 2,
-            BlockchainFeatures.SmartAccounts.id -> 0
-          ))
+    forAll(preconditions) { case (acc, genesis) =>
+      val fs = TestFunctionalitySettings.Stub.copy(preActivatedFeatures =
+        Map(
+          BlockchainFeatures.NG.id            -> 0,
+          BlockchainFeatures.BlockV5.id       -> 2,
+          BlockchainFeatures.SmartAccounts.id -> 0
+        )
+      )
 
-        withDomain(WavesSettings.default().copy(blockchainSettings = WavesSettings.default().blockchainSettings.copy(functionalitySettings = fs))) {
-          d =>
-            def applyBlock(txs: Transaction*): SignedBlockHeader = {
-              d.appendBlock(
-                TestBlock.create(
-                  System.currentTimeMillis(),
-                  d.blockchainUpdater.lastBlockId.getOrElse(TestBlock.randomSignature()),
-                  txs,
-                  version =
-                    if (d.blockchainUpdater.height >= 1) Block.ProtoBlockVersion
-                    else Block.PlainBlockVersion
-                )
+      withDomain(WavesSettings.default().copy(blockchainSettings = WavesSettings.default().blockchainSettings.copy(functionalitySettings = fs))) {
+        d =>
+          def applyBlock(txs: Transaction*): SignedBlockHeader = {
+            d.appendBlock(
+              TestBlock.create(
+                System.currentTimeMillis(),
+                d.blockchainUpdater.lastBlockId.getOrElse(TestBlock.randomSignature()),
+                txs,
+                version =
+                  if (d.blockchainUpdater.height >= 1) Block.ProtoBlockVersion
+                  else Block.PlainBlockVersion
               )
-              lastBlock
-            }
+            )
+            lastBlock
+          }
 
-            def lastBlock: SignedBlockHeader =
-              d.blockchainUpdater.lastBlockHeader.get
+          def lastBlock: SignedBlockHeader =
+            d.blockchainUpdater.lastBlockHeader.get
 
-            val block1 = applyBlock(genesis, TxHelpers.genesis(TxHelpers.defaultAddress)) // h=1
-            block1.id() shouldBe block1.signature
-            block1.id() should have length crypto.SignatureLength
+          val block1 = applyBlock(genesis, TxHelpers.genesis(TxHelpers.defaultAddress)) // h=1
+          block1.id() shouldBe block1.signature
+          block1.id() should have length crypto.SignatureLength
 
-            val block2 = applyBlock() // h=2
-            block2.header.reference shouldBe block1.signature
-            block2.id() should have length crypto.DigestLength
+          val block2 = applyBlock() // h=2
+          block2.header.reference shouldBe block1.signature
+          block2.id() should have length crypto.DigestLength
 
-            val block3 = applyBlock()
-            block3.header.reference shouldBe block2.id()
-            block3.id() should have length crypto.DigestLength
+          val block3 = applyBlock()
+          block3.header.reference shouldBe block2.id()
+          block3.id() should have length crypto.DigestLength
 
-            val (keyBlock, microBlocks) =
-              UnsafeBlocks.unsafeChainBaseAndMicro(
-                block3.id(),
-                Nil,
-                Seq(Seq(TxHelpers.transfer()), Seq(TxHelpers.transfer())),
-                acc,
-                Block.ProtoBlockVersion,
-                System.currentTimeMillis()
-              )
-            d.appendBlock(keyBlock)
-            microBlocks.foreach(d.appendMicroBlock)
+          val (keyBlock, microBlocks) =
+            UnsafeBlocks.unsafeChainBaseAndMicro(
+              block3.id(),
+              Nil,
+              Seq(Seq(TxHelpers.transfer()), Seq(TxHelpers.transfer())),
+              acc,
+              Block.ProtoBlockVersion,
+              System.currentTimeMillis()
+            )
+          d.appendBlock(keyBlock)
+          microBlocks.foreach(d.appendMicroBlock)
 
-            val mb1 = d.microBlocks.head
-            mb1.totalResBlockSig should have length crypto.SignatureLength
-            mb1.reference should not be keyBlock.signature
-            mb1.reference shouldBe keyBlock.id()
-        }
+          val mb1 = d.microBlocks.head
+          mb1.totalResBlockSig should have length crypto.SignatureLength
+          mb1.reference should not be keyBlock.signature
+          mb1.reference shouldBe keyBlock.id()
+      }
     }
   }
 
@@ -451,7 +446,7 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
   private def withBlockchain(disabledFeatures: AtomicReference[Set[Short]], time: Time = ntpTime, settings: WavesSettings = testSettings)(
       f: Blockchain with BlockchainUpdater with NG => Unit
   ): Unit = {
-    withLevelDBWriter(settings.blockchainSettings) { blockchain =>
+    withRocksDBWriter(settings.blockchainSettings) { blockchain =>
       val bcu: BlockchainUpdaterImpl =
         new BlockchainUpdaterImpl(blockchain, Observer.stopped, settings, time, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty) {
           override def activatedFeatures: Map[Short, Int] = super.activatedFeatures -- disabledFeatures.get()
@@ -472,8 +467,8 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
     val utxPool           = new UtxPoolImpl(time, blockchain, settings.utxSettings, settings.minerSettings.enable)
     val minerScheduler    = Scheduler.singleThread("miner")
     val appenderScheduler = Scheduler.singleThread("appender")
-    val miner             = new MinerImpl(allChannels, blockchain, settings, time, utxPool, wallet, pos, minerScheduler, appenderScheduler, Observable.empty)
-    val blockAppender     = BlockAppender(blockchain, time, utxPool, pos, appenderScheduler) _
+    val miner = new MinerImpl(allChannels, blockchain, settings, time, utxPool, wallet, pos, minerScheduler, appenderScheduler, Observable.empty)
+    val blockAppender = BlockAppender(blockchain, time, utxPool, pos, appenderScheduler) _
     f(miner, blockAppender, appenderScheduler)
   }
 }
@@ -487,23 +482,32 @@ object BlockV5Test {
   private val defaultSettings = WavesSettings.fromRootConfig(ConfigFactory.load())
   private val testSettings = defaultSettings.copy(
     blockchainSettings = defaultSettings.blockchainSettings.copy(
-      functionalitySettings = FunctionalitySettings(featureCheckBlocksPeriod = 10, blocksForFeatureActivation = 1, blockVersion3AfterHeight = NGActivationHeight, preActivatedFeatures = Map(
+      functionalitySettings = FunctionalitySettings(
+        featureCheckBlocksPeriod = 10,
+        blocksForFeatureActivation = 1,
+        blockVersion3AfterHeight = NGActivationHeight,
+        preActivatedFeatures = Map(
           BlockchainFeatures.BlockV5.id     -> BlockV5ActivationHeight,
           BlockchainFeatures.BlockReward.id -> BlockRewardActivationHeight,
           BlockchainFeatures.NG.id          -> NGActivationHeight,
           BlockchainFeatures.FairPoS.id     -> FairPoSActivationHeight
-        ), doubleFeaturesPeriodsAfterHeight = Int.MaxValue)
+        ),
+        doubleFeaturesPeriodsAfterHeight = Int.MaxValue
+      )
     ),
     minerSettings = defaultSettings.minerSettings.copy(quorum = 0)
   )
   private val preActivatedTestSettings = testSettings.copy(
     blockchainSettings = testSettings.blockchainSettings.copy(
-      functionalitySettings = testSettings.blockchainSettings.functionalitySettings.copy(blockVersion3AfterHeight = 0, preActivatedFeatures = Map(
+      functionalitySettings = testSettings.blockchainSettings.functionalitySettings.copy(
+        blockVersion3AfterHeight = 0,
+        preActivatedFeatures = Map(
           BlockchainFeatures.BlockV5.id     -> 0,
           BlockchainFeatures.BlockReward.id -> 0,
           BlockchainFeatures.NG.id          -> 0,
           BlockchainFeatures.FairPoS.id     -> 0
-        ))
+        )
+      )
     )
   )
 }

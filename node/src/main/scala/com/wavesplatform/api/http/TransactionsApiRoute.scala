@@ -434,6 +434,7 @@ object TransactionsApiRoute {
           case FAIL(reason) =>
             out.writeKey("error")
             out.writeVal(reason)
+          case _ =>
         }
         out.writeObjectEnd()
       }
@@ -499,6 +500,12 @@ object TransactionsApiRoute {
       override def nullValue: FUNCTION_CALL = ???
     }
 
+    implicit val leaseStatusCodec: JsonValueCodec[LeaseStatus] = new JsonValueCodec[LeaseStatus] {
+      override def decodeValue(in: JsonReader, default: LeaseStatus): LeaseStatus = ???
+      override def encodeValue(x: LeaseStatus, out: JsonWriter): Unit =
+        if (x == LeaseStatus.active) out.writeVal("active") else out.writeVal("canceled")
+      override def nullValue: LeaseStatus = ???
+    }
     implicit val leaseRefCodec: JsonValueCodec[LeaseRef] = JsonCodecMaker.make(CodecMakerConfig.withTransientNone(false))
 
     implicit val leaseCodec: JsonValueCodec[Lease] = new JsonValueCodec[Lease] {
@@ -694,9 +701,9 @@ object TransactionsApiRoute {
       recipient: Address,
       amount: Long,
       height: Int,
-      status: LeaseStatus = LeaseStatus.active,
-      cancelHeight: Option[Int] = None,
-      cancelTransactionId: Option[ByteStr] = None
+      status: LeaseStatus,
+      cancelHeight: Option[Int],
+      cancelTransactionId: Option[ByteStr]
   )
   private[this] object LeaseRef {
     import com.wavesplatform.utils.byteStrFormat

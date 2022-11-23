@@ -8,7 +8,7 @@ import com.wavesplatform.api.common.CommonAccountsApi.AddressDataIterator.BatchS
 import com.wavesplatform.api.common.TransactionMeta.Ethereum
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{AddressId, DBExt, DBResource, Key, KeyTags, Keys, readIntSeq}
+import com.wavesplatform.database.{AddressId, DBExt, DBResource, Key, KeyTags, Keys}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBRecipients
@@ -22,11 +22,10 @@ import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.{EthereumTransaction, TransactionType}
 import monix.eval.Task
 import monix.reactive.Observable
-import org.rocksdb.{ReadOptions, RocksDB, RocksIterator}
+import org.rocksdb.RocksDB
 
 import java.nio.ByteBuffer
 import java.util.regex.Pattern
-import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 
@@ -130,7 +129,7 @@ object CommonAccountsApi {
               Task(new AddressDataIterator(dbResource, address, addressId, entriesFromDiff, pattern).asScala)
             )
           }
-          .getOrElse(Observable.empty)
+          .getOrElse(Observable.fromIterable(entriesFromDiff))
           .filterNot(_.isEmpty)
       }
     }

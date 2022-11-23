@@ -8,11 +8,11 @@ import com.wavesplatform.history.Domain
 import com.wavesplatform.settings.{Constants, WavesSettings}
 import com.wavesplatform.transaction.TxHelpers
 import monix.execution.Scheduler.Implicits.global
-import org.iq80.leveldb.DB
+import org.rocksdb.RocksDB
 import org.scalatest.Suite
 
 trait WithBUDomain extends WithDomain { _: Suite =>
-  def withDomainAndRepo(settings: WavesSettings)(f: (Domain, Repo) => Unit, wrapDB: DB => DB = identity): Unit = {
+  def withDomainAndRepo(settings: WavesSettings)(f: (Domain, Repo) => Unit, wrapDB: RocksDB => RocksDB = identity): Unit = {
     withDomain(settings) { d =>
       tempDb { db =>
         val repo = new Repo(wrapDB(db), d.blocksApi)

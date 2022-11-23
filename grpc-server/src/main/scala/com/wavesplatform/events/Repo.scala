@@ -1,18 +1,18 @@
 package com.wavesplatform.events
 
 import java.nio.{ByteBuffer, ByteOrder}
-import cats.syntax.semigroup._
+import cats.syntax.semigroup.*
 import com.google.common.primitives.Ints
 import com.wavesplatform.api.common.CommonBlocksApi
-import com.wavesplatform.api.grpc._
+import com.wavesplatform.api.grpc.*
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.DBExt
 import com.wavesplatform.events.Repo.keyForHeight
 import com.wavesplatform.events.api.grpc.protobuf.BlockchainUpdatesApiGrpc.BlockchainUpdatesApi
-import com.wavesplatform.events.api.grpc.protobuf._
-import com.wavesplatform.events.protobuf.serde._
-import com.wavesplatform.events.protobuf.{BlockchainUpdated => PBBlockchainUpdated}
+import com.wavesplatform.events.api.grpc.protobuf.*
+import com.wavesplatform.events.protobuf.serde.*
+import com.wavesplatform.events.protobuf.BlockchainUpdated as PBBlockchainUpdated
 import com.wavesplatform.events.repo.LiquidState
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.BlockDiffer
@@ -22,14 +22,17 @@ import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import monix.reactive.subjects.PublishToOneSubject
-import org.iq80.leveldb.DB
+import org.rocksdb.RocksDB
 
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.Future
 import scala.util.Using
 import scala.util.control.Exception
 
-class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler) extends BlockchainUpdatesApi with BlockchainUpdateTriggers with ScorexLogging {
+class Repo(db: RocksDB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
+    extends BlockchainUpdatesApi
+    with BlockchainUpdateTriggers
+    with ScorexLogging {
   private[this] val monitor     = new Object
   private[this] var liquidState = Option.empty[LiquidState]
   private[this] val handlers    = ConcurrentHashMap.newKeySet[Handler]()
@@ -48,8 +51,9 @@ class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler) extends Bl
       var lastHeight = 0
       Using(ro.newIterator) { iter =>
         Exception.ignoring(classOf[UnsupportedOperationException])(iter.seekToLast())
-        while (iter.hasNext) {
-          lastHeight = Ints.fromByteArray(iter.next().getKey)
+        while (iter.isValid) {
+          lastHeight = Ints.fromByteArray(iter.key())
+          iter.next()
         }
       }
       lastHeight
@@ -100,11 +104,11 @@ class Repo(db: DB, blocksApi: CommonBlocksApi)(implicit s: Scheduler) extends Bl
       var buf: List[BlockAppended] = Nil
       Using(rw.newIterator) { iter =>
         iter.seek(keyForHeight(toHeight + 1))
-        while (iter.hasNext) {
-          val e           = iter.next()
-          val height      = Ints.fromByteArray(e.getKey)
-          val stateUpdate = Loader.parseUpdate(e.getValue, blocksApi, height).vanillaAppend
+        while (iter.isValid) {
+          val height      = Ints.fromByteArray(iter.key())
+          val stateUpdate = Loader.parseUpdate(iter.value(), blocksApi, height).vanillaAppend
           buf = stateUpdate :: buf
+          iter.next()
         }
       }
 

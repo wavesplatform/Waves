@@ -14,7 +14,7 @@ import cats.syntax.alternative.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.github.plokhotnyuk.jsoniter_scala.core.{JsonValueCodec, writeToArray}
-import com.github.plokhotnyuk.jsoniter_scala.macros.JsonCodecMaker
+import com.github.plokhotnyuk.jsoniter_scala.macros.{CodecMakerConfig, JsonCodecMaker}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiError.*
@@ -37,7 +37,6 @@ import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeS
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import io.netty.util.concurrent.DefaultThreadFactory
-import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import play.api.libs.json.*
@@ -177,14 +176,14 @@ case class AssetsApiRoute(
                       tx.sender.toAddress(tx.chainId).toString,
                       tx.sender.toString,
                       tx.proofs.proofs.map(_.toString),
-                      if (tx.usesLegacySignature) Some(tx.signature.toString) else None,
                       tx.assetId.toString,
                       tx.name.toStringUtf8,
                       tx.quantity.value,
                       tx.reissuable,
                       tx.decimals.value,
                       tx.description.toStringUtf8,
-                      if (tx.version >= TxVersion.V2) tx.script.map(_.bytes().base64) else None
+                      if (tx.version >= TxVersion.V2) tx.script.map(_.bytes().base64) else None,
+                      if (tx.usesLegacySignature) Some(tx.signature.toString) else None
                     )
                   },
                   balance = balance
@@ -307,11 +306,11 @@ case class AssetsApiRoute(
       routeTimeout.executeStreamed {
         commonAccountApi
           .nftList(address, after)
-          .concatMapIterable(
+          .concatMapIterable { a =>
             AssetsApiRoute
-              .jsonDetailsNew(compositeBlockchain)(_, full = true)
+              .jsonDetailsNew(compositeBlockchain)(a, full = true)
               .valueOr(err => throw new IllegalArgumentException(err))
-          )
+          }
           .take(limit)
           .toListL
       }(identity)
@@ -385,7 +384,7 @@ object AssetsApiRoute {
   }
 
   def jsonDetailsNew(blockchain: Blockchain)(assets: Seq[(IssuedAsset, AssetDescription)], full: Boolean): Either[String, Seq[ByteString]] = {
-    def additionalInfo(ids: Seq[ByteStr]): Either[String, Seq[(TxTimestamp, Height)]] =
+    def additionalInfo(ids: Seq[ByteStr]): Either[String, Seq[(TxTimestamp, Height)]] = {
       blockchain.transactionInfos(ids).traverse { infoOpt =>
         for {
           tt <- infoOpt
@@ -401,6 +400,7 @@ object AssetsApiRoute {
           }).toRight("No issue/invokeScript/invokeExpression transaction found with the given asset ID")
         } yield (ts, txm.height)
       }
+    }
 
     additionalInfo(assets.map { case (_, description) => description.originTransactionId }).map { infos =>
       assets.zip(infos).map { case ((id, description), (timestamp, height)) =>
@@ -523,14 +523,14 @@ object AssetsApiRoute {
       sender: String,
       senderPublicKey: String,
       proofs: Seq[String],
-      signature: Option[String],
       assetId: String,
       name: String,
       quantity: Long,
       reissuable: Boolean,
       decimals: Byte,
       description: String,
-      script: Option[String]
+      script: Option[String],
+      signature: Option[String] = None
   )
 
   case class FullAssetInfo(
@@ -545,7 +545,8 @@ object AssetsApiRoute {
 
   case class AssetId(assetId: String)
 
-  implicit val assetDetailCodec: JsonValueCodec[AssetDetails]    = JsonCodecMaker.make
-  implicit val fullAssetInfoCodec: JsonValueCodec[FullAssetInfo] = JsonCodecMaker.make
-  implicit val assetIdCodec: JsonValueCodec[AssetId]             = JsonCodecMaker.make
+  implicit val issueTxInfoCodec: JsonValueCodec[IssueTransactionInfo] = JsonCodecMaker.make(CodecMakerConfig.withTransientNone(false))
+  implicit val assetDetailCodec: JsonValueCodec[AssetDetails]         = JsonCodecMaker.make
+  implicit val fullAssetInfoCodec: JsonValueCodec[FullAssetInfo]      = JsonCodecMaker.make
+  implicit val assetIdCodec: JsonValueCodec[AssetId]                  = JsonCodecMaker.make
 }

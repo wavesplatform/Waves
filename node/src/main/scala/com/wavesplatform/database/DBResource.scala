@@ -69,6 +69,7 @@ object DBResource {
       prefixIterator.synchronized(prefixIterator.close())
       fullIterator.synchronized(fullIterator.close())
       snapshot.close()
+      readOptions.close()
     }
   }
 }

@@ -23,9 +23,9 @@ object StorageFactory extends ScorexLogging {
       miner: Miner = _ => ()
   ): (BlockchainUpdaterImpl, RocksDBWriter & AutoCloseable) = {
     checkVersion(db)
-    val levelDBWriter = RocksDBWriter(db, spendableBalanceChanged, settings)
+    val rocksDBWriter = RocksDBWriter(db, spendableBalanceChanged, settings)
     val bui = new BlockchainUpdaterImpl(
-      levelDBWriter,
+      rocksDBWriter,
       spendableBalanceChanged,
       settings,
       time,
@@ -33,7 +33,7 @@ object StorageFactory extends ScorexLogging {
       (minHeight, maxHeight) => loadActiveLeases(db, minHeight, maxHeight),
       miner
     )
-    (bui, levelDBWriter)
+    (bui, rocksDBWriter)
   }
 
   private def checkVersion(db: RocksDB): Unit = db.readWrite { rw =>

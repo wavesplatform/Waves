@@ -17,7 +17,7 @@ import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{TestFunctionalitySettings as TFS, *}
 import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT}
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.utils.TestLevelDB
+import com.wavesplatform.state.utils.TestRocksDB
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Portfolio}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
@@ -49,26 +49,26 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
     }
   }
 
-  protected def withLevelDBWriter[A](ws: WavesSettings)(test: RocksDBWriter => A): A = tempDb { db =>
-    val (_, ldb) = TestStorageFactory(
+  protected def withRocksDBWriter[A](ws: WavesSettings)(test: RocksDBWriter => A): A = tempDb { db =>
+    val (_, rdb) = TestStorageFactory(
       ws,
       db,
       ntpTime,
       ignoreSpendableBalanceChanged,
       ignoreBlockchainUpdateTriggers
     )
-    test(ldb)
+    test(rdb)
   }
 
-  protected def withLevelDBWriter[A](bs: BlockchainSettings)(test: RocksDBWriter => A): A =
-    withLevelDBWriter(TestSettings.Default.copy(blockchainSettings = bs))(test)
+  protected def withRocksDBWriter[A](bs: BlockchainSettings)(test: RocksDBWriter => A): A =
+    withRocksDBWriter(TestSettings.Default.copy(blockchainSettings = bs))(test)
 
-  def withLevelDBWriter[A](fs: FunctionalitySettings)(test: RocksDBWriter => A): A =
-    withLevelDBWriter(TestLevelDB.createTestBlockchainSettings(fs))(test)
+  def withRocksDBWriter[A](fs: FunctionalitySettings)(test: RocksDBWriter => A): A =
+    withRocksDBWriter(TestRocksDB.createTestBlockchainSettings(fs))(test)
 
   def assertDiffEi(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)(
       assertion: Either[ValidationError, Diff] => Unit
-  ): Unit = withLevelDBWriter(fs) { state =>
+  ): Unit = withRocksDBWriter(fs) { state =>
     assertDiffEi(preconditions, block, state)(assertion)
   }
 
@@ -88,7 +88,7 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
 
   def assertDiffEiTraced(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)(
       assertion: TracedResult[ValidationError, Diff] => Unit
-  ): Unit = withLevelDBWriter(fs) { state =>
+  ): Unit = withRocksDBWriter(fs) { state =>
     def differ(blockchain: Blockchain, b: Block) =
       BlockDiffer.fromBlockTraced(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature, verify = true)
 
@@ -102,7 +102,7 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
 
   private def assertDiffAndState(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings, withNg: Boolean)(
       assertion: (Diff, Blockchain) => Unit
-  ): Unit = withLevelDBWriter(fs) { state =>
+  ): Unit = withRocksDBWriter(fs) { state =>
     def differ(blockchain: Blockchain, prevBlock: Option[Block], b: Block): Either[ValidationError, BlockDiffer.Result] =
       BlockDiffer.fromBlock(blockchain, if (withNg) prevBlock else None, b, MiningConstraint.Unlimited, b.header.generationSignature)
 
@@ -131,7 +131,7 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
     assertDiffAndState(preconditions, block, fs, withNg = false)(assertion)
 
   def assertDiffAndState(fs: FunctionalitySettings)(test: (Seq[Transaction] => Either[ValidationError, Unit]) => Unit): Unit =
-    withLevelDBWriter(fs) { state =>
+    withRocksDBWriter(fs) { state =>
       def differ(blockchain: Blockchain, b: Block) =
         BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature)
 
@@ -168,7 +168,7 @@ trait WithDomain extends WithState { _: Suite =>
         DomainPresets.SettingsFromDefaultConfig.addFeatures(BlockchainFeatures.SmartAccounts), // SmartAccounts to allow V2 transfers by default
       balances: Seq[AddrWithBalance] = Seq.empty
   )(test: Domain => A): A =
-    withLevelDBWriter(settings) { blockchain =>
+    withRocksDBWriter(settings) { blockchain =>
       var domain: Domain = null
       val bcu = new BlockchainUpdaterImpl(
         blockchain,

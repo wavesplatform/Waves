@@ -685,7 +685,7 @@ package object database {
       result
     }
 
-    def multiGetBuffered[A](readOptions: ReadOptions, keys: Seq[Key[A]], valBufferSize: Int): Seq[A] = {
+    def multiGetBuffered[A](readOptions: ReadOptions, keys: Seq[Key[Option[A]]], valBufferSize: Int): Seq[Option[A]] = {
       val keyBufs = keys.map { k =>
         val arr = k.keyBytes
         val b   = Util.getTemporaryDirectBuffer(arr.length)
@@ -702,12 +702,12 @@ package object database {
 
       val result = keys.view
         .zip(db.multiGetByteBuffers(readOptions, keyBufs, valBufs).asScala)
-        .flatMap { case (parser, value) =>
+        .map { case (parser, value) =>
           if (value.status.getCode == Status.Code.Ok) {
             val arr = new Array[Byte](value.requiredSize)
             value.value.get(arr)
             Util.releaseTemporaryDirectBuffer(value.value)
-            Some(parser.parse(arr))
+            parser.parse(arr)
           } else None
         }
         .toSeq
@@ -716,7 +716,7 @@ package object database {
       result
     }
 
-    def multiGetBuffered[A](readOptions: ReadOptions, keys: Seq[Key[A]], valBufSizes: Seq[Int]): Seq[A] = {
+    def multiGetBuffered[A](readOptions: ReadOptions, keys: Seq[Key[Option[A]]], valBufSizes: Seq[Int]): Seq[Option[A]] = {
       val keyBufs = keys.map { k =>
         val arr = k.keyBytes
         val b   = Util.getTemporaryDirectBuffer(arr.length)
@@ -731,12 +731,12 @@ package object database {
 
       val result = keys.view
         .zip(db.multiGetByteBuffers(readOptions, keyBufs, valBufs).asScala)
-        .flatMap { case (parser, value) =>
+        .map { case (parser, value) =>
           if (value.status.getCode == Status.Code.Ok) {
             val arr = new Array[Byte](value.requiredSize)
             value.value.get(arr)
             Util.releaseTemporaryDirectBuffer(value.value)
-            Some(parser.parse(arr))
+            parser.parse(arr)
           } else None
         }
         .toSeq
