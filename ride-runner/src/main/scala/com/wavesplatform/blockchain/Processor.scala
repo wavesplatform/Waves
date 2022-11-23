@@ -179,9 +179,10 @@ class BlockchainProcessor private (
 
     val r = Task
       .parTraverseUnordered(xs) { s =>
-        Task(runScript(height, s)).tapError { e =>
-          Task(log.error(s"An error during running ${s.key}", e))
-        }
+        Task(runScript(height, s))
+          .tapError { e =>
+            Task(log.error(s"An error during running ${s.key}", e))
+          }
       }
       .runToFuture(scheduler)
 
@@ -194,13 +195,14 @@ class BlockchainProcessor private (
   override def removeFrom(height: Height): Unit = blockchainStorage.blockHeaders.removeFrom(height)
 
   private def runScript(height: Int, script: RestApiScript): Unit = {
+    val start     = System.nanoTime()
     val refreshed = script.refreshed(settings.enableTraces)
     val key       = script.key
     storage.put(key, refreshed)
 
     val complexity = refreshed.lastResult.value("complexity").as[Int]
     val result     = refreshed.lastResult.value("result").as[JsObject].value("value")
-    log.info(s"[$height, $key] complexity: $complexity, apiResult: $result")
+    log.info(f"[$height, $key] complexity: $complexity in ${(System.nanoTime() - start) / 1e9d}%5f s, apiResult: $result")
   }
 
   override def getLastResultOrRun(address: Address, request: JsObject): Task[JsObject] = {

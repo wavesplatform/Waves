@@ -17,8 +17,7 @@ class AccountScriptStorage[TagT](
     estimator: => ScriptEstimator,
     blockchainApi: BlockchainGrpcApi,
     override val persistentCache: PersistentCache[Address, AccountScriptInfo]
-) extends HeightStorage[Address, AccountScriptInfo, TagT]
-    with HasAnyRefMap[Address, AccountScriptInfo, TagT] {
+) extends HeightStorage[Address, AccountScriptInfo, TagT] {
   override def getFromBlockchain(key: Address): Option[AccountScriptInfo] = blockchainApi.getAccountScript(key, estimator)
 
   def append(height: Int, account: PublicKey, newScript: ByteString): AppendResult[TagT] =
@@ -33,6 +32,7 @@ object AccountScriptStorage {
     // TODO dup, see BlockchainGrpcApi
 
     // DiffCommons
+    // TODO
     val fixEstimateOfVerifier    = true // blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
     val useContractVerifierLimit = true // !isAsset && blockchain.useReducedVerifierComplexityLimit
 
