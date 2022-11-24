@@ -636,7 +636,7 @@ class Parser(implicit offset: Int) {
     parseWithError[DAPP](
       new StringBuilder(scriptStr),
       parse,
-      DAPP(Pos(0, scriptStr.length - 1), Nil, Nil,)
+      DAPP(Pos(0, scriptStr.length - 1), Nil, Nil)
     ).map { dAppAndErrorIndexes =>
       val removedCharPosOpt = if (dAppAndErrorIndexes._2.isEmpty) None else Some(Pos(dAppAndErrorIndexes._2.min, dAppAndErrorIndexes._2.max))
       (dAppAndErrorIndexes._1, removedCharPosOpt)
