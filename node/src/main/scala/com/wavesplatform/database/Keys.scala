@@ -48,7 +48,7 @@ object Keys {
     Key(WavesBalanceHistory, hBytes(addressId.toByteArray, height), readBalanceNode, writeBalanceNode)
 
   def assetBalance(addressId: AddressId, asset: IssuedAsset): Key[CurrentBalance] =
-    Key(AssetBalance, asset.id.arr ++ addressId.toByteArray, readCurrentBalance, writeCurrentBalance)
+    Key(AssetBalance, addressId.toByteArray ++ asset.id.arr, readCurrentBalance, writeCurrentBalance)
 
   def assetBalanceAt(addressId: AddressId, asset: IssuedAsset, height: Height): Key[BalanceNode] =
     Key(AssetBalanceHistory, hBytes(addressId.toByteArray ++ asset.id.arr, height), readBalanceNode, writeBalanceNode)

@@ -12,7 +12,7 @@ import org.rocksdb.RocksDB
 
 object TestStorageFactory {
   private def wrappedFilter(use: Boolean): BloomFilter =
-    if (use) new Wrapper(GBloomFilter.create(Funnels.byteArrayFunnel(), 1000L)) else BloomFilter.AlwaysEmpty
+    if (use) new Wrapper(GBloomFilter.create(Funnels.byteArrayFunnel(), 1L)) else BloomFilter.AlwaysEmpty
 
   def apply(
       settings: WavesSettings,

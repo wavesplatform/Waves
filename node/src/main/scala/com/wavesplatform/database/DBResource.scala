@@ -15,6 +15,7 @@ trait DBResource extends AutoCloseable {
   def multiGetLongs(keys: Seq[Array[Byte]]): View[Long]
   def multiGetLongs(keys: ArrayBuffer[Array[Byte]]): View[Long]
   def multiGetBuffered[A](keys: ArrayBuffer[Key[A]], valBufferSizes: ArrayBuffer[Int]): Seq[A]
+  def multiGetBuffered[A](keys: ArrayBuffer[Key[A]], valBufferSize: Int): View[A]
   def multiGetBufferedFlat[A](keys: ArrayBuffer[Key[Option[A]]], valBufferSize: Int): Seq[A]
   def multiGetBufferedFlat[A](keys: ArrayBuffer[Key[Option[A]]], valBufferSizes: ArrayBuffer[Int]): Seq[A]
   def prefixIterator: RocksIterator // Should have a single instance
@@ -42,6 +43,9 @@ object DBResource {
 
     def multiGetBuffered[A](keys: ArrayBuffer[Key[A]], valBufferSizes: ArrayBuffer[Int]): Seq[A] =
       db.multiGetBuffered(readOptions, keys, valBufferSizes)
+
+    def multiGetBuffered[A](keys: ArrayBuffer[Key[A]], valBufferSize: Int): View[A] =
+      db.multiGetBuffered(readOptions, keys, valBufferSize)
 
     override def multiGet(keys: ArrayBuffer[Array[Byte]]): Seq[Array[Byte]] = db.multiGet(readOptions, keys)
 

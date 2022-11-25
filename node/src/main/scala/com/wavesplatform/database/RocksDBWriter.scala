@@ -1,23 +1,23 @@
 package com.wavesplatform.database
 
-import java.io.File
 import java.util
-
 import cats.data.Ior
 import cats.syntax.option.*
 import cats.syntax.semigroup.*
 import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
-import com.google.common.primitives.Bytes
+import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database
 import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, TransactionMeta, BlockMeta as PBBlockMeta}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings, WavesSettings}
 import com.wavesplatform.state.*
@@ -594,6 +594,14 @@ abstract class RocksDBWriter private[database] (
             addressId <- rw.get(Keys.changedAddresses(currentHeight))
           } yield addressId -> rw.get(Keys.idToAddress(addressId))
 
+          rw.iterateOver(KeyTags.ChangedAssetBalances.prefixBytes ++ Ints.toByteArray(currentHeight)) { e =>
+            val assetId = IssuedAsset(ByteStr(e.getKey.takeRight(32)))
+            for ((addressId, address) <- changedAddresses) {
+              balancesToInvalidate += address -> assetId
+              rollbackBalanceHistory(rw, Keys.assetBalance(addressId, assetId), Keys.assetBalanceAt(addressId, assetId, _), currentHeight)
+            }
+          }
+
           for ((addressId, address) <- changedAddresses) {
             for (k <- rw.get(Keys.changedDataKeys(currentHeight, addressId))) {
               log.trace(s"Discarding $k for $address at $currentHeight")
@@ -604,7 +612,7 @@ abstract class RocksDBWriter private[database] (
             rw.delete(Keys.changedDataKeys(currentHeight, addressId))
 
             balancesToInvalidate += (address -> Waves)
-            rw.filterHistory(Keys.wavesBalanceHistory(addressId), currentHeight)
+            rollbackBalanceHistory(rw, Keys.wavesBalance(addressId), Keys.wavesBalanceAt(addressId, _), currentHeight)
 
             rw.delete(Keys.leaseBalance(addressId)(currentHeight))
             rw.filterHistory(Keys.leaseBalanceHistory(addressId), currentHeight)
@@ -631,7 +639,8 @@ abstract class RocksDBWriter private[database] (
 
           rollbackAssetsInfo(rw, currentHeight)
 
-          loadTransactions(currentHeight, rw).view.zipWithIndex.foreach { case ((_, tx), idx) =>
+          val blockTxs = loadTransactions(currentHeight, rw)
+          blockTxs.view.zipWithIndex.foreach { case ((_, tx), idx) =>
             val num = TxNum(idx.toShort)
             (tx: @unchecked) match {
               case _: GenesisTransaction                                                       => // genesis transaction can not be rolled back
@@ -689,7 +698,15 @@ abstract class RocksDBWriter private[database] (
             disabledAliases = DisableHijackedAliases.revert(rw)
           }
 
-          ???
+          val block = createBlock(
+            PBBlocks.vanilla(
+              discardedMeta.header.getOrElse(throw new IllegalArgumentException(s"Block header is missing at height ${currentHeight.toInt}"))
+            ),
+            ByteStr(discardedMeta.signature.toByteArray),
+            blockTxs.map(_._2)
+          ).explicitGet()
+
+          (block, Caches.toHitSource(discardedMeta))
         }
 
         balancesToInvalidate.result().foreach(discardBalance)
@@ -703,6 +720,15 @@ abstract class RocksDBWriter private[database] (
 
     log.debug(s"Rollback to block $targetBlockId at $targetHeight completed")
     discardedBlocks.reverse
+  }
+
+  private def rollbackBalanceHistory(rw: RW, curBalanceKey: Key[CurrentBalance], balanceNodeKey: Height => Key[BalanceNode], height: Height): Unit = {
+    val balance = rw.get(curBalanceKey)
+    if (balance.height == height) {
+      val prevBalanceNode = rw.get(balanceNodeKey(balance.prevHeight))
+      rw.delete(balanceNodeKey(height))
+      rw.put(curBalanceKey, CurrentBalance(prevBalanceNode.balance, balance.prevHeight, prevBalanceNode.prevHeight))
+    }
   }
 
   private def rollbackAssetsInfo(rw: RW, currentHeight: Int): Unit = {

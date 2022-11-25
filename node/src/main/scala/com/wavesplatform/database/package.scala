@@ -826,6 +826,36 @@ package object database {
       result
     }
 
+    def multiGetBuffered[A](readOptions: ReadOptions, keys: ArrayBuffer[Key[A]], valBufSize: Int): View[A] = {
+      val keyBufs = keys.map { k =>
+        val arr = k.keyBytes
+        val b   = Util.getTemporaryDirectBuffer(arr.length)
+        b.put(k.keyBytes).flip()
+        b
+      }.asJava
+      val valBufs = List
+        .fill(keys.size) {
+          val buf = Util.getTemporaryDirectBuffer(valBufSize)
+          buf.limit(buf.capacity())
+          buf
+        }
+        .asJava
+
+      val result = keys.view
+        .zip(db.multiGetByteBuffers(readOptions, keyBufs, valBufs).asScala)
+        .flatMap { case (parser, value) =>
+          if (value.status.getCode == Status.Code.Ok) {
+            val arr = new Array[Byte](value.requiredSize)
+            value.value.get(arr)
+            Util.releaseTemporaryDirectBuffer(value.value)
+            Some(parser.parse(arr))
+          } else None
+        }
+
+      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
+      result
+    }
+
     def get[A](key: Key[A]): A                           = key.parse(db.get(key.keyBytes))
     def get[A](key: Key[A], readOptions: ReadOptions): A = key.parse(db.get(readOptions, key.keyBytes))
     def has(key: Key[?]): Boolean                        = db.get(key.keyBytes) != null

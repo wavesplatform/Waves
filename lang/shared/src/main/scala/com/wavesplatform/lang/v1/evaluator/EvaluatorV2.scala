@@ -209,7 +209,7 @@ class EvaluatorV2(
                     update = update,
                     limit = unused - overheadCost,
                     parentBlocks = parentBlocks
-                    )
+                  )
                 )
               case FALSE if unused > 0 =>
                 update(i.ifFalse).flatMap(_ =>
@@ -218,7 +218,7 @@ class EvaluatorV2(
                     update = update,
                     limit = unused - overheadCost,
                     parentBlocks = parentBlocks
-                    )
+                  )
                 )
               case _: EVALUATED => EvaluationResult("Non-boolean result in cond", unused)
               case _            => EvaluationResult(unused)
@@ -273,7 +273,14 @@ class EvaluatorV2(
   ): EvaluationResult[Int] = {
     val result = root(
       expr = let.value,
-      update = v => EvaluationResult(let.value = v),
+      update = v =>
+        EvaluationResult(let.value = v)
+          .map(_ =>
+            let.value match {
+              case e: EVALUATED => ctx.log(let, Right(e))
+              case _            =>
+            }
+          ),
       limit = limit,
       parentBlocks = nextParentBlocks
     ).flatMap { unused =>
@@ -282,8 +289,17 @@ class EvaluatorV2(
         case _                           => EvaluationResult(unused)
       }
     }
-    EvaluationResult(result.value)
+    logError(let, result)
   }
+
+  private def logError(let: LET, r: EvaluationResult[Int]): EvaluationResult[Int] =
+    EvaluationResult(
+      r.value
+        .map(_.leftMap { case l @ (error, _) =>
+          ctx.log(let, Left(error))
+          l
+        })
+    )
 
   private def findGlobalVar(key: String, update: EVALUATED => EvaluationResult[Unit], limit: Int): Option[EvaluationResult[Int]] =
     ctx.ec.letDefs

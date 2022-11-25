@@ -18,7 +18,7 @@ import com.wavesplatform.api.http.eth.EthRpcRoute
 import com.wavesplatform.api.http.leasing.LeaseApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.database.{DBExt, openDB}
+import com.wavesplatform.database.{AddressId, DBExt, Keys, openDB}
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.EstimatorProvider.*
@@ -28,6 +28,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerDebugInfo, MinerImpl}
 import com.wavesplatform.network.*
+import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height, TxMeta}
@@ -57,6 +58,7 @@ import java.io.File
 import java.security.Security
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.{TimeUnit, *}
+import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
@@ -317,7 +319,24 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     // API start
     if (settings.restAPISettings.enable) {
-      def loadBalanceHistory(address: Address): Seq[(Int, Long)] = Seq.empty // FIXME: implement?
+      // TODO: maybe add length constraint
+      def loadBalanceHistory(address: Address): Seq[(Int, Long)] = db.readOnly { rdb =>
+        @tailrec
+        def getPrevBalances(addressId: AddressId, height: Height, acc: Seq[(Int, Long)]): Seq[(Int, Long)] = {
+          if (height > 0) {
+            val balance = rdb.get(Keys.wavesBalanceAt(addressId, height))
+            getPrevBalances(addressId, balance.prevHeight, (height, balance.balance) +: acc)
+          } else acc
+        }
+
+        rdb
+          .get(Keys.addressId(address))
+          .map { aid =>
+            val currentBalance = rdb.get(Keys.wavesBalance(aid))
+            (currentBalance.height, currentBalance.balance) +: getPrevBalances(aid, currentBalance.prevHeight, Seq.empty).reverse
+          }
+          .getOrElse(Seq.empty)
+      }
 
       val limitedScheduler =
         Schedulers.timeBoundedFixedPool(
@@ -587,10 +606,10 @@ object Application extends ScorexLogging {
         .getOrElse(db.readOnly(ro => database.loadTransactions(Height(height), ro)))
     }
 
-  // FIXME: implement?
-  private[wavesplatform] def loadBlockMetaAt(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] = {
-    None
-  }
+  private[wavesplatform] def loadBlockMetaAt(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] =
+    blockchainUpdater.liquidBlockMeta
+      .filter(_ => blockchainUpdater.height == height)
+      .orElse(db.get(Keys.blockMetaAt(Height(height))).flatMap(BlockMeta.fromPb))
 
   def main(args: Array[String]): Unit = {
 
