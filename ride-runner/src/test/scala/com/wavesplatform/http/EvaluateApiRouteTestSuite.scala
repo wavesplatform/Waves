@@ -37,7 +37,6 @@ class EvaluateApiRouteTestSuite extends RouteSpec("/utils") with RestAPISettings
       }
 
       val api = EvaluateApiRoute(
-        restAPISettings,
         Schedulers.timeBoundedFixedPool(
           new HashedWheelTimer(),
           5.seconds,

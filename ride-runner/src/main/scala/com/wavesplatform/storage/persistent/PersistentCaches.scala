@@ -18,7 +18,4 @@ trait PersistentCaches {
 
   def getActivatedFeatures(): RemoteData[Map[Short, Int]]
   def setActivatedFeatures(data: Map[Short, Int]): Unit
-
-  def resolveAlias(alias: Alias): RemoteData[Address]
-  def setAlias(alias: Alias, data: RemoteData[Address]): Unit
 }

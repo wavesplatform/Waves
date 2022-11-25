@@ -328,20 +328,6 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
     log.trace("setActivatedFeatures")
   }
 
-  override def resolveAlias(alias: Alias): RemoteData[Address] =
-    db
-      .readOnly {
-        _.readFromDb(CacheKeys.Aliases.mkKey(alias))
-      }
-      .tap { r => log.trace(s"resolveAlias($alias): ${r.toFoundStr()}") }
-
-  override def setAlias(alias: Alias, data: RemoteData[Address]): Unit = {
-    db.readWrite {
-      _.writeToDb(CacheKeys.Aliases.mkKey(alias), data)
-    }
-    log.trace(s"setAlias($alias)")
-  }
-
   // TODO caching from NODE
   private def getOrMkAddressId(ro: ReadOnlyDB, address: Address): AddressId = {
     val key = CacheKeys.AddressIds.mkKey(address)
