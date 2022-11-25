@@ -17,9 +17,8 @@ import com.wavesplatform.api.grpc.{
   BlockchainApiGrpc,
   BlocksApiGrpc,
   DataRequest,
-  PBSignedTransactionConversions,
   TransactionsApiGrpc,
-  TransactionsRequest
+  TransactionsByIdRequest
 }
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.collections.syntax.*
@@ -35,8 +34,8 @@ import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.Block
 import com.wavesplatform.protobuf.transaction.PBTransactions.{toVanillaDataEntry, toVanillaScript}
 import com.wavesplatform.ride.input.EmptyPublicKey
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, DataEntry, Height, LeaseBalance, Portfolio, TxMeta}
-import com.wavesplatform.transaction.{Asset, Inspect, Transaction}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, DataEntry, Height, LeaseBalance, Portfolio}
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.*
 import io.grpc.stub.ClientCalls
@@ -309,33 +308,19 @@ class DefaultBlockchainApi(
       .tap(r => log.trace(s"getBalances($address): found assets=${r.assets.size}"))
   }
 
-  override def getTransferLikeTransaction(id: ByteStr): Option[(TxMeta, Option[Transaction])] = {
+  override def getTransactionHeight(id: ByteStr): Option[Height] = {
     val xs = ClientCalls
       .blockingServerStreamingCall(
-        grpcApiChannel.newCall(TransactionsApiGrpc.METHOD_GET_TRANSACTIONS, CallOptions.DEFAULT),
-        TransactionsRequest(transactionIds = Seq(UnsafeByteOperations.unsafeWrap(id.arr)))
+        grpcApiChannel.newCall(TransactionsApiGrpc.METHOD_GET_STATUSES, CallOptions.DEFAULT),
+        TransactionsByIdRequest(transactionIds = Seq(UnsafeByteOperations.unsafeWrap(id.arr)))
       )
 
     val r = if (xs.hasNext) {
       val pbTx = xs.next()
-
-      val mayBeTransferLikeTx = pbTx.transaction.flatMap { signedTx =>
-        signedTx.toVanilla.toOption.flatMap { tx =>
-          if (Inspect.isTransferLike(tx)) tx.some
-          else none
-        }
-      }
-
-      val meta = TxMeta(
-        height = Height(pbTx.height.toInt),
-        succeeded = pbTx.applicationStatus.isSucceeded, // Not used in Ride
-        spentComplexity = 0                             // TODO: It seems, not used
-      )
-
-      (meta, mayBeTransferLikeTx).some
+      Height(pbTx.height.toInt).some
     } else None
 
-    log.trace(s"getTransaction($id): ${r.toFoundStr { case (meta, tx) => s"meta=${meta.height}, tpe=${tx.map(_.tpe)}" }}")
+    log.trace(s"getTransactionHeight($id): ${r.toFoundStr { h => s"height=$h" }}")
     r
   }
 

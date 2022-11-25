@@ -27,11 +27,7 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     val startTs       = System.nanoTime()
     val basePath      = args(0)
-    val (_, settings) = AppInitializer.init(Some(new File(s"$basePath/node/waves.conf")))
-
-    AddressScheme.current = new AddressScheme {
-      override val chainId: Byte = 'W'.toByte
-    }
+    val (_, settings) = AppInitializer.init(Some(new File(s"$basePath/node/waves-testnet.conf")))
 
     val r = Using.Manager { use =>
       log.info("Loading args...")
@@ -42,42 +38,10 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
       val connector = use(new GrpcConnector)
 
       log.info("Making gRPC channel to gRPC API...")
-      val grpcApiChannel = use(
-        connector.mkChannel(
-          GrpcClientSettings(
-            target = "grpc.wavesnodes.com:6870",
-            maxHedgedAttempts = 5,
-            maxRetryAttempts = 30,
-            keepAliveWithoutCalls = false,
-            keepAliveTime = 60.seconds,
-            keepAliveTimeout = 15.seconds,
-            idleTimeout = 300.days,
-            maxInboundMessageSize = 8388608, // 8 MiB
-            channelOptions = GrpcClientSettings.ChannelOptionsSettings(
-              connectTimeout = 5.seconds
-            )
-          )
-        )
-      )
+      val grpcApiChannel = use(connector.mkChannel(settings.rideRunner.grpcApi))
 
       log.info("Making gRPC channel to Blockchain Updates API...")
-      val blockchainUpdatesApiChannel = use(
-        connector.mkChannel(
-          GrpcClientSettings(
-            target = "grpc.wavesnodes.com:6881",
-            maxHedgedAttempts = 5,
-            maxRetryAttempts = 30,
-            keepAliveWithoutCalls = false,
-            keepAliveTime = 60.seconds,
-            keepAliveTimeout = 15.seconds,
-            idleTimeout = 300.days,
-            maxInboundMessageSize = 8388608, // 8 MiB
-            channelOptions = GrpcClientSettings.ChannelOptionsSettings(
-              connectTimeout = 5.seconds
-            )
-          )
-        )
-      )
+      val blockchainUpdatesApiChannel = use(connector.mkChannel(settings.rideRunner.blockchainUpdatesApi))
 
       val commonScheduler = use(
         Executors.newScheduledThreadPool(
@@ -113,8 +77,12 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
       log.info("Warm up caches...") // Also helps to figure out, which data is used by a script
       processor.runScripts(forceAll = true)
 
-      val start = Height(3393500)   // math.max(0, blockchainStorage.height - 100 - 1))
-      val end   = Height(start + 1) // 101 // lastHeightAtStart
+      // mainnet
+//      val start = Height(3393500)   // math.max(0, blockchainStorage.height - 100 - 1))
+//      val end   = Height(start + 1) // 101 // lastHeightAtStart
+
+      val start = Height(2327973)
+      val end   = Height(start + 1)
 
       val blockchainUpdates = use(blockchainApi.mkBlockchainUpdatesStream())
       val events = blockchainUpdates.stream

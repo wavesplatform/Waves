@@ -7,11 +7,36 @@ import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{AddressId, Key, readAccountScriptInfo, readAssetDetails, readAssetScript, readAssetStaticInfo, readBlockMeta, readLeaseBalance, writeAccountScriptInfo, writeAssetDetails, writeAssetScript, writeAssetStaticInfo, writeBlockMeta, writeLeaseBalance}
+import com.wavesplatform.database.{
+  AddressId,
+  Key,
+  readAccountScriptInfo,
+  readAssetDetails,
+  readAssetScript,
+  readAssetStaticInfo,
+  readBlockMeta,
+  readLeaseBalance,
+  writeAccountScriptInfo,
+  writeAssetDetails,
+  writeAssetScript,
+  writeAssetStaticInfo,
+  writeBlockMeta,
+  writeLeaseBalance
+}
 import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.serialization.*
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetInfo, AssetStaticInfo, AssetVolumeInfo, DataEntry, Portfolio, TransactionId, TxMeta}
+import com.wavesplatform.state.{
+  AccountScriptInfo,
+  AssetDescription,
+  AssetInfo,
+  AssetStaticInfo,
+  AssetVolumeInfo,
+  DataEntry,
+  Portfolio,
+  TransactionId,
+  TxMeta
+}
 import com.wavesplatform.storage.persistent.AsBytes.{ByteArrayOutputStreamOps, optional}
 import com.wavesplatform.transaction.serialization.impl.DataTxSerializer
 import com.wavesplatform.transaction.{Asset, EthereumTransaction, GenesisTransaction, PBSince, PaymentTransaction, Transaction, TransactionParsers}
@@ -225,7 +250,7 @@ sealed abstract class CacheKey[KeyT, ValueT](prefix: Short)(implicit keyAsBytes:
     override def encode(v: ValueT): Array[Byte]    = valueAsBytes.toByteArray(v)
   }
 
-  def parseKey(xs: Array[Byte]): KeyT = keyAsBytes.fromByteArray(xs.drop(Shorts.BYTES))._1
+  def parseKey(xs: Array[Byte]): KeyT     = keyAsBytes.fromByteArray(xs.drop(Shorts.BYTES))._1
   def parseValue(xs: Array[Byte]): ValueT = valueAsBytes.fromByteArray(xs)._1
 }
 
@@ -257,7 +282,7 @@ object CacheKeys {
   object PortfoliosHistory extends CacheHistoryKey[AddressId](14)
   object Portfolios        extends CacheKey[(AddressId, Int), Option[Portfolio]](15)
 
-  object Transactions extends CacheKey[TransactionId, Option[(TxMeta, Option[Transaction])]](13)
+  object Transactions extends CacheKey[TransactionId, Option[Int]](13)
 
   implicit val byteStrAsBytes: AsBytes[ByteStr] = AsBytes[Array[Byte]].transform(ByteStr(_), _.arr)
 

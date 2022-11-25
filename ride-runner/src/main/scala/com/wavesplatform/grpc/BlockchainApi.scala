@@ -6,8 +6,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.grpc.BlockchainApi.*
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, Portfolio, TxMeta}
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, Height, Portfolio}
+import com.wavesplatform.transaction.Asset
 import monix.reactive.Observable
 
 trait BlockchainApi {
@@ -23,7 +23,7 @@ trait BlockchainApi {
   def getAssetDescription(asset: Asset.IssuedAsset): Option[AssetDescription]
   def resolveAlias(alias: Alias): Option[Address]
   def getBalances(address: Address): Portfolio
-  def getTransferLikeTransaction(id: ByteStr): Option[(TxMeta, Option[Transaction])]
+  def getTransactionHeight(id: ByteStr): Option[Height]
 }
 
 object BlockchainApi {

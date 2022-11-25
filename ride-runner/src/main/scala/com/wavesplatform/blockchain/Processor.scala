@@ -119,8 +119,8 @@ class BlockchainProcessor private (
             r.withAppendResult(blockchainStorage.aliases.append(h, alias, pk))
           }
       )
-      .pipe(append.transactionIds.view.zip(txs).foldLeft(_) { case (r, (txId, tx)) =>
-        r.withAppendResult(blockchainStorage.transactions.append(h, txId, tx))
+      .pipe(append.transactionIds.foldLeft(_) { case (r, txId) =>
+        r.withAppendResult(blockchainStorage.transactions.append(h, txId))
       })
   }
 

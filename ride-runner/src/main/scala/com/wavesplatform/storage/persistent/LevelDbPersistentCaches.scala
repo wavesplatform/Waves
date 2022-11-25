@@ -6,10 +6,10 @@ import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.collections.syntax.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{AddressId, DBExt, Key, RW, ReadOnlyDB}
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, Portfolio, TransactionId, TxMeta}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, Height, Portfolio, TransactionId}
 import com.wavesplatform.storage.AccountDataKey
 import com.wavesplatform.storage.persistent.LevelDbPersistentCaches.{ReadOnlyDBOps, ReadWriteDBOps}
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB
 
@@ -199,25 +199,20 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
         .tap { _ => log.trace(s"remove($key, $fromHeight)") }
   }
 
-  override val transactions: PersistentCache[TransactionId, (TxMeta, Option[Transaction])] =
-    new PersistentCache[TransactionId, (TxMeta, Option[Transaction])] with ScorexLogging {
-      override def get(maxHeight: Int, key: TransactionId): RemoteData[(TxMeta, Option[Transaction])] =
+  override val transactions: PersistentCache[TransactionId, Height] =
+    new PersistentCache[TransactionId, Height] with ScorexLogging {
+      override def get(maxHeight: Int, key: TransactionId): RemoteData[Height] =
         db
-          .readOnly {
-            _.readFromDb(CacheKeys.Transactions.mkKey(key))
-          }
-          .tap { r => log.trace(s"get($key): ${r.toFoundStr { case (meta, tx) => s"meta=${meta.height}, tpe=${tx.map(_.tpe)}" }}") }
+          .readOnly { _.readFromDb(CacheKeys.Transactions.mkKey(key)).map(Height(_)) }
+          .tap { r => log.trace(s"get($key): ${r.toFoundStr { h => s"height=$h" }}") }
 
-      // TODO atHeight
-      override def set(atHeight: Int, key: TransactionId, data: RemoteData[(TxMeta, Option[Transaction])]): Unit = {
-        db.readWrite {
-          _.writeToDb(CacheKeys.Transactions.mkKey(key), data)
-        }
-        log.trace(s"setTransaction($key)")
+      override def set(atHeight: Int, key: TransactionId, data: RemoteData[Height]): Unit = {
+        db.readWrite { _.writeToDb(CacheKeys.Transactions.mkKey(key), data) }
+        log.trace(s"set($key)")
       }
 
       // TODO
-      override def remove(fromHeight: Int, key: TransactionId): RemoteData[(TxMeta, Option[Transaction])] = RemoteData.Unknown
+      override def remove(fromHeight: Int, key: TransactionId): RemoteData[Height] = RemoteData.Unknown
     }
 
   override val blockHeaders = new BlockPersistentCache {

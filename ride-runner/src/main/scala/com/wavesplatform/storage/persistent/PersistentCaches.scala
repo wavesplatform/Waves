@@ -2,9 +2,9 @@ package com.wavesplatform.storage.persistent
 
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.blockchain.RemoteData
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, Portfolio, TransactionId, TxMeta}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, Height, Portfolio, TransactionId}
 import com.wavesplatform.storage.AccountDataKey
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.Asset
 
 trait PersistentCaches {
   def accountDataEntries: PersistentCache[AccountDataKey, DataEntry[?]]
@@ -12,7 +12,7 @@ trait PersistentCaches {
   def assetDescriptions: PersistentCache[Asset.IssuedAsset, AssetDescription]
   def aliases: PersistentCache[Alias, Address]
   def balances: PersistentCache[Address, Portfolio]
-  def transactions: PersistentCache[TransactionId, (TxMeta, Option[Transaction])]
+  def transactions: PersistentCache[TransactionId, Height]
   def blockHeaders: BlockPersistentCache
   def vrf: VrfPersistentCache
 

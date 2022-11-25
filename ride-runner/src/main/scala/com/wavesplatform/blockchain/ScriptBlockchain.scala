@@ -14,6 +14,7 @@ import com.wavesplatform.state.{
   BalanceSnapshot,
   Blockchain,
   DataEntry,
+  Height,
   LeaseBalance,
   Portfolio,
   TransactionId,
@@ -71,6 +72,7 @@ class ScriptBlockchain[TagT](storage: SharedBlockchainData[TagT], tag: TagT) ext
   override def balance(address: Address, mayBeAssetId: Asset): Long = withPortfolios(address).balanceOf(mayBeAssetId)
 
   // Ride: wavesBalance (specifies to=None)
+
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] =
     // "to" always None
@@ -78,15 +80,16 @@ class ScriptBlockchain[TagT](storage: SharedBlockchainData[TagT], tag: TagT) ext
     List(BalanceSnapshot(height, withPortfolios(address)))
   // input.balanceSnapshots.getOrElse(address, Seq(BalanceSnapshot(height, 0, 0, 0))).filter(_.height >= from)
 
-  private def withTransactions(id: ByteStr): Option[(TxMeta, Option[TransferTransactionLike])] =
-    storage.transactions.getWithTransferLike(height, TransactionId(id), tag)
+  private def withTransactions(id: ByteStr): Option[Height] = storage.transactions.get(height, TransactionId(id), tag)
 
   // Ride: transactionHeightById
-  override def transactionMeta(id: ByteStr): Option[TxMeta] = withTransactions(id).map(_._1)
+  override def transactionMeta(id: ByteStr): Option[TxMeta] = {
+    // Other information is not used
+    withTransactions(id).map(TxMeta(_, succeeded = true, 0))
+  }
 
   // Ride: transferTransactionById
-  override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =
-    withTransactions(id).flatMap { case (meta, tx) => tx.map((meta.height, _)) }
+  override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] = kill("transferById")
 
   override def score: BigInt = kill("score")
 
@@ -119,5 +122,5 @@ class ScriptBlockchain[TagT](storage: SharedBlockchainData[TagT], tag: TagT) ext
   // GET /eth/assets
   override def resolveERC20Address(address: ERC20Address): Option[Asset.IssuedAsset] = kill("resolveERC20Address")
 
-  private def kill(methodName: String) = throw new RuntimeException(methodName)
+  private def kill(methodName: String) = throw new RuntimeException(s"$methodName is not supported, contact with developers")
 }
