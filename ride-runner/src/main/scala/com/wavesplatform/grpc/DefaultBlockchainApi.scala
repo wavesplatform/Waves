@@ -36,8 +36,7 @@ import com.wavesplatform.protobuf.block.Block
 import com.wavesplatform.protobuf.transaction.PBTransactions.{toVanillaDataEntry, toVanillaScript}
 import com.wavesplatform.ride.input.EmptyPublicKey
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, DataEntry, Height, LeaseBalance, Portfolio, TxMeta}
-import com.wavesplatform.transaction.transfer.TransferTransactionLike
-import com.wavesplatform.transaction.{Asset, EthereumTransaction, Transaction}
+import com.wavesplatform.transaction.{Asset, Inspect, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.*
 import io.grpc.stub.ClientCalls
@@ -320,19 +319,10 @@ class DefaultBlockchainApi(
     val r = if (xs.hasNext) {
       val pbTx = xs.next()
 
-      val tx = pbTx.transaction.flatMap { signedTx =>
-        signedTx.toVanilla.toOption.flatMap {
-          case etx: EthereumTransaction =>
-            etx.payload match {
-              case _: EthereumTransaction.Transfer =>
-                // TODO have to call GET /eth/assets/... or blockchain.resolveERC20Address
-                // transfer.toTransferLike(tx, blockchain = ???).toOption
-                none
-              case _ => none
-            }
-
-          case tx: TransferTransactionLike => tx.some
-          case _                           => none
+      val mayBeTransferLikeTx = pbTx.transaction.flatMap { signedTx =>
+        signedTx.toVanilla.toOption.flatMap { tx =>
+          if (Inspect.isTransferLike(tx)) tx.some
+          else none
         }
       }
 
@@ -342,7 +332,7 @@ class DefaultBlockchainApi(
         spentComplexity = 0                             // TODO: It seems, not used
       )
 
-      (meta, tx).some
+      (meta, mayBeTransferLikeTx).some
     } else None
 
     log.trace(s"getTransaction($id): ${r.toFoundStr { case (meta, tx) => s"meta=${meta.height}, tpe=${tx.map(_.tpe)}" }}")

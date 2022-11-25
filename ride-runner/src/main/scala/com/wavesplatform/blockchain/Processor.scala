@@ -202,9 +202,14 @@ class BlockchainProcessor private (
     val key       = script.key
     storage.put(key, refreshed)
 
-    val complexity = refreshed.lastResult.value("complexity").as[Int]
-    val result     = refreshed.lastResult.value("result").as[JsObject].value("value")
-    log.info(f"[$height, $key] complexity: $complexity in ${(System.nanoTime() - start) / 1e9d}%5f s, apiResult: $result")
+    val lastResult = refreshed.lastResult
+    if ((lastResult \ "error").isEmpty) {
+      val complexity = lastResult.value("complexity").as[Int]
+      val result     = lastResult.value("result").as[JsObject].value("value")
+      log.info(f"[$height, $key] complexity: $complexity in ${(System.nanoTime() - start) / 1e9d}%5f s, apiResult: $result")
+    } else {
+      log.info(f"[$height, $key] failed: $lastResult")
+    }
   }
 
   override def getLastResultOrRun(address: Address, request: JsObject): Task[JsObject] = {

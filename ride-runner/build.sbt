@@ -5,3 +5,5 @@ libraryDependencies ++= Seq(
   Dependencies.leveldbJava().exclude("com.google.guava", "guava") % Test,
   Dependencies.akkaHttpModule("akka-http-testkit")                % Test
 ) ++ Dependencies.logDeps ++ Dependencies.test
+
+run / fork := true

@@ -3,6 +3,7 @@ package com.wavesplatform.storage
 import cats.syntax.option.*
 import com.google.protobuf.ByteString
 import com.wavesplatform.api.grpc.*
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.grpc.BlockchainApi
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.SignedTransaction
@@ -10,7 +11,7 @@ import com.wavesplatform.state.{Height, TransactionId, TxMeta}
 import com.wavesplatform.storage.actions.AppendResult
 import com.wavesplatform.storage.persistent.PersistentCache
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
-import com.wavesplatform.transaction.{EthereumTransaction, Transaction}
+import com.wavesplatform.transaction.{Asset, EthereumTransaction, Inspect, Transaction, TxPositiveAmount}
 
 class TransactionsStorage[TagT](
     blockchainApi: BlockchainApi,
@@ -24,10 +25,15 @@ class TransactionsStorage[TagT](
         case tx: TransferTransactionLike => tx.some
         case tx: EthereumTransaction =>
           tx.payload match {
-            case payload: EthereumTransaction.Transfer =>
-              // tx.toTransferLike()
-              // payload.toTransferLike(tx, this).toOption
-              none
+            case transfer: EthereumTransaction.Transfer =>
+              tx
+                .toTransferLike(
+                  TxPositiveAmount.from(transfer.amount).explicitGet(),
+                  transfer.recipient,
+                  // TODO have to call GET /eth/assets/... or blockchain.resolveERC20Address
+                  transfer.tokenAddress.fold(Asset.Waves)(x => throw new RuntimeException(s"unknown asset: $x"))
+                )
+                .some
             case _ => none
           }
         case _ => none
@@ -47,19 +53,9 @@ class TransactionsStorage[TagT](
           succeeded = true,
           spentComplexity = 0
         ),
-        // TODO: copy-paste from BlockchainGrpcApi
-        signedTx.toVanilla.toOption.flatMap {
-          case etx: EthereumTransaction =>
-            etx.payload match {
-              case _: EthereumTransaction.Transfer =>
-                // TODO have to call GET /eth/assets/... or blockchain.resolveERC20Address
-                // transfer.toTransferLike(tx, blockchain = ???).toOption
-                none
-              case _ => none
-            }
-
-          case tx: TransferTransactionLike => tx.some
-          case _                           => none
+        signedTx.toVanilla.toOption.flatMap { tx =>
+          if (Inspect.isTransferLike(tx)) tx.some
+          else none
         }
       ).some
     )

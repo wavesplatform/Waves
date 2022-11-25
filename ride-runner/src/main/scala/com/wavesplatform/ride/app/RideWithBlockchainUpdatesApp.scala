@@ -36,7 +36,7 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
     val r = Using.Manager { use =>
       log.info("Loading args...")
       val scripts = Json
-        .parse(use(Source.fromFile(new File(s"$basePath/input5.json"))).getLines().mkString("\n"))
+        .parse(use(Source.fromFile(new File(s"$basePath/input6.json"))).getLines().mkString("\n"))
         .as[List[RequestKey]]
 
       val connector = use(new GrpcConnector)
@@ -113,8 +113,8 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
       log.info("Warm up caches...") // Also helps to figure out, which data is used by a script
       processor.runScripts(forceAll = true)
 
-      val start = Height(3393500)     // math.max(0, blockchainStorage.height - 100 - 1))
-      val end   = Height(start + 101) // lastHeightAtStart
+      val start = Height(3393500)   // math.max(0, blockchainStorage.height - 100 - 1))
+      val end   = Height(start + 1) // 101 // lastHeightAtStart
 
       val blockchainUpdates = use(blockchainApi.mkBlockchainUpdatesStream())
       val events = blockchainUpdates.stream
