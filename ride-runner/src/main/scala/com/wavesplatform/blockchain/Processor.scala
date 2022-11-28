@@ -120,7 +120,7 @@ class BlockchainProcessor private (
           }
       )
       .pipe(append.transactionIds.foldLeft(_) { case (r, txId) =>
-        r.withAppendResult(blockchainStorage.transactions.append(h, txId))
+        r.withAppendResult(blockchainStorage.transactions.setHeight(txId, h))
       })
   }
 
@@ -136,10 +136,10 @@ class BlockchainProcessor private (
       .pipe(stateUpdate.assets.foldLeft(_) { case (r, x) =>
         r.withRollbackResult(blockchainStorage.assets.rollback(h, x))
       })
-      /* TODO:
-      .pipe(stateUpdate.aliases.foldLeft(_) { case (r, x) =>
-        r.withRollbackResult(blockchainStorage.aliases.rollback(h, x))
-      })*/
+      /* TODO: Will be fixed soon with a new BlockchainUpdates API
+        .pipe(stateUpdate.aliases.foldLeft(_) { case (r, x) =>
+          r.withRollbackResult(blockchainStorage.aliases.rollback(h, x))
+        })*/
       .pipe(stateUpdate.balances.foldLeft(_) { case (r, x) =>
         r.withRollbackResult(blockchainStorage.portfolios.rollback(h, x))
       })
@@ -149,14 +149,14 @@ class BlockchainProcessor private (
       .pipe(stateUpdate.dataEntries.foldLeft(_) { case (r, x) =>
         r.withRollbackResult(blockchainStorage.data.rollback(h, x))
       })
-    /* TODO:
+      .pipe(rollback.removedTransactionIds.foldLeft(_) { case (r, txId) =>
+        r.withRollbackResult(blockchainStorage.transactions.remove(txId))
+      })
+    /* TODO: Will be fixed soon with a new BlockchainUpdates API
         .pipe(stateUpdate.accountScripts.foldLeft(_) { case (r, x) =>
           r.withRollbackResult(blockchainStorage.accountScripts.rollback(h, x))
         })
-        // TODO Remove?
-        .pipe(append.transactionIds.view.zip(txs).foldLeft(_) { case (r, txId) =>
-          r.withRollbackResult(blockchainStorage.transactions.rollback(h, txId)
-        })*/
+     */
 
   }
 
@@ -176,7 +176,8 @@ class BlockchainProcessor private (
     val xs =
       if (forceAll) storage.values
       else if (accumulatedChanges.affectedScripts.isEmpty) {
-        log.debug(s"[$height] Not updated"); Nil
+        log.debug(s"[$height] Not updated");
+        Nil
       } else accumulatedChanges.affectedScripts.flatMap(storage.get)
 
     val r = Task

@@ -199,21 +199,21 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
         .tap { _ => log.trace(s"remove($key, $fromHeight)") }
   }
 
-  override val transactions: PersistentCache[TransactionId, Height] =
-    new PersistentCache[TransactionId, Height] with ScorexLogging {
-      override def get(maxHeight: Int, key: TransactionId): RemoteData[Height] =
-        db
-          .readOnly { _.readFromDb(CacheKeys.Transactions.mkKey(key)).map(Height(_)) }
-          .tap { r => log.trace(s"get($key): ${r.toFoundStr { h => s"height=$h" }}") }
+  override val transactions: TransactionPersistentCache = new TransactionPersistentCache with ScorexLogging {
+    override def getHeight(txId: TransactionId): RemoteData[Height] =
+      db
+        .readOnly { _.readFromDb(CacheKeys.Transactions.mkKey(txId)).map(Height(_)) }
+        .tap { r => log.trace(s"get($txId): ${r.toFoundStr { h => s"height=$h" }}") }
 
-      override def set(atHeight: Int, key: TransactionId, data: RemoteData[Height]): Unit = {
-        db.readWrite { _.writeToDb(CacheKeys.Transactions.mkKey(key), data) }
-        log.trace(s"set($key)")
+    override def setHeight(txId: TransactionId, height: RemoteData[Height]): Unit = {
+      db.readWrite {
+        _.writeToDb(CacheKeys.Transactions.mkKey(txId), height)
       }
-
-      // TODO
-      override def remove(fromHeight: Int, key: TransactionId): RemoteData[Height] = RemoteData.Unknown
+      log.trace(s"set($txId)")
     }
+
+    override def remove(txId: TransactionId): Unit = db.readWrite(_.delete(CacheKeys.Transactions.mkKey(txId)))
+  }
 
   override val blockHeaders = new BlockPersistentCache {
     private val Key = CacheKeys.SignedBlockHeaders

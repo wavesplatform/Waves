@@ -58,7 +58,7 @@ trait HeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging { storag
         log.debug(s"Update $name($key)")
 
         val updated = RemoteData.loaded(update)
-        persistentCache.set(height, key, updated)
+        persistentCache.set(height, key, updated) // Write here (not in "else"), because we want to preserve the height
 
         if (updated == orig.data) AppendResult.ignored
         else {
@@ -69,7 +69,7 @@ trait HeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging { storag
 
   // Micro blocks don't affect, because we know new values
   // TODO rollbackAssetId?
-  def rollback(rollbackHeight: Int, key: KeyT, after: Option[ValueT]): RollbackResult[TagT] = {
+  def rollback(rollbackHeight: Int, key: KeyT, after: Option[ValueT]): RollbackResult[TagT] =
     memoryCache.get(key) match {
       case None => RollbackResult.ignored
       case Some(orig) =>
@@ -92,7 +92,6 @@ trait HeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging { storag
             }
         }
     }
-  }
 
   final def mkDataKey(key: KeyT): DataKey = StorageDataKey(key)
 

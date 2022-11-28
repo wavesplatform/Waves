@@ -80,7 +80,7 @@ class ScriptBlockchain[TagT](storage: SharedBlockchainData[TagT], tag: TagT) ext
     List(BalanceSnapshot(height, withPortfolios(address)))
   // input.balanceSnapshots.getOrElse(address, Seq(BalanceSnapshot(height, 0, 0, 0))).filter(_.height >= from)
 
-  private def withTransactions(id: ByteStr): Option[Height] = storage.transactions.get(height, TransactionId(id), tag)
+  private def withTransactions(id: ByteStr): Option[Height] = storage.transactions.get(TransactionId(id), tag)
 
   // Ride: transactionHeightById
   override def transactionMeta(id: ByteStr): Option[TxMeta] = {
