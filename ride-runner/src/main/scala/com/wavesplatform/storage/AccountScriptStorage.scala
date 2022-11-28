@@ -29,10 +29,10 @@ class AccountScriptStorage[TagT](
 
 object AccountScriptStorage {
   def toAccountScriptInfo(estimator: ScriptEstimator, account: PublicKey, script: Script): AccountScriptInfo = {
-    // TODO dup, see BlockchainGrpcApi
+    // TODO #28 dup, see BlockchainGrpcApi
 
     // DiffCommons
-    // TODO
+    // TODO #27 Get right arguments for Script.complexityInfo
     val fixEstimateOfVerifier    = true // blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
     val useContractVerifierLimit = true // !isAsset && blockchain.useReducedVerifierComplexityLimit
 

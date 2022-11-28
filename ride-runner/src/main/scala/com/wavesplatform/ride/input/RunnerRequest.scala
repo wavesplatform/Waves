@@ -27,7 +27,7 @@ case class RunnerRequest(
     timestamp: TxTimestamp = System.currentTimeMillis(),
     proofs: List[String] = Nil
 ) {
-  val senderPk: PublicKey = senderPublicKey.getOrElse(EmptyPublicKey)
+  val senderPk: PublicKey                 = senderPublicKey.getOrElse(EmptyPublicKey)
   def exactSender(chainId: Byte): Address = sender.getOrElse(senderPk.toAddress(chainId))
 
   def toTx(chainId: Byte): InvokeScriptTransactionLike = {
@@ -62,10 +62,7 @@ case class RunnerRequest(
 
   def toExpr(thatChainId: Byte, script: Script): Either[ValidationError, EXPR] = {
     call match {
-      case Left(expr) =>
-        // TODO SerdeV1.deserialize(bytes.arr).
-        UtilsEvaluator.compile(expr.stdLibVersion)(expr.expr)
-
+      case Left(expr) => UtilsEvaluator.compile(expr.stdLibVersion)(expr.expr)
       case Right(call) =>
         UtilsInvocationRequest(
           call = call.call,
@@ -92,7 +89,7 @@ case class RunnerCall(
 case class RunnerCallPayment(amount: Long, assetId: Asset = Waves)
 
 case class RunnerExpr(
-    expr: String, // TODO Either[ByteStr, String]
+    expr: String, // TODO #14: Either[ByteStr, String]
     stdLibVersion: StdLibVersion = V6
 ) {
   // ([], expr) is what InvokeExpressionTransaction requires

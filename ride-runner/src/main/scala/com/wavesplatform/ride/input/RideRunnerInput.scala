@@ -21,7 +21,7 @@ import play.api.libs.json.*
 import java.util.Locale
 import scala.util.Try
 
-// TODO Longs in JS
+// TODO #14: Longs in JS
 case class RideRunnerInput(
     request: RunnerRequest,
     accounts: Map[Address, RunnerAccountState] = Map.empty,
@@ -60,7 +60,7 @@ case class RideRunnerInput(
   lazy val resolveAlias: Map[Alias, Address] = for {
     (addr, state) <- accounts
     alias         <- state.aliases
-  } yield Alias.createWithChainId(alias, 'W'.toByte).explicitGet() -> addr // TODO chain id from input
+  } yield Alias.createWithChainId(alias, 'W'.toByte).explicitGet() -> addr // TODO #14: chain id from input
 
   private def accountStateLens[T](f: RunnerAccountState => T): Map[Address, T] = for {
     (addr, state) <- accounts
@@ -98,7 +98,7 @@ object RideRunnerInput {
     }
   )
 
-  // TODO numericMapFormat
+  // TODO #14: numericMapFormat
   implicit def shortMapFormat[T: Format]: Format[Map[Short, T]] = mapFormat[Short, T](
     _.toString,
     x => x.toShortOption.fold[JsResult[Short]](JsError(s"Can't parse int: $x"))(JsSuccess(_))
@@ -154,14 +154,14 @@ object RideRunnerInput {
 
   implicit val scriptFormat: Format[Script] = implicitly[Format[String]]
     .bimap(
-      Script.fromBase64String(_).explicitGet(), // TODO JsError instead
+      Script.fromBase64String(_).explicitGet(), // TODO #14: JsError instead
       _.bytes().base64Raw
     )
   implicit val accountScriptInfoFormat: OFormat[AccountScriptInfo] = Json.format
 
   implicit val aliasFormat: Format[Alias] = implicitly[Format[String]]
     .bimap(
-      Alias.fromString(_).explicitGet(), // TODO JsError instead
+      Alias.fromString(_).explicitGet(), // TODO #14: JsError instead
       _.name
     )
 

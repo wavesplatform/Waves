@@ -39,7 +39,6 @@ trait Processor {
 
   def runScripts(forceAll: Boolean = false): Unit
 
-  // TODO move to another place?
   def getLastResultOrRun(address: Address, request: JsObject): Task[JsObject]
 }
 
@@ -65,9 +64,8 @@ class BlockchainProcessor private (
   }
 
   private def process(h: Height, append: BlockchainUpdated.Append): ProcessResult[RequestKey] = {
-    // TODO the height will be eventually > if this is a rollback
-    // Almost all scripts use the height
-    val withUpdatedHeight = accumulatedChanges.copy(newHeight = h) // TODO
+    // Almost all scripts use the height, so we can run all of them
+    val withUpdatedHeight = accumulatedChanges.copy(newHeight = h) // TODO #31 Affect all scripts if height is increased
 
     val txs = append.body match {
       // PBBlocks.vanilla(block.getBlock.getHeader)
@@ -125,9 +123,9 @@ class BlockchainProcessor private (
   }
 
   private def process(h: Height, rollback: BlockchainUpdated.Rollback): ProcessResult[RequestKey] = {
-    // TODO the height will be eventually > if this is a rollback
+    // TODO #20 The height will be eventually > if this is a rollback, so we need to run all scripts
     // Almost all scripts use the height
-    val withUpdatedHeight = accumulatedChanges.copy(newHeight = h) // TODO
+    val withUpdatedHeight = accumulatedChanges.copy(newHeight = h)
 
     blockchainStorage.vrf.removeFrom(h + 1)
 
@@ -136,10 +134,6 @@ class BlockchainProcessor private (
       .pipe(stateUpdate.assets.foldLeft(_) { case (r, x) =>
         r.withRollbackResult(blockchainStorage.assets.rollback(h, x))
       })
-      /* TODO: Will be fixed soon with a new BlockchainUpdates API
-        .pipe(stateUpdate.aliases.foldLeft(_) { case (r, x) =>
-          r.withRollbackResult(blockchainStorage.aliases.rollback(h, x))
-        })*/
       .pipe(stateUpdate.balances.foldLeft(_) { case (r, x) =>
         r.withRollbackResult(blockchainStorage.portfolios.rollback(h, x))
       })
@@ -152,12 +146,14 @@ class BlockchainProcessor private (
       .pipe(rollback.removedTransactionIds.foldLeft(_) { case (r, txId) =>
         r.withRollbackResult(blockchainStorage.transactions.remove(txId))
       })
-    /* TODO: Will be fixed soon with a new BlockchainUpdates API
-        .pipe(stateUpdate.accountScripts.foldLeft(_) { case (r, x) =>
-          r.withRollbackResult(blockchainStorage.accountScripts.rollback(h, x))
-        })
-     */
-
+    /* TODO #29: Will be fixed (or not) soon with a new BlockchainUpdates API
+       NOTE: Ignoring, because 1) almost impossible 2) transactions return to blockchain eventually
+      .pipe(stateUpdate.aliases.foldLeft(_) { case (r, x) =>
+        r.withRollbackResult(blockchainStorage.aliases.rollback(h, x))
+      })
+      .pipe(stateUpdate.accountScripts.foldLeft(_) { case (r, x) =>
+        r.withRollbackResult(blockchainStorage.accountScripts.rollback(h, x))
+      }) */
   }
 
   override def runScripts(forceAll: Boolean = false): Unit = {
@@ -220,11 +216,10 @@ class BlockchainProcessor private (
       case None =>
         blockchainStorage.accountScripts.getUntagged(blockchainStorage.height, address) match {
           case None =>
-            // TODO should not be in business logic
+            // TODO #19 Change/move an error to an appropriate layer
             Task.raiseError(ApiException(CustomValidationError(s"Address $address is not dApp")))
 
           case _ =>
-            // TODO settings.evaluateScriptComplexityLimit = 52000
             val script = RestApiScript(address, blockchainStorage, request).refreshed(settings.enableTraces)
             storage.putIfAbsent(key, script)
             Task.now(script.lastResult)
@@ -246,8 +241,7 @@ object BlockchainProcessor {
   ): BlockchainProcessor =
     new BlockchainProcessor(settings, blockchainStorage, scheduler, TrieMap.from(scripts.map(k => (k, RestApiScript(k._1, blockchainStorage, k._2)))))
 
-  // TODO get rid of TagT
-  // TODO don't calculate affectedScripts if all scripts are affected
+  // TODO #18: don't calculate affectedScripts if all scripts are affected
   private case class ProcessResult[TagT](
       /*allScripts: Set[Int], */ newHeight: Int = 0,
       affectedScripts: Set[TagT] = Set.empty[TagT],
@@ -271,8 +265,7 @@ case class RestApiScript(address: Address, blockchain: Blockchain, request: JsOb
   def key: RequestKey = (address, request)
 
   def refreshed(trace: Boolean): RestApiScript = {
-    // TODO settings.evaluateScriptComplexityLimit = 52000
-    // TODO enable / disable traces
+    // TODO #17: settings.evaluateScriptComplexityLimit = 52000
     val result = UtilsApiRoute.evaluate(52000, blockchain, address, request, trace)
     copy(lastResult = result)
   }

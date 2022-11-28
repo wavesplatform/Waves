@@ -33,7 +33,7 @@ class TransactionsStorage[TagT](
             else
               RemoteData
                 .loaded(getFromBlockchain(txId))
-                .tap(r => persistentCache.setHeight(txId, r)) // TODO double check before set, because we could have an update
+                .tap(r => persistentCache.setHeight(txId, r)) // TODO #10: double check before set, because we could have an update
 
           Some(TaggedData(r, Set(tag)))
       }

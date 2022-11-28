@@ -32,7 +32,7 @@ trait HeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging { storag
             else
               RemoteData
                 .loaded(getFromBlockchain(key))
-                .tap(r => persistentCache.set(height, key, r)) // TODO double check before set, because we could have an update
+                .tap(r => persistentCache.set(height, key, r)) // TODO #10: double check before set, because we could have an update
 
           Some(TaggedData(r, tag.toSet))
       }
@@ -68,7 +68,6 @@ trait HeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging { storag
     }
 
   // Micro blocks don't affect, because we know new values
-  // TODO rollbackAssetId?
   def rollback(rollbackHeight: Int, key: KeyT, after: Option[ValueT]): RollbackResult[TagT] =
     memoryCache.get(key) match {
       case None => RollbackResult.ignored
@@ -77,7 +76,7 @@ trait HeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging { storag
 
         persistentCache.remove(rollbackHeight + 1, key) match {
           case latest @ RemoteData.Cached(_) =>
-            // TODO compare with afterRollback
+            // TODO #11: compare with afterRollback
             memoryCache.update(key, orig.copy(data = latest))
             RollbackResult.rolledBack(orig.tags)
 

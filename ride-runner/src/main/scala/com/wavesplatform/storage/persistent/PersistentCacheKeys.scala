@@ -84,20 +84,17 @@ object AsBytes {
   }
 
   implicit val shortAsBytes: AsBytes[Short] = new AsBytes[Short] {
-    override def toByteArray(x: Short): Array[Byte] = Shorts.toByteArray(x)
-
+    override def toByteArray(x: Short): Array[Byte]           = Shorts.toByteArray(x)
     override def fromByteArray(xs: Array[Byte]): (Short, Int) = (Shorts.fromByteArray(xs), Shorts.BYTES)
   }
 
   implicit val intAsBytes: AsBytes[Int] = new AsBytes[Int] {
-    override def toByteArray(x: Int): Array[Byte] = Ints.toByteArray(x)
-
-    override def fromByteArray(xs: Array[Byte]): (Int, Int) = (Ints.fromByteArray(xs), Ints.BYTES) // TODO (Int, BytesLen)
+    override def toByteArray(x: Int): Array[Byte]           = Ints.toByteArray(x)
+    override def fromByteArray(xs: Array[Byte]): (Int, Int) = (Ints.fromByteArray(xs), Ints.BYTES) // TODO #23 (Int, BytesLen)
   }
 
   implicit val longAsBytes: AsBytes[Long] = new AsBytes[Long] {
-    override def toByteArray(x: Long): Array[Byte] = Longs.toByteArray(x)
-
+    override def toByteArray(x: Long): Array[Byte]           = Longs.toByteArray(x)
     override def fromByteArray(xs: Array[Byte]): (Long, Int) = (Longs.fromByteArray(xs), Longs.BYTES)
   }
 
@@ -137,7 +134,7 @@ object AsBytes {
     }
   }
 
-  // TODO dup
+  // TODO #24 Generalize with tuple3
   implicit def tuple2[A, B](implicit aAsBytes: AsBytes[A], bAsBytes: AsBytes[B]): AsBytes[(A, B)] = new AsBytes[(A, B)] {
     override def toByteArray(x: (A, B)): Array[Byte] = {
       val (a, b) = x
@@ -270,13 +267,12 @@ object CacheKeys {
   object Height             extends CacheKey[Unit, Int](7)
   object VRF                extends CacheKey[Int, Option[ByteStr]](8)
 
-  // TODO
   object ActivatedFeatures extends CacheKey[Unit, Map[Short, Int]](9)
 
   object AssetDescriptionsHistory extends CacheHistoryKey[Asset.IssuedAsset](11)
   object AssetDescriptions        extends CacheKey[(Asset.IssuedAsset, Int), Option[AssetDescription]](12)
 
-  // TODO Store AddressId
+  // TODO #25 Store AddressId
   object Aliases extends CacheKey[Alias, Option[Address]](13)
 
   object PortfoliosHistory extends CacheHistoryKey[AddressId](14)
@@ -370,7 +366,7 @@ object CacheKeys {
 
       val sponsorship = bb.getLong
 
-      // TODO optional
+      // TODO #26 Use AsBytes.option
       val (script, scriptLen) = bb.getByte match {
         case 0 => (None, 1)
         case 1 =>
@@ -413,7 +409,7 @@ object CacheKeys {
       val balance = bb.getLong
 
       val leaseLen = bb.getInt
-      val lease    = readLeaseBalance(bb.getByteArray(leaseLen)) // TODO AsBytes?
+      val lease    = readLeaseBalance(bb.getByteArray(leaseLen)) // TODO #22 AsBytes for LeaseBalance
 
       val assetsLen   = bb.getInt
       val (assets, _) = assetsAsBytes.fromByteArray(bb.getByteArray(assetsLen))

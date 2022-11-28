@@ -68,7 +68,7 @@ class DefaultBlockchainApi(
       new RichGrpcObserver[SubscribeRequest, SubscribeEvent](settings.noDataTimeout, hangScheduler) {
         override def onReceived(event: SubscribeEvent): Boolean = {
           s.onNext(Event.Next(event))
-          true // TODO
+          true // TODO #2 make a fair back-pressure
         }
 
         override def onFailed(error: Throwable): Unit = {
@@ -127,7 +127,7 @@ class DefaultBlockchainApi(
         ActivationStatusRequest(height)
       )
       .features
-      .map(x => x.id.toShort -> x.activationHeight) // TODO ???
+      .map(x => x.id.toShort -> x.activationHeight) // TODO #3 is this correct?
       .toMap
       .tap(r => log.trace(s"getActivatedFeatures: found ${r.mkString(", ")}"))
 
@@ -181,7 +181,7 @@ class DefaultBlockchainApi(
         val fixEstimateOfVerifier    = true // blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
         val useContractVerifierLimit = true // !isAsset && blockchain.useReducedVerifierComplexityLimit
 
-        // TODO explicitGet?
+        // TODO #4 explicitGet?
         val complexityInfo = Script.complexityInfo(script, estimator, fixEstimateOfVerifier, useContractVerifierLimit).explicitGet()
         log.trace(s"Complexities (estimator of v${estimator.version}): ${complexityInfo.callableComplexities}")
 
@@ -216,7 +216,7 @@ class DefaultBlockchainApi(
       .tap(_ => log.trace(s"getBlockHeaderRange($fromHeight, $toHeight)"))
   }
 
-  // TODO It seems VRF only from REST API
+  // TODO #5: It seems VRF only from REST API, take from gRPC/BlockchainUpdates API
   override def getVrf(height: Int): Option[ByteStr] = {
     basicRequest
       .get(uri"${settings.nodeApiBaseUri}/blocks/headers/at/$height")
@@ -272,7 +272,7 @@ class DefaultBlockchainApi(
       try {
         val x = ClientCalls.blockingUnaryCall(
           grpcApiChannel.newCall(AccountsApiGrpc.METHOD_RESOLVE_ALIAS, CallOptions.DEFAULT),
-          alias.toString // TODO ???
+          alias.toString // TODO #6: check implementation
         )
 
         Address.fromBytes(x.toByteArray).toOption

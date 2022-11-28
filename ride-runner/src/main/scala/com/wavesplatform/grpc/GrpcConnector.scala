@@ -9,7 +9,7 @@ import io.netty.channel.socket.nio.NioSocketChannel
 import java.util.concurrent.Executors
 
 class GrpcConnector extends AutoCloseable with ScorexLogging {
-  // TODO
+  // TODO #9: configure in settings
   private val eventLoopGroup = new NioEventLoopGroup(8)
 
   private val executor =

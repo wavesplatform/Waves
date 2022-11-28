@@ -32,7 +32,7 @@ class PortfolioStorage[TagT](blockchainApi: BlockchainApi, override val persiste
               case asset: IssuedAsset => orig.copy(assets = orig.assets.updated(asset, after))
             })
 
-        super.append(height, address, updated) // TODO suboptimal, probably separate balances and leasing?
+        super.append(height, address, updated) // TODO #22 suboptimal, probably separate balances and leasing?
     }
   }
 
@@ -48,11 +48,11 @@ class PortfolioStorage[TagT](blockchainApi: BlockchainApi, override val persiste
           if (updatedLease.out == 0 && orig.isEmpty) none
           else orig.copy(lease = updatedLease).some
 
-        append(height, address, updated) // TODO suboptimal
+        append(height, address, updated) // TODO #22 suboptimal
     }
   }
 
-  // TODO not optimal, because we need to access DB again and again for each asset and leasing.
+  // TODO #22 Not optimal, because we need to access DB again and again for each asset and leasing.
   def rollback(rollbackHeight: Int, update: StateUpdate.BalanceUpdate): RollbackResult[TagT] = {
     val address = update.address.toAddress
     memoryCache.get(address) match {
@@ -78,7 +78,7 @@ class PortfolioStorage[TagT](blockchainApi: BlockchainApi, override val persiste
     memoryCache.get(address) match {
       case None           => RollbackResult.ignored
       case Some(origData) =>
-        // TODO copy-paste from append
+        // TODO #21 Copy-paste from append
         val updatedLease = LeaseBalance(update.inAfter, update.outAfter)
 
         val orig = origData.data.mayBeValue.getOrElse(Portfolio.empty)

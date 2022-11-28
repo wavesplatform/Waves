@@ -27,7 +27,7 @@ import scala.util.Failure
 
 object RideWithBlockchainUpdatesService extends ScorexLogging {
   def main(args: Array[String]): Unit = {
-    val basePath                 = args(0)
+    val basePath = args(0)
     val (globalConfig, settings) = AppInitializer.init(Some(new File(s"$basePath/node/waves.conf")))
 
     val r = Using.Manager { use =>
@@ -88,23 +88,28 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
         hangScheduler = commonScheduler
       )
 
-      val db                = use(openDB(s"$basePath/db"))
-      val dbCaches          = new LevelDbPersistentCaches(db)
+      val db = use(openDB(s"$basePath/db"))
+      val dbCaches = new LevelDbPersistentCaches(db)
       val blockchainStorage = new SharedBlockchainData[RequestKey](settings.blockchain, dbCaches, blockchainApi)
 
       val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
       log.info(s"Current height: $lastHeightAtStart")
 
+      val monixScheduler = use.acquireWithShutdown(Scheduler(commonScheduler).withExecutionModel(ExecutionModel.AlwaysAsyncExecution)) { x =>
+        x.shutdown()
+        x.awaitTermination(5.seconds)
+      }
+
       val processor = BlockchainProcessor.mk(
         settings.rideRunner.processor,
-        use.acquireWithShutdown(Scheduler(commonScheduler).withExecutionModel(ExecutionModel.AlwaysAsyncExecution))(_.shutdown()), // TODO
+        monixScheduler,
         blockchainStorage
       )
 
       log.info("Warm up caches...") // Also helps to figure out, which data is used by a script
       processor.runScripts(forceAll = true)
 
-      val start             = Height(math.max(0, blockchainStorage.height - 100 - 1))
+      val start = Height(math.max(0, blockchainStorage.height - 100 - 1))
       val blockchainUpdates = use(blockchainApi.mkBlockchainUpdatesStream())
       val events = blockchainUpdates.stream
         .doOnError(e =>
@@ -126,11 +131,11 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
         .runToFuture(Scheduler(commonScheduler))
 
       log.info(s"Watching blockchain updates...")
-      blockchainUpdates.start(start + 1, lastHeightAtStart + 1) // TODO end
+      blockchainUpdates.start(start + 1)
 
       // ====
       val heavyRequestProcessorPoolThreads =
-        /*settings.restAPISettings.heavyRequestProcessorPoolThreads*/ None.getOrElse((Runtime.getRuntime.availableProcessors() * 2).min(4))
+      /*settings.restAPISettings.heavyRequestProcessorPoolThreads*/ None.getOrElse((Runtime.getRuntime.availableProcessors() * 2).min(4))
       val heavyRequestExecutor = use(
         new ThreadPoolExecutor(
           heavyRequestProcessorPoolThreads,
@@ -158,11 +163,6 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
         resource.awaitTermination(5.seconds)
       }
 
-      // TODO ?
-//      val routeTimeout = new RouteTimeout(
-//        FiniteDuration(settings.config.getDuration("akka.http.server.request-timeout").getSeconds, TimeUnit.SECONDS)
-//      )(heavyRequestScheduler)
-
       val apiRoutes = Seq(EvaluateApiRoute(heavyRequestScheduler, processor))
 
       implicit val actorSystem = use.acquireWithShutdown(ActorSystem("ride-runner", globalConfig)) { x =>
@@ -180,7 +180,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
 
     r match {
       case Failure(e) => log.error("Got an error", e)
-      case _          => log.info("Done")
+      case _ => log.info("Done")
     }
   }
 }

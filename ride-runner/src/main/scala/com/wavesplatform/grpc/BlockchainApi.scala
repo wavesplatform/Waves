@@ -37,7 +37,7 @@ object BlockchainApi {
   trait BlockchainUpdatesStream extends AutoCloseable {
     val stream: Observable[Event]
 
-    def start(fromHeight: Int): Unit // TODO better name
+    def start(fromHeight: Int): Unit
     def start(fromHeight: Int, toHeight: Int): Unit
 
     def closeUpstream(): Unit

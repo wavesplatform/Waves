@@ -29,7 +29,7 @@ import com.wavesplatform.utils.ScorexLogging
 class ScriptBlockchain[TagT](storage: SharedBlockchainData[TagT], tag: TagT) extends Blockchain with ScorexLogging {
   override def settings: BlockchainSettings = storage.settings
 
-  // TODO use utils/evaluate through REST API
+  // TODO #16 use utils/evaluate through REST API
   // Ride: isDataStorageUntouched
   override def hasData(address: Address): Boolean = kill(s"hasData($address)") // data.contains(address)
 
@@ -48,7 +48,7 @@ class ScriptBlockchain[TagT](storage: SharedBlockchainData[TagT], tag: TagT) ext
   // Ride: blockInfoByHeight
   override def hitSource(height: Int): Option[ByteStr] = storage.vrf.get(height)
 
-  // Ride: wavesBalance, height, lastBlock TODO: a binding in Ride?
+  // Ride: wavesBalance, height, lastBlock
   override def height: Int = storage.height
 
   override def activatedFeatures: Map[Short, Int] = storage.activatedFeatures

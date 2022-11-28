@@ -23,7 +23,6 @@ class AssetStorage[TagT](
     append(height, asset, update.after.map(AssetStorage.toAssetDescription(asset, _)))
   }
 
-  // TODO looks similar to append
   def rollback(rollbackHeight: Int, update: StateUpdate.AssetStateUpdate): RollbackResult[TagT] = {
     val asset = getAsset(update)
     rollback(rollbackHeight, asset, update.after.map(AssetStorage.toAssetDescription(asset, _)))

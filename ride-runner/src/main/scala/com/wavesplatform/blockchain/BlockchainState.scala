@@ -7,12 +7,12 @@ import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
 
-// TODO doesn't relate to blockchain itself, move to the business domain
+// TODO #8: move. Doesn't relate to blockchain itself, move to the business domain
 sealed trait BlockchainState extends Product with Serializable
 
 object BlockchainState extends ScorexLogging {
-  case class Starting(blockchainHeight: Height, foundDiffentBlocks: Boolean = false) extends BlockchainState {
-    def withDifferentBlocks: Starting = copy(foundDiffentBlocks = true)
+  case class Starting(blockchainHeight: Height, foundDifferentBlocks: Boolean = false) extends BlockchainState {
+    def withDifferentBlocks: Starting = copy(foundDifferentBlocks = true)
   }
 
   case class Working(height: Height) extends BlockchainState {
@@ -84,7 +84,7 @@ object BlockchainState extends ScorexLogging {
         update match {
           case _: Update.Append =>
             val comparedBlocks =
-              if (orig.foundDiffentBlocks) orig
+              if (orig.foundDifferentBlocks) orig
               else
                 processor.hasLocalBlockAt(h, currBlockId) match {
                   case Some(true) | None => orig // true - same blocks

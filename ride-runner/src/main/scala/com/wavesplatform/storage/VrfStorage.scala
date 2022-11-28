@@ -8,9 +8,6 @@ import com.wavesplatform.utils.ScorexLogging
 import scala.util.chaining.scalaUtilChainingOps
 
 class VrfStorage(blockchainApi: BlockchainApi, persistentCache: VrfPersistentCache, currHeight: => Int) extends ScorexLogging {
-  // TODO LRU cache
-
-  // TODO if height > current
   def get(height: Int): Option[ByteStr] =
     if (height > currHeight) throw new RuntimeException(s"Can't receive a block VRF with height=$height > current height=$currHeight")
     else {

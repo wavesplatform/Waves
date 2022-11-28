@@ -16,8 +16,6 @@ import org.iq80.leveldb.DB
 import java.util.concurrent.atomic.AtomicLong
 import scala.util.chaining.scalaUtilChainingOps
 
-// TODO unify with BlockchainGrpcApi? Or create a bridge?
-// TODO don't need the base class?
 class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLogging {
   private val lastAddressIdKey = CacheKeys.LastAddressId.mkKey(())
   private val lastAddressId    = new AtomicLong(db.readOnly(_.getOpt(lastAddressIdKey).getOrElse(-1L)))
@@ -265,7 +263,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
         }
       }
 
-      // TODO
+      // TODO #30 Get the last height in one batch
       db.readWrite { rw =>
         lastHeight = if (rw.prefixExists(Key.prefixBytes)) {
           val newLastHeight = fromHeight - 1
@@ -323,7 +321,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
     log.trace("setActivatedFeatures")
   }
 
-  // TODO caching from NODE
+  // TODO #12: Caching from NODE
   private def getOrMkAddressId(ro: ReadOnlyDB, address: Address): AddressId = {
     val key = CacheKeys.AddressIds.mkKey(address)
     ro.getOpt(key) match {
@@ -391,7 +389,7 @@ object LevelDbPersistentCaches {
       val history = self.getOpt(historyKey).getOrElse(Seq.empty)
       if (history.isEmpty) RemoteData.Unknown
       else {
-        val (removedHistory, updatedHistory) = history.partition(_ >= fromHeight) // TODO binary search
+        val (removedHistory, updatedHistory) = history.partition(_ >= fromHeight) // TODO #13: binary search
         self.put(historyKey, updatedHistory) // not deleting, because it will be added with a high probability
         removedHistory.foreach(h => self.delete(dataOnHeightKey(h)))
 

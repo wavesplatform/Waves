@@ -135,7 +135,7 @@ object RideWithPreparedStateApp {
 
       override def settings: BlockchainSettings = nodeSettings.blockchainSettings
 
-      // Ride: wavesBalance, height, lastBlock TODO: a binding in Ride?
+      // Ride: wavesBalance, height, lastBlock
       override def height: Int = input.height
 
       override val activatedFeatures: Map[Short, Int] = Map[Int, Int](

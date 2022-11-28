@@ -1,6 +1,6 @@
 package com.wavesplatform.collections
 
-// TODO remove?
+// TODO #1: remove?
 trait MapSyntax {
   @`inline` implicit final def mapSyntax[K <: AnyRef, V](self: Map[K, V]): MapOps[K, V] = new MapOps(self)
 }

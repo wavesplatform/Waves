@@ -1,12 +1,11 @@
 package com.wavesplatform.ride.app
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.blockchain.BlockchainProcessor.RequestKey
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
 import com.wavesplatform.grpc.BlockchainApi.Event
-import com.wavesplatform.grpc.{DefaultBlockchainApi, GrpcClientSettings, GrpcConnector}
+import com.wavesplatform.grpc.{DefaultBlockchainApi, GrpcConnector}
 import com.wavesplatform.resources.*
 import com.wavesplatform.state.Height
 import com.wavesplatform.storage.persistent.LevelDbPersistentCaches
@@ -67,9 +66,14 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
       val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
       log.info(s"Current height: $lastHeightAtStart")
 
+      val monixScheduler = use.acquireWithShutdown(Scheduler(commonScheduler).withExecutionModel(ExecutionModel.AlwaysAsyncExecution)) { x =>
+        x.shutdown()
+        x.awaitTermination(5.seconds)
+      }
+
       val processor = BlockchainProcessor.mk(
         settings.rideRunner.processor,
-        use.acquireWithShutdown(Scheduler(commonScheduler).withExecutionModel(ExecutionModel.AlwaysAsyncExecution))(_.shutdown()), // TODO
+        monixScheduler,
         blockchainStorage,
         scripts
       )
@@ -78,8 +82,8 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
       processor.runScripts(forceAll = true)
 
       // mainnet
-//      val start = Height(3393500)   // math.max(0, blockchainStorage.height - 100 - 1))
-//      val end   = Height(start + 1) // 101 // lastHeightAtStart
+      //      val start = Height(3393500)   // math.max(0, blockchainStorage.height - 100 - 1))
+      //      val end   = Height(start + 1) // 101 // lastHeightAtStart
 
       val start = Height(2327973)
       val end   = Height(start + 1)
@@ -106,7 +110,7 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
 
       log.info(s"Watching blockchain updates...")
 
-      blockchainUpdates.start(start + 1, end) // TODO end
+      blockchainUpdates.start(start + 1, end)
 
       Await.result(events, Duration.Inf)
     }

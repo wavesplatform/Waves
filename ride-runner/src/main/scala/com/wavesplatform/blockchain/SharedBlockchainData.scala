@@ -12,7 +12,7 @@ import com.wavesplatform.utils.ScorexLogging
 import scala.util.chaining.scalaUtilChainingOps
 
 class SharedBlockchainData[TagT](val settings: BlockchainSettings, persistentCaches: PersistentCaches, blockchainApi: DefaultBlockchainApi)
-    extends ScorexLogging {
+  extends ScorexLogging {
   private val chainId = settings.addressSchemeCharacter.toByte
 
   val data = new AccountDataStorage[TagT](blockchainApi, persistentCaches.accountDataEntries)
@@ -23,7 +23,7 @@ class SharedBlockchainData[TagT](val settings: BlockchainSettings, persistentCac
 
   val vrf = new VrfStorage(blockchainApi, persistentCaches.vrf, height)
 
-  // Ride: wavesBalance, height, lastBlock TODO: a binding in Ride?
+  // Ride: wavesBalance, height, lastBlock
   def height: Int = blockHeaders.last.height
 
   // No way to get this from blockchain updates
@@ -46,10 +46,10 @@ class SharedBlockchainData[TagT](val settings: BlockchainSettings, persistentCac
   private def estimator: ScriptEstimator = EstimatorProvider.byActivatedFeatures(settings.functionalitySettings, activatedFeatures, height)
 
   private def load[KeyT, ValueT](
-      fromCache: KeyT => RemoteData[ValueT],
-      fromBlockchain: KeyT => Option[ValueT],
-      updateCache: (KeyT, RemoteData[ValueT]) => Unit
-  )(key: KeyT): Option[ValueT] =
+                                  fromCache: KeyT => RemoteData[ValueT],
+                                  fromBlockchain: KeyT => Option[ValueT],
+                                  updateCache: (KeyT, RemoteData[ValueT]) => Unit
+                                )(key: KeyT): Option[ValueT] =
     fromCache(key)
       .or(RemoteData.loaded(fromBlockchain(key)).tap(updateCache(key, _)))
       .mayBeValue
