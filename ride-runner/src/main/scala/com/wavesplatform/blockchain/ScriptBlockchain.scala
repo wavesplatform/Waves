@@ -71,14 +71,12 @@ class ScriptBlockchain[TagT](storage: SharedBlockchainData[TagT], tag: TagT) ext
   // Ride: assetBalance, wavesBalance
   override def balance(address: Address, mayBeAssetId: Asset): Long = withPortfolios(address).balanceOf(mayBeAssetId)
 
-  // Ride: wavesBalance (specifies to=None)
-
+  // Ride: wavesBalance (specifies to=None), "to" always None and means "to the end"
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
-  override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] =
-    // "to" always None
-    // TODO this should work correctly
+  override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = {
+    // NOTE: This code leads to a wrong generating balance, but we see no use-cases for now
     List(BalanceSnapshot(height, withPortfolios(address)))
-  // input.balanceSnapshots.getOrElse(address, Seq(BalanceSnapshot(height, 0, 0, 0))).filter(_.height >= from)
+  }
 
   private def withTransactions(id: ByteStr): Option[Height] = storage.transactions.get(TransactionId(id), tag)
 
