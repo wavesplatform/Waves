@@ -29,9 +29,9 @@ import com.wavesplatform.utils.ScorexLogging
 class ScriptBlockchain[TagT](storage: SharedBlockchainData[TagT], tag: TagT) extends Blockchain with ScorexLogging {
   override def settings: BlockchainSettings = storage.settings
 
-  // TODO #16 use utils/evaluate through REST API
+  // TODO #16 We don't support it for now, use GET /utils/script/evaluate
   // Ride: isDataStorageUntouched
-  override def hasData(address: Address): Boolean = kill(s"hasData($address)") // data.contains(address)
+  override def hasData(address: Address): Boolean = kill(s"hasData($address)")
 
   // Ride: get*Value (data), get* (data)
   override def accountData(address: Address, key: String): Option[DataEntry[?]] = storage.data.get(height, (address, key), tag)

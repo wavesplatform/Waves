@@ -9,5 +9,7 @@ We have some limitations. If you faced one of them, please issue a ticket on Git
 2. [wavesBalance](https://docs.waves.tech/en/ride/functions/built-in-functions/blockchain-functions#wavesbalance)
    returns [BalanceDetails](https://docs.waves.tech/en/ride/structures/common-structures/balance-details), which has a
    wrong `generating` value for now.
-3. Asset scripts aren't supported as in `/utils/script/evaluate`. 
+3. [isDataStorageUntouched](https://docs.waves.tech/en/ride/functions/built-in-functions/account-data-storage-functions#isdatastorageuntouched-address-alias-boolean)
+   is not supported.
+4. Asset scripts aren't supported as in `GET /utils/script/evaluate` of Node REST API. 
  
