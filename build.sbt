@@ -144,7 +144,6 @@ inScope(Global)(
       "-Wconf:cat=deprecation&site=com.wavesplatform.state.InvokeScriptResult.*:s"
     ),
     crossPaths := false,
-    dependencyOverrides ++= Dependencies.enforcedVersions.value,
     cancelable        := true,
     parallelExecution := true,
     /* http://www.scalatest.org/user_guide/using_the_runner

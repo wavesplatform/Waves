@@ -35,9 +35,8 @@ object Dependencies {
   val curve25519         = "com.wavesplatform"   % "curve25519-java"   % "0.6.4"
   val nettyHandler       = "io.netty"            % "netty-handler"     % "4.1.85.Final"
 
-  val catsEffect = catsModule("effect", "2.1.3")
-  val catsCore   = catsModule("core", "2.7.0")
-  val shapeless  = Def.setting("com.chuusai" %%% "shapeless" % "2.3.9")
+  val catsCore   = catsModule("core", "2.9.0")
+  val shapeless  = Def.setting("com.chuusai" %%% "shapeless" % "2.3.10")
 
   val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.14" % Test
   val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.1" % Test)
@@ -45,43 +44,6 @@ object Dependencies {
   val sttp3 = "com.softwaremill.sttp.client3" % "core_2.13" % "3.5.2" // 3.6.x and later is built for Java 11
 
   val bouncyCastleProvider = "org.bouncycastle" % s"bcprov-jdk15on" % "1.70"
-
-  val enforcedVersions = Def.setting(
-    Seq(
-      akkaModule("actor"),
-      akkaModule("stream"),
-      akkaHttp,
-      jacksonModuleScala,
-      scalaTest,
-      googleGuava,
-      "org.slf4j" % "slf4j-api" % "2.0.0",
-      jacksonModule("core", "core"),
-      jacksonModule("core", "annotations"),
-      jacksonModule("core", "databind"),
-      jacksonModule("dataformat", "dataformat-yaml"),
-      jacksonModule("dataformat", "dataformat-properties"),
-      jacksonModule("jaxrs", "jaxrs-base"),
-      jacksonModule("jaxrs", "jaxrs-json-provider"),
-      kamonCore,
-      "com.typesafe" % "config" % "1.4.1",
-      machinist,
-      "com.squareup.okhttp3" % "okhttp"     % "4.9.1",
-      "com.squareup.okio"    % "okio"       % "2.10.0",
-      "com.lihaoyi"         %% "sourcecode" % "0.2.7",
-      nettyHandler,
-      bouncyCastleProvider,
-      "org.apache.httpcomponents" % "httpcore"         % "4.4.14",
-      "org.javassist"             % "javassist"        % "3.21.0-GA",
-      "org.reactivestreams"       % "reactive-streams" % "1.0.3",
-      "org.scala-lang"            % "scala-library"    % scalaVersion.value,
-      "org.scala-lang"            % "scala-reflect"    % scalaVersion.value,
-      catsEffect.value,
-      catsCore.value,
-      catsModule("kernel").value,
-      catsModule("macros", "2.1.1").value,
-      shapeless.value
-    )
-  )
 
   val console = Seq("com.github.scopt" %% "scopt" % "4.1.0")
 
@@ -167,7 +129,7 @@ object Dependencies {
       nettyHandler,
       "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5",
       "eu.timepit"                 %% "refined"       % "0.10.1",
-      "com.esaulpaugh"              % "headlong"      % "8.1.0",
+      "com.esaulpaugh"              % "headlong"      % "9.0.0",
       web3jModule("abi"),
       akkaModule("testkit")                              % Test,
       akkaHttpModule("akka-http-testkit")                % Test,
