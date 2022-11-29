@@ -19,7 +19,7 @@ class AccountScriptStorage[TagT](
     estimator: => ScriptEstimator,
     blockchainApi: BlockchainApi,
     override val persistentCache: PersistentCache[Address, AccountScriptInfo]
-) extends HeightStorage[Address, AccountScriptInfo, TagT] {
+) extends ExactWithHeightStorage[Address, AccountScriptInfo, TagT] {
   override def getFromBlockchain(key: Address): Option[AccountScriptInfo] = {
     blockchainApi.getAccountScript(key).map { script =>
       toAccountScriptInfo(estimator, EmptyPublicKey, script) // EmptyPublicKey will be replaced during an update

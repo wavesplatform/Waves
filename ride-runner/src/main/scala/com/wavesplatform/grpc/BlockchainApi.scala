@@ -1,12 +1,13 @@
 package com.wavesplatform.grpc
 
 import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.grpc.BlockchainApi.*
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.state.{AssetDescription, DataEntry, Height, Portfolio}
+import com.wavesplatform.state.{AssetDescription, DataEntry, Height}
 import com.wavesplatform.transaction.Asset
 import monix.reactive.Observable
 
@@ -22,7 +23,8 @@ trait BlockchainApi {
   def getVrf(height: Int): Option[ByteStr]
   def getAssetDescription(asset: Asset.IssuedAsset): Option[AssetDescription]
   def resolveAlias(alias: Alias): Option[Address]
-  def getBalances(address: Address): Portfolio
+  def getBalance(address: Address, asset: Asset): Long
+  def getLeaseBalance(address: Address): WavesBalances
   def getTransactionHeight(id: ByteStr): Option[Height]
 }
 

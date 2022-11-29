@@ -63,8 +63,6 @@ class ScriptBlockchain[TagT](storage: SharedBlockchainData[TagT], tag: TagT) ext
   override def resolveAlias(a: Alias): Either[ValidationError, Address] =
     storage.aliases.get(height, a, tag).toRight(AliasDoesNotExist(a): ValidationError)
 
-  private def withPortfolios(address: Address): Portfolio = storage.portfolios.get(height, address, tag).getOrElse(Portfolio.empty)
-
   // Ride: wavesBalance
   override def leaseBalance(address: Address): LeaseBalance = withPortfolios(address).lease
 
@@ -75,7 +73,7 @@ class ScriptBlockchain[TagT](storage: SharedBlockchainData[TagT], tag: TagT) ext
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = {
     // NOTE: This code leads to a wrong generating balance, but we see no use-cases for now
-    List(BalanceSnapshot(height, withPortfolios(address)))
+    List(BalanceSnapshot(height, withPortfolios(address))) // TODO #22 doesn't require Portfolio
   }
 
   private def withTransactions(id: ByteStr): Option[Height] = storage.transactions.get(TransactionId(id), tag)

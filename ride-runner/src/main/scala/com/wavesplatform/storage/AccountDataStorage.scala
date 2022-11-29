@@ -9,7 +9,7 @@ import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
 import com.wavesplatform.storage.persistent.PersistentCache
 
 class AccountDataStorage[TagT](blockchainApi: BlockchainApi, override val persistentCache: PersistentCache[AccountDataKey, DataEntry[?]])
-    extends HeightStorage[AccountDataKey, DataEntry[?], TagT] {
+    extends ExactWithHeightStorage[AccountDataKey, DataEntry[?], TagT] {
   override def getFromBlockchain(key: AccountDataKey): Option[DataEntry[?]] = blockchainApi.getAccountDataEntry(key._1, key._2)
 
   def append(height: Int, update: StateUpdate.DataEntryUpdate): AppendResult[TagT] =

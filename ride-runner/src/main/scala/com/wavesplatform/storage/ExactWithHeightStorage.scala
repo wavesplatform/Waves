@@ -10,7 +10,9 @@ import com.wavesplatform.utils.ScorexLogging
 import scala.collection.mutable
 import scala.util.chaining.*
 
-trait HeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging { storage =>
+/** Exact, because stores not only a value, but an absence of it too
+  */
+trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging { storage =>
   protected val memoryCache = mutable.AnyRefMap.empty[KeyT, TaggedData[RemoteData[ValueT], TagT]]
 
   lazy val name = getSimpleName(this)
@@ -75,12 +77,7 @@ trait HeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging { storag
         log.info(s"Rollback $name($key)")
 
         persistentCache.remove(rollbackHeight + 1, key) match {
-          case latest @ RemoteData.Cached(_) =>
-            // TODO #11: compare with afterRollback
-            memoryCache.update(key, orig.copy(data = latest))
-            RollbackResult.rolledBack(orig.tags)
-
-          case RemoteData.Unknown | RemoteData.Absence =>
+          case RemoteData.Unknown =>
             after match {
               case None => RollbackResult.uncertain(mkDataKey(key), orig.tags) // will be updated later
               case Some(after) =>
@@ -89,6 +86,11 @@ trait HeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging { storag
                 memoryCache.update(key, orig.copy(data = x))
                 RollbackResult.rolledBack(orig.tags)
             }
+
+          case latest => // Cached | Absence
+            // TODO #11: compare with afterRollback
+            memoryCache.update(key, orig.copy(data = latest))
+            RollbackResult.rolledBack(orig.tags)
         }
     }
 

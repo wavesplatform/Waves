@@ -8,7 +8,7 @@ import com.wavesplatform.storage.persistent.PersistentCache
 
 // It seems, we don't need to update this. Only for some optimization needs
 class AliasStorage[TagT](chainId: Byte, blockchainApi: BlockchainApi, override val persistentCache: PersistentCache[Alias, Address])
-    extends HeightStorage[Alias, Address, TagT] {
+    extends ExactWithHeightStorage[Alias, Address, TagT] {
   override def getFromBlockchain(key: Alias): Option[Address] = blockchainApi.resolveAlias(key)
 
   def append(height: Int, rawAlias: String, account: PublicKey): AppendResult[TagT] =

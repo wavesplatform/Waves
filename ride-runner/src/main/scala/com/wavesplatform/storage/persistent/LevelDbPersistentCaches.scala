@@ -7,7 +7,7 @@ import com.wavesplatform.collections.syntax.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{AddressId, DBExt, Key, RW, ReadOnlyDB}
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, Height, Portfolio, TransactionId}
-import com.wavesplatform.storage.AccountDataKey
+import com.wavesplatform.storage.{AccountAssetKey, AccountDataKey}
 import com.wavesplatform.storage.persistent.LevelDbPersistentCaches.{ReadOnlyDBOps, ReadWriteDBOps}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.ScorexLogging
@@ -26,7 +26,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
       db
         .readOnly { ro =>
           val addressId = getOrMkAddressId(ro, key._1)
-          ro.readHistoricalFromDb(
+          ro.readHistoricalFromDbOpt(
             CacheKeys.AccountDataEntriesHistory.mkKey((addressId, key._2)),
             h => CacheKeys.AccountDataEntries.mkKey((addressId, key._2, h)),
             maxHeight
@@ -37,7 +37,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
     override def set(atHeight: Int, key: (Address, String), data: RemoteData[DataEntry[?]]): Unit = {
       db.readWrite { rw =>
         val addressId = getOrMkAddressId(rw, key._1)
-        rw.writeHistoricalToDb(
+        rw.writeHistoricalToDbOpt(
           CacheKeys.AccountDataEntriesHistory.mkKey((addressId, key._2)),
           h => CacheKeys.AccountDataEntries.mkKey((addressId, key._2, h)),
           atHeight,
@@ -51,7 +51,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
       db
         .readWrite { rw =>
           val addressId = getOrMkAddressId(rw, key._1)
-          rw.removeAfterAndGetLatestExisted(
+          rw.removeAfterAndGetLatestExistedOpt(
             CacheKeys.AccountDataEntriesHistory.mkKey((addressId, key._2)),
             h => CacheKeys.AccountDataEntries.mkKey((addressId, key._2, h)),
             fromHeight
@@ -65,7 +65,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
       db
         .readOnly { ro =>
           val addressId = getOrMkAddressId(ro, key)
-          ro.readHistoricalFromDb(
+          ro.readHistoricalFromDbOpt(
             CacheKeys.AccountScriptsHistory.mkKey(addressId),
             h => CacheKeys.AccountScripts.mkKey((addressId, h)),
             maxHeight
@@ -76,7 +76,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
     override def set(atHeight: Int, key: Address, data: RemoteData[AccountScriptInfo]): Unit = {
       db.readWrite { rw =>
         val addressId = getOrMkAddressId(rw, key)
-        rw.writeHistoricalToDb(
+        rw.writeHistoricalToDbOpt(
           CacheKeys.AccountScriptsHistory.mkKey(addressId),
           h => CacheKeys.AccountScripts.mkKey((addressId, h)),
           atHeight,
@@ -90,7 +90,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
       db
         .readWrite { rw =>
           val addressId = getOrMkAddressId(rw, key)
-          rw.removeAfterAndGetLatestExisted(
+          rw.removeAfterAndGetLatestExistedOpt(
             CacheKeys.AccountScriptsHistory.mkKey(addressId),
             h => CacheKeys.AccountScripts.mkKey((addressId, h)),
             fromHeight
@@ -104,7 +104,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
     override def get(maxHeight: Int, key: Asset.IssuedAsset): RemoteData[AssetDescription] =
       db
         .readOnly { ro =>
-          ro.readHistoricalFromDb(
+          ro.readHistoricalFromDbOpt(
             CacheKeys.AssetDescriptionsHistory.mkKey(key),
             h => CacheKeys.AssetDescriptions.mkKey((key, h)),
             maxHeight
@@ -114,7 +114,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
 
     override def set(atHeight: Int, key: Asset.IssuedAsset, data: RemoteData[AssetDescription]): Unit = {
       db.readWrite { rw =>
-        rw.writeHistoricalToDb(
+        rw.writeHistoricalToDbOpt(
           CacheKeys.AssetDescriptionsHistory.mkKey(key),
           h => CacheKeys.AssetDescriptions.mkKey((key, h)),
           atHeight,
@@ -127,7 +127,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
     override def remove(fromHeight: Int, key: Asset.IssuedAsset): RemoteData[AssetDescription] =
       db
         .readWrite { rw =>
-          rw.removeAfterAndGetLatestExisted(
+          rw.removeAfterAndGetLatestExistedOpt(
             CacheKeys.AssetDescriptionsHistory.mkKey(key),
             h => CacheKeys.AssetDescriptions.mkKey((key, h)),
             fromHeight
@@ -140,7 +140,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
     override def get(maxHeight: Int, key: Alias): RemoteData[Address] =
       db
         .readOnly {
-          _.readFromDb(CacheKeys.Aliases.mkKey(key))
+          _.readFromDbOpt(CacheKeys.Aliases.mkKey(key))
         }
         .tap { r => log.trace(s"get($key): ${r.toFoundStr()}") }
 
@@ -158,39 +158,43 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
     }
   }
 
-  override val balances: PersistentCache[Address, Portfolio] = new PersistentCache[Address, Portfolio] with ScorexLogging {
-    override def get(maxHeight: Int, key: Address): RemoteData[Portfolio] =
+  override val accountBalances: PersistentCache[AccountAssetKey, Long] = new PersistentCache[AccountAssetKey, Long] with ScorexLogging {
+    override def get(maxHeight: Int, key: AccountAssetKey): RemoteData[Long] =
       db
         .readOnly { ro =>
-          val addressId = getOrMkAddressId(ro, key)
+          val (address, asset) = key
+          val addressId        = getOrMkAddressId(ro, address)
           ro.readHistoricalFromDb(
-            CacheKeys.PortfoliosHistory.mkKey(addressId),
-            h => CacheKeys.Portfolios.mkKey((addressId, h)),
+            CacheKeys.AccountAssetsHistory.mkKey((addressId, asset)),
+            h => CacheKeys.AccountAssets.mkKey((addressId, asset, h)),
             maxHeight
           )
         }
-        .tap { r => log.trace(s"get($key): ${r.toFoundStr("assets", _.assets)}") }
+        .tap { r => log.trace(s"get($key): $r") }
 
-    override def set(atHeight: Int, key: Address, data: RemoteData[Portfolio]): Unit = {
+    override def set(atHeight: Int, key: AccountAssetKey, data: RemoteData[Long]): Unit = {
       db.readWrite { rw =>
-        val addressId = getOrMkAddressId(rw, key)
+        val (address, asset) = key
+        val addressId        = getOrMkAddressId(rw, address)
         rw.writeHistoricalToDb(
-          CacheKeys.PortfoliosHistory.mkKey(addressId),
-          h => CacheKeys.Portfolios.mkKey((addressId, h)),
+          CacheKeys.AccountAssetsHistory.mkKey((addressId, asset)),
+          h => CacheKeys.AccountAssets.mkKey((addressId, asset, h)),
           atHeight,
-          data
+          data,
+          0
         )
       }
       log.trace(s"set($key)")
     }
 
-    override def remove(fromHeight: Int, key: Address): RemoteData[Portfolio] =
+    override def remove(fromHeight: Int, key: AccountAssetKey): RemoteData[Long] =
       db
         .readWrite { rw =>
-          val addressId = getOrMkAddressId(rw, key)
+          val (address, asset) = key
+          val addressId        = getOrMkAddressId(rw, address)
           rw.removeAfterAndGetLatestExisted(
-            CacheKeys.PortfoliosHistory.mkKey(addressId),
-            h => CacheKeys.Portfolios.mkKey((addressId, h)),
+            CacheKeys.AccountAssetsHistory.mkKey((addressId, asset)),
+            h => CacheKeys.AccountAssets.mkKey((addressId, asset, h)),
             fromHeight
           )
         }
@@ -200,7 +204,9 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
   override val transactions: TransactionPersistentCache = new TransactionPersistentCache with ScorexLogging {
     override def getHeight(txId: TransactionId): RemoteData[Height] =
       db
-        .readOnly { _.readFromDb(CacheKeys.Transactions.mkKey(txId)).map(Height(_)) }
+        .readOnly {
+          _.readFromDbOpt(CacheKeys.Transactions.mkKey(txId)).map(Height(_))
+        }
         .tap { r => log.trace(s"get($txId): ${r.toFoundStr { h => s"height=$h" }}") }
 
     override def setHeight(txId: TransactionId, height: RemoteData[Height]): Unit = {
@@ -353,7 +359,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
 
 object LevelDbPersistentCaches {
   implicit final class ReadOnlyDBOps(val self: ReadOnlyDB) extends AnyVal {
-    def readHistoricalFromDb[T](
+    def readHistoricalFromDbOpt[T](
         historyKey: Key[Seq[Int]],
         dataOnHeightKey: Int => Key[Option[T]],
         maxHeight: Int
@@ -364,14 +370,30 @@ object LevelDbPersistentCaches {
         .fold[RemoteData[T]](RemoteData.Unknown)(RemoteData.loaded)
     }
 
-    def readFromDb[T](dbKey: Key[Option[T]]): RemoteData[T] = {
+    def readHistoricalFromDb[T](
+        historyKey: Key[Seq[Int]],
+        dataOnHeightKey: Int => Key[T],
+        maxHeight: Int
+    ): RemoteData[T] = {
+      val height = self.getOpt(historyKey).getOrElse(Seq.empty).find(_ <= maxHeight) // ordered from the newest to the oldest
+      height
+        .map(height => self.get(dataOnHeightKey(height)))
+        .fold[RemoteData[T]](RemoteData.Unknown)(RemoteData.Cached(_))
+    }
+
+    def readFromDbOpt[T](dbKey: Key[Option[T]]): RemoteData[T] = {
       val x = self.getOpt(dbKey)
       x.fold[RemoteData[T]](RemoteData.Unknown)(RemoteData.loaded)
+    }
+
+    def readFromDb[T](dbKey: Key[T]): RemoteData[T] = {
+      val x = self.getOpt(dbKey)
+      x.fold[RemoteData[T]](RemoteData.Unknown)(RemoteData.Cached(_))
     }
   }
 
   implicit final class ReadWriteDBOps(val self: RW) extends AnyVal {
-    def writeHistoricalToDb[T](
+    def writeHistoricalToDbOpt[T](
         historyKey: Key[Seq[Int]],
         dataOnHeightKey: Int => Key[Option[T]],
         height: Int,
@@ -381,9 +403,39 @@ object LevelDbPersistentCaches {
       self.put(dataOnHeightKey(height), data.mayBeValue)
     }
 
-    def removeAfterAndGetLatestExisted[T](
+    def writeHistoricalToDb[T](
+        historyKey: Key[Seq[Int]],
+        dataOnHeightKey: Int => Key[T],
+        height: Int,
+        data: RemoteData[T],
+        default: => T
+    ): Unit = {
+      self.put(historyKey, self.getOpt(historyKey).getOrElse(Seq.empty).prepended(height))
+      self.put(dataOnHeightKey(height), data.mayBeValue.getOrElse(default))
+    }
+
+    def removeAfterAndGetLatestExistedOpt[T](
         historyKey: Key[Seq[Int]],
         dataOnHeightKey: Int => Key[Option[T]],
+        fromHeight: Int
+    ): RemoteData[T] = {
+      val history = self.getOpt(historyKey).getOrElse(Seq.empty)
+      if (history.isEmpty) RemoteData.Unknown
+      else {
+        val (removedHistory, updatedHistory) = history.partition(_ >= fromHeight) // TODO #13: binary search
+        self.put(historyKey, updatedHistory) // not deleting, because it will be added with a high probability
+        removedHistory.foreach(h => self.delete(dataOnHeightKey(h)))
+
+        updatedHistory.headOption match {
+          case None    => RemoteData.Unknown
+          case Some(h) => self.readFromDbOpt(dataOnHeightKey(h))
+        }
+      }
+    }
+
+    def removeAfterAndGetLatestExisted[T](
+        historyKey: Key[Seq[Int]],
+        dataOnHeightKey: Int => Key[T],
         fromHeight: Int
     ): RemoteData[T] = {
       val history = self.getOpt(historyKey).getOrElse(Seq.empty)

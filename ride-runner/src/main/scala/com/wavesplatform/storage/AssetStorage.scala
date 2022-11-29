@@ -15,7 +15,7 @@ import java.nio.charset.StandardCharsets
 class AssetStorage[TagT](
     blockchainApi: BlockchainApi,
     override val persistentCache: PersistentCache[IssuedAsset, AssetDescription]
-) extends HeightStorage[IssuedAsset, AssetDescription, TagT] {
+) extends ExactWithHeightStorage[IssuedAsset, AssetDescription, TagT] {
   override def getFromBlockchain(key: IssuedAsset): Option[AssetDescription] = blockchainApi.getAssetDescription(key)
 
   def append(height: Int, update: StateUpdate.AssetStateUpdate): AppendResult[TagT] = {
