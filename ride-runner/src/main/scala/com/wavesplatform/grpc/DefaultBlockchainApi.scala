@@ -23,18 +23,15 @@ import com.wavesplatform.api.grpc.{
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.collections.syntax.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.events.api.grpc.protobuf.*
 import com.wavesplatform.grpc.BlockchainApi.{BlockchainUpdatesStream, Event}
 import com.wavesplatform.grpc.DefaultBlockchainApi.{HttpBlockHeader, Settings}
 import com.wavesplatform.grpc.observers.RichGrpcObserver
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.Block
 import com.wavesplatform.protobuf.transaction.PBTransactions.{toVanillaDataEntry, toVanillaScript}
-import com.wavesplatform.ride.input.EmptyPublicKey
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, DataEntry, Height, LeaseBalance, Portfolio}
+import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, DataEntry, Height, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.*
@@ -169,30 +166,13 @@ class DefaultBlockchainApi(
         throw e
     }
 
-  override def getAccountScript(address: Address, estimator: ScriptEstimator): Option[AccountScriptInfo] = {
+  override def getAccountScript(address: Address): Option[Script] = {
     val x = ClientCalls.blockingUnaryCall(
       grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_SCRIPT, CallOptions.DEFAULT),
       AccountRequest(toPb(address))
     )
 
-    toVanillaScript(x.scriptBytes)
-      .map { script =>
-        // DiffCommons
-        val fixEstimateOfVerifier    = true // blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
-        val useContractVerifierLimit = true // !isAsset && blockchain.useReducedVerifierComplexityLimit
-
-        // TODO #4 explicitGet?
-        val complexityInfo = Script.complexityInfo(script, estimator, fixEstimateOfVerifier, useContractVerifierLimit).explicitGet()
-        log.trace(s"Complexities (estimator of v${estimator.version}): ${complexityInfo.callableComplexities}")
-
-        AccountScriptInfo(
-          publicKey = EmptyPublicKey,
-          script = script, // Only this field matters in Ride Runner, see MutableBlockchain.accountScript
-          verifierComplexity = x.complexity,
-          complexitiesByEstimator = Map(estimator.version -> complexityInfo.callableComplexities)
-        )
-      }
-      .tap(r => log.trace(s"getAccountScript($address): ${r.toFoundStr("hash", _.script.hashCode())}"))
+    toVanillaScript(x.scriptBytes).tap(r => log.trace(s"getAccountScript($address): ${r.toFoundStr("hash", _.hashCode())}"))
   }
 
   override def getBlockHeader(height: Int): Option[SignedBlockHeader] = {

@@ -5,8 +5,8 @@ import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.grpc.BlockchainApi.*
-import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, Height, Portfolio}
+import com.wavesplatform.lang.script.Script
+import com.wavesplatform.state.{AssetDescription, DataEntry, Height, Portfolio}
 import com.wavesplatform.transaction.Asset
 import monix.reactive.Observable
 
@@ -16,7 +16,7 @@ trait BlockchainApi {
   def getActivatedFeatures(height: Int): Map[Short, Int]
   def getAccountDataEntries(address: Address): Seq[DataEntry[?]]
   def getAccountDataEntry(address: Address, key: String): Option[DataEntry[?]]
-  def getAccountScript(address: Address, estimator: ScriptEstimator): Option[AccountScriptInfo]
+  def getAccountScript(address: Address): Option[Script]
   def getBlockHeader(height: Int): Option[SignedBlockHeader]
   def getBlockHeaderRange(fromHeight: Int, toHeight: Int): List[SignedBlockHeader]
   def getVrf(height: Int): Option[ByteStr]
