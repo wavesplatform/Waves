@@ -195,7 +195,7 @@ class BlockchainProcessor private (
 
   private def runScript(height: Int, script: RestApiScript): Unit = {
     val start     = System.nanoTime()
-    val refreshed = script.refreshed(settings.enableTraces)
+    val refreshed = script.refreshed(settings.enableTraces, settings.evaluateScriptComplexityLimit)
     val key       = script.key
     storage.put(key, refreshed)
 
@@ -220,7 +220,7 @@ class BlockchainProcessor private (
             Task.raiseError(ApiException(CustomValidationError(s"Address $address is not dApp")))
 
           case _ =>
-            val script = RestApiScript(address, blockchainStorage, request).refreshed(settings.enableTraces)
+            val script = RestApiScript(address, blockchainStorage, request).refreshed(settings.enableTraces, settings.evaluateScriptComplexityLimit)
             storage.putIfAbsent(key, script)
             Task.now(script.lastResult)
         }
@@ -231,7 +231,7 @@ class BlockchainProcessor private (
 object BlockchainProcessor {
   type RequestKey = (Address, JsObject)
 
-  case class Settings(enableTraces: Boolean)
+  case class Settings(enableTraces: Boolean, evaluateScriptComplexityLimit: Int)
 
   def mk(
       settings: Settings,
@@ -264,9 +264,8 @@ object BlockchainProcessor {
 case class RestApiScript(address: Address, blockchain: Blockchain, request: JsObject, lastResult: JsObject) {
   def key: RequestKey = (address, request)
 
-  def refreshed(trace: Boolean): RestApiScript = {
-    // TODO #17: settings.evaluateScriptComplexityLimit = 52000
-    val result = UtilsApiRoute.evaluate(52000, blockchain, address, request, trace)
+  def refreshed(trace: Boolean, evaluateScriptComplexityLimit: Int): RestApiScript = {
+    val result = UtilsApiRoute.evaluate(evaluateScriptComplexityLimit, blockchain, address, request, trace)
     copy(lastResult = result)
   }
 }
