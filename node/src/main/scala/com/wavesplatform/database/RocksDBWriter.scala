@@ -117,7 +117,7 @@ object RocksDBWriter extends ScorexLogging {
     val _orderFilter        = load("orders", KeyTags.FilledVolumeAndFeeHistory)
     val _dataKeyFilter      = load("account-data", KeyTags.DataHistory)
     val _addressesKeyFilter = load("addresses", KeyTags.AddressId)
-    new RocksDBWriter(db, spendableBalanceChanged, settings.blockchainSettings, settings.dbSettings) with AutoCloseable {
+    new RocksDBWriter(db, spendableBalanceChanged, 200_000_000, settings.blockchainSettings, settings.dbSettings) with AutoCloseable {
 
       override val orderFilter: BloomFilter   = _orderFilter.getOrElse(BloomFilter.AlwaysEmpty)
       override val dataKeyFilter: BloomFilter = _dataKeyFilter.getOrElse(BloomFilter.AlwaysEmpty)
@@ -143,7 +143,7 @@ object RocksDBWriter extends ScorexLogging {
       else
         BloomFilter.AlwaysEmpty
 
-    new RocksDBWriter(db, Observer.stopped, settings.blockchainSettings, settings.dbSettings) {
+    new RocksDBWriter(db, Observer.stopped, 200_000_000, settings.blockchainSettings, settings.dbSettings) {
       override val orderFilter: BloomFilter   = loadFilter("orders")
       override val dataKeyFilter: BloomFilter = loadFilter("account-data")
       override val addressFilter: BloomFilter = loadFilter("addresses")
@@ -155,9 +155,10 @@ object RocksDBWriter extends ScorexLogging {
 abstract class RocksDBWriter private[database] (
     writableDB: RocksDB,
     spendableBalanceChanged: Observer[(Address, Asset)],
+    txFilterSize: Int,
     val settings: BlockchainSettings,
     val dbSettings: DBSettings
-) extends Caches(spendableBalanceChanged) {
+) extends Caches(spendableBalanceChanged, txFilterSize) {
 
   private[this] val log = LoggerFacade(LoggerFactory.getLogger(classOf[RocksDBWriter]))
 

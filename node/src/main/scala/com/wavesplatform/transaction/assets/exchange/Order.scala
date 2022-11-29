@@ -56,7 +56,7 @@ case class Order(
     case OrderAuthentication.Eip712Signature(_)     => Proofs.empty
   }
 
-  lazy val sender: PublicKey      = senderPublicKey
+  lazy val sender: PublicKey = senderPublicKey
   def senderAddress: Address = sender.toAddress
 
   def withProofs(proofs: Proofs): Order = {
@@ -106,6 +106,14 @@ case class Order(
   }
 
   val json: Coeval[JsObject] = Coeval.evalOnce(OrderSerializer.toJson(this))
+
+  override protected def verifyFirstProof(): Either[GenericError, Unit] =
+    eip712Signature match {
+      case Some(ethSignature) =>
+        val signerKey = EthOrders.recoverEthSignerKey(this, ethSignature.arr)
+        Either.cond(signerKey == senderPublicKey, this, GenericError(s"Ethereum signature invalid for $this"))
+      case _ => super.verifyFirstProof()
+    }
 
   override def toString: String = {
     val matcherFeeAssetIdStr = if (version == 3) s" matcherFeeAssetId=${matcherFeeAssetId.fold("Waves")(_.toString)}," else ""

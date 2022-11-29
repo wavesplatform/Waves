@@ -62,7 +62,7 @@ object CommonAssetsApi {
         height,
         after,
         if (height == blockchain.height) diff().portfolios else Map.empty[Address, Portfolio],
-        KeyTags.WavesBalance.prefixBytes,
+        KeyTags.WavesBalanceHistory.prefixBytes,
         bs => AddressId.fromByteArray(bs.slice(2, bs.length - 4)),
         _.balance
       )
@@ -73,7 +73,7 @@ object CommonAssetsApi {
         height,
         after,
         if (height == blockchain.height) diff().portfolios else Map.empty[Address, Portfolio],
-        KeyTags.AssetBalance.prefixBytes ++ asset.id.arr,
+        KeyTags.AssetBalanceHistory.prefixBytes ++ asset.id.arr,
         bs => AddressId.fromByteArray(bs.slice(2 + crypto.DigestLength, bs.length - 4)),
         _.assets.getOrElse(asset, 0L)
       )

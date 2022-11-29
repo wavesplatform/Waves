@@ -28,7 +28,7 @@ import monix.reactive.Observer
 import scala.jdk.CollectionConverters.*
 import scala.reflect.ClassTag
 
-abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) extends Blockchain with Storage {
+abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFilterSize: Int) extends Blockchain with Storage {
   import Caches.*
 
   val dbSettings: DBSettings
@@ -60,7 +60,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
   override def heightOf(blockId: ByteStr): Option[Int] = if (current.id.contains(blockId)) Some(height) else loadHeightOf(blockId)
 
-  private val transactionsBloomFilter = GBloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), 200_000_000)
+  private val transactionsBloomFilter = GBloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), txFilterSize)
 
   override def containsTransaction(tx: Transaction): Boolean = transactionsBloomFilter.mightContain(tx.id().arr) && transactionMeta(tx.id()).nonEmpty
 
@@ -172,10 +172,10 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       block.bytes().length,
       block.transactionData.size,
       totalFee,
-      block.header.rewardVote,
+      reward.getOrElse(0),
       if (block.header.version >= Block.ProtoBlockVersion) ByteString.copyFrom(hitSource.arr) else ByteString.EMPTY,
       ByteString.copyFrom(newScore.toByteArray),
-      current.meta.fold(0L)(_.totalWavesAmount) + reward.getOrElse(0L)
+      current.meta.fold(settings.genesisSettings.initialBalance)(_.totalWavesAmount) + reward.getOrElse(0L)
     )
 
     val stateHash = new StateHashBuilder

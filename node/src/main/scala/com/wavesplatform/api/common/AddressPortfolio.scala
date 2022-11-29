@@ -69,6 +69,7 @@ class AssetBalanceIterator(addressId: AddressId, resource: DBResource) extends A
       if (dbIterator.isValid) {
         val assetId    = IssuedAsset(ByteStr(dbIterator.key().takeRight(crypto.DigestLength)))
         val curBalance = readCurrentBalance(dbIterator.value())
+        dbIterator.next()
         Seq(assetId -> curBalance.balance)
       } else endOfData()
     }(endOfData())
@@ -135,5 +136,4 @@ object AddressPortfolio {
       .map(_.filter { case (asset, balance) =>
         includeAsset(asset) && balance > 0
       })
-
 }

@@ -12,13 +12,13 @@ class SortedBatch extends WriteBatch {
   val addedEntries   = HashingStrategyMaps.mutable.`with`[Array[Byte], Array[Byte]](ByteArrayHashingStrategy)
   val deletedEntries = HashingStrategySets.mutable.`with`[Array[Byte]](ByteArrayHashingStrategy)
 
-  override def put(bytes: Array[Byte], bytes1: Array[Byte]): WriteBatch = {
+  override def put(bytes: Array[Byte], bytes1: Array[Byte]): Unit = {
     addedEntries.put(bytes, bytes1)
     deletedEntries.remove(bytes)
     this
   }
 
-  override def delete(bytes: Array[Byte]): WriteBatch = {
+  override def delete(bytes: Array[Byte]): Unit = {
     addedEntries.remove(bytes)
     deletedEntries.add(bytes)
     this
