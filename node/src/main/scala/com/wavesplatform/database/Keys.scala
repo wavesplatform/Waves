@@ -23,6 +23,16 @@ object BalanceNode {
   val Empty: BalanceNode = BalanceNode(0, Height(0))
 }
 
+case class CurrentVolumeAndFee(volume: Long, fee: Long, height: Height, prevHeight: Height)
+object CurrentVolumeAndFee {
+  val Unavailable: CurrentVolumeAndFee = CurrentVolumeAndFee(0, 0, Height(0), Height(0))
+}
+
+case class VolumeAndFeeNode(volume: Long, fee: Long, prevHeight: Height)
+object VolumeAndFeeNode {
+  val Empty: VolumeAndFeeNode = VolumeAndFeeNode(0, 0, Height(0))
+}
+
 object Keys {
   import KeyHelpers.*
   import KeyTags.{
@@ -38,8 +48,6 @@ object Keys {
     Key(Height, Array.emptyByteArray, v => state.Height @@ (if (v != null && v.length >= Ints.BYTES) Ints.fromByteArray(v) else 0), Ints.toByteArray)
 
   def heightOf(blockId: ByteStr): Key[Option[Int]] = Key.opt[Int](HeightOf, blockId.arr, Ints.fromByteArray, Ints.toByteArray)
-
-  def wavesBalanceHistory(addressId: AddressId): Key[Seq[Int]] = historyKey(WavesBalanceHistory, addressId.toByteArray)
 
   def wavesBalance(addressId: AddressId): Key[CurrentBalance] =
     Key(WavesBalance, addressId.toByteArray, readCurrentBalance, writeCurrentBalance)
@@ -71,9 +79,11 @@ object Keys {
   def leaseDetails(leaseId: ByteStr)(height: Int): Key[Option[Either[Boolean, LeaseDetails]]] =
     Key.opt(LeaseDetailsTag, Ints.toByteArray(height) ++ leaseId.arr, readLeaseDetails, writeLeaseDetails)
 
-  def filledVolumeAndFeeHistory(orderId: ByteStr): Key[Seq[Int]] = historyKey(FilledVolumeAndFeeHistory, orderId.arr)
-  def filledVolumeAndFee(orderId: ByteStr)(height: Int): Key[VolumeAndFee] =
-    Key(FilledVolumeAndFee, hBytes(orderId.arr, height), readVolumeAndFee, writeVolumeAndFee)
+  def filledVolumeAndFeeAt(orderId: ByteStr, height: Height): Key[VolumeAndFeeNode] =
+    Key(FilledVolumeAndFeeHistory, hBytes(orderId.arr, height), readVolumeAndFeeNode, writeVolumeAndFeeNode)
+
+  def filledVolumeAndFee(orderId: ByteStr): Key[CurrentVolumeAndFee] =
+    Key(FilledVolumeAndFee, orderId.arr, readVolumeAndFee, writeVolumeAndFee)
 
   def changedAddresses(height: Int): Key[Seq[AddressId]] = Key(ChangedAddresses, h(height), readAddressIds, writeAddressIds)
 

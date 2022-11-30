@@ -119,7 +119,6 @@ object RocksDBWriter extends ScorexLogging {
     val _addressesKeyFilter = load("addresses", KeyTags.AddressId)
     new RocksDBWriter(db, spendableBalanceChanged, 200_000_000, settings.blockchainSettings, settings.dbSettings) with AutoCloseable {
 
-      override val orderFilter: BloomFilter   = _orderFilter.getOrElse(BloomFilter.AlwaysEmpty)
       override val dataKeyFilter: BloomFilter = _dataKeyFilter.getOrElse(BloomFilter.AlwaysEmpty)
       override val addressFilter: BloomFilter = _addressesKeyFilter.getOrElse(BloomFilter.AlwaysEmpty)
 
@@ -144,7 +143,6 @@ object RocksDBWriter extends ScorexLogging {
         BloomFilter.AlwaysEmpty
 
     new RocksDBWriter(db, Observer.stopped, 200_000_000, settings.blockchainSettings, settings.dbSettings) {
-      override val orderFilter: BloomFilter   = loadFilter("orders")
       override val dataKeyFilter: BloomFilter = loadFilter("account-data")
       override val addressFilter: BloomFilter = loadFilter("addresses")
     }
@@ -164,7 +162,6 @@ abstract class RocksDBWriter private[database] (
 
 //  val txdb = new TXDB(new File(dbSettings.directory).getCanonicalPath + "/../transactions")
 
-  def orderFilter: BloomFilter
   def dataKeyFilter: BloomFilter
   def addressFilter: BloomFilter
 
@@ -254,10 +251,9 @@ abstract class RocksDBWriter private[database] (
   override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] =
     writableDB.withResource(r => database.loadAssetDescription(r, asset))
 
-  override protected def loadVolumeAndFee(orderId: ByteStr): VolumeAndFee =
-    loadWithFilter(orderFilter, Keys.filledVolumeAndFeeHistory(orderId)) { (ro, history) =>
-      history.headOption.map(h => ro.get(Keys.filledVolumeAndFee(orderId)(h)))
-    }.orEmpty
+  override protected def loadVolumeAndFee(orderId: ByteStr): CurrentVolumeAndFee = readOnly { ro =>
+    ro.get(Keys.filledVolumeAndFee(orderId))
+  }
 
   override protected def loadApprovedFeatures(): Map[Short, Int] = {
     readOnly(_.get(Keys.approvedFeatures))
@@ -354,7 +350,7 @@ abstract class RocksDBWriter private[database] (
       leaseStates: Map[ByteStr, LeaseDetails],
       issuedAssets: Map[IssuedAsset, NewAssetInfo],
       updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
-      filledQuantity: Map[ByteStr, VolumeAndFee],
+      filledQuantity: Map[ByteStr, (CurrentVolumeAndFee, VolumeAndFeeNode)],
       scripts: Map[AddressId, Option[AccountScriptInfo]],
       assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]],
       data: Map[Address, AccountDataInfo],
@@ -410,10 +406,9 @@ abstract class RocksDBWriter private[database] (
         expiredKeys ++= updateHistory(rw, Keys.leaseBalanceHistory(addressId), balanceThreshold, Keys.leaseBalance(addressId))
       }
 
-      for ((orderId, volumeAndFee) <- filledQuantity) {
-        orderFilter.put(orderId.arr)
-        rw.put(Keys.filledVolumeAndFee(orderId)(height), volumeAndFee)
-        expiredKeys ++= updateHistory(rw, Keys.filledVolumeAndFeeHistory(orderId), threshold, Keys.filledVolumeAndFee(orderId))
+      for ((orderId, (currentVolumeAndFee, volumeAndFeeNode)) <- filledQuantity) {
+        rw.put(Keys.filledVolumeAndFee(orderId), currentVolumeAndFee)
+        rw.put(Keys.filledVolumeAndFeeAt(orderId, currentVolumeAndFee.height), volumeAndFeeNode)
       }
 
       for ((asset, NewAssetInfo(staticInfo, info, volumeInfo)) <- issuedAssets) {
@@ -762,9 +757,15 @@ abstract class RocksDBWriter private[database] (
     }
   }
 
-  private def rollbackOrderFill(rw: RW, orderId: ByteStr, currentHeight: Int): ByteStr = {
-    rw.delete(Keys.filledVolumeAndFee(orderId)(currentHeight))
-    rw.filterHistory(Keys.filledVolumeAndFeeHistory(orderId), currentHeight)
+  private def rollbackOrderFill(rw: RW, orderId: ByteStr, height: Height): ByteStr = {
+    val curVfKey = Keys.filledVolumeAndFee(orderId)
+    val vf       = rw.get(curVfKey)
+    if (vf.height == height) {
+      val vfNodeKey  = Keys.filledVolumeAndFeeAt(orderId, _)
+      val prevVfNode = rw.get(vfNodeKey(vf.prevHeight))
+      rw.delete(vfNodeKey(height))
+      rw.put(curVfKey, CurrentVolumeAndFee(prevVfNode.volume, prevVfNode.fee, vf.prevHeight, prevVfNode.prevHeight))
+    }
     orderId
   }
 

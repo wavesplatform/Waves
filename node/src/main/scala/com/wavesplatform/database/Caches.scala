@@ -80,10 +80,13 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
   protected def discardAssetDescription(asset: IssuedAsset): Unit             = assetDescriptionCache.invalidate(asset)
   override def assetDescription(asset: IssuedAsset): Option[AssetDescription] = assetDescriptionCache.get(asset)
 
-  private val volumeAndFeeCache: LoadingCache[ByteStr, VolumeAndFee] = cache(dbSettings.maxCacheSize, loadVolumeAndFee)
-  protected def loadVolumeAndFee(orderId: ByteStr): VolumeAndFee
-  protected def discardVolumeAndFee(orderId: ByteStr): Unit       = volumeAndFeeCache.invalidate(orderId)
-  override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee = volumeAndFeeCache.get(orderId)
+  private val volumeAndFeeCache: LoadingCache[ByteStr, CurrentVolumeAndFee] = cache(dbSettings.maxCacheSize, loadVolumeAndFee)
+  protected def loadVolumeAndFee(orderId: ByteStr): CurrentVolumeAndFee
+  protected def discardVolumeAndFee(orderId: ByteStr): Unit = volumeAndFeeCache.invalidate(orderId)
+  override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee = {
+    val curVf = volumeAndFeeCache.get(orderId)
+    VolumeAndFee(curVf.volume, curVf.fee)
+  }
 
   private val scriptCache: LoadingCache[Address, Option[AccountScriptInfo]] = cache(dbSettings.maxCacheSize, loadScript)
   protected def loadScript(address: Address): Option[AccountScriptInfo]
@@ -149,7 +152,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
       leaseStates: Map[ByteStr, LeaseDetails],
       issuedAssets: Map[IssuedAsset, NewAssetInfo],
       reissuedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
-      filledQuantity: Map[ByteStr, VolumeAndFee],
+      filledQuantity: Map[ByteStr, (CurrentVolumeAndFee, VolumeAndFeeNode)],
       scripts: Map[AddressId, Option[AccountScriptInfo]],
       assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]],
       data: Map[Address, AccountDataInfo],
@@ -198,7 +201,14 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
 
     val newFills = for {
       (orderId, fillInfo) <- diff.orderFills
-    } yield orderId -> volumeAndFeeCache.get(orderId).combine(fillInfo)
+    } yield {
+      val prev = volumeAndFeeCache.get(orderId)
+      orderId -> (CurrentVolumeAndFee(prev.volume + fillInfo.volume, prev.fee + fillInfo.fee, Height(newHeight), prev.height), VolumeAndFeeNode(
+        prev.volume + fillInfo.volume,
+        prev.fee + fillInfo.fee,
+        prev.height
+      ))
+    }
 
     val transactionMeta     = Seq.newBuilder[(TxMeta, Transaction)]
     val addressTransactions = ArrayListMultimap.create[AddressId, TransactionId]()
@@ -302,7 +312,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
         diff.assetScripts.keySet
 
     for ((address, id)                       <- newAddressIds) addressIdCache.put(address, Some(id))
-    for ((orderId, volumeAndFee)             <- newFills) volumeAndFeeCache.put(orderId, volumeAndFee)
+    for ((orderId, (volumeAndFee, _))        <- newFills) volumeAndFeeCache.put(orderId, volumeAndFee)
     for (((address, asset), (newBalance, _)) <- updatedBalanceNodes) balancesCache.put((address, asset), newBalance)
     for (id                                  <- assetsToInvalidate) assetDescriptionCache.invalidate(id)
     for ((alias, address)                    <- diff.aliases) aliasCache.put(alias, Some(address))

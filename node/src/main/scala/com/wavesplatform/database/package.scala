@@ -292,17 +292,24 @@ package object database {
       )
     }
 
-  def readVolumeAndFee(data: Array[Byte]): VolumeAndFee = Option(data).fold(VolumeAndFee.empty) { d =>
-    val ndi = newDataInput(d)
-    VolumeAndFee(ndi.readLong(), ndi.readLong())
-  }
+  def readVolumeAndFeeNode(data: Array[Byte]): VolumeAndFeeNode = if (data != null && data.length == 20)
+    VolumeAndFeeNode(Longs.fromByteArray(data.take(8)), Longs.fromByteArray(data.slice(8, 16)), Height(Ints.fromByteArray(data.takeRight(4))))
+  else VolumeAndFeeNode.Empty
 
-  def writeVolumeAndFee(vf: VolumeAndFee): Array[Byte] = {
-    val ndo = newDataOutput()
-    ndo.writeLong(vf.volume)
-    ndo.writeLong(vf.fee)
-    ndo.toByteArray
-  }
+  def writeVolumeAndFeeNode(volumeAndFeeNode: VolumeAndFeeNode): Array[Byte] =
+    Longs.toByteArray(volumeAndFeeNode.volume) ++ Longs.toByteArray(volumeAndFeeNode.fee) ++ Ints.toByteArray(volumeAndFeeNode.prevHeight)
+
+  def readVolumeAndFee(data: Array[Byte]): CurrentVolumeAndFee = if (data != null && data.length == 24)
+    CurrentVolumeAndFee(
+      Longs.fromByteArray(data.take(8)),
+      Longs.fromByteArray(data.slice(8, 16)),
+      Height(Ints.fromByteArray(data.slice(16, 20))),
+      Height(Ints.fromByteArray(data.takeRight(4)))
+    )
+  else CurrentVolumeAndFee.Unavailable
+
+  def writeVolumeAndFee(vf: CurrentVolumeAndFee): Array[Byte] =
+    Longs.toByteArray(vf.volume) ++ Longs.toByteArray(vf.fee) ++ Ints.toByteArray(vf.height) ++ Ints.toByteArray(vf.prevHeight)
 
   def readTransactionInfo(data: Array[Byte]): (Int, Transaction) =
     (Ints.fromByteArray(data), TransactionParsers.parseBytes(data.drop(4)).get)

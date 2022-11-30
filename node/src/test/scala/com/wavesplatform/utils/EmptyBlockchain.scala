@@ -4,9 +4,10 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.database.CurrentVolumeAndFee
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state._
+import com.wavesplatform.state.*
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError

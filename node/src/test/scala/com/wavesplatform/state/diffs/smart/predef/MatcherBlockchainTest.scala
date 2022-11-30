@@ -5,6 +5,7 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.database.CurrentVolumeAndFee
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values.V5

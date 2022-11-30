@@ -72,6 +72,19 @@ object Explorer extends ScorexLogging {
     val blockchainHeight = reader.height
     log.info(s"Blockchain height is $blockchainHeight")
     try {
+      def loadBalanceHistory(curBalanceKey: Key[CurrentBalance], balanceNodeKey: Height => Key[BalanceNode]): Seq[(Int, Long)] = db.readOnly { rdb =>
+        @tailrec
+        def getPrevBalances(addressId: AddressId, height: Height, acc: Seq[(Int, Long)]): Seq[(Int, Long)] = {
+          if (height > 0) {
+            val balance = rdb.get(balanceNodeKey(height))
+            getPrevBalances(addressId, balance.prevHeight, (height, balance.balance) +: acc)
+          } else acc
+        }
+
+        val currentBalance = rdb.get(curBalanceKey)
+        (currentBalance.height, currentBalance.balance) +: getPrevBalances(currentBalance.prevHeight, Seq.empty).reverse
+      }
+
       @inline
       def argument(i: Int, msg: => String) = args.applyOrElse(i, (_: Int) => throw new IllegalArgumentException(s"Argument #${i + 1} missing: $msg"))
       val flag                             = argument(0, "command").toUpperCase
@@ -130,22 +143,32 @@ object Explorer extends ScorexLogging {
           } else log.error("No block ID was provided")
 
         case "O" =>
+          def loadVfHistory(orderId: ByteStr): Seq[(Int, Long, Long)] = {
+            @tailrec
+            def getPrevVfs(height: Height, acc: Seq[(Int, Long, Long)]): Seq[(Int, Long, Long)] = {
+              if (height > 0) {
+                val vf = db.get(Keys.filledVolumeAndFeeAt(orderId, height))
+                getPrevVfs(vf.prevHeight, (height, vf.volume, vf.fee) +: acc)
+              } else acc
+            }
+
+            val currentVf = db.get(Keys.filledVolumeAndFee(orderId))
+            (currentVf.height, currentVf.volume, currentVf.fee) +: getPrevVfs(currentVf.prevHeight, Seq.empty).reverse
+          }
+
           val orderId = Base58.tryDecodeWithLimit(argument(1, "order id")).toOption.map(ByteStr.apply)
           if (orderId.isDefined) {
-            val kVolumeAndFee = Keys.filledVolumeAndFee(orderId.get)(blockchainHeight)
+            val kVolumeAndFee = Keys.filledVolumeAndFeeAt(orderId.get, Height(blockchainHeight))
             val bytes1        = db.get(kVolumeAndFee.keyBytes)
             val v             = kVolumeAndFee.parse(bytes1)
             log.info(s"OrderId = ${Base58.encode(orderId.get.arr)}: Volume = ${v.volume}, Fee = ${v.fee}")
 
-            val kVolumeAndFeeHistory = Keys.filledVolumeAndFeeHistory(orderId.get)
-            val bytes2               = db.get(kVolumeAndFeeHistory.keyBytes)
-            val value2               = kVolumeAndFeeHistory.parse(bytes2)
-            val value2Str            = value2.mkString("[", ", ", "]")
-            log.info(s"OrderId = ${Base58.encode(orderId.get.arr)}: History = $value2Str")
-            value2.foreach { h =>
-              val k = Keys.filledVolumeAndFee(orderId.get)(h)
-              val v = k.parse(db.get(k.keyBytes))
-              log.info(s"\t h = $h: Volume = ${v.volume}, Fee = ${v.fee}")
+            val vfHistory  = loadVfHistory(orderId.get)
+            val heights    = vfHistory.map(_._1)
+            val heightsStr = heights.mkString("[", ", ", "]")
+            log.info(s"OrderId = ${Base58.encode(orderId.get.arr)}: History = $heightsStr")
+            vfHistory.foreach { case (h, volume, fee) =>
+              log.info(s"\t h = $h: Volume = $volume, Fee = $fee")
             }
           } else log.error("No order ID was provided")
 
@@ -155,14 +178,9 @@ object Explorer extends ScorexLogging {
           val addressId = aid.parse(db.get(aid.keyBytes)).get
           log.info(s"Address id = $addressId")
 
-          val kwbh = Keys.wavesBalanceHistory(addressId)
-          val wbh  = kwbh.parse(db.get(kwbh.keyBytes))
-
-//          val balances = wbh.map { h =>
-//            val k = Keys.wavesBalance(addressId)(h)
-//            h -> k.parse(db.get(k.keyBytes))
-//          }
-//          balances.foreach(b => log.info(s"h = ${b._1}: balance = ${b._2}"))
+          loadBalanceHistory(Keys.wavesBalance(addressId), Keys.wavesBalanceAt(addressId, _)).foreach { case (h, balance) =>
+            log.info(s"h = $h: balance = $balance")
+          }
 
         case "AC" =>
           val lastAddressId = Keys.lastAddressId.parse(db.get(Keys.lastAddressId.keyBytes))
@@ -193,14 +211,9 @@ object Explorer extends ScorexLogging {
           val addressId = ai.parse(db.get(ai.keyBytes)).get
           log.info(s"Address ID = $addressId")
 
-//          val kabh = Keys.assetBalanceHistory(addressId, asset)
-//          val abh  = kabh.parse(db.get(kabh.keyBytes))
-//
-//          val balances = abh.map { h =>
-//            val k = Keys.assetBalance(addressId, asset)(h)
-//            h -> k.parse(db.get(k.keyBytes))
-//          }
-//          balances.foreach(b => log.info(s"h = ${b._1}: balance = ${b._2}"))
+          loadBalanceHistory(Keys.assetBalance(addressId, asset), Keys.assetBalanceAt(addressId, asset, _)).foreach { case (h, balance) =>
+            log.info(s"h = $h: balance = $balance")
+          }
 
         case "S" =>
           log.info("Collecting DB stats")

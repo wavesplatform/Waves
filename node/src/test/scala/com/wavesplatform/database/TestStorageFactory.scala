@@ -23,7 +23,6 @@ object TestStorageFactory {
   ): (BlockchainUpdaterImpl, RocksDBWriter) = {
     val useBloomFilter = settings.dbSettings.useBloomFilter
     val rocksDBWriter: RocksDBWriter = new RocksDBWriter(db, spendableBalanceChanged, 200, settings.blockchainSettings, settings.dbSettings) {
-      override val orderFilter: BloomFilter   = wrappedFilter(useBloomFilter)
       override val dataKeyFilter: BloomFilter = wrappedFilter(useBloomFilter)
       override val addressFilter: BloomFilter = wrappedFilter(useBloomFilter)
     }
