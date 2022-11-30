@@ -19,7 +19,7 @@ class AccountLeaseBalanceStorage[TagT](blockchainApi: BlockchainApi, override va
     val address = update.address.toAddress
     memoryCache.get(address) match {
       case None => AppendResult.ignored
-      case _    => append(height, address, Some(toVanilla(update)))
+      case _    => append(height, address, toVanilla(update))
     }
   }
 
@@ -28,7 +28,7 @@ class AccountLeaseBalanceStorage[TagT](blockchainApi: BlockchainApi, override va
     val address = update.address.toAddress
     memoryCache.get(address) match {
       case None => RollbackResult.ignored
-      case _    => super.rollback(rollbackHeight, address, Some(toVanilla(update)))
+      case _    => super.rollback(rollbackHeight, address, toVanilla(update))
     }
   }
 

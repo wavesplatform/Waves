@@ -19,7 +19,7 @@ class AccountBalanceStorage[TagT](blockchainApi: BlockchainApi, override val per
     val key            = (address, asset)
     memoryCache.get(key) match {
       case None => AppendResult.ignored
-      case _    => super.append(height, key, Some(after)) // TODO #22 We can go further: just store values
+      case _    => super.append(height, key, after)
     }
   }
 
@@ -29,7 +29,7 @@ class AccountBalanceStorage[TagT](blockchainApi: BlockchainApi, override val per
     val key            = (address, asset)
     memoryCache.get(key) match {
       case None => RollbackResult.ignored
-      case _    => super.rollback(rollbackHeight, key, Some(after))
+      case _    => super.rollback(rollbackHeight, key, after)
     }
   }
 }

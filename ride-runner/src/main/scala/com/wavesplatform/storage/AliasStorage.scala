@@ -12,5 +12,5 @@ class AliasStorage[TagT](chainId: Byte, blockchainApi: BlockchainApi, override v
   override def getFromBlockchain(key: Alias): Option[Address] = blockchainApi.resolveAlias(key)
 
   def append(height: Int, rawAlias: String, account: PublicKey): AppendResult[TagT] =
-    append(height, Alias.createWithChainId(rawAlias, chainId).explicitGet(), Some(account.toAddress(chainId)))
+    append(height, Alias.createWithChainId(rawAlias, chainId).explicitGet(), account.toAddress(chainId))
 }

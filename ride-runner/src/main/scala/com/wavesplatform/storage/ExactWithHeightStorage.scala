@@ -12,7 +12,8 @@ import scala.util.chaining.*
 
 /** Exact, because stores not only a value, but an absence of it too
   */
-trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging { storage =>
+trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging {
+  storage =>
   protected val memoryCache = mutable.AnyRefMap.empty[KeyT, TaggedData[RemoteData[ValueT], TagT]]
 
   lazy val name = getSimpleName(this)
@@ -21,8 +22,10 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
 
   def persistentCache: PersistentCache[KeyT, ValueT]
 
-  def getUntagged(height: Int, key: KeyT): Option[ValueT]    = getInternal(height, key, None)
+  def getUntagged(height: Int, key: KeyT): Option[ValueT] = getInternal(height, key, None)
+
   def get(height: Int, key: KeyT, tag: TagT): Option[ValueT] = getInternal(height, key, Some(tag))
+
   private def getInternal(height: Int, key: KeyT, tag: Option[TagT]): Option[ValueT] =
     memoryCache
       .updateWith(key) {
@@ -53,6 +56,8 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
       case x => x
     }
 
+  def append(height: Int, key: KeyT, update: ValueT): AppendResult[TagT] = append(height, key, update.some)
+
   def append(height: Int, key: KeyT, update: Option[ValueT]): AppendResult[TagT] =
     memoryCache.get(key) match {
       case None => AppendResult.ignored
@@ -68,6 +73,8 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
           AppendResult.appended(mkDataKey(key), orig.tags)
         }
     }
+
+  def rollback(rollbackHeight: Int, key: KeyT, after: ValueT): RollbackResult[TagT] = rollback(rollbackHeight, key, after.some)
 
   // Micro blocks don't affect, because we know new values
   def rollback(rollbackHeight: Int, key: KeyT, after: Option[ValueT]): RollbackResult[TagT] =

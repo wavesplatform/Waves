@@ -15,13 +15,11 @@ import com.wavesplatform.database.{
   readAssetScript,
   readAssetStaticInfo,
   readBlockMeta,
-  readLeaseBalance,
   writeAccountScriptInfo,
   writeAssetDetails,
   writeAssetScript,
   writeAssetStaticInfo,
-  writeBlockMeta,
-  writeLeaseBalance
+  writeBlockMeta
 }
 import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
@@ -34,7 +32,6 @@ import com.wavesplatform.state.{
   AssetVolumeInfo,
   DataEntry,
   LeaseBalance,
-  Portfolio,
   TransactionId,
   TxMeta
 }
@@ -426,37 +423,6 @@ object CacheKeys {
         staticInfo.nft
       )
       (r, Ints.BYTES + staticInfoLen + Ints.BYTES + detailsLen + Longs.BYTES + scriptLen)
-    }
-  }
-
-  implicit val portfoliosAsBytes: AsBytes[Portfolio] = new AsBytes[Portfolio] {
-    private val assetsAsBytes: AsBytes[Map[Asset.IssuedAsset, Long]] = AsBytes.map[Asset.IssuedAsset, Long]
-
-    override def toByteArray(x: Portfolio): Array[Byte] =
-      new ByteArrayOutputStream()
-        .writeLong(x.balance)
-        .writeWithLen(writeLeaseBalance(x.lease))
-        .writeWithLen(assetsAsBytes.toByteArray(x.assets))
-        .toByteArray
-
-    override def fromByteArray(xs: Array[Byte]): (Portfolio, Int) = {
-      val bb = ByteBuffer.wrap(xs)
-
-      val balance = bb.getLong
-
-      val leaseLen = bb.getInt
-      val lease    = readLeaseBalance(bb.getByteArray(leaseLen)) // TODO #22 AsBytes for LeaseBalance
-
-      val assetsLen   = bb.getInt
-      val (assets, _) = assetsAsBytes.fromByteArray(bb.getByteArray(assetsLen))
-
-      val portfolio = Portfolio(
-        balance = balance,
-        lease = lease,
-        assets = assets
-      )
-
-      (portfolio, Longs.BYTES + Ints.BYTES + leaseLen + Ints.BYTES + assetsLen)
     }
   }
 
