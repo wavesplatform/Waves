@@ -7,8 +7,7 @@ import com.wavesplatform.protobuf.transaction.PBAmounts.toAssetAndAmount
 import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
 import com.wavesplatform.storage.persistent.PersistentCache
 
-// TODO #? Not all addresses are interesting, probably having a wrapped Map[Address, Map[Asset, Long]] is better.
-// TODO #? Also see AccountDataKey
+// TODO #32 Not all addresses are interesting. Probably, having a wrapped Map[Address, Map[Asset, Long]] is better, because we can filter out values slightly before.
 class AccountBalanceStorage[TagT](blockchainApi: BlockchainApi, override val persistentCache: PersistentCache[AccountAssetKey, Long])
     extends ExactWithHeightStorage[AccountAssetKey, Long, TagT] {
   override def getFromBlockchain(key: AccountAssetKey): Option[Long] = Option(blockchainApi.getBalance(key._1, key._2))
