@@ -149,17 +149,14 @@ class DefaultBlockchainApi(
 
   override def getAccountDataEntry(address: Address, key: String): Option[DataEntry[_]] =
     try {
-      ClientCalls
-        .blockingServerStreamingCall(
-          grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_DATA_ENTRIES, CallOptions.DEFAULT),
-          DataRequest(address = toPb(address), key = key)
-        )
-        .asScala
-        .flatMap(_.entry)
-        .map(toVanillaDataEntry)
-        .take(1)
-        .toSeq
-        .headOption
+      firstOf(
+        ClientCalls
+          .blockingServerStreamingCall(
+            grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_DATA_ENTRIES, CallOptions.DEFAULT),
+            DataRequest(address = toPb(address), key = key)
+          )
+      )
+        .map(x => toVanillaDataEntry(x.getEntry))
         .tap(r => log.trace(s"getAccountDataEntry($address, '$key'): ${r.toFoundStr("value", _.value)}"))
     } catch {
       case e: Throwable =>

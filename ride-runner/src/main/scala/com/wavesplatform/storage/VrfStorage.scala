@@ -16,7 +16,7 @@ class VrfStorage(blockchainApi: BlockchainApi, persistentCache: VrfPersistentCac
       else
         blockchainApi.getVrf(height).tap { x =>
           set(height, x)
-          log.info(s"Set VRF at $height: $x")
+          log.trace(s"Set VRF at $height: $x")
         }
     }
 

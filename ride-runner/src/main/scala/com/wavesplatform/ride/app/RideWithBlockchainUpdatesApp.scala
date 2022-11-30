@@ -24,14 +24,14 @@ import scala.util.Failure
 
 object RideWithBlockchainUpdatesApp extends ScorexLogging {
   def main(args: Array[String]): Unit = {
-    val startTs       = System.nanoTime()
-    val basePath      = args(0)
-    val (_, settings) = AppInitializer.init(Some(new File(s"$basePath/node/waves-testnet.conf")))
+    val startTs = System.nanoTime()
+    val basePath = args(0)
+    val (_, settings) = AppInitializer.init(Some(new File(s"$basePath/node/waves.conf")))
 
     val r = Using.Manager { use =>
       log.info("Loading args...")
       val scripts = Json
-        .parse(use(Source.fromFile(new File(s"$basePath/input6.json"))).getLines().mkString("\n"))
+        .parse(use(Source.fromFile(new File(s"$basePath/input5.json"))).getLines().mkString("\n"))
         .as[List[RequestKey]]
 
       val connector = use(new GrpcConnector)
@@ -59,8 +59,8 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
         hangScheduler = commonScheduler
       )
 
-      val db                = use(openDB(s"$basePath/db"))
-      val dbCaches          = new LevelDbPersistentCaches(db)
+      val db = use(openDB(s"$basePath/db"))
+      val dbCaches = new LevelDbPersistentCaches(db)
       val blockchainStorage = new SharedBlockchainData[RequestKey](settings.blockchain, dbCaches, blockchainApi)
 
       val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
@@ -82,11 +82,13 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
       processor.runScripts(forceAll = true)
 
       // mainnet
-      //      val start = Height(3393500)   // math.max(0, blockchainStorage.height - 100 - 1))
-      //      val end   = Height(start + 1) // 101 // lastHeightAtStart
+      val start = Height(3393500) // math.max(0, blockchainStorage.height - 100 - 1))
+      val end = Height(start + 1) // 101 // lastHeightAtStart
 
-      val start = Height(2327973)
-      val end   = Height(start + 1)
+
+      // testnet
+      //      val start = Height(2327973)
+      //      val end   = Height(start + 1)
 
       val blockchainUpdates = use(blockchainApi.mkBlockchainUpdatesStream())
       val events = blockchainUpdates.stream
@@ -118,7 +120,7 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
     val duration = System.nanoTime() - startTs
     r match {
       case Failure(e) => log.error("Got an error", e)
-      case _          => log.info(f"Done in ${duration / 1e9d}%5f s")
+      case _ => log.info(f"Done in ${duration / 1e9d}%5f s")
     }
   }
 }
