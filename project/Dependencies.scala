@@ -59,10 +59,10 @@ object Dependencies {
       // defined here because %%% can only be used within a task or setting macro
       // explicit dependency can likely be removed when monix 3 is released
       monixModule("eval").value,
-      catsCore.value.exclude("org.scala-js", "scalajs-library_2.13"),
-      ("com.lihaoyi" %%% "fastparse" % "2.3.3").exclude("org.scala-js", "scalajs-library_2.13"),
-      shapeless.value.exclude("org.scala-js", "scalajs-library_2.13"),
-      ("org.typelevel" %% "cats-mtl-core" % "0.7.1").exclude("org.scalacheck", "scalacheck_2.13"),
+      catsCore.value,
+      "com.lihaoyi" %%% "fastparse" % "2.3.3",
+      shapeless.value,
+      "org.typelevel" %%% "cats-mtl" % "1.3.0",
       "ch.obermuhlner"  % "big-math"      % "2.3.2",
       curve25519,
       bouncyCastleProvider,
