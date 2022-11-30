@@ -164,7 +164,7 @@ object Blockchain {
       isFeatureActivated(BlockchainFeatures.ReduceNFTFee) && quantity == 1 && decimals == 0 && !reissuable
 
     def isFeatureActivated(feature: BlockchainFeature, height: Int = blockchain.height): Boolean =
-      blockchain.activatedFeatures.get(feature.id).exists(_ <= height)
+      Blockchain.isFeatureActivated(blockchain.activatedFeatures, feature, height)
 
     def activatedFeaturesAt(height: Int): Set[Short] =
       blockchain.activatedFeatures.collect {
@@ -204,4 +204,7 @@ object Blockchain {
 
     def transactionSucceeded(id: ByteStr): Boolean = blockchain.transactionMeta(id).exists(_.succeeded)
   }
+
+  def isFeatureActivated(activatedFeatures: Map[Short, Int], feature: BlockchainFeature, height: Int): Boolean =
+    activatedFeatures.get(feature.id).exists(_ <= height)
 }

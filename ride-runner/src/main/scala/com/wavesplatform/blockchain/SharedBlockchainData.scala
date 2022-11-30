@@ -1,10 +1,14 @@
 package com.wavesplatform.blockchain
 
 import cats.syntax.option.*
-import com.wavesplatform.features.EstimatorProvider
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.features.{BlockchainFeatures, ComplexityCheckPolicyProvider, EstimatorProvider}
 import com.wavesplatform.grpc.DefaultBlockchainApi
+import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.settings.BlockchainSettings
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.storage.*
 import com.wavesplatform.storage.persistent.PersistentCaches
 import com.wavesplatform.utils.ScorexLogging
@@ -17,7 +21,21 @@ class SharedBlockchainData[TagT](val settings: BlockchainSettings, persistentCac
 
   val data = new AccountDataStorage[TagT](blockchainApi, persistentCaches.accountDataEntries)
 
-  val accountScripts = new AccountScriptStorage[TagT](chainId, estimator, blockchainApi, persistentCaches.accountScripts)
+  val accountScripts = new AccountScriptStorage[TagT](chainId, estimate, blockchainApi, persistentCaches.accountScripts)
+
+  // See DiffCommons.countVerifierComplexity
+  private def estimate(script: Script): Map[Int, ComplexityInfo] = {
+    val fixEstimateOfVerifier = Blockchain.isFeatureActivated(activatedFeatures, BlockchainFeatures.RideV6, height)
+
+    // !isAsset && blockchain.useReducedVerifierComplexityLimit
+    val isAsset                  = false
+    val useContractVerifierLimit = !isAsset && ComplexityCheckPolicyProvider.useReducedVerifierComplexityLimit(activatedFeatures)
+
+    val currEstimator = estimator
+    // TODO #4 explicitGet?
+    val r = Script.complexityInfo(script, currEstimator, fixEstimateOfVerifier, useContractVerifierLimit).explicitGet()
+    Map(currEstimator.version -> r)
+  }
 
   val blockHeaders = new BlockHeadersStorage(blockchainApi, persistentCaches.blockHeaders)
 

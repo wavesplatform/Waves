@@ -164,6 +164,7 @@ class DefaultBlockchainApi(
         throw e
     }
 
+  // TODO #10 Get "io.grpc.StatusRuntimeException: UNAVAILABLE: unavailable" on empty database. Probably, because of multiple equivalent requests
   override def getAccountScript(address: Address): Option[Script] = {
     val x = ClientCalls.blockingUnaryCall(
       grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_SCRIPT, CallOptions.DEFAULT),
