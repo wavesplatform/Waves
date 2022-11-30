@@ -16,7 +16,6 @@ import com.wavesplatform.state.{
   DataEntry,
   Height,
   LeaseBalance,
-  Portfolio,
   TransactionId,
   TxMeta,
   VolumeAndFee
@@ -64,16 +63,18 @@ class ScriptBlockchain[TagT](storage: SharedBlockchainData[TagT], tag: TagT) ext
     storage.aliases.get(height, a, tag).toRight(AliasDoesNotExist(a): ValidationError)
 
   // Ride: wavesBalance
-  override def leaseBalance(address: Address): LeaseBalance = withPortfolios(address).lease
+  override def leaseBalance(address: Address): LeaseBalance = storage.accountLeaseBalances.get(height, address, tag).getOrElse(LeaseBalance.empty)
 
   // Ride: assetBalance, wavesBalance
-  override def balance(address: Address, mayBeAssetId: Asset): Long = withPortfolios(address).balanceOf(mayBeAssetId)
+  override def balance(address: Address, mayBeAssetId: Asset): Long = storage.accountBalances.get(height, (address, mayBeAssetId), tag).getOrElse(0L)
 
+  // Retrieves Waves balance snapshot in the [from, to] range (inclusive)
   // Ride: wavesBalance (specifies to=None), "to" always None and means "to the end"
-  /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = {
     // NOTE: This code leads to a wrong generating balance, but we see no use-cases for now
-    List(BalanceSnapshot(height, withPortfolios(address))) // TODO #22 doesn't require Portfolio
+    val lb           = leaseBalance(address)
+    val wavesBalance = balance(address, Asset.Waves)
+    List(BalanceSnapshot(height, wavesBalance, lb.in, lb.out))
   }
 
   private def withTransactions(id: ByteStr): Option[Height] = storage.transactions.get(TransactionId(id), tag)

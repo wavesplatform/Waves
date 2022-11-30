@@ -11,6 +11,7 @@ import com.wavesplatform.api.grpc.{
   ActivationStatusRequest,
   AssetRequest,
   AssetsApiGrpc,
+  BalanceResponse,
   BalancesRequest,
   BlockRangeRequest,
   BlockRequest,
@@ -31,7 +32,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.Block
 import com.wavesplatform.protobuf.transaction.PBTransactions.{toVanillaDataEntry, toVanillaScript}
-import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, DataEntry, Height, LeaseBalance, Portfolio}
+import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, DataEntry, Height}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.*
@@ -264,28 +265,35 @@ class DefaultBlockchainApi(
     r
   }
 
-  override def getBalances(address: Address): Portfolio = {
+  override def getBalance(address: Address, asset: Asset): Long = {
     val xs = ClientCalls.blockingServerStreamingCall(
       grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_BALANCES, CallOptions.DEFAULT),
       BalancesRequest(toPb(address))
     )
 
-    xs.asScala
-      .foldLeft(Portfolio.empty) { case (r, x) =>
-        x.balance match {
-          case Balance.Empty => r
-          case Balance.Waves(wavesBalance) =>
-            r.copy(
-              balance = wavesBalance.regular,
-              lease = LeaseBalance(in = wavesBalance.leaseIn, out = wavesBalance.leaseOut)
-            )
-          case Balance.Asset(assetBalance) =>
-            r.copy(
-              assets = r.assets.updated(Asset.IssuedAsset(assetBalance.assetId.toByteStr), assetBalance.amount)
-            )
-        }
+    firstOf(xs)
+      .map(_.balance)
+      .fold(0L) {
+        case Balance.Empty               => 0L
+        case Balance.Waves(wavesBalance) => wavesBalance.regular
+        case Balance.Asset(assetBalance) => assetBalance.amount
       }
-      .tap(r => log.trace(s"getBalances($address): found assets=${r.assets.size}"))
+      .tap(r => log.trace(s"getBalance($address, $asset): $r"))
+  }
+
+  override def getLeaseBalance(address: Address): BalanceResponse.WavesBalances = {
+    val xs = ClientCalls.blockingServerStreamingCall(
+      grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_BALANCES, CallOptions.DEFAULT),
+      BalancesRequest(toPb(address))
+    )
+
+    firstOf(xs)
+      .map(_.balance)
+      .fold(BalanceResponse.WavesBalances.defaultInstance) {
+        case Balance.Waves(wavesBalance) => wavesBalance
+        case x                           => throw new RuntimeException(s"Expected Balance.Waves, but got $x")
+      }
+      .tap(r => log.trace(s"getLeaseBalance($address): $r"))
   }
 
   override def getTransactionHeight(id: ByteStr): Option[Height] = {
@@ -295,14 +303,12 @@ class DefaultBlockchainApi(
         TransactionsByIdRequest(transactionIds = Seq(UnsafeByteOperations.unsafeWrap(id.arr)))
       )
 
-    val r = if (xs.hasNext) {
-      val pbTx = xs.next()
-      Height(pbTx.height.toInt).some
-    } else None
-
+    val r = firstOf(xs).map(x => Height(x.height.toInt))
     log.trace(s"getTransactionHeight($id): ${r.toFoundStr { h => s"height=$h" }}")
     r
   }
+
+  private def firstOf[T](xs: java.util.Iterator[T]): Option[T] = if (xs.hasNext) xs.next().some else none
 
   private def toPb(address: Address): ByteString = UnsafeByteOperations.unsafeWrap(address.bytes)
 

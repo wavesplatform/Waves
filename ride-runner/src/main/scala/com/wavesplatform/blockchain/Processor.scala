@@ -81,10 +81,10 @@ class BlockchainProcessor private (
         r.withAppendResult(blockchainStorage.assets.append(h, x))
       })
       .pipe(stateUpdate.flatMap(_.balances).foldLeft(_) { case (r, x) =>
-        r.withAppendResult(blockchainStorage.portfolios.append(h, x))
+        r.withAppendResult(blockchainStorage.accountBalances.append(h, x))
       })
       .pipe(stateUpdate.flatMap(_.leasingForAddress).foldLeft(_) { case (r, x) =>
-        r.withAppendResult(blockchainStorage.portfolios.append(h, x))
+        r.withAppendResult(blockchainStorage.accountLeaseBalances.append(h, x))
       })
       .pipe(stateUpdate.flatMap(_.dataEntries).foldLeft(_) { case (r, x) =>
         r.withAppendResult(blockchainStorage.data.append(h, x))
@@ -135,10 +135,10 @@ class BlockchainProcessor private (
         r.withRollbackResult(blockchainStorage.assets.rollback(h, x))
       })
       .pipe(stateUpdate.balances.foldLeft(_) { case (r, x) =>
-        r.withRollbackResult(blockchainStorage.portfolios.rollback(h, x))
+        r.withRollbackResult(blockchainStorage.accountBalances.rollback(h, x))
       })
       .pipe(stateUpdate.leasingForAddress.foldLeft(_) { case (r, x) =>
-        r.withRollbackResult(blockchainStorage.portfolios.rollback(h, x))
+        r.withRollbackResult(blockchainStorage.accountLeaseBalances.rollback(h, x))
       })
       .pipe(stateUpdate.dataEntries.foldLeft(_) { case (r, x) =>
         r.withRollbackResult(blockchainStorage.data.rollback(h, x))

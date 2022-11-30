@@ -6,9 +6,9 @@ import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.collections.syntax.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{AddressId, DBExt, Key, RW, ReadOnlyDB}
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, Height, Portfolio, TransactionId}
-import com.wavesplatform.storage.{AccountAssetKey, AccountDataKey}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, Height, LeaseBalance, TransactionId}
 import com.wavesplatform.storage.persistent.LevelDbPersistentCaches.{ReadOnlyDBOps, ReadWriteDBOps}
+import com.wavesplatform.storage.{AccountAssetKey, AccountDataKey}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB
@@ -83,7 +83,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
           data
         )
       }
-      log.trace(s"setAccountScript($key, $atHeight)")
+      log.trace(s"set($key, $atHeight)")
     }
 
     override def remove(fromHeight: Int, key: Address): RemoteData[AccountScriptInfo] =
@@ -181,7 +181,7 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
           h => CacheKeys.AccountAssets.mkKey((addressId, asset, h)),
           atHeight,
           data,
-          0
+          0L
         )
       }
       log.trace(s"set($key)")
@@ -195,6 +195,46 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
           rw.removeAfterAndGetLatestExisted(
             CacheKeys.AccountAssetsHistory.mkKey((addressId, asset)),
             h => CacheKeys.AccountAssets.mkKey((addressId, asset, h)),
+            fromHeight
+          )
+        }
+        .tap { _ => log.trace(s"remove($key, $fromHeight)") }
+  }
+
+  override def accountLeaseBalances: PersistentCache[Address, LeaseBalance] = new PersistentCache[Address, LeaseBalance] with ScorexLogging {
+    override def get(maxHeight: Int, key: Address): RemoteData[LeaseBalance] =
+      db
+        .readOnly { ro =>
+          val addressId = getOrMkAddressId(ro, key)
+          ro.readHistoricalFromDb(
+            CacheKeys.AccountLeaseBalancesHistory.mkKey(addressId),
+            h => CacheKeys.AccountLeaseBalances.mkKey((addressId, h)),
+            maxHeight
+          )
+        }
+        .tap { r => log.trace(s"get($key, $maxHeight): ${r.toFoundStr()}") }
+
+    override def set(atHeight: Int, key: Address, data: RemoteData[LeaseBalance]): Unit = {
+      db.readWrite { rw =>
+        val addressId = getOrMkAddressId(rw, key)
+        rw.writeHistoricalToDb(
+          CacheKeys.AccountLeaseBalancesHistory.mkKey(addressId),
+          h => CacheKeys.AccountLeaseBalances.mkKey((addressId, h)),
+          atHeight,
+          data,
+          LeaseBalance.empty
+        )
+      }
+      log.trace(s"set($key, $atHeight)")
+    }
+
+    override def remove(fromHeight: Int, key: Address): RemoteData[LeaseBalance] =
+      db
+        .readWrite { rw =>
+          val addressId = getOrMkAddressId(rw, key)
+          rw.removeAfterAndGetLatestExisted(
+            CacheKeys.AccountLeaseBalancesHistory.mkKey(addressId),
+            h => CacheKeys.AccountLeaseBalances.mkKey((addressId, h)),
             fromHeight
           )
         }
