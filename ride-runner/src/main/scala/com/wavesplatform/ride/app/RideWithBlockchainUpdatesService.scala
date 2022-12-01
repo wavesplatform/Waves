@@ -31,7 +31,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     val (globalConfig, settings) = AppInitializer.init(Some(new File(s"$basePath/node/waves.conf")))
 
     val r = Using.Manager { use =>
-      val connector = use(new GrpcConnector)
+      val connector = use(new GrpcConnector(settings.rideRunner.grpcConnector))
 
       log.info("Making gRPC channel to gRPC API...")
       val grpcApiChannel = use(connector.mkChannel(settings.rideRunner.grpcApi))

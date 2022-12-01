@@ -35,7 +35,7 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
         .parse(use(Source.fromFile(new File(s"$basePath/input5.json"))).getLines().mkString("\n"))
         .as[List[RequestKey]]
 
-      val connector = use(new GrpcConnector)
+      val connector = use(new GrpcConnector(settings.rideRunner.grpcConnector))
 
       log.info("Making gRPC channel to gRPC API...")
       val grpcApiChannel = use(connector.mkChannel(settings.rideRunner.grpcApi))
