@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs
 import cats.implicits.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.database.CurrentBalance
 import com.wavesplatform.state
 import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset.Waves
@@ -17,10 +18,15 @@ object BalanceDiffValidation {
   }
 
   def apply(b: Blockchain)(d: Diff): Either[AccountBalanceError, Diff] = {
-    def check(acc: Address, portfolio: Portfolio): Either[(Address, String), Unit] = {
+    def check(
+        acc: Address,
+        portfolio: Portfolio
+//        oldBalances: Map[Address, Long],
+//        oldLeases: Map[Address, LeaseBalance]
+    ): Either[(Address, String), Unit] = {
       val balance  = portfolio.balance
-      val oldWaves = b.balance(acc, Waves)
-      val oldLease = b.leaseBalance(acc)
+      val oldWaves = b.balance(acc, Waves) // oldBalances.getOrElse(acc, CurrentBalance.Unavailable.balance)
+      val oldLease = b.leaseBalance(acc)   // oldLeases.getOrElse(acc, LeaseBalance.empty)
 
       def negativeBalanceCheck(newLease: LeaseBalance, newWaves: Long): Either[(Address, String), Unit] =
         if (balance < 0) {
@@ -57,6 +63,9 @@ object BalanceDiffValidation {
         _        <- assetsCheck
       } yield ()
     }
+
+//    val oldBalances = b.wavesBalances(d.portfolios.keys.toSeq)
+//    val oldLeases   = b.leaseBalances(d.portfolios.keys.toSeq)
 
     val positiveBalanceErrors =
       d.portfolios.flatMap { case (acc, p) => check(acc, p).fold(error => List(error), _ => Nil) }

@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs
 
 import cats.implicits.{toBifunctorOps, toFoldableOps}
 import cats.syntax.either.catsSyntaxEitherId
+import cats.syntax.parallel.*
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
@@ -13,9 +14,16 @@ import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, ProvenTransaction, Signed, Transaction}
+import com.wavesplatform.utils.Schedulers
+import monix.eval.Task
+import monix.execution.ExecutionModel
+import monix.execution.Scheduler.Implicits.global
+import monix.execution.schedulers.SchedulerService
 
 object BlockDiffer {
+  val sigverify: SchedulerService = Schedulers.fixedPool(4, "sigverify", executionModel = ExecutionModel.BatchedExecution(5))
+
   final case class DetailedDiff(parentDiff: Diff, transactionDiffs: List[Diff])
   final case class Result(diff: Diff, carry: Long, totalFee: Long, constraint: MiningConstraint, detailedDiff: DetailedDiff)
 
@@ -64,7 +72,8 @@ object BlockDiffer {
             pf.minus(pf.multiply(CurrentBlockFeePart))
           }
           .foldM(Portfolio.empty)(_.combine(_))
-      } else
+      }
+      else
         Right(Portfolio.empty)
 
     val initialFeeFromThisBlockE =
@@ -163,6 +172,16 @@ object BlockDiffer {
     val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, verify) _
     val hasSponsorship = currentBlockHeight >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
 
+    if (verify) {
+      txs
+        .parUnorderedTraverse {
+          case tx: ProvenTransaction => Task(tx.firstProofIsValidSignature).void
+          case _                     => Task.unit
+        }
+        .executeOn(sigverify)
+        .runSyncUnsafe()
+    }
+
     txs
       .foldLeft(TracedResult(Result(initDiff, 0L, 0L, initConstraint, DetailedDiff(initDiff, Nil)).asRight[ValidationError])) {
         case (acc @ TracedResult(Left(_), _, _), _) => acc
@@ -206,11 +225,10 @@ object BlockDiffer {
 
   private def patchesDiff(blockchain: Blockchain): Either[String, Diff] = {
     Seq(CancelAllLeases, CancelLeaseOverflow, CancelInvalidLeaseIn, CancelLeasesToDisabledAliases)
-      .foldM(Diff.empty) {
-        case (prevDiff, patch) =>
-          patch
-            .lift(CompositeBlockchain(blockchain, prevDiff))
-            .fold(prevDiff.asRight[String])(prevDiff.combineF)
+      .foldM(Diff.empty) { case (prevDiff, patch) =>
+        patch
+          .lift(CompositeBlockchain(blockchain, prevDiff))
+          .fold(prevDiff.asRight[String])(prevDiff.combineF)
       }
   }
 }

@@ -184,6 +184,10 @@ abstract class RocksDBWriter private[database] (
 
   override protected def loadAddressId(address: Address): Option[AddressId] = loadWithFilter(addressFilter, Keys.addressId(address)) { (_, id) => id }
 
+  override protected def loadAddressIds(addresses: Seq[Address]): Map[Address, Option[AddressId]] = readOnly { ro =>
+    addresses.view.zip(ro.multiGetBuffered(addresses.map(Keys.addressId), 8)).toMap
+  }
+
   override protected def loadHeight(): Height = RocksDBWriter.loadHeight(writableDB)
 
   override def safeRollbackHeight: Int = readOnly(_.get(Keys.safeRollbackHeight))
@@ -241,11 +245,23 @@ abstract class RocksDBWriter private[database] (
       }
     }
 
+  protected override def loadWavesBalances(req: Seq[Address]): Map[(Address, Asset), CurrentBalance] = readOnly { ro =>
+    addressIds(req).map { case (address, addressId) =>
+      (address, Waves) -> addressId.fold(CurrentBalance.Unavailable) { addressId => ro.get(Keys.wavesBalance(addressId)) }
+    }
+  }
+
   private def loadLeaseBalance(db: ReadOnlyDB, addressId: AddressId): LeaseBalance =
     db.fromHistory(Keys.leaseBalanceHistory(addressId), Keys.leaseBalance(addressId)).getOrElse(LeaseBalance.empty)
 
   override protected def loadLeaseBalance(address: Address): LeaseBalance = readOnly { db =>
     addressId(address).fold(LeaseBalance.empty)(loadLeaseBalance(db, _))
+  }
+
+  override protected def loadLeaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance] = readOnly { ro =>
+    addressIds(addresses).map { case (address, addressId) =>
+      address -> addressId.fold(LeaseBalance.empty)(loadLeaseBalance(ro, _))
+    }
   }
 
   override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] =
@@ -467,16 +483,22 @@ abstract class RocksDBWriter private[database] (
         id -> size
       }
 
-      if (dbSettings.storeTransactionsByAddress) for ((addressId, txIds) <- addressTransactions.asScala) {
-        val kk        = Keys.addressTransactionSeqNr(addressId)
-        val nextSeqNr = rw.get(kk) + 1
-        val txTypeNumSeq = txIds.asScala.map { txId =>
-          val (_, tx, num) = transactions(txId)
-          val size         = txSizes(txId)
-          (tx.tpe.id.toByte, num, size)
-        }.toSeq
-        rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq.sortBy(-_._2))))
-        rw.put(kk, nextSeqNr)
+      if (dbSettings.storeTransactionsByAddress) {
+        val addressTxs = addressTransactions.asScala.toSeq.map { case (aid, txIds) =>
+          (aid, txIds, Keys.addressTransactionSeqNr(aid))
+        }
+        rw.multiGetInts(addressTxs.map(_._3))
+          .zip(addressTxs)
+          .foreach { case (prevSeqNr, (addressId, txIds, txSeqNrKey)) =>
+            val nextSeqNr = prevSeqNr.getOrElse(0) + 1
+            val txTypeNumSeq = txIds.asScala.map { txId =>
+              val (_, tx, num) = transactions(txId)
+              val size         = txSizes(txId)
+              (tx.tpe.id.toByte, num, size)
+            }.toSeq
+            rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq.sortBy(-_._2))))
+            rw.put(txSeqNrKey, nextSeqNr)
+          }
       }
 
       for ((alias, addressId) <- aliases) {

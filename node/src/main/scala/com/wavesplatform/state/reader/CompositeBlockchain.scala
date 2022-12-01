@@ -36,8 +36,18 @@ final class CompositeBlockchain private (
   override def balance(address: Address, assetId: Asset): Long =
     inner.balance(address, assetId) + diff.portfolios.get(address).fold(0L)(_.balanceOf(assetId))
 
+  override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] =
+    inner.wavesBalances(addresses).map { case (address, balance) =>
+      address -> (balance + diff.portfolios.get(address).fold(0L)(_.balanceOf(Waves)))
+    }
+
   override def leaseBalance(address: Address): LeaseBalance =
     inner.leaseBalance(address).combineF[Id](diff.portfolios.getOrElse(address, Portfolio.empty).lease)
+
+  override def leaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance] =
+    inner.leaseBalances(addresses).map { case (address, leaseBalance) =>
+      address -> leaseBalance.combineF[Id](diff.portfolios.getOrElse(address, Portfolio.empty).lease)
+    }
 
   override def assetScript(asset: IssuedAsset): Option[AssetScriptInfo] =
     maybeDiff

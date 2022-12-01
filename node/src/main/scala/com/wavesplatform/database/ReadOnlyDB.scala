@@ -6,6 +6,7 @@ import com.wavesplatform.metrics.RocksDBStats.DbHistogramExt
 import org.rocksdb.{ReadOptions, RocksDB, RocksIterator}
 
 import scala.annotation.tailrec
+import scala.collection.View
 import scala.util.Using
 
 class ReadOnlyDB(db: RocksDB, readOptions: ReadOptions) {
@@ -23,6 +24,9 @@ class ReadOnlyDB(db: RocksDB, readOptions: ReadOptions) {
 
   def multiGetBuffered[V](keys: Seq[Key[Option[V]]], valBufSizes: Seq[Int]): Seq[Option[V]] =
     db.multiGetBuffered(readOptions, keys, valBufSizes)
+
+  def multiGetInts(keys: Seq[Key[Int]]): View[Option[Int]] =
+    db.multiGetInts(readOptions, keys.map(_.keyBytes))
 
   def has[V](key: Key[V]): Boolean = {
     val bytes = db.get(readOptions, key.keyBytes)

@@ -709,8 +709,16 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.balance(address, mayBeAssetId)
   }
 
+  override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] = readLock {
+    compositeBlockchain.wavesBalances(addresses)
+  }
+
   override def leaseBalance(address: Address): LeaseBalance = readLock {
     compositeBlockchain.leaseBalance(address)
+  }
+
+  override def leaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance] = readLock {
+    compositeBlockchain.leaseBalances(addresses)
   }
 
   override def hitSource(height: Int): Option[ByteStr] = readLock {

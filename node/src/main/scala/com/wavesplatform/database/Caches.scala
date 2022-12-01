@@ -66,14 +66,33 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
 
   private val leaseBalanceCache: LoadingCache[Address, LeaseBalance] = cache(dbSettings.maxCacheSize, loadLeaseBalance)
   protected def loadLeaseBalance(address: Address): LeaseBalance
+  protected def loadLeaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance]
   protected def discardLeaseBalance(address: Address): Unit = leaseBalanceCache.invalidate(address)
   override def leaseBalance(address: Address): LeaseBalance = leaseBalanceCache.get(address)
+
+  override def leaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance] = {
+    val fromCache   = leaseBalanceCache.getAllPresent(addresses.asJava).asScala
+    val cacheMissed = addresses.filterNot(fromCache.contains)
+    val fromDb      = loadLeaseBalances(cacheMissed)
+    leaseBalanceCache.putAll(fromDb.asJava)
+    fromCache.map { case (addr, balance) => addr -> balance }.toMap ++
+      fromDb.map { case (addr, balance) => addr -> balance }
+  }
 
   protected val balancesCache: LoadingCache[(Address, Asset), CurrentBalance] = cache(dbSettings.maxCacheSize * 16, loadBalance)
   protected def clearBalancesCache(): Unit                                    = balancesCache.invalidateAll()
   protected def discardBalance(key: (Address, Asset)): Unit                   = balancesCache.invalidate(key)
   override def balance(address: Address, mayBeAssetId: Asset): Long           = balancesCache.get(address -> mayBeAssetId).balance
+  override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] = {
+    val fromCache   = balancesCache.getAllPresent(addresses.map(_ -> Waves).asJava).asScala
+    val cacheMissed = addresses.filterNot(addr => fromCache.contains(addr -> Waves))
+    val fromDb      = loadWavesBalances(cacheMissed)
+    balancesCache.putAll(fromDb.asJava)
+    fromCache.map { case ((addr, _), balance) => addr -> balance.balance }.toMap ++
+      fromDb.map { case ((addr, _), balance) => addr -> balance.balance }
+  }
   protected def loadBalance(req: (Address, Asset)): CurrentBalance
+  protected def loadWavesBalances(req: Seq[Address]): Map[(Address, Asset), CurrentBalance]
 
   private val assetDescriptionCache: LoadingCache[IssuedAsset, Option[AssetDescription]] = cache(dbSettings.maxCacheSize, loadAssetDescription)
   protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription]
@@ -110,6 +129,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
 
   private val addressIdCache: LoadingCache[Address, Option[AddressId]] = cache(dbSettings.maxCacheSize, loadAddressId)
   protected def loadAddressId(address: Address): Option[AddressId]
+  protected def loadAddressIds(addresses: Seq[Address]): Map[Address, Option[AddressId]]
 
   protected def addressIdWithFallback(address: Address, newAddresses: Map[Address, AddressId]): AddressId =
     newAddresses.getOrElse(address, addressIdCache.get(address).get)
@@ -126,6 +146,13 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
   protected def loadAccountData(acc: Address, key: String): Option[DataEntry[?]]
 
   private[database] def addressId(address: Address): Option[AddressId] = addressIdCache.get(address)
+  private[database] def addressIds(addresses: Seq[Address]): Map[Address, Option[AddressId]] = {
+    val fromCache   = addressIdCache.getAllPresent(addresses.asJava).asScala
+    val cacheMissed = addresses.filterNot(fromCache.contains)
+    val fromDb      = loadAddressIds(cacheMissed)
+    addressIdCache.putAll(fromDb.asJava)
+    fromDb ++ fromCache
+  }
 
   protected val aliasCache: LoadingCache[Alias, Option[Address]] = cache(dbSettings.maxCacheSize, loadAlias)
   protected def loadAlias(alias: Alias): Option[Address]

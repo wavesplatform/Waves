@@ -640,6 +640,36 @@ package object database {
       result
     }
 
+    def multiGetInts(readOptions: ReadOptions, keys: Seq[Array[Byte]]): View[Option[Int]] = {
+      val keyBufs = keys.map { k =>
+        val b = Util.getTemporaryDirectBuffer(k.length)
+        b.put(k).flip()
+        b
+      }.asJava
+      val valBufs = List
+        .fill(keys.size) {
+          val buf = Util.getTemporaryDirectBuffer(4)
+          buf.limit(buf.capacity())
+          buf
+        }
+        .asJava
+
+      val result = db
+        .multiGetByteBuffers(readOptions, keyBufs, valBufs)
+        .asScala
+        .view
+        .map { value =>
+          if (value.status.getCode == Status.Code.Ok) {
+            val h = Some(value.value.getInt)
+            Util.releaseTemporaryDirectBuffer(value.value)
+            h
+          } else None
+        }
+
+      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
+      result
+    }
+
     def multiGetLongs(readOptions: ReadOptions, keys: Seq[Array[Byte]]): View[Long] = {
       val keyBufs = keys.map { k =>
         val b = Util.getTemporaryDirectBuffer(k.length)

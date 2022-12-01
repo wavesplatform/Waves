@@ -73,7 +73,11 @@ trait Blockchain {
 
   def leaseBalance(address: Address): LeaseBalance
 
+  def leaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance]
+
   def balance(address: Address, mayBeAssetId: Asset = Waves): Long
+
+  def wavesBalances(addresses: Seq[Address]): Map[Address, Long]
 
   def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]
 

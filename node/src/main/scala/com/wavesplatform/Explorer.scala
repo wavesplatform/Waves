@@ -74,10 +74,10 @@ object Explorer extends ScorexLogging {
     try {
       def loadBalanceHistory(curBalanceKey: Key[CurrentBalance], balanceNodeKey: Height => Key[BalanceNode]): Seq[(Int, Long)] = db.readOnly { rdb =>
         @tailrec
-        def getPrevBalances(addressId: AddressId, height: Height, acc: Seq[(Int, Long)]): Seq[(Int, Long)] = {
+        def getPrevBalances(height: Height, acc: Seq[(Int, Long)]): Seq[(Int, Long)] = {
           if (height > 0) {
             val balance = rdb.get(balanceNodeKey(height))
-            getPrevBalances(addressId, balance.prevHeight, (height, balance.balance) +: acc)
+            getPrevBalances(balance.prevHeight, (height, balance.balance) +: acc)
           } else acc
         }
 

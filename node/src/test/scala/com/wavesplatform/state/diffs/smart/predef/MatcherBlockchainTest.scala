@@ -56,7 +56,9 @@ class MatcherBlockchainTest extends PropSpec with MockFactory with WithDomain {
       override def accountData(acc: Address, key: String): Option[DataEntry[?]]                             = ???
       override def hasData(address: Address): Boolean                                                       = ???
       override def leaseBalance(address: Address): LeaseBalance                                             = ???
+      override def leaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance]                       = ???
       override def balance(address: Address, mayBeAssetId: Asset): Long                                     = ???
+      override def wavesBalances(addresses: Seq[Address]): Map[Address, Long]                               = ???
       override def resolveERC20Address(address: ERC20Address): Option[Asset.IssuedAsset]                    = ???
       override def compositeBlockchain: Blockchain                                                          = ???
     }
