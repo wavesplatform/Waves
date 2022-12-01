@@ -7,8 +7,8 @@ import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.blockchain.BlockchainProcessor.RequestKey
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
-import com.wavesplatform.grpc.BlockchainApi.Event
-import com.wavesplatform.grpc.{DefaultBlockchainApi, GrpcClientSettings, GrpcConnector}
+import com.wavesplatform.events.WrappedEvent
+import com.wavesplatform.grpc.{DefaultBlockchainApi, GrpcConnector}
 import com.wavesplatform.http.EvaluateApiRoute
 import com.wavesplatform.resources.*
 import com.wavesplatform.state.Height
@@ -27,49 +27,17 @@ import scala.util.Failure
 
 object RideWithBlockchainUpdatesService extends ScorexLogging {
   def main(args: Array[String]): Unit = {
-    val basePath = args(0)
+    val basePath                 = args(0)
     val (globalConfig, settings) = AppInitializer.init(Some(new File(s"$basePath/node/waves.conf")))
 
     val r = Using.Manager { use =>
       val connector = use(new GrpcConnector)
 
       log.info("Making gRPC channel to gRPC API...")
-      val grpcApiChannel = use(
-        connector.mkChannel(
-          GrpcClientSettings(
-            target = "grpc.wavesnodes.com:6870",
-            maxHedgedAttempts = 5,
-            maxRetryAttempts = 30,
-            keepAliveWithoutCalls = false,
-            keepAliveTime = 60.seconds,
-            keepAliveTimeout = 15.seconds,
-            idleTimeout = 300.days,
-            maxInboundMessageSize = 8388608, // 8 MiB
-            channelOptions = GrpcClientSettings.ChannelOptionsSettings(
-              connectTimeout = 5.seconds
-            )
-          )
-        )
-      )
+      val grpcApiChannel = use(connector.mkChannel(settings.rideRunner.grpcApi))
 
       log.info("Making gRPC channel to Blockchain Updates API...")
-      val blockchainUpdatesApiChannel = use(
-        connector.mkChannel(
-          GrpcClientSettings(
-            target = "grpc.wavesnodes.com:6881",
-            maxHedgedAttempts = 5,
-            maxRetryAttempts = 30,
-            keepAliveWithoutCalls = false,
-            keepAliveTime = 60.seconds,
-            keepAliveTimeout = 15.seconds,
-            idleTimeout = 300.days,
-            maxInboundMessageSize = 8388608, // 8 MiB
-            channelOptions = GrpcClientSettings.ChannelOptionsSettings(
-              connectTimeout = 5.seconds
-            )
-          )
-        )
-      )
+      val blockchainUpdatesApiChannel = use(connector.mkChannel(settings.rideRunner.blockchainUpdatesApi))
 
       val commonScheduler = use(
         Executors.newScheduledThreadPool(
@@ -78,6 +46,11 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
         )
       )
 
+      val monixScheduler = use.acquireWithShutdown(Scheduler(commonScheduler).withExecutionModel(ExecutionModel.AlwaysAsyncExecution)) { x =>
+        x.shutdown()
+        x.awaitTermination(5.seconds)
+      }
+
       val httpBackend = use.acquireWithShutdown(HttpURLConnectionBackend())(_.close())
 
       val blockchainApi = new DefaultBlockchainApi(
@@ -85,20 +58,15 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
         grpcApiChannel = grpcApiChannel,
         blockchainUpdatesApiChannel = blockchainUpdatesApiChannel,
         httpBackend = httpBackend,
-        hangScheduler = commonScheduler
+        scheduler = monixScheduler
       )
 
-      val db = use(openDB(s"$basePath/db"))
-      val dbCaches = new LevelDbPersistentCaches(db)
+      val db                = use(openDB(s"$basePath/db"))
+      val dbCaches          = new LevelDbPersistentCaches(db)
       val blockchainStorage = new SharedBlockchainData[RequestKey](settings.blockchain, dbCaches, blockchainApi)
 
       val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
       log.info(s"Current height: $lastHeightAtStart")
-
-      val monixScheduler = use.acquireWithShutdown(Scheduler(commonScheduler).withExecutionModel(ExecutionModel.AlwaysAsyncExecution)) { x =>
-        x.shutdown()
-        x.awaitTermination(5.seconds)
-      }
 
       val processor = BlockchainProcessor.mk(
         settings.rideRunner.processor,
@@ -109,7 +77,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
       log.info("Warm up caches...") // Also helps to figure out, which data is used by a script
       processor.runScripts(forceAll = true)
 
-      val start = Height(math.max(0, blockchainStorage.height - 100 - 1))
+      val start             = Height(math.max(0, blockchainStorage.height - 100 - 1))
       val blockchainUpdates = use(blockchainApi.mkBlockchainUpdatesStream())
       val events = blockchainUpdates.stream
         .doOnError(e =>
@@ -118,15 +86,15 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
           }
         )
         .takeWhile {
-          case _: Event.Next => true
-          case Event.Closed =>
+          case WrappedEvent.Next(_) => true
+          case WrappedEvent.Closed =>
             log.info("Blockchain stream closed")
             false
-          case Event.Failed(error) =>
+          case WrappedEvent.Failed(error) =>
             log.error("Blockchain stream failed", error)
             false
         }
-        .collect { case Event.Next(event) => event }
+        .collect { case WrappedEvent.Next(event) => event }
         .foldLeftL(BlockchainState.Starting(lastHeightAtStart): BlockchainState)(BlockchainState(processor, _, _))
         .runToFuture(Scheduler(commonScheduler))
 
@@ -135,7 +103,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
 
       // ====
       val heavyRequestProcessorPoolThreads =
-      /*settings.restAPISettings.heavyRequestProcessorPoolThreads*/ None.getOrElse((Runtime.getRuntime.availableProcessors() * 2).min(4))
+        /*settings.restAPISettings.heavyRequestProcessorPoolThreads*/ None.getOrElse((Runtime.getRuntime.availableProcessors() * 2).min(4))
       val heavyRequestExecutor = use(
         new ThreadPoolExecutor(
           heavyRequestProcessorPoolThreads,
@@ -180,7 +148,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
 
     r match {
       case Failure(e) => log.error("Got an error", e)
-      case _ => log.info("Done")
+      case _          => log.info("Done")
     }
   }
 }

@@ -4,6 +4,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.grpc.BlockchainApi.*
 import com.wavesplatform.lang.script.Script
@@ -29,15 +30,8 @@ trait BlockchainApi {
 }
 
 object BlockchainApi {
-  sealed trait Event extends Product with Serializable
-  object Event {
-    case class Next(event: SubscribeEvent) extends Event
-    case class Failed(error: Throwable)    extends Event
-    case object Closed                     extends Event
-  }
-
   trait BlockchainUpdatesStream extends AutoCloseable {
-    val stream: Observable[Event]
+    val stream: Observable[WrappedEvent[SubscribeEvent]]
 
     def start(fromHeight: Int): Unit
     def start(fromHeight: Int, toHeight: Int): Unit

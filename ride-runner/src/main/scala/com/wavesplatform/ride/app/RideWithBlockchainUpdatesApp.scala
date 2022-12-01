@@ -4,7 +4,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.blockchain.BlockchainProcessor.RequestKey
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
-import com.wavesplatform.grpc.BlockchainApi.Event
+import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.grpc.{DefaultBlockchainApi, GrpcConnector}
 import com.wavesplatform.resources.*
 import com.wavesplatform.state.Height
@@ -12,6 +12,7 @@ import com.wavesplatform.storage.persistent.LevelDbPersistentCaches
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
+import monix.reactive.OverflowStrategy
 import play.api.libs.json.Json
 import sttp.client3.HttpURLConnectionBackend
 
@@ -24,8 +25,8 @@ import scala.util.Failure
 
 object RideWithBlockchainUpdatesApp extends ScorexLogging {
   def main(args: Array[String]): Unit = {
-    val startTs = System.nanoTime()
-    val basePath = args(0)
+    val startTs       = System.nanoTime()
+    val basePath      = args(0)
     val (_, settings) = AppInitializer.init(Some(new File(s"$basePath/node/waves.conf")))
 
     val r = Using.Manager { use =>
@@ -49,6 +50,11 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
         )
       )
 
+      val monixScheduler = use.acquireWithShutdown(Scheduler(commonScheduler).withExecutionModel(ExecutionModel.AlwaysAsyncExecution)) { x =>
+        x.shutdown()
+        x.awaitTermination(5.seconds)
+      }
+
       val httpBackend = use.acquireWithShutdown(HttpURLConnectionBackend())(_.close())
 
       val blockchainApi = new DefaultBlockchainApi(
@@ -56,20 +62,15 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
         grpcApiChannel = grpcApiChannel,
         blockchainUpdatesApiChannel = blockchainUpdatesApiChannel,
         httpBackend = httpBackend,
-        hangScheduler = commonScheduler
+        scheduler = monixScheduler
       )
 
-      val db = use(openDB(s"$basePath/db"))
-      val dbCaches = new LevelDbPersistentCaches(db)
+      val db                = use(openDB(s"$basePath/db"))
+      val dbCaches          = new LevelDbPersistentCaches(db)
       val blockchainStorage = new SharedBlockchainData[RequestKey](settings.blockchain, dbCaches, blockchainApi)
 
       val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
       log.info(s"Current height: $lastHeightAtStart")
-
-      val monixScheduler = use.acquireWithShutdown(Scheduler(commonScheduler).withExecutionModel(ExecutionModel.AlwaysAsyncExecution)) { x =>
-        x.shutdown()
-        x.awaitTermination(5.seconds)
-      }
 
       val processor = BlockchainProcessor.mk(
         settings.rideRunner.processor,
@@ -82,9 +83,8 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
       processor.runScripts(forceAll = true)
 
       // mainnet
-      val start = Height(3393500) // math.max(0, blockchainStorage.height - 100 - 1))
-      val end = Height(start + 1) // 101 // lastHeightAtStart
-
+      val start = Height(3393500)   // math.max(0, blockchainStorage.height - 100 - 1))
+      val end   = Height(start + 3) // 101 // lastHeightAtStart
 
       // testnet
       //      val start = Height(2327973)
@@ -92,21 +92,23 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
 
       val blockchainUpdates = use(blockchainApi.mkBlockchainUpdatesStream())
       val events = blockchainUpdates.stream
+//        .timeoutOnSlowUpstream()
+        .asyncBoundary(OverflowStrategy.BackPressure(4))
         .doOnError(e =>
           Task {
             log.error("Error!", e)
           }
         )
         .takeWhile {
-          case _: Event.Next => true
-          case Event.Closed =>
+          case WrappedEvent.Next(_) => true
+          case WrappedEvent.Closed =>
             log.info("Blockchain stream closed")
             false
-          case Event.Failed(error) =>
+          case WrappedEvent.Failed(error) =>
             log.error("Blockchain stream failed", error)
             false
         }
-        .collect { case Event.Next(event) => event }
+        .collect { case WrappedEvent.Next(event) => event }
         .foldLeftL(BlockchainState.Starting(end): BlockchainState)(BlockchainState(processor, _, _))
         .runToFuture(Scheduler(commonScheduler))
 
@@ -120,7 +122,7 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
     val duration = System.nanoTime() - startTs
     r match {
       case Failure(e) => log.error("Got an error", e)
-      case _ => log.info(f"Done in ${duration / 1e9d}%5f s")
+      case _          => log.info(f"Done in ${duration / 1e9d}%5f s")
     }
   }
 }

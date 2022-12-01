@@ -1,6 +1,6 @@
-* Ride runner
+# Ride runner
 
-** Limitations
+## Limitations
 
 We have some limitations. If you faced one of them, please issue a ticket on GitHub and tell us your use-case.
 

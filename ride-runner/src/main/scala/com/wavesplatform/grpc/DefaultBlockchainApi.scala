@@ -24,10 +24,11 @@ import com.wavesplatform.api.grpc.{
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.collections.syntax.*
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.*
-import com.wavesplatform.grpc.BlockchainApi.{BlockchainUpdatesStream, Event}
+import com.wavesplatform.grpc.BlockchainApi.BlockchainUpdatesStream
 import com.wavesplatform.grpc.DefaultBlockchainApi.{HttpBlockHeader, Settings}
-import com.wavesplatform.grpc.observers.RichGrpcObserver
+import com.wavesplatform.grpc.observers.{ManualGrpcObserver, MonixWrappedDownstream}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.Block
@@ -37,14 +38,14 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.*
 import io.grpc.stub.ClientCalls
+import monix.eval.Task
 import monix.execution.Scheduler
-import monix.reactive.MulticastStrategy
 import monix.reactive.subjects.ConcurrentSubject
+import monix.reactive.{MulticastStrategy, OverflowStrategy}
 import play.api.libs.json.{Json, Reads}
 import sttp.client3.{Identity, SttpBackend, UriContext, asString, basicRequest}
 
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters.IteratorHasAsScala
@@ -52,56 +53,38 @@ import scala.util.chaining.scalaUtilChainingOps
 
 class DefaultBlockchainApi(
     settings: Settings,
-    grpcApiChannel: ManagedChannel,
-    blockchainUpdatesApiChannel: ManagedChannel,
+    grpcApiChannel: Channel,
+    blockchainUpdatesApiChannel: Channel,
     httpBackend: SttpBackend[Identity, Any],
-    hangScheduler: ScheduledExecutorService
+    scheduler: Scheduler
 ) extends ScorexLogging
     with BlockchainApi {
 
   override def mkBlockchainUpdatesStream(): BlockchainUpdatesStream = {
-    val s = ConcurrentSubject[Event](MulticastStrategy.publish)(Scheduler(hangScheduler))
-
-    def mkObserver(call: ClientCall[SubscribeRequest, SubscribeEvent]): RichGrpcObserver[SubscribeRequest, SubscribeEvent] =
-      new RichGrpcObserver[SubscribeRequest, SubscribeEvent](settings.noDataTimeout, hangScheduler) {
-        override def onReceived(event: SubscribeEvent): Boolean = {
-          s.onNext(Event.Next(event))
-          true // TODO #2 make a fair back-pressure
-        }
-
-        override def onFailed(error: Throwable): Unit = {
-          s.onNext(Event.Failed(error))
-        }
-
-        // We can't obtain IP earlier, it's a netty-grpc limitation
-        override def onReady(): Unit = {
-          // This doesn't work for streams :(
-          // log.debug("Ready to receive from {}", call.socketAddressStr)
-        }
-
-        override def onClosedByRemotePart(): Unit = {
-          s.onNext(Event.Closed)
-        }
-      }
+    val s = ConcurrentSubject[WrappedEvent[SubscribeEvent]](MulticastStrategy.publish)(scheduler)
 
     new BlockchainUpdatesStream {
-      private val currentObserver = new AtomicReference[RichGrpcObserver[SubscribeRequest, SubscribeEvent]]
-      override val stream         = s
+      private val currentObserver = new AtomicReference(new ManualGrpcObserver[SubscribeRequest, SubscribeEvent])
+      override val stream = s
+        .doOnNextAck((_, _) => Task(currentObserver.get().requestNext()))
+        .timeoutOnSlowUpstream(settings.blockchainUpdates.noDataTimeout)
+        .asyncBoundary(OverflowStrategy.BackPressure(settings.blockchainUpdates.bufferSize))
 
       override def start(fromHeight: Int): Unit = start(fromHeight, toHeight = 0)
 
       override def start(fromHeight: Int, toHeight: Int): Unit = {
         val call     = blockchainUpdatesApiChannel.newCall(BlockchainUpdatesApiGrpc.METHOD_SUBSCRIBE, CallOptions.DEFAULT)
-        val observer = mkObserver(call)
-        Option(currentObserver.getAndSet(observer)).foreach(_.close())
+        val observer = new MonixWrappedDownstream[SubscribeRequest, SubscribeEvent](s)
+
+        currentObserver.getAndSet(observer).close()
 
         log.info("Start receiving updates from {}", fromHeight)
-        ClientCalls.asyncServerStreamingCall(call, SubscribeRequest(fromHeight = fromHeight, toHeight = toHeight), observer.underlying)
+        ClientCalls.asyncServerStreamingCall(call, SubscribeRequest(fromHeight = fromHeight, toHeight = toHeight), observer)
       }
 
-      override def closeUpstream(): Unit = Option(currentObserver.get()).foreach(_.close()) // Closes if failed
+      override def closeUpstream(): Unit = currentObserver.get().close() // Closes if failed
 
-      override def closeDownstream(): Unit = stream.onComplete()
+      override def closeDownstream(): Unit = s.onComplete()
 
       override def close(): Unit = {
         closeDownstream()
@@ -129,7 +112,7 @@ class DefaultBlockchainApi(
       .toMap
       .tap(r => log.trace(s"getActivatedFeatures: found ${r.mkString(", ")}"))
 
-  override def getAccountDataEntries(address: Address): Seq[DataEntry[_]] =
+  override def getAccountDataEntries(address: Address): Seq[DataEntry[?]] =
     try
       ClientCalls
         .blockingServerStreamingCall(
@@ -147,7 +130,7 @@ class DefaultBlockchainApi(
         throw e
     }
 
-  override def getAccountDataEntry(address: Address, key: String): Option[DataEntry[_]] =
+  override def getAccountDataEntry(address: Address, key: String): Option[DataEntry[?]] =
     try {
       firstOf(
         ClientCalls
@@ -331,14 +314,13 @@ class DefaultBlockchainApi(
 }
 
 object DefaultBlockchainApi {
-  case class Settings(nodeApiBaseUri: String, noDataTimeout: FiniteDuration)
+  case class Settings(nodeApiBaseUri: String, blockchainUpdates: BlockchainUpdatesSettings)
+  case class BlockchainUpdatesSettings(noDataTimeout: FiniteDuration, bufferSize: Int)
 
   private case class HttpBlockHeader(VRF: Option[ByteStr] = None)
 
   private object HttpBlockHeader {
-
     import com.wavesplatform.utils.byteStrFormat
-
     implicit val httpBlockHeaderReads: Reads[HttpBlockHeader] = Json.using[Json.WithDefaultValues].reads
   }
 }
