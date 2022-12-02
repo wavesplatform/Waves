@@ -346,7 +346,7 @@ class ScriptParserTest extends PropSpec with ScriptGenParser {
   List("then", "else", "true").foreach { keyword =>
     property(s"reserved keywords are invalid variable names in block: $keyword") {
       val script =
-        s"""let ${keyword.padTo(4, " ").mkString} = 1
+        s"""let ${keyword.padTo(4, ' ').mkString} = 1
            |true""".stripMargin
       parse(script) shouldBe BLOCK(
         AnyPos,

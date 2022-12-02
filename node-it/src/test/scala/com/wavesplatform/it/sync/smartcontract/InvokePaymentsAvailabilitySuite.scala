@@ -94,13 +94,13 @@ class InvokePaymentsAvailabilitySuite extends BaseTransactionSuite {
     sender.assetBalance(callerAddress, assetId).balance shouldBe callerStartBalance - paymentAmount
 
     val expectingProxyDAppBalance = 0
-    List(
+    List[Any](
       sender.assetBalance(proxyDAppAddress, assetId).balance,
       sender.getData(proxyDAppAddress, "balance_self").head.value
     ).foreach(_ shouldBe proxyStartBalance + expectingProxyDAppBalance)
 
     val expectingCallingDAppBalance = paymentAmount
-    List(
+    List[Any](
       sender.assetBalance(callingDAppAddress, assetId).balance,
       sender.getData(proxyDAppAddress, "balance_calling_dApp").head.value
     ).foreach(_ shouldBe callingDAppStartBalance + expectingCallingDAppBalance)
