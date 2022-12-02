@@ -15,20 +15,12 @@ class AccountBalanceStorage[TagT](blockchainApi: BlockchainApi, override val per
   def append(height: Int, update: StateUpdate.BalanceUpdate): AppendResult[TagT] = {
     val address        = update.address.toAddress
     val (asset, after) = toAssetAndAmount(update.getAmountAfter)
-    val key            = (address, asset)
-    memoryCache.get(key) match {
-      case None => AppendResult.ignored
-      case _    => super.append(height, key, after)
-    }
+    append(height, (address, asset), after)
   }
 
   def rollback(rollbackHeight: Int, update: StateUpdate.BalanceUpdate): RollbackResult[TagT] = {
     val address        = update.address.toAddress
     val (asset, after) = toAssetAndAmount(update.getAmountAfter)
-    val key            = (address, asset)
-    memoryCache.get(key) match {
-      case None => RollbackResult.ignored
-      case _    => super.rollback(rollbackHeight, key, after)
-    }
+    rollback(rollbackHeight, (address, asset), after)
   }
 }

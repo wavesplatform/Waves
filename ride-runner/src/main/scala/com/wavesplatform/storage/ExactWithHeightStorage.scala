@@ -1,20 +1,23 @@
 package com.wavesplatform.storage
 
 import cats.syntax.option.*
-import com.wavesplatform.blockchain.{RemoteData, TaggedData}
+import com.github.benmanes.caffeine.cache.Caffeine
+import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
 import com.wavesplatform.storage.persistent.PersistentCache
 import com.wavesplatform.utils.ScorexLogging
 
-import scala.collection.mutable
 import scala.util.chaining.*
 
 /** Exact, because stores not only a value, but an absence of it too
   */
 trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging {
   storage =>
-  protected val memoryCache = mutable.AnyRefMap.empty[KeyT, TaggedData[RemoteData[ValueT], TagT]]
+  protected val values = Caffeine.newBuilder().build[KeyT, RemoteData[ValueT]]()
+
+  protected val tags                       = Caffeine.newBuilder().build[KeyT, Set[TagT]]()
+  private def tagsOf(key: KeyT): Set[TagT] = Option(tags.getIfPresent(key)).getOrElse(Set.empty)
 
   lazy val name = getSimpleName(this)
 
@@ -26,40 +29,37 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
 
   def get(height: Int, key: KeyT, tag: TagT): Option[ValueT] = getInternal(height, key, Some(tag))
 
-  private def getInternal(height: Int, key: KeyT, tag: Option[TagT]): Option[ValueT] =
-    memoryCache
-      .updateWith(key) {
-        case Some(orig) => Some(tag.foldLeft(orig)(_.withTag(_)))
-        case None =>
-          val cached = persistentCache.get(height, key)
-          val r =
-            if (cached.loaded) cached
-            else
-              RemoteData
-                .loaded(getFromBlockchain(key))
-                .tap(r => persistentCache.set(height, key, r)) // TODO #10: double check before set, because we could have an update
+  private def getInternal(height: Int, key: KeyT, tag: Option[TagT]): Option[ValueT] = {
+    tag.foreach { tag =>
+      val origTags = tagsOf(key)
+      if (!origTags.contains(tag)) tags.put(key, origTags + tag)
+    }
 
-          Some(TaggedData(r, tag.toSet))
-      }
-      .flatMap(_.data.mayBeValue)
+    values
+      .get(
+        key,
+        { (key: KeyT) =>
+          val cached = persistentCache.get(height, key)
+          if (cached.loaded) cached
+          else
+            RemoteData
+              .loaded(getFromBlockchain(key))
+              .tap(r => persistentCache.set(height, key, r))
+        }
+      )
+      .mayBeValue
+  }
 
   // Use only for known before data
-  def reload(height: Int, key: KeyT): Unit =
-    memoryCache.updateWith(key) {
-      case Some(orig) =>
-        log.info(s"Reload $name($key)")
-
-        val loaded = RemoteData.loaded(getFromBlockchain(key))
-        persistentCache.set(height, key, loaded)
-        orig.copy(data = loaded).some
-
-      case x => x
-    }
+  def reload(height: Int, key: KeyT): Unit = {
+    log.info(s"Invalidating $name($key)")
+    values.invalidate(key)
+  }
 
   def append(height: Int, key: KeyT, update: ValueT): AppendResult[TagT] = append(height, key, update.some)
 
-  def append(height: Int, key: KeyT, update: Option[ValueT]): AppendResult[TagT] =
-    memoryCache.get(key) match {
+  def append(height: Int, key: KeyT, update: Option[ValueT]): AppendResult[TagT] = {
+    Option(values.getIfPresent(key)) match {
       case None => AppendResult.ignored
       case Some(orig) =>
         log.debug(s"Update $name($key)")
@@ -67,37 +67,39 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
         val updated = RemoteData.loaded(update)
         persistentCache.set(height, key, updated) // Write here (not in "else"), because we want to preserve the height
 
-        if (updated == orig.data) AppendResult.ignored
+        if (updated == orig) AppendResult.ignored
         else {
-          memoryCache.update(key, orig.copy(data = updated))
-          AppendResult.appended(mkDataKey(key), orig.tags)
+          values.put(key, updated)
+          AppendResult.appended(mkDataKey(key), tagsOf(key))
         }
     }
+  }
 
   def rollback(rollbackHeight: Int, key: KeyT, after: ValueT): RollbackResult[TagT] = rollback(rollbackHeight, key, after.some)
 
   // Micro blocks don't affect, because we know new values
   def rollback(rollbackHeight: Int, key: KeyT, after: Option[ValueT]): RollbackResult[TagT] =
-    memoryCache.get(key) match {
+    Option(values.getIfPresent(key)) match {
       case None => RollbackResult.ignored
       case Some(orig) =>
         log.info(s"Rollback $name($key)")
 
+        val tags = tagsOf(key)
         persistentCache.remove(rollbackHeight + 1, key) match {
           case RemoteData.Unknown =>
             after match {
-              case None => RollbackResult.uncertain(mkDataKey(key), orig.tags) // will be updated later
+              case None => RollbackResult.uncertain(mkDataKey(key), tags) // will be updated later
               case Some(after) =>
-                val x = RemoteData.Cached(after)
-                persistentCache.set(rollbackHeight, key, x)
-                memoryCache.update(key, orig.copy(data = x))
-                RollbackResult.rolledBack(orig.tags)
+                val restored = RemoteData.Cached(after)
+                persistentCache.set(rollbackHeight, key, restored)
+                values.put(key, restored)
+                RollbackResult.rolledBack(tags)
             }
 
           case latest => // Cached | Absence
             // TODO #11: compare with afterRollback
-            memoryCache.update(key, orig.copy(data = latest))
-            RollbackResult.rolledBack(orig.tags)
+            values.put(key, latest)
+            RollbackResult.rolledBack(tags)
         }
     }
 

@@ -1,8 +1,8 @@
 package com.wavesplatform.storage
 
-import cats.syntax.option.*
+import com.github.benmanes.caffeine.cache.Caffeine
 import com.google.protobuf.ByteString
-import com.wavesplatform.blockchain.{RemoteData, TaggedData}
+import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.grpc.BlockchainApi
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.state.{Height, TransactionId}
@@ -10,7 +10,6 @@ import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
 import com.wavesplatform.storage.persistent.TransactionPersistentCache
 import com.wavesplatform.utils.ScorexLogging
 
-import scala.collection.mutable
 import scala.util.chaining.scalaUtilChainingOps
 
 class TransactionsStorage[TagT](
@@ -18,26 +17,32 @@ class TransactionsStorage[TagT](
     persistentCache: TransactionPersistentCache
 ) extends ScorexLogging {
   storage =>
-  protected val memoryCache = mutable.AnyRefMap.empty[TransactionId, TaggedData[RemoteData[Height], TagT]]
+
+  protected val values = Caffeine.newBuilder().build[TransactionId, RemoteData[Height]]()
+
+  protected val tags                                = Caffeine.newBuilder().build[TransactionId, Set[TagT]]()
+  private def tagsOf(key: TransactionId): Set[TagT] = Option(tags.getIfPresent(key)).getOrElse(Set.empty)
 
   def getFromBlockchain(key: TransactionId): Option[Height] = blockchainApi.getTransactionHeight(key)
 
-  def get(txId: TransactionId, tag: TagT): Option[Height] =
-    memoryCache
-      .updateWith(txId) {
-        case Some(orig) => Some(orig.withTag(tag))
-        case None =>
-          val cached = persistentCache.getHeight(txId)
-          val r =
-            if (cached.loaded) cached
-            else
-              RemoteData
-                .loaded(getFromBlockchain(txId))
-                .tap(r => persistentCache.setHeight(txId, r)) // TODO #10: double check before set, because we could have an update
+  def get(txId: TransactionId, tag: TagT): Option[Height] = {
+    val origTags = tagsOf(txId)
+    if (!origTags.contains(tag)) tags.put(txId, origTags + tag)
 
-          Some(TaggedData(r, Set(tag)))
-      }
-      .flatMap(_.data.mayBeValue)
+    values
+      .get(
+        txId,
+        { (txId: TransactionId) =>
+          val cached = persistentCache.getHeight(txId)
+          if (cached.loaded) cached
+          else
+            RemoteData
+              .loaded(getFromBlockchain(txId))
+              .tap(r => persistentCache.setHeight(txId, r))
+        }
+      )
+      .mayBeValue
+  }
 
   // Got a transaction, got a rollback, same transaction on new height/failed/removed
   def setHeight(pbTxId: ByteString, height: Int): AppendResult[TagT] = {
@@ -45,42 +50,35 @@ class TransactionsStorage[TagT](
     setHeight(txId, Height(height))
   }
 
-  def setHeight(key: TransactionId, height: Height): AppendResult[TagT] = {
-    memoryCache.get(key) match {
+  def setHeight(txId: TransactionId, height: Height): AppendResult[TagT] =
+    Option(values.getIfPresent(txId)) match {
       case None => AppendResult.ignored
       case Some(orig) =>
         val updated = RemoteData.Cached(height)
-        if (updated == orig.data) AppendResult.ignored
+        if (updated == orig) AppendResult.ignored
         else {
-          log.debug(s"Update Transactions($key)")
-          persistentCache.setHeight(key, updated)
-          memoryCache.update(key, orig.copy(data = updated))
-          AppendResult.appended(mkDataKey(key), orig.tags)
+          log.debug(s"Update Transactions($txId)")
+          persistentCache.setHeight(txId, updated)
+          values.put(txId, updated)
+          AppendResult.appended(mkDataKey(txId), tagsOf(txId))
         }
     }
-  }
 
   def remove(pbTxId: ByteString): RollbackResult[TagT] = remove(TransactionId(pbTxId.toByteStr))
-  def remove(key: TransactionId): RollbackResult[TagT] =
-    memoryCache.get(key) match {
+  def remove(txId: TransactionId): RollbackResult[TagT] =
+    Option(values.getIfPresent(txId)) match {
       case None => RollbackResult.ignored
-      case Some(orig) =>
-        log.info(s"Rollback Transactions($key)")
-        persistentCache.remove(key)
-        RollbackResult.uncertain(mkDataKey(key), orig.tags) // Will be updated later
+      case _ =>
+        log.info(s"Rollback Transactions($txId)")
+        persistentCache.remove(txId)
+        RollbackResult.uncertain(mkDataKey(txId), tagsOf(txId)) // Will be updated later
     }
 
   // Use only for known before data
-  def reload(txId: TransactionId): Unit =
-    memoryCache.updateWith(txId) {
-      case Some(orig) =>
-        log.info(s"Reload Transactions($txId)")
-        val loaded = RemoteData.loaded(getFromBlockchain(txId))
-        persistentCache.setHeight(txId, loaded)
-        orig.copy(data = loaded).some
-
-      case x => x
-    }
+  def reload(txId: TransactionId): Unit = {
+    log.info(s"Invalidating Transactions($txId)")
+    values.invalidate(txId)
+  }
 
   final def mkDataKey(key: TransactionId): DataKey = StorageDataKey(key)
 

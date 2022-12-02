@@ -17,19 +17,13 @@ class AccountLeaseBalanceStorage[TagT](blockchainApi: BlockchainApi, override va
 
   def append(height: Int, update: StateUpdate.LeasingUpdate): AppendResult[TagT] = {
     val address = update.address.toAddress
-    memoryCache.get(address) match {
-      case None => AppendResult.ignored
-      case _    => append(height, address, toVanilla(update))
-    }
+    append(height, address, toVanilla(update))
   }
 
   // TODO #21 Copy-paste from append
   def rollback(rollbackHeight: Int, update: StateUpdate.LeasingUpdate): RollbackResult[TagT] = {
     val address = update.address.toAddress
-    memoryCache.get(address) match {
-      case None => RollbackResult.ignored
-      case _    => super.rollback(rollbackHeight, address, toVanilla(update))
-    }
+    rollback(rollbackHeight, address, toVanilla(update))
   }
 
   private def toVanilla(x: StateUpdate.LeasingUpdate): LeaseBalance = LeaseBalance(x.inAfter, x.outAfter)

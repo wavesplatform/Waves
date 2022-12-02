@@ -42,10 +42,10 @@ class ScriptBlockchain[TagT](storage: SharedBlockchainData[TagT], tag: TagT) ext
   override def hasAccountScript(address: Address): Boolean = accountScript(address).nonEmpty
 
   // Ride: blockInfoByHeight, lastBlock
-  override def blockHeader(height: Int): Option[SignedBlockHeader] = storage.blockHeaders.get(height)
+  override def blockHeader(height: Int): Option[SignedBlockHeader] = storage.blockHeaders.get(height) // TODO #?, tag)
 
   // Ride: blockInfoByHeight
-  override def hitSource(height: Int): Option[ByteStr] = storage.vrf.get(height)
+  override def hitSource(height: Int): Option[ByteStr] = storage.vrf.get(height) // TODO #?, tag)
 
   // Ride: wavesBalance, height, lastBlock
   override def height: Int = storage.height
