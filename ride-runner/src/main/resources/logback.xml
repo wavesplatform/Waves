@@ -16,7 +16,6 @@
     <logger name="io.grpc.netty" level="ERROR"/>
     <logger name="io.grpc.Context" level="INFO"/> <!-- To ignore "Storage override doesn't exist. Using default" -->
     <logger name="org.reflections" level="WARN"/>
-    <logger name="com.alibaba" level="ERROR"/>
 
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <target>System.out</target>
