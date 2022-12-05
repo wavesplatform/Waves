@@ -36,6 +36,14 @@ final class CompositeBlockchain private (
   override def balance(address: Address, assetId: Asset): Long =
     inner.balance(address, assetId) + diff.portfolios.get(address).fold(0L)(_.balanceOf(assetId))
 
+  override def balances(req: Seq[(Address, Asset)]): Map[(Address, Asset), Long] = {
+    inner.balances(req).map { case ((address, asset), balance) =>
+      (address, asset) -> (balance + diff.portfolios.get(address).fold(0L)(_.balanceOf(asset)))
+    }
+  }
+
+  override def loadCacheData(addresses: Seq[Address]): Unit = inner.loadCacheData(addresses)
+
   override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] =
     inner.wavesBalances(addresses).map { case (address, balance) =>
       address -> (balance + diff.portfolios.get(address).fold(0L)(_.balanceOf(Waves)))

@@ -1,10 +1,10 @@
 package com.wavesplatform.database
 
-import java.util
+import java.{lang, util}
 import cats.data.Ior
 import cats.syntax.option.*
 import cats.syntax.semigroup.*
-import com.google.common.cache.CacheBuilder
+import com.google.common.cache.{CacheBuilder, CacheLoader}
 import com.google.common.collect.MultimapBuilder
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.account.{Address, Alias}
@@ -185,7 +185,7 @@ abstract class RocksDBWriter private[database] (
   override protected def loadAddressId(address: Address): Option[AddressId] = loadWithFilter(addressFilter, Keys.addressId(address)) { (_, id) => id }
 
   override protected def loadAddressIds(addresses: Seq[Address]): Map[Address, Option[AddressId]] = readOnly { ro =>
-    addresses.view.zip(ro.multiGetBuffered(addresses.map(Keys.addressId), 8)).toMap
+    addresses.view.zip(ro.multiGetBufferedOpt(addresses.map(Keys.addressId), 8)).toMap
   }
 
   override protected def loadHeight(): Height = RocksDBWriter.loadHeight(writableDB)
@@ -245,10 +245,41 @@ abstract class RocksDBWriter private[database] (
       }
     }
 
-  protected override def loadWavesBalances(req: Seq[Address]): Map[(Address, Asset), CurrentBalance] = readOnly { ro =>
-    addressIds(req).map { case (address, addressId) =>
-      (address, Waves) -> addressId.fold(CurrentBalance.Unavailable) { addressId => ro.get(Keys.wavesBalance(addressId)) }
+  override protected def loadBalances(req: Seq[(Address, Asset)]): Map[(Address, Asset), CurrentBalance] = readOnly { ro =>
+    val addressToId = addressIds(req.map(_._1))
+    req.map { case (address, asset) =>
+      (address, asset) -> addressToId.get(address).flatten.fold(CurrentBalance.Unavailable) { addressId =>
+        asset match {
+          case asset @ IssuedAsset(_) =>
+            ro.get(Keys.assetBalance(addressId, asset))
+          case Waves =>
+            ro.get(Keys.wavesBalance(addressId))
+        }
+      }
+    }.toMap
+  }
+
+  protected override def loadWavesBalances(req: Seq[(Address, Asset)]): Map[(Address, Asset), CurrentBalance] = readOnly { ro =>
+    val addrToId = addressIds(req.map(_._1))
+    val idToAddr = addrToId.collect { case (address, Some(aid)) =>
+      aid -> address
     }
+    val addrIds = idToAddr.keys.toSeq
+
+    val idToBalance = addrIds
+      .zip(
+        ro.multiGetBuffered(
+          addrIds.map { addrId =>
+            Keys.wavesBalance(addrId)
+          },
+          16
+        )
+      )
+      .toMap
+
+    req.map { case (address, asset) =>
+      (address, asset) -> addrToId.get(address).flatMap(_.flatMap(idToBalance.get)).flatten.getOrElse(CurrentBalance.Unavailable)
+    }.toMap
   }
 
   private def loadLeaseBalance(db: ReadOnlyDB, addressId: AddressId): LeaseBalance =
@@ -396,6 +427,7 @@ abstract class RocksDBWriter private[database] (
 
       rw.put(Keys.blockMetaAt(Height(height)), Some(blockMeta))
       rw.put(Keys.heightOf(blockMeta.id), Some(height))
+      blockHeightCache.put(blockMeta.id, Some(height))
 
       val lastAddressId = loadMaxAddressId() + newAddresses.size
 
@@ -592,12 +624,13 @@ abstract class RocksDBWriter private[database] (
 
     val discardedBlocks: Seq[(Block, ByteStr)] =
       for (currentHeightInt <- height until targetHeight by -1; currentHeight = Height(currentHeightInt)) yield {
-        val balancesToInvalidate    = Seq.newBuilder[(Address, Asset)]
-        val ordersToInvalidate      = Seq.newBuilder[ByteStr]
-        val scriptsToDiscard        = Seq.newBuilder[Address]
-        val assetScriptsToDiscard   = Seq.newBuilder[IssuedAsset]
-        val accountDataToInvalidate = Seq.newBuilder[(Address, String)]
-        val aliasesToInvalidate     = Seq.newBuilder[Alias]
+        val balancesToInvalidate     = Seq.newBuilder[(Address, Asset)]
+        val ordersToInvalidate       = Seq.newBuilder[ByteStr]
+        val scriptsToDiscard         = Seq.newBuilder[Address]
+        val assetScriptsToDiscard    = Seq.newBuilder[IssuedAsset]
+        val accountDataToInvalidate  = Seq.newBuilder[(Address, String)]
+        val aliasesToInvalidate      = Seq.newBuilder[Alias]
+        val blockHeightsToInvalidate = Seq.newBuilder[ByteStr]
 
         val discardedBlock = readWrite { rw =>
           rw.put(Keys.height, Height(currentHeight - 1))
@@ -708,6 +741,7 @@ abstract class RocksDBWriter private[database] (
           rw.delete(Keys.blockMetaAt(currentHeight))
           rw.delete(Keys.changedAddresses(currentHeight))
           rw.delete(Keys.heightOf(discardedMeta.id))
+          blockHeightsToInvalidate.addOne(discardedMeta.id)
           rw.delete(Keys.carryFee(currentHeight))
           rw.delete(Keys.blockTransactionsFee(currentHeight))
           rw.delete(Keys.stateHash(currentHeight))
@@ -733,6 +767,7 @@ abstract class RocksDBWriter private[database] (
         assetScriptsToDiscard.result().foreach(discardAssetScript)
         accountDataToInvalidate.result().foreach(discardAccountData)
         aliasesToInvalidate.result().foreach(discardAlias)
+        blockHeightsToInvalidate.result().foreach(discardBlockHeight)
         discardedBlock
       }
 
@@ -826,7 +861,7 @@ abstract class RocksDBWriter private[database] (
   override def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)] = readOnly(transactionInfo(id, _))
 
   override def transactionInfos(ids: Seq[ByteStr]): Seq[Option[(TxMeta, Transaction)]] = readOnly { db =>
-    val tms = db.multiGetBuffered(ids.map(id => Keys.transactionMetaById(TransactionId(id))), 36)
+    val tms = db.multiGetBufferedOpt(ids.map(id => Keys.transactionMetaById(TransactionId(id))), 36)
     val (keys, sizes) = tms.map {
       case Some(tm) => Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort)) -> tm.size
       case None     => Keys.transactionAt(Height(0), TxNum(0.toShort))              -> 0
@@ -857,6 +892,8 @@ abstract class RocksDBWriter private[database] (
       .map(addressId => db.get(Keys.idToAddress(addressId)))
   }
 
+  override protected def loadBlockHeight(blockId: BlockId): Option[Int] = readOnly(_.get(Keys.heightOf(blockId)))
+
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readOnly { db =>
     for {
       h             <- db.get(Keys.leaseDetailsHistory(leaseId)).headOption
@@ -886,13 +923,43 @@ abstract class RocksDBWriter private[database] (
     .newBuilder()
     .maximumSize(100000)
     .recordStats()
-    .build[(Int, AddressId), BalanceNode]()
+    .build[(Int, AddressId), BalanceNode](new CacheLoader[(Int, AddressId), BalanceNode] {
+      override def load(key: (Int, AddressId)): BalanceNode = {
+        val (h, aid) = key
+        readOnly(_.get(Keys.wavesBalanceAt(aid, Height(h))))
+      }
+      override def loadAll(keys: lang.Iterable[? <: (Int, AddressId)]): util.Map[(Int, AddressId), BalanceNode] = {
+        val heights = keys.asScala.toSeq
+        heights
+          .zip(readOnly(_.multiGetBuffered(heights.map { case (h, aid) => Keys.wavesBalanceAt(aid, Height(h)) }, 12)))
+          .map { case ((h, aid), balance) =>
+            (h, aid) -> balance.getOrElse(BalanceNode.Empty)
+          }
+          .toMap
+          .asJava
+      }
+    })
 
   private val leaseBalanceAtHeightCache = CacheBuilder
     .newBuilder()
     .maximumSize(100000)
     .recordStats()
-    .build[(Int, AddressId), LeaseBalance]()
+    .build[(Int, AddressId), LeaseBalance](new CacheLoader[(Int, AddressId), LeaseBalance] {
+      override def load(key: (Int, AddressId)): LeaseBalance = {
+        val (h, aid) = key
+        readOnly(_.get(Keys.leaseBalance(aid)(h)))
+      }
+      override def loadAll(keys: lang.Iterable[? <: (Int, AddressId)]): util.Map[(Int, AddressId), LeaseBalance] = {
+        val heights = keys.asScala.toSeq
+        heights
+          .zip(readOnly(_.multiGetBuffered(heights.map { case (h, aid) => Keys.leaseBalance(aid)(h) }, 16)))
+          .map { case ((h, aid), balance) =>
+            (h, aid) -> balance.getOrElse(LeaseBalance.empty)
+          }
+          .toMap
+          .asJava
+      }
+    })
 
   override def balanceAtHeight(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)] = None
 
@@ -912,19 +979,24 @@ abstract class RocksDBWriter private[database] (
           collectBalanceHistory(newAcc, bn.prevHeight)
         }
 
-      val wbh = slice(collectBalanceHistory(Vector.empty, lastBalance.height), from, toHeight)
-      val lbh = slice(db.get(Keys.leaseBalanceHistory(addressId)), from, toHeight)
-      for {
-        (wh, lh) <- merge(wbh, lbh)
-        wb = balanceAtHeightCache.get((wh, addressId), () => db.get(Keys.wavesBalanceAt(addressId, Height(wh))))
-        lb = leaseBalanceAtHeightCache.get((lh, addressId), () => db.get(Keys.leaseBalance(addressId)(lh)))
-      } yield BalanceSnapshot(wh.max(lh), wb.balance, lb.in, lb.out)
+      val wbh    = slice(collectBalanceHistory(Vector.empty, lastBalance.height), from, toHeight)
+      val lbh    = slice(db.get(Keys.leaseBalanceHistory(addressId)), from, toHeight)
+      val merged = merge(wbh, lbh)
+      val whs    = merged.map { case (wh, _) => wh -> addressId }.asJava
+      val lhs    = merged.map { case (lh, _) => lh -> addressId }.asJava
+      val wbs    = balanceAtHeightCache.getAll(whs).asScala
+      val lbs    = leaseBalanceAtHeightCache.getAll(lhs).asScala
+
+      merged.flatMap { case (wh, lh) =>
+        for {
+          wb <- wbs.get((wh, addressId))
+          lb <- lbs.get((lh, addressId))
+        } yield BalanceSnapshot(wh.max(lh), wb.balance, lb.in, lb.out)
+      }
     }
   }
 
-  override def loadHeightOf(blockId: ByteStr): Option[Int] = {
-    readOnly(_.get(Keys.heightOf(blockId)))
-  }
+  override def loadHeightOf(blockId: ByteStr): Option[Int] = blockHeightCache.get(blockId)
 
   override def featureVotes(height: Int): Map[Short, Int] = readOnly { db =>
     settings.functionalitySettings

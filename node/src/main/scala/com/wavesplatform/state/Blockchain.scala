@@ -77,11 +77,15 @@ trait Blockchain {
 
   def balance(address: Address, mayBeAssetId: Asset = Waves): Long
 
+  def balances(req: Seq[(Address, Asset)]): Map[(Address, Asset), Long]
+
   def wavesBalances(addresses: Seq[Address]): Map[Address, Long]
 
   def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]
 
   def compositeBlockchain: Blockchain
+
+  def loadCacheData(addresses: Seq[Address]): Unit
 }
 
 object Blockchain {

@@ -730,7 +730,7 @@ package object database {
       result
     }
 
-    def multiGetBuffered[A](readOptions: ReadOptions, keys: Seq[Key[Option[A]]], valBufferSize: Int): Seq[Option[A]] = {
+    def multiGetBufferedOpt[A](readOptions: ReadOptions, keys: Seq[Key[Option[A]]], valBufferSize: Int): Seq[Option[A]] = {
       val keyBufs = keys.map { k =>
         val arr = k.keyBytes
         val b   = Util.getTemporaryDirectBuffer(arr.length)
@@ -761,7 +761,7 @@ package object database {
       result
     }
 
-    def multiGetBuffered[A](readOptions: ReadOptions, keys: Seq[Key[Option[A]]], valBufSizes: Seq[Int]): Seq[Option[A]] = {
+    def multiGetBufferedOpt[A](readOptions: ReadOptions, keys: Seq[Key[Option[A]]], valBufSizes: Seq[Int]): Seq[Option[A]] = {
       val keyBufs = keys.map { k =>
         val arr = k.keyBytes
         val b   = Util.getTemporaryDirectBuffer(arr.length)
@@ -904,6 +904,37 @@ package object database {
             Some(parser.parse(arr))
           } else None
         }
+
+      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
+      result
+    }
+
+    def multiGetBuffered[A](readOptions: ReadOptions, keys: Seq[Key[A]], valBufSize: Int): Seq[Option[A]] = {
+      val keyBufs = keys.map { k =>
+        val arr = k.keyBytes
+        val b   = Util.getTemporaryDirectBuffer(arr.length)
+        b.put(k.keyBytes).flip()
+        b
+      }.asJava
+      val valBufs = List
+        .fill(keys.size) {
+          val buf = Util.getTemporaryDirectBuffer(valBufSize)
+          buf.limit(buf.capacity())
+          buf
+        }
+        .asJava
+
+      val result = keys.view
+        .zip(db.multiGetByteBuffers(readOptions, keyBufs, valBufs).asScala)
+        .map { case (parser, value) =>
+          if (value.status.getCode == Status.Code.Ok) {
+            val arr = new Array[Byte](value.requiredSize)
+            value.value.get(arr)
+            Util.releaseTemporaryDirectBuffer(value.value)
+            Some(parser.parse(arr))
+          } else None
+        }
+        .toSeq
 
       keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
       result

@@ -19,11 +19,14 @@ class ReadOnlyDB(db: RocksDB, readOptions: ReadOptions) {
   def multiGet[V](keys: Seq[Key[V]]): Seq[V] =
     db.multiGet(readOptions, keys).toSeq
 
-  def multiGetBuffered[V](keys: Seq[Key[Option[V]]], valBufferSize: Int): Seq[Option[V]] =
+  def multiGetBufferedOpt[V](keys: Seq[Key[Option[V]]], valBufferSize: Int): Seq[Option[V]] =
+    db.multiGetBufferedOpt(readOptions, keys, valBufferSize)
+
+  def multiGetBuffered[V](keys: Seq[Key[V]], valBufferSize: Int): Seq[Option[V]] =
     db.multiGetBuffered(readOptions, keys, valBufferSize)
 
   def multiGetBuffered[V](keys: Seq[Key[Option[V]]], valBufSizes: Seq[Int]): Seq[Option[V]] =
-    db.multiGetBuffered(readOptions, keys, valBufSizes)
+    db.multiGetBufferedOpt(readOptions, keys, valBufSizes)
 
   def multiGetInts(keys: Seq[Key[Int]]): View[Option[Int]] =
     db.multiGetInts(readOptions, keys.map(_.keyBytes))

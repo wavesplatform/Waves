@@ -1,7 +1,6 @@
 package com.wavesplatform.database
 
-import java.util
-
+import java.{lang, util}
 import cats.data.Ior
 import cats.syntax.monoid.*
 import cats.syntax.option.*
@@ -79,20 +78,37 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
       fromDb.map { case (addr, balance) => addr -> balance }
   }
 
-  protected val balancesCache: LoadingCache[(Address, Asset), CurrentBalance] = cache(dbSettings.maxCacheSize * 16, loadBalance)
-  protected def clearBalancesCache(): Unit                                    = balancesCache.invalidateAll()
-  protected def discardBalance(key: (Address, Asset)): Unit                   = balancesCache.invalidate(key)
-  override def balance(address: Address, mayBeAssetId: Asset): Long           = balancesCache.get(address -> mayBeAssetId).balance
-  override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] = {
-    val fromCache   = balancesCache.getAllPresent(addresses.map(_ -> Waves).asJava).asScala
-    val cacheMissed = addresses.filterNot(addr => fromCache.contains(addr -> Waves))
-    val fromDb      = loadWavesBalances(cacheMissed)
+  protected val balancesCache: LoadingCache[(Address, Asset), CurrentBalance] =
+    cache(dbSettings.maxCacheSize * 16, loadBalance, keys => loadWavesBalances(keys.asScala.toSeq).asJava)
+  protected def clearBalancesCache(): Unit                          = balancesCache.invalidateAll()
+  protected def discardBalance(key: (Address, Asset)): Unit         = balancesCache.invalidate(key)
+  override def balance(address: Address, mayBeAssetId: Asset): Long = balancesCache.get(address -> mayBeAssetId).balance
+
+  override def balances(req: Seq[(Address, Asset)]): Map[(Address, Asset), Long] = {
+    val fromCache   = balancesCache.getAllPresent(req.asJava).asScala.toMap
+    val cacheMissed = req.filterNot(fromCache.contains)
+    val fromDb      = loadBalances(cacheMissed)
     balancesCache.putAll(fromDb.asJava)
-    fromCache.map { case ((addr, _), balance) => addr -> balance.balance }.toMap ++
-      fromDb.map { case ((addr, _), balance) => addr -> balance.balance }
+    (fromCache ++ fromDb).view.mapValues(_.balance).toMap
   }
+
+  override def loadCacheData(addresses: Seq[Address]): Unit = {
+    addressIdCache.getAll(addresses.asJava)
+    balancesCache.getAll(addresses.map(_ -> Waves).asJava)
+  }
+
+  override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] =
+    balancesCache
+      .getAll(addresses.map(_ -> Waves).asJava)
+      .asScala
+      .view
+      .map { case ((address, _), balance) =>
+        address -> balance.balance
+      }
+      .toMap
   protected def loadBalance(req: (Address, Asset)): CurrentBalance
-  protected def loadWavesBalances(req: Seq[Address]): Map[(Address, Asset), CurrentBalance]
+  protected def loadBalances(req: Seq[(Address, Asset)]): Map[(Address, Asset), CurrentBalance]
+  protected def loadWavesBalances(req: Seq[(Address, Asset)]): Map[(Address, Asset), CurrentBalance]
 
   private val assetDescriptionCache: LoadingCache[IssuedAsset, Option[AssetDescription]] = cache(dbSettings.maxCacheSize, loadAssetDescription)
   protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription]
@@ -127,7 +143,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
   private var lastAddressId = loadMaxAddressId()
   protected def loadMaxAddressId(): Long
 
-  private val addressIdCache: LoadingCache[Address, Option[AddressId]] = cache(dbSettings.maxCacheSize, loadAddressId)
+  private val addressIdCache: LoadingCache[Address, Option[AddressId]] =
+    cache(dbSettings.maxCacheSize, loadAddressId, keys => loadAddressIds(keys.asScala.toSeq).asJava)
   protected def loadAddressId(address: Address): Option[AddressId]
   protected def loadAddressIds(addresses: Seq[Address]): Map[Address, Option[AddressId]]
 
@@ -146,17 +163,16 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
   protected def loadAccountData(acc: Address, key: String): Option[DataEntry[?]]
 
   private[database] def addressId(address: Address): Option[AddressId] = addressIdCache.get(address)
-  private[database] def addressIds(addresses: Seq[Address]): Map[Address, Option[AddressId]] = {
-    val fromCache   = addressIdCache.getAllPresent(addresses.asJava).asScala
-    val cacheMissed = addresses.filterNot(fromCache.contains)
-    val fromDb      = loadAddressIds(cacheMissed)
-    addressIdCache.putAll(fromDb.asJava)
-    fromDb ++ fromCache
-  }
+  private[database] def addressIds(addresses: Seq[Address]): Map[Address, Option[AddressId]] =
+    addressIdCache.getAll(addresses.asJava).asScala.toMap
 
   protected val aliasCache: LoadingCache[Alias, Option[Address]] = cache(dbSettings.maxCacheSize, loadAlias)
   protected def loadAlias(alias: Alias): Option[Address]
   protected def discardAlias(alias: Alias): Unit = aliasCache.invalidate(alias)
+
+  protected val blockHeightCache: LoadingCache[ByteStr, Option[Int]] = cache(1000, loadBlockHeight)
+  protected def loadBlockHeight(blockId: ByteStr): Option[Int]
+  protected def discardBlockHeight(blockId: ByteStr): Unit = blockHeightCache.invalidate(blockId)
 
   @volatile
   protected var approvedFeaturesCache: Map[Short, Int] = loadApprovedFeatures()
@@ -388,13 +404,18 @@ object Caches {
 
   def toSignedHeader(m: PBBlockMeta): SignedBlockHeader = SignedBlockHeader(PBBlocks.vanilla(m.getHeader), m.signature.toByteStr)
 
-  def cache[K <: AnyRef, V <: AnyRef](maximumSize: Int, loader: K => V): LoadingCache[K, V] =
+  def cache[K <: AnyRef, V <: AnyRef](
+      maximumSize: Int,
+      loader: K => V,
+      batchLoader: lang.Iterable[? <: K] => util.Map[K, V] = { _: lang.Iterable[? <: K] => new util.HashMap[K, V]() }
+  ): LoadingCache[K, V] =
     CacheBuilder
       .newBuilder()
       .maximumSize(maximumSize)
       .recordStats()
       .build(new CacheLoader[K, V] {
-        override def load(key: K): V = loader(key)
+        override def load(key: K): V                                      = loader(key)
+        override def loadAll(keys: lang.Iterable[? <: K]): util.Map[K, V] = batchLoader(keys)
       })
 
   def observedCache[K <: AnyRef, V <: AnyRef](maximumSize: Int, changed: Observer[K], loader: K => V)(implicit ct: ClassTag[K]): LoadingCache[K, V] =

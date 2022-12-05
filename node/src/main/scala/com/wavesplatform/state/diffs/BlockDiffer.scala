@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs
 import cats.implicits.{toBifunctorOps, toFoldableOps}
 import cats.syntax.either.catsSyntaxEitherId
 import cats.syntax.parallel.*
+import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
@@ -13,16 +14,20 @@ import com.wavesplatform.state.patch.*
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
+import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
+import com.wavesplatform.transaction.lease.LeaseTransaction
+import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Asset, ProvenTransaction, Signed, Transaction}
+import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.transaction.{Asset, Authorized, GenesisTransaction, PaymentTransaction, ProvenTransaction, Signed, Transaction}
 import com.wavesplatform.utils.Schedulers
 import monix.eval.Task
 import monix.execution.ExecutionModel
-import monix.execution.Scheduler.Implicits.global
 import monix.execution.schedulers.SchedulerService
 
 object BlockDiffer {
-  val sigverify: SchedulerService = Schedulers.fixedPool(4, "sigverify", executionModel = ExecutionModel.BatchedExecution(5))
+  implicit val sigverify: SchedulerService = Schedulers.fixedPool(4, "sigverify", executionModel = ExecutionModel.AlwaysAsyncExecution)
 
   final case class DetailedDiff(parentDiff: Diff, transactionDiffs: List[Diff])
   final case class Result(diff: Diff, carry: Long, totalFee: Long, constraint: MiningConstraint, detailedDiff: DetailedDiff)
@@ -179,8 +184,37 @@ object BlockDiffer {
           case _                     => Task.unit
         }
         .executeOn(sigverify)
-        .runSyncUnsafe()
+        .runAsyncAndForget
     }
+
+    val addresses = scala.collection.mutable.Set(blockGenerator)
+
+    txs.foreach {
+      case tx: ExchangeTransaction => addresses.addAll(Seq(tx.sender.toAddress, tx.buyOrder.senderAddress, tx.sellOrder.senderAddress))
+      case tx: GenesisTransaction  => addresses.add(tx.recipient)
+      case tx: InvokeScriptTransaction =>
+        addresses.addAll(Seq(tx.senderAddress) ++ (tx.dApp match {
+          case addr: Address => Some(addr)
+          case _             => None
+        }))
+      case tx: LeaseTransaction =>
+        addresses.addAll(Seq(tx.sender.toAddress) ++ (tx.recipient match {
+          case addr: Address => Some(addr)
+          case _             => None
+        }))
+      case tx: MassTransferTransaction =>
+        addresses.addAll(Seq(tx.sender.toAddress) ++ tx.transfers.collect { case ParsedTransfer(addr: Address, _) => addr })
+      case tx: PaymentTransaction => addresses.addAll(Seq(tx.sender.toAddress, tx.recipient))
+      case tx: TransferTransaction =>
+        addresses.addAll(Seq(tx.sender.toAddress) ++ (tx.recipient match {
+          case addr: Address => Some(addr)
+          case _             => None
+        }))
+      case tx: Authorized => addresses.add(tx.sender.toAddress)
+      case _              => ()
+    }
+
+    blockchain.loadCacheData(addresses.toSeq)
 
     txs
       .foldLeft(TracedResult(Result(initDiff, 0L, 0L, initConstraint, DetailedDiff(initDiff, Nil)).asRight[ValidationError])) {

@@ -6,7 +6,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.CurrentBalance
 import com.wavesplatform.state
 import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
-import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AccountBalanceError
 
 import scala.util.{Left, Right}
@@ -20,13 +21,12 @@ object BalanceDiffValidation {
   def apply(b: Blockchain)(d: Diff): Either[AccountBalanceError, Diff] = {
     def check(
         acc: Address,
-        portfolio: Portfolio
-//        oldBalances: Map[Address, Long],
-//        oldLeases: Map[Address, LeaseBalance]
+        portfolio: Portfolio,
+        oldWavesBalances: Map[Address, Long]
     ): Either[(Address, String), Unit] = {
       val balance  = portfolio.balance
-      val oldWaves = b.balance(acc, Waves) // oldBalances.getOrElse(acc, CurrentBalance.Unavailable.balance)
-      val oldLease = b.leaseBalance(acc)   // oldLeases.getOrElse(acc, LeaseBalance.empty)
+      val oldWaves = oldWavesBalances.getOrElse(acc, CurrentBalance.Unavailable.balance)
+      val oldLease = b.leaseBalance(acc)
 
       def negativeBalanceCheck(newLease: LeaseBalance, newWaves: Long): Either[(Address, String), Unit] =
         if (balance < 0) {
@@ -64,11 +64,10 @@ object BalanceDiffValidation {
       } yield ()
     }
 
-//    val oldBalances = b.wavesBalances(d.portfolios.keys.toSeq)
-//    val oldLeases   = b.leaseBalances(d.portfolios.keys.toSeq)
+    val oldWavesBalances = b.wavesBalances(d.portfolios.keys.toSeq)
 
     val positiveBalanceErrors =
-      d.portfolios.flatMap { case (acc, p) => check(acc, p).fold(error => List(error), _ => Nil) }
+      d.portfolios.flatMap { case (acc, p) => check(acc, p, oldWavesBalances).fold(error => List(error), _ => Nil) }
 
     if (positiveBalanceErrors.isEmpty) {
       Right(d)
@@ -77,7 +76,12 @@ object BalanceDiffValidation {
     }
   }
 
-  private def negativeAssetsInfo(b: Blockchain, acc: Address, diff: Portfolio): Map[ByteStr, Long] =
+  private def negativeAssetsInfo(
+      b: Blockchain,
+      acc: Address,
+      diff: Portfolio
+//      oldAssetBalances: Map[(Address, Asset), Long]
+  ): Map[ByteStr, Long] =
     diff.assets
       .map { case (aid, balanceChange) => aid.id -> (b.balance(acc, aid) + balanceChange) }
       .filter(_._2 < 0)
