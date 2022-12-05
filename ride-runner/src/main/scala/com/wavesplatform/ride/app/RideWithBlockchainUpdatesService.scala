@@ -2,12 +2,16 @@ package com.wavesplatform.ride.app
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import cats.syntax.either.*
 import com.google.common.util.concurrent.ThreadFactoryBuilder
+import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.blockchain.BlockchainProcessor.RequestKey
+import com.wavesplatform.blockchain.Processor.RunResult
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
 import com.wavesplatform.events.WrappedEvent
+import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.grpc.{DefaultBlockchainApi, GrpcConnector}
 import com.wavesplatform.http.EvaluateApiRoute
 import com.wavesplatform.resources.*
@@ -17,12 +21,15 @@ import com.wavesplatform.utils.ScorexLogging
 import io.netty.util.concurrent.DefaultThreadFactory
 import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
+import monix.reactive.subjects.ConcurrentSubject
+import monix.reactive.{MulticastStrategy, Observable}
+import play.api.libs.json.JsObject
 import sttp.client3.HttpURLConnectionBackend
 
 import java.io.File
 import java.util.concurrent.*
-import scala.concurrent.Await
 import scala.concurrent.duration.{Duration, DurationInt}
+import scala.concurrent.{Await, Promise}
 import scala.util.Failure
 
 object RideWithBlockchainUpdatesService extends ScorexLogging {
@@ -79,7 +86,25 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
 
       val start             = Height(math.max(0, blockchainStorage.height - 100 - 1))
       val blockchainUpdates = use(blockchainApi.mkBlockchainUpdatesStream())
-      val events = blockchainUpdates.stream
+      val toExecute         = ConcurrentSubject[FullRequest](MulticastStrategy.publish)(monixScheduler)
+
+      val xs: List[Observable[WrappedEvent[Either[Seq[FullRequest], SubscribeEvent]]]] = List(
+        blockchainUpdates.stream.map(_.map(_.asRight[Seq[FullRequest]])),
+        // TODO #10 add a buffer and cancel new requests due to overflow
+        toExecute
+          .flatMap { x =>
+            processor.getLastResultOrRun(x.address, x.request) match {
+              case RunResult.Cached(r) =>
+                x.result.success(r)
+                Observable.empty
+
+              case _ => Observable(x)
+            }
+          }
+          .bufferTimedAndCounted(50.millis, 5)
+          .map(x => WrappedEvent.Next(x.asLeft[SubscribeEvent]))
+      )
+      val events = Observable(xs*).merge
         .doOnError(e =>
           Task {
             log.error("Error!", e)
@@ -95,8 +120,28 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
             false
         }
         .collect { case WrappedEvent.Next(event) => event }
-        .foldLeftL(BlockchainState.Starting(lastHeightAtStart): BlockchainState)(BlockchainState(processor, _, _))
-        .runToFuture(Scheduler(commonScheduler))
+        .scanEval0F(Task.now(BlockchainState.Starting(lastHeightAtStart): BlockchainState)) { case (r, curr) =>
+          curr match {
+            case Right(curr) => Task.now(BlockchainState(processor, r, curr))
+            case Left(xs) =>
+              Task
+                .parSequenceUnordered {
+                  xs.map { x =>
+                    processor.getLastResultOrRun(x.address, x.request) match {
+                      case RunResult.Cached(r) => Task.now(x.result.success(r))
+                      case RunResult.NotProcessed(task) =>
+                        task
+                          .foreachL(x.result.success)
+                          .doOnFinish(r => Task.now(r.foreach(x.result.failure)))
+                          .doOnCancel(Task(x.result.tryFailure(new CancellationException("Task was cancelled"))))
+                    }
+                  }
+                }
+                .map(_ => r)
+          }
+        }
+        .lastL
+        .runToFuture(monixScheduler)
 
       log.info(s"Watching blockchain updates...")
       blockchainUpdates.start(start + 1)
@@ -131,7 +176,16 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
         resource.awaitTermination(5.seconds)
       }
 
-      val apiRoutes = Seq(EvaluateApiRoute(heavyRequestScheduler, processor))
+      val apiRoutes = Seq(
+        EvaluateApiRoute(
+          heavyRequestScheduler,
+          { (address, request) =>
+            val result = Promise[JsObject]()
+            toExecute.onNext(FullRequest(address, request, result))
+            result.future
+          }
+        )
+      )
 
       implicit val actorSystem = use.acquireWithShutdown(ActorSystem("ride-runner", globalConfig)) { x =>
         Await.ready(x.terminate(), 20.seconds)
@@ -152,3 +206,5 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     }
   }
 }
+
+case class FullRequest(address: Address, request: JsObject, result: Promise[JsObject])

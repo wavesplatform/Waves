@@ -6,6 +6,7 @@ import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.api.http.ApiException
 import com.wavesplatform.api.http.utils.UtilsApiRoute
 import com.wavesplatform.blockchain.BlockchainProcessor.{ProcessResult, RequestKey, Settings}
+import com.wavesplatform.blockchain.Processor.RunResult
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
@@ -39,7 +40,15 @@ trait Processor {
 
   def runScripts(forceAll: Boolean = false): Unit
 
-  def getLastResultOrRun(address: Address, request: JsObject): Task[JsObject]
+  def getLastResultOrRun(address: Address, request: JsObject): RunResult
+}
+
+object Processor {
+  sealed trait RunResult extends Product with Serializable
+  object RunResult {
+    case class Cached(result: JsObject)             extends RunResult
+    case class NotProcessed(result: Task[JsObject]) extends RunResult
+  }
 }
 
 class BlockchainProcessor private (
@@ -209,20 +218,24 @@ class BlockchainProcessor private (
     }
   }
 
-  override def getLastResultOrRun(address: Address, request: JsObject): Task[JsObject] = {
+  override def getLastResultOrRun(address: Address, request: JsObject): RunResult = {
     val key = (address, request)
     storage.get(key) match {
-      case Some(r) => Task.now(r.lastResult)
+      case Some(r) => RunResult.Cached(r.lastResult)
       case None =>
-        blockchainStorage.accountScripts.getUntagged(blockchainStorage.height, address) match {
-          case None =>
-            // TODO #19 Change/move an error to an appropriate layer
-            Task.raiseError(ApiException(CustomValidationError(s"Address $address is not dApp")))
+        RunResult.NotProcessed {
+          Task(blockchainStorage.accountScripts.getUntagged(blockchainStorage.height, address)).flatMap {
+            case None =>
+              // TODO #19 Change/move an error to an appropriate layer
+              Task.raiseError(ApiException(CustomValidationError(s"Address $address is not dApp")))
 
-          case _ =>
-            val script = RestApiScript(address, blockchainStorage, request).refreshed(settings.enableTraces, settings.evaluateScriptComplexityLimit)
-            storage.putIfAbsent(key, script)
-            Task.now(script.lastResult)
+            case _ =>
+              Task {
+                val script = RestApiScript(address, blockchainStorage, request).refreshed(settings.enableTraces, settings.evaluateScriptComplexityLimit)
+                storage.putIfAbsent(key, script) // TODO #10 Could be in another thread (if it is not)
+                script.lastResult
+              }
+          }
         }
     }
   }
