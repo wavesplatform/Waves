@@ -953,9 +953,9 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           acc1 <- accountGen
           tx1  <- transfer(acc, ENOUGH_AMT / 3, ntpTime)
           txs  <- Gen.nonEmptyListOf(transfer(acc1, 10000000L, ntpTime).suchThat(_.fee.value < tx1.fee.value))
-        } yield (tx1, txs)
+        } yield (acc, acc1, tx1, txs)
 
-        forAll(gen) { case (tx1, rest) =>
+        forAll(gen) { case (acc, acc1, tx1, rest) =>
           val blockchain = stub[Blockchain]
           (() => blockchain.settings).when().returning(WavesSettings.default().blockchainSettings)
           (() => blockchain.height).when().returning(1)
@@ -963,9 +963,9 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
 
           val utx =
             new UtxPoolImpl(ntpTime, blockchain, WavesSettings.default().utxSettings, isMiningEnabled = true)
-          (blockchain.balance _).when(*, *).returning(ENOUGH_AMT).repeat((rest.length + 1) * 2)
-
           (blockchain.balance _).when(*, *).returning(ENOUGH_AMT)
+
+          (blockchain.wavesBalances _).when(*).returning(Map(acc.toAddress -> ENOUGH_AMT, acc1.toAddress -> ENOUGH_AMT))
 
           (blockchain.leaseBalance _).when(*).returning(LeaseBalance(0, 0))
           (blockchain.accountScript _).when(*).onCall { _: Address =>

@@ -9,30 +9,32 @@ import com.wavesplatform.database.openDB
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
-import com.wavesplatform.settings._
+import com.wavesplatform.settings.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.utils.NTP
 import monix.execution.UncaughtExceptionReporter
 import monix.reactive.Observer
-import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.Ficus.*
 
 object BaseTargetChecker {
   def main(args: Array[String]): Unit = {
     implicit val reporter: UncaughtExceptionReporter = UncaughtExceptionReporter.default
-    val sharedConfig = Docker.genesisOverride()
+    val sharedConfig = Docker
+      .genesisOverride()
       .withFallback(Docker.configTemplate)
       .withFallback(defaultApplication())
       .withFallback(defaultReference())
       .resolve()
 
     val settings               = WavesSettings.fromRootConfig(sharedConfig)
-    val db                     = openDB("/tmp/tmp-db")
+    val db                     = openDB(settings.dbSettings.copy(directory = "/tmp/tmp-db"))
     val ntpTime                = new NTP("ntp.pool.org")
     val (blockchainUpdater, _) = StorageFactory(settings, db, ntpTime, Observer.empty, BlockchainUpdateTriggers.noop)
     val poSSelector            = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
 
     try {
-      val genesisBlock = Block.genesis(settings.blockchainSettings.genesisSettings, blockchainUpdater.isFeatureActivated(BlockchainFeatures.RideV6)).explicitGet()
+      val genesisBlock =
+        Block.genesis(settings.blockchainSettings.genesisSettings, blockchainUpdater.isFeatureActivated(BlockchainFeatures.RideV6)).explicitGet()
       blockchainUpdater.processBlock(genesisBlock, genesisBlock.header.generationSignature)
 
       NodeConfigs.Default.map(_.withFallback(sharedConfig)).collect {

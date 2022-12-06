@@ -82,6 +82,15 @@ class EthOrderSpec
       val sh = StubHelpers(blockchain)
       sh.creditBalance(ethBuyOrder.senderAddress, *)
       sh.creditBalance(ethSellOrder.senderAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(
+          Map(
+            TxHelpers.matcher.toAddress -> Long.MaxValue / 3,
+            ethBuyOrder.senderAddress   -> Long.MaxValue / 3,
+            ethSellOrder.senderAddress  -> Long.MaxValue / 3
+          )
+        )
       sh.issueAsset(ByteStr(EthStubBytes32))
     }
 
@@ -96,6 +105,9 @@ class EthOrderSpec
       val sh = StubHelpers(blockchain)
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
       sh.creditBalance(ethSellOrder.senderAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(Map(TxHelpers.matcher.toAddress -> Long.MaxValue / 3, ethSellOrder.senderAddress -> Long.MaxValue / 3))
       sh.issueAsset(ByteStr(EthStubBytes32))
     }
 
@@ -237,6 +249,9 @@ class EthOrderSpec
       val sh = StubHelpers(blockchain)
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
       sh.creditBalance(TestEthOrdersPublicKey.toAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(Map(TxHelpers.matcher.toAddress -> Long.MaxValue / 3, TestEthOrdersPublicKey.toAddress -> Long.MaxValue / 3))
       sh.issueAsset(ByteStr(EthStubBytes32))
     }
 
@@ -261,6 +276,9 @@ class EthOrderSpec
       val sh = StubHelpers(blockchain)
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
       sh.creditBalance(ethSellOrder.senderAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(Map(TxHelpers.matcher.toAddress -> Long.MaxValue / 3, ethSellOrder.senderAddress -> Long.MaxValue / 3))
 
       // TODO: something more smart ?
       val script = TxHelpers.script("""
@@ -300,6 +318,15 @@ class EthOrderSpec
       sh.creditBalance(TxHelpers.matcher.toAddress, *)
       sh.creditBalance(ethBuyOrder.senderAddress, *)
       sh.creditBalance(ethSellOrder.senderAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(
+          Map(
+            TxHelpers.matcher.toAddress -> Long.MaxValue / 3,
+            ethBuyOrder.senderAddress   -> Long.MaxValue / 3,
+            ethSellOrder.senderAddress  -> Long.MaxValue / 3
+          )
+        )
       sh.issueAsset(ByteStr(EthStubBytes32))
 
       val script = TxHelpers.script(

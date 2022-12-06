@@ -2,7 +2,6 @@ package com.wavesplatform.database
 
 import java.{lang, util}
 import cats.data.Ior
-import cats.syntax.monoid.*
 import cats.syntax.option.*
 import com.google.common.cache.*
 import com.google.common.collect.ArrayListMultimap
@@ -12,7 +11,6 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, BlockMeta as PBBlockMeta}
-import com.wavesplatform.metrics.RocksDBStats
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.DBSettings
@@ -93,8 +91,10 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
   }
 
   override def loadCacheData(addresses: Seq[Address]): Unit = {
-    addressIdCache.getAll(addresses.asJava)
-    balancesCache.getAll(addresses.map(_ -> Waves).asJava)
+    addressIdCache.putAll(loadAddressIds(addresses).asJava)
+    balancesCache.putAll(loadWavesBalances(addresses.map(_ -> Waves)).asJava)
+//    addressIdCache.getAll(addresses.asJava)
+//    balancesCache.getAll(addresses.map(_ -> Waves).asJava)
   }
 
   override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] =

@@ -54,6 +54,7 @@ import supertagged.TaggedType
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{View, mutable}
+import scala.jdk.CollectionConverters.*
 import scala.util.Using
 
 //noinspection UnstableApiUsage
@@ -584,50 +585,45 @@ package object database {
       }
     }
 
-    import scala.jdk.CollectionConverters.*
+    def multiGetOpt[A](readOptions: ReadOptions, keys: Seq[Key[Option[A]]], valBufSize: Int): Seq[Option[A]] =
+      multiGetOpt(readOptions, keys, getKeyBuffersFromKeys(keys), getValueBuffers(keys.size, valBufSize))
 
-    def multiGet[A, B](readOptions: ReadOptions, keys: ArrayBuffer[(Key[A], B)]): View[(A, B)] =
-      keys.view.zip(db.multiGetAsList(readOptions, keys.map(_._1.keyBytes).asJava).asScala).map { case ((k, av), v) =>
-        k.parse(v) -> av
-      }
+    def multiGetOpt[A](readOptions: ReadOptions, keys: Seq[Key[Option[A]]], valBufSizes: Seq[Int]): Seq[Option[A]] =
+      multiGetOpt(readOptions, keys, getKeyBuffersFromKeys(keys), getValueBuffers(valBufSizes))
 
-    def multiGetFlat[A](readOptions: ReadOptions, keys: ArrayBuffer[Key[Option[A]]]): Seq[A] =
-      keys.view
-        .zip(db.multiGetAsList(readOptions, keys.map(_.keyBytes).asJava).asScala)
-        .flatMap { case (parser, value) =>
-          parser.parse(value)
+    def multiGet[A](readOptions: ReadOptions, keys: ArrayBuffer[Key[A]], valBufSizes: ArrayBuffer[Int]): View[A] =
+      multiGet(readOptions, keys, getKeyBuffersFromKeys(keys), getValueBuffers(valBufSizes))
+
+    def multiGet[A](readOptions: ReadOptions, keys: ArrayBuffer[Key[A]], valBufSize: Int): View[A] =
+      multiGet(readOptions, keys, getKeyBuffersFromKeys(keys), getValueBuffers(keys.size, valBufSize))
+
+    def multiGet[A](readOptions: ReadOptions, keys: Seq[Key[A]], valBufSize: Int): Seq[Option[A]] = {
+      val keyBufs = getKeyBuffersFromKeys(keys)
+      val valBufs = getValueBuffers(keys.size, valBufSize)
+
+      val result = keys.view
+        .zip(db.multiGetByteBuffers(readOptions, keyBufs, valBufs).asScala)
+        .map { case (parser, value) =>
+          if (value.status.getCode == Status.Code.Ok) {
+            val arr = new Array[Byte](value.requiredSize)
+            value.value.get(arr)
+            Util.releaseTemporaryDirectBuffer(value.value)
+            Some(parser.parse(arr))
+          } else None
         }
         .toSeq
 
-    def multiGet(readOptions: ReadOptions, keys: ArrayBuffer[Array[Byte]]): Seq[Array[Byte]] =
-      db.multiGetAsList(readOptions, keys.asJava).asScala.toSeq
+      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
+      result
+    }
 
-    def multiGet(readOptions: ReadOptions, keys: Seq[Array[Byte]]): Seq[Array[Byte]] =
-      db.multiGetAsList(readOptions, keys.asJava).asScala.toSeq
-
-    def multiGet[A, B](readOptions: ReadOptions, keys: Seq[Key[A]]): View[A] =
-      keys.view.zip(db.multiGetAsList(readOptions, keys.map(_.keyBytes).asJava).asScala).map { case (k, v) =>
-        k.parse(v)
-      }
-
-    def multiGetInts(readOptions: ReadOptions, keys: ArrayBuffer[Array[Byte]]): View[Option[Int]] = {
-      val keyBufs = keys.map { k =>
-        val b = Util.getTemporaryDirectBuffer(k.length)
-        b.put(k).flip()
-        b
-      }.asJava
-      val valBufs = List
-        .fill(keys.size) {
-          val buf = Util.getTemporaryDirectBuffer(4)
-          buf.limit(buf.capacity())
-          buf
-        }
-        .asJava
+    def multiGetInts(readOptions: ReadOptions, keys: Seq[Array[Byte]]): Seq[Option[Int]] = {
+      val keyBufs = getKeyBuffers(keys)
+      val valBufs = getValueBuffers(keys.size, 4)
 
       val result = db
         .multiGetByteBuffers(readOptions, keyBufs, valBufs)
         .asScala
-        .view
         .map { value =>
           if (value.status.getCode == Status.Code.Ok) {
             val h = Some(value.value.getInt)
@@ -635,175 +631,15 @@ package object database {
             h
           } else None
         }
-
-      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
-      result
-    }
-
-    def multiGetInts(readOptions: ReadOptions, keys: Seq[Array[Byte]]): View[Option[Int]] = {
-      val keyBufs = keys.map { k =>
-        val b = Util.getTemporaryDirectBuffer(k.length)
-        b.put(k).flip()
-        b
-      }.asJava
-      val valBufs = List
-        .fill(keys.size) {
-          val buf = Util.getTemporaryDirectBuffer(4)
-          buf.limit(buf.capacity())
-          buf
-        }
-        .asJava
-
-      val result = db
-        .multiGetByteBuffers(readOptions, keyBufs, valBufs)
-        .asScala
-        .view
-        .map { value =>
-          if (value.status.getCode == Status.Code.Ok) {
-            val h = Some(value.value.getInt)
-            Util.releaseTemporaryDirectBuffer(value.value)
-            h
-          } else None
-        }
-
-      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
-      result
-    }
-
-    def multiGetLongs(readOptions: ReadOptions, keys: Seq[Array[Byte]]): View[Long] = {
-      val keyBufs = keys.map { k =>
-        val b = Util.getTemporaryDirectBuffer(k.length)
-        b.put(k).flip()
-        b
-      }.asJava
-      val valBufs = List
-        .fill(keys.size) {
-          val buf = Util.getTemporaryDirectBuffer(8)
-          buf.limit(buf.capacity())
-          buf
-        }
-        .asJava
-
-      val result = db
-        .multiGetByteBuffers(readOptions, keyBufs, valBufs)
-        .asScala
-        .view
-        .map { value =>
-          if (value.status.getCode == Status.Code.Ok) {
-            val res = value.value.getLong
-            Util.releaseTemporaryDirectBuffer(value.value)
-            res
-          } else 0
-        }
-
-      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
-      result
-    }
-
-    def multiGetLongs(readOptions: ReadOptions, keys: ArrayBuffer[Array[Byte]]): View[Long] = {
-      val keyBufs = keys.map { k =>
-        val b = Util.getTemporaryDirectBuffer(k.length)
-        b.put(k).flip()
-        b
-      }.asJava
-      val valBufs = List
-        .fill(keys.size) {
-          val buf = Util.getTemporaryDirectBuffer(8)
-          buf.limit(buf.capacity())
-          buf
-        }
-        .asJava
-
-      val result = db
-        .multiGetByteBuffers(readOptions, keyBufs, valBufs)
-        .asScala
-        .view
-        .map { value =>
-          if (value.status.getCode == Status.Code.Ok) {
-            val res = value.value.getLong
-            Util.releaseTemporaryDirectBuffer(value.value)
-            res
-          } else 0
-        }
-
-      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
-      result
-    }
-
-    def multiGetBufferedOpt[A](readOptions: ReadOptions, keys: Seq[Key[Option[A]]], valBufferSize: Int): Seq[Option[A]] = {
-      val keyBufs = keys.map { k =>
-        val arr = k.keyBytes
-        val b   = Util.getTemporaryDirectBuffer(arr.length)
-        b.put(k.keyBytes).flip()
-        b
-      }.asJava
-      val valBufs = List
-        .fill(keys.size) {
-          val buf = Util.getTemporaryDirectBuffer(valBufferSize)
-          buf.limit(buf.capacity())
-          buf
-        }
-        .asJava
-
-      val result = keys.view
-        .zip(db.multiGetByteBuffers(readOptions, keyBufs, valBufs).asScala)
-        .map { case (parser, value) =>
-          if (value.status.getCode == Status.Code.Ok) {
-            val arr = new Array[Byte](value.requiredSize)
-            value.value.get(arr)
-            Util.releaseTemporaryDirectBuffer(value.value)
-            parser.parse(arr)
-          } else None
-        }
         .toSeq
 
       keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
       result
     }
 
-    def multiGetBufferedOpt[A](readOptions: ReadOptions, keys: Seq[Key[Option[A]]], valBufSizes: Seq[Int]): Seq[Option[A]] = {
-      val keyBufs = keys.map { k =>
-        val arr = k.keyBytes
-        val b   = Util.getTemporaryDirectBuffer(arr.length)
-        b.put(k.keyBytes).flip()
-        b
-      }.asJava
-      val valBufs = valBufSizes.map { size =>
-        val buf = Util.getTemporaryDirectBuffer(size)
-        buf.limit(buf.capacity())
-        buf
-      }.asJava
-
-      val result = keys.view
-        .zip(db.multiGetByteBuffers(readOptions, keyBufs, valBufs).asScala)
-        .map { case (parser, value) =>
-          if (value.status.getCode == Status.Code.Ok) {
-            val arr = new Array[Byte](value.requiredSize)
-            value.value.get(arr)
-            Util.releaseTemporaryDirectBuffer(value.value)
-            parser.parse(arr)
-          } else None
-        }
-        .toSeq
-
-      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
-      result
-    }
-
-    def multiGetBufferedFlat[A](readOptions: ReadOptions, keys: ArrayBuffer[Key[Option[A]]], valBufferSize: Int): Seq[A] = {
-      val keyBufs = keys.map { k =>
-        val arr = k.keyBytes
-        val b   = Util.getTemporaryDirectBuffer(arr.length)
-        b.put(k.keyBytes).flip()
-        b
-      }.asJava
-      val valBufs = List
-        .fill(keys.size) {
-          val buf = Util.getTemporaryDirectBuffer(valBufferSize)
-          buf.limit(buf.capacity())
-          buf
-        }
-        .asJava
+    def multiGetFlat[A](readOptions: ReadOptions, keys: ArrayBuffer[Key[Option[A]]], valBufSizes: ArrayBuffer[Int]): Seq[A] = {
+      val keyBufs = getKeyBuffersFromKeys(keys)
+      val valBufs = getValueBuffers(valBufSizes)
 
       val result = keys.view
         .zip(db.multiGetByteBuffers(readOptions, keyBufs, valBufs).asScala)
@@ -813,125 +649,6 @@ package object database {
             value.value.get(arr)
             Util.releaseTemporaryDirectBuffer(value.value)
             parser.parse(arr)
-          } else None
-        }
-        .toSeq
-
-      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
-      result
-    }
-
-    def multiGetBufferedFlat[A](readOptions: ReadOptions, keys: ArrayBuffer[Key[Option[A]]], valBufSizes: ArrayBuffer[Int]): Seq[A] = {
-      val keyBufs = keys.map { k =>
-        val arr = k.keyBytes
-        val b   = Util.getTemporaryDirectBuffer(arr.length)
-        b.put(k.keyBytes).flip()
-        b
-      }.asJava
-      val valBufs = valBufSizes.map { size =>
-        val buf = Util.getTemporaryDirectBuffer(size)
-        buf.limit(buf.capacity())
-        buf
-      }.asJava
-
-      val result = keys.view
-        .zip(db.multiGetByteBuffers(readOptions, keyBufs, valBufs).asScala)
-        .flatMap { case (parser, value) =>
-          if (value.status.getCode == Status.Code.Ok) {
-            val arr = new Array[Byte](value.requiredSize)
-            value.value.get(arr)
-            Util.releaseTemporaryDirectBuffer(value.value)
-            parser.parse(arr)
-          } else None
-        }
-        .toSeq
-
-      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
-      result
-    }
-
-    def multiGetBuffered[A](readOptions: ReadOptions, keys: ArrayBuffer[Key[A]], valBufSizes: ArrayBuffer[Int]): Seq[A] = {
-      val keyBufs = keys.map { k =>
-        val arr = k.keyBytes
-        val b   = Util.getTemporaryDirectBuffer(arr.length)
-        b.put(k.keyBytes).flip()
-        b
-      }.asJava
-      val valBufs = valBufSizes.map { size =>
-        val buf = Util.getTemporaryDirectBuffer(size)
-        buf.limit(buf.capacity())
-        buf
-      }.asJava
-
-      val result = keys.view
-        .zip(db.multiGetByteBuffers(readOptions, keyBufs, valBufs).asScala)
-        .flatMap { case (parser, value) =>
-          if (value.status.getCode == Status.Code.Ok) {
-            val arr = new Array[Byte](value.requiredSize)
-            value.value.get(arr)
-            Util.releaseTemporaryDirectBuffer(value.value)
-            Some(parser.parse(arr))
-          } else None
-        }
-        .toSeq
-
-      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
-      result
-    }
-
-    def multiGetBuffered[A](readOptions: ReadOptions, keys: ArrayBuffer[Key[A]], valBufSize: Int): View[A] = {
-      val keyBufs = keys.map { k =>
-        val arr = k.keyBytes
-        val b   = Util.getTemporaryDirectBuffer(arr.length)
-        b.put(k.keyBytes).flip()
-        b
-      }.asJava
-      val valBufs = List
-        .fill(keys.size) {
-          val buf = Util.getTemporaryDirectBuffer(valBufSize)
-          buf.limit(buf.capacity())
-          buf
-        }
-        .asJava
-
-      val result = keys.view
-        .zip(db.multiGetByteBuffers(readOptions, keyBufs, valBufs).asScala)
-        .flatMap { case (parser, value) =>
-          if (value.status.getCode == Status.Code.Ok) {
-            val arr = new Array[Byte](value.requiredSize)
-            value.value.get(arr)
-            Util.releaseTemporaryDirectBuffer(value.value)
-            Some(parser.parse(arr))
-          } else None
-        }
-
-      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
-      result
-    }
-
-    def multiGetBuffered[A](readOptions: ReadOptions, keys: Seq[Key[A]], valBufSize: Int): Seq[Option[A]] = {
-      val keyBufs = keys.map { k =>
-        val arr = k.keyBytes
-        val b   = Util.getTemporaryDirectBuffer(arr.length)
-        b.put(k.keyBytes).flip()
-        b
-      }.asJava
-      val valBufs = List
-        .fill(keys.size) {
-          val buf = Util.getTemporaryDirectBuffer(valBufSize)
-          buf.limit(buf.capacity())
-          buf
-        }
-        .asJava
-
-      val result = keys.view
-        .zip(db.multiGetByteBuffers(readOptions, keyBufs, valBufs).asScala)
-        .map { case (parser, value) =>
-          if (value.status.getCode == Status.Code.Ok) {
-            val arr = new Array[Byte](value.requiredSize)
-            value.value.get(arr)
-            Util.releaseTemporaryDirectBuffer(value.value)
-            Some(parser.parse(arr))
           } else None
         }
         .toSeq
@@ -970,6 +687,80 @@ package object database {
       val resource = DBResource(db)
       try f(resource)
       finally resource.close()
+    }
+
+    private def getKeyBuffersFromKeys(keys: collection.Seq[Key[?]]): util.List[ByteBuffer] =
+      keys.map { k =>
+        val arr = k.keyBytes
+        val b   = Util.getTemporaryDirectBuffer(arr.length)
+        b.put(k.keyBytes).flip()
+        b
+      }.asJava
+
+    private def getKeyBuffers(keys: collection.Seq[Array[Byte]]): util.List[ByteBuffer] =
+      keys.map { k =>
+        val b = Util.getTemporaryDirectBuffer(k.length)
+        b.put(k).flip()
+        b
+      }.asJava
+
+    private def getValueBuffers(amount: Int, bufferSize: Int): util.List[ByteBuffer] =
+      List
+        .fill(amount) {
+          val buf = Util.getTemporaryDirectBuffer(bufferSize)
+          buf.limit(buf.capacity())
+          buf
+        }
+        .asJava
+
+    private def getValueBuffers(bufferSizes: collection.Seq[Int]): util.List[ByteBuffer] =
+      bufferSizes.map { size =>
+        val buf = Util.getTemporaryDirectBuffer(size)
+        buf.limit(buf.capacity())
+        buf
+      }.asJava
+
+    private def multiGetOpt[A](
+        readOptions: ReadOptions,
+        keys: Seq[Key[Option[A]]],
+        keyBufs: util.List[ByteBuffer],
+        valBufs: util.List[ByteBuffer]
+    ): Seq[Option[A]] = {
+      val result = keys.view
+        .zip(db.multiGetByteBuffers(readOptions, keyBufs, valBufs).asScala)
+        .map { case (parser, value) =>
+          if (value.status.getCode == Status.Code.Ok) {
+            val arr = new Array[Byte](value.requiredSize)
+            value.value.get(arr)
+            Util.releaseTemporaryDirectBuffer(value.value)
+            parser.parse(arr)
+          } else None
+        }
+        .toSeq
+
+      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
+      result
+    }
+
+    private def multiGet[A](
+        readOptions: ReadOptions,
+        keys: ArrayBuffer[Key[A]],
+        keyBufs: util.List[ByteBuffer],
+        valBufs: util.List[ByteBuffer]
+    ): View[A] = {
+      val result = keys.view
+        .zip(db.multiGetByteBuffers(readOptions, keyBufs, valBufs).asScala)
+        .flatMap { case (parser, value) =>
+          if (value.status.getCode == Status.Code.Ok) {
+            val arr = new Array[Byte](value.requiredSize)
+            value.value.get(arr)
+            Util.releaseTemporaryDirectBuffer(value.value)
+            Some(parser.parse(arr))
+          } else None
+        }
+
+      keyBufs.forEach(Util.releaseTemporaryDirectBuffer(_))
+      result
     }
   }
 

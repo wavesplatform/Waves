@@ -166,7 +166,6 @@ case class Diff(
     ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta],
     transactionFilter: Option[BloomFilter[Array[Byte]]]
 ) {
-  import Diff.*
   @inline
   final def combineE(newer: Diff): Either[ValidationError, Diff] = combineF(newer).leftMap(GenericError(_))
 
@@ -319,7 +318,7 @@ object Diff {
       tx match {
         case i: InvokeTransaction =>
           i.dApp match {
-            case alias: Alias     => d.aliases.get(alias).orElse(blockchain.resolveAlias(alias).toOption).foreach(addr => allAffectedAddresses += addr)
+            case alias: Alias => d.aliases.get(alias).orElse(blockchain.resolveAlias(alias).toOption).foreach(addr => allAffectedAddresses += addr)
             case address: Address => allAffectedAddresses += address
           }
         case et: EthereumTransaction =>
@@ -330,7 +329,6 @@ object Diff {
         case _ =>
           None
       }
-
 
       d.copy(
         transactions = Vector(NewTransactionInfo(tx, allAffectedAddresses.result(), applied, d.scriptsComplexity)),

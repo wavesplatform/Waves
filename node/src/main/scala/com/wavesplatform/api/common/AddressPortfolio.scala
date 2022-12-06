@@ -45,7 +45,7 @@ class NFTIterator(addressId: AddressId, maybeAfter: Option[IssuedAsset], resourc
       }
       if (keysBuffer.nonEmpty) {
         resource
-          .multiGetBuffered(keysBuffer, 16)
+          .multiGet(keysBuffer, 16)
           .zip(assetsBuffer)
           .map { case (curBalance, asset) =>
             asset -> curBalance.balance

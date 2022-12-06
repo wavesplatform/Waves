@@ -4,7 +4,6 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.CurrentVolumeAndFee
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.*
@@ -77,6 +76,8 @@ trait EmptyBlockchain extends Blockchain {
 
   override def balance(address: Address, mayBeAssetId: Asset): Long = 0
 
+  override def balances(req: Seq[(Address, Asset)]): Map[(Address, Asset), Long] = Map.empty
+
   override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] = Map.empty
 
   override def leaseBalance(address: Address): LeaseBalance = LeaseBalance.empty
@@ -86,6 +87,8 @@ trait EmptyBlockchain extends Blockchain {
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] = None
 
   override def compositeBlockchain: Blockchain = this
+
+  override def loadCacheData(addresses: Seq[Address]): Unit = ()
 }
 
 object EmptyBlockchain extends EmptyBlockchain

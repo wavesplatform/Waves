@@ -111,7 +111,7 @@ case class Order(
     eip712Signature match {
       case Some(ethSignature) =>
         val signerKey = EthOrders.recoverEthSignerKey(this, ethSignature.arr)
-        Either.cond(signerKey == senderPublicKey, this, GenericError(s"Ethereum signature invalid for $this"))
+        Either.cond(signerKey == senderPublicKey, (), GenericError(s"Ethereum signature invalid for $this"))
       case _ => super.verifyFirstProof()
     }
 

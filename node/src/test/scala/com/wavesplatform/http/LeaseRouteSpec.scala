@@ -37,7 +37,6 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.{JsArray, JsObject, Json}
 
-import scala.concurrent.duration.*
 import scala.concurrent.Future
 import scala.concurrent.duration.*
 

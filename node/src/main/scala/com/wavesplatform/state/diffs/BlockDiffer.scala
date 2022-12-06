@@ -16,11 +16,11 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.*
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{Asset, Authorized, GenesisTransaction, PaymentTransaction, ProvenTransaction, Signed, Transaction}
+import com.wavesplatform.transaction.{Asset, Authorized, GenesisTransaction, PaymentTransaction, ProvenTransaction, Transaction}
 import com.wavesplatform.utils.Schedulers
 import monix.eval.Task
 import monix.execution.ExecutionModel
@@ -187,34 +187,7 @@ object BlockDiffer {
         .runAsyncAndForget
     }
 
-    val addresses = scala.collection.mutable.Set(blockGenerator)
-
-    txs.foreach {
-      case tx: ExchangeTransaction => addresses.addAll(Seq(tx.sender.toAddress, tx.buyOrder.senderAddress, tx.sellOrder.senderAddress))
-      case tx: GenesisTransaction  => addresses.add(tx.recipient)
-      case tx: InvokeScriptTransaction =>
-        addresses.addAll(Seq(tx.senderAddress) ++ (tx.dApp match {
-          case addr: Address => Some(addr)
-          case _             => None
-        }))
-      case tx: LeaseTransaction =>
-        addresses.addAll(Seq(tx.sender.toAddress) ++ (tx.recipient match {
-          case addr: Address => Some(addr)
-          case _             => None
-        }))
-      case tx: MassTransferTransaction =>
-        addresses.addAll(Seq(tx.sender.toAddress) ++ tx.transfers.collect { case ParsedTransfer(addr: Address, _) => addr })
-      case tx: PaymentTransaction => addresses.addAll(Seq(tx.sender.toAddress, tx.recipient))
-      case tx: TransferTransaction =>
-        addresses.addAll(Seq(tx.sender.toAddress) ++ (tx.recipient match {
-          case addr: Address => Some(addr)
-          case _             => None
-        }))
-      case tx: Authorized => addresses.add(tx.sender.toAddress)
-      case _              => ()
-    }
-
-    blockchain.loadCacheData(addresses.toSeq)
+    prepareCaches(blockchain, blockGenerator, txs)
 
     txs
       .foldLeft(TracedResult(Result(initDiff, 0L, 0L, initConstraint, DetailedDiff(initDiff, Nil)).asRight[ValidationError])) {
@@ -264,5 +237,36 @@ object BlockDiffer {
           .lift(CompositeBlockchain(blockchain, prevDiff))
           .fold(prevDiff.asRight[String])(prevDiff.combineF)
       }
+  }
+
+  private def prepareCaches(blockchain: Blockchain, blockGenerator: Address, txs: Seq[Transaction]): Unit = {
+    val addresses = scala.collection.mutable.Set(blockGenerator)
+
+    txs.foreach {
+      case tx: ExchangeTransaction => addresses.addAll(Seq(tx.sender.toAddress, tx.buyOrder.senderAddress, tx.sellOrder.senderAddress))
+      case tx: GenesisTransaction  => addresses.add(tx.recipient)
+      case tx: InvokeScriptTransaction =>
+        addresses.addAll(Seq(tx.senderAddress) ++ (tx.dApp match {
+          case addr: Address => Some(addr)
+          case _             => None
+        }))
+      case tx: LeaseTransaction =>
+        addresses.addAll(Seq(tx.sender.toAddress) ++ (tx.recipient match {
+          case addr: Address => Some(addr)
+          case _             => None
+        }))
+      case tx: MassTransferTransaction =>
+        addresses.addAll(Seq(tx.sender.toAddress) ++ tx.transfers.collect { case ParsedTransfer(addr: Address, _) => addr })
+      case tx: PaymentTransaction => addresses.addAll(Seq(tx.sender.toAddress, tx.recipient))
+      case tx: TransferTransaction =>
+        addresses.addAll(Seq(tx.sender.toAddress) ++ (tx.recipient match {
+          case addr: Address => Some(addr)
+          case _             => None
+        }))
+      case tx: Authorized => addresses.add(tx.sender.toAddress)
+      case _              => ()
+    }
+
+    blockchain.loadCacheData(addresses.toSeq)
   }
 }

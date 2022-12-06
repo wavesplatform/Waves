@@ -1,12 +1,9 @@
 package com.wavesplatform
 
-import com.typesafe.config.ConfigFactory
-
 import java.nio.file.Files
 import com.wavesplatform.account.Address
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.events.BlockchainUpdateTriggers
-import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.transaction.Asset
 import monix.reactive.subjects.{PublishSubject, Subject}
 import org.rocksdb.RocksDB

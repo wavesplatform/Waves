@@ -382,6 +382,7 @@ class TransactionsRouteSpec
     "returns meta for eth transfer" in {
       val blockchain = createBlockchainStub { blockchain =>
         blockchain.stub.creditBalance(TxHelpers.defaultEthAddress, Waves)
+        (blockchain.wavesBalances _).when(*).returns(Map(TxHelpers.defaultEthAddress -> Long.MaxValue / 3, TxHelpers.secondAddress -> 0L))
         blockchain.stub.activateAllFeatures()
       }
 
@@ -433,6 +434,7 @@ class TransactionsRouteSpec
     "returns meta and state changes for eth invoke" in {
       val blockchain = createBlockchainStub { blockchain =>
         blockchain.stub.creditBalance(TxHelpers.defaultEthAddress, Waves)
+        (blockchain.wavesBalances _).when(*).returns(Map(TxHelpers.defaultEthAddress -> Long.MaxValue / 3))
         blockchain.stub.setScript(
           TxHelpers.secondAddress,
           TxHelpers.scriptV5("""@Callable(i)

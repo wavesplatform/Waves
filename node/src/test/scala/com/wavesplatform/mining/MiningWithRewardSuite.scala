@@ -10,7 +10,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.database.{Keys, TestStorageFactory}
+import com.wavesplatform.database.TestStorageFactory
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock

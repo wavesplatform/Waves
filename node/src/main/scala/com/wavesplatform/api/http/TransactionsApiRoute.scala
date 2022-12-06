@@ -5,7 +5,6 @@ import akka.http.scaladsl.server.Route
 import akka.util.ByteString
 import cats.instances.either.*
 import cats.instances.list.*
-import cats.instances.try_.*
 import cats.syntax.alternative.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
@@ -17,9 +16,7 @@ import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, *}
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
-import com.wavesplatform.database.protobuf.EthereumTransactionMeta.Payload
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.settings.RestAPISettings

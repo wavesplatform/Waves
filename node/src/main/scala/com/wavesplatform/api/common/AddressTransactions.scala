@@ -23,8 +23,7 @@ object AddressTransactions {
       sizes: ArrayBuffer[Int],
       sender: Option[Address]
   ): Seq[(TxMeta, Transaction, Option[TxNum])] =
-    db.multiGetBuffered(keys, sizes)
-      .view
+    db.multiGet(keys, sizes)
       .zip(nums)
       .flatMap {
         case (Some((m, tx: Authorized)), txNum) if sender.forall(_ == tx.sender.toAddress)         => Some((m, tx, Some(txNum)))

@@ -5,7 +5,6 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.CurrentVolumeAndFee
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values.V5
@@ -58,9 +57,11 @@ class MatcherBlockchainTest extends PropSpec with MockFactory with WithDomain {
       override def leaseBalance(address: Address): LeaseBalance                                             = ???
       override def leaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance]                       = ???
       override def balance(address: Address, mayBeAssetId: Asset): Long                                     = ???
+      override def balances(req: Seq[(Address, Asset)]): Map[(Address, Asset), Long]                        = ???
       override def wavesBalances(addresses: Seq[Address]): Map[Address, Long]                               = ???
       override def resolveERC20Address(address: ERC20Address): Option[Asset.IssuedAsset]                    = ???
       override def compositeBlockchain: Blockchain                                                          = ???
+      override def loadCacheData(addresses: Seq[Address]): Unit                                             = ???
     }
 
     val tx = TransferTransaction.selfSigned(1.toByte, accountGen.sample.get, accountGen.sample.get.toAddress, Waves, 1, Waves, 1, ByteStr.empty, 0)

@@ -15,13 +15,11 @@ class SortedBatch extends WriteBatch {
   override def put(bytes: Array[Byte], bytes1: Array[Byte]): Unit = {
     addedEntries.put(bytes, bytes1)
     deletedEntries.remove(bytes)
-    this
   }
 
   override def delete(bytes: Array[Byte]): Unit = {
     addedEntries.remove(bytes)
     deletedEntries.add(bytes)
-    this
   }
 
 }

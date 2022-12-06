@@ -164,6 +164,7 @@ class DebugApiRouteSpec
     "valid tx" in {
       val blockchain = createBlockchainStub()
       (blockchain.balance _).when(TxHelpers.defaultSigner.publicKey.toAddress, *).returns(Long.MaxValue)
+      (blockchain.wavesBalances _).when(Seq(TxHelpers.defaultAddress)).returns(Map(TxHelpers.defaultAddress -> Long.MaxValue))
 
       val route = routeWithBlockchain(blockchain)
 
@@ -178,6 +179,7 @@ class DebugApiRouteSpec
     "invalid tx" in {
       val blockchain = createBlockchainStub()
       (blockchain.balance _).when(TxHelpers.defaultSigner.publicKey.toAddress, *).returns(0)
+      (blockchain.wavesBalances _).when(Seq(TxHelpers.defaultAddress)).returns(Map(TxHelpers.defaultAddress -> 0))
 
       val route = routeWithBlockchain(blockchain)
 
@@ -193,6 +195,7 @@ class DebugApiRouteSpec
     "exchange tx with fail script" in {
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(TxHelpers.defaultAddress, *).returns(Long.MaxValue)
+        (blockchain.wavesBalances _).when(Seq(TxHelpers.defaultAddress)).returns(Map(TxHelpers.defaultAddress -> Long.MaxValue))
 
         val (assetScript, comp) =
           ScriptCompiler.compile("if true then throw(\"error\") else false", ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()
@@ -234,6 +237,7 @@ class DebugApiRouteSpec
     "invoke tx with asset failing" in {
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(*, *).returns(Long.MaxValue / 2)
+        (blockchain.wavesBalances _).when(*).returns(Map(TxHelpers.defaultAddress -> Long.MaxValue / 2))
 
         val (assetScript, assetScriptComplexity) = ScriptCompiler
           .compile(
@@ -600,6 +604,7 @@ class DebugApiRouteSpec
 
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(*, *).returns(Long.MaxValue)
+        (blockchain.wavesBalances _).when(*).returns(Map(TxHelpers.defaultAddress -> Long.MaxValue))
 
         (blockchain.resolveAlias _).when(Alias.create(recipient2.name).explicitGet()).returning(Right(TxHelpers.secondAddress))
 
@@ -793,6 +798,7 @@ class DebugApiRouteSpec
 
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(*, *).returns(Long.MaxValue)
+        (blockchain.wavesBalances _).when(*).returns(Map(TxHelpers.defaultAddress -> Long.MaxValue))
 
         val (dAppScript, _) = ScriptCompiler
           .compile(
@@ -950,6 +956,7 @@ class DebugApiRouteSpec
     "transfer transaction with asset fail" in {
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(*, *).returns(Long.MaxValue / 2)
+        (blockchain.wavesBalances _).when(*).returns(Map(TxHelpers.defaultAddress -> Long.MaxValue / 2))
 
         val (assetScript, assetScriptComplexity) =
           ScriptCompiler.compile("false", ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()
@@ -1012,6 +1019,9 @@ class DebugApiRouteSpec
         (() => blockchain.settings).when().returns(WavesSettings.default().blockchainSettings.copy(functionalitySettings = settings))
         (() => blockchain.activatedFeatures).when().returns(settings.preActivatedFeatures)
         (blockchain.balance _).when(*, *).returns(ENOUGH_AMT)
+        (blockchain.wavesBalances _)
+          .when(*)
+          .returns(Map(TxHelpers.defaultAddress -> ENOUGH_AMT, TxHelpers.secondAddress -> ENOUGH_AMT, TxHelpers.address(3) -> ENOUGH_AMT))
 
         val script                = ExprScript(TRUE).explicitGet()
         def info(complexity: Int) = Some(AccountScriptInfo(TxHelpers.secondSigner.publicKey, script, complexity))

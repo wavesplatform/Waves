@@ -25,13 +25,7 @@ import monix.reactive.Observable
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterAll
 
-class GRPCBroadcastSpec
-    extends FlatSpec
-    with BeforeAndAfterAll
-    with PathMockFactory
-    with BlockchainStubHelpers
-    with EthHelpers
-    with DiffMatchers {
+class GRPCBroadcastSpec extends FlatSpec with BeforeAndAfterAll with PathMockFactory with BlockchainStubHelpers with EthHelpers with DiffMatchers {
   // Fake NTP time
   val FakeTime: TestTime = TestTime(100)
 
@@ -42,6 +36,15 @@ class GRPCBroadcastSpec
       val sh = StubHelpers(blockchain)
       sh.creditBalance(ethBuyOrder.senderAddress, *)
       sh.creditBalance(ethSellOrder.senderAddress, *)
+      (blockchain.wavesBalances _)
+        .when(*)
+        .returns(
+          Map(
+            TxHelpers.defaultAddress   -> Long.MaxValue / 3,
+            ethBuyOrder.senderAddress  -> Long.MaxValue / 3,
+            ethSellOrder.senderAddress -> Long.MaxValue / 3
+          )
+        )
       sh.issueAsset(ByteStr(EthStubBytes32))
     }
 
@@ -62,27 +65,30 @@ class GRPCBroadcastSpec
     intercept[Exception](blockchain.assertBroadcast(transaction)).toString should include("ETH transactions should not be broadcasted over gRPC")
   }
 
-  //noinspection NotImplementedCode
+  // noinspection NotImplementedCode
   implicit class BlockchainBroadcastExt(blockchain: Blockchain) {
     def grpcTxApi: TransactionsApiGrpcImpl =
-      new TransactionsApiGrpcImpl(blockchain, new CommonTransactionsApi {
-        def aliasesOfAddress(address: Address): Observable[(Height, CreateAliasTransaction)] = ???
-        def transactionById(txId: ByteStr): Option[TransactionMeta]                          = ???
-        def unconfirmedTransactions: Seq[Transaction]                                        = ???
-        def unconfirmedTransactionById(txId: ByteStr): Option[Transaction]                   = ???
-        def calculateFee(tx: Transaction): Either[ValidationError, (Asset, Long, Long)]      = ???
-        def transactionsByAddress(
-            subject: Address,
-            sender: Option[Address],
-            transactionTypes: Set[TransactionType],
-            fromId: Option[ByteStr]
-        ): Observable[TransactionMeta]                                                     = ???
-        def transactionProofs(transactionIds: List[ByteStr]): List[Block.TransactionProof] = ???
-        def broadcastTransaction(tx: Transaction): Future[TracedResult[ValidationError, Boolean]] = {
-          val differ = blockchain.stub.transactionDiffer(FakeTime)
-          Future.successful(differ(tx).map(_ => true))
+      new TransactionsApiGrpcImpl(
+        blockchain,
+        new CommonTransactionsApi {
+          def aliasesOfAddress(address: Address): Observable[(Height, CreateAliasTransaction)] = ???
+          def transactionById(txId: ByteStr): Option[TransactionMeta]                          = ???
+          def unconfirmedTransactions: Seq[Transaction]                                        = ???
+          def unconfirmedTransactionById(txId: ByteStr): Option[Transaction]                   = ???
+          def calculateFee(tx: Transaction): Either[ValidationError, (Asset, Long, Long)]      = ???
+          def transactionsByAddress(
+              subject: Address,
+              sender: Option[Address],
+              transactionTypes: Set[TransactionType],
+              fromId: Option[ByteStr]
+          ): Observable[TransactionMeta] = ???
+          def transactionProofs(transactionIds: List[ByteStr]): List[Block.TransactionProof] = ???
+          def broadcastTransaction(tx: Transaction): Future[TracedResult[ValidationError, Boolean]] = {
+            val differ = blockchain.stub.transactionDiffer(FakeTime)
+            Future.successful(differ(tx).map(_ => true))
+          }
         }
-      })(Scheduler.global)
+      )(Scheduler.global)
 
     @throws[StatusException]("on failed broadcast")
     def assertBroadcast(tx: Transaction): Unit = {

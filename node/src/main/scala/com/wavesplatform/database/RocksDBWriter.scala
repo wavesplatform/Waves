@@ -1,10 +1,10 @@
 package com.wavesplatform.database
 
-import java.{lang, util}
+import java.util
 import cats.data.Ior
 import cats.syntax.option.*
 import cats.syntax.semigroup.*
-import com.google.common.cache.{CacheBuilder, CacheLoader}
+import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.account.{Address, Alias}
@@ -185,7 +185,7 @@ abstract class RocksDBWriter private[database] (
   override protected def loadAddressId(address: Address): Option[AddressId] = loadWithFilter(addressFilter, Keys.addressId(address)) { (_, id) => id }
 
   override protected def loadAddressIds(addresses: Seq[Address]): Map[Address, Option[AddressId]] = readOnly { ro =>
-    addresses.view.zip(ro.multiGetBufferedOpt(addresses.map(Keys.addressId), 8)).toMap
+    addresses.view.zip(ro.multiGetOpt(addresses.map(Keys.addressId), 8)).toMap
   }
 
   override protected def loadHeight(): Height = RocksDBWriter.loadHeight(writableDB)
@@ -268,7 +268,7 @@ abstract class RocksDBWriter private[database] (
 
     val idToBalance = addrIds
       .zip(
-        ro.multiGetBuffered(
+        ro.multiGet(
           addrIds.map { addrId =>
             Keys.wavesBalance(addrId)
           },
@@ -861,13 +861,13 @@ abstract class RocksDBWriter private[database] (
   override def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)] = readOnly(transactionInfo(id, _))
 
   override def transactionInfos(ids: Seq[ByteStr]): Seq[Option[(TxMeta, Transaction)]] = readOnly { db =>
-    val tms = db.multiGetBufferedOpt(ids.map(id => Keys.transactionMetaById(TransactionId(id))), 36)
+    val tms = db.multiGetOpt(ids.map(id => Keys.transactionMetaById(TransactionId(id))), 36)
     val (keys, sizes) = tms.map {
       case Some(tm) => Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort)) -> tm.size
       case None     => Keys.transactionAt(Height(0), TxNum(0.toShort))              -> 0
     }.unzip
 
-    db.multiGetBuffered(keys, sizes)
+    db.multiGetOpt(keys, sizes)
   }
 
   protected def transactionInfo(id: ByteStr, db: ReadOnlyDB): Option[(TxMeta, Transaction)] =
@@ -923,44 +923,15 @@ abstract class RocksDBWriter private[database] (
     .newBuilder()
     .maximumSize(100000)
     .recordStats()
-    .build[(Int, AddressId), BalanceNode](new CacheLoader[(Int, AddressId), BalanceNode] {
-      override def load(key: (Int, AddressId)): BalanceNode = {
-        val (h, aid) = key
-        readOnly(_.get(Keys.wavesBalanceAt(aid, Height(h))))
-      }
-      override def loadAll(keys: lang.Iterable[? <: (Int, AddressId)]): util.Map[(Int, AddressId), BalanceNode] = {
-        val heights = keys.asScala.toSeq
-        heights
-          .zip(readOnly(_.multiGetBuffered(heights.map { case (h, aid) => Keys.wavesBalanceAt(aid, Height(h)) }, 12)))
-          .map { case ((h, aid), balance) =>
-            (h, aid) -> balance.getOrElse(BalanceNode.Empty)
-          }
-          .toMap
-          .asJava
-      }
-    })
+    .build[(Int, AddressId), BalanceNode]()
 
   private val leaseBalanceAtHeightCache = CacheBuilder
     .newBuilder()
     .maximumSize(100000)
     .recordStats()
-    .build[(Int, AddressId), LeaseBalance](new CacheLoader[(Int, AddressId), LeaseBalance] {
-      override def load(key: (Int, AddressId)): LeaseBalance = {
-        val (h, aid) = key
-        readOnly(_.get(Keys.leaseBalance(aid)(h)))
-      }
-      override def loadAll(keys: lang.Iterable[? <: (Int, AddressId)]): util.Map[(Int, AddressId), LeaseBalance] = {
-        val heights = keys.asScala.toSeq
-        heights
-          .zip(readOnly(_.multiGetBuffered(heights.map { case (h, aid) => Keys.leaseBalance(aid)(h) }, 16)))
-          .map { case ((h, aid), balance) =>
-            (h, aid) -> balance.getOrElse(LeaseBalance.empty)
-          }
-          .toMap
-          .asJava
-      }
-    })
+    .build[(Int, AddressId), LeaseBalance]()
 
+  // FIXME: implement
   override def balanceAtHeight(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)] = None
 
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = readOnly { db =>
@@ -979,20 +950,13 @@ abstract class RocksDBWriter private[database] (
           collectBalanceHistory(newAcc, bn.prevHeight)
         }
 
-      val wbh    = slice(collectBalanceHistory(Vector.empty, lastBalance.height), from, toHeight)
-      val lbh    = slice(db.get(Keys.leaseBalanceHistory(addressId)), from, toHeight)
-      val merged = merge(wbh, lbh)
-      val whs    = merged.map { case (wh, _) => wh -> addressId }.asJava
-      val lhs    = merged.map { case (lh, _) => lh -> addressId }.asJava
-      val wbs    = balanceAtHeightCache.getAll(whs).asScala
-      val lbs    = leaseBalanceAtHeightCache.getAll(lhs).asScala
-
-      merged.flatMap { case (wh, lh) =>
-        for {
-          wb <- wbs.get((wh, addressId))
-          lb <- lbs.get((lh, addressId))
-        } yield BalanceSnapshot(wh.max(lh), wb.balance, lb.in, lb.out)
-      }
+      val wbh = slice(collectBalanceHistory(Vector.empty, lastBalance.height), from, toHeight)
+      val lbh = slice(db.get(Keys.leaseBalanceHistory(addressId)), from, toHeight)
+      for {
+        (wh, lh) <- merge(wbh, lbh)
+        wb = balanceAtHeightCache.get((wh, addressId), () => db.get(Keys.wavesBalanceAt(addressId, Height(wh))))
+        lb = leaseBalanceAtHeightCache.get((lh, addressId), () => db.get(Keys.leaseBalance(addressId)(lh)))
+      } yield BalanceSnapshot(wh.max(lh), wb.balance, lb.in, lb.out)
     }
   }
 

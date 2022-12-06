@@ -4,10 +4,8 @@ import com.wavesplatform.block.Block.protoHeaderHash
 import com.wavesplatform.block.serialization.BlockHeaderSerializer
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.Keys
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.state.Height
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 

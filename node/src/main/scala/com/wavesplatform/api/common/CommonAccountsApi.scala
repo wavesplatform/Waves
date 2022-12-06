@@ -259,12 +259,12 @@ object CommonAccountsApi {
                 val buf = ByteBuffer.wrap(arr)
                 keysBuffer.addOne(Keys.data(addressId, key)(buf.getInt))
                 sizesBuffer.addOne(buf.getInt)
-              } // FIXME: refactor
+              }
             }
             dbIterator.next()
           }
           if (keysBuffer.nonEmpty) {
-            nextDbEntries = db.multiGetBufferedFlat(keysBuffer, sizesBuffer)
+            nextDbEntries = db.multiGetFlat(keysBuffer, sizesBuffer)
             computeNext()
           } else if (nextIndex < length) {
             nextIndex += 1

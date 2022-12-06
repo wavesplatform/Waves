@@ -57,6 +57,15 @@ class TransactionBroadcastSpec
         sh.creditBalance(TxHelpers.matcher.toAddress, *)
         sh.creditBalance(ethBuyOrder.senderAddress, *)
         sh.creditBalance(ethSellOrder.senderAddress, *)
+        (blockchain.wavesBalances _)
+          .when(*)
+          .returns(
+            Map(
+              TxHelpers.matcher.toAddress -> Long.MaxValue / 3,
+              ethBuyOrder.senderAddress   -> Long.MaxValue / 3,
+              ethSellOrder.senderAddress  -> Long.MaxValue / 3
+            )
+          )
         sh.issueAsset(ByteStr(EthStubBytes32))
       }
 

@@ -8,16 +8,9 @@ import scala.collection.mutable.ArrayBuffer
 trait DBResource extends AutoCloseable {
   def get[V](key: Key[V]): V
   def get(key: Array[Byte]): Array[Byte]
-  def multiGet[V, K](keys: ArrayBuffer[(Key[V], K)]): View[(V, K)]
-  def multiGet(keys: ArrayBuffer[Array[Byte]]): Seq[Array[Byte]]
-  def multiGet(keys: Seq[Array[Byte]]): Seq[Array[Byte]]
-  def multiGetInts(keys: ArrayBuffer[Array[Byte]]): View[Option[Int]]
-  def multiGetLongs(keys: Seq[Array[Byte]]): View[Long]
-  def multiGetLongs(keys: ArrayBuffer[Array[Byte]]): View[Long]
-  def multiGetBuffered[A](keys: ArrayBuffer[Key[A]], valBufferSizes: ArrayBuffer[Int]): Seq[A]
-  def multiGetBuffered[A](keys: ArrayBuffer[Key[A]], valBufferSize: Int): View[A]
-  def multiGetBufferedFlat[A](keys: ArrayBuffer[Key[Option[A]]], valBufferSize: Int): Seq[A]
-  def multiGetBufferedFlat[A](keys: ArrayBuffer[Key[Option[A]]], valBufferSizes: ArrayBuffer[Int]): Seq[A]
+  def multiGet[A](keys: ArrayBuffer[Key[A]], valBufferSizes: ArrayBuffer[Int]): View[A]
+  def multiGet[A](keys: ArrayBuffer[Key[A]], valBufferSize: Int): View[A]
+  def multiGetFlat[A](keys: ArrayBuffer[Key[Option[A]]], valBufferSizes: ArrayBuffer[Int]): Seq[A]
   def prefixIterator: RocksIterator // Should have a single instance
   def fullIterator: RocksIterator
   def withSafePrefixIterator[A](ifNotClosed: RocksIterator => A)(ifClosed: => A = ()): A
@@ -33,29 +26,14 @@ object DBResource {
 
     override def get(key: Array[Byte]): Array[Byte] = db.get(readOptions, key)
 
-    override def multiGet[V, K](keys: ArrayBuffer[(Key[V], K)]): View[(V, K)] = db.multiGet(readOptions, keys)
+    override def multiGetFlat[A](keys: ArrayBuffer[Key[Option[A]]], valBufferSizes: ArrayBuffer[Int]): Seq[A] =
+      db.multiGetFlat(readOptions, keys, valBufferSizes)
 
-    override def multiGetBufferedFlat[A](keys: ArrayBuffer[Key[Option[A]]], valBufferSize: Int): Seq[A] =
-      db.multiGetBufferedFlat(readOptions, keys, valBufferSize)
+    def multiGet[A](keys: ArrayBuffer[Key[A]], valBufferSizes: ArrayBuffer[Int]): View[A] =
+      db.multiGet(readOptions, keys, valBufferSizes)
 
-    override def multiGetBufferedFlat[A](keys: ArrayBuffer[Key[Option[A]]], valBufferSizes: ArrayBuffer[Int]): Seq[A] =
-      db.multiGetBufferedFlat(readOptions, keys, valBufferSizes)
-
-    def multiGetBuffered[A](keys: ArrayBuffer[Key[A]], valBufferSizes: ArrayBuffer[Int]): Seq[A] =
-      db.multiGetBuffered(readOptions, keys, valBufferSizes)
-
-    def multiGetBuffered[A](keys: ArrayBuffer[Key[A]], valBufferSize: Int): View[A] =
-      db.multiGetBuffered(readOptions, keys, valBufferSize)
-
-    override def multiGet(keys: ArrayBuffer[Array[Byte]]): Seq[Array[Byte]] = db.multiGet(readOptions, keys)
-
-    override def multiGet(keys: Seq[Array[Byte]]): Seq[Array[Byte]] = db.multiGet(readOptions, keys)
-
-    override def multiGetInts(keys: ArrayBuffer[Array[Byte]]): View[Option[Int]] = db.multiGetInts(readOptions, keys)
-
-    override def multiGetLongs(keys: Seq[Array[Byte]]): View[Long] = db.multiGetLongs(readOptions, keys)
-
-    override def multiGetLongs(keys: ArrayBuffer[Array[Byte]]): View[Long] = db.multiGetLongs(readOptions, keys)
+    def multiGet[A](keys: ArrayBuffer[Key[A]], valBufferSize: Int): View[A] =
+      db.multiGet(readOptions, keys, valBufferSize)
 
     override lazy val prefixIterator: RocksIterator = db.newIterator(readOptions.setTotalOrderSeek(false).setPrefixSameAsStart(true))
 

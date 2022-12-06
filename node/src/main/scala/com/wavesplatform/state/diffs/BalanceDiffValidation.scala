@@ -6,8 +6,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.CurrentBalance
 import com.wavesplatform.state
 import com.wavesplatform.state.{Blockchain, Diff, LeaseBalance, Portfolio}
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AccountBalanceError
 
 import scala.util.{Left, Right}

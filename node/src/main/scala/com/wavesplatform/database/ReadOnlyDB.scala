@@ -6,7 +6,6 @@ import com.wavesplatform.metrics.RocksDBStats.DbHistogramExt
 import org.rocksdb.{ReadOptions, RocksDB, RocksIterator}
 
 import scala.annotation.tailrec
-import scala.collection.View
 import scala.util.Using
 
 class ReadOnlyDB(db: RocksDB, readOptions: ReadOptions) {
@@ -16,19 +15,16 @@ class ReadOnlyDB(db: RocksDB, readOptions: ReadOptions) {
     key.parse(bytes)
   }
 
-  def multiGet[V](keys: Seq[Key[V]]): Seq[V] =
-    db.multiGet(readOptions, keys).toSeq
+  def multiGetOpt[V](keys: Seq[Key[Option[V]]], valBufferSize: Int): Seq[Option[V]] =
+    db.multiGetOpt(readOptions, keys, valBufferSize)
 
-  def multiGetBufferedOpt[V](keys: Seq[Key[Option[V]]], valBufferSize: Int): Seq[Option[V]] =
-    db.multiGetBufferedOpt(readOptions, keys, valBufferSize)
+  def multiGet[V](keys: Seq[Key[V]], valBufferSize: Int): Seq[Option[V]] =
+    db.multiGet(readOptions, keys, valBufferSize)
 
-  def multiGetBuffered[V](keys: Seq[Key[V]], valBufferSize: Int): Seq[Option[V]] =
-    db.multiGetBuffered(readOptions, keys, valBufferSize)
+  def multiGetOpt[V](keys: Seq[Key[Option[V]]], valBufSizes: Seq[Int]): Seq[Option[V]] =
+    db.multiGetOpt(readOptions, keys, valBufSizes)
 
-  def multiGetBuffered[V](keys: Seq[Key[Option[V]]], valBufSizes: Seq[Int]): Seq[Option[V]] =
-    db.multiGetBufferedOpt(readOptions, keys, valBufSizes)
-
-  def multiGetInts(keys: Seq[Key[Int]]): View[Option[Int]] =
+  def multiGetInts(keys: Seq[Key[Int]]): Seq[Option[Int]] =
     db.multiGetInts(readOptions, keys.map(_.keyBytes))
 
   def has[V](key: Key[V]): Boolean = {
