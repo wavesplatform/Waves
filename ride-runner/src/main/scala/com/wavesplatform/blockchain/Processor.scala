@@ -40,7 +40,7 @@ trait Processor {
 
   def runScripts(forceAll: Boolean = false): Unit
 
-  def getLastResultOrRun(address: Address, request: JsObject): RunResult
+  def getCachedResultOrRun(address: Address, request: JsObject): RunResult
 }
 
 object Processor {
@@ -218,7 +218,7 @@ class BlockchainProcessor private (
     }
   }
 
-  override def getLastResultOrRun(address: Address, request: JsObject): RunResult = {
+  override def getCachedResultOrRun(address: Address, request: JsObject): RunResult = {
     val key = (address, request)
     storage.get(key) match {
       case Some(r) => RunResult.Cached(r.lastResult)

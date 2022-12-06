@@ -19,7 +19,7 @@ class EvaluateApiRouteTestSuite extends RouteSpec("/utils") with RestAPISettings
   "EvaluateApiRoute" - {
     "POST /utils/script/evaluate/{address}" - {
       val processor = new EmptyProcessor() {
-        override def getLastResultOrRun(address: Address, request: JsObject): Task[JsObject] =
+        override def getCachedResultOrRun(address: Address, request: JsObject): Task[JsObject] =
           if (address == defaultAddr)
             Task.now(
               Json.obj(
@@ -33,7 +33,7 @@ class EvaluateApiRouteTestSuite extends RouteSpec("/utils") with RestAPISettings
                 "address"    -> defaultAddr.toString
               )
             )
-          else super.getLastResultOrRun(address, request)
+          else super.getCachedResultOrRun(address, request)
       }
 
       val api = EvaluateApiRoute(

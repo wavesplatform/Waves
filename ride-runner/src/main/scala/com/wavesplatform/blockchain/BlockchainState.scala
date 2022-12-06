@@ -11,7 +11,7 @@ import com.wavesplatform.utils.ScorexLogging
 sealed trait BlockchainState extends Product with Serializable
 
 object BlockchainState extends ScorexLogging {
-  case class Starting(blockchainHeight: Height, foundDifferentBlocks: Boolean = false) extends BlockchainState {
+  case class Starting(workingHeight: Height, foundDifferentBlocks: Boolean = false) extends BlockchainState {
     def withDifferentBlocks: Starting = copy(foundDifferentBlocks = true)
   }
 
@@ -94,7 +94,7 @@ object BlockchainState extends ScorexLogging {
                 }
 
             processor.process(event.getUpdate)
-            if (h >= comparedBlocks.blockchainHeight) {
+            if (h >= comparedBlocks.workingHeight) {
               log.debug(s"[$h] Reached the current height, run all scripts")
               processor.runScripts()
               Working(h)

@@ -84,7 +84,11 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
       log.info("Warm up caches...") // Also helps to figure out, which data is used by a script
       processor.runScripts(forceAll = true)
 
-      val start             = Height(math.max(0, blockchainStorage.height - 100 - 1))
+//      val lastKnownHeight             = Height(math.max(0, blockchainStorage.height - 100 - 1))
+      val lastKnownHeight = Height(1)
+      val workingHeight   = Height(lastKnownHeight + 3)
+      val endHeight       = workingHeight + 1
+
       val blockchainUpdates = use(blockchainApi.mkBlockchainUpdatesStream())
       val toExecute         = ConcurrentSubject[FullRequest](MulticastStrategy.publish)(monixScheduler)
 
@@ -93,7 +97,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
         // TODO #10 add a buffer and cancel new requests due to overflow
         toExecute
           .flatMap { x =>
-            processor.getLastResultOrRun(x.address, x.request) match {
+            processor.getCachedResultOrRun(x.address, x.request) match {
               case RunResult.Cached(r) =>
                 x.result.success(r)
                 Observable.empty
@@ -104,12 +108,10 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
           .bufferTimedAndCounted(50.millis, 5)
           .map(x => WrappedEvent.Next(x.asLeft[SubscribeEvent]))
       )
+
+      // TODO #33 Move wrapped events from here: processing of Closed and Failed should be moved to blockchainUpdates.stream
       val events = Observable(xs*).merge
-        .doOnError(e =>
-          Task {
-            log.error("Error!", e)
-          }
-        )
+        .doOnError(e => Task { log.error("Error!", e) })
         .takeWhile {
           case WrappedEvent.Next(_) => true
           case WrappedEvent.Closed =>
@@ -120,14 +122,14 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
             false
         }
         .collect { case WrappedEvent.Next(event) => event }
-        .scanEval0F(Task.now(BlockchainState.Starting(lastHeightAtStart): BlockchainState)) { case (r, curr) =>
+        .scanEval0F(Task.now(BlockchainState.Starting(workingHeight): BlockchainState)) { case (r, curr) =>
           curr match {
             case Right(curr) => Task.now(BlockchainState(processor, r, curr))
             case Left(xs) =>
               Task
                 .parSequenceUnordered {
                   xs.map { x =>
-                    processor.getLastResultOrRun(x.address, x.request) match {
+                    processor.getCachedResultOrRun(x.address, x.request) match {
                       case RunResult.Cached(r) => Task.now(x.result.success(r))
                       case RunResult.NotProcessed(task) =>
                         task
@@ -144,7 +146,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
         .runToFuture(monixScheduler)
 
       log.info(s"Watching blockchain updates...")
-      blockchainUpdates.start(start + 1)
+      blockchainUpdates.start(lastKnownHeight + 1, endHeight)
 
       // ====
       val heavyRequestProcessorPoolThreads =

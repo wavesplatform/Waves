@@ -24,6 +24,7 @@ import com.wavesplatform.api.grpc.{
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.collections.syntax.*
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.concurrent.MayBeSemaphore
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.*
 import com.wavesplatform.grpc.BlockchainApi.BlockchainUpdatesStream
@@ -60,6 +61,8 @@ class DefaultBlockchainApi(
 ) extends ScorexLogging
     with BlockchainApi {
 
+  private val grpcApiCalls = MayBeSemaphore(settings.grpcApi.maxConcurrentRequests)
+
   override def mkBlockchainUpdatesStream(): BlockchainUpdatesStream = {
     val s = ConcurrentSubject[WrappedEvent[SubscribeEvent]](MulticastStrategy.publish)(scheduler)
 
@@ -67,12 +70,14 @@ class DefaultBlockchainApi(
       private val currentObserver = new AtomicReference(new ManualGrpcObserver[SubscribeRequest, SubscribeEvent])
       override val stream = s
         .doOnNextAck((_, _) => Task(currentObserver.get().requestNext()))
-        .timeoutOnSlowUpstream(settings.blockchainUpdates.noDataTimeout)
+        .timeoutOnSlowUpstream(settings.blockchainUpdates.noDataTimeout) // TODO #33
         .asyncBoundary(OverflowStrategy.BackPressure(settings.blockchainUpdates.bufferSize))
 
       override def start(fromHeight: Int): Unit = start(fromHeight, toHeight = 0)
 
       override def start(fromHeight: Int, toHeight: Int): Unit = {
+        // How to know the source of data: you can wrap blockchainUpdatesApiChannel by MetadataUtils.newCaptureMetadataInterceptor
+        // and get HTTP headers in Metadata.
         val call     = blockchainUpdatesApiChannel.newCall(BlockchainUpdatesApiGrpc.METHOD_SUBSCRIBE, CallOptions.DEFAULT)
         val observer = new MonixWrappedDownstream[SubscribeRequest, SubscribeEvent](s)
 
@@ -94,83 +99,87 @@ class DefaultBlockchainApi(
   }
 
   override def getCurrentBlockchainHeight(): Int =
-    ClientCalls
-      .blockingUnaryCall(
-        grpcApiChannel.newCall(BlocksApiGrpc.METHOD_GET_CURRENT_HEIGHT, CallOptions.DEFAULT),
-        Empty()
-      )
-      .tap(r => log.trace(s"getCurrentBlockchainHeight: $r"))
+    grpcApiCalls
+      .limited {
+        ClientCalls.blockingUnaryCall(
+          grpcApiChannel.newCall(BlocksApiGrpc.METHOD_GET_CURRENT_HEIGHT, CallOptions.DEFAULT),
+          Empty()
+        )
+      }
+      .tap { r => log.trace(s"getCurrentBlockchainHeight: $r") }
 
   override def getActivatedFeatures(height: Int): Map[Short, Int] =
-    ClientCalls
-      .blockingUnaryCall(
-        grpcApiChannel.newCall(BlockchainApiGrpc.METHOD_GET_ACTIVATION_STATUS, CallOptions.DEFAULT),
-        ActivationStatusRequest(height)
-      )
+    grpcApiCalls
+      .limited {
+        ClientCalls
+          .blockingUnaryCall(
+            grpcApiChannel.newCall(BlockchainApiGrpc.METHOD_GET_ACTIVATION_STATUS, CallOptions.DEFAULT),
+            ActivationStatusRequest(height)
+          )
+      }
       .features
       .map(x => x.id.toShort -> x.activationHeight) // TODO #3 is this correct?
       .toMap
       .tap(r => log.trace(s"getActivatedFeatures: found ${r.mkString(", ")}"))
 
   override def getAccountDataEntries(address: Address): Seq[DataEntry[?]] =
-    try
-      ClientCalls
-        .blockingServerStreamingCall(
-          grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_DATA_ENTRIES, CallOptions.DEFAULT),
-          DataRequest(toPb(address))
-        )
-        .asScala
-        .flatMap(_.entry)
-        .map(toVanillaDataEntry)
-        .toSeq
-        .tap(r => log.trace(s"getAccountDataEntries($address): found ${r.length} elements"))
-    catch {
-      case e: Throwable =>
-        log.error(s"getAccountDataEntries($address)", e)
-        throw e
-    }
-
-  override def getAccountDataEntry(address: Address, key: String): Option[DataEntry[?]] =
-    try {
-      firstOf(
+    grpcApiCalls
+      .limited {
         ClientCalls
           .blockingServerStreamingCall(
             grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_DATA_ENTRIES, CallOptions.DEFAULT),
-            DataRequest(address = toPb(address), key = key)
+            DataRequest(toPb(address))
           )
-      )
-        .map(x => toVanillaDataEntry(x.getEntry))
-        .tap(r => log.trace(s"getAccountDataEntry($address, '$key'): ${r.toFoundStr("value", _.value)}"))
-    } catch {
-      case e: Throwable =>
-        log.error(s"getAccountDataEntry($address, '$key')", e)
-        throw e
-    }
+      }
+      .asScala
+      .flatMap(_.entry)
+      .map(toVanillaDataEntry)
+      .toSeq
+      .tap(r => log.trace(s"getAccountDataEntries($address): found ${r.length} elements"))
 
-  // TODO #10 Get "io.grpc.StatusRuntimeException: UNAVAILABLE: unavailable" on empty database. Probably, because of multiple equivalent requests
+  override def getAccountDataEntry(address: Address, key: String): Option[DataEntry[?]] =
+    grpcApiCalls
+      .limited {
+        firstOf(
+          ClientCalls
+            .blockingServerStreamingCall(
+              grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_DATA_ENTRIES, CallOptions.DEFAULT),
+              DataRequest(address = toPb(address), key = key)
+            )
+        )
+      }
+      .map(x => toVanillaDataEntry(x.getEntry))
+      .tap(r => log.trace(s"getAccountDataEntry($address, '$key'): ${r.toFoundStr("value", _.value)}"))
+
   override def getAccountScript(address: Address): Option[Script] = {
-    val x = ClientCalls.blockingUnaryCall(
-      grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_SCRIPT, CallOptions.DEFAULT),
-      AccountRequest(toPb(address))
-    )
+    val x = grpcApiCalls.limited {
+      ClientCalls.blockingUnaryCall(
+        grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_SCRIPT, CallOptions.DEFAULT),
+        AccountRequest(toPb(address))
+      )
+    }
 
     toVanillaScript(x.scriptBytes).tap(r => log.trace(s"getAccountScript($address): ${r.toFoundStr("hash", _.hashCode())}"))
   }
 
   override def getBlockHeader(height: Int): Option[SignedBlockHeader] = {
-    val x = ClientCalls.blockingUnaryCall(
-      grpcApiChannel.newCall(BlocksApiGrpc.METHOD_GET_BLOCK, CallOptions.DEFAULT),
-      BlockRequest(request = BlockRequest.Request.Height(height))
-    )
+    val x = grpcApiCalls.limited {
+      ClientCalls.blockingUnaryCall(
+        grpcApiChannel.newCall(BlocksApiGrpc.METHOD_GET_BLOCK, CallOptions.DEFAULT),
+        BlockRequest(request = BlockRequest.Request.Height(height))
+      )
+    }
 
     x.block.map(toVanilla).tap(r => log.trace(s"getBlockHeader($height): ${r.toFoundStr("id", _.id())}"))
   }
 
   override def getBlockHeaderRange(fromHeight: Int, toHeight: Int): List[SignedBlockHeader] = {
-    val xs = ClientCalls.blockingServerStreamingCall(
-      grpcApiChannel.newCall(BlocksApiGrpc.METHOD_GET_BLOCK_RANGE, CallOptions.DEFAULT),
-      BlockRangeRequest(fromHeight = fromHeight, toHeight = toHeight)
-    )
+    val xs = grpcApiCalls.limited {
+      ClientCalls.blockingServerStreamingCall(
+        grpcApiChannel.newCall(BlocksApiGrpc.METHOD_GET_BLOCK_RANGE, CallOptions.DEFAULT),
+        BlockRangeRequest(fromHeight = fromHeight, toHeight = toHeight)
+      )
+    }
 
     xs.asScala
       .map(x => toVanilla(x.getBlock))
@@ -195,81 +204,80 @@ class DefaultBlockchainApi(
   }
 
   override def getAssetDescription(asset: Asset.IssuedAsset): Option[AssetDescription] = {
-    val r =
-      try {
-        val x = ClientCalls
+    val x = grpcApiCalls.limited {
+      try
+        ClientCalls
           .blockingUnaryCall(
             grpcApiChannel.newCall(AssetsApiGrpc.METHOD_GET_INFO, CallOptions.DEFAULT),
             AssetRequest(UnsafeByteOperations.unsafeWrap(asset.id.arr))
           )
-
-        Some(
-          AssetDescription(
-            originTransactionId = asset.id,
-            issuer = PublicKey(x.issuer.toByteArray),
-            name = UnsafeByteOperations.unsafeWrap(x.name.getBytes(StandardCharsets.UTF_8)),
-            description = UnsafeByteOperations.unsafeWrap(x.description.getBytes(StandardCharsets.UTF_8)),
-            decimals = x.decimals,
-            reissuable = x.reissuable,
-            totalVolume = x.totalVolume,
-            lastUpdatedAt = Height(1), // not used, see: https://docs.waves.tech/en/ride/structures/common-structures/asset#fields
-            script = for {
-              pbScript <- x.script
-              script   <- toVanillaScript(pbScript.scriptBytes)
-            } yield AssetScriptInfo(script, pbScript.complexity),
-            sponsorship = x.sponsorship,
-            nft = false // not used, see: https://docs.waves.tech/en/ride/structures/common-structures/asset#fields
-          )
-        )
-      } catch {
+          .some
+      catch {
         case x: StatusException if x.getStatus == Status.NOT_FOUND => None
       }
+    }
+
+    val r = x.map { x =>
+      AssetDescription(
+        originTransactionId = asset.id,
+        issuer = PublicKey(x.issuer.toByteArray),
+        name = UnsafeByteOperations.unsafeWrap(x.name.getBytes(StandardCharsets.UTF_8)),
+        description = UnsafeByteOperations.unsafeWrap(x.description.getBytes(StandardCharsets.UTF_8)),
+        decimals = x.decimals,
+        reissuable = x.reissuable,
+        totalVolume = x.totalVolume,
+        lastUpdatedAt = Height(1), // not used, see: https://docs.waves.tech/en/ride/structures/common-structures/asset#fields
+        script = for {
+          pbScript <- x.script
+          script   <- toVanillaScript(pbScript.scriptBytes)
+        } yield AssetScriptInfo(script, pbScript.complexity),
+        sponsorship = x.sponsorship,
+        nft = false // not used, see: https://docs.waves.tech/en/ride/structures/common-structures/asset#fields
+      )
+    }
 
     log.trace(s"getAssetDescription($asset): ${r.toFoundStr(_.toString)}")
     r
   }
 
   override def resolveAlias(alias: Alias): Option[Address] = {
-    val r =
-      try {
-        val x = ClientCalls.blockingUnaryCall(
-          grpcApiChannel.newCall(AccountsApiGrpc.METHOD_RESOLVE_ALIAS, CallOptions.DEFAULT),
-          alias.toString // TODO #6: check implementation
-        )
-
-        Address.fromBytes(x.toByteArray).toOption
-      } catch {
+    val x = grpcApiCalls.limited {
+      try
+        ClientCalls
+          .blockingUnaryCall(
+            grpcApiChannel.newCall(AccountsApiGrpc.METHOD_RESOLVE_ALIAS, CallOptions.DEFAULT),
+            alias.toString // TODO #6: check implementation
+          )
+          .some
+      catch {
         case e: StatusException if e.getStatus == Status.INVALID_ARGUMENT => None
       }
+    }
+
+    val r = x.map { x =>
+      Address
+        .fromBytes(x.toByteArray)
+        .fold(
+          e => throw new RuntimeException(s"Can't get address of alias '$alias': ${e.reason}"),
+          identity
+        )
+    }
 
     log.trace(s"resolveAlias($alias): ${r.toFoundStr()}")
     r
   }
 
-  override def getBalance(address: Address, asset: Asset): Long = {
-    val xs = ClientCalls.blockingServerStreamingCall(
-      grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_BALANCES, CallOptions.DEFAULT),
-      BalancesRequest(toPb(address))
-    )
-
-    firstOf(xs)
-      .map(_.balance)
+  override def getBalance(address: Address, asset: Asset): Long =
+    getBalanceInternal(address, asset)
       .fold(0L) {
         case Balance.Empty               => 0L
         case Balance.Waves(wavesBalance) => wavesBalance.regular
         case Balance.Asset(assetBalance) => assetBalance.amount
       }
       .tap(r => log.trace(s"getBalance($address, $asset): $r"))
-  }
 
   override def getLeaseBalance(address: Address): BalanceResponse.WavesBalances = {
-    val xs = ClientCalls.blockingServerStreamingCall(
-      grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_BALANCES, CallOptions.DEFAULT),
-      BalancesRequest(toPb(address))
-    )
-
-    firstOf(xs)
-      .map(_.balance)
+    getBalanceInternal(address, Asset.Waves)
       .fold(BalanceResponse.WavesBalances.defaultInstance) {
         case Balance.Waves(wavesBalance) => wavesBalance
         case x                           => throw new RuntimeException(s"Expected Balance.Waves, but got $x")
@@ -277,14 +285,30 @@ class DefaultBlockchainApi(
       .tap(r => log.trace(s"getLeaseBalance($address): $r"))
   }
 
-  override def getTransactionHeight(id: ByteStr): Option[Height] = {
-    val xs = ClientCalls
-      .blockingServerStreamingCall(
-        grpcApiChannel.newCall(TransactionsApiGrpc.METHOD_GET_STATUSES, CallOptions.DEFAULT),
-        TransactionsByIdRequest(transactionIds = Seq(UnsafeByteOperations.unsafeWrap(id.arr)))
-      )
+  private def getBalanceInternal(address: Address, asset: Asset): Option[Balance] =
+    grpcApiCalls
+      .limited {
+        firstOf(
+          ClientCalls.blockingServerStreamingCall(
+            grpcApiChannel.newCall(AccountsApiGrpc.METHOD_GET_BALANCES, CallOptions.DEFAULT),
+            BalancesRequest(address = toPb(address), assets = Seq(toPb(asset)))
+          )
+        )
+      }
+      .map(_.balance)
 
-    val r = firstOf(xs).map(x => Height(x.height.toInt))
+  override def getTransactionHeight(id: ByteStr): Option[Height] = {
+    val x = grpcApiCalls.limited {
+      firstOf(
+        ClientCalls
+          .blockingServerStreamingCall(
+            grpcApiChannel.newCall(TransactionsApiGrpc.METHOD_GET_STATUSES, CallOptions.DEFAULT),
+            TransactionsByIdRequest(transactionIds = Seq(UnsafeByteOperations.unsafeWrap(id.arr)))
+          )
+      )
+    }
+
+    val r = x.map(x => Height(x.height.toInt))
     log.trace(s"getTransactionHeight($id): ${r.toFoundStr { h => s"height=$h" }}")
     r
   }
@@ -292,6 +316,7 @@ class DefaultBlockchainApi(
   private def firstOf[T](xs: java.util.Iterator[T]): Option[T] = if (xs.hasNext) xs.next().some else none
 
   private def toPb(address: Address): ByteString = UnsafeByteOperations.unsafeWrap(address.bytes)
+  private def toPb(asset: Asset): ByteString     = asset.fold(ByteString.EMPTY)(x => UnsafeByteOperations.unsafeWrap(x.id.arr))
 
   private def toVanilla(block: Block): SignedBlockHeader = {
     val header = block.getHeader
@@ -314,7 +339,8 @@ class DefaultBlockchainApi(
 }
 
 object DefaultBlockchainApi {
-  case class Settings(nodeApiBaseUri: String, blockchainUpdates: BlockchainUpdatesSettings)
+  case class Settings(nodeApiBaseUri: String, grpcApi: GrpcApiSettings, blockchainUpdates: BlockchainUpdatesSettings)
+  case class GrpcApiSettings(maxConcurrentRequests: Option[Int])
   case class BlockchainUpdatesSettings(noDataTimeout: FiniteDuration, bufferSize: Int)
 
   private case class HttpBlockHeader(VRF: Option[ByteStr] = None)

@@ -83,22 +83,18 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
       processor.runScripts(forceAll = true)
 
       // mainnet
-      val start = Height(3393500)   // math.max(0, blockchainStorage.height - 100 - 1))
-      val end   = Height(start + 3) // 101 // lastHeightAtStart
+      val lastKnownHeight = Height(3393500)           // math.max(0, blockchainStorage.height - 100 - 1))
+      val workingHeight   = Height(lastKnownHeight + 3)
+      val endHeight       = Height(workingHeight + 1) // 101 // lastHeightAtStart
 
       // testnet
-      //      val start = Height(2327973)
-      //      val end   = Height(start + 1)
+      //      val lastKnownHeight = Height(2327973)
+      //      val endHeight   = Height(lastKnownHeight + 1)
 
       val blockchainUpdates = use(blockchainApi.mkBlockchainUpdatesStream())
       val events = blockchainUpdates.stream
-//        .timeoutOnSlowUpstream()
         .asyncBoundary(OverflowStrategy.BackPressure(4))
-        .doOnError(e =>
-          Task {
-            log.error("Error!", e)
-          }
-        )
+        .doOnError(e => Task { log.error("Error!", e) })
         .takeWhile {
           case WrappedEvent.Next(_) => true
           case WrappedEvent.Closed =>
@@ -109,12 +105,11 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
             false
         }
         .collect { case WrappedEvent.Next(event) => event }
-        .foldLeftL(BlockchainState.Starting(end): BlockchainState)(BlockchainState(processor, _, _))
+        .foldLeftL(BlockchainState.Starting(workingHeight): BlockchainState)(BlockchainState(processor, _, _))
         .runToFuture(Scheduler(commonScheduler))
 
       log.info(s"Watching blockchain updates...")
-
-      blockchainUpdates.start(start + 1, end)
+      blockchainUpdates.start(lastKnownHeight + 1, endHeight)
 
       Await.result(events, Duration.Inf)
     }
