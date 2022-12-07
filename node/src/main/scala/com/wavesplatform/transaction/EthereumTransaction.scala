@@ -2,7 +2,6 @@ package com.wavesplatform.transaction
 
 import java.math.BigInteger
 
-import cats.syntax.either.*
 import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.EthereumKeyLength
@@ -118,7 +117,6 @@ object EthereumTransaction {
       blockchain.accountScript(dApp).toRight(GenericError(s"No script at address $dApp")).flatMap { scriptInfo =>
         ABIConverter(scriptInfo.script)
           .decodeFunctionCall(hexCallData)
-          .leftMap(GenericError(_))
           .map { case (extractedCall, extractedPayments) =>
             new InvokeScriptTransactionLike {
               override def funcCall: Terms.FUNCTION_CALL                  = extractedCall

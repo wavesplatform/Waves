@@ -178,7 +178,8 @@ object RideRunnerInput {
         Base58
           .tryDecodeWithLimit(str)
           .toEither
-          .flatMap(AddressOrAlias.fromBytes)
+          .leftMap(_ => ())
+          .flatMap(AddressOrAlias.fromBytes(_).leftMap(_ => ()))
           .map(JsSuccess(_))
           .getOrElse(JsError("Can't read Address or Alias"))
 

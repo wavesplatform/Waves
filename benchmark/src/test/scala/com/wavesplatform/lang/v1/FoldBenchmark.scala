@@ -46,7 +46,7 @@ class FoldBenchmark {
 @State(Scope.Benchmark)
 class FoldSt {
   val ds  = DirectiveSet(V5, Account, Expression).fold(null, identity)
-  val ctx = lazyContexts(ds).value().evaluationContext(Common.emptyBlockchainEnvironment())
+  val ctx = lazyContexts((ds, true)).value().evaluationContext(Common.emptyBlockchainEnvironment())
 
   val function = "func f(acc: Boolean, elem: ByteVector) = acc && sigVerify(elem, base58'', base58'')"
 

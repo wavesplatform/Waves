@@ -20,8 +20,9 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{BinaryDataEntry, Blockchain, Diff, Height, TxMeta}
-import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.*
+import com.wavesplatform.transaction.TxHelpers.{defaultSigner, secondSigner, signer}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
@@ -36,8 +37,8 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import play.api.libs.json.{JsArray, JsObject, Json}
 
-import scala.concurrent.duration.*
 import scala.concurrent.Future
+import scala.concurrent.duration.*
 
 class LeaseRouteSpec
     extends RouteSpec("/leasing")
@@ -313,48 +314,41 @@ class LeaseRouteSpec
       }
     }
 
-    val genesisWithEthereumInvoke = for {
-      sender    <- ethAccountGen
-      dApp      <- accountGen
-      recipient <- accountGen
-      invokeEth <- ethereumInvokeTransactionGen(
-        sender,
-        dApp,
-        "leaseTo",
-        Seq(Arg.Bytes(ByteStr(recipient.toAddress.bytes)), Arg.Integer(10000.waves))
-      )
-    } yield (
-      dApp,
-      setScriptTransaction(dApp),
-      invokeEth,
-      recipient.toAddress
-    )
-
-    "created by EthereumTransaction and canceled by CancelLeaseTransaction" in forAll(genesisWithEthereumInvoke) {
-      case (dApp, setScript, invoke, recipient) =>
-        withRoute(Seq(AddrWithBalance(dApp.toAddress), AddrWithBalance(invoke.sender.toAddress))) { (d, r) =>
-          d.appendBlock(setScript)
-          d.appendBlock(invoke)
-          val leaseId = d.blockchain
-            .accountData(dApp.toAddress, "leaseId")
-            .collect { case i: BinaryDataEntry =>
-              i.value
-            }
-            .get
-          val expectedDetails = Seq(leaseId -> LeaseDetails(dApp.publicKey, recipient, 10_000.waves, LeaseDetails.Status.Active, invoke.id(), 1))
-
-          d.liquidAndSolidAssert { () =>
-            checkActiveLeasesFor(dApp.toAddress, r, expectedDetails)
-            checkActiveLeasesFor(recipient, r, expectedDetails)
+    "created by EthereumTransaction and canceled by CancelLeaseTransaction" in {
+      val sender    = signer(2).toEthKeyPair
+      val dApp      = defaultSigner
+      val recipient = secondSigner.toAddress
+      val invoke =
+        EthTxGenerator.generateEthInvoke(
+          keyPair = sender,
+          address = dApp.toAddress,
+          funcName = "leaseTo",
+          args = Seq(Arg.Bytes(ByteStr(recipient.bytes)), Arg.Integer(10000.waves)),
+          payments = Seq.empty
+        )
+      withRoute(Seq(AddrWithBalance(dApp.toAddress), AddrWithBalance(invoke.sender.toAddress))) { (d, r) =>
+        d.appendBlock(setScriptTransaction(dApp))
+        d.appendBlock(invoke)
+        val leaseId = d.blockchain
+          .accountData(dApp.toAddress, "leaseId")
+          .collect { case i: BinaryDataEntry =>
+            i.value
           }
+          .get
+        val expectedDetails = Seq(leaseId -> LeaseDetails(dApp.publicKey, recipient, 10_000.waves, LeaseDetails.Status.Active, invoke.id(), 1))
 
-          d.appendMicroBlock(leaseCancelTransaction(dApp, leaseId))
-
-          d.liquidAndSolidAssert { () =>
-            checkActiveLeasesFor(dApp.toAddress, r, Seq.empty)
-            checkActiveLeasesFor(recipient, r, Seq.empty)
-          }
+        d.liquidAndSolidAssert { () =>
+          checkActiveLeasesFor(dApp.toAddress, r, expectedDetails)
+          checkActiveLeasesFor(recipient, r, expectedDetails)
         }
+
+        d.appendMicroBlock(leaseCancelTransaction(dApp, leaseId))
+
+        d.liquidAndSolidAssert { () =>
+          checkActiveLeasesFor(dApp.toAddress, r, Seq.empty)
+          checkActiveLeasesFor(recipient, r, Seq.empty)
+        }
+      }
     }
 
     val nestedInvocation = {

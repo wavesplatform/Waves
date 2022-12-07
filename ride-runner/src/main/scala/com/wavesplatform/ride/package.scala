@@ -85,7 +85,7 @@ let x1 = if (valueOrElse(getBoolean("b"), false)) then 1 else 0
     ) ++ (if (request.trace) Json.obj(TraceStep.logJson(log)) else Json.obj())
 
     evaluated.leftMap {
-      case e: ScriptExecutionError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.error)
+      case e: ScriptExecutionError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.message)
       case e                       => ApiError.fromValidationError(e).json
     }.merge
   }
@@ -123,7 +123,7 @@ let x1 = if (valueOrElse(getBoolean("b"), false)) then 1 else 0
       }
       .left
       .map {
-        case e: ScriptExecutionError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.error)
+        case e: ScriptExecutionError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.message)
         case e                       => ApiError.fromValidationError(e).json
       }
       .merge

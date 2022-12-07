@@ -124,7 +124,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels            = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val utxStorage =
-      new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.minerSettings.enable, utxEvents.onNext)
+      new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable, utxEvents.onNext)
     maybeUtx = Some(utxStorage)
 
     val timer                 = new HashedWheelTimer()
@@ -203,7 +203,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         .map {
           case Right(discardedBlocks) =>
             allChannels.broadcast(LocalScoreChanged(blockchainUpdater.score))
-            if (returnTxsToUtx) utxStorage.addAndCleanup(discardedBlocks.view.flatMap(_._1.transactionData))
+            if (returnTxsToUtx) utxStorage.addAndScheduleCleanup(discardedBlocks.view.flatMap(_._1.transactionData))
             Right(discardedBlocks)
           case Left(error) => Left(error)
         }
@@ -378,6 +378,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         UtilsApiRoute(
           time,
           settings.restAPISettings,
+          settings.maxTxErrorLogSize,
           () => blockchainUpdater.estimator,
           limitedScheduler,
           blockchainUpdater

@@ -28,7 +28,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.CoevalR.traced
 import com.wavesplatform.transaction.smart.script.trace.InvokeScriptTrace
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, TransactionBase, TransactionType}
+import com.wavesplatform.transaction.{Asset, DiffToLogConverter, TransactionBase, TransactionType}
 import monix.eval.Coeval
 import shapeless.*
 
@@ -140,12 +140,12 @@ class WavesEnvironment(
   }
 
   override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails] = {
-    (for {
-      aoa <- addressOrAlias match {
-        case Address(bytes) => AddressOrAlias.fromBytes(bytes.arr)
-        case Alias(name)    => com.wavesplatform.account.Alias.create(name)
-      }
-      address <- blockchain.resolveAlias(aoa)
+    val addressE: Either[ValidationError, account.Address] = addressOrAlias match {
+      case Address(bytes) => account.Address.fromBytes(bytes.arr)
+      case Alias(name)    => account.Alias.create(name).flatMap(a => blockchain.resolveAlias(a))
+    }
+    for {
+      address <- addressE.leftMap(_.toString)
       portfolio = currentBlockchain().wavesPortfolio(address)
       effectiveBalance <- portfolio.effectiveBalance
     } yield Environment.BalanceDetails(
@@ -153,7 +153,7 @@ class WavesEnvironment(
       portfolio.balance,
       blockchain.generatingBalance(address),
       effectiveBalance
-    )).left.map(_.toString)
+    )
   }
 
   override def transactionHeightById(id: Array[Byte]): Option[Long] =
@@ -240,7 +240,7 @@ class WavesEnvironment(
       payments: Seq[(Option[Array[Byte]], Long)],
       availableComplexity: Int,
       reentrant: Boolean
-  ): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
+  ): Coeval[(Either[ValidationError, (EVALUATED, Log[Id])], Int)] = ???
 }
 
 object DAppEnvironment {
@@ -280,7 +280,13 @@ object DAppEnvironment {
       }
 
     def getErrorMessage: Option[InvokeScriptResult.ErrorMessage] = {
-      def isNestedError(ve: ValidationError) = invocations.exists(_.result.left.map(_.toString) == Left(ve.toString))
+      def isNestedError(ve: ValidationError) = invocations.exists { inv =>
+        (inv.result, ve) match {
+          case (Left(fte1: FailedTransactionError), fte2: FailedTransactionError) => fte1.error == fte2.error
+          case (Left(ve1), ve2)                                                   => ve1 == ve2
+          case _                                                                  => false
+        }
+      }
 
       this.result.left.toOption.collect {
         case ve if !isNestedError(ve) =>
@@ -337,7 +343,7 @@ class DAppEnvironment(
       payments: Seq[(Option[Array[Byte]], Long)],
       availableComplexity: Int,
       reentrant: Boolean
-  ): Coeval[(Either[ValidationError, EVALUATED], Int)] = {
+  ): Coeval[(Either[ValidationError, (EVALUATED, Log[Id])], Int)] = {
 
     val r = for {
       address <- traced(
@@ -384,10 +390,9 @@ class DAppEnvironment(
           if (reentrant) calledAddresses else calledAddresses + invoke.sender.toAddress,
           invocationTracker
         )(invoke)
-      fixedDiff = diff.copy(
-        scriptResults = Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = diff.scriptResults(txId))))),
-        scriptsRun = diff.scriptsRun + 1
-      )
+      fixedDiff = diff
+        .withScriptResults(Map(txId -> InvokeScriptResult(invokes = Seq(invocation.copy(stateChanges = diff.scriptResults(txId))))))
+        .withScriptRuns(diff.scriptsRun + 1)
       newCurrentDiff <- traced(currentDiff.combineF(fixedDiff).leftMap(GenericError(_)))
     } yield {
       currentDiff = newCurrentDiff
@@ -399,14 +404,14 @@ class DAppEnvironment(
       availablePayments = remainingPayments
       availableData = remainingData
       availableDataSize = remainingDataSize
-      (evaluated, diff.scriptsComplexity.toInt)
+      (evaluated, diff.scriptsComplexity.toInt, DiffToLogConverter.convert(diff, tx.id(), func, availableComplexity))
     }
 
     r.v.map {
       _.resultE match {
-        case Left(fte: FailedTransactionError) => (Left(fte), fte.spentComplexity.toInt)
-        case Left(e)                           => (Left(e), 0)
-        case Right((evaluated, complexity))    => (Right(evaluated), complexity)
+        case Left(fte: FailedTransactionError)       => (Left(fte), fte.spentComplexity.toInt)
+        case Left(e)                                 => (Left(e), 0)
+        case Right((evaluated, complexity, diffLog)) => (Right((evaluated, diffLog)), complexity)
       }
     }
   }

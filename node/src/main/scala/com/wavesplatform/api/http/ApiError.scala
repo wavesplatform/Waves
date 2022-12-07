@@ -58,8 +58,10 @@ object ApiError {
             if (e.isAssetScript) TransactionNotAllowedByAssetScript(tx)
             else TransactionNotAllowedByAccountScript(tx)
           case TxValidationError.Mistiming(errorMessage)                         => Mistiming(errorMessage)
-          case e: TxValidationError.ScriptExecutionError                         => ScriptExecutionError(tx, e.error, isTokenScript = e.isAssetScript)
-          case e: TxValidationError.FailedTransactionError if e.isExecutionError => ScriptExecutionError(tx, e.message, e.isAssetScript)
+          case e: TxValidationError.ScriptExecutionError                         => ScriptExecutionError(tx, e.message, e.isAssetScript)
+          case e: TxValidationError.FailedTransactionError if e.isAssetExecution => ScriptExecutionError(tx, e.message, isTokenScript = true)
+          case e: TxValidationError.FailedTransactionError if e.isDAppExecution  => InvokeExecutionError(tx, e.message)
+          case e: TxValidationError.InvokeRejectError                            => InvokeExecutionError(tx, e.message)
           case _: TxValidationError.FailedTransactionError                       => TransactionNotAllowedByAssetScript(tx)
           case err                                                               => StateCheckFailed(tx, fromValidationError(err))
         }
@@ -256,6 +258,13 @@ object ApiError {
     override lazy val json: JsObject = ScriptErrorJson(id, tx, message)
   }
 
+  final case class InvokeExecutionError(tx: Transaction, error: String) extends ApiError {
+    override val id: Int             = ScriptExecutionError.Id
+    override val code: StatusCode    = StatusCodes.BadRequest
+    override val message: String     = s"Error while executing dApp: $error"
+    override lazy val json: JsObject = ScriptErrorJson(id, tx, message)
+  }
+
   case object ScriptExecutionError {
     val Id = 306
   }
@@ -440,9 +449,9 @@ object ApiError {
     override val code    = StatusCodes.BadRequest
   }
 
-  case object ConflictedRequestStructure extends ApiError {
+  case object ConflictingRequestStructure extends ApiError {
     override val id      = 198
-    override val message = "Conflicted request structure. Used first and second request versions"
+    override val message = "Conflicting request structure. Both expression and invocation structure were sent"
     override val code    = StatusCodes.BadRequest
   }
 }

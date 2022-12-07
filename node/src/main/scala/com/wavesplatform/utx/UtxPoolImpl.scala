@@ -3,7 +3,6 @@ package com.wavesplatform.utx
 import java.time.Duration
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
-
 import com.wavesplatform.ResponsivenessLogs
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
@@ -20,7 +19,7 @@ import com.wavesplatform.state.diffs.{BlockDiffer, TransactionDiffer}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.*
-import com.wavesplatform.transaction.TxValidationError.{AlreadyInTheState, GenericError, SenderIsBlacklisted}
+import com.wavesplatform.transaction.TxValidationError.{AlreadyInTheState, GenericError, SenderIsBlacklisted, WithLog}
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
@@ -43,6 +42,7 @@ class UtxPoolImpl(
     time: Time,
     blockchain: Blockchain,
     utxSettings: UtxSettings,
+    maxTxErrorLogSize: Int,
     isMiningEnabled: Boolean,
     onEvent: UtxEvent => Unit = _ => (),
     nanoTimeSource: () => TxTimestamp = () => System.nanoTime()
@@ -155,7 +155,10 @@ class UtxPoolImpl(
         log.trace(s"putIfNew(${tx.id()}) succeeded, isNew = $isNew")
       case Left(err) =>
         log.debug(s"putIfNew(${tx.id()}) failed with ${extractErrorMessage(err)}")
-        traceLogger.trace(err.toString)
+        traceLogger.trace(err match {
+          case w: WithLog => w.toStringWithLog(maxTxErrorLogSize)
+          case err        => err.toString
+        })
     }
     tracedIsNew
   }
@@ -444,7 +447,7 @@ class UtxPoolImpl(
 
   @scala.annotation.tailrec
   private def extractErrorMessage(error: ValidationError): String = error match {
-    case see: TxValidationError.ScriptExecutionError        => s"ScriptExecutionError(${see.error})"
+    case see: TxValidationError.ScriptExecutionError        => s"ScriptExecutionError(${see.message})"
     case _: TxValidationError.TransactionNotAllowedByScript => "TransactionNotAllowedByScript"
     case TransactionValidationError(cause, _)               => extractErrorMessage(cause)
     case other                                              => other.toString
@@ -520,12 +523,12 @@ class UtxPoolImpl(
   }
 
   /** DOES NOT verify transactions */
-  def addAndCleanup(transactions: Iterable[Transaction]): Unit = {
+  def addAndScheduleCleanup(transactions: Iterable[Transaction]): Unit = {
     transactions.foreach(addTransaction(_, verify = false))
     TxCleanup.runCleanupAsync()
   }
 
-  def runCleanup(): Unit = {
+  def scheduleCleanup(): Unit = {
     TxCleanup.runCleanupAsync()
   }
 

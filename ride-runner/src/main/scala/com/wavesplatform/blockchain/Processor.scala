@@ -198,7 +198,7 @@ class BlockchainProcessor private (
 
   private def runScript(height: Int, script: RestApiScript): Unit = {
     val start     = System.nanoTime()
-    val refreshed = script.refreshed(settings.enableTraces, settings.evaluateScriptComplexityLimit)
+    val refreshed = script.refreshed(settings.enableTraces, settings.evaluateScriptComplexityLimit, settings.maxTxErrorLogSize)
     val key       = script.key
     storage.put(key, refreshed)
 
@@ -224,8 +224,9 @@ class BlockchainProcessor private (
 
           case _ =>
             Task {
-              val script =
-                RestApiScript(address, blockchainStorage, request).refreshed(settings.enableTraces, settings.evaluateScriptComplexityLimit)
+              val script = RestApiScript(address, blockchainStorage, request)
+                // TODO dup
+                .refreshed(settings.enableTraces, settings.evaluateScriptComplexityLimit, settings.maxTxErrorLogSize)
               storage.putIfAbsent(key, script)
               script.lastResult
             }
@@ -237,7 +238,7 @@ class BlockchainProcessor private (
 object BlockchainProcessor {
   type RequestKey = (Address, JsObject)
 
-  case class Settings(enableTraces: Boolean, evaluateScriptComplexityLimit: Int)
+  case class Settings(enableTraces: Boolean, evaluateScriptComplexityLimit: Int, maxTxErrorLogSize: Int)
 
   def mk(
       settings: Settings,
@@ -270,8 +271,8 @@ object BlockchainProcessor {
 case class RestApiScript(address: Address, blockchain: Blockchain, request: JsObject, lastResult: JsObject) {
   def key: RequestKey = (address, request)
 
-  def refreshed(trace: Boolean, evaluateScriptComplexityLimit: Int): RestApiScript = {
-    val result = UtilsApiRoute.evaluate(evaluateScriptComplexityLimit, blockchain, address, request, trace)
+  def refreshed(trace: Boolean, evaluateScriptComplexityLimit: Int, maxTxErrorLogSize: Int): RestApiScript = {
+    val result = UtilsApiRoute.evaluate(evaluateScriptComplexityLimit, blockchain, address, request, trace, maxTxErrorLogSize)
     copy(lastResult = result)
   }
 }

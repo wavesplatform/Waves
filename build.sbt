@@ -6,10 +6,8 @@
    2. You've checked "Make project before run"
  */
 
-import sbt.Def
+import sbt.{Compile, Def}
 import sbt.Keys.{concurrentRestrictions, _}
-
-import scala.collection.Seq
 
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
@@ -22,6 +20,7 @@ lazy val lang =
       libraryDependencies ++= Dependencies.lang.value ++ Dependencies.test,
       inConfig(Compile)(
         Seq(
+          sourceGenerators += Tasks.docSource,
           PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value,
           PB.protoSources += PB.externalIncludePath.value,
           PB.generate / includeFilter := { (f: File) =>
@@ -42,9 +41,6 @@ lazy val `lang-jvm` = lang.jvm
 
 lazy val `lang-js` = lang.js
   .enablePlugins(VersionObject)
-  .settings(
-    Compile / sourceGenerators += Tasks.docSource
-  )
 
 lazy val `lang-testkit` = project
   .dependsOn(`lang-jvm`)
@@ -56,16 +52,14 @@ lazy val `lang-testkit` = project
 lazy val `lang-tests` = project
   .in(file("lang/tests"))
   .dependsOn(`lang-testkit`)
-  .settings(
-    Compile / sourceGenerators += Tasks.docSource
-  )
 
-lazy val `lang-doc` = project
-  .in(file("lang/doc"))
-  .dependsOn(`lang-jvm`)
+lazy val `lang-tests-js` = project
+  .in(file("lang/tests-js"))
+  .enablePlugins(ScalaJSPlugin)
+  .dependsOn(`lang-js`)
   .settings(
-    Compile / sourceGenerators += Tasks.docSource,
-    libraryDependencies ++= Seq("com.github.spullara.mustache.java" % "compiler" % "0.9.10") ++ Dependencies.test
+    libraryDependencies += Dependencies.scalaJsTest.value,
+    testFrameworks += new TestFramework("utest.runner.Framework")
   )
 
 lazy val node = project.dependsOn(`lang-jvm`, `lang-testkit` % "test")
@@ -116,6 +110,7 @@ lazy val `waves-node` = (project in file("."))
     `lang-js`,
     `lang-jvm`,
     `lang-tests`,
+    `lang-tests-js`,
     `lang-testkit`,
     `repl-js`,
     `repl-jvm`,
@@ -129,7 +124,7 @@ lazy val `waves-node` = (project in file("."))
 
 inScope(Global)(
   Seq(
-    scalaVersion         := "2.13.8",
+    scalaVersion         := "2.13.10",
     organization         := "com.wavesplatform",
     organizationName     := "Waves Platform",
     organizationHomepage := Some(url("https://wavesplatform.com")),
@@ -150,7 +145,6 @@ inScope(Global)(
       "-Wconf:cat=deprecation&site=com.wavesplatform.state.InvokeScriptResult.*:s"
     ),
     crossPaths := false,
-    dependencyOverrides ++= Dependencies.enforcedVersions.value,
     cancelable        := true,
     parallelExecution := true,
     /* http://www.scalatest.org/user_guide/using_the_runner
@@ -185,7 +179,12 @@ git.uncommittedSignifier := Some("DIRTY")
 lazy val packageAll = taskKey[Unit]("Package all artifacts")
 packageAll := {
   (node / assembly).value
+  buildDebPackages.value
+  buildTarballsForDocker.value
+}
 
+lazy val buildTarballsForDocker = taskKey[Unit]("Package node and grpc-server tarballs and copy them to docker/target")
+buildTarballsForDocker := {
   IO.copyFile((node / Universal / packageZipTarball).value, new File(baseDirectory.value, "docker/target/waves.tgz"))
   IO.copyFile((`grpc-server` / Universal / packageZipTarball).value, new File(baseDirectory.value, "docker/target/waves-grpc-server.tgz"))
 }
@@ -195,14 +194,15 @@ checkPRRaw := Def
   .sequential(
     `waves-node` / clean,
     Def.task {
-      (Test / compile).value
       (`lang-tests` / Test / test).value
       (`repl-jvm` / Test / test).value
       (`lang-js` / Compile / fastOptJS).value
+      (`lang-tests-js` / Test / test).value
       (`grpc-server` / Test / test).value
       (node / Test / test).value
       (`repl-js` / Compile / fastOptJS).value
       (`node-it` / Test / compile).value
+      (benchmark / Test / compile).value
     }
   )
   .value

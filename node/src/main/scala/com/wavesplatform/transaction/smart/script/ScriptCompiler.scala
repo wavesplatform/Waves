@@ -29,6 +29,6 @@ object ScriptCompiler {
     API.compile(scriptText, estimator, libraries = libraries, defaultStdLib = defaultStdLib).map {
       case CompileResult.Expression(v, _, complexity, expr, _, isFreeCall) => (ExprScriptImpl(v, isFreeCall, expr), complexity)
       case CompileResult.Library(v, _, complexity, expr)                   => (ExprScriptImpl(v, isFreeCall = false, expr), complexity)
-      case CompileResult.DApp(v, r, _)                                     => (ContractScriptImpl(v, r.dApp), r.verifierComplexity)
+      case CompileResult.DApp(v, r, _, _)                                  => (ContractScriptImpl(v, r.dApp), r.verifierComplexity)
     }
 }

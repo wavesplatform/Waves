@@ -34,11 +34,11 @@ class TestCompiler(version: StdLibVersion) {
     (baseCompilerContext |+|
       WavesContext.build(Global, DirectiveSet(version, Asset, Expression).explicitGet())).compilerContext
 
-  def compile(script: String, allowIllFormedStrings: Boolean = false): Either[String, DApp] =
-    ContractCompiler.compile(script, compilerContext, version, allowIllFormedStrings = allowIllFormedStrings)
+  def compile(script: String, allowIllFormedStrings: Boolean = false, compact: Boolean = false): Either[String, DApp] =
+    ContractCompiler.compile(script, compilerContext, version, allowIllFormedStrings = allowIllFormedStrings, needCompaction = compact)
 
-  def compileContract(script: String, allowIllFormedStrings: Boolean = false): ContractScriptImpl =
-    ContractScript(version, compile(script, allowIllFormedStrings).explicitGet()).explicitGet()
+  def compileContract(script: String, allowIllFormedStrings: Boolean = false, compact: Boolean = false): ContractScriptImpl =
+    ContractScript(version, compile(script, allowIllFormedStrings, compact).explicitGet()).explicitGet()
 
   def compileExpression(script: String, allowIllFormedStrings: Boolean = false, checkSize: Boolean = true): ExprScript =
     ExprScript(
@@ -46,6 +46,15 @@ class TestCompiler(version: StdLibVersion) {
       ExpressionCompiler.compile(script, expressionCompilerContext, allowIllFormedStrings).explicitGet()._1,
       checkSize = checkSize
     ).explicitGet()
+
+  def compileExpressionE(script: String, allowIllFormedStrings: Boolean = false, checkSize: Boolean = true): Either[String, ExprScript] =
+    ExpressionCompiler.compile(script, expressionCompilerContext, allowIllFormedStrings).map( s =>
+      ExprScript(
+        version,
+        s._1,
+        checkSize = checkSize
+      ).explicitGet()
+    )
 
   def compileAsset(script: String): Script =
     ExprScript(version, ExpressionCompiler.compile(script, assetCompilerContext).explicitGet()._1).explicitGet()
@@ -59,7 +68,10 @@ class TestCompiler(version: StdLibVersion) {
 object TestCompiler {
   private val compilerByVersion = mutable.HashMap.empty[StdLibVersion, TestCompiler]
   def apply(version: StdLibVersion): TestCompiler =
-    compilerByVersion.getOrElse(version, compilerByVersion.synchronized {
-      compilerByVersion.getOrElseUpdate(version, new TestCompiler(version))
-    })
+    compilerByVersion.getOrElse(
+      version,
+      compilerByVersion.synchronized {
+        compilerByVersion.getOrElseUpdate(version, new TestCompiler(version))
+      }
+    )
 }

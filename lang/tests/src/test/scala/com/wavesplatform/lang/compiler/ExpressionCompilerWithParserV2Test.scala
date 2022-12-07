@@ -1,13 +1,14 @@
 package com.wavesplatform.lang.compiler
 
+import cats.implicits.toBifunctorOps
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.{Directive, DirectiveParser}
 import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
-import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.parser.Expressions
+import com.wavesplatform.lang.v1.parser.Expressions.*
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
-import com.wavesplatform.lang.v1.parser.Expressions._
 import com.wavesplatform.test.PropSpec
 
 class ExpressionCompilerWithParserV2Test extends PropSpec {
@@ -18,7 +19,7 @@ class ExpressionCompilerWithParserV2Test extends PropSpec {
       directives <- DirectiveParser(script)
       ds         <- Directive.extractDirectives(directives)
       ctx = utils.compilerContext(ds)
-      compResult <- ExpressionCompiler.compileWithParseResult(script, ctx, saveExprContext)
+      compResult <- ExpressionCompiler.compileWithParseResult(script, ctx, saveExprContext).leftMap(_._1)
     } yield compResult
 
     result.map(_._2.expr)
@@ -26,19 +27,19 @@ class ExpressionCompilerWithParserV2Test extends PropSpec {
 
   property("simple test") {
     val script = """
-      |{-# STDLIB_VERSION 3 #-}
-      |{-# CONTENT_TYPE EXPRESSION #-}
-      |{-# SCRIPT_TYPE ACCOUNT #-}
-      |
-      |let foo = 1234567
-      |let bar = 987654
-      |
-      |if (foo + bar > 123456) then
-      |   true
-      |else
-      |   false
-      |
-      |""".stripMargin
+                   |{-# STDLIB_VERSION 3 #-}
+                   |{-# CONTENT_TYPE EXPRESSION #-}
+                   |{-# SCRIPT_TYPE ACCOUNT #-}
+                   |
+                   |let foo = 1234567
+                   |let bar = 987654
+                   |
+                   |if (foo + bar > 123456) then
+                   |   true
+                   |else
+                   |   false
+                   |
+                 """.stripMargin
 
     val result = compile(script)
 
@@ -59,13 +60,13 @@ class ExpressionCompilerWithParserV2Test extends PropSpec {
                 FUNCTION_CALL(
                   AnyPos,
                   PART.VALID(AnyPos, "+"),
-                  List(REF(AnyPos, PART.VALID(AnyPos, "foo"), None, None), REF(AnyPos, PART.VALID(AnyPos, "bar"), None, None)),
-                  None,
+                  List(REF(AnyPos, PART.VALID(AnyPos, "foo"), Some(LONG), None), REF(AnyPos, PART.VALID(AnyPos, "bar"), Some(LONG), None)),
+                  Some(LONG),
                   None
                 ),
                 CONST_LONG(AnyPos, 123456, None)
               ),
-              None,
+              Some(BOOLEAN),
               None
             ),
             TRUE(AnyPos, None),

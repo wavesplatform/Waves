@@ -1,16 +1,9 @@
 package com.wavesplatform.api.http.utils
-
 import akka.http.scaladsl.server.{PathMatcher1, Route}
 import cats.syntax.either.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.*
-import com.wavesplatform.api.http.ApiError.{
-  ConflictedRequestStructure,
-  CustomValidationError,
-  InvalidMessage,
-  ScriptCompilerError,
-  TooBigArrayAllocation
-}
+import com.wavesplatform.api.http.ApiError.{ConflictingRequestStructure, CustomValidationError, ScriptCompilerError, TooBigArrayAllocation, WrongJson}
 import com.wavesplatform.api.http.requests.{ScriptWithImportsRequest, byteStrFormat}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
@@ -21,15 +14,14 @@ import com.wavesplatform.lang.directives.values.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.ContractLimits
-import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.lang.{API, CompileResult}
 import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
 import com.wavesplatform.state.diffs.FeeValidation
-import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError}
+import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
+import com.wavesplatform.transaction.TxValidationError.{GenericError, InvokeRejectError}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.TraceStep
 import com.wavesplatform.utils.Time
@@ -41,6 +33,7 @@ import java.security.SecureRandom
 case class UtilsApiRoute(
     timeService: Time,
     settings: RestAPISettings,
+    maxTxErrorLogSize: Int,
     estimator: () => ScriptEstimator,
     limitedScheduler: Scheduler,
     blockchain: Blockchain
@@ -262,7 +255,7 @@ case class UtilsApiRoute(
 
   def evaluate: Route =
     (path("script" / "evaluate" / ScriptedAddress) & jsonPostD[JsObject] & parameter("trace".as[Boolean] ? false)) { (address, request, trace) =>
-      val apiResult = UtilsApiRoute.evaluate(settings.evaluateScriptComplexityLimit, blockchain, address, request, trace)
+      val apiResult = UtilsApiRoute.evaluate(settings.evaluateScriptComplexityLimit, blockchain, address, request, trace, maxTxErrorLogSize)
       complete(apiResult ++ request ++ Json.obj("address" -> address.toString))
     }
 
@@ -281,32 +274,33 @@ object UtilsApiRoute {
       blockchain: Blockchain,
       address: Address,
       request: JsObject,
-      trace: Boolean
+      trace: Boolean,
+      maxTxErrorLogSize: Int
   ): JsObject =
-    evaluate(evaluateScriptComplexityLimit, _ => blockchain, blockchain.accountScript(_).get, address, request, trace)
+    evaluate(evaluateScriptComplexityLimit, blockchain, blockchain.accountScript(_).get, address, request, trace, maxTxErrorLogSize)
 
   def evaluate(
       evaluateScriptComplexityLimit: Int,
-      blockchain: Terms.EXPR => Blockchain, // TODO this looks bad!
+      blockchain: Blockchain,
       getAccountScript: Address => AccountScriptInfo,
       address: Address,
       request: JsObject,
-      trace: Boolean
+      trace: Boolean,
+      maxTxErrorLogSize: Int
   ): JsObject = {
     val scriptInfo = getAccountScript(address)
     val pk         = scriptInfo.publicKey
     val script     = scriptInfo.script
 
     val simpleExpr = request.value.get("expr").map(parseCall(_, script.stdLibVersion))
-
     val exprFromInvocation =
       request
         .asOpt[UtilsInvocationRequest]
         .map(_.toInvocation.flatMap(UtilsEvaluator.toExpr(script, _)))
 
     val exprE = (simpleExpr, exprFromInvocation) match {
-      case (Some(_), Some(_)) if request.fields.size > 1 => Left(ConflictedRequestStructure.json)
-      case (None, None)                                  => Left(InvalidMessage.json)
+      case (Some(_), Some(_)) if request.fields.size > 1 => Left(ConflictingRequestStructure.json)
+      case (None, None)                                  => Left(WrongJson().json)
       case (Some(expr), _)                               => Right(expr)
       case (None, Some(expr))                            => Right(expr)
     }
@@ -314,21 +308,21 @@ object UtilsApiRoute {
     val apiResult = exprE.flatMap { exprE =>
       val evaluated = for {
         expr                      <- exprE
-        (result, complexity, log) <- UtilsEvaluator.executeExpression(blockchain(expr), script, address, pk, evaluateScriptComplexityLimit)(expr)
+        (result, complexity, log) <- UtilsEvaluator.executeExpression(blockchain, script, address, pk, evaluateScriptComplexityLimit)(expr)
       } yield Json.obj(
         "result"     -> ScriptValuesJson.serializeValue(result),
         "complexity" -> complexity
       ) ++ (if (trace) Json.obj(TraceStep.logJson(log)) else Json.obj())
       evaluated.leftMap {
-        case e: ScriptExecutionError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.error)
-        case e                       => ApiError.fromValidationError(e).json
+        case e: InvokeRejectError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.toStringWithLog(maxTxErrorLogSize))
+        case e                    => ApiError.fromValidationError(e).json
       }
     }.merge
 
     apiResult
   }
 
-  private def parseCall(js: JsReadable, version: StdLibVersion): Either[GenericError, Terms.EXPR] = {
+  private def parseCall(js: JsReadable, version: StdLibVersion) = {
     val binaryCall = js
       .asOpt[ByteStr]
       .toRight(GenericError("Unable to parse expr bytes"))

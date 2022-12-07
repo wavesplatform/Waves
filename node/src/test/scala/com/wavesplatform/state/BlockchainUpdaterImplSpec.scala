@@ -5,13 +5,14 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.TestHelpers.enableNG
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
+import com.wavesplatform.block.Block.PlainBlockVersion
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.loadActiveLeases
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{DBCacheSettings, WithDomain}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
-import com.wavesplatform.history.{chainBaseAndMicro, randomSig}
+import com.wavesplatform.history.{Domain, chainBaseAndMicro, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
@@ -109,7 +110,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
           (triggersMock.onProcessBlock _)
             .expects(where { (block, diff, _, bc) =>
               val txDiff = diff.transactionDiffs.head
-              val tx     = txDiff.transactions.head._2.transaction.asInstanceOf[TransferTransaction]
+              val tx     = txDiff.transactions.head.transaction.asInstanceOf[TransferTransaction]
 
               bc.height == 1 &&
               block.transactionData.length == 5 &&
@@ -313,9 +314,9 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
           loadActiveLeases(db, _, _)
         )
 
-        val block = TestBlock.create(Seq(genesis(defaultAddress)))
-        blockchain.processBlock(block)
-        blockchain.processBlock(TestBlock.create(block.header.timestamp, block.id(), Seq(transfer())))
+        val d = Domain(db, blockchain, levelDb, RideV6)
+        blockchain.processBlock(d.createBlock(PlainBlockVersion, Seq(genesis(defaultAddress)), generator = TestBlock.defaultSigner))
+        blockchain.processBlock(d.createBlock(PlainBlockVersion, Seq(transfer()), generator = TestBlock.defaultSigner))
 
         ps.onComplete()
         Await.result(items, 2.seconds) shouldBe Seq(

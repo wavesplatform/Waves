@@ -243,7 +243,7 @@ class ExpressionCompilerV1Test extends PropSpec {
         |   case t1: (Int, String)              => t1._2
         |   case t2: (Boolean, Int, ByteVector) => t2._1
         | }
-        |
+        | true
       """.stripMargin
     val expr2 = Parser.parseExpr(script2).get.value
     ExpressionCompiler(compilerContextV4, expr2) should produce(
