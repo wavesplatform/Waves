@@ -7,7 +7,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.blockchain.BlockchainProcessor.RequestKey
-import com.wavesplatform.blockchain.Processor.RunResult
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
 import com.wavesplatform.events.WrappedEvent
@@ -31,6 +30,7 @@ import java.util.concurrent.*
 import scala.concurrent.duration.{Duration, DurationInt}
 import scala.concurrent.{Await, Promise}
 import scala.util.Failure
+import scala.util.control.NoStackTrace
 
 object RideWithBlockchainUpdatesService extends ScorexLogging {
   def main(args: Array[String]): Unit = {
@@ -92,6 +92,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
       val blockchainUpdates = use(blockchainApi.mkBlockchainUpdatesStream())
       val toExecute         = ConcurrentSubject[FullRequest](MulticastStrategy.publish)(monixScheduler)
 
+      val maxRequestBufferSize = 1000 // TODO #10 settings
       val xs: List[Observable[WrappedEvent[Either[Seq[FullRequest], SubscribeEvent]]]] = List(
         blockchainUpdates.stream.map(_.map(_.asRight[Seq[FullRequest]])),
         // TODO #10 add a buffer and cancel new requests due to overflow
@@ -105,13 +106,27 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
               case _ => Observable(x)
             }
           }
-//          .whileBusyBuffer(OverflowStrategy.DropNewAndSignal(100))
+          // Like .whileBusyBuffer(OverflowStrategy.DropNew(maxRequestBufferSize)), but has an access to the event
+          .whileBusyAggregateEvents(Vector(_)) {
+            case (buffer, curr) =>
+              if (buffer.size < maxRequestBufferSize) buffer.appended(curr)
+              else {
+                curr.result.failure(ServerUnderLoadException)
+                buffer
+              }
+          }
+          .flatMapIterable(identity)
+          // Buffering to limit a parallel execution of new scripts, otherwise the service can stuck and don't process blockchain events.
+          // Execution of scripts is blocking, because Ride must know a returned value of a blockchain function to run further.
+          // Also we can't run scripts outside this stream, because imagine:
+          // 1. We receive a request
+          // 2.
           .bufferTimedAndCounted(50.millis, 5) // TODO #10 settings
           .map(x => WrappedEvent.Next(x.asLeft[SubscribeEvent]))
       )
 
       // TODO #33 Move wrapped events from here: processing of Closed and Failed should be moved to blockchainUpdates.stream
-      val events = Observable(xs*).merge
+      val events = blockchainUpdates.stream
         .doOnError(e => Task { log.error("Error!", e) })
         .takeWhile {
           case WrappedEvent.Next(_) => true
@@ -211,3 +226,4 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
 }
 
 case class FullRequest(address: Address, request: JsObject, result: Promise[JsObject])
+object ServerUnderLoadException extends RuntimeException("The server under the load, try later or contact the administrator") with NoStackTrace
