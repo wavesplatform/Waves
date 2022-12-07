@@ -2,10 +2,10 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.HttpRequest
 import com.wavesplatform.account.Address
+import com.wavesplatform.api.http.RouteTimeout
 import com.wavesplatform.blockchain.EmptyProcessor
 import com.wavesplatform.utils.Schedulers
 import com.wavesplatform.wallet.Wallet
-import io.netty.util.HashedWheelTimer
 import monix.eval.Task
 import play.api.libs.json.*
 
@@ -37,13 +37,8 @@ class EvaluateApiRouteTestSuite extends RouteSpec("/utils") with RestAPISettings
       }
 
       val api = EvaluateApiRoute(
-        Schedulers.timeBoundedFixedPool(
-          new HashedWheelTimer(),
-          5.seconds,
-          1,
-          "rest-time-limited"
-        ),
-        processor
+        new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler")),
+        processor.getCachedResultOrRun
       )
       val route = seal(api.route)
 

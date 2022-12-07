@@ -2,15 +2,12 @@ package com.wavesplatform.ride.app
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import cats.syntax.either.*
 import com.google.common.util.concurrent.ThreadFactoryBuilder
-import com.wavesplatform.account.Address
-import com.wavesplatform.api.http.CompositeHttpService
+import com.wavesplatform.api.http.{CompositeHttpService, RouteTimeout}
 import com.wavesplatform.blockchain.BlockchainProcessor.RequestKey
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
 import com.wavesplatform.events.WrappedEvent
-import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.grpc.{DefaultBlockchainApi, GrpcConnector}
 import com.wavesplatform.http.EvaluateApiRoute
 import com.wavesplatform.resources.*
@@ -20,17 +17,13 @@ import com.wavesplatform.utils.ScorexLogging
 import io.netty.util.concurrent.DefaultThreadFactory
 import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
-import monix.reactive.subjects.ConcurrentSubject
-import monix.reactive.{MulticastStrategy, Observable, OverflowStrategy}
-import play.api.libs.json.JsObject
 import sttp.client3.HttpURLConnectionBackend
 
 import java.io.File
 import java.util.concurrent.*
-import scala.concurrent.duration.{Duration, DurationInt}
-import scala.concurrent.{Await, Promise}
+import scala.concurrent.Await
+import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
 import scala.util.Failure
-import scala.util.control.NoStackTrace
 
 object RideWithBlockchainUpdatesService extends ScorexLogging {
   def main(args: Array[String]): Unit = {
@@ -90,41 +83,6 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
       val endHeight       = workingHeight + 1
 
       val blockchainUpdates = use(blockchainApi.mkBlockchainUpdatesStream())
-      val toExecute         = ConcurrentSubject[FullRequest](MulticastStrategy.publish)(monixScheduler)
-
-      val maxRequestBufferSize = 1000 // TODO #10 settings
-      val xs: List[Observable[WrappedEvent[Either[Seq[FullRequest], SubscribeEvent]]]] = List(
-        blockchainUpdates.stream.map(_.map(_.asRight[Seq[FullRequest]])),
-        // TODO #10 add a buffer and cancel new requests due to overflow
-        toExecute
-          .flatMap { x =>
-            processor.getCachedResultOrRun(x.address, x.request) match {
-              case RunResult.Cached(r) =>
-                x.result.success(r)
-                Observable.empty
-
-              case _ => Observable(x)
-            }
-          }
-          // Like .whileBusyBuffer(OverflowStrategy.DropNew(maxRequestBufferSize)), but has an access to the event
-          .whileBusyAggregateEvents(Vector(_)) {
-            case (buffer, curr) =>
-              if (buffer.size < maxRequestBufferSize) buffer.appended(curr)
-              else {
-                curr.result.failure(ServerUnderLoadException)
-                buffer
-              }
-          }
-          .flatMapIterable(identity)
-          // Buffering to limit a parallel execution of new scripts, otherwise the service can stuck and don't process blockchain events.
-          // Execution of scripts is blocking, because Ride must know a returned value of a blockchain function to run further.
-          // Also we can't run scripts outside this stream, because imagine:
-          // 1. We receive a request
-          // 2.
-          .bufferTimedAndCounted(50.millis, 5) // TODO #10 settings
-          .map(x => WrappedEvent.Next(x.asLeft[SubscribeEvent]))
-      )
-
       // TODO #33 Move wrapped events from here: processing of Closed and Failed should be moved to blockchainUpdates.stream
       val events = blockchainUpdates.stream
         .doOnError(e => Task { log.error("Error!", e) })
@@ -138,27 +96,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
             false
         }
         .collect { case WrappedEvent.Next(event) => event }
-        .scanEval0F(Task.now(BlockchainState.Starting(workingHeight): BlockchainState)) { case (r, curr) =>
-          curr match {
-            case Right(curr) => Task.now(BlockchainState(processor, r, curr))
-            case Left(xs) =>
-              Task
-                .parSequenceUnordered {
-                  xs.map { x =>
-                    processor.getCachedResultOrRun(x.address, x.request) match {
-                      case RunResult.Cached(r) => Task.now(x.result.success(r))
-                      case RunResult.NotProcessed(task) =>
-                        task
-                          .foreachL(x.result.success)
-                          .doOnFinish(r => Task.now(r.foreach(x.result.failure)))
-                          .doOnCancel(Task(x.result.tryFailure(new CancellationException("Task was cancelled"))))
-                    }
-                  }
-                }
-                .map(_ => r)
-          }
-        }
-        .lastL
+        .foldLeftL(BlockchainState.Starting(lastHeightAtStart): BlockchainState)(BlockchainState(processor, _, _))
         .runToFuture(monixScheduler)
 
       log.info(s"Watching blockchain updates...")
@@ -194,14 +132,14 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
         resource.awaitTermination(5.seconds)
       }
 
+      val routeTimeout = new RouteTimeout(
+        FiniteDuration(globalConfig.getDuration("akka.http.server.request-timeout").getSeconds, TimeUnit.SECONDS)
+      )(heavyRequestScheduler)
+
       val apiRoutes = Seq(
         EvaluateApiRoute(
-          heavyRequestScheduler,
-          { (address, request) =>
-            val result = Promise[JsObject]()
-            toExecute.onNext(FullRequest(address, request, result))
-            result.future
-          }
+          routeTimeout,
+          { (address, request) => processor.getCachedResultOrRun(address, request) }
         )
       )
 
@@ -224,6 +162,3 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     }
   }
 }
-
-case class FullRequest(address: Address, request: JsObject, result: Promise[JsObject])
-object ServerUnderLoadException extends RuntimeException("The server under the load, try later or contact the administrator") with NoStackTrace

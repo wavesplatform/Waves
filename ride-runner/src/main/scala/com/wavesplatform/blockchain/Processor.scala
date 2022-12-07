@@ -6,7 +6,6 @@ import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.api.http.ApiException
 import com.wavesplatform.api.http.utils.UtilsApiRoute
 import com.wavesplatform.blockchain.BlockchainProcessor.{ProcessResult, RequestKey, Settings}
-import com.wavesplatform.blockchain.Processor.RunResult
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
@@ -40,15 +39,7 @@ trait Processor {
 
   def runScripts(forceAll: Boolean = false): Unit
 
-  def getCachedResultOrRun(address: Address, request: JsObject): RunResult
-}
-
-object Processor {
-  sealed trait RunResult extends Product with Serializable
-  object RunResult {
-    case class Cached(result: JsObject)             extends RunResult
-    case class NotProcessed(result: Task[JsObject]) extends RunResult
-  }
+  def getCachedResultOrRun(address: Address, request: JsObject): Task[JsObject]
 }
 
 class BlockchainProcessor private (
@@ -181,7 +172,7 @@ class BlockchainProcessor private (
     val xs =
       if (forceAll) storage.values
       else if (accumulatedChanges.affectedScripts.isEmpty) {
-        log.debug(s"[$height] Not updated");
+        log.debug(s"[$height] Not updated")
         Nil
       } else accumulatedChanges.affectedScripts.flatMap(storage.get)
 
@@ -195,7 +186,10 @@ class BlockchainProcessor private (
       .runToFuture(scheduler)
 
     Await.result(r, Duration.Inf)
-    accumulatedChanges = ProcessResult()
+
+    // Don't clean all affected scripts, because not all scripts could be added to the storage on the moment of runScripts.
+    // See getCachedResultOrRun: it takes some time to run a script and later add it to the storage.
+    accumulatedChanges = ProcessResult(affectedScripts = accumulatedChanges.affectedScripts -- xs.map(_.key))
   }
 
   override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] = blockchainStorage.blockHeaders.getLocal(height).map(_.id() == id)
@@ -218,24 +212,23 @@ class BlockchainProcessor private (
     }
   }
 
-  override def getCachedResultOrRun(address: Address, request: JsObject): RunResult = {
+  override def getCachedResultOrRun(address: Address, request: JsObject): Task[JsObject] = {
     val key = (address, request)
     storage.get(key) match {
-      case Some(r) => RunResult.Cached(r.lastResult)
+      case Some(r) => Task.now(r.lastResult)
       case None =>
-        RunResult.NotProcessed {
-          Task(blockchainStorage.accountScripts.getUntagged(blockchainStorage.height, address)).flatMap {
-            case None =>
-              // TODO #19 Change/move an error to an appropriate layer
-              Task.raiseError(ApiException(CustomValidationError(s"Address $address is not dApp")))
+        Task(blockchainStorage.accountScripts.getUntagged(blockchainStorage.height, address)).flatMap {
+          case None =>
+            // TODO #19 Change/move an error to an appropriate layer
+            Task.raiseError(ApiException(CustomValidationError(s"Address $address is not dApp")))
 
-            case _ =>
-              Task {
-                val script = RestApiScript(address, blockchainStorage, request).refreshed(settings.enableTraces, settings.evaluateScriptComplexityLimit)
-                storage.putIfAbsent(key, script)
-                script.lastResult
-              }
-          }
+          case _ =>
+            Task {
+              val script =
+                RestApiScript(address, blockchainStorage, request).refreshed(settings.enableTraces, settings.evaluateScriptComplexityLimit)
+              storage.putIfAbsent(key, script)
+              script.lastResult
+            }
         }
     }
   }
