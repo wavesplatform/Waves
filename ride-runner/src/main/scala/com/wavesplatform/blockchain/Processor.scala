@@ -232,7 +232,7 @@ class BlockchainProcessor private (
             case _ =>
               Task {
                 val script = RestApiScript(address, blockchainStorage, request).refreshed(settings.enableTraces, settings.evaluateScriptComplexityLimit)
-                storage.putIfAbsent(key, script) // TODO #10 Could be in another thread (if it is not)
+                storage.putIfAbsent(key, script)
                 script.lastResult
               }
           }

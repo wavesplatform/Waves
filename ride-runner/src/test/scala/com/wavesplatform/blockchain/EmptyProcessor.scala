@@ -11,7 +11,8 @@ import play.api.libs.json.JsObject
 class EmptyProcessor extends Processor {
   override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] = None
 
-  override def getCachedResultOrRun(address: Address, request: JsObject): Task[JsObject] = Task.raiseError(new RuntimeException("Test"))
+  override def getCachedResultOrRun(address: Address, request: JsObject): Processor.RunResult =
+    Processor.RunResult.NotProcessed(Task.raiseError(new RuntimeException("Test")))
 
   override def removeFrom(height: Height): Unit = {
     actions = actions.appended(RemoveFrom(height))

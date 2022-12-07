@@ -22,7 +22,7 @@ import io.netty.util.concurrent.DefaultThreadFactory
 import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
 import monix.reactive.subjects.ConcurrentSubject
-import monix.reactive.{MulticastStrategy, Observable}
+import monix.reactive.{MulticastStrategy, Observable, OverflowStrategy}
 import play.api.libs.json.JsObject
 import sttp.client3.HttpURLConnectionBackend
 
@@ -105,7 +105,8 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
               case _ => Observable(x)
             }
           }
-          .bufferTimedAndCounted(50.millis, 5)
+//          .whileBusyBuffer(OverflowStrategy.DropNewAndSignal(100))
+          .bufferTimedAndCounted(50.millis, 5) // TODO #10 settings
           .map(x => WrappedEvent.Next(x.asLeft[SubscribeEvent]))
       )
 

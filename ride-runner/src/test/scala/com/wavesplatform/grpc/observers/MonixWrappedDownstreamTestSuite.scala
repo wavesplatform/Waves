@@ -27,6 +27,7 @@ class MonixWrappedDownstreamTestSuite extends BaseTestSuite with HasGrpc with Sc
         val blockchainApi = new DefaultBlockchainApi(
           DefaultBlockchainApi.Settings(
             "",
+            DefaultBlockchainApi.GrpcApiSettings(None),
             DefaultBlockchainApi.BlockchainUpdatesSettings(100.millis, 2)
           ),
           EmptyChannel,

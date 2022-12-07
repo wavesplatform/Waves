@@ -44,7 +44,7 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
           else
             RemoteData
               .loaded(getFromBlockchain(key))
-              .tap(r => persistentCache.set(height, key, r))
+              .tap(r => persistentCache.set(height, key, r)) // TODO #36 This could be updated in a different thread
         }
       )
       .mayBeValue
@@ -65,6 +65,7 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
         log.debug(s"Update $name($key)")
 
         val updated = RemoteData.loaded(update)
+        // TODO #36 This could be updated in a different thread
         persistentCache.set(height, key, updated) // Write here (not in "else"), because we want to preserve the height
 
         if (updated == orig) AppendResult.ignored
@@ -91,7 +92,7 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
               case None => RollbackResult.uncertain(mkDataKey(key), tags) // will be updated later
               case Some(after) =>
                 val restored = RemoteData.Cached(after)
-                persistentCache.set(rollbackHeight, key, restored)
+                persistentCache.set(rollbackHeight, key, restored) // TODO #36 This could be updated in a different thread
                 values.put(key, restored)
                 RollbackResult.rolledBack(tags)
             }
