@@ -183,10 +183,11 @@ packageAll := {
   buildTarballsForDocker.value
 }
 
-lazy val buildTarballsForDocker = taskKey[Unit]("Package node and grpc-server tarballs and copy them to docker/target")
+lazy val buildTarballsForDocker = taskKey[Unit]("Package node, grpc-server and ride-runner tarballs and copy them to docker/target")
 buildTarballsForDocker := {
   IO.copyFile((node / Universal / packageZipTarball).value, new File(baseDirectory.value, "docker/target/waves.tgz"))
   IO.copyFile((`grpc-server` / Universal / packageZipTarball).value, new File(baseDirectory.value, "docker/target/waves-grpc-server.tgz"))
+  IO.copyFile((`ride-runner` / Universal / packageZipTarball).value, new File(baseDirectory.value, "docker/target/ride-runner.tgz"))
 }
 
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")

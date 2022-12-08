@@ -1,13 +1,13 @@
 package com.wavesplatform.grpc
 
-import com.wavesplatform.grpc.GrpcClientSettings.ChannelOptionsSettings
+import com.wavesplatform.grpc.GrpcChannelSettings.ChannelOptionsSettings
 import io.grpc.netty.{InternalNettyChannelBuilder, NettyChannelBuilder}
 import io.netty.channel.ChannelOption
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.chaining.*
 
-final case class GrpcClientSettings(
+final case class GrpcChannelSettings(
     target: String,
     maxHedgedAttempts: Int,
     maxRetryAttempts: Int,
@@ -37,6 +37,6 @@ final case class GrpcClientSettings(
 
 }
 
-object GrpcClientSettings {
+object GrpcChannelSettings {
   final case class ChannelOptionsSettings(connectTimeout: FiniteDuration)
 }

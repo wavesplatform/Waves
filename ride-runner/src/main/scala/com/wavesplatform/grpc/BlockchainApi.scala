@@ -10,10 +10,11 @@ import com.wavesplatform.grpc.BlockchainApi.*
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.{AssetDescription, DataEntry, Height}
 import com.wavesplatform.transaction.Asset
+import monix.execution.Scheduler
 import monix.reactive.Observable
 
 trait BlockchainApi {
-  def mkBlockchainUpdatesStream(): BlockchainUpdatesStream
+  def mkBlockchainUpdatesStream(scheduler: Scheduler): BlockchainUpdatesStream
   def getCurrentBlockchainHeight(): Int
   def getActivatedFeatures(height: Int): Map[Short, Int]
   def getAccountDataEntries(address: Address): Seq[DataEntry[?]]

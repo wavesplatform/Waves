@@ -45,7 +45,7 @@ trait Processor {
 class BlockchainProcessor private (
     settings: Settings,
     blockchainStorage: SharedBlockchainData[RequestKey],
-    scheduler: Scheduler,
+    runScriptsScheduler: Scheduler,
     private val storage: TrieMap[RequestKey, RestApiScript]
 ) extends Processor
     with ScorexLogging {
@@ -183,7 +183,7 @@ class BlockchainProcessor private (
             Task(log.error(s"An error during running ${s.key}", e))
           }
       }
-      .runToFuture(scheduler)
+      .runToFuture(runScriptsScheduler)
 
     Await.result(r, Duration.Inf)
 

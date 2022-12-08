@@ -56,22 +56,21 @@ class DefaultBlockchainApi(
     settings: Settings,
     grpcApiChannel: Channel,
     blockchainUpdatesApiChannel: Channel,
-    httpBackend: SttpBackend[Identity, Any],
-    scheduler: Scheduler
+    httpBackend: SttpBackend[Identity, Any]
 ) extends ScorexLogging
     with BlockchainApi {
 
   private val grpcApiCalls = MayBeSemaphore(settings.grpcApi.maxConcurrentRequests)
 
-  override def mkBlockchainUpdatesStream(): BlockchainUpdatesStream = {
+  override def mkBlockchainUpdatesStream(scheduler: Scheduler): BlockchainUpdatesStream = {
     val s = ConcurrentSubject[WrappedEvent[SubscribeEvent]](MulticastStrategy.publish)(scheduler)
 
     new BlockchainUpdatesStream {
       private val currentObserver = new AtomicReference(new ManualGrpcObserver[SubscribeRequest, SubscribeEvent])
       override val stream = s
         .doOnNextAck((_, _) => Task(currentObserver.get().requestNext()))
-        .timeoutOnSlowUpstream(settings.blockchainUpdates.noDataTimeout) // TODO #33
-        .asyncBoundary(OverflowStrategy.BackPressure(settings.blockchainUpdates.bufferSize))
+        .timeoutOnSlowUpstream(settings.blockchainUpdatesApi.noDataTimeout) // TODO #33
+        .asyncBoundary(OverflowStrategy.BackPressure(settings.blockchainUpdatesApi.bufferSize))
 
       override def start(fromHeight: Int): Unit = start(fromHeight, toHeight = 0)
 
@@ -339,9 +338,9 @@ class DefaultBlockchainApi(
 }
 
 object DefaultBlockchainApi {
-  case class Settings(nodeApiBaseUri: String, grpcApi: GrpcApiSettings, blockchainUpdates: BlockchainUpdatesSettings)
+  case class Settings(nodeApiBaseUri: String, grpcApi: GrpcApiSettings, blockchainUpdatesApi: BlockchainUpdatesApiSettings)
   case class GrpcApiSettings(maxConcurrentRequests: Option[Int])
-  case class BlockchainUpdatesSettings(noDataTimeout: FiniteDuration, bufferSize: Int)
+  case class BlockchainUpdatesApiSettings(noDataTimeout: FiniteDuration, bufferSize: Int)
 
   private case class HttpBlockHeader(VRF: Option[ByteStr] = None)
 

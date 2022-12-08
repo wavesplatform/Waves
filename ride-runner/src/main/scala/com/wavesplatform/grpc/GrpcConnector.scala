@@ -13,7 +13,7 @@ class GrpcConnector(settings: Settings) extends AutoCloseable with ScorexLogging
     new ThreadFactoryBuilder().setNameFormat("waves-grpc-%d").setDaemon(false).build()
   )
 
-  def mkChannel(grpcClientSettings: GrpcClientSettings): ManagedChannel = {
+  def mkChannel(grpcClientSettings: GrpcChannelSettings): ManagedChannel = {
     log.info(s"Creating a channel to ${grpcClientSettings.target}")
     grpcClientSettings.toNettyChannelBuilder
       .executor(executor)

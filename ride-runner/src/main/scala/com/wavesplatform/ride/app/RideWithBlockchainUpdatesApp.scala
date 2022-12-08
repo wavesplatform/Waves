@@ -38,10 +38,10 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
       val connector = use(new GrpcConnector(settings.rideRunner.grpcConnector))
 
       log.info("Making gRPC channel to gRPC API...")
-      val grpcApiChannel = use(connector.mkChannel(settings.rideRunner.grpcApi))
+      val grpcApiChannel = use(connector.mkChannel(settings.rideRunner.grpcApiChannel))
 
       log.info("Making gRPC channel to Blockchain Updates API...")
-      val blockchainUpdatesApiChannel = use(connector.mkChannel(settings.rideRunner.blockchainUpdatesApi))
+      val blockchainUpdatesApiChannel = use(connector.mkChannel(settings.rideRunner.blockchainUpdatesApiChannel))
 
       val commonScheduler = use(
         Executors.newScheduledThreadPool(
@@ -61,8 +61,7 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
         settings = settings.rideRunner.blockchainApi,
         grpcApiChannel = grpcApiChannel,
         blockchainUpdatesApiChannel = blockchainUpdatesApiChannel,
-        httpBackend = httpBackend,
-        scheduler = monixScheduler
+        httpBackend = httpBackend
       )
 
       val db                = use(openDB(s"$basePath/db"))
@@ -91,7 +90,7 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
       //      val lastKnownHeight = Height(2327973)
       //      val endHeight   = Height(lastKnownHeight + 1)
 
-      val blockchainUpdates = use(blockchainApi.mkBlockchainUpdatesStream())
+      val blockchainUpdates = use(blockchainApi.mkBlockchainUpdatesStream(monixScheduler))
       val events = blockchainUpdates.stream
         .asyncBoundary(OverflowStrategy.BackPressure(4))
         .doOnError(e => Task { log.error("Error!", e) })

@@ -2,7 +2,7 @@ package com.wavesplatform.ride.app
 
 import com.typesafe.config.Config
 import com.wavesplatform.blockchain.BlockchainProcessor
-import com.wavesplatform.grpc.{DefaultBlockchainApi, GrpcClientSettings, GrpcConnector}
+import com.wavesplatform.grpc.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.settings.*
 import net.ceedubs.ficus.Ficus.*
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
@@ -21,6 +21,6 @@ case class RideRunnerSettings(
     processor: BlockchainProcessor.Settings,
     blockchainApi: DefaultBlockchainApi.Settings,
     grpcConnector: GrpcConnector.Settings,
-    grpcApi: GrpcClientSettings,
-    blockchainUpdatesApi: GrpcClientSettings
+    grpcApiChannel: GrpcChannelSettings,
+    blockchainUpdatesApiChannel: GrpcChannelSettings
 )

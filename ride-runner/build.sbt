@@ -1,17 +1,51 @@
-libraryDependencies ++= Seq(
-  "com.thesamet.scalapb"         %% "scalapb-json4s"                % "0.11.1",
-  // https://github.com/netty/netty/wiki/Native-transports
-  "io.netty"                      % "netty-transport-native-epoll"  % "4.1.79.Final" classifier "linux-x86_64",
-  "com.github.ben-manes.caffeine" % "caffeine"                      % "3.1.2",
-  Dependencies.sttp3,
-  Dependencies.sttp3Monix,
-  Dependencies.leveldbJava().exclude("com.google.guava", "guava") % Test,
-  Dependencies.akkaHttpModule("akka-http-testkit")                % Test
-) ++ Dependencies.logDeps ++ Dependencies.test
+name := "ride-runner"
+description := "Allows to execute RIDE code independently from Waves NODE"
 
+mainClass := Some("com.wavesplatform.ride.app.RideWithBlockchainUpdatesService")
+//discoveredMainClasses := (Compile / mainClass).value.toSeq
 run / fork := true
 
 enablePlugins(
   JavaServerAppPackaging,
-  UniversalDeployPlugin
+  UniversalDeployPlugin,
+  GitVersioning,
+  JavaAgent
+)
+
+libraryDependencies ++= Dependencies.rideRunner.value
+
+javaAgents ++= {
+  if (instrumentation.value) {
+    Dependencies.kanela
+  } else {
+    Seq.empty
+  }
+}
+
+inConfig(Compile)(
+  Seq(
+    packageDoc / publishArtifact := false,
+    packageSrc / publishArtifact := false
+  )
+)
+
+bashScriptExtraDefines += bashScriptEnvConfigLocation.value.fold("")(envFile => s"[[ -f $envFile ]] && . $envFile")
+
+linuxScriptReplacements += ("network" -> network.value.toString)
+
+inConfig(Universal)(
+  Seq(
+    mappings += (baseDirectory.value / s"ride-runner-sample.conf" -> "doc/ride-runner.conf.sample"),
+    javaOptions ++= Seq(
+      // -J prefix is required by the bash script
+      "-J-server",
+      "-J-Xmx2g",
+      "-J-XX:+ExitOnOutOfMemoryError",
+      "-J-XX:+UseG1GC",
+      "-J-XX:+ParallelRefProcEnabled",
+      "-J-XX:+UseStringDeduplication",
+      // JVM default charset for proper and deterministic getBytes behaviour
+      "-J-Dfile.encoding=UTF-8"
+    )
+  )
 )
