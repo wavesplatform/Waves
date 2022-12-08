@@ -2,7 +2,6 @@ package com.wavesplatform.ride.app
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.api.http.{CompositeHttpService, RouteTimeout}
 import com.wavesplatform.blockchain.BlockchainProcessor.RequestKey
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
@@ -28,54 +27,45 @@ import scala.util.Failure
 
 object RideWithBlockchainUpdatesService extends ScorexLogging {
   def main(args: Array[String]): Unit = {
-    val basePath                 = args(0)
-    val (globalConfig, settings) = AppInitializer.init(Some(new File(s"$basePath/node/waves.conf")))
+    val (globalConfig, settings) = AppInitializer.init(args.headOption.map(new File(_)))
 
     val r = Using.Manager { use =>
+      log.info("Initializing thread pools...")
+
+      def mkScheduler(name: String, threads: Int): Scheduler = {
+        val executor = use(
+          new ThreadPoolExecutor(
+            threads,
+            threads,
+            0,
+            TimeUnit.MILLISECONDS,
+            new LinkedBlockingQueue[Runnable],
+            new DefaultThreadFactory(name, true),
+            { (r: Runnable, executor: ThreadPoolExecutor) =>
+              log.error(s"$r has been rejected from $executor")
+              throw new RejectedExecutionException
+            }
+          )
+        )
+
+        use.acquireWithShutdown(
+          Scheduler(
+            executor = if (globalConfig.getBoolean("kamon.enable")) ExecutorInstrumentation.instrument(executor, name) else executor,
+            executionModel = ExecutionModel.AlwaysAsyncExecution
+          )
+        ) { resource =>
+          resource.shutdown()
+          resource.awaitTermination(5.seconds)
+        }
+      }
+
+      val blockchainEventsStreamScheduler = mkScheduler("blockchain-events", 2)
+      val rideRequestsScheduler = mkScheduler(
+        name = "ride",
+        threads = settings.restApi.heavyRequestProcessorPoolThreads.getOrElse((Runtime.getRuntime.availableProcessors() * 2).min(4))
+      )
+
       val connector = use(new GrpcConnector(settings.rideRunner.grpcConnector))
-
-      val commonScheduler = use(
-        Executors.newScheduledThreadPool(
-          2,
-          new ThreadFactoryBuilder().setNameFormat("common-scheduler-%d").setDaemon(false).build()
-        )
-      )
-
-      val monixScheduler = use.acquireWithShutdown(Scheduler(commonScheduler).withExecutionModel(ExecutionModel.AlwaysAsyncExecution)) { x =>
-        x.shutdown()
-        x.awaitTermination(5.seconds)
-      }
-
-
-      val heavyRequestProcessorPoolThreads =
-        settings.restApi.heavyRequestProcessorPoolThreads.getOrElse((Runtime.getRuntime.availableProcessors() * 2).min(4))
-      val heavyRequestExecutor = use(
-        new ThreadPoolExecutor(
-          heavyRequestProcessorPoolThreads,
-          heavyRequestProcessorPoolThreads,
-          0,
-          TimeUnit.MILLISECONDS,
-          new LinkedBlockingQueue[Runnable],
-          new DefaultThreadFactory("rest-heavy-request-processor", true),
-          { (r: Runnable, executor: ThreadPoolExecutor) =>
-            log.error(s"$r has been rejected from $executor")
-            throw new RejectedExecutionException
-          }
-        )
-      )
-
-      val heavyRequestScheduler = use.acquireWithShutdown(
-        Scheduler(
-          if (globalConfig.getBoolean("kamon.enable"))
-            ExecutorInstrumentation.instrument(heavyRequestExecutor, "heavy-request-executor")
-          else heavyRequestExecutor,
-          ExecutionModel.AlwaysAsyncExecution
-        )
-      ) { resource =>
-        resource.shutdown()
-        resource.awaitTermination(5.seconds)
-      }
-
 
       log.info("Making gRPC channel to gRPC API...")
       val grpcApiChannel = use(connector.mkChannel(settings.rideRunner.grpcApiChannel))
@@ -92,7 +82,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
         httpBackend = httpBackend
       )
 
-      val db                = use(openDB(s"$basePath/db"))
+      val db                = use(openDB(settings.rideRunner.db.directory))
       val dbCaches          = new LevelDbPersistentCaches(db)
       val blockchainStorage = new SharedBlockchainData[RequestKey](settings.blockchain, dbCaches, blockchainApi)
 
@@ -101,7 +91,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
 
       val processor = BlockchainProcessor.mk(
         settings.rideRunner.processor,
-        monixScheduler,
+        blockchainEventsStreamScheduler,
         blockchainStorage
       )
 
@@ -113,7 +103,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
       val workingHeight   = Height(lastKnownHeight + 3)
       val endHeight       = workingHeight + 1
 
-      val blockchainUpdates = use(blockchainApi.mkBlockchainUpdatesStream(monixScheduler))
+      val blockchainUpdates = use(blockchainApi.mkBlockchainUpdatesStream(blockchainEventsStreamScheduler))
       // TODO #33 Move wrapped events from here: processing of Closed and Failed should be moved to blockchainUpdates.stream
       val events = blockchainUpdates.stream
         .doOnError(e => Task { log.error("Error!", e) })
@@ -127,15 +117,16 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
             false
         }
         .collect { case WrappedEvent.Next(event) => event }
+        // TODO #38 use scanLeft*
         .foldLeftL(BlockchainState.Starting(lastHeightAtStart): BlockchainState)(BlockchainState(processor, _, _))
-        .runToFuture(monixScheduler)
+        .runToFuture(blockchainEventsStreamScheduler)
 
       log.info(s"Watching blockchain updates...")
       blockchainUpdates.start(lastKnownHeight + 1, endHeight)
 
       val routeTimeout = new RouteTimeout(
         FiniteDuration(globalConfig.getDuration("akka.http.server.request-timeout").getSeconds, TimeUnit.SECONDS)
-      )(heavyRequestScheduler)
+      )(rideRequestsScheduler)
 
       val apiRoutes = Seq(
         EvaluateApiRoute(
@@ -152,7 +143,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
         .newServerAt(settings.restApi.bindAddress, settings.restApi.port)
         .bindFlow(httpService.loggingCompositeRoute)
 
-      log.info("REST API binging on ${settings.restApi.bindAddress}:${settings.restApi.port}")
+      log.info(s"REST API binging on ${settings.restApi.bindAddress}:${settings.restApi.port}")
       Await.result(httpFuture, 20.seconds)
       log.info("REST API was bound")
 

@@ -1,0 +1,16 @@
+waves {
+  blockchain {
+    type = MAINNET
+  }
+
+  ride-runner {
+    directory = ${WVDATA}
+    enable-traces = no
+    rest-api {
+      bind-address = "0.0.0.0"
+      port = 6890
+    }
+  }
+}
+
+include "local.conf"

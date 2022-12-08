@@ -25,14 +25,17 @@ import scala.util.Failure
 
 object RideWithBlockchainUpdatesApp extends ScorexLogging {
   def main(args: Array[String]): Unit = {
-    val startTs       = System.nanoTime()
-    val basePath      = args(0)
-    val (_, settings) = AppInitializer.init(Some(new File(s"$basePath/node/waves.conf")))
+    val startTs                  = System.nanoTime()
+    val (globalConfig, settings) = AppInitializer.init(args.headOption.map(new File(_)))
 
     val r = Using.Manager { use =>
       log.info("Loading args...")
+      val inputFile =
+        if (args.length < 2) throw new IllegalArgumentException("Please specify an input.json file")
+        else new File(args(1))
+
       val scripts = Json
-        .parse(use(Source.fromFile(new File(s"$basePath/input5.json"))).getLines().mkString("\n"))
+        .parse(use(Source.fromFile(inputFile)).getLines().mkString("\n"))
         .as[List[RequestKey]]
 
       val connector = use(new GrpcConnector(settings.rideRunner.grpcConnector))
@@ -64,7 +67,7 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
         httpBackend = httpBackend
       )
 
-      val db                = use(openDB(s"$basePath/db"))
+      val db                = use(openDB(settings.rideRunner.db.directory))
       val dbCaches          = new LevelDbPersistentCaches(db)
       val blockchainStorage = new SharedBlockchainData[RequestKey](settings.blockchain, dbCaches, blockchainApi)
 

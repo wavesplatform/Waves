@@ -1,4 +1,4 @@
-name := "ride-runner"
+name        := "ride-runner"
 description := "Allows to execute RIDE code independently from Waves NODE"
 
 mainClass := Some("com.wavesplatform.ride.app.RideWithBlockchainUpdatesService")
@@ -35,7 +35,10 @@ linuxScriptReplacements += ("network" -> network.value.toString)
 
 inConfig(Universal)(
   Seq(
-    mappings += (baseDirectory.value / s"ride-runner-sample.conf" -> "doc/ride-runner.conf.sample"),
+    mappings ++= Seq(
+      baseDirectory.value / "ride-runner-sample.conf" -> "doc/ride-runner.conf.sample",
+      resourceDirectory.value / "logback.xml"         -> "doc/logback.xml"
+    ),
     javaOptions ++= Seq(
       // -J prefix is required by the bash script
       "-J-server",

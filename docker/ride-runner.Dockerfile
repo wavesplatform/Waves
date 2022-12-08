@@ -15,33 +15,32 @@ RUN apt-get update && apt-get install -y wget unzip gosu || exit 1; \
     # Clean
     apt-get remove -y wget unzip && apt-get autoremove -y && apt-get autoclean && rm -rf /var/lib/apt/lists/*
 
-# Node files
-ENV WVDATA=/var/lib/waves
-ENV WVLOG=/var/log/waves
-ENV WAVES_INSTALL_PATH=/usr/share/waves
-ENV WAVES_CONFIG=/etc/waves/waves.conf
+# RIDE runner files
+ENV WVDATA=/var/lib/ride-runner
+ENV WVLOG=/var/log/ride-runner
+ENV WAVES_INSTALL_PATH=/usr/share/ride-runner
+ENV WAVES_CONFIG=/etc/ride-runner/ride-runner.conf
+
 COPY target /tmp/
-COPY waves.conf.template $WAVES_CONFIG
+COPY ride-runner.conf.template $WAVES_CONFIG
 
 # Setup node
-COPY entrypoint.sh $WAVES_INSTALL_PATH/bin/entrypoint.sh
-ARG INCLUDE_GRPC=true
+COPY ride-runner.entrypoint.sh $WAVES_INSTALL_PATH/bin/entrypoint.sh
 RUN mkdir -p $WVDATA $WVLOG; \
     # Create user
-    groupadd -r waves --gid=999; \
-    useradd -r -g waves --uid=999 --home-dir=$WVDATA --shell=/bin/bash waves; \
+    groupadd -r ride --gid=999; \
+    useradd -r -g ride --uid=999 --home-dir=$WVDATA --shell=/bin/bash ride; \
     # Unpack tgz packages
     tar zxvf /tmp/ride-runner.tgz -C $WAVES_INSTALL_PATH --strip-components=1; \
     # Set permissions
-    chown -R waves:waves $WVDATA $WVLOG $WAVES_INSTALL_PATH && chmod 755 $WVDATA $WVLOG; \
+    chown -R ride:ride $WVDATA $WVLOG $WAVES_INSTALL_PATH && chmod 755 $WVDATA $WVLOG; \
     # Cleanup
     rm -rf /tmp/*
 
-EXPOSE 6869 6868 6863 6862 6870
+EXPOSE 6890
 VOLUME $WVDATA
 VOLUME $WVLOG
-VOLUME $WAVES_INSTALL_PATH/lib/plugins
 WORKDIR $WVDATA
 
 STOPSIGNAL SIGINT
-ENTRYPOINT ["/usr/share/waves/bin/entrypoint.sh"]
+ENTRYPOINT ["/usr/share/ride-runner/bin/entrypoint.sh"]

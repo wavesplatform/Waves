@@ -185,6 +185,7 @@ class BlockchainProcessor private (
       }
       .runToFuture(runScriptsScheduler)
 
+    // TODO #38 Get rid of Await.result. Wrapp all this code in Task
     Await.result(r, Duration.Inf)
 
     // Don't clean all affected scripts, because not all scripts could be added to the storage on the moment of runScripts.
