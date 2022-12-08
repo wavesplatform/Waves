@@ -33,6 +33,16 @@ object VolumeAndFeeNode {
   val Empty: VolumeAndFeeNode = VolumeAndFeeNode(0, 0, Height(0))
 }
 
+case class CurrentLeaseBalance(in: Long, out: Long, height: Height, prevHeight: Height)
+object CurrentLeaseBalance {
+  val Unavailable: CurrentLeaseBalance = CurrentLeaseBalance(0, 0, Height(0), Height(0))
+}
+
+case class LeaseBalanceNode(in: Long, out: Long, prevHeight: Height)
+object LeaseBalanceNode {
+  val Empty: LeaseBalanceNode = LeaseBalanceNode(0, 0, Height(0))
+}
+
 object Keys {
   import KeyHelpers.*
   import KeyTags.{
@@ -71,9 +81,11 @@ object Keys {
     Key(UpdatedAssets, h(height), d => readAssetIds(d).map(IssuedAsset(_)), ias => writeAssetIds(ias.map(_.id)))
   def sponsorshipAssets(height: Int): Key[Seq[IssuedAsset]] =
     Key(SponsoredAssets, h(height), d => readAssetIds(d).map(IssuedAsset(_)), ias => writeAssetIds(ias.map(_.id)))
-  def leaseBalanceHistory(addressId: AddressId): Key[Seq[Int]] = historyKey(LeaseBalanceHistory, addressId.toByteArray)
-  def leaseBalance(addressId: AddressId)(height: Int): Key[LeaseBalance] =
-    Key(LeaseBalance, hAddr(height, addressId), readLeaseBalance, writeLeaseBalance)
+  def leaseBalanceAt(addressId: AddressId, height: Height): Key[LeaseBalanceNode] =
+    Key(LeaseBalanceHistory, hBytes(addressId.toByteArray, height), readLeaseBalanceNode, writeLeaseBalanceNode)
+
+  def leaseBalance(addressId: AddressId): Key[CurrentLeaseBalance] =
+    Key(LeaseBalance, addressId.toByteArray, readLeaseBalance, writeLeaseBalance)
 
   def leaseDetailsHistory(leaseId: ByteStr): Key[Seq[Int]] = historyKey(LeaseDetailsHistory, leaseId.arr)
   def leaseDetails(leaseId: ByteStr)(height: Int): Key[Option[Either[Boolean, LeaseDetails]]] =

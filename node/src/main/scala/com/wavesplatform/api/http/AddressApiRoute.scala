@@ -199,7 +199,7 @@ case class AddressApiRoute(
 
   def getData: Route =
     pathPrefix("data" / AddrSegment) { address =>
-      implicit val jsonStreamingSupport: ToResponseMarshaller[Source[ByteString, NotUsed]] = jsonStreamMarshallerNew()
+      implicit val jsonStreamingSupport: ToResponseMarshaller[Source[ByteString, NotUsed]] = jsonBytesStreamMarshaller()
 
       (path(Segment) & get) { key =>
         complete(accountDataEntry(address, key))

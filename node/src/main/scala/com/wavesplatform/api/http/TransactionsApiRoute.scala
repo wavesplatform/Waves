@@ -81,7 +81,7 @@ case class TransactionsApiRoute(
         if (limit > settings.transactionsByAddressLimit) throw ApiException(TooBigArrayAllocation)
 
         transactionsByAddress(address, limit, after) // Double list - [ [tx1, tx2, ...] ]
-      }(jsonStreamMarshallerNew("[[", ",", "]]"))
+      }(jsonBytesStreamMarshaller("[[", ",", "]]"))
     }
   }
 

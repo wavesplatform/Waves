@@ -104,7 +104,7 @@ trait ApiMarshallers extends JsonFormats {
     }
   }
 
-  def jsonStreamMarshallerNew(
+  def jsonBytesStreamMarshaller(
       prefix: String = "[",
       delimiter: String = ",",
       suffix: String = "]"

@@ -61,34 +61,42 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
 
   override def containsTransaction(tx: Transaction): Boolean = transactionsBloomFilter.mightContain(tx.id().arr) && transactionMeta(tx.id()).nonEmpty
 
-  private val leaseBalanceCache: LoadingCache[Address, LeaseBalance] = cache(dbSettings.maxCacheSize, loadLeaseBalance)
-  protected def loadLeaseBalance(address: Address): LeaseBalance
-  protected def loadLeaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance]
+  protected val leaseBalanceCache: LoadingCache[Address, CurrentLeaseBalance] =
+    cache(dbSettings.maxCacheSize, loadLeaseBalance, keys => loadLeaseBalances(keys.asScala.toSeq).asJava)
+  protected def loadLeaseBalance(address: Address): CurrentLeaseBalance
+  protected def loadLeaseBalances(addresses: Seq[Address]): Map[Address, CurrentLeaseBalance]
   protected def discardLeaseBalance(address: Address): Unit = leaseBalanceCache.invalidate(address)
-  override def leaseBalance(address: Address): LeaseBalance = leaseBalanceCache.get(address)
+  override def leaseBalance(address: Address): LeaseBalance = {
+    val currentLeaseBalance = leaseBalanceCache.get(address)
+    LeaseBalance(currentLeaseBalance.in, currentLeaseBalance.out)
+  }
 
   override def leaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance] = {
-    val fromCache   = leaseBalanceCache.getAllPresent(addresses.asJava).asScala
-    val cacheMissed = addresses.filterNot(fromCache.contains)
-    val fromDb      = loadLeaseBalances(cacheMissed)
-    leaseBalanceCache.putAll(fromDb.asJava)
-    fromCache.map { case (addr, balance) => addr -> balance }.toMap ++
-      fromDb.map { case (addr, balance) => addr -> balance }
+    leaseBalanceCache
+      .getAll(addresses.asJava)
+      .asScala
+      .view
+      .map { case (address, leaseBalance) =>
+        address -> LeaseBalance(leaseBalance.in, leaseBalance.out)
+      }
+      .toMap
   }
 
   protected val balancesCache: LoadingCache[(Address, Asset), CurrentBalance] =
-    cache(dbSettings.maxCacheSize * 16, loadBalance, keys => loadWavesBalances(keys.asScala.toSeq).asJava)
+    cache(dbSettings.maxCacheSize * 16, loadBalance, keys => loadBalances(keys.asScala.toSeq).asJava)
   protected def clearBalancesCache(): Unit                          = balancesCache.invalidateAll()
   protected def discardBalance(key: (Address, Asset)): Unit         = balancesCache.invalidate(key)
   override def balance(address: Address, mayBeAssetId: Asset): Long = balancesCache.get(address -> mayBeAssetId).balance
 
-  override def balances(req: Seq[(Address, Asset)]): Map[(Address, Asset), Long] = {
-    val fromCache   = balancesCache.getAllPresent(req.asJava).asScala.toMap
-    val cacheMissed = req.filterNot(fromCache.contains)
-    val fromDb      = loadBalances(cacheMissed)
-    balancesCache.putAll(fromDb.asJava)
-    (fromCache ++ fromDb).view.mapValues(_.balance).toMap
-  }
+  override def balances(req: Seq[(Address, Asset)]): Map[(Address, Asset), Long] =
+    balancesCache
+      .getAll(req.asJava)
+      .asScala
+      .view
+      .map { case ((address, asset), balance) =>
+        (address, asset) -> balance.balance
+      }
+      .toMap
 
   override def loadCacheData(addresses: Seq[Address]): Unit = {
     addressIdCache.putAll(loadAddressIds(addresses).asJava)
@@ -170,7 +178,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
   protected def loadAlias(alias: Alias): Option[Address]
   protected def discardAlias(alias: Alias): Unit = aliasCache.invalidate(alias)
 
-  protected val blockHeightCache: LoadingCache[ByteStr, Option[Int]] = cache(1000, loadBlockHeight)
+  protected val blockHeightCache: LoadingCache[ByteStr, Option[Int]] = cache(dbSettings.maxRollbackDepth + 1000, loadBlockHeight)
   protected def loadBlockHeight(blockId: ByteStr): Option[Int]
   protected def discardBlockHeight(blockId: ByteStr): Unit = blockHeightCache.invalidate(blockId)
 
@@ -190,7 +198,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
       carry: Long,
       newAddresses: Map[Address, AddressId],
       balances: Map[(AddressId, Asset), (CurrentBalance, BalanceNode)],
-      leaseBalances: Map[AddressId, LeaseBalance],
+      leaseBalances: Map[AddressId, (CurrentLeaseBalance, LeaseBalanceNode)],
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       leaseStates: Map[ByteStr, LeaseDetails],
       issuedAssets: Map[IssuedAsset, NewAssetInfo],
@@ -240,7 +248,14 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
 
     val PortfolioUpdates(updatedBalances, updatedLeaseBalances) = DiffToStateApplier.portfolios(this, diff)
 
-    val leaseBalances = updatedLeaseBalances.map { case (address, lb) => addressIdWithFallback(address, newAddressIds) -> lb }
+    val leaseBalances = updatedLeaseBalances.map { case (address, lb) =>
+      val prevCurrentLeaseBalance = leaseBalanceCache.get(address)
+      address ->
+        (
+          CurrentLeaseBalance(lb.in, lb.out, Height(newHeight), prevCurrentLeaseBalance.height),
+          LeaseBalanceNode(lb.in, lb.out, prevCurrentLeaseBalance.height)
+        )
+    }
 
     val newFills = for {
       (orderId, fillInfo) <- diff.orderFills
@@ -320,7 +335,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
       carryFee,
       newAddressIds,
       updatedBalanceNodes.map { case ((address, asset), v) => (addressIdWithFallback(address, newAddressIds), asset) -> v },
-      leaseBalances,
+      leaseBalances.map { case (address, balance) => addressIdWithFallback(address, newAddressIds) -> balance },
       addressTransactions.asMap(),
       diff.leaseState,
       diff.issuedAssets,
@@ -359,7 +374,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
     for (((address, asset), (newBalance, _)) <- updatedBalanceNodes) balancesCache.put((address, asset), newBalance)
     for (id                                  <- assetsToInvalidate) assetDescriptionCache.invalidate(id)
     for ((alias, address)                    <- diff.aliases) aliasCache.put(alias, Some(address))
-    leaseBalanceCache.putAll(updatedLeaseBalances.asJava)
+    leaseBalanceCache.putAll(leaseBalances.view.mapValues(_._1).toMap.asJava)
     scriptCache.putAll(diff.scripts.asJava)
     assetScriptCache.putAll(diff.assetScripts.asJava)
     accountDataCache.putAll(newData.asJava)

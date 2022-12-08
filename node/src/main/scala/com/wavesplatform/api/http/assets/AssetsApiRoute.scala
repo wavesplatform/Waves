@@ -150,7 +150,7 @@ case class AssetsApiRoute(
       case (errors, _) => InvalidIds(errors)
     }
 
-  def fullAssetInfoJsonNew(balances: Seq[(IssuedAsset, Long)]): Seq[ByteString] =
+  def fullAssetInfoJsonBytes(balances: Seq[(IssuedAsset, Long)]): Seq[ByteString] =
     balances.view
       .zip(commonAssetsApi.fullInfos(balances.map(_._1)))
       .map { case ((asset, balance), infoOpt) =>
@@ -199,30 +199,12 @@ case class AssetsApiRoute(
       }
       .toSeq
 
-  def fullAssetInfoJson(asset: IssuedAsset): JsObject = commonAssetsApi.fullInfo(asset) match {
-    case Some(CommonAssetsApi.AssetInfo(assetInfo, issueTransaction, sponsorBalance)) =>
-      Json.obj(
-        "assetId"    -> asset,
-        "reissuable" -> assetInfo.reissuable,
-        "minSponsoredAssetFee" -> (assetInfo.sponsorship match {
-          case 0           => JsNull
-          case sponsorship => JsNumber(sponsorship)
-        }),
-        "sponsorBalance"   -> sponsorBalance,
-        "quantity"         -> JsNumber(BigDecimal(assetInfo.totalVolume)),
-        "issueTransaction" -> issueTransaction.map(_.json())
-      )
-
-    case None =>
-      Json.obj("assetId" -> asset)
-  }
-
   /** @param assets
     *   Some(assets) for specific asset balances, None for a full portfolio
     */
   def balances(address: Address, assets: Option[Seq[IssuedAsset]] = None): Route = {
     implicit val jsonStreamingSupport: ToResponseMarshaller[Source[ByteString, NotUsed]] =
-      jsonStreamMarshallerNew(s"""{"address":"$address","balances":[""", ",", "]}")
+      jsonBytesStreamMarshaller(s"""{"address":"$address","balances":[""", ",", "]}")
 
     routeTimeout.executeFromObservable(
       (assets match {
@@ -231,7 +213,7 @@ case class AssetsApiRoute(
         case None =>
           commonAccountApi
             .portfolio(address)
-      }).concatMapIterable(fullAssetInfoJsonNew)
+      }).concatMapIterable(fullAssetInfoJsonBytes)
     )
   }
 
@@ -289,7 +271,7 @@ case class AssetsApiRoute(
     if (limit > settings.transactionsByAddressLimit) complete(TooBigArrayAllocation)
     else {
       import cats.syntax.either.*
-      implicit val jsonStreamingSupport: ToResponseMarshaller[Source[ByteString, NotUsed]] = jsonStreamMarshallerNew()
+      implicit val jsonStreamingSupport: ToResponseMarshaller[Source[ByteString, NotUsed]] = jsonBytesStreamMarshaller()
 
       val compositeBlockchain = blockchain.compositeBlockchain
       routeTimeout.executeStreamed {

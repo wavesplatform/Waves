@@ -239,17 +239,24 @@ package object database {
       .array()
   }
 
-  def writeLeaseBalance(lb: LeaseBalance): Array[Byte] = {
-    val ndo = newDataOutput()
-    ndo.writeLong(lb.in)
-    ndo.writeLong(lb.out)
-    ndo.toByteArray
-  }
+  def readLeaseBalanceNode(data: Array[Byte]): LeaseBalanceNode = if (data != null && data.length == 20)
+    LeaseBalanceNode(Longs.fromByteArray(data.take(8)), Longs.fromByteArray(data.slice(8, 16)), Height(Ints.fromByteArray(data.takeRight(4))))
+  else LeaseBalanceNode.Empty
 
-  def readLeaseBalance(data: Array[Byte]): LeaseBalance = Option(data).fold(LeaseBalance.empty) { d =>
-    val ndi = newDataInput(d)
-    LeaseBalance(ndi.readLong(), ndi.readLong())
-  }
+  def writeLeaseBalanceNode(leaseBalanceNode: LeaseBalanceNode): Array[Byte] =
+    Longs.toByteArray(leaseBalanceNode.in) ++ Longs.toByteArray(leaseBalanceNode.out) ++ Ints.toByteArray(leaseBalanceNode.prevHeight)
+
+  def readLeaseBalance(data: Array[Byte]): CurrentLeaseBalance = if (data != null && data.length == 24)
+    CurrentLeaseBalance(
+      Longs.fromByteArray(data.take(8)),
+      Longs.fromByteArray(data.slice(8, 16)),
+      Height(Ints.fromByteArray(data.slice(16, 20))),
+      Height(Ints.fromByteArray(data.takeRight(4)))
+    )
+  else CurrentLeaseBalance.Unavailable
+
+  def writeLeaseBalance(lb: CurrentLeaseBalance): Array[Byte] =
+    Longs.toByteArray(lb.in) ++ Longs.toByteArray(lb.out) ++ Ints.toByteArray(lb.height) ++ Ints.toByteArray(lb.prevHeight)
 
   def writeLeaseDetails(lde: Either[Boolean, LeaseDetails]): Array[Byte] =
     lde.fold(

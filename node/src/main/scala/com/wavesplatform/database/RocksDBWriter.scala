@@ -246,25 +246,34 @@ abstract class RocksDBWriter private[database] (
     }
 
   override protected def loadBalances(req: Seq[(Address, Asset)]): Map[(Address, Asset), CurrentBalance] = readOnly { ro =>
-    val addressToId = addressIds(req.map(_._1))
-    req.map { case (address, asset) =>
-      (address, asset) -> addressToId.get(address).flatten.fold(CurrentBalance.Unavailable) { addressId =>
-        asset match {
-          case asset @ IssuedAsset(_) =>
-            ro.get(Keys.assetBalance(addressId, asset))
-          case Waves =>
-            ro.get(Keys.wavesBalance(addressId))
-        }
+    val addrToId = addressIds(req.map(_._1)).collect { case (address, Some(aid)) =>
+      address -> aid
+    }
+
+    val reqWithKeys = req.flatMap { case (address, asset) =>
+      addrToId.get(address).map { aid =>
+        (address, asset) -> (asset match {
+          case Waves                    => Keys.wavesBalance(aid)
+          case issuedAsset: IssuedAsset => Keys.assetBalance(aid, issuedAsset)
+        })
       }
+    }
+
+    val addressAssetToBalance = reqWithKeys
+      .zip(ro.multiGet(reqWithKeys.map(_._2), 16))
+      .collect { case (((address, asset), _), Some(balance)) =>
+        (address, asset) -> balance
+      }
+      .toMap
+
+    req.map { key =>
+      key -> addressAssetToBalance.getOrElse(key, CurrentBalance.Unavailable)
     }.toMap
   }
 
   protected override def loadWavesBalances(req: Seq[(Address, Asset)]): Map[(Address, Asset), CurrentBalance] = readOnly { ro =>
     val addrToId = addressIds(req.map(_._1))
-    val idToAddr = addrToId.collect { case (address, Some(aid)) =>
-      aid -> address
-    }
-    val addrIds = idToAddr.keys.toSeq
+    val addrIds  = addrToId.collect { case (_, Some(aid)) => aid }.toSeq
 
     val idToBalance = addrIds
       .zip(
@@ -282,17 +291,31 @@ abstract class RocksDBWriter private[database] (
     }.toMap
   }
 
-  private def loadLeaseBalance(db: ReadOnlyDB, addressId: AddressId): LeaseBalance =
-    db.fromHistory(Keys.leaseBalanceHistory(addressId), Keys.leaseBalance(addressId)).getOrElse(LeaseBalance.empty)
+  private def loadLeaseBalance(db: ReadOnlyDB, addressId: AddressId): CurrentLeaseBalance =
+    db.get(Keys.leaseBalance(addressId))
 
-  override protected def loadLeaseBalance(address: Address): LeaseBalance = readOnly { db =>
-    addressId(address).fold(LeaseBalance.empty)(loadLeaseBalance(db, _))
+  override protected def loadLeaseBalance(address: Address): CurrentLeaseBalance = readOnly { db =>
+    addressId(address).fold(CurrentLeaseBalance.Unavailable)(loadLeaseBalance(db, _))
   }
 
-  override protected def loadLeaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance] = readOnly { ro =>
-    addressIds(addresses).map { case (address, addressId) =>
-      address -> addressId.fold(LeaseBalance.empty)(loadLeaseBalance(ro, _))
-    }
+  override protected def loadLeaseBalances(addresses: Seq[Address]): Map[Address, CurrentLeaseBalance] = readOnly { ro =>
+    val addrToId = addressIds(addresses)
+    val addrIds  = addrToId.collect { case (_, Some(aid)) => aid }.toSeq
+
+    val idToBalance = addrIds
+      .zip(
+        ro.multiGet(
+          addrIds.map { addrId =>
+            Keys.leaseBalance(addrId)
+          },
+          24
+        )
+      )
+      .toMap
+
+    addresses.map { address =>
+      address -> addrToId.get(address).flatMap(_.flatMap(idToBalance.get)).flatten.getOrElse(CurrentLeaseBalance.Unavailable)
+    }.toMap
   }
 
   override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] =
@@ -392,7 +415,7 @@ abstract class RocksDBWriter private[database] (
       carry: Long,
       newAddresses: Map[Address, AddressId],
       balances: Map[(AddressId, Asset), (CurrentBalance, BalanceNode)],
-      leaseBalances: Map[AddressId, LeaseBalance],
+      leaseBalances: Map[AddressId, (CurrentLeaseBalance, LeaseBalanceNode)],
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       leaseStates: Map[ByteStr, LeaseDetails],
       issuedAssets: Map[IssuedAsset, NewAssetInfo],
@@ -440,8 +463,7 @@ abstract class RocksDBWriter private[database] (
         addressFilter.put(kaid.suffix)
       }
 
-      val threshold        = newSafeRollbackHeight
-      val balanceThreshold = height - balanceSnapshotMaxRollbackDepth
+      val threshold = newSafeRollbackHeight
 
       appendBalances(balances, issuedAssets, rw)
 
@@ -449,9 +471,9 @@ abstract class RocksDBWriter private[database] (
       rw.put(Keys.changedAddresses(height), changedAddresses.toSeq)
 
       // leases
-      for ((addressId, leaseBalance) <- leaseBalances) {
-        rw.put(Keys.leaseBalance(addressId)(height), leaseBalance)
-        expiredKeys ++= updateHistory(rw, Keys.leaseBalanceHistory(addressId), balanceThreshold, Keys.leaseBalance(addressId))
+      for ((addressId, (currentLeaseBalance, leaseBalanceNode)) <- leaseBalances) {
+        rw.put(Keys.leaseBalance(addressId), currentLeaseBalance)
+        rw.put(Keys.leaseBalanceAt(addressId, currentLeaseBalance.height), leaseBalanceNode)
       }
 
       for ((orderId, (currentVolumeAndFee, volumeAndFeeNode)) <- filledQuantity) {
@@ -665,8 +687,7 @@ abstract class RocksDBWriter private[database] (
             balancesToInvalidate += (address -> Waves)
             rollbackBalanceHistory(rw, Keys.wavesBalance(addressId), Keys.wavesBalanceAt(addressId, _), currentHeight)
 
-            rw.delete(Keys.leaseBalance(addressId)(currentHeight))
-            rw.filterHistory(Keys.leaseBalanceHistory(addressId), currentHeight)
+            rollbackLeaseBalance(rw, addressId, currentHeight)
 
             balanceAtHeightCache.invalidate((currentHeight, addressId))
             leaseBalanceAtHeightCache.invalidate((currentHeight, addressId))
@@ -826,6 +847,17 @@ abstract class RocksDBWriter private[database] (
     orderId
   }
 
+  private def rollbackLeaseBalance(rw: RW, addressId: AddressId, height: Height): Unit = {
+    val curLbKey = Keys.leaseBalance(addressId)
+    val lb       = rw.get(curLbKey)
+    if (lb.height == height) {
+      val lbNodeKey  = Keys.leaseBalanceAt(addressId, _)
+      val prevLbNode = rw.get(lbNodeKey(lb.prevHeight))
+      rw.delete(lbNodeKey(height))
+      rw.put(curLbKey, CurrentLeaseBalance(prevLbNode.in, prevLbNode.out, lb.prevHeight, prevLbNode.prevHeight))
+    }
+  }
+
   private def rollbackLeaseStatus(rw: RW, leaseId: ByteStr, currentHeight: Int): Unit = {
     rw.delete(Keys.leaseDetails(leaseId)(currentHeight))
     rw.filterHistory(Keys.leaseDetailsHistory(leaseId), currentHeight)
@@ -929,7 +961,7 @@ abstract class RocksDBWriter private[database] (
     .newBuilder()
     .maximumSize(100000)
     .recordStats()
-    .build[(Int, AddressId), LeaseBalance]()
+    .build[(Int, AddressId), LeaseBalanceNode]()
 
   // FIXME: implement
   override def balanceAtHeight(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)] = None
@@ -938,7 +970,8 @@ abstract class RocksDBWriter private[database] (
     addressId(address).fold(Seq(BalanceSnapshot(1, 0, 0, 0))) { addressId =>
       val toHeight = to.flatMap(this.heightOf).getOrElse(this.height)
 
-      val lastBalance = balancesCache.get((address, Asset.Waves))
+      val lastBalance      = balancesCache.get((address, Asset.Waves))
+      val lastLeaseBalance = leaseBalanceCache.get(address)
 
       @tailrec
       def collectBalanceHistory(acc: Vector[Int], hh: Int): Seq[Int] =
@@ -950,12 +983,22 @@ abstract class RocksDBWriter private[database] (
           collectBalanceHistory(newAcc, bn.prevHeight)
         }
 
+      @tailrec
+      def collectLeaseBalanceHistory(acc: Vector[Int], hh: Int): Seq[Int] =
+        if (hh < from)
+          acc :+ hh
+        else {
+          val lbn    = leaseBalanceAtHeightCache.get((hh, addressId), () => db.get(Keys.leaseBalanceAt(addressId, Height(hh))))
+          val newAcc = if (hh > toHeight) acc else acc :+ hh
+          collectLeaseBalanceHistory(newAcc, lbn.prevHeight)
+        }
+
       val wbh = slice(collectBalanceHistory(Vector.empty, lastBalance.height), from, toHeight)
-      val lbh = slice(db.get(Keys.leaseBalanceHistory(addressId)), from, toHeight)
+      val lbh = slice(collectLeaseBalanceHistory(Vector.empty, lastLeaseBalance.height), from, toHeight)
       for {
         (wh, lh) <- merge(wbh, lbh)
         wb = balanceAtHeightCache.get((wh, addressId), () => db.get(Keys.wavesBalanceAt(addressId, Height(wh))))
-        lb = leaseBalanceAtHeightCache.get((lh, addressId), () => db.get(Keys.leaseBalance(addressId)(lh)))
+        lb = leaseBalanceAtHeightCache.get((lh, addressId), () => db.get(Keys.leaseBalanceAt(addressId, Height(lh))))
       } yield BalanceSnapshot(wh.max(lh), wb.balance, lb.in, lb.out)
     }
   }
