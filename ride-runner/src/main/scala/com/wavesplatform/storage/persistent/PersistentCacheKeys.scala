@@ -39,6 +39,7 @@ import com.wavesplatform.storage.persistent.AsBytes.{ByteArrayOutputStreamOps, o
 import com.wavesplatform.storage.persistent.CacheKey.prefixOffset
 import com.wavesplatform.transaction.serialization.impl.DataTxSerializer
 import com.wavesplatform.transaction.{Asset, EthereumTransaction, GenesisTransaction, PBSince, PaymentTransaction, Transaction, TransactionParsers}
+import play.api.libs.json.{JsObject, Json}
 
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
@@ -271,15 +272,12 @@ sealed abstract class CacheHistoryKey[KeyT: AsBytes](prefix: Short) extends Cach
 
 object CacheKeys {
   object LastAddressId extends CacheKey[Unit, AddressId](0)
-
   object AddressIds extends CacheKey[Address, AddressId](1)
 
   object AccountDataEntriesHistory extends CacheHistoryKey[(AddressId, String)](2)
-
   object AccountDataEntries extends CacheKey[(AddressId, String, Int), Option[DataEntry[?]]](3)
 
   object AccountScriptsHistory extends CacheHistoryKey[AddressId](4)
-
   object AccountScripts extends CacheKey[(AddressId, Int), Option[AccountScriptInfo]](5)
 
   object SignedBlockHeaders extends CacheKey[Int, SignedBlockHeader](6)
@@ -291,21 +289,23 @@ object CacheKeys {
   object ActivatedFeatures extends CacheKey[Unit, Map[Short, Int]](9)
 
   object AssetDescriptionsHistory extends CacheHistoryKey[Asset.IssuedAsset](11)
-
-  object AssetDescriptions extends CacheKey[(Asset.IssuedAsset, Int), Option[AssetDescription]](12)
+  object AssetDescriptions        extends CacheKey[(Asset.IssuedAsset, Int), Option[AssetDescription]](12)
 
   // TODO #25 Store AddressId
   object Aliases extends CacheKey[Alias, Option[Address]](13)
 
   object AccountAssetsHistory extends CacheHistoryKey[(AddressId, Asset)](14)
-
-  object AccountAssets extends CacheKey[(AddressId, Asset, Int), Long](15)
+  object AccountAssets        extends CacheKey[(AddressId, Asset, Int), Long](15)
 
   object AccountLeaseBalancesHistory extends CacheHistoryKey[AddressId](16)
-
-  object AccountLeaseBalances extends CacheKey[(AddressId, Int), LeaseBalance](17)
+  object AccountLeaseBalances        extends CacheKey[(AddressId, Int), LeaseBalance](17)
 
   object Transactions extends CacheKey[TransactionId, Option[Int]](18)
+
+  object RequestsNumber extends CacheKey[Unit, Int](19)
+  object Requests       extends CacheKey[Int, (Address, JsObject)](20)
+
+  implicit val jsObjectAsBytes: AsBytes[JsObject] = AsBytes[String].transform(JsObject. Json.parse(_), Json.stringify(_))
 
   implicit val byteStrAsBytes: AsBytes[ByteStr] = AsBytes[Array[Byte]].transform(ByteStr(_), _.arr)
 

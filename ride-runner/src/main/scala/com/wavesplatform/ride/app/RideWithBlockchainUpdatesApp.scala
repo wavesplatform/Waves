@@ -1,19 +1,21 @@
 package com.wavesplatform.ride.app
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder
-import com.wavesplatform.blockchain.BlockchainProcessor.RequestKey
+import com.wavesplatform.account.Address
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.grpc.{DefaultBlockchainApi, GrpcConnector}
 import com.wavesplatform.resources.*
 import com.wavesplatform.state.Height
+import com.wavesplatform.storage.RequestsStorage
+import com.wavesplatform.storage.RequestsStorage.RequestKey
 import com.wavesplatform.storage.persistent.LevelDbPersistentCaches
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
 import monix.reactive.OverflowStrategy
-import play.api.libs.json.Json
+import play.api.libs.json.{JsObject, Json}
 import sttp.client3.HttpURLConnectionBackend
 
 import java.io.File
@@ -74,11 +76,14 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
       val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
       log.info(s"Current height: $lastHeightAtStart")
 
-      val processor = BlockchainProcessor.mk(
+      val processor = new BlockchainProcessor(
         settings.rideRunner.processor,
-        monixScheduler,
         blockchainStorage,
-        scripts
+        new RequestsStorage {
+          override def all(): List[(Address, JsObject)]     = scripts
+          override def append(x: (Address, JsObject)): Unit = {} // Ignore, because no way to evaluate a new expr
+        },
+        monixScheduler
       )
 
       log.info("Warm up caches...") // Also helps to figure out, which data is used by a script

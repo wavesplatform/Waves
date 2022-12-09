@@ -3,7 +3,6 @@ package com.wavesplatform.ride.app
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import com.wavesplatform.api.http.{CompositeHttpService, RouteTimeout}
-import com.wavesplatform.blockchain.BlockchainProcessor.RequestKey
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
 import com.wavesplatform.events.WrappedEvent
@@ -11,6 +10,8 @@ import com.wavesplatform.grpc.{DefaultBlockchainApi, GrpcConnector}
 import com.wavesplatform.http.EvaluateApiRoute
 import com.wavesplatform.resources.*
 import com.wavesplatform.state.Height
+import com.wavesplatform.storage.LevelDbRequestsStorage
+import com.wavesplatform.storage.RequestsStorage.RequestKey
 import com.wavesplatform.storage.persistent.LevelDbPersistentCaches
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.util.concurrent.DefaultThreadFactory
@@ -89,10 +90,12 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
       val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
       log.info(s"Current height: $lastHeightAtStart")
 
-      val processor = BlockchainProcessor.mk(
+      val requestsStorage = new LevelDbRequestsStorage(db)
+      val processor = new BlockchainProcessor(
         settings.rideRunner.processor,
-        blockchainEventsStreamScheduler,
-        blockchainStorage
+        blockchainStorage,
+        requestsStorage,
+        blockchainEventsStreamScheduler
       )
 
       log.info("Warm up caches...") // Also helps to figure out, which data is used by a script
@@ -129,7 +132,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
       val apiRoutes = Seq(
         EvaluateApiRoute(
           routeTimeout,
-          { (address, request) => processor.getCachedResultOrRun(address, request) }
+          Function.tupled(processor.getCachedResultOrRun)
         )
       )
 

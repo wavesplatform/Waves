@@ -5,7 +5,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.api.http.ApiException
 import com.wavesplatform.api.http.utils.UtilsApiRoute
-import com.wavesplatform.blockchain.BlockchainProcessor.{ProcessResult, RequestKey, Settings}
+import com.wavesplatform.blockchain.BlockchainProcessor.{ProcessResult, Settings}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
@@ -14,8 +14,9 @@ import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.state.{Blockchain, Height}
-import com.wavesplatform.storage.DataKey
+import com.wavesplatform.storage.RequestsStorage.RequestKey
 import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
+import com.wavesplatform.storage.{DataKey, RequestsStorage}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.execution.Scheduler
@@ -42,13 +43,17 @@ trait Processor {
   def getCachedResultOrRun(address: Address, request: JsObject): Task[JsObject]
 }
 
-class BlockchainProcessor private (
+class BlockchainProcessor(
     settings: Settings,
     blockchainStorage: SharedBlockchainData[RequestKey],
-    runScriptsScheduler: Scheduler,
-    private val storage: TrieMap[RequestKey, RestApiScript]
+    requestsStorage: RequestsStorage,
+    runScriptsScheduler: Scheduler
 ) extends Processor
     with ScorexLogging {
+  private val storage: TrieMap[RequestKey, RestApiScript] = {
+    TrieMap.from(requestsStorage.all().map(k => (k, RestApiScript(k._1, blockchainStorage, k._2))))
+  }
+
   @volatile private var accumulatedChanges = new ProcessResult[RequestKey]()
 
   override def process(event: BlockchainUpdated): Unit = {
@@ -185,7 +190,7 @@ class BlockchainProcessor private (
       }
       .runToFuture(runScriptsScheduler)
 
-    // TODO #38 Get rid of Await.result. Wrapp all this code in Task
+    // TODO #38 Get rid of Await.result. Wrap all this code in Task
     Await.result(r, Duration.Inf)
 
     // Don't clean all affected scripts, because not all scripts could be added to the storage on the moment of runScripts.
@@ -237,17 +242,7 @@ class BlockchainProcessor private (
 }
 
 object BlockchainProcessor {
-  type RequestKey = (Address, JsObject)
-
   case class Settings(enableTraces: Boolean, evaluateScriptComplexityLimit: Int, maxTxErrorLogSize: Int)
-
-  def mk(
-      settings: Settings,
-      scheduler: Scheduler,
-      blockchainStorage: SharedBlockchainData[RequestKey],
-      scripts: List[RequestKey] = Nil
-  ): BlockchainProcessor =
-    new BlockchainProcessor(settings, blockchainStorage, scheduler, TrieMap.from(scripts.map(k => (k, RestApiScript(k._1, blockchainStorage, k._2)))))
 
   // TODO #18: don't calculate affectedScripts if all scripts are affected
   private case class ProcessResult[TagT](
