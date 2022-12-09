@@ -1,6 +1,7 @@
 package com.wavesplatform.ride.app
 
 import com.typesafe.config.{Config, ConfigFactory, ConfigParseOptions}
+import com.wavesplatform.Version
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.settings.*
 import com.wavesplatform.utils.{Misconfiguration, ScorexLogging, forceStopApplication}
@@ -41,6 +42,8 @@ object AppInitializer extends ScorexLogging {
     AddressScheme.current = new AddressScheme {
       override val chainId: Byte = settings.blockchain.addressSchemeCharacter.toByte
     }
+
+    log.info(s"Starting ${Version.VersionString}...")
 
     // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
     //            our merged config BEFORE initializing any metrics, including in settings-related companion objects

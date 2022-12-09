@@ -1,3 +1,4 @@
+# To build: docker build -t wavesplatform/ride-runner:latest -f docker/ride-runner.Dockerfile docker
 FROM openjdk:11-jre-slim
 
 ENV WAVES_LOG_LEVEL=INFO

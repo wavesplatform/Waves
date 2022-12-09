@@ -98,10 +98,8 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
       log.info("Warm up caches...") // Also helps to figure out, which data is used by a script
       processor.runScripts(forceAll = true)
 
-//      val lastKnownHeight             = Height(math.max(0, blockchainStorage.height - 100 - 1))
-      val lastKnownHeight = Height(1)
-      val workingHeight   = Height(lastKnownHeight + 3)
-      val endHeight       = workingHeight + 1
+      val lastKnownHeight = Height(math.max(0, blockchainStorage.height - 100 - 1))
+      val workingHeight   = Height(blockchainStorage.height)
 
       val blockchainUpdates = use(blockchainApi.mkBlockchainUpdatesStream(blockchainEventsStreamScheduler))
       // TODO #33 Move wrapped events from here: processing of Closed and Failed should be moved to blockchainUpdates.stream
@@ -118,11 +116,11 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
         }
         .collect { case WrappedEvent.Next(event) => event }
         // TODO #38 use scanLeft*
-        .foldLeftL(BlockchainState.Starting(lastHeightAtStart): BlockchainState)(BlockchainState(processor, _, _))
+        .foldLeftL(BlockchainState.Starting(workingHeight): BlockchainState)(BlockchainState(processor, _, _))
         .runToFuture(blockchainEventsStreamScheduler)
 
       log.info(s"Watching blockchain updates...")
-      blockchainUpdates.start(lastKnownHeight + 1, endHeight)
+      blockchainUpdates.start(lastKnownHeight + 1)
 
       val routeTimeout = new RouteTimeout(
         FiniteDuration(globalConfig.getDuration("akka.http.server.request-timeout").getSeconds, TimeUnit.SECONDS)

@@ -3,13 +3,14 @@ waves {
     type = MAINNET
   }
 
+  rest-api {
+    bind-address = "0.0.0.0"
+    port = 6890
+  }
+
   ride-runner {
     directory = ${WVDATA}
     enable-traces = no
-    rest-api {
-      bind-address = "0.0.0.0"
-      port = 6890
-    }
   }
 }
 
