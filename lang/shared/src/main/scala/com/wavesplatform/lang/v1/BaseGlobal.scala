@@ -139,7 +139,7 @@ trait BaseGlobal {
       (compDAppOpt, exprDApp, compErrorList) = compRes
       complexityWithMap <-
         if (compDAppOpt.nonEmpty && compErrorList.isEmpty)
-          ContractScript.estimateComplexity(stdLibVersion, compDAppOpt.get, estimator, fixEstimateOfVerifier = true).leftMap((_, 0, 0))
+          ContractScript.estimateFully(stdLibVersion, compDAppOpt.get, estimator).map(de => (de.maxAnnotatedComplexity._2, de.annotatedComplexities)).leftMap((_, 0, 0))
         else Right((0L, Map.empty[String, Long]))
       bytes <-
         if (compDAppOpt.nonEmpty && compErrorList.isEmpty) serializeContract(compDAppOpt.get, stdLibVersion).leftMap((_, 0, 0))
