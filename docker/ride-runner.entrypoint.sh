@@ -15,8 +15,9 @@ logEcho "JAVA_OPTS='${JAVA_OPTS}'"
 JAVA_OPTS="-Dlogback.stdout.level=${WAVES_LOG_LEVEL}
   -XX:+ExitOnOutOfMemoryError
   -Xmx${WAVES_HEAP_SIZE}
+  -Dlogback.configurationFile=${WAVES_LOGBACK_CONFIG}
   -Dlogback.file.directory=$WVLOG
   -Dconfig.override_with_env_vars=true
   ${JAVA_OPTS}"
 
-java $JAVA_OPTS -cp "$WAVES_INSTALL_PATH/lib/*" com.wavesplatform.ride.app.RideWithBlockchainUpdatesService "$WAVES_CONFIG"
+java $JAVA_OPTS -cp "${WAVES_INSTALL_PATH}/lib/*" com.wavesplatform.ride.app.RideWithBlockchainUpdatesService "$WAVES_CONFIG"

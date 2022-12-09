@@ -36,8 +36,8 @@ linuxScriptReplacements += ("network" -> network.value.toString)
 inConfig(Universal)(
   Seq(
     mappings ++= Seq(
-      baseDirectory.value / "ride-runner-sample.conf" -> "doc/ride-runner.conf.sample",
-      resourceDirectory.value / "logback.xml"         -> "doc/logback.xml"
+      baseDirectory.value / "ride-runner-sample.conf"     -> "doc/ride-runner.conf.sample",
+      (Compile / resourceDirectory).value / "logback.xml" -> "doc/logback.sample.xml" // Logback doesn't allow .xml.sample
     ),
     javaOptions ++= Seq(
       // -J prefix is required by the bash script

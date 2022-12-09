@@ -20,6 +20,7 @@ ENV WVDATA=/var/lib/ride-runner
 ENV WVLOG=/var/log/ride-runner
 ENV WAVES_INSTALL_PATH=/usr/share/ride-runner
 ENV WAVES_CONFIG=/etc/ride-runner/ride-runner.conf
+ENV WAVES_LOGBACK_CONFIG=$WAVES_INSTALL_PATH/doc/logback.sample.xml
 
 COPY target /tmp/
 COPY ride-runner.conf.template $WAVES_CONFIG
