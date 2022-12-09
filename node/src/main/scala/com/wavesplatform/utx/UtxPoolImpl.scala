@@ -196,9 +196,15 @@ class UtxPoolImpl(
     val diffEi = {
       def calculateDiff(): TracedResult[ValidationError, Diff] = {
         if (forceValidate)
-          TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(priorityPool.compositeBlockchain, tx)
+          TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime(), enableExecutionLog = true)(
+            priorityPool.compositeBlockchain,
+            tx
+          )
         else
-          TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(priorityPool.compositeBlockchain, tx)
+          TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), verify, enableExecutionLog = true)(
+            priorityPool.compositeBlockchain,
+            tx
+          )
       }
 
       if (canLock) priorityPool.optimisticRead(calculateDiff())(_.resultE.isLeft)
@@ -249,7 +255,7 @@ class UtxPoolImpl(
       strategy: PackStrategy,
       cancelled: () => Boolean
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
-    pack(TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime()))(initialConstraint, strategy, cancelled)
+    pack(TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), enableExecutionLog = true))(initialConstraint, strategy, cancelled)
   }
 
   def cleanUnconfirmed(): Unit = {
@@ -263,9 +269,15 @@ class UtxPoolImpl(
           TxStateActions.removeExpired(tx)
         } else {
           val differ = if (!isMiningEnabled && utxSettings.forceValidateInCleanup) {
-            TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(priorityPool.compositeBlockchain, _)
+            TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime(), enableExecutionLog = true)(
+              priorityPool.compositeBlockchain,
+              _
+            )
           } else {
-            TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime())(priorityPool.compositeBlockchain, _)
+            TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), enableExecutionLog = true)(
+              priorityPool.compositeBlockchain,
+              _
+            )
           }
           val diffEi = differ(tx).resultE
           diffEi.left.foreach { error =>

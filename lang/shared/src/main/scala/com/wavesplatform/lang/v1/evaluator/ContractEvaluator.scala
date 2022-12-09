@@ -108,12 +108,13 @@ object ContractEvaluator {
       version: StdLibVersion,
       limit: Int,
       correctFunctionCallScope: Boolean,
-      newMode: Boolean
+      newMode: Boolean,
+      enableExecutionLog: Boolean
   ): Coeval[Either[(ExecutionError, Int, Log[Id]), (ScriptResult, Log[Id])]] =
     Coeval
       .now(buildExprFromInvocation(dApp, i, version).leftMap((_, limit, Nil)))
       .flatMap {
-        case Right(value) => applyV2Coeval(ctx, value, version, i.transactionId, limit, correctFunctionCallScope, newMode)
+        case Right(value) => applyV2Coeval(ctx, value, version, i.transactionId, limit, correctFunctionCallScope, newMode, enableExecutionLog)
         case Left(error)  => Coeval.now(Left(error))
       }
 
@@ -124,10 +125,11 @@ object ContractEvaluator {
       transactionId: ByteStr,
       limit: Int,
       correctFunctionCallScope: Boolean,
-      newMode: Boolean
+      newMode: Boolean,
+      enableExecutionLog: Boolean
   ): Coeval[Either[(ExecutionError, Int, Log[Id]), (ScriptResult, Log[Id])]] =
     EvaluatorV2
-      .applyLimitedCoeval(expr, limit, ctx, version, correctFunctionCallScope, newMode)
+      .applyLimitedCoeval(expr, limit, ctx, version, correctFunctionCallScope, newMode, enableExecutionLog = enableExecutionLog)
       .map(_.flatMap { case (expr, unusedComplexity, log) =>
         val result =
           expr match {

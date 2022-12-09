@@ -48,6 +48,7 @@ object InvokeScriptDiff {
       blockchain: Blockchain,
       blockTime: Long,
       limitedExecution: Boolean,
+      enableExecutionLog: Boolean,
       totalComplexityLimit: Int,
       remainingComplexity: Int,
       remainingCalls: Int,
@@ -156,7 +157,8 @@ object InvokeScriptDiff {
                 script.script,
                 isAssetScript = true,
                 scriptContainerAddress = Coproduct[Environment.Tthis](Environment.AssetId(assetId.arr)),
-                nextRemainingComplexity
+                nextRemainingComplexity,
+                enableExecutionLog = enableExecutionLog
               )
               val scriptComplexity = if (blockchain.storeEvaluatedComplexity) evaluatedComplexity else script.complexity.toInt
               val totalComplexity  = usedComplexity + scriptComplexity
@@ -218,6 +220,7 @@ object InvokeScriptDiff {
                   pk,
                   calledAddresses,
                   limitedExecution,
+                  enableExecutionLog,
                   totalComplexityLimit,
                   remainingCalls - 1,
                   remainingActions,
@@ -238,7 +241,8 @@ object InvokeScriptDiff {
                       invocation,
                       environment,
                       complexityAfterPayments,
-                      remainingComplexity
+                      remainingComplexity,
+                      enableExecutionLog
                     ).map(TracedResult(_))
                   )
                   diff <- traced(environment.currentDiff.combineF(paymentsPartToResolve).leftMap(GenericError(_)))
@@ -275,7 +279,8 @@ object InvokeScriptDiff {
                     isSyncCall = true,
                     limitedExecution,
                     totalComplexityLimit,
-                    Seq()
+                    Seq(),
+                    enableExecutionLog
                   )
                 )
               )
@@ -404,11 +409,21 @@ object InvokeScriptDiff {
       invocation: ContractEvaluator.Invocation,
       environment: Environment[Id],
       limit: Int,
-      startComplexityLimit: Int
+      startComplexityLimit: Int,
+      enableExecutionLog: Boolean
   ): Coeval[Either[ValidationError, (ScriptResult, Log[Id])]] = {
     val evaluationCtx = CachedDAppCTX.get(version, blockchain).completeContext(environment)
     ContractEvaluator
-      .applyV2Coeval(evaluationCtx, contract, invocation, version, limit, blockchain.correctFunctionCallScope, blockchain.newEvaluatorMode)
+      .applyV2Coeval(
+        evaluationCtx,
+        contract,
+        invocation,
+        version,
+        limit,
+        blockchain.correctFunctionCallScope,
+        blockchain.newEvaluatorMode,
+        enableExecutionLog
+      )
       .map(
         _.leftMap[ValidationError] {
           case (reject @ FailOrRejectError(_, true), _, _) =>

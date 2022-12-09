@@ -1151,7 +1151,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       )
       .anyNumberOfTimes()
     InvokeScriptTransactionDiff
-      .apply(blockchain, invoke.timestamp, limitedExecution = false)(invoke)
+      .apply(blockchain, invoke.timestamp, limitedExecution = false, enableExecutionLog = false)(invoke)
       .resultE should produceRejectOrFailedDiff("is already issued")
 
   }

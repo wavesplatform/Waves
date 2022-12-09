@@ -378,6 +378,7 @@ object UtilsApiRoute {
               pk,
               Set.empty[Address],
               limitedExecution = false,
+              enableExecutionLog = true,
               limit,
               remainingCalls = ContractLimits.MaxSyncDAppCalls(script.stdLibVersion),
               availableActions = ContractLimits.MaxCallableActionsAmountBeforeV6(script.stdLibVersion),
@@ -401,7 +402,8 @@ object UtilsApiRoute {
             script.stdLibVersion,
             correctFunctionCallScope = blockchain.checkEstimatorSumOverflow,
             newMode = blockchain.newEvaluatorMode,
-            checkConstructorArgsTypes = true
+            checkConstructorArgsTypes = true,
+            enableExecutionLog = true
           )
           .value()
           .leftMap { case (err, _, log) => ScriptExecutionError.dAppExecution(err.message, log) }

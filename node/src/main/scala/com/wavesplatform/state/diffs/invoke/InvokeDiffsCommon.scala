@@ -167,7 +167,8 @@ object InvokeDiffsCommon {
       isSyncCall: Boolean,
       limitedExecution: Boolean,
       totalComplexityLimit: Int,
-      otherIssues: Seq[Issue]
+      otherIssues: Seq[Issue],
+      enableExecutionLog: Boolean
   ): TracedResult[ValidationError, Diff] = {
     val complexityLimit =
       if (limitedExecution) ContractLimits.FailFreeInvokeComplexity - storingComplexity
@@ -252,7 +253,11 @@ object InvokeDiffsCommon {
           }
       }
 
-      compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey)(actions, paymentsAndFeeDiff, complexityLimit)
+      compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey, enableExecutionLog)(
+        actions,
+        paymentsAndFeeDiff,
+        complexityLimit
+      )
         .leftMap {
           case failed: FailedTransactionError => failed.addComplexity(storingComplexity)
           case other                          => other
@@ -439,7 +444,8 @@ object InvokeDiffsCommon {
       blockTime: Long,
       tx: InvokeScriptLike,
       dAppAddress: Address,
-      pk: PublicKey
+      pk: PublicKey,
+      enableExecutionLog: Boolean
   )(
       actions: List[CallableAction],
       paymentsDiff: Diff,
@@ -507,7 +513,8 @@ object InvokeDiffsCommon {
                         assetVerifierDiff,
                         script,
                         complexity,
-                        complexityLimit
+                        complexityLimit,
+                        enableExecutionLog
                       )
                     } yield assetValidationDiff
                     val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
@@ -616,7 +623,8 @@ object InvokeDiffsCommon {
                 result,
                 script,
                 complexity,
-                complexityLimit
+                complexityLimit,
+                enableExecutionLog
               )
             } yield validatedResult
           val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
@@ -665,7 +673,8 @@ object InvokeDiffsCommon {
       nextDiff: Diff,
       script: Script,
       estimatedComplexity: Long,
-      complexityLimit: Int
+      complexityLimit: Int,
+      enableExecutionLog: Boolean
   ): Either[FailedTransactionError, Diff] =
     Try {
       val (log, evaluatedComplexity, result) = ScriptRunner(
@@ -676,7 +685,8 @@ object InvokeDiffsCommon {
         scriptContainerAddress =
           if (blockchain.passCorrectAssetId) Coproduct[Environment.Tthis](Environment.AssetId(assetId.arr))
           else Coproduct[Environment.Tthis](Environment.AssetId(tx.dApp.bytes)),
-        complexityLimit
+        complexityLimit,
+        enableExecutionLog = enableExecutionLog
       )
       val complexity = if (blockchain.storeEvaluatedComplexity) evaluatedComplexity else estimatedComplexity
       result match {
@@ -725,7 +735,6 @@ object InvokeDiffsCommon {
         blockchain.isFeatureActivated(
           SynchronousCalls
         ) && blockchain.height >= blockchain.settings.functionalitySettings.enforceTransferValidationAfter
-
       ) {
         TracedResult(Left(FailOrRejectError(message)))
       } else

@@ -26,14 +26,15 @@ object Dependencies {
 
   val akkaHttp           = akkaHttpModule("akka-http")
   val jacksonModuleScala = jacksonModule("module", "module-scala").withCrossVersion(CrossVersion.Binary())
-  val googleGuava        = "com.google.guava"    % "guava"             % "31.1-jre"
+  val googleGuava        = "com.google.guava"              % "guava"             % "31.1-jre"
+  val cafeine            = "com.github.ben-manes.caffeine" % "caffeine"          % "2.9.2"
   val kamonCore          = kamonModule("core")
-  val machinist          = "org.typelevel"      %% "machinist"         % "0.6.8"
-  val logback            = "ch.qos.logback"      % "logback-classic"   % "1.3.0"
-  val janino             = "org.codehaus.janino" % "janino"            % "3.1.8"
-  val asyncHttpClient    = "org.asynchttpclient" % "async-http-client" % "2.12.3"
-  val curve25519         = "com.wavesplatform"   % "curve25519-java"   % "0.6.4"
-  val nettyHandler       = "io.netty"            % "netty-handler"     % "4.1.79.Final"
+  val machinist          = "org.typelevel"                %% "machinist"         % "0.6.8"
+  val logback            = "ch.qos.logback"                % "logback-classic"   % "1.3.0"
+  val janino             = "org.codehaus.janino"           % "janino"            % "3.1.8"
+  val asyncHttpClient    = "org.asynchttpclient"           % "async-http-client" % "2.12.3"
+  val curve25519         = "com.wavesplatform"             % "curve25519-java"   % "0.6.4"
+  val nettyHandler       = "io.netty"                      % "netty-handler"     % "4.1.79.Final"
 
   val catsEffect = catsModule("effect", "2.1.3")
   val catsCore   = catsModule("core", "2.7.0")
@@ -52,7 +53,6 @@ object Dependencies {
       akkaHttp,
       jacksonModuleScala,
       scalaTest,
-      googleGuava,
       "org.slf4j" % "slf4j-api" % "2.0.0",
       jacksonModule("core", "core"),
       jacksonModule("core", "annotations"),
@@ -159,7 +159,7 @@ object Dependencies {
       kamonModule("akka-http"),
       kamonModule("executors"),
       "org.influxdb" % "influxdb-java" % "2.23",
-      googleGuava,
+      cafeine,
       "com.google.code.findbugs" % "jsr305"    % "3.0.2" % Compile, // javax.annotation stubs
       "com.typesafe.play"       %% "play-json" % "2.9.2",
       akkaModule("actor"),

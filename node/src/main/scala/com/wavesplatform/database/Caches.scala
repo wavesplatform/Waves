@@ -3,7 +3,7 @@ package com.wavesplatform.database
 import java.{lang, util}
 import cats.data.Ior
 import cats.syntax.option.*
-import com.google.common.cache.*
+import com.github.benmanes.caffeine.cache.{CacheLoader, Caffeine, LoadingCache}
 import com.google.common.collect.ArrayListMultimap
 import com.google.common.hash.{Funnels, BloomFilter as GBloomFilter}
 import com.google.protobuf.ByteString
@@ -99,10 +99,11 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
       .toMap
 
   override def loadCacheData(addresses: Seq[Address]): Unit = {
-    addressIdCache.putAll(loadAddressIds(addresses).asJava)
-    balancesCache.putAll(loadWavesBalances(addresses.map(_ -> Waves)).asJava)
-//    addressIdCache.getAll(addresses.asJava)
-//    balancesCache.getAll(addresses.map(_ -> Waves).asJava)
+//    addressIdCache.putAll(loadAddressIds(addresses).asJava)
+//    balancesCache.putAll(loadWavesBalances(addresses.map(_ -> Waves)).asJava)
+    addressIdCache.getAll(addresses.asJava)
+    balancesCache.getAll(addresses.map(_ -> Waves).asJava)
+    leaseBalanceCache.getAll(addresses.asJava)
   }
 
   override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] =
@@ -424,7 +425,7 @@ object Caches {
       loader: K => V,
       batchLoader: lang.Iterable[? <: K] => util.Map[K, V] = { _: lang.Iterable[? <: K] => new util.HashMap[K, V]() }
   ): LoadingCache[K, V] =
-    CacheBuilder
+    Caffeine
       .newBuilder()
       .maximumSize(maximumSize)
       .recordStats()

@@ -217,7 +217,7 @@ case class DebugApiRoute(
 
       val tracedDiff = for {
         tx   <- TracedResult(parsedTransaction)
-        diff <- TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, tx)
+        diff <- TransactionDiffer.forceValidate(blockchain.lastBlockTimestamp, time.correctedTime(), enableExecutionLog = true)(blockchain, tx)
       } yield (tx, diff)
 
       val error = tracedDiff.resultE match {

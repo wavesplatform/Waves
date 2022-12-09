@@ -19,7 +19,7 @@ package object estimator {
 
   private val environment = Common.emptyBlockchainEnvironment()
   private def evaluator(overhead: Boolean, expr: EXPR) =
-    EvaluatorV2.applyCompleted(ctx.evaluationContext(environment), expr, V3, correctFunctionCallScope = true, overhead)
+    EvaluatorV2.applyCompleted(ctx.evaluationContext(environment), expr, V3, correctFunctionCallScope = true, overhead, enableExecutionLog = false)
 
   def evaluatorV2AsEstimator(overhead: Boolean): ScriptEstimator = new ScriptEstimator {
     override val version: Int = 0

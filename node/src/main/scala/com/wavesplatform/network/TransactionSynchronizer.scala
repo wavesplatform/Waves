@@ -1,6 +1,6 @@
 package com.wavesplatform.network
 
-import com.google.common.cache.CacheBuilder
+import com.github.benmanes.caffeine.cache.Caffeine
 import com.typesafe.scalalogging.LazyLogging
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.settings.SynchronizationSettings.UtxSynchronizerSettings
@@ -17,7 +17,7 @@ object TransactionSynchronizer extends LazyLogging {
       transactionValidator: TransactionPublisher
   )(implicit scheduler: Scheduler): Cancelable = {
     val dummy = new Object()
-    val knownTransactions = CacheBuilder
+    val knownTransactions = Caffeine
       .newBuilder()
       .maximumSize(settings.networkTxCacheSize)
       .build[ByteStr, Object]
@@ -29,19 +29,22 @@ object TransactionSynchronizer extends LazyLogging {
 
     def transactionIsNew(txId: ByteStr): Boolean = {
       var isNew = false
-      knownTransactions.get(txId, { () =>
-        isNew = true; dummy
-      })
+      knownTransactions.get(
+        txId,
+        { _ =>
+          isNew = true; dummy
+        }
+      )
       isNew
     }
 
     transactions
-      .filter {
-        case (_, tx) => transactionIsNew(tx.id())
+      .filter { case (_, tx) =>
+        transactionIsNew(tx.id())
       }
       .whileBusyBuffer(OverflowStrategy.DropNew(settings.maxQueueSize))
-      .mapParallelUnorderedF(settings.maxThreads) {
-        case (channel, tx) => transactionValidator.validateAndBroadcast(tx, Some(channel))
+      .mapParallelUnorderedF(settings.maxThreads) { case (channel, tx) =>
+        transactionValidator.validateAndBroadcast(tx, Some(channel))
       }
       .subscribe()
   }

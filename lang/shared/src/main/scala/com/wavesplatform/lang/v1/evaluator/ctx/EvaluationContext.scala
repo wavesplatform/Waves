@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.evaluator.ctx
 
-import cats._
+import cats.*
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.LET
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
@@ -25,20 +25,31 @@ case class EvaluationContext[C[_[_]], F[_]](
     )
 }
 
-case class LoggedEvaluationContext[C[_[_]], F[_]](l: LetLogCallback[F], ec: EvaluationContext[C, F]) {
+trait LoggedEvaluationContext[C[_[_]], F[_]] {
+  def ec: EvaluationContext[C, F]
+  def log(let: LET, result: LetExecResult[F]): Unit
+}
+
+case class EnabledLogEvaluationContext[C[_[_]], F[_]](l: LetLogCallback[F], ec: EvaluationContext[C, F]) extends LoggedEvaluationContext[C, F] {
   val loggedLets: util.IdentityHashMap[LET, Unit] = new util.IdentityHashMap()
 
-  def log(let: LET, result: LetExecResult[F]): Unit =
+  override def log(let: LET, result: LetExecResult[F]): Unit =
     loggedLets.computeIfAbsent(let, _ => l(let.name)(result))
 }
 
-object LoggedEvaluationContext {
+object EnabledLogEvaluationContext {
   class Lenses[F[_], C[_[_]]] {
-    val types: Lens[LoggedEvaluationContext[C, F], Map[String, FINAL]]     = lens[LoggedEvaluationContext[C, F]] >> Symbol("ec") >> Symbol("typeDefs")
-    val lets: Lens[LoggedEvaluationContext[C, F], Map[String, LazyVal[F]]] = lens[LoggedEvaluationContext[C, F]] >> Symbol("ec") >> Symbol("letDefs")
-    val funcs: Lens[LoggedEvaluationContext[C, F], Map[FunctionHeader, BaseFunction[C]]] =
-      lens[LoggedEvaluationContext[C, F]] >> Symbol("ec") >> Symbol("functions")
+    val types: Lens[EnabledLogEvaluationContext[C, F], Map[String, FINAL]] =
+      lens[EnabledLogEvaluationContext[C, F]] >> Symbol("ec") >> Symbol("typeDefs")
+    val lets: Lens[EnabledLogEvaluationContext[C, F], Map[String, LazyVal[F]]] =
+      lens[EnabledLogEvaluationContext[C, F]] >> Symbol("ec") >> Symbol("letDefs")
+    val funcs: Lens[EnabledLogEvaluationContext[C, F], Map[FunctionHeader, BaseFunction[C]]] =
+      lens[EnabledLogEvaluationContext[C, F]] >> Symbol("ec") >> Symbol("functions")
   }
+}
+
+case class DisabledLogEvaluationContext[C[_[_]], F[_]](ec: EvaluationContext[C, F]) extends LoggedEvaluationContext[C, F] {
+  override def log(let: LET, result: LetExecResult[F]): Unit = ()
 }
 
 object EvaluationContext {

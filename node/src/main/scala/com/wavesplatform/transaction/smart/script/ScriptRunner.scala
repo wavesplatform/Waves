@@ -34,7 +34,8 @@ object ScriptRunner {
       isAssetScript: Boolean,
       scriptContainerAddress: Environment.Tthis,
       complexityLimit: Int = Int.MaxValue,
-      default: EVALUATED = TRUE
+      default: EVALUATED = TRUE,
+      enableExecutionLog: Boolean = false
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
     applyGeneric(
       in,
@@ -50,7 +51,8 @@ object ScriptRunner {
         blockchain.height > blockchain.settings.functionalitySettings.enforceTransferValidationAfter,
       blockchain.checkEstimatorSumOverflow,
       blockchain.newEvaluatorMode,
-      blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
+      blockchain.isFeatureActivated(BlockchainFeatures.RideV6),
+      enableExecutionLog
     )
 
   def applyGeneric(
@@ -66,7 +68,8 @@ object ScriptRunner {
       useNewPowPrecision: Boolean,
       checkEstimatorSumOverflow: Boolean,
       newEvaluatorMode: Boolean,
-      checkWeakPk: Boolean
+      checkWeakPk: Boolean,
+      enableExecutionLog: Boolean
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
 
     def evalVerifier(
@@ -121,7 +124,8 @@ object ScriptRunner {
           limit,
           correctFunctionCallScope = checkEstimatorSumOverflow,
           newMode = newEvaluatorMode,
-          onExceed
+          onExceed,
+          enableExecutionLog
         )
 
       (log, limit - unusedComplexity, result)
