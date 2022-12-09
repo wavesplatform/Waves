@@ -17,7 +17,6 @@ RUN apt-get update && apt-get install -y wget unzip gosu || exit 1; \
 
 # RIDE runner files
 ENV WVDATA=/var/lib/ride-runner
-ENV WVLOG=/var/log/ride-runner
 ENV WAVES_INSTALL_PATH=/usr/share/ride-runner
 ENV WAVES_CONFIG=/etc/ride-runner/ride-runner.conf
 ENV WAVES_LOGBACK_CONFIG=$WAVES_INSTALL_PATH/doc/logback.sample.xml
@@ -34,13 +33,12 @@ RUN mkdir -p $WVDATA $WVLOG; \
     # Unpack tgz packages
     tar zxvf /tmp/ride-runner.tgz -C $WAVES_INSTALL_PATH --strip-components=1; \
     # Set permissions
-    chown -R ride:ride $WVDATA $WVLOG $WAVES_INSTALL_PATH && chmod 755 $WVDATA $WVLOG; \
+    chown -R ride:ride $WVDATA $WAVES_INSTALL_PATH && chmod 755 $WVDATA; \
     # Cleanup
     rm -rf /tmp/*
 
 EXPOSE 6890
 VOLUME $WVDATA
-VOLUME $WVLOG
 WORKDIR $WVDATA
 
 STOPSIGNAL SIGINT
