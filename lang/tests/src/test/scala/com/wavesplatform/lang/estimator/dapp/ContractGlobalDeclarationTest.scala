@@ -3,7 +3,6 @@ package com.wavesplatform.lang.estimator.dapp
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.script.ContractScript
-import com.wavesplatform.lang.v1.compiler.Terms.{FUNC, LET}
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.test.PropSpec
@@ -932,22 +931,12 @@ class ContractGlobalDeclarationTest extends PropSpec {
     val dApp      = TestCompiler(V6).compileContract(neutrinoScript).expr
     val estimator = ScriptEstimatorV3(fixOverflow = true, overhead = false)
 
-    val oldFunctionsCosts =
-      ContractScript
-        .estimateDeclarations(V6, dApp, estimator, dApp.decs.collect { case f: FUNC => (None, f) }, preserveDefinition = false)
-        .explicitGet()
-        .toMap
-
-    val oldLetsCosts =
-      ContractScript
-        .estimateDeclarations(V6, dApp, estimator, dApp.decs.collect { case l: LET => (None, l) }, preserveDefinition = false)
-        .explicitGet()
-        .toMap
-
+    val oldFunctionsCosts = ContractScript.oldGlobalFunctionsCosts(V6, dApp, estimator).explicitGet()
+    val oldLetsCosts      = ContractScript.oldGlobalLetsCosts(V6, dApp, estimator).explicitGet()
     val (oldMaxAnnotatedComplexity, oldAnnotatedComplexities) =
       ContractScript.estimateComplexityExact(V6, dApp, estimator, fixEstimateOfVerifier = true).explicitGet()
 
-    val newCosts = ContractScript.estimateFully(V6, dApp).explicitGet()
+    val newCosts = ContractScript.estimateFully(V6, dApp, estimator).explicitGet()
     newCosts.globalFunctionsCosts shouldBe oldFunctionsCosts
     newCosts.globalLetsCosts shouldBe oldLetsCosts
     newCosts.maxAnnotatedComplexity shouldBe oldMaxAnnotatedComplexity

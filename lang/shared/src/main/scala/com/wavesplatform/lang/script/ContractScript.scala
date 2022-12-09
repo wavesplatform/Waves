@@ -200,15 +200,33 @@ object ContractScript {
       max = annotatedFunctionComplexities.toList.maximumOption(_._2 compareTo _._2).getOrElse(("", 0L))
     } yield (max, annotatedFunctionComplexities.toMap)
 
-  def estimateFully(version: StdLibVersion, dApp: DApp): Either[String, DAppEstimation] = {
-    val allDecs   = dApp.decs ++ dApp.callableFuncs.map(_.u) ++ dApp.verifierFuncOpt.map(_.u)
-    val singleAst = allDecs.foldRight[EXPR](TRUE) { case (decl, expr) => BLOCK(decl, expr) }
-    val libCosts  = functionCosts(version, DAppType)
-    val estimator = ScriptEstimatorV3(fixOverflow = true, overhead = false)
-    for {
-      GlobalDeclarationsCosts(lets, functions) <- estimator.globalDeclarationsCosts(libCosts, singleAst)
-      nonAnnotatedFunctions = functions.view.filterKeys(k => dApp.decs.exists(_.name == k)).toMap
-      annotatedFunctions    = functions.view.filterKeys(!nonAnnotatedFunctions.contains(_)).toMap
-    } yield DAppEstimation(annotatedFunctions, lets, nonAnnotatedFunctions)
+  def estimateFully(version: StdLibVersion, dApp: DApp, estimator: ScriptEstimator): Either[String, DAppEstimation] = {
+    estimator match {
+      case estimatorV3: ScriptEstimatorV3 =>
+        val allDecs   = dApp.decs ++ dApp.callableFuncs.map(_.u) ++ dApp.verifierFuncOpt.map(_.u)
+        val singleAst = allDecs.foldRight[EXPR](TRUE) { case (decl, expr) => BLOCK(decl, expr) }
+        val libCosts  = functionCosts(version, DAppType)
+        for {
+          GlobalDeclarationsCosts(lets, functions) <- estimatorV3.globalDeclarationsCosts(libCosts, singleAst)
+          nonAnnotatedFunctions = functions.view.filterKeys(k => dApp.decs.exists(_.name == k)).toMap
+          annotatedFunctions    = functions.view.filterKeys(!nonAnnotatedFunctions.contains(_)).toMap
+        } yield DAppEstimation(annotatedFunctions, lets, nonAnnotatedFunctions)
+      case oldEstimator =>
+        for {
+          annotatedComplexities <- estimateAnnotatedFunctions(version, dApp, oldEstimator, fixEstimateOfVerifier = true)
+          letsCosts             <- oldGlobalLetsCosts(version, dApp, oldEstimator)
+          functionsCosts        <- oldGlobalFunctionsCosts(version, dApp, oldEstimator)
+        } yield DAppEstimation(annotatedComplexities.toMap, letsCosts, functionsCosts)
+    }
   }
+
+  def oldGlobalFunctionsCosts(version: StdLibVersion, dApp: DApp, estimator: ScriptEstimator): Either[String, Map[String, Long]] =
+    ContractScript
+      .estimateDeclarations(version, dApp, estimator, dApp.decs.collect { case f: FUNC => (None, f) }, preserveDefinition = false)
+      .map(_.toMap)
+
+  def oldGlobalLetsCosts(version: StdLibVersion, dApp: DApp, estimator: ScriptEstimator): Either[String, Map[String, Long]] =
+    ContractScript
+      .estimateDeclarations(version, dApp, estimator, dApp.decs.collect { case l: LET => (None, l) }, preserveDefinition = false)
+      .map(_.toMap)
 }

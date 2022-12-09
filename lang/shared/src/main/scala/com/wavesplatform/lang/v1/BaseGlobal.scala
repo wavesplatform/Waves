@@ -141,7 +141,9 @@ trait BaseGlobal {
         if (compDAppOpt.nonEmpty && compErrorList.isEmpty)
           ContractScript.estimateComplexity(stdLibVersion, compDAppOpt.get, estimator, fixEstimateOfVerifier = true).leftMap((_, 0, 0))
         else Right((0L, Map.empty[String, Long]))
-      bytes <- if (compDAppOpt.nonEmpty && compErrorList.isEmpty) serializeContract(compDAppOpt.get, stdLibVersion).leftMap((_, 0, 0)) else Right(Array.empty[Byte])
+      bytes <-
+        if (compDAppOpt.nonEmpty && compErrorList.isEmpty) serializeContract(compDAppOpt.get, stdLibVersion).leftMap((_, 0, 0))
+        else Right(Array.empty[Byte])
     } yield (bytes, complexityWithMap, exprDApp, compErrorList))
       .recover { case (e, start, end) =>
         (Array.empty[Byte], (0L, Map.empty[String, Long]), Expressions.DAPP(AnyPos, List.empty, List.empty), List(Generic(start, end, e)))
@@ -202,17 +204,17 @@ trait BaseGlobal {
   def compileContract(
       input: String,
       ctx: CompilerContext,
-      stdLibVersion: StdLibVersion,
+      version: StdLibVersion,
       estimator: ScriptEstimator,
       needCompaction: Boolean,
       removeUnusedCode: Boolean
   ): Either[String, DAppInfo] =
     for {
-      dApp                       <- ContractCompiler.compile(input, ctx, stdLibVersion, CallableFunction, needCompaction, removeUnusedCode)
-      bytes                      <- serializeContract(dApp, stdLibVersion)
-      _                          <- ContractScript.validateBytes(bytes)
-      de @ DAppEstimation(annotatedComplexities, globalLetsCosts, globalFunctionsCosts) <- ContractScript.estimateFully(stdLibVersion, dApp)
-      _ <- ContractScript.checkComplexity(stdLibVersion, dApp, de.maxAnnotatedComplexity, annotatedComplexities, useReducedVerifierLimit = true)
+      dApp  <- ContractCompiler.compile(input, ctx, version, CallableFunction, needCompaction, removeUnusedCode)
+      bytes <- serializeContract(dApp, version)
+      _     <- ContractScript.validateBytes(bytes)
+      de @ DAppEstimation(annotatedComplexities, globalLetsCosts, globalFunctionsCosts) <- ContractScript.estimateFully(version, dApp, estimator)
+      _ <- ContractScript.checkComplexity(version, dApp, de.maxAnnotatedComplexity, annotatedComplexities, useReducedVerifierLimit = true)
       (verifierComplexity, callableComplexities) = dApp.verifierFuncOpt.fold(
         (0L, annotatedComplexities)
       )(v => (annotatedComplexities(v.u.name), annotatedComplexities - v.u.name))
