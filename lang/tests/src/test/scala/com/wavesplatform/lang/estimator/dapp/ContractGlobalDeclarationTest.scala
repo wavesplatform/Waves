@@ -944,8 +944,13 @@ class ContractGlobalDeclarationTest extends PropSpec {
         .explicitGet()
         .toMap
 
-    val newCosts = ContractScript.estimateWithGlobalDeclarations(V6, dApp, estimator).explicitGet()
+    val (oldMaxAnnotatedComplexity, oldAnnotatedComplexities) =
+      ContractScript.estimateComplexityExact(V6, dApp, estimator, fixEstimateOfVerifier = true).explicitGet()
+
+    val newCosts = ContractScript.estimateFully(V6, dApp).explicitGet()
     newCosts.globalFunctionsCosts shouldBe oldFunctionsCosts
     newCosts.globalLetsCosts shouldBe oldLetsCosts
+    newCosts.maxAnnotatedComplexity shouldBe oldMaxAnnotatedComplexity
+    newCosts.annotatedComplexities shouldBe oldAnnotatedComplexities
   }
 }

@@ -25,12 +25,12 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean) extends Sc
   ): Either[String, Long] =
     estimate(funcs, expr, globalDeclarationsMode = false)._2
 
-  def globalDeclarationCosts(
+  def globalDeclarationsCosts(
       funcs: Map[FunctionHeader, Coeval[Long]],
       expr: EXPR
-  ): GlobalDeclarationsCosts = {
+  ): Either[EstimationError, GlobalDeclarationsCosts] = {
     val result = estimate(funcs, expr, globalDeclarationsMode = true)
-    GlobalDeclarationsCosts(result._1.globalLetsCosts, result._1.globalFunctionsCosts)
+    result._2.map(_ => GlobalDeclarationsCosts(result._1.globalLetsCosts, result._1.globalFunctionsCosts))
   }
 
   private def estimate(

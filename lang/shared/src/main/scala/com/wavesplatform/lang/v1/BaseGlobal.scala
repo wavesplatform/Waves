@@ -211,16 +211,15 @@ trait BaseGlobal {
       dApp                       <- ContractCompiler.compile(input, ctx, stdLibVersion, CallableFunction, needCompaction, removeUnusedCode)
       bytes                      <- serializeContract(dApp, stdLibVersion)
       _                          <- ContractScript.validateBytes(bytes)
-      DAppEstimation(maxComplexity, annotatedComplexities, globalLetsCosts, globalFunctionsCosts) <-
-        ContractScript.estimateWithGlobalDeclarations(stdLibVersion, dApp, estimator)
-      _ <- ContractScript.checkComplexity(stdLibVersion, dApp, maxComplexity, annotatedComplexities, useReducedVerifierLimit = true)
+      de @ DAppEstimation(annotatedComplexities, globalLetsCosts, globalFunctionsCosts) <- ContractScript.estimateFully(stdLibVersion, dApp)
+      _ <- ContractScript.checkComplexity(stdLibVersion, dApp, de.maxAnnotatedComplexity, annotatedComplexities, useReducedVerifierLimit = true)
       (verifierComplexity, callableComplexities) = dApp.verifierFuncOpt.fold(
         (0L, annotatedComplexities)
       )(v => (annotatedComplexities(v.u.name), annotatedComplexities - v.u.name))
     } yield DAppInfo(
       bytes,
       dApp,
-      maxComplexity,
+      de.maxAnnotatedComplexity,
       annotatedComplexities,
       verifierComplexity,
       callableComplexities,
