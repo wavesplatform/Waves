@@ -8,6 +8,7 @@ import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.StreamObserver
 import io.grpc.{CallOptions, Channel, ClientCall, MethodDescriptor}
 import monix.execution.Scheduler.Implicits.traced
+import monix.execution.Scheduler.global
 import monix.execution.exceptions.UpstreamTimeoutException
 import sttp.client3.testing.SttpBackendStub
 
@@ -32,11 +33,10 @@ class MonixWrappedDownstreamTestSuite extends BaseTestSuite with HasGrpc with Sc
           ),
           EmptyChannel,
           channel,
-          SttpBackendStub.synchronous,
-          traced
+          SttpBackendStub.synchronous
         )
 
-        val stream = blockchainApi.mkBlockchainUpdatesStream()
+        val stream = blockchainApi.mkBlockchainUpdatesStream(global)
         val r      = stream.stream.failed.runAsyncGetFirst
         stream.start(1)
         r

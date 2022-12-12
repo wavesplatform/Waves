@@ -21,8 +21,9 @@ class EmptyProcessor extends Processor {
     actions = actions.appended(Process(event))
   }
 
-  override def runScripts(forceAll: Boolean): Unit = {
+  override def runScripts(forceAll: Boolean): Task[Unit] = {
     actions = actions.appended(RunScripts(forceAll))
+    Task.now(())
   }
 
   var actions: Vector[ProcessorAction] = Vector.empty

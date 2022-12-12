@@ -1,4 +1,4 @@
-package com.wavesplatform.storage.persistent
+package com.wavesplatform.storage
 
 import com.google.common.io.MoreFiles
 import com.wavesplatform.database.LevelDBFactory

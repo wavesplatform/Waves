@@ -4,6 +4,7 @@ import com.wavesplatform.BaseTestSuite
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.ride.input.EmptyPublicKey
+import com.wavesplatform.storage.HasLevelDb
 
 class BlockPersistentCacheTestSuite extends BaseTestSuite with HasLevelDb {
   "BlockPersistentCache" - {

@@ -3,6 +3,7 @@ package com.wavesplatform.storage.persistent
 import com.wavesplatform.BaseTestSuite
 import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.meta.getSimpleName
+import com.wavesplatform.storage.HasLevelDb
 
 abstract class PersistentCacheTestSuite[KeyT, ValueT] extends BaseTestSuite with HasLevelDb {
   private val name                    = getSimpleName(this).replace("TestSuite", "")

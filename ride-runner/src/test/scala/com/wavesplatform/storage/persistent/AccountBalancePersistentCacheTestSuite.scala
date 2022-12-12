@@ -3,7 +3,7 @@ package com.wavesplatform.storage.persistent
 import com.wavesplatform.BaseTestSuite
 import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.storage.AccountAssetKey
+import com.wavesplatform.storage.{AccountAssetKey, HasLevelDb}
 import com.wavesplatform.transaction.{Asset, AssetIdLength}
 import com.wavesplatform.wallet.Wallet
 

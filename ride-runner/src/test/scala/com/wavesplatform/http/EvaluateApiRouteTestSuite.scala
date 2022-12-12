@@ -2,15 +2,13 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.HttpRequest
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.http.RouteTimeout
 import com.wavesplatform.blockchain.EmptyProcessor
-import com.wavesplatform.utils.Schedulers
 import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
+import monix.execution.Scheduler.global
 import play.api.libs.json.*
 
 import java.nio.charset.StandardCharsets
-import scala.concurrent.duration.DurationInt
 
 class EvaluateApiRouteTestSuite extends RouteSpec("/utils") with RestAPISettingsHelper {
   private val default     = Wallet.generateNewAccount("test".getBytes(StandardCharsets.UTF_8), 0)
@@ -36,10 +34,7 @@ class EvaluateApiRouteTestSuite extends RouteSpec("/utils") with RestAPISettings
           else super.getCachedResultOrRun(address, request)
       }
 
-      val api = EvaluateApiRoute(
-        new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler")),
-        processor.getCachedResultOrRun
-      )
+      val api   = EvaluateApiRoute(Function.tupled(processor.getCachedResultOrRun(_, _).runToFuture(global)))
       val route = seal(api.route)
 
       def evalScript(text: String, trace: Boolean): HttpRequest =

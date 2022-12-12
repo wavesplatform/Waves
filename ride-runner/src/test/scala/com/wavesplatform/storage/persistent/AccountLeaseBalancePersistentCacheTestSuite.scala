@@ -4,6 +4,7 @@ import com.wavesplatform.BaseTestSuite
 import com.wavesplatform.account.Address
 import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.state.LeaseBalance
+import com.wavesplatform.storage.HasLevelDb
 import com.wavesplatform.wallet.Wallet
 
 import java.nio.charset.StandardCharsets

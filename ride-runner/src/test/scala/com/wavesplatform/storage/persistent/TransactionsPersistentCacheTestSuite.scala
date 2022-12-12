@@ -5,6 +5,7 @@ import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.state.{Height, TransactionId}
+import com.wavesplatform.storage.HasLevelDb
 
 class TransactionsPersistentCacheTestSuite extends BaseTestSuite with HasLevelDb {
   private val defaultTxId        = TransactionId @@ ByteStr(Array.fill[Byte](DigestLength)(0))

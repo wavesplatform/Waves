@@ -216,6 +216,7 @@ class BlockchainProcessor(
 
   override def getCachedResultOrRun(address: Address, request: JsObject): Task[JsObject] = {
     val key = (address, request)
+    requestsStorage.append(key)
     storage.get(key) match {
       case Some(r) => Task.now(r.lastResult)
       case None =>
