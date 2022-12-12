@@ -272,13 +272,13 @@ sealed abstract class CacheHistoryKey[KeyT: AsBytes](prefix: Short) extends Cach
 
 object CacheKeys {
   object LastAddressId extends CacheKey[Unit, AddressId](0)
-  object AddressIds extends CacheKey[Address, AddressId](1)
+  object AddressIds    extends CacheKey[Address, AddressId](1)
 
   object AccountDataEntriesHistory extends CacheHistoryKey[(AddressId, String)](2)
-  object AccountDataEntries extends CacheKey[(AddressId, String, Int), Option[DataEntry[?]]](3)
+  object AccountDataEntries        extends CacheKey[(AddressId, String, Int), Option[DataEntry[?]]](3)
 
   object AccountScriptsHistory extends CacheHistoryKey[AddressId](4)
-  object AccountScripts extends CacheKey[(AddressId, Int), Option[AccountScriptInfo]](5)
+  object AccountScripts        extends CacheKey[(AddressId, Int), Option[AccountScriptInfo]](5)
 
   object SignedBlockHeaders extends CacheKey[Int, SignedBlockHeader](6)
 
@@ -305,7 +305,14 @@ object CacheKeys {
   object RequestsNumber extends CacheKey[Unit, Int](19)
   object Requests       extends CacheKey[Int, (Address, JsObject)](20)
 
-  implicit val jsObjectAsBytes: AsBytes[JsObject] = AsBytes[String].transform(JsObject. Json.parse(_), Json.stringify(_))
+  implicit val jsObjectAsBytes: AsBytes[JsObject] = AsBytes[String].transform(
+    s =>
+      Json.parse(s) match {
+        case r: JsObject => r
+        case r           => throw new RuntimeException(s"Expected JsObject, got $r")
+      },
+    Json.stringify(_)
+  )
 
   implicit val byteStrAsBytes: AsBytes[ByteStr] = AsBytes[Array[Byte]].transform(ByteStr(_), _.arr)
 
