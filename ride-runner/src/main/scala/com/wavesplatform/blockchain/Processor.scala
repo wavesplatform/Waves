@@ -23,8 +23,6 @@ import monix.execution.Scheduler
 import play.api.libs.json.JsObject
 
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.Await
-import scala.concurrent.duration.Duration
 import scala.util.chaining.scalaUtilChainingOps
 
 trait Processor {
@@ -38,7 +36,7 @@ trait Processor {
 
   def process(event: BlockchainUpdated): Unit
 
-  def runScripts(forceAll: Boolean = false): Unit
+  def runScripts(forceAll: Boolean = false): Task[Unit]
 
   def getCachedResultOrRun(address: Address, request: JsObject): Task[JsObject]
 }
@@ -161,7 +159,7 @@ class BlockchainProcessor(
       }) */
   }
 
-  override def runScripts(forceAll: Boolean = false): Unit = {
+  override def runScripts(forceAll: Boolean = false): Task[Unit] = {
     val height = accumulatedChanges.newHeight
     if (accumulatedChanges.uncertainKeys.nonEmpty) {
       log.debug(s"Getting data for keys: ${accumulatedChanges.uncertainKeys.toVector.map(_.toString).sorted.mkString(", ")}")
@@ -181,21 +179,19 @@ class BlockchainProcessor(
         Nil
       } else accumulatedChanges.affectedScripts.flatMap(storage.get)
 
-    val r = Task
+    // Don't clean all affected scripts, because not all scripts could be added to the storage on the moment of runScripts.
+    // See getCachedResultOrRun: it takes some time to run a script and later add it to the storage.
+    accumulatedChanges = ProcessResult(affectedScripts = accumulatedChanges.affectedScripts -- xs.map(_.key))
+
+    Task
       .parTraverseUnordered(xs) { s =>
         Task(runScript(height, s))
           .tapError { e =>
             Task(log.error(s"An error during running ${s.key}", e))
           }
       }
-      .runToFuture(runScriptsScheduler)
-
-    // TODO #38 Get rid of Await.result. Wrap all this code in Task
-    Await.result(r, Duration.Inf)
-
-    // Don't clean all affected scripts, because not all scripts could be added to the storage on the moment of runScripts.
-    // See getCachedResultOrRun: it takes some time to run a script and later add it to the storage.
-    accumulatedChanges = ProcessResult(affectedScripts = accumulatedChanges.affectedScripts -- xs.map(_.key))
+      .as(())
+      .executeOn(runScriptsScheduler)
   }
 
   override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] = blockchainStorage.blockHeaders.getLocal(height).map(_.id() == id)
@@ -235,7 +231,7 @@ class BlockchainProcessor(
                 .refreshed(settings.enableTraces, settings.evaluateScriptComplexityLimit, settings.maxTxErrorLogSize)
               storage.putIfAbsent(key, script)
               script.lastResult
-            }
+            }.executeOn(runScriptsScheduler)
         }
     }
   }

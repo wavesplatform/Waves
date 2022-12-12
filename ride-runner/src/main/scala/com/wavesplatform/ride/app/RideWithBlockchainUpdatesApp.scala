@@ -1,6 +1,5 @@
 package com.wavesplatform.ride.app
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.account.Address
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
@@ -12,6 +11,8 @@ import com.wavesplatform.storage.RequestsStorage
 import com.wavesplatform.storage.RequestsStorage.RequestKey
 import com.wavesplatform.storage.persistent.LevelDbPersistentCaches
 import com.wavesplatform.utils.ScorexLogging
+import io.netty.util.concurrent.DefaultThreadFactory
+import kamon.instrumentation.executor.ExecutorInstrumentation
 import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
 import monix.reactive.OverflowStrategy
@@ -19,7 +20,7 @@ import play.api.libs.json.{JsObject, Json}
 import sttp.client3.HttpURLConnectionBackend
 
 import java.io.File
-import java.util.concurrent.Executors
+import java.util.concurrent.{LinkedBlockingQueue, RejectedExecutionException, ThreadPoolExecutor, TimeUnit}
 import scala.concurrent.Await
 import scala.concurrent.duration.{Duration, DurationInt}
 import scala.io.Source
@@ -38,6 +39,39 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
 
       use.acquire(new Metrics(globalConfig))
 
+      def mkScheduler(name: String, threads: Int): Scheduler = {
+        val executor = use(
+          new ThreadPoolExecutor(
+            threads,
+            threads,
+            0,
+            TimeUnit.MILLISECONDS,
+            new LinkedBlockingQueue[Runnable],
+            new DefaultThreadFactory(name, true),
+            { (r: Runnable, executor: ThreadPoolExecutor) =>
+              log.error(s"$r has been rejected from $executor")
+              throw new RejectedExecutionException
+            }
+          )
+        )
+
+        use.acquireWithShutdown(
+          Scheduler(
+            executor = if (globalConfig.getBoolean("kamon.enable")) ExecutorInstrumentation.instrument(executor, name) else executor,
+            executionModel = ExecutionModel.AlwaysAsyncExecution
+          )
+        ) { resource =>
+          resource.shutdown()
+          resource.awaitTermination(5.seconds)
+        }
+      }
+
+      val blockchainEventsStreamScheduler = mkScheduler("blockchain-events", 2)
+      val rideScheduler = mkScheduler(
+        name = "ride",
+        threads = settings.restApi.heavyRequestProcessorPoolThreads.getOrElse((Runtime.getRuntime.availableProcessors() * 2).min(4))
+      )
+
       val scripts = Json
         .parse(use(Source.fromFile(inputFile)).getLines().mkString("\n"))
         .as[List[RequestKey]]
@@ -49,18 +83,6 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
 
       log.info("Making gRPC channel to Blockchain Updates API...")
       val blockchainUpdatesApiChannel = use(connector.mkChannel(settings.rideRunner.blockchainUpdatesApiChannel))
-
-      val commonScheduler = use(
-        Executors.newScheduledThreadPool(
-          8,
-          new ThreadFactoryBuilder().setNameFormat("common-scheduler-%d").setDaemon(false).build()
-        )
-      )
-
-      val monixScheduler = use.acquireWithShutdown(Scheduler(commonScheduler).withExecutionModel(ExecutionModel.AlwaysAsyncExecution)) { x =>
-        x.shutdown()
-        x.awaitTermination(5.seconds)
-      }
 
       val httpBackend = use.acquireWithShutdown(HttpURLConnectionBackend())(_.close())
 
@@ -85,11 +107,11 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
           override def all(): List[(Address, JsObject)]     = scripts
           override def append(x: (Address, JsObject)): Unit = {} // Ignore, because no way to evaluate a new expr
         },
-        monixScheduler
+        rideScheduler
       )
 
       log.info("Warm up caches...") // Also helps to figure out, which data is used by a script
-      processor.runScripts(forceAll = true)
+      Await.result(processor.runScripts(forceAll = true).runToFuture(rideScheduler), Duration.Inf)
 
       // mainnet
       val lastKnownHeight = Height(3393500)           // math.max(0, blockchainStorage.height - 100 - 1))
@@ -100,7 +122,7 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
       //      val lastKnownHeight = Height(2327973)
       //      val endHeight   = Height(lastKnownHeight + 1)
 
-      val blockchainUpdates = use(blockchainApi.mkBlockchainUpdatesStream(monixScheduler))
+      val blockchainUpdates = use(blockchainApi.mkBlockchainUpdatesStream(blockchainEventsStreamScheduler))
       val events = blockchainUpdates.stream
         .asyncBoundary(OverflowStrategy.BackPressure(4))
         .doOnError(e => Task { log.error("Error!", e) })
@@ -114,8 +136,9 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
             false
         }
         .collect { case WrappedEvent.Next(event) => event }
-        .foldLeftL(BlockchainState.Starting(workingHeight): BlockchainState)(BlockchainState(processor, _, _))
-        .runToFuture(Scheduler(commonScheduler))
+        .scanEval(Task.now[BlockchainState](BlockchainState.Starting(workingHeight)))(BlockchainState(processor, _, _))
+        .lastL
+        .runToFuture(Scheduler(blockchainEventsStreamScheduler))
 
       log.info(s"Watching blockchain updates...")
       blockchainUpdates.start(lastKnownHeight + 1, endHeight)

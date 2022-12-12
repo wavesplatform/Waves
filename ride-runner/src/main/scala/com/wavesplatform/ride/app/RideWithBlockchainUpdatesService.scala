@@ -2,7 +2,7 @@ package com.wavesplatform.ride.app
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import com.wavesplatform.api.http.{CompositeHttpService, RouteTimeout}
+import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
 import com.wavesplatform.events.WrappedEvent
@@ -23,7 +23,7 @@ import sttp.client3.HttpURLConnectionBackend
 import java.io.File
 import java.util.concurrent.*
 import scala.concurrent.Await
-import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
+import scala.concurrent.duration.{Duration, DurationInt}
 import scala.util.Failure
 
 object RideWithBlockchainUpdatesService extends ScorexLogging {
@@ -63,7 +63,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
       }
 
       val blockchainEventsStreamScheduler = mkScheduler("blockchain-events", 2)
-      val rideRequestsScheduler = mkScheduler(
+      val rideScheduler = mkScheduler(
         name = "ride",
         threads = settings.restApi.heavyRequestProcessorPoolThreads.getOrElse((Runtime.getRuntime.availableProcessors() * 2).min(4))
       )
@@ -97,11 +97,11 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
         settings.rideRunner.processor,
         blockchainStorage,
         requestsStorage,
-        blockchainEventsStreamScheduler
+        rideScheduler
       )
 
       log.info("Warm up caches...") // Also helps to figure out, which data is used by a script
-      processor.runScripts(forceAll = true)
+      Await.result(processor.runScripts(forceAll = true).runToFuture(rideScheduler), Duration.Inf)
 
       val lastKnownHeight = Height(math.max(0, blockchainStorage.height - 100 - 1))
       val workingHeight   = Height(blockchainStorage.height)
@@ -120,27 +120,21 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
             false
         }
         .collect { case WrappedEvent.Next(event) => event }
-        // TODO #38 use scanLeft*
-        .foldLeftL(BlockchainState.Starting(workingHeight): BlockchainState)(BlockchainState(processor, _, _))
+        .scanEval(Task.now[BlockchainState](BlockchainState.Starting(workingHeight)))(BlockchainState(processor, _, _))
+        .lastL
         .runToFuture(blockchainEventsStreamScheduler)
 
       log.info(s"Watching blockchain updates...")
       blockchainUpdates.start(lastKnownHeight + 1)
 
-      val routeTimeout = new RouteTimeout(
-        FiniteDuration(globalConfig.getDuration("akka.http.server.request-timeout").getSeconds, TimeUnit.SECONDS)
-      )(rideRequestsScheduler)
-
-      val apiRoutes = Seq(
-        EvaluateApiRoute(
-          routeTimeout,
-          Function.tupled(processor.getCachedResultOrRun)
-        )
-      )
-
       implicit val actorSystem = use.acquireWithShutdown(ActorSystem("ride-runner", globalConfig)) { x =>
         Await.ready(x.terminate(), 20.seconds)
       }
+
+      val apiRoutes = Seq(
+        EvaluateApiRoute(Function.tupled(processor.getCachedResultOrRun(_, _).runToFuture(rideScheduler)))
+      )
+
       val httpService = CompositeHttpService(apiRoutes, settings.restApi)
       val httpFuture = Http()
         .newServerAt(settings.restApi.bindAddress, settings.restApi.port)
