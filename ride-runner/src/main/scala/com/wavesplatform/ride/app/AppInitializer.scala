@@ -44,19 +44,6 @@ object AppInitializer extends ScorexLogging {
     }
 
     log.info(s"Starting ${Version.VersionString}...")
-
-    // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
-    //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
-    //    if (config.getBoolean("kamon.enable")) {
-    //      Kamon.init(config)
-    //    } else {
-    //      Kamon.reconfigure(config)
-    //    }
-    //
-    //    sys.addShutdownHook {
-    //      Try(Await.result(Kamon.stop(), 30 seconds))
-    //    }
-
     (config, settings)
   }
 }

@@ -163,6 +163,7 @@ object Dependencies {
       // "io.netty"                      % "netty-transport-native-epoll"  % "4.1.79.Final" classifier "linux-x86_64",
       "com.github.ben-manes.caffeine" % "caffeine"                 % "3.1.2",
       "net.logstash.logback"          % "logstash-logback-encoder" % "7.2" % Runtime,
+      kamonModule("prometheus"),
       Dependencies.sttp3,
       Dependencies.sttp3Monix,
       Dependencies.leveldbJava().exclude("com.google.guava", "guava") % Test,
@@ -180,5 +181,5 @@ object Dependencies {
   }
 
   lazy val kanela =
-    Seq("io.kamon" % "kanela-agent" % "1.0.14")
+    Seq("io.kamon" % "kanela-agent" % "1.0.16")
 }

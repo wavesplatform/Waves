@@ -17,7 +17,8 @@ Seq(
   "org.portable-scala" % "sbt-scalajs-crossproject" % "1.2.0",
   "pl.project13.scala" % "sbt-jmh"                  % "0.4.3",
   "com.github.sbt"     % "sbt-ci-release"           % "1.5.10",
-  "com.lightbend.sbt"  % "sbt-javaagent"            % "0.1.6"
+  "com.lightbend.sbt"  % "sbt-javaagent"            % "0.1.6",
+  "io.kamon"           % "sbt-kanela-runner"        % "2.0.14" // TODO #44 Only to ride-runner
 ).map(addSbtPlugin)
 
 libraryDependencies ++= Seq(

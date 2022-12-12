@@ -31,6 +31,8 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     val (globalConfig, settings) = AppInitializer.init(args.headOption.map(new File(_)))
 
     val r = Using.Manager { use =>
+      use.acquire(new Metrics(globalConfig))
+
       log.info("Initializing thread pools...")
 
       def mkScheduler(name: String, threads: Int): Scheduler = {

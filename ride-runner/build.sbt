@@ -3,7 +3,7 @@ description := "Allows to execute RIDE code independently from Waves NODE"
 
 mainClass := Some("com.wavesplatform.ride.app.RideWithBlockchainUpdatesService")
 //discoveredMainClasses := (Compile / mainClass).value.toSeq
-run / fork := true
+run / fork := true // For working instrumentation
 
 enablePlugins(
   JavaServerAppPackaging,
@@ -13,14 +13,7 @@ enablePlugins(
 )
 
 libraryDependencies ++= Dependencies.rideRunner.value
-
-javaAgents ++= {
-  if (instrumentation.value) {
-    Dependencies.kanela
-  } else {
-    Seq.empty
-  }
-}
+javaAgents ++= Dependencies.kanela
 
 inConfig(Compile)(
   Seq(

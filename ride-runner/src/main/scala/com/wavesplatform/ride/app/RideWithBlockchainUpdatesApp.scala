@@ -36,6 +36,8 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
         if (args.length < 2) throw new IllegalArgumentException("Please specify an input.json file")
         else new File(args(1))
 
+      use.acquire(new Metrics(globalConfig))
+
       val scripts = Json
         .parse(use(Source.fromFile(inputFile)).getLines().mkString("\n"))
         .as[List[RequestKey]]
