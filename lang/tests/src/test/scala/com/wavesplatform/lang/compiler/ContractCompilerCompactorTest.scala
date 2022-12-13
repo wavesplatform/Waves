@@ -8,7 +8,7 @@ import com.wavesplatform.lang.directives.{Directive, DirectiveParser, DirectiveS
 import com.wavesplatform.lang.directives.values.{DApp as DAppType, *}
 import com.wavesplatform.lang.script.{Script, ScriptPreprocessor}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
-import com.wavesplatform.lang.v1.compiler.ContractScriptCompactor
+import com.wavesplatform.lang.v1.compiler.{ContractScriptCompactor, TestCompiler}
 import com.wavesplatform.lang.v1.{CTX, compiler}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
@@ -24,6 +24,10 @@ class ContractCompilerCompactorTest extends PropSpec {
     def compactedSource(stdLibVersion: StdLibVersion = V5): String =
       Script.decompile(ContractScriptImpl(stdLibVersion, dApp.copy(meta = DAppMeta())))._1
   }
+
+  private def ctxForV(version: StdLibVersion): CTX[Environment] =
+    PureContext.build(version, useNewPowPrecision = true).withEnvironment[Environment] |+|
+      WavesContext.build(Global, DirectiveSet(version, Account, DAppType).explicitGet())
 
   property("contract script compaction - V4, V5, V6") {
 
@@ -801,7 +805,19 @@ class ContractCompilerCompactorTest extends PropSpec {
     checkForV(V6)
   }
 
-  private def ctxForV(version: StdLibVersion): CTX[Environment] =
-    PureContext.build(version, useNewPowPrecision = true).withEnvironment[Environment] |+|
-      WavesContext.build(Global, DirectiveSet(version, Account, DAppType).explicitGet())
+  property("removeUnusedCode mode should not remove global functions definitions used in inner functions") {
+    val compiled = TestCompiler(V6).compile(
+      """
+        |func user() = []
+        |
+        |@Callable(i)
+        |func default() = {
+        |  func f() = user()
+        |  f()
+        |}
+      """.stripMargin,
+      removeUnused = true
+    )
+    compiled.explicitGet().decs.map(_.name) shouldBe List("user")
+  }
 }
