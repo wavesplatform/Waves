@@ -178,16 +178,18 @@ git.uncommittedSignifier := Some("DIRTY")
 
 lazy val packageAll = taskKey[Unit]("Package all artifacts")
 packageAll := {
-  (node / assembly).value
-  buildDebPackages.value
+  // TODO temporarily disabled
+  //  (node / assembly).value
+  //  buildDebPackages.value
   buildTarballsForDocker.value
 }
 
 lazy val buildTarballsForDocker = taskKey[Unit]("Package node, grpc-server and ride-runner tarballs and copy them to docker/target")
 buildTarballsForDocker := {
-  IO.copyFile((node / Universal / packageZipTarball).value, new File(baseDirectory.value, "docker/target/waves.tgz"))
-  IO.copyFile((`grpc-server` / Universal / packageZipTarball).value, new File(baseDirectory.value, "docker/target/waves-grpc-server.tgz"))
-  IO.copyFile((`ride-runner` / Universal / packageZipTarball).value, new File(baseDirectory.value, "docker/target/ride-runner.tgz"))
+  // TODO temporarily disabled
+  //  IO.copyFile((node / Universal / packageZipTarball).value, new File(baseDirectory.value, "docker/target/waves.tgz"))
+  //  IO.copyFile((`grpc-server` / Universal / packageZipTarball).value, new File(baseDirectory.value, "docker/target/waves-grpc-server.tgz"))
+  IO.copyFile((`ride-runner` / Universal / packageZipTarball).value, new File(baseDirectory.value, "docker/ride-runner-target/ride-runner.tgz"))
 }
 
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")

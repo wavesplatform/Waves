@@ -6,6 +6,7 @@
 
 # scala build folders and files
 target
+ride-runner-target
 *.tgz
 *.jar
 !third-party/yourkit/yjp-controller-api-redist.jar
