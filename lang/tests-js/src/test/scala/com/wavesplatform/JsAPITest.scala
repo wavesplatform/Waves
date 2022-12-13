@@ -177,8 +177,56 @@ object JsAPITest extends JsTestBase {
           | {-# CONTENT_TYPE LIBRARY #-}
           | func f() = 1
         """.stripMargin
-      val result = JSON.stringify(JsAPI.parseAndCompile(library, 3).ast)
-      result ==> """{"type":"BLOCK","func":{"name":"f","args":[],"body":{"type":"LONG","value":1}},"body":{"type":"REF","key":"unit"}}"""
+
+      val result = JsAPI.parseAndCompile(library, 3).exprAst.expr
+      val expected = """
+                       |{
+                       |  "type": "BLOCK",
+                       |  "posStart": 62,
+                       |  "posEnd": 88,
+                       |  "resultType": {
+                       |    "type": "Unit"
+                       |  },
+                       |  "ctx": [],
+                       |  "dec": {
+                       |    "type": "FUNC",
+                       |    "posStart": 62,
+                       |    "posEnd": 74,
+                       |    "name": {
+                       |      "value": "f",
+                       |      "posStart": 67,
+                       |      "posEnd": 68
+                       |    },
+                       |    "argList": [],
+                       |    "expr": {
+                       |      "type": "CONST_LONG",
+                       |      "posStart": 73,
+                       |      "posEnd": 74,
+                       |      "resultType": {
+                       |        "type": "Int"
+                       |      },
+                       |      "ctx": []
+                       |    }
+                       |  },
+                       |  "body": {
+                       |    "type": "REF",
+                       |    "posStart": 84,
+                       |    "posEnd": 88,
+                       |    "resultType": {
+                       |      "type": "Unit"
+                       |    },
+                       |    "ctx": [
+                       |      {
+                       |        "name": "f",
+                       |        "posStart": 62,
+                       |        "posEnd": 74
+                       |      }
+                       |    ],
+                       |    "name": "unit"
+                       |  }
+                       |}
+                     """.stripMargin
+      JSON.stringify(result) ==> JSON.stringify(JSON.parse(expected))
     }
   }
 }

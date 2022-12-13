@@ -114,27 +114,9 @@ object API {
     val stdLibVer = ds.stdLibVersion
     ds.contentType match {
       case Expression =>
-        G.parseAndCompileExpression(
-          input,
-          offset,
-          utils.compilerContext(ds),
-          G.LetBlockVersions.contains(stdLibVer),
-          stdLibVer,
-          estimator
-        ).map { case (bytes, complexity, exprScript, errors) =>
-          CompileAndParseResult.Expression(bytes, complexity, exprScript, errors.toSeq)
-        }
+        parseAndCompileExpression(ds, input, offset, estimator, stdLibVer)
       case Library =>
-        G.compileDecls(
-          input,
-          utils.compilerContext(ds),
-          stdLibVer,
-          ds.scriptType,
-          estimator
-        ).map { case (bytes, expr, complexity) =>
-          CompileAndParseResult.Library(bytes, complexity, expr)
-        }
-
+        parseAndCompileExpression(ds, input + "\nunit", offset, estimator, stdLibVer)
       case DAppType =>
         G.parseAndCompileContract(
           input,
@@ -150,6 +132,24 @@ object API {
 
     }
   }
+
+  private def parseAndCompileExpression(
+      ds: DirectiveSet,
+      input: ExecutionLog,
+      offset: Int,
+      estimator: ScriptEstimator,
+      stdLibVer: StdLibVersion
+  ): Either[ExecutionLog, CompileAndParseResult.Expression] =
+    G.parseAndCompileExpression(
+      input,
+      offset,
+      utils.compilerContext(ds),
+      G.LetBlockVersions.contains(stdLibVer),
+      stdLibVer,
+      estimator
+    ).map { case (bytes, complexity, exprScript, errors) =>
+      CompileAndParseResult.Expression(bytes, complexity, exprScript, errors.toSeq)
+    }
 
   def compile(
       input: String,
