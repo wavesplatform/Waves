@@ -90,7 +90,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
       val blockchainStorage = new SharedBlockchainData[RequestKey](settings.blockchain, dbCaches, blockchainApi)
 
       val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
-      log.info(s"Current height: $lastHeightAtStart")
+      log.info(s"Current height: known=${blockchainStorage.height}, blockchain=$lastHeightAtStart")
 
       val requestsStorage = new LevelDbRequestsStorage(db)
       val processor = new BlockchainProcessor(
@@ -103,8 +103,8 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
       log.info("Warm up caches...") // Also helps to figure out, which data is used by a script
       Await.result(processor.runScripts(forceAll = true).runToFuture(rideScheduler), Duration.Inf)
 
-      val lastKnownHeight = Height(math.max(0, blockchainStorage.height - 100 - 1))
-      val workingHeight   = Height(blockchainStorage.height)
+      val lastSafeKnownHeight = Height(math.max(0, blockchainStorage.height - 100 - 1)) // A rollback is not possible
+      val workingHeight       = Height(math.max(blockchainStorage.height, lastHeightAtStart))
 
       val blockchainUpdates = use(blockchainApi.mkBlockchainUpdatesStream(blockchainEventsStreamScheduler))
       // TODO #33 Move wrapped events from here: processing of Closed and Failed should be moved to blockchainUpdates.stream
@@ -125,7 +125,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
         .runToFuture(blockchainEventsStreamScheduler)
 
       log.info(s"Watching blockchain updates...")
-      blockchainUpdates.start(lastKnownHeight + 1)
+      blockchainUpdates.start(lastSafeKnownHeight + 1)
 
       implicit val actorSystem = use.acquireWithShutdown(ActorSystem("ride-runner", globalConfig)) { x =>
         Await.ready(x.terminate(), 20.seconds)
