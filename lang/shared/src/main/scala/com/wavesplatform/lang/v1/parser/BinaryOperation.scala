@@ -15,7 +15,7 @@ object BinaryOperation {
 
   implicit def hack(p: fastparse.P[Any]): fastparse.P[Unit] = p.map(_ => ())
 
-  // No monadic notion here, Left and Right mean `left-assosiative and `right-assosiative`
+  // No monadic notion here, Left and Right mean `left-associative and `right-associative`
   val opsByPriority: List[Either[List[BinaryOperation], List[BinaryOperation]]] = List(
     Left(List(OR_OP)),
     Left(List(AND_OP)),

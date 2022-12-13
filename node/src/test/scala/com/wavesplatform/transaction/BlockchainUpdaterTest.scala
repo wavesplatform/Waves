@@ -221,7 +221,7 @@ class BlockchainUpdaterTest extends FreeSpec with HistoryTest with WithDomain {
       b.processBlock(getNextTestBlockWithVotes(b, Seq(-1))) should beRight
     }
 
-    Try(b.processBlock(getNextTestBlockWithVotes(b, Seq(-1)))).recover { case _: SecurityException => // NOP
+    Try(b.processBlock(getNextTestBlockWithVotes(b, Seq(-1)))).recover[Any] { case _: SecurityException => // NOP
     }
 
     signal.tryAcquire(10, TimeUnit.SECONDS)
