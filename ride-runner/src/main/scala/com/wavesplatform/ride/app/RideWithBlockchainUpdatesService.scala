@@ -1,6 +1,5 @@
 package com.wavesplatform.ride.app
 
-import akka.Done
 import akka.actor.{ActorSystem, CoordinatedShutdown}
 import akka.http.scaladsl.Http
 import com.wavesplatform.api.http.CompositeHttpService
@@ -23,8 +22,8 @@ import sttp.client3.HttpURLConnectionBackend
 
 import java.io.File
 import java.util.concurrent.*
+import scala.concurrent.Await
 import scala.concurrent.duration.{Duration, DurationInt}
-import scala.concurrent.{Await, Future}
 
 object RideWithBlockchainUpdatesService extends ScorexLogging {
   def main(args: Array[String]): Unit = {
@@ -34,17 +33,8 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     implicit val actorSystem = ActorSystem("ride-runner", globalConfig)
     val cs                   = CoordinatedShutdown(actorSystem)
 
-    def cleanup(afterPhase: CustomShutdownPhase)(f: => Unit): Unit = cleanupTask(afterPhase, "general")(f)
-    def cleanupTask(afterPhase: CustomShutdownPhase, taskName: String)(f: => Unit): Unit =
-      cs.addTask(afterPhase.name, taskName) { () =>
-        Future {
-          f
-          Done
-        }(actorSystem.dispatcher)
-      }
-
     val metrics = new Metrics(globalConfig)
-    cleanup(CustomShutdownPhase.Metrics) { metrics.close() }
+    cs.cleanup(CustomShutdownPhase.Metrics) { metrics.close() }
 
     log.info("Initializing thread pools...")
     def mkScheduler(name: String, threads: Int): Scheduler = {
@@ -66,7 +56,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
         executionModel = ExecutionModel.AlwaysAsyncExecution
       )
 
-      cleanupTask(CustomShutdownPhase.ThreadPools, name) {
+      cs.cleanupTask(CustomShutdownPhase.ThreadPools, name) {
         monixScheduler.shutdown()
         monixScheduler.awaitTermination(5.seconds)
 
@@ -85,11 +75,11 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     )
 
     val grpcConnector = new GrpcConnector(settings.rideRunner.grpcConnector)
-    cleanup(CustomShutdownPhase.GrpcConnector) { grpcConnector.close() }
+    cs.cleanup(CustomShutdownPhase.GrpcConnector) { grpcConnector.close() }
 
     def mkGrpcChannel(name: String, settings: GrpcChannelSettings): ManagedChannel = {
       val grpcApiChannel = grpcConnector.mkChannel(settings)
-      cleanupTask(CustomShutdownPhase.ApiClient, name) {
+      cs.cleanupTask(CustomShutdownPhase.ApiClient, name) {
         grpcApiChannel.shutdown()
         try grpcApiChannel.awaitTermination(5, TimeUnit.SECONDS)
         finally grpcApiChannel.shutdownNow()
@@ -105,7 +95,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
 
     log.info("Creating general API gateway...")
     val httpBackend = HttpURLConnectionBackend()
-    cleanupTask(CustomShutdownPhase.ApiClient, "httpBackend") { httpBackend.close() }
+    cs.cleanupTask(CustomShutdownPhase.ApiClient, "httpBackend") { httpBackend.close() }
 
     val blockchainApi = new DefaultBlockchainApi(
       settings = settings.rideRunner.blockchainApi,
@@ -116,7 +106,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
 
     log.info("Opening a caches DB...")
     val db = openDB(settings.rideRunner.db.directory)
-    cleanup(CustomShutdownPhase.Db) { db.close() }
+    cs.cleanup(CustomShutdownPhase.Db) { db.close() }
     val dbCaches          = new LevelDbPersistentCaches(db)
     val blockchainStorage = new SharedBlockchainData[RequestKey](settings.blockchain, dbCaches, blockchainApi)
 
@@ -139,7 +129,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
 
     log.info(s"Watching blockchain updates...")
     val blockchainUpdates = blockchainApi.mkBlockchainUpdatesStream(blockchainEventsStreamScheduler)
-    cleanup(CustomShutdownPhase.BlockchainUpdatesStream) { blockchainUpdates.close() }
+    cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream) { blockchainUpdates.close() }
 
     // TODO #33 Move wrapped events from here: processing of Closed and Failed should be moved to blockchainUpdates.stream
     val events = blockchainUpdates.stream
