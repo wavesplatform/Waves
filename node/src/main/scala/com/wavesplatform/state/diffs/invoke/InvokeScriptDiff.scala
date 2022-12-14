@@ -157,8 +157,8 @@ object InvokeScriptDiff {
                 script.script,
                 isAssetScript = true,
                 scriptContainerAddress = Coproduct[Environment.Tthis](Environment.AssetId(assetId.arr)),
-                nextRemainingComplexity,
-                enableExecutionLog = enableExecutionLog
+                enableExecutionLog = enableExecutionLog,
+                nextRemainingComplexity
               )
               val scriptComplexity = if (blockchain.storeEvaluatedComplexity) evaluatedComplexity else script.complexity.toInt
               val totalComplexity  = usedComplexity + scriptComplexity

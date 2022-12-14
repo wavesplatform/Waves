@@ -66,8 +66,11 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
     blockchain
   }
 
-  def createTxPublisherStub(blockchain: Blockchain): TransactionPublisher = { (transaction, _) =>
-    Future.successful(TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis())(blockchain, transaction).map(_ => true))
+  def createTxPublisherStub(blockchain: Blockchain, enableExecutionLog: Boolean): TransactionPublisher = { (transaction, _) =>
+    Future.successful(
+      TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis(), enableExecutionLog = enableExecutionLog)(blockchain, transaction)
+        .map(_ => true)
+    )
   }
 
   implicit class BlockchainStubOps(blockchain: Blockchain) {

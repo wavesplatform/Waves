@@ -4,7 +4,7 @@ import java.util
 import cats.data.Ior
 import cats.syntax.option.*
 import cats.syntax.semigroup.*
-import com.github.benmanes.caffeine.cache.Caffeine
+import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.account.{Address, Alias}
@@ -950,13 +950,13 @@ abstract class RocksDBWriter private[database] (
   // These two caches are used exclusively for balance snapshots. They are not used for portfolios, because there aren't
   // as many miners, so snapshots will rarely be evicted due to overflows.
 
-  private val balanceAtHeightCache = Caffeine
+  private val balanceAtHeightCache = CacheBuilder
     .newBuilder()
     .maximumSize(100000)
     .recordStats()
     .build[(Int, AddressId), BalanceNode]()
 
-  private val leaseBalanceAtHeightCache = Caffeine
+  private val leaseBalanceAtHeightCache = CacheBuilder
     .newBuilder()
     .maximumSize(100000)
     .recordStats()
@@ -977,7 +977,7 @@ abstract class RocksDBWriter private[database] (
         if (hh < from)
           acc :+ hh
         else {
-          val bn     = balanceAtHeightCache.get((hh, addressId), _ => db.get(Keys.wavesBalanceAt(addressId, Height(hh))))
+          val bn     = balanceAtHeightCache.get((hh, addressId), () => db.get(Keys.wavesBalanceAt(addressId, Height(hh))))
           val newAcc = if (hh > toHeight) acc else acc :+ hh
           collectBalanceHistory(newAcc, bn.prevHeight)
         }
@@ -987,7 +987,7 @@ abstract class RocksDBWriter private[database] (
         if (hh < from)
           acc :+ hh
         else {
-          val lbn    = leaseBalanceAtHeightCache.get((hh, addressId), _ => db.get(Keys.leaseBalanceAt(addressId, Height(hh))))
+          val lbn    = leaseBalanceAtHeightCache.get((hh, addressId), () => db.get(Keys.leaseBalanceAt(addressId, Height(hh))))
           val newAcc = if (hh > toHeight) acc else acc :+ hh
           collectLeaseBalanceHistory(newAcc, lbn.prevHeight)
         }
@@ -996,8 +996,8 @@ abstract class RocksDBWriter private[database] (
       val lbh = slice(collectLeaseBalanceHistory(Vector.empty, lastLeaseBalance.height), from, toHeight)
       for {
         (wh, lh) <- merge(wbh, lbh)
-        wb = balanceAtHeightCache.get((wh, addressId), _ => db.get(Keys.wavesBalanceAt(addressId, Height(wh))))
-        lb = leaseBalanceAtHeightCache.get((lh, addressId), _ => db.get(Keys.leaseBalanceAt(addressId, Height(lh))))
+        wb = balanceAtHeightCache.get((wh, addressId), () => db.get(Keys.wavesBalanceAt(addressId, Height(wh))))
+        lb = leaseBalanceAtHeightCache.get((lh, addressId), () => db.get(Keys.leaseBalanceAt(addressId, Height(lh))))
       } yield BalanceSnapshot(wh.max(lh), wb.balance, lb.in, lb.out)
     }
   }

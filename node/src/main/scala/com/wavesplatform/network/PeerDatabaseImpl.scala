@@ -1,9 +1,9 @@
 package com.wavesplatform.network
 
-import com.github.benmanes.caffeine.cache.{Caffeine, RemovalCause, RemovalListener}
-
 import java.net.{InetAddress, InetSocketAddress}
 import java.util.concurrent.TimeUnit
+
+import com.google.common.cache.{CacheBuilder, RemovalNotification}
 import com.google.common.collect.EvictingQueue
 import com.wavesplatform.settings.NetworkSettings
 import com.wavesplatform.utils.{JsonFileStorage, ScorexLogging}
@@ -18,17 +18,20 @@ import scala.util.control.NonFatal
 
 class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with ScorexLogging {
 
-  private def cache[T <: AnyRef](timeout: FiniteDuration, removalListener: Option[RemovalListener[T, java.lang.Long]] = None) =
+  private type PeerRemoved[T]         = RemovalNotification[T, java.lang.Long]
+  private type PeerRemovalListener[T] = PeerRemoved[T] => Unit
+
+  private def cache[T <: AnyRef](timeout: FiniteDuration, removalListener: Option[PeerRemovalListener[T]] = None) =
     removalListener.fold {
-      Caffeine
+      CacheBuilder
         .newBuilder()
         .expireAfterWrite(timeout.toMillis, TimeUnit.MILLISECONDS)
         .build[T, java.lang.Long]()
     } { listener =>
-      Caffeine
+      CacheBuilder
         .newBuilder()
         .expireAfterWrite(timeout.toMillis, TimeUnit.MILLISECONDS)
-        .removalListener(listener)
+        .removalListener(listener(_))
         .build[T, java.lang.Long]()
     }
 
@@ -41,10 +44,9 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
 
   private val knownPeersAddresses = settings.knownPeers.map(inetSocketAddress(_, 6863))
 
-  private def nonExpiringKnownPeers: RemovalListener[InetSocketAddress, java.lang.Long] =
-    (key: InetSocketAddress, value: java.lang.Long, cause: RemovalCause) =>
-      if (cause.wasEvicted() && knownPeersAddresses.contains(key))
-        peersPersistence.put(key, value)
+  private def nonExpiringKnownPeers(n: PeerRemoved[InetSocketAddress]): Unit =
+    if (n.wasEvicted() && knownPeersAddresses.contains(n.getKey))
+      peersPersistence.put(n.getKey, n.getValue)
 
   for (a <- knownPeersAddresses) {
     // add peers from config with max timestamp so they never get evicted from the list of known peers
@@ -53,7 +55,7 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
 
   for (f <- settings.file if f.exists()) try {
     JsonFileStorage.load[PeersPersistenceType](f.getCanonicalPath).foreach(a => touch(inetSocketAddress(a, 6863)))
-    log.info(s"Loaded ${peersPersistence.estimatedSize()} known peer(s) from ${f.getName}")
+    log.info(s"Loaded ${peersPersistence.size} known peer(s) from ${f.getName}")
   } catch {
     case NonFatal(_) => log.info("Legacy or corrupted peers.dat, ignoring, starting all over from known-peers...")
   }

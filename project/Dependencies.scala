@@ -160,6 +160,7 @@ object Dependencies {
       kamonModule("akka-http"),
       kamonModule("executors"),
       "org.influxdb" % "influxdb-java" % "2.23",
+      googleGuava,
       cafeine,
       "com.google.code.findbugs" % "jsr305"    % "3.0.2" % Compile, // javax.annotation stubs
       "com.typesafe.play"       %% "play-json" % "2.9.2",

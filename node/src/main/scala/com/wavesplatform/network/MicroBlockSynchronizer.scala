@@ -1,6 +1,6 @@
 package com.wavesplatform.network
 
-import com.github.benmanes.caffeine.cache.{Cache, Caffeine}
+import com.google.common.cache.{Cache, CacheBuilder}
 
 import java.util.concurrent.TimeUnit
 import com.wavesplatform.block.Block.BlockId
@@ -45,7 +45,7 @@ object MicroBlockSynchronizer extends ScorexLogging {
     def alreadyProcessed(totalRef: MicroBlockSignature): Boolean = Option(successfullyReceived.getIfPresent(totalRef)).isDefined
 
     val cacheSizesReporter = Coeval.eval {
-      CacheSizes(microBlockOwners.estimatedSize(), nextInvs.estimatedSize(), awaiting.estimatedSize(), successfullyReceived.estimatedSize())
+      CacheSizes(microBlockOwners.size(), nextInvs.size(), awaiting.size(), successfullyReceived.size())
     }
 
     def requestMicroBlock(mbInv: MicroBlockInv): CancelableFuture[Unit] = {
@@ -103,10 +103,10 @@ object MicroBlockSynchronizer extends ScorexLogging {
             case Left(err) =>
               peerDatabase.blacklistAndClose(ch, err.toString)
             case Right(_) =>
-              microBlockOwners.get(totalBlockId, _ => MSet.empty) += ch
+              microBlockOwners.get(totalBlockId, () => MSet.empty) += ch
               nextInvs.get(
                 reference,
-                { _ =>
+                { () =>
                   BlockStats.inv(mbInv, ch)
                   mbInv
                 }
@@ -152,7 +152,7 @@ object MicroBlockSynchronizer extends ScorexLogging {
     }
 
   def cache[K <: AnyRef, V <: AnyRef](timeout: FiniteDuration): Cache[K, V] =
-    Caffeine
+    CacheBuilder
       .newBuilder()
       .expireAfterWrite(timeout.toMillis, TimeUnit.MILLISECONDS)
       .build[K, V]()

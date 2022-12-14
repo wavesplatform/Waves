@@ -173,7 +173,8 @@ class ContractIntegrationTest extends PropSpec with Inside {
         V3,
         Int.MaxValue,
         correctFunctionCallScope = true,
-        newMode = false
+        newMode = false,
+        enableExecutionLog = true
       )
       .value()
       .leftMap { case (e, _, log) => (e, log) }
@@ -187,7 +188,8 @@ class ContractIntegrationTest extends PropSpec with Inside {
       .verify(
         compiled.decs,
         compiled.verifierFuncOpt.get,
-        EvaluatorV2.applyCompleted(ctx.evaluationContext(environment), _, _, V3, correctFunctionCallScope = true, newMode = false),
+        EvaluatorV2
+          .applyCompleted(ctx.evaluationContext(environment), _, _, V3, correctFunctionCallScope = true, newMode = false, enableExecutionLog = false),
         txObject
       )
       ._3

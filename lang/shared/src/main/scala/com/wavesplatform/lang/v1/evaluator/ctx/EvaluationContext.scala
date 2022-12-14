@@ -52,7 +52,7 @@ case class EnabledLogEvaluationContext[C[_[_]], F[_]: Monad](l: LetLogCallback[F
 }
 
 object EnabledLogEvaluationContext {
-  class Lenses[F[_], C[_[_]]] {
+  class Lenses[F[_]: Monad, C[_[_]]] {
     val types: Lens[EnabledLogEvaluationContext[C, F], Map[String, FINAL]] =
       lens[EnabledLogEvaluationContext[C, F]] >> Symbol("ec") >> Symbol("typeDefs")
     val lets: Lens[EnabledLogEvaluationContext[C, F], Map[String, LazyVal[F]]] =

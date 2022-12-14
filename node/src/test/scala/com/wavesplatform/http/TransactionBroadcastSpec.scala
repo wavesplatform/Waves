@@ -281,7 +281,7 @@ class TransactionBroadcastSpec
 
         (blockchain.hasAccountScript _).when(*).returns(true)
       }
-      val publisher = createTxPublisherStub(blockchain)
+      val publisher = createTxPublisherStub(blockchain, enableExecutionLog = true)
       val route     = transactionsApiRoute.copy(blockchain = blockchain, transactionPublisher = publisher).route
 
       Post(routePath("/broadcast?trace=true"), invoke.json()) ~> route ~> check {

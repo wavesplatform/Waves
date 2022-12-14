@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit
 import cats.*
 import cats.instances.bigInt.*
 import cats.instances.tuple.*
-import com.github.benmanes.caffeine.cache.Caffeine
+import com.google.common.cache.CacheBuilder
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.*
 import monix.eval.Coeval
@@ -58,12 +58,12 @@ object RxScoreObserver extends ScorexLogging {
 
     var localScore: BigInt                  = initalLocalScore
     var currentBestChannel: Option[Channel] = None
-    val scores = Caffeine
+    val scores = CacheBuilder
       .newBuilder()
       .expireAfterWrite(scoreTtl.toMillis, TimeUnit.MILLISECONDS)
       .build[Channel, BigInt]()
     val statsReporter = Coeval.eval {
-      Stats(localScore, currentBestChannel.toString, scores.estimatedSize())
+      Stats(localScore, currentBestChannel.toString, scores.size())
     }
 
     def ls: Observable[Option[Channel]] =

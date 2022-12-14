@@ -1,7 +1,6 @@
 package com.wavesplatform.state
 
 import java.io.File
-
 import com.wavesplatform.Application
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
@@ -11,8 +10,8 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
-import org.iq80.leveldb.DB
 import org.openjdk.jmh.annotations.{Param, Scope, State, TearDown}
+import org.rocksdb.RocksDB
 
 @State(Scope.Benchmark)
 abstract class DBState extends ScorexLogging {
@@ -21,7 +20,7 @@ abstract class DBState extends ScorexLogging {
 
   lazy val settings: WavesSettings = Application.loadApplicationConfig(Some(new File(configFile)).filter(_.exists()))
 
-  lazy val db: DB = openDB(settings.dbSettings.directory)
+  lazy val db: RocksDB = openDB(settings.dbSettings)
 
   lazy val levelDBWriter: RocksDBWriter =
     RocksDBWriter.readOnly(

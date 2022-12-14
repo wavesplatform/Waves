@@ -1,33 +1,37 @@
 package com.wavesplatform.state
 
+import com.typesafe.config.ConfigFactory
+
 import java.io.File
 import java.nio.file.Files
-
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{LevelDBFactory, RocksDBWriter}
+import com.wavesplatform.database.{RocksDBWriter, openDB}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.utils.TestRocksDB
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import monix.execution.UncaughtExceptionReporter
 import monix.reactive.Observer
-import org.iq80.leveldb.{DB, Options}
 import org.openjdk.jmh.annotations.{Setup, TearDown}
+import org.rocksdb.RocksDB
 import org.scalacheck.{Arbitrary, Gen}
 
 trait BaseState {
-  import BaseState._
+  import BaseState.*
 
+  val benchSettings: Settings = Settings.fromConfig(ConfigFactory.load())
+  val wavesSettings: WavesSettings = {
+    val config = loadConfig(ConfigFactory.parseFile(new File(benchSettings.networkConfigFile)))
+    WavesSettings.fromRootConfig(config)
+  }
   private val fsSettings: FunctionalitySettings = updateFunctionalitySettings(FunctionalitySettings.TESTNET)
-  private val db: DB = {
-    val dir     = Files.createTempDirectory("state-synthetic").toAbsolutePath.toString
-    val options = new Options()
-    options.createIfMissing(true)
-    LevelDBFactory.factory.open(new File(dir), options)
+  private val db: RocksDB = {
+    val dir = Files.createTempDirectory("state-synthetic").toAbsolutePath.toString
+    openDB(wavesSettings.dbSettings.copy(directory = dir))
   }
 
   private val portfolioChanges = Observer.empty(UncaughtExceptionReporter.default)

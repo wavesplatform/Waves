@@ -1,6 +1,6 @@
 package com.wavesplatform.database
 
-import com.github.benmanes.caffeine.cache.{CacheLoader, Caffeine}
+import com.google.common.cache.{CacheBuilder, CacheLoader}
 
 import java.util
 import com.google.common.primitives.UnsignedBytes
@@ -65,7 +65,7 @@ class InMemoryDB(underlying: RocksDB, settings: InMemorySettings) extends RocksD
   private val entries             = HashingStrategyMaps.mutable.`with`[Array[Byte], Array[Byte]](ByteArrayHashingStrategy)
   private val toDelete            = HashingStrategySets.mutable.`with`[Array[Byte]](ByteArrayHashingStrategy)
 
-  private val cc = Caffeine
+  private val cc = CacheBuilder
     .newBuilder()
     .maximumWeight(settings.maxCacheWeight)
     .weigher((_: KW, value: Array[Byte]) => value.length)

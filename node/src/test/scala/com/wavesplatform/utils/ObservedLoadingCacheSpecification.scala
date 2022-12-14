@@ -1,6 +1,7 @@
 package com.wavesplatform.utils
 
-import com.github.benmanes.caffeine.cache.{CacheLoader, Caffeine, LoadingCache, Ticker}
+import com.google.common.base.Ticker
+import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
@@ -63,7 +64,7 @@ class ObservedLoadingCacheSpecification extends FreeSpec with MockFactory {
     val changes = mock[Observer[String]]
     val ticker  = new FakeTicker()
 
-    val delegate = Caffeine
+    val delegate = CacheBuilder
       .newBuilder()
       .expireAfterWrite(ExpiringTime.toMillis, TimeUnit.MILLISECONDS)
       .ticker(ticker)

@@ -1,6 +1,6 @@
 package com.wavesplatform.account
 
-import com.github.benmanes.caffeine.cache.{Cache, Caffeine}
+import com.google.common.cache.{Cache, CacheBuilder}
 
 import java.nio.ByteBuffer
 import com.google.common.primitives.{Bytes, Ints}
@@ -67,13 +67,13 @@ object Address {
   val AddressLength: Int       = 1 + 1 + HashLength + ChecksumLength
   val AddressStringLength: Int = base58Length(AddressLength)
 
-  private[this] val publicKeyBytesCache: Cache[(ByteStr, Byte), Address] = Caffeine
+  private[this] val publicKeyBytesCache: Cache[(ByteStr, Byte), Address] = CacheBuilder
     .newBuilder()
     .softValues()
     .maximumSize(200000)
     .build()
 
-  private[this] val bytesCache: Cache[ByteStr, Either[InvalidAddress, Address]] = Caffeine
+  private[this] val bytesCache: Cache[ByteStr, Either[InvalidAddress, Address]] = CacheBuilder
     .newBuilder()
     .softValues()
     .maximumSize(200000)
@@ -92,7 +92,7 @@ object Address {
   def fromPublicKey(publicKey: PublicKey, chainId: Byte = scheme.chainId): Address = {
     publicKeyBytesCache.get(
       (publicKey, chainId),
-      { _ =>
+      { () =>
         val withoutChecksum = ByteBuffer
           .allocate(1 + 1 + HashLength)
           .put(AddressVersion)
@@ -114,7 +114,7 @@ object Address {
   def fromBytes(addressBytes: Array[Byte], chainId: Byte = scheme.chainId): Either[InvalidAddress, Address] = {
     bytesCache.get(
       ByteStr(addressBytes),
-      { _ =>
+      { () =>
         Either
           .cond(
             addressBytes.length == Address.AddressLength,

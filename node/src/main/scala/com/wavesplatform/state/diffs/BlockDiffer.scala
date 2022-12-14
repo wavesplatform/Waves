@@ -44,9 +44,10 @@ object BlockDiffer {
       block: Block,
       constraint: MiningConstraint,
       hitSource: ByteStr,
-      verify: Boolean = true
+      verify: Boolean = true,
+      enableExecutionLog: Boolean = false
   ): Either[ValidationError, Result] =
-    fromBlockTraced(blockchain, maybePrevBlock, block, constraint, hitSource, verify).resultE
+    fromBlockTraced(blockchain, maybePrevBlock, block, constraint, hitSource, verify, enableExecutionLog).resultE
 
   def fromBlockTraced(
       blockchain: Blockchain,
@@ -54,7 +55,8 @@ object BlockDiffer {
       block: Block,
       constraint: MiningConstraint,
       hitSource: ByteStr,
-      verify: Boolean
+      verify: Boolean,
+      enableExecutionLog: Boolean = false
   ): TracedResult[ValidationError, Result] = {
     val stateHeight = blockchain.height
 
@@ -108,7 +110,8 @@ object BlockDiffer {
         resultDiff,
         stateHeight >= ngHeight,
         block.transactionData,
-        verify
+        verify,
+        enableExecutionLog
       )
     } yield r
   }
@@ -118,16 +121,18 @@ object BlockDiffer {
       prevBlockTimestamp: Option[Long],
       micro: MicroBlock,
       constraint: MiningConstraint,
-      verify: Boolean = true
+      verify: Boolean = true,
+      enableExecutionLog: Boolean = false
   ): Either[ValidationError, Result] =
-    fromMicroBlockTraced(blockchain, prevBlockTimestamp, micro, constraint, verify).resultE
+    fromMicroBlockTraced(blockchain, prevBlockTimestamp, micro, constraint, verify, enableExecutionLog).resultE
 
   def fromMicroBlockTraced(
       blockchain: Blockchain,
       prevBlockTimestamp: Option[Long],
       micro: MicroBlock,
       constraint: MiningConstraint,
-      verify: Boolean = true
+      verify: Boolean = true,
+      enableExecutionLog: Boolean = false
   ): TracedResult[ValidationError, Result] = {
     for {
       // microblocks are processed within block which is next after 40-only-block which goes on top of activated height
@@ -146,7 +151,8 @@ object BlockDiffer {
         Diff.empty,
         hasNg = true,
         micro.transactionData,
-        verify = verify
+        verify = verify,
+        enableExecutionLog = enableExecutionLog
       )
     } yield r
   }
@@ -165,7 +171,8 @@ object BlockDiffer {
       initDiff: Diff,
       hasNg: Boolean,
       txs: Seq[Transaction],
-      verify: Boolean
+      verify: Boolean,
+      enableExecutionLog: Boolean
   ): TracedResult[ValidationError, Result] = {
     def updateConstraint(constraint: MiningConstraint, blockchain: Blockchain, tx: Transaction, diff: Diff): MiningConstraint =
       constraint.put(blockchain, tx, diff)
@@ -174,7 +181,7 @@ object BlockDiffer {
     val timestamp          = blockchain.lastBlockTimestamp.get
     val blockGenerator     = blockchain.lastBlockHeader.get.header.generator.toAddress
 
-    val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, verify) _
+    val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, verify, enableExecutionLog = enableExecutionLog) _
     val hasSponsorship = currentBlockHeight >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
 
     if (verify) {

@@ -66,17 +66,17 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
   def withRocksDBWriter[A](fs: FunctionalitySettings)(test: RocksDBWriter => A): A =
     withRocksDBWriter(TestRocksDB.createTestBlockchainSettings(fs))(test)
 
-  def assertDiffEi(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)(
+  def assertDiffEi(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled, enableExecutionLog: Boolean = false)(
       assertion: Either[ValidationError, Diff] => Unit
   ): Unit = withRocksDBWriter(fs) { state =>
-    assertDiffEi(preconditions, block, state)(assertion)
+    assertDiffEi(preconditions, block, state, enableExecutionLog)(assertion)
   }
 
-  def assertDiffEi(preconditions: Seq[Block], block: Block, state: RocksDBWriter)(
+  def assertDiffEi(preconditions: Seq[Block], block: Block, state: RocksDBWriter, enableExecutionLog: Boolean)(
       assertion: Either[ValidationError, Diff] => Unit
   ): Unit = {
     def differ(blockchain: Blockchain, b: Block) =
-      BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature)
+      BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature, enableExecutionLog = enableExecutionLog)
 
     preconditions.foreach { precondition =>
       val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) = differ(state, precondition).explicitGet()
@@ -86,11 +86,19 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
     assertion(totalDiff1.map(_.diff))
   }
 
-  def assertDiffEiTraced(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)(
+  def assertDiffEiTraced(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled, enableExecutionLog: Boolean = false)(
       assertion: TracedResult[ValidationError, Diff] => Unit
   ): Unit = withRocksDBWriter(fs) { state =>
     def differ(blockchain: Blockchain, b: Block) =
-      BlockDiffer.fromBlockTraced(blockchain, None, b, MiningConstraint.Unlimited, b.header.generationSignature, verify = true)
+      BlockDiffer.fromBlockTraced(
+        blockchain,
+        None,
+        b,
+        MiningConstraint.Unlimited,
+        b.header.generationSignature,
+        verify = true,
+        enableExecutionLog = enableExecutionLog
+      )
 
     preconditions.foreach { precondition =>
       val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) = differ(state, precondition).resultE.explicitGet()

@@ -46,8 +46,8 @@ object UtilsEvaluator {
     for {
       ds <- DirectiveSet(script.stdLibVersion, Account, DAppType).leftMap(GenericError(_))
       invoke = new InvokeScriptTransactionLike {
-        override def dApp: AddressOrAlias              = address
-        override def funcCall: Terms.FUNCTION_CALL     = Terms.FUNCTION_CALL(FunctionHeader.User(""), Nil)
+        override def dApp: AddressOrAlias          = address
+        override def funcCall: Terms.FUNCTION_CALL = Terms.FUNCTION_CALL(FunctionHeader.User(""), Nil)
         // Payments, that are mapped to RIDE structure, is taken from Invocation,
         // while this field used for validation inside InvokeScriptTransactionDiff,
         // that unused in the current implementation.
@@ -73,6 +73,7 @@ object UtilsEvaluator {
         pk,
         Set.empty[Address],
         limitedExecution = false,
+        enableExecutionLog = true,
         limit,
         remainingCalls = ContractLimits.MaxSyncDAppCalls(script.stdLibVersion),
         availableActions = ContractLimits.MaxCallableActionsAmountBeforeV6(script.stdLibVersion),
@@ -95,7 +96,8 @@ object UtilsEvaluator {
           script.stdLibVersion,
           correctFunctionCallScope = blockchain.checkEstimatorSumOverflow,
           newMode = blockchain.newEvaluatorMode,
-          checkConstructorArgsTypes = true
+          checkConstructorArgsTypes = true,
+          enableExecutionLog = true
         )
         .value()
         .leftMap { case (err, _, log) => InvokeRejectError(err.message, log) }

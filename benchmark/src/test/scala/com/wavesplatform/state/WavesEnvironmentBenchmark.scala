@@ -2,24 +2,23 @@ package com.wavesplatform.state
 
 import java.io.File
 import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
-
 import cats.Id
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.database.{LevelDBFactory, RocksDBWriter}
+import com.wavesplatform.database.{RocksDBWriter, openDB}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
-import com.wavesplatform.state.WavesEnvironmentBenchmark._
+import com.wavesplatform.state.WavesEnvironmentBenchmark.*
 import com.wavesplatform.state.bench.DataTestData
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import monix.eval.Coeval
-import org.iq80.leveldb.{DB, Options}
-import org.openjdk.jmh.annotations._
+import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
+import org.rocksdb.RocksDB
 import scodec.bits.BitVector
 
 import scala.io.Codec
@@ -130,10 +129,10 @@ object WavesEnvironmentBenchmark {
       override val chainId: Byte = wavesSettings.blockchainSettings.addressSchemeCharacter.toByte
     }
 
-    private val db: DB = {
+    private val db: RocksDB = {
       val dir = new File(wavesSettings.dbSettings.directory)
       if (!dir.isDirectory) throw new IllegalArgumentException(s"Can't find directory at '${wavesSettings.dbSettings.directory}'")
-      LevelDBFactory.factory.open(dir, new Options)
+      openDB(wavesSettings.dbSettings)
     }
 
     val environment: Environment[Id] = {

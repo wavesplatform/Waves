@@ -193,8 +193,8 @@ object Verifier extends ScorexLogging {
           script,
           isAsset,
           containerAddress,
-          complexityLimit,
-          enableExecutionLog = enableExecutionLog
+          enableExecutionLog,
+          complexityLimit
         )
       val complexity = if (blockchain.storeEvaluatedComplexity) evaluatedComplexity else estimatedComplexity
       val resultE = result match {
@@ -240,8 +240,8 @@ object Verifier extends ScorexLogging {
         script.script,
         isAssetScript = false,
         Coproduct[Environment.Tthis](Recipient.Address(ByteStr(order.sender.toAddress.bytes))),
-        complexityLimit,
-        enableExecutionLog = enableExecutionLog
+        enableExecutionLog,
+        complexityLimit
       )
     ).toEither
       .leftMap(e => ScriptExecutionError(s"Uncaught execution error: $e", Nil, None))

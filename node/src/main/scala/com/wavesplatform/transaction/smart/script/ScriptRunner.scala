@@ -34,9 +34,9 @@ object ScriptRunner {
       script: Script,
       isAssetScript: Boolean,
       scriptContainerAddress: Environment.Tthis,
+      enableExecutionLog: Boolean,
       complexityLimit: Int = Int.MaxValue,
-      default: EVALUATED = TRUE,
-      enableExecutionLog: Boolean = false
+      default: EVALUATED = TRUE
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
     applyGeneric(
       in,

@@ -690,8 +690,8 @@ object InvokeDiffsCommon {
         scriptContainerAddress =
           if (blockchain.passCorrectAssetId) Coproduct[Environment.Tthis](Environment.AssetId(assetId.arr))
           else Coproduct[Environment.Tthis](Environment.AssetId(tx.dApp.bytes)),
-        complexityLimit,
-        enableExecutionLog = enableExecutionLog
+        enableExecutionLog = enableExecutionLog,
+        complexityLimit
       )
       val complexity = if (blockchain.storeEvaluatedComplexity) evaluatedComplexity else estimatedComplexity
       result match {

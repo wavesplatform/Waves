@@ -3,7 +3,7 @@ package com.wavesplatform.database
 import java.{lang, util}
 import cats.data.Ior
 import cats.syntax.option.*
-import com.github.benmanes.caffeine.cache.{CacheLoader, Caffeine, LoadingCache}
+import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.google.common.collect.ArrayListMultimap
 import com.google.common.hash.{Funnels, BloomFilter as GBloomFilter}
 import com.google.protobuf.ByteString
@@ -423,7 +423,7 @@ object Caches {
       loader: K => V,
       batchLoader: lang.Iterable[? <: K] => util.Map[K, V] = { _: lang.Iterable[? <: K] => new util.HashMap[K, V]() }
   ): LoadingCache[K, V] =
-    Caffeine
+    CacheBuilder
       .newBuilder()
       .maximumSize(maximumSize)
       .recordStats()

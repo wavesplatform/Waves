@@ -1,6 +1,6 @@
 package com.wavesplatform.network
 
-import com.github.benmanes.caffeine.cache.Caffeine
+import com.google.common.cache.CacheBuilder
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.InvalidBlockStorageImpl.*
@@ -21,7 +21,7 @@ object InvalidBlockStorage {
 }
 
 class InvalidBlockStorageImpl(settings: InvalidBlockStorageSettings) extends InvalidBlockStorage {
-  private val cache = Caffeine
+  private val cache = CacheBuilder
     .newBuilder()
     .expireAfterWrite(settings.timeout.length, settings.timeout.unit)
     .build[ByteStr, ValidationError]()

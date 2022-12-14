@@ -1,6 +1,6 @@
 package com.wavesplatform.network
 
-import com.github.benmanes.caffeine.cache.Caffeine
+import com.google.common.cache.CacheBuilder
 
 import java.util
 import com.wavesplatform.block.Block
@@ -22,7 +22,7 @@ class LegacyFrameCodec(peerDatabase: PeerDatabase, receivedTxsCacheTimeout: Fini
   import BasicMessagesRepo.specsByCodes
   import LegacyFrameCodec.*
 
-  private val receivedTxsCache = Caffeine
+  private val receivedTxsCache = CacheBuilder
     .newBuilder()
     .expireAfterWrite(receivedTxsCacheTimeout.length, receivedTxsCacheTimeout.unit)
     .build[String, Object]()

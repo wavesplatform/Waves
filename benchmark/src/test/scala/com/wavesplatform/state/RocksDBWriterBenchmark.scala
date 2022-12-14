@@ -2,21 +2,20 @@ package com.wavesplatform.state
 
 import java.io.File
 import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
-
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account._
+import com.wavesplatform.account.*
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.database
-import com.wavesplatform.database.{DBExt, Keys, LevelDBFactory, RocksDBWriter}
+import com.wavesplatform.database.{DBExt, Keys, RocksDBWriter, openDB}
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
-import com.wavesplatform.state.LevelDBWriterBenchmark._
+import com.wavesplatform.state.RocksDBWriterBenchmark.*
 import com.wavesplatform.transaction.Transaction
-import org.iq80.leveldb.{DB, Options}
-import org.openjdk.jmh.annotations._
+import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
+import org.rocksdb.RocksDB
 
 import scala.io.Codec
 
@@ -31,7 +30,7 @@ import scala.io.Codec
 @Fork(1)
 @Warmup(iterations = 10)
 @Measurement(iterations = 100)
-class LevelDBWriterBenchmark {
+class RocksDBWriterBenchmark {
   @Benchmark
   def readFullBlock_test(st: BlocksByIdSt, bh: Blackhole): Unit = {
     bh.consume(st.blockById(st.allBlocks.random).get)
@@ -48,7 +47,7 @@ class LevelDBWriterBenchmark {
   }
 }
 
-object LevelDBWriterBenchmark {
+object RocksDBWriterBenchmark {
 
   @State(Scope.Benchmark)
   class TransactionByIdSt extends BaseSt {
@@ -82,10 +81,10 @@ object LevelDBWriterBenchmark {
       override val chainId: Byte = wavesSettings.blockchainSettings.addressSchemeCharacter.toByte
     }
 
-    private val rawDB: DB = {
+    private val rawDB: RocksDB = {
       val dir = new File(wavesSettings.dbSettings.directory)
       if (!dir.isDirectory) throw new IllegalArgumentException(s"Can't find directory at '${wavesSettings.dbSettings.directory}'")
-      LevelDBFactory.factory.open(dir, new Options)
+      openDB(wavesSettings.dbSettings)
     }
 
     val db = RocksDBWriter.readOnly(rawDB, wavesSettings)
@@ -95,7 +94,7 @@ object LevelDBWriterBenchmark {
         meta -> rawDB.readOnly(ro => database.loadTransactions(Height(height), ro))
       }
 
-    def loadBlockMetaAt(height: Int): Option[BlockMeta] = rawDB.get(Keys.blockMetaAt(Height(height)))
+    def loadBlockMetaAt(height: Int): Option[BlockMeta] = rawDB.get(Keys.blockMetaAt(Height(height))).flatMap(BlockMeta.fromPb)
 
     val cba = CommonBlocksApi(db, loadBlockMetaAt, loadBlockInfoAt)
 

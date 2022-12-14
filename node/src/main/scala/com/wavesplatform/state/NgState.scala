@@ -1,6 +1,6 @@
 package com.wavesplatform.state
 
-import com.github.benmanes.caffeine.cache.Caffeine
+import com.google.common.cache.CacheBuilder
 
 import java.util.concurrent.TimeUnit
 import com.wavesplatform.block
@@ -19,13 +19,13 @@ object NgState {
   case class CachedMicroDiff(diff: Diff, carryFee: Long, totalFee: Long, timestamp: Long)
 
   class NgStateCaches {
-    val blockDiffCache = Caffeine
+    val blockDiffCache = CacheBuilder
       .newBuilder()
       .maximumSize(NgState.MaxTotalDiffs)
       .expireAfterWrite(10, TimeUnit.MINUTES)
       .build[BlockId, (Diff, Long, Long)]()
 
-    val forgedBlockCache = Caffeine
+    val forgedBlockCache = CacheBuilder
       .newBuilder()
       .maximumSize(NgState.MaxTotalDiffs)
       .expireAfterWrite(10, TimeUnit.MINUTES)
@@ -75,7 +75,7 @@ case class NgState(
       else
         internalCaches.blockDiffCache.get(
           totalResBlockRef,
-          { _ =>
+          { () =>
             microBlocks.find(_.idEquals(totalResBlockRef)) match {
               case Some(MicroBlockInfo(blockId, current)) =>
                 val (prevDiff, prevCarry, prevTotalFee)                   = this.diffFor(current.reference)
@@ -178,7 +178,7 @@ case class NgState(
   private[this] def forgeBlock(blockId: BlockId): Option[(Block, DiscardedMicroBlocks)] =
     internalCaches.forgedBlockCache.get(
       blockId,
-      { _ =>
+      { () =>
         val microBlocksAsc = microBlocks.reverse
 
         if (base.id() == blockId) {
