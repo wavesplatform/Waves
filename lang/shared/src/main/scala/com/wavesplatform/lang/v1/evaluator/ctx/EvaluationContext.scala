@@ -1,6 +1,8 @@
 package com.wavesplatform.lang.v1.evaluator.ctx
 
 import cats.*
+import cats.syntax.functor.*
+import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.LET
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
@@ -30,10 +32,22 @@ trait LoggedEvaluationContext[C[_[_]], F[_]] {
   def log(let: LET, result: LetExecResult[F]): Unit
 }
 
-case class EnabledLogEvaluationContext[C[_[_]], F[_]](l: LetLogCallback[F], ec: EvaluationContext[C, F]) extends LoggedEvaluationContext[C, F] {
-  val loggedLets: util.IdentityHashMap[LET, Unit] = new util.IdentityHashMap()
+case class EnabledLogEvaluationContext[C[_[_]], F[_]: Monad](l: LetLogCallback[F], ec: EvaluationContext[C, F])
+    extends LoggedEvaluationContext[C, F] {
+  val loggedLets: util.IdentityHashMap[LET, Unit]          = new util.IdentityHashMap()
+  val loggedErrors: collection.mutable.Set[ExecutionError] = collection.mutable.Set()
 
-  override def log(let: LET, result: LetExecResult[F]): Unit =
+  override def log(let: LET, result: LetExecResult[F]): Unit = {
+    result.map {
+      case Left(err) if !loggedErrors.contains(err) =>
+        loggedErrors.addOne(err)
+        add(let, result)
+      case Left(_) => ()
+      case _       => add(let, result)
+    }
+  }
+
+  private def add(let: LET, result: LetExecResult[F]): Unit =
     loggedLets.computeIfAbsent(let, _ => l(let.name)(result))
 }
 

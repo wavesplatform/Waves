@@ -1,7 +1,5 @@
 package com.wavesplatform.mining
 
-import java.util.concurrent.atomic.AtomicReference
-
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
 import com.wavesplatform.block.serialization.{BlockHeaderSerializer, BlockSerializer}
@@ -12,14 +10,14 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.history.chainBaseAndMicro
+import com.wavesplatform.history.{chainBaseAndMicro, defaultSigner}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WalletSettings, WavesSettings}
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, NG, diffs}
-import com.wavesplatform.test.{FlatSpec, _}
+import com.wavesplatform.test.{FlatSpec, *}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction, TxHelpers, TxVersion}
@@ -33,15 +31,16 @@ import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.{Observable, Observer}
 import org.scalacheck.Gen
-import org.scalatest._
+import org.scalatest.*
 import org.scalatest.enablers.Length
 
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Await
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 class BlockV5Test extends FlatSpec with WithDomain with OptionValues with EitherValues with BlocksTransactionsHelpers {
-  import BlockV5Test._
+  import BlockV5Test.*
 
-  private val testTime = new TestTime(1)
+  private val testTime = TestTime(1)
   def shiftTime(miner: MinerImpl, minerAcc: KeyPair): Unit = {
     val offset = miner.getNextBlockGenerationOffset(minerAcc).explicitGet()
     testTime.advance(offset + 1.milli)
@@ -50,7 +49,19 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
   "Proto block" should "be serialized" in {
     val features = Seq(534, 3, 33, 5, 1, 0, 12343242).map(_.toShort)
     val block =
-      TestBlock.create(System.currentTimeMillis(), TestBlock.randomSignature(), Nil, version = Block.ProtoBlockVersion, features = features.sorted)
+      Block
+        .buildAndSign(
+          Block.ProtoBlockVersion,
+          System.currentTimeMillis(),
+          TestBlock.randomSignature(),
+          2L,
+          ByteStr(Array.fill(Block.GenerationVRFSignatureLength)(0: Byte)),
+          Seq.empty,
+          defaultSigner,
+          features.sorted,
+          -1
+        )
+        .explicitGet()
 
     def updateHeader(block: Block, f: BlockHeader => BlockHeader): Block =
       block.copy(header = f(block.header))
@@ -109,7 +120,7 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
       val deserializedHeader = PBBlocks.vanilla(protobuf.block.PBBlockHeader.parseFrom(serializedHeader))
       serialized1 shouldBe serialized2
       all(Seq(deserialized1, deserialized2)) should matchPattern {
-        case b: Block if b.transactionsRootValid() && b.signatureValid() => // Pass
+        case b: Block if b.signatureValid() => // Pass
       }
       all(Seq(deserialized1, deserialized2)) shouldBe block
       deserializedHeader shouldBe block.header
@@ -380,14 +391,8 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
         d =>
           def applyBlock(txs: Transaction*): SignedBlockHeader = {
             d.appendBlock(
-              TestBlock.create(
-                System.currentTimeMillis(),
-                d.blockchainUpdater.lastBlockId.getOrElse(TestBlock.randomSignature()),
-                txs,
-                version =
-                  if (d.blockchainUpdater.height >= 1) Block.ProtoBlockVersion
-                  else Block.PlainBlockVersion
-              )
+              if (d.blockchainUpdater.height >= 1) Block.ProtoBlockVersion else Block.PlainBlockVersion,
+              txs*
             )
             lastBlock
           }
@@ -407,19 +412,11 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
           block3.header.reference shouldBe block2.id()
           block3.id() should have length crypto.DigestLength
 
-          val (keyBlock, microBlocks) =
-            UnsafeBlocks.unsafeChainBaseAndMicro(
-              block3.id(),
-              Nil,
-              Seq(Seq(TxHelpers.transfer()), Seq(TxHelpers.transfer())),
-              acc,
-              Block.ProtoBlockVersion,
-              System.currentTimeMillis()
-            )
-          d.appendBlock(keyBlock)
-          microBlocks.foreach(d.appendMicroBlock)
+          val keyBlock = d.appendKeyBlock()
+          val mb1      = d.createMicroBlock(TxHelpers.transfer())
+          d.blockchain.processMicroBlock(mb1)
+          d.appendMicroBlock(TxHelpers.transfer())
 
-          val mb1 = d.microBlocks.head
           mb1.totalResBlockSig should have length crypto.SignatureLength
           mb1.reference should not be keyBlock.signature
           mb1.reference shouldBe keyBlock.id()
@@ -444,7 +441,7 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
     } yield (miner1, miner2, genesisBlock)
 
   private def withBlockchain(disabledFeatures: AtomicReference[Set[Short]], time: Time = ntpTime, settings: WavesSettings = testSettings)(
-      f: Blockchain with BlockchainUpdater with NG => Unit
+      f: Blockchain & BlockchainUpdater & NG => Unit
   ): Unit = {
     withRocksDBWriter(settings.blockchainSettings) { blockchain =>
       val bcu: BlockchainUpdaterImpl =
@@ -458,13 +455,13 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
 
   type Appender = Block => Task[Either[ValidationError, Option[BigInt]]]
 
-  private def withMiner(blockchain: Blockchain with BlockchainUpdater with NG, time: Time, settings: WavesSettings = testSettings)(
+  private def withMiner(blockchain: Blockchain & BlockchainUpdater & NG, time: Time, settings: WavesSettings = testSettings)(
       f: (MinerImpl, Appender, Scheduler) => Unit
   ): Unit = {
     val pos               = PoSSelector(blockchain, settings.synchronizationSettings.maxBaseTarget)
     val allChannels       = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val wallet            = Wallet(WalletSettings(None, Some("123"), None))
-    val utxPool           = new UtxPoolImpl(time, blockchain, settings.utxSettings, settings.minerSettings.enable)
+    val utxPool           = new UtxPoolImpl(time, blockchain, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
     val minerScheduler    = Scheduler.singleThread("miner")
     val appenderScheduler = Scheduler.singleThread("appender")
     val miner = new MinerImpl(allChannels, blockchain, settings, time, utxPool, wallet, pos, minerScheduler, appenderScheduler, Observable.empty)

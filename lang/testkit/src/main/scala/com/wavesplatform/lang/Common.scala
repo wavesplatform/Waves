@@ -9,8 +9,8 @@ import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
-//import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
-//import com.wavesplatform.lang.v1.evaluator.EvaluatorV1.*
+import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, Log}
+import com.wavesplatform.lang.v1.evaluator.EvaluatorV1.*
 import com.wavesplatform.lang.v1.evaluator.ctx.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, *}
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
@@ -23,7 +23,7 @@ import scala.annotation.tailrec
 import scala.util.{Left, Right, Try}
 
 object Common {
-  import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
+  import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters.*
 
   private val dataEntryValueType = UNION(LONG, BOOLEAN, BYTESTR, STRING)
   val dataEntryType              = CASETYPEREF("DataEntry", List("key" -> STRING, "value" -> dataEntryValueType))
@@ -33,8 +33,8 @@ object Common {
       context: EvaluationContext[NoContext, Id] =
         Monoid.combine(PureContext.build(V1, useNewPowPrecision = true).evaluationContext, addCtx.evaluationContext),
       expr: EXPR
-  ): Either[ExecutionError, T] = ???
-//    new EvaluatorV1[Id, NoContext]().apply[T](context, expr)
+  ): Either[ExecutionError, T] =
+    new EvaluatorV1[Id, NoContext]().apply[T](context, expr)
 
   val multiplierFunction: NativeFunction[NoContext] =
     NativeFunction("MULTIPLY", 1L, 10005.toShort, LONG, ("x1", LONG), ("x2", LONG)) {
@@ -103,7 +103,7 @@ object Common {
           payments: Seq[(Option[Array[Byte]], Long)],
           remainingComplexity: Int,
           reentrant: Boolean
-      ): Coeval[(Either[ValidationError, EVALUATED], Int)] = ???
+      ): Coeval[(Either[ValidationError, (EVALUATED, Log[Id])], Int)] = ???
     }
 
   def addressFromPublicKey(chainId: Byte, pk: Array[Byte], addressVersion: Byte = EnvironmentFunctions.AddressVersion): Array[Byte] = {

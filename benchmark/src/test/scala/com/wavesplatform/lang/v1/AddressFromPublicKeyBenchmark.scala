@@ -29,7 +29,7 @@ class AddressFromPublicKeyBenchmark {
 @State(Scope.Benchmark)
 class PkSt extends EthHelpers {
   val ds  = DirectiveSet(V6, Account, Expression).fold(null, identity)
-  val ctx = lazyContexts(ds).value().evaluationContext(EnvironmentFunctionsBenchmark.environment)
+  val ctx = lazyContexts((ds, true)).value().evaluationContext(EnvironmentFunctionsBenchmark.environment)
 
   val wavesPk   = ByteStr(curve25519.generateKeypair._2)
   val exprWaves = TestCompiler(V6).compileExpression(s"addressFromPublicKey(base58'$wavesPk')").expr.asInstanceOf[EXPR]

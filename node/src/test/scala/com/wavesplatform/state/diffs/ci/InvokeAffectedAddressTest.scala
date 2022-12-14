@@ -7,10 +7,10 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.test.PropSpec
-import com.wavesplatform.transaction.TxHelpers._
+import com.wavesplatform.transaction.TxHelpers.*
 
 class InvokeAffectedAddressTest extends PropSpec with WithDomain {
-  import DomainPresets._
+  import DomainPresets.*
 
   private def dApp(failed: Boolean) =
     TestCompiler(V5).compileContract(
@@ -58,7 +58,7 @@ class InvokeAffectedAddressTest extends PropSpec with WithDomain {
           d.liquidDiff.errorMessage(invokeTx.id()) shouldBe defined
         } else
           d.appendAndAssertSucceed(aliasTx, invokeTx)
-        d.liquidDiff.transactions.find(_.transaction.id() == invokeTx.id()).get.affected shouldBe Set(defaultAddress, secondAddress)
+        d.liquidDiff.transaction(invokeTx.id()).get.affected shouldBe Set(defaultAddress, secondAddress)
       }
     }
   }

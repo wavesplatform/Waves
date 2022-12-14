@@ -292,7 +292,7 @@ object Verifier extends ScorexLogging {
         }
         .getOrElse(
           stats.signatureVerification
-            .measureForType(typeId)(et.firstProofIsValidSignature.as(0))
+            .measureForType(typeId)(verifyAsEllipticCurveSignature(et, blockchain.isFeatureActivated(BlockchainFeatures.RideV6)).as(0))
         )
 
     def orderVerification(order: Order): TracedResult[ValidationError, Int] = {
@@ -307,7 +307,7 @@ object Verifier extends ScorexLogging {
         }
         .getOrElse(
           stats.signatureVerification
-            .measureForType(typeId)(order.firstProofIsValidSignature.as(0))
+            .measureForType(typeId)(verifyOrderSignature(order, blockchain.isFeatureActivated(BlockchainFeatures.RideV6)).as(0))
         )
 
       TracedResult(verificationResult)
@@ -344,7 +344,7 @@ object Verifier extends ScorexLogging {
         case (sb, (k, Right(v))) =>
           sb.append(s"\nEvaluated `$k` to ")
           v match {
-            case obj: EVALUATED => TermPrinter.print(str => sb.append(str), obj); sb
+            case obj: EVALUATED => TermPrinter().print(str => sb.append(str), obj); sb
             case a              => sb.append(a.toString)
           }
         case (sb, (k, Left(err))) => sb.append(s"\nFailed to evaluate `$k`: $err")

@@ -7,11 +7,11 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.database.{openDB, RocksDBWriter}
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.{Diff, Portfolio}
-import com.wavesplatform.transaction.{GenesisTransaction, Proofs}
+import com.wavesplatform.transaction.{GenesisTransaction, Proofs, TxDecimals, TxPositiveAmount}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.utils.{NTP, ScorexLogging}
@@ -20,9 +20,9 @@ import monix.reactive.Observer
 object RollbackBenchmark extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     val settings      = Application.loadApplicationConfig(Some(new File(args(0))))
-    val db            = openDB(settings.dbSettings.directory)
+    val db            = openDB(settings.dbSettings)
     val time          = new NTP(settings.ntpServer)
-    val levelDBWriter = RocksDBWriter(db, Observer.stopped, settings)
+    val rocksDBWriter = RocksDBWriter(db, Observer.stopped, settings)
 
     val issuer = KeyPair(new Array[Byte](32))
 
@@ -40,11 +40,11 @@ object RollbackBenchmark extends ScorexLogging {
         issuer.publicKey,
         ByteString.copyFromUtf8("asset-" + i),
         ByteString.EMPTY,
-        100000e2.toLong,
-        2.toByte,
+        TxPositiveAmount.unsafeFrom(100000e2.toLong),
+        TxDecimals.unsafeFrom(2.toByte),
         false,
         None,
-        1e8.toLong,
+        TxPositiveAmount.unsafeFrom(1e8.toLong),
         time.getTimestamp(),
         Proofs(ByteStr(new Array[Byte](64))),
         AddressScheme.current.chainId
@@ -72,7 +72,7 @@ object RollbackBenchmark extends ScorexLogging {
     } yield address -> Portfolio(assets = map)
 
     log.info("Appending genesis block")
-    levelDBWriter.append(
+    rocksDBWriter.append(
       Diff(portfolios = portfolios.toMap),
       0,
       0,
@@ -88,13 +88,13 @@ object RollbackBenchmark extends ScorexLogging {
     val nextDiff = Diff(portfolios = addresses.map(_ -> Portfolio(1, assets = Map(IssuedAsset(assets.head.id()) -> 1L))).toMap)
 
     log.info("Appending next block")
-    levelDBWriter.append(nextDiff, 0, 0, None, ByteStr.empty, nextBlock)
+    rocksDBWriter.append(nextDiff, 0, 0, None, ByteStr.empty, nextBlock)
 
     log.info("Rolling back")
     val start = System.nanoTime()
-    levelDBWriter.rollbackTo(1)
+    rocksDBWriter.rollbackTo(1)
     val end = System.nanoTime()
     log.info(f"Rollback took ${(end - start) * 1e-6}%.3f ms")
-    levelDBWriter.close()
+    rocksDBWriter.close()
   }
 }

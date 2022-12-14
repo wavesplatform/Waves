@@ -148,7 +148,7 @@ object BlockchainGeneratorApp extends ScorexLogging {
         map.get(account).toRight(GenericError(s"No key for $account"))
     }
 
-    val utx         = new UtxPoolImpl(fakeTime, blockchain, wavesSettings.utxSettings, wavesSettings.minerSettings.enable)
+    val utx = new UtxPoolImpl(fakeTime, blockchain, wavesSettings.utxSettings, wavesSettings.maxTxErrorLogSize, wavesSettings.minerSettings.enable)
     val posSelector = PoSSelector(blockchain, None)
     val utxEvents   = ConcurrentSubject.publish[UtxEvent](scheduler)
     val miner = new MinerImpl(

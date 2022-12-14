@@ -80,7 +80,7 @@ class BlockchainUpdaterImpl(
       ngState
         .flatMap(_.totalDiffOf(id))
         .map { case (_, diff, _, _, _) =>
-          diff.transactions.map(info => (TxMeta(Height(height), info.applied, info.spentComplexity), info.transaction))
+          diff.transactions.toSeq.map(info => (TxMeta(Height(height), info.applied, info.spentComplexity), info.transaction))
         }
     )
 
@@ -332,11 +332,11 @@ class BlockchainUpdaterImpl(
                           block,
                           hitSource,
                           differResult.carry,
-                          reward
+                          None
                         )
                         miner.scheduleMining(Some(tempBlockchain))
 
-                        blockchainUpdateTriggers.onProcessBlock(block, differResult.detailedDiff, reward, referencedBlockchain)
+                        blockchainUpdateTriggers.onProcessBlock(block, differResult.detailedDiff, reward, this)
 
                         rocksdb.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)
                         BlockStats.appended(referencedForgedBlock, referencedLiquidDiff.scriptsComplexity)
@@ -661,7 +661,7 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.resolveAlias(alias)
   }
 
-  // FIXME: optimize for batch requests (get compositeBlockchain)
+  // TODO: optimize for batch requests (get compositeBlockchain)
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readLock {
     compositeBlockchain.leaseDetails(leaseId)
   }

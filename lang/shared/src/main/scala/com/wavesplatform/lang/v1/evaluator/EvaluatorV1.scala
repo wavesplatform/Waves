@@ -108,7 +108,7 @@ class EvaluatorV1[F[_]: Monad, C[_[_]]](implicit ev: Monad[EvalF[F, *]], ev2: Mo
                   EitherT(r).flatten.value.pure[Eval]
                 case f: Extended[C] =>
                   f.evaluate(ctx.ec.environment, args, Int.MaxValue)
-                    .map(_.map(_._1))
+                    .map(_.map(_._1.map(_._1)))
                     .to[Eval]
               }
               liftTER[F, C, EVALUATED](evaluated)

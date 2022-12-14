@@ -20,9 +20,9 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
   import DomainPresets.*
 
   private val invalidLengthAsset = IssuedAsset(ByteStr.decodeBase58("WAVES").get)
-  private val nonExistentAsset    = IssuedAsset(ByteStr.decodeBase58("WAVESwavesWAVESwavesWAVESwavesWAVESwaves123").get)
+  private val nonExistentAsset   = IssuedAsset(ByteStr.decodeBase58("WAVESwavesWAVESwavesWAVESwavesWAVESwaves123").get)
 
-  private val lengthError     = s"Transfer error: invalid asset ID '$invalidLengthAsset' length = 4 bytes, must be 32"
+  private val lengthError      = s"Transfer error: invalid asset ID '$invalidLengthAsset' length = 4 bytes, must be 32"
   private val nonExistentError = s"Transfer error: asset '$nonExistentAsset' is not found on the blockchain"
 
   property("invoke asset checks") {
@@ -46,20 +46,20 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
 
     for {
       activated <- Seq(true, false)
-      func <- Seq("invalidLength", "unexisting")
+      func      <- Seq("invalidLength", "unexisting")
     } {
       tempDb { _ =>
-        val miner = TxHelpers.signer(0).toAddress
-        val invoker = TxHelpers.signer(1)
-        val master = TxHelpers.signer(2)
-        val balances = AddrWithBalance.enoughBalances(invoker, master)
+        val miner       = TxHelpers.signer(0).toAddress
+        val invoker     = TxHelpers.signer(1)
+        val master      = TxHelpers.signer(2)
+        val balances    = AddrWithBalance.enoughBalances(invoker, master)
         val setScriptTx = TxHelpers.setScript(master, dApp)
-        val invoke = TxHelpers.invoke(master.toAddress, Some(func), invoker = invoker)
+        val invoke      = TxHelpers.invoke(master.toAddress, Some(func), invoker = invoker)
 
         val dAppAddress = master.toAddress
 
-        def invokeInfo(succeeded: Boolean): NewTransactionInfo =
-          NewTransactionInfo(invoke, Set(invoke.senderAddress, dAppAddress), succeeded, if (!succeeded) 8L else 18L)
+        def invokeInfo(succeeded: Boolean): Vector[NewTransactionInfo] =
+          Vector(NewTransactionInfo(invoke, Set(invoke.senderAddress, dAppAddress), succeeded, if (!succeeded) 8L else 18L))
 
         val expectedResult =
           if (activated) {
@@ -68,23 +68,23 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
                 lengthError
               else
                 nonExistentError
-            Diff.withTransaction(
+            Diff.withTransactions(
               invokeInfo(false),
               portfolios = Map(
                 invoke.senderAddress -> Portfolio(-invoke.fee.value),
-                miner -> Portfolio((setScriptTx.fee.value * 0.6 + invoke.fee.value * 0.4).toLong + 6.waves)
+                miner                -> Portfolio((setScriptTx.fee.value * 0.6 + invoke.fee.value * 0.4).toLong + 6.waves)
               ),
               scriptsComplexity = 8,
               scriptResults = Map(invoke.id() -> InvokeScriptResult(error = Some(ErrorMessage(1, expectingMessage))))
             )
           } else {
             val asset = if (func == "invalidLength") invalidLengthAsset else nonExistentAsset
-            Diff.withTransaction(
+            Diff.withTransactions(
               invokeInfo(true),
               portfolios = Map(
                 invoke.senderAddress -> Portfolio(-invoke.fee.value, assets = Map(asset -> 0)),
-                dAppAddress -> Portfolio.build(asset, 0),
-                miner -> Portfolio((setScriptTx.fee.value * 0.6 + invoke.fee.value * 0.4).toLong + 6.waves)
+                dAppAddress          -> Portfolio.build(asset, 0),
+                miner                -> Portfolio((setScriptTx.fee.value * 0.6 + invoke.fee.value * 0.4).toLong + 6.waves)
               ),
               scriptsRun = 1,
               scriptsComplexity = 18,
@@ -194,11 +194,11 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
         val sigVerify = s"""strict c = ${(1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")} """
         def dApp(name: String = "name", description: String = "") = TestCompiler(V5).compileContract(
           s"""
-           | @Callable(i)
-           | func default() = [
-           |   ${if (complex) sigVerify else ""}
-           |   Issue("$name", "$description", 1000, 4, true, unit, 0)
-           | ]
+             | @Callable(i)
+             | func default() = [
+             |   ${if (complex) sigVerify else ""}
+             |   Issue("$name", "$description", 1000, 4, true, unit, 0)
+             | ]
          """.stripMargin
         )
 

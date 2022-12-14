@@ -42,9 +42,12 @@ object CryptoContext {
     ContextfulVal.pure(CaseObj(tpe, Map.empty))
 
   def build(global: BaseGlobal, version: StdLibVersion): CTX[NoContext] =
-    ctxCache.getOrElse((global, version), ctxCache.synchronized {
-      ctxCache.getOrElseUpdate((global, version), buildNew(global, version))
-    })
+    ctxCache.getOrElse(
+      (global, version),
+      ctxCache.synchronized {
+        ctxCache.getOrElseUpdate((global, version), buildNew(global, version))
+      }
+    )
 
   private val ctxCache = mutable.AnyRefMap.empty[(BaseGlobal, StdLibVersion), CTX[NoContext]]
 
@@ -56,11 +59,10 @@ object CryptoContext {
         returnType: TYPE,
         args: (String, TYPE)*
     )(body: (Int, List[EVALUATED]) => Either[ExecutionError, EVALUATED]): Array[BaseFunction[NoContext]] =
-      costByLimit.mapWithIndex {
-        case ((limit, cost), i) =>
-          val name = nameByLimit(limit)
-          val id   = (startId + i).toShort
-          NativeFunction[NoContext](name, cost, id, returnType, args*)(args => body(limit, args))
+      costByLimit.mapWithIndex { case ((limit, cost), i) =>
+        val name = nameByLimit(limit)
+        val id   = (startId + i).toShort
+        NativeFunction[NoContext](name, cost, id, returnType, args*)(args => body(limit, args))
       }.toArray
 
     def hashFunction(name: String, internalName: Short, cost: Long)(h: Array[Byte] => Array[Byte]): BaseFunction[NoContext] =
@@ -235,7 +237,7 @@ object CryptoContext {
     ) =
       for {
         alg    <- algFromCO(digestAlg)
-        result <- global.rsaVerify(alg, msg.arr, sig.arr, pub.arr).leftMap(CommonError)
+        result <- global.rsaVerify(alg, msg.arr, sig.arr, pub.arr).leftMap(CommonError(_))
       } yield CONST_BOOLEAN(result)
 
     val rsaVerifyF: BaseFunction[NoContext] = {
@@ -284,8 +286,10 @@ object CryptoContext {
           else
             Left(s"Invalid message size = ${msg.size} bytes, must be not greater than $limit KB")
         case (limit, xs) =>
-          notImplemented[Id, EVALUATED](s"rsaVerify_${limit}Kb(digest: DigestAlgorithmType, message: ByteVector, sig: ByteVector, pub: ByteVector)",
-                                        xs)
+          notImplemented[Id, EVALUATED](
+            s"rsaVerify_${limit}Kb(digest: DigestAlgorithmType, message: ByteVector, sig: ByteVector, pub: ByteVector)",
+            xs
+          )
       }
 
     def toBase58StringF: BaseFunction[NoContext] =
@@ -296,8 +300,9 @@ object CryptoContext {
         STRING,
         ("bytes", BYTESTR)
       ) {
-        case CONST_BYTESTR(bytes) :: Nil => global.base58Encode(bytes.arr).leftMap(CommonError).flatMap(CONST_STRING(_, reduceLimit = version >= V4))
-        case xs                          => notImplemented[Id, EVALUATED]("toBase58String(bytes: ByteVector)", xs)
+        case CONST_BYTESTR(bytes) :: Nil =>
+          global.base58Encode(bytes.arr).leftMap(CommonError(_)).flatMap(CONST_STRING(_, reduceLimit = version >= V4))
+        case xs => notImplemented[Id, EVALUATED]("toBase58String(bytes: ByteVector)", xs)
       }
 
     def fromBase58StringF: BaseFunction[NoContext] =
@@ -308,8 +313,9 @@ object CryptoContext {
         BYTESTR,
         ("str", STRING)
       ) {
-        case CONST_STRING(str: String) :: Nil => global.base58Decode(str, global.MaxBase58String).leftMap(CommonError).flatMap(x => CONST_BYTESTR(ByteStr(x)))
-        case xs                               => notImplemented[Id, EVALUATED]("fromBase58String(str: String)", xs)
+        case CONST_STRING(str: String) :: Nil =>
+          global.base58Decode(str, global.MaxBase58String).leftMap(CommonError(_)).flatMap(x => CONST_BYTESTR(ByteStr(x)))
+        case xs => notImplemented[Id, EVALUATED]("fromBase58String(str: String)", xs)
       }
 
     def toBase64StringF: BaseFunction[NoContext] =
@@ -320,8 +326,9 @@ object CryptoContext {
         STRING,
         ("bytes", BYTESTR)
       ) {
-        case CONST_BYTESTR(bytes) :: Nil => global.base64Encode(bytes.arr).leftMap(CommonError).flatMap(CONST_STRING(_, reduceLimit = version >= V4))
-        case xs                          => notImplemented[Id, EVALUATED]("toBase64String(bytes: ByteVector)", xs)
+        case CONST_BYTESTR(bytes) :: Nil =>
+          global.base64Encode(bytes.arr).leftMap(CommonError(_)).flatMap(CONST_STRING(_, reduceLimit = version >= V4))
+        case xs => notImplemented[Id, EVALUATED]("toBase64String(bytes: ByteVector)", xs)
       }
 
     def fromBase64StringF: BaseFunction[NoContext] =
@@ -332,8 +339,9 @@ object CryptoContext {
         BYTESTR,
         ("str", STRING)
       ) {
-        case CONST_STRING(str: String) :: Nil => global.base64Decode(str, global.MaxBase64String).leftMap(CommonError).flatMap(x => CONST_BYTESTR(ByteStr(x)))
-        case xs                               => notImplemented[Id, EVALUATED]("fromBase64String(str: String)", xs)
+        case CONST_STRING(str: String) :: Nil =>
+          global.base64Decode(str, global.MaxBase64String).leftMap(CommonError(_)).flatMap(x => CONST_BYTESTR(ByteStr(x)))
+        case xs => notImplemented[Id, EVALUATED]("fromBase64String(str: String)", xs)
       }
 
     val checkMerkleProofF: BaseFunction[NoContext] =
@@ -362,14 +370,12 @@ object CryptoContext {
         ("index", LONG)
       ) {
         case xs @ ARR(proof) :: CONST_BYTESTR(value) :: CONST_LONG(index) :: Nil =>
-          if (value.size == 32 && proof.length <= 16 && proof.forall({
-                case CONST_BYTESTR(v) => v.size == 32
-                case _                => false
-              })) {
-            CONST_BYTESTR(ByteStr(createRoot(value.arr, Math.toIntExact(index), proof.reverse.map({
-              case CONST_BYTESTR(v) => v.arr
-              case _                => throw new Exception("Expect ByteStr")
-            }))))
+          val filteredProofs = proof.collect {
+            case bs@CONST_BYTESTR(v) if v.size == 32 => bs
+          }
+
+          if (value.size == 32 && proof.length <= 16 && filteredProofs.size == proof.size) {
+            CONST_BYTESTR(ByteStr(createRoot(value.arr, Math.toIntExact(index), filteredProofs.reverse.map(_.bs.arr))))
           } else {
             notImplemented[Id, EVALUATED](s"createMerkleRoot(merkleProof: ByteVector, valueBytes: ByteVector)", xs)
           }
@@ -377,13 +383,13 @@ object CryptoContext {
       }
 
     def toBase16StringF(checkLength: Boolean): BaseFunction[NoContext] = NativeFunction("toBase16String", 10, TOBASE16, STRING, ("bytes", BYTESTR)) {
-      case CONST_BYTESTR(bytes) :: Nil => global.base16Encode(bytes.arr, checkLength).leftMap(CommonError).flatMap(CONST_STRING(_))
+      case CONST_BYTESTR(bytes) :: Nil => global.base16Encode(bytes.arr, checkLength).leftMap(CommonError(_)).flatMap(CONST_STRING(_))
       case xs                          => notImplemented[Id, EVALUATED]("toBase16String(bytes: ByteVector)", xs)
     }
 
     def fromBase16StringF(checkLength: Boolean): BaseFunction[NoContext] =
       NativeFunction("fromBase16String", 10, FROMBASE16, BYTESTR, ("str", STRING)) {
-        case CONST_STRING(str: String) :: Nil => global.base16Decode(str, checkLength).leftMap(CommonError).flatMap(x => CONST_BYTESTR(ByteStr(x)))
+        case CONST_STRING(str: String) :: Nil => global.base16Decode(str, checkLength).leftMap(CommonError(_)).flatMap(x => CONST_BYTESTR(ByteStr(x)))
         case xs                               => notImplemented[Id, EVALUATED]("fromBase16String(str: String)", xs)
       }
 

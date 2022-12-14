@@ -494,7 +494,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
         newState.accountData(dAppAddress, "sender").get.value shouldBe ByteStr(ci.sender.toAddress.bytes)
         newState.accountData(dAppAddress, "argument").get.value shouldBe ci.funcCallOpt.get.args.head.asInstanceOf[CONST_BYTESTR].bs
 
-        blockDiff.transactions.find(_.transaction.id() == ci.id()).get.affected.contains(setScript.sender.toAddress) shouldBe true
+        blockDiff.transaction(ci.id()).get.affected.contains(setScript.sender.toAddress) shouldBe true
 
     }
   }
@@ -530,7 +530,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       blockDiff.scriptsRun shouldBe 1
       blockDiff.portfolios(thirdAddress).balance shouldBe amount
       blockDiff.portfolios(setScript.sender.toAddress).balance shouldBe -amount
-      blockDiff.containsTransaction(ci.id()) shouldBe true
+      blockDiff.transaction(ci.id()) shouldBe defined
     }
   }
 
@@ -541,7 +541,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       blockDiff.scriptsRun shouldBe 1
       blockDiff.portfolios(thirdAddress).balance shouldBe amount
       blockDiff.portfolios(setScript.sender.toAddress).balance shouldBe -amount
-      blockDiff.containsTransaction(ci.id()) shouldBe true
+      blockDiff.transaction(ci.id()) shouldBe defined
     }
   }
 
@@ -557,7 +557,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
     ) { case (blockDiff, _) =>
       blockDiff.scriptsRun shouldBe 1
       blockDiff.portfolios(thirdAddress) shouldBe Portfolio.waves(amount)
-      blockDiff.containsTransaction(ci.id()) shouldBe true
+      blockDiff.transaction(ci.id()) shouldBe defined
     }
   }
 
@@ -608,7 +608,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       case (blockDiff, newState) =>
         blockDiff.scriptsRun shouldBe 1
         newState.balance(thirdAddress, Waves) shouldBe amount
-        blockDiff.containsTransaction(ci.id()) shouldBe true
+        blockDiff.transaction(ci.id()) shouldBe defined
     }
     testDiff(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(fakeCi), Block.ProtoBlockVersion)) {
       _ should produceRejectOrFailedDiff("does not exist")
@@ -1278,7 +1278,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
       inside(_) {
         case Right(diff) =>
           diff.scriptResults(invoke.id()).error.get.text should include("is already issued")
-        case Left(TransactionValidationError(ScriptExecutionError(error, _, _), _)) => error should include("is already issued")
+        case Left(TransactionValidationError(InvokeRejectError(error, _), _)) => error should include("is already issued")
       }
     }
   }
@@ -1497,7 +1497,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
             diff.scriptsComplexity should be > 0L
         }
         testDiff(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), from = V6) {
-          _ should produce("TransactionValidationError")
+          _ should produce("Transaction is not allowed by script of the asset")
         }
       }
   }

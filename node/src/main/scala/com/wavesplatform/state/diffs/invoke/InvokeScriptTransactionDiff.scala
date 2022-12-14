@@ -41,8 +41,6 @@ import com.wavesplatform.transaction.validation.impl.DataTxValidator
 import monix.eval.Coeval
 import shapeless.Coproduct
 
-import scala.util.Right
-
 object InvokeScriptTransactionDiff {
 
   private[this] def allIssues(r: InvokeScriptResult): Seq[Issue] = {
@@ -107,6 +105,7 @@ object InvokeScriptTransactionDiff {
             (result, log) <- evaluateV2(
               version,
               contract,
+              dAppAddress,
               invocation,
               environment,
               fullLimit,
@@ -177,7 +176,8 @@ object InvokeScriptTransactionDiff {
           limitedExecution,
           ContractLimits.MaxTotalInvokeComplexity(version),
           otherIssues,
-          enableExecutionLog
+          enableExecutionLog,
+          log
         )
 
         process = (actions: List[CallableAction], unusedComplexity: Long) => {
@@ -224,7 +224,7 @@ object InvokeScriptTransactionDiff {
           case i: IncompleteResult =>
             TracedResult(Left(GenericError(s"Evaluation was uncompleted with unused complexity = ${i.unusedComplexity}")))
         }
-        totalDiff <- TracedResult(invocationDiff.copy(scriptsComplexity = 0).combineF(resultDiff)).leftMap(GenericError(_))
+        totalDiff <- TracedResult(invocationDiff.withScriptsComplexity(0).combineF(resultDiff)).leftMap(GenericError(_))
       } yield totalDiff
     }
 
@@ -356,6 +356,7 @@ object InvokeScriptTransactionDiff {
   private def evaluateV2(
       version: StdLibVersion,
       contract: DApp,
+      dAppAddress: Address,
       invocation: ContractEvaluator.Invocation,
       environment: Environment[Id],
       limit: Int,
@@ -371,6 +372,7 @@ object InvokeScriptTransactionDiff {
       .applyV2Coeval(
         evaluationCtx,
         contract,
+        ByteStr(dAppAddress.bytes),
         invocation,
         version,
         startLimit,
@@ -383,28 +385,36 @@ object InvokeScriptTransactionDiff {
       .flatten
       .leftMap[ValidationError] {
         case (FailOrRejectError(msg, true), _, log) =>
-          ScriptExecutionError.dAppExecution(msg, log)
+          InvokeRejectError(msg, log)
         case (error, unusedComplexity, log) =>
           val usedComplexity = startLimit - unusedComplexity.max(0)
+          val msg = error match {
+            case CommonError(_, Some(fte: FailedTransactionError)) => fte.error.getOrElse(error.message)
+            case _                                                 => error.message
+          }
           if (usedComplexity > failFreeLimit) {
             val storingComplexity = if (blockchain.storeEvaluatedComplexity) usedComplexity else estimatedComplexity
-            FailedTransactionError.dAppExecution(error.message, storingComplexity + paymentsComplexity, log)
+            FailedTransactionError.dAppExecution(msg, storingComplexity + paymentsComplexity, log)
           } else
-            ScriptExecutionError.dAppExecution(error.message, log)
+            InvokeRejectError(msg, log)
       }
       .flatTap { case (r, log) =>
         InvokeDiffsCommon
           .checkScriptResultFields(blockchain, r)
           .leftMap[ValidationError] {
             case FailOrRejectError(message, true) =>
-              ScriptExecutionError.dAppExecution(message, log)
+              InvokeRejectError(message, log)
             case error =>
               val usedComplexity = startLimit - r.unusedComplexity
+              val msg = error match {
+                case fte: FailedTransactionError => fte.error.getOrElse(error.toString)
+                case _                           => error.toString
+              }
               if (usedComplexity > failFreeLimit) {
                 val storingComplexity = if (blockchain.storeEvaluatedComplexity) usedComplexity else estimatedComplexity
-                FailedTransactionError.dAppExecution(error.toString, storingComplexity + paymentsComplexity, log)
+                FailedTransactionError.dAppExecution(msg, storingComplexity + paymentsComplexity, log)
               } else
-                ScriptExecutionError.dAppExecution(error.toString, log)
+                InvokeRejectError(msg, log)
           }
       }
   }

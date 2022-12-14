@@ -81,10 +81,10 @@ class TypeCastTest extends EvaluatorSpec {
   }
 
   property("type cast to concrete list is not supported") {
-    eval("func f(a: Any) = a.as[List[Int]]")(V3) should produce(
+    eval("func f(a: Any) = a.as[List[Int]]; true")(V3) should produce(
       "Type cast to List is allowed only if expecting type is List[Any] in 17-32"
     )
-    eval("func f(a: Any) = a.exactAs[List[Int]]")(V3) should produce(
+    eval("func f(a: Any) = a.exactAs[List[Int]]; true")(V3) should produce(
       "Type cast to List is allowed only if expecting type is List[Any] in 17-37"
     )
   }

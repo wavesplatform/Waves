@@ -144,9 +144,9 @@ object BlockDiffer {
         constraint,
         prevBlockTimestamp,
         Diff.empty,
-        true,
+        hasNg = true,
         micro.transactionData,
-        verify
+        verify = verify
       )
     } yield r
   }

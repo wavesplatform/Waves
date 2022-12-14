@@ -148,7 +148,7 @@ case class NewAssetInfo(static: AssetStaticInfo, dynamic: AssetInfo, volume: Ass
 
 case class LeaseActionInfo(invokeId: ByteStr, dAppPublicKey: PublicKey, recipient: AddressOrAlias, amount: Long)
 
-case class Diff(
+case class Diff private (
     transactions: Vector[NewTransactionInfo],
     portfolios: Map[Address, Portfolio],
     issuedAssets: Map[IssuedAsset, NewAssetInfo],
@@ -172,12 +172,33 @@ case class Diff(
   def containsTransaction(txId: ByteStr): Boolean =
     transactions.nonEmpty && transactionFilter.exists(_.mightContain(txId.arr)) && transactions.exists(_.transaction.id() == txId)
 
+  def transaction(txId: ByteStr): Option[NewTransactionInfo] =
+    if (transactions.nonEmpty && transactionFilter.exists(_.mightContain(txId.arr)))
+      transactions.find(_.transaction.id() == txId)
+    else None
+
+  def withScriptsComplexity(newScriptsComplexity: Long): Diff = copy(scriptsComplexity = newScriptsComplexity)
+
+  def withScriptResults(newScriptResults: Map[ByteStr, InvokeScriptResult]): Diff = copy(scriptResults = newScriptResults)
+
+  def withScriptRuns(newScriptRuns: Int): Diff = copy(scriptsRun = newScriptRuns)
+
+  def withPortfolios(newPortfolios: Map[Address, Portfolio]): Diff = copy(portfolios = newPortfolios)
+
   def combineF(newer: Diff): Either[String, Diff] =
     Diff
       .combine(portfolios, newer.portfolios)
       .map { portfolios =>
+        val newTransactions = if (transactions.isEmpty) newer.transactions else transactions ++ newer.transactions
+        val newFilter = transactionFilter match {
+          case Some(bf) =>
+            newer.transactions.foreach(nti => bf.put(nti.transaction.id().arr))
+            Some(bf)
+          case None => newer.transactionFilter
+        }
+
         Diff(
-          transactions = if (transactions.isEmpty) newer.transactions else transactions ++ newer.transactions,
+          transactions = newTransactions,
           portfolios = portfolios,
           issuedAssets = issuedAssets ++ newer.issuedAssets,
           updatedAssets = updatedAssets |+| newer.updatedAssets,
@@ -192,14 +213,7 @@ case class Diff(
           scriptResults = scriptResults.combine(newer.scriptResults),
           scriptsComplexity = scriptsComplexity + newer.scriptsComplexity,
           ethereumTransactionMeta = ethereumTransactionMeta ++ newer.ethereumTransactionMeta,
-          transactionFilter = transactionFilter match {
-            case Some(bf) =>
-              newer.transactions.foreach(nti => bf.put(nti.transaction.id().arr))
-              Some(bf)
-            case None if newer.transactions.nonEmpty =>
-              newer.transactionFilter
-            case _ => None
-          }
+          transactionFilter = newFilter
         )
       }
 }
@@ -240,8 +254,8 @@ object Diff {
       None
     )
 
-  def withTransaction(
-      nti: NewTransactionInfo,
+  def withTransactions(
+      nti: Vector[NewTransactionInfo],
       portfolios: Map[Address, Portfolio] = Map.empty,
       issuedAssets: Map[IssuedAsset, NewAssetInfo] = Map.empty,
       updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map.empty,
@@ -258,7 +272,7 @@ object Diff {
       ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map.empty
   ): Diff =
     new Diff(
-      Vector(nti),
+      nti,
       portfolios,
       issuedAssets,
       updatedAssets,
@@ -273,7 +287,7 @@ object Diff {
       scriptsComplexity,
       scriptResults,
       ethereumTransactionMeta,
-      mkFilterForTransactions(nti.transaction)
+      mkFilterForTransactions(nti.map(_.transaction)*)
     )
 
   val empty: Diff = Diff()
@@ -295,9 +309,16 @@ object Diff {
         case (r, _) => r
       }
 
-  private def mkFilter() = BloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), 10000, 0.01f)
-  private def mkFilterForTransactions(tx: Transaction) =
-    Some(mkFilter().tap(_.put(tx.id().arr)))
+  private def mkFilter() =
+    BloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), 10000, 0.01f)
+  private def mkFilterForTransactions(tx: Transaction*) =
+    Some(
+      mkFilter().tap(bf =>
+        tx.foreach { t =>
+          bf.put(t.id().arr)
+        }
+      )
+    )
 
   implicit class DiffExt(private val d: Diff) extends AnyVal {
     def errorMessage(txId: ByteStr): Option[InvokeScriptResult.ErrorMessage] =
@@ -307,31 +328,25 @@ object Diff {
       Integer.toHexString(d.hashCode())
 
     def bindTransaction(blockchain: Blockchain, tx: Transaction, applied: Boolean): Diff = {
-      val allAffectedAddresses = Set.newBuilder[Address]
-      for (r <- d.scriptResults.values) {
-        allAffectedAddresses ++= InvokeScriptResult.Invocation.calledAddresses(r.invokes)
-      }
-
-      allAffectedAddresses ++= d.portfolios.keys
-      allAffectedAddresses ++= d.accountData.keys
-
-      tx match {
+      val calledScripts = d.scriptResults.values.flatMap(inv => InvokeScriptResult.Invocation.calledAddresses(inv.invokes))
+      val maybeDApp = tx match {
         case i: InvokeTransaction =>
           i.dApp match {
-            case alias: Alias => d.aliases.get(alias).orElse(blockchain.resolveAlias(alias).toOption).foreach(addr => allAffectedAddresses += addr)
-            case address: Address => allAffectedAddresses += address
+            case alias: Alias     => d.aliases.get(alias).orElse(blockchain.resolveAlias(alias).toOption)
+            case address: Address => Some(address)
           }
         case et: EthereumTransaction =>
           et.payload match {
-            case EthereumTransaction.Invocation(dApp, _) => allAffectedAddresses += dApp
-            case _                                       =>
+            case EthereumTransaction.Invocation(dApp, _) => Some(dApp)
+            case _                                       => None
           }
         case _ =>
           None
       }
+      val affectedAddresses = d.portfolios.keySet ++ d.accountData.keySet ++ calledScripts ++ maybeDApp
 
       d.copy(
-        transactions = Vector(NewTransactionInfo(tx, allAffectedAddresses.result(), applied, d.scriptsComplexity)),
+        transactions = Vector(NewTransactionInfo(tx, affectedAddresses, applied, d.scriptsComplexity)),
         transactionFilter = mkFilterForTransactions(tx)
       )
     }
