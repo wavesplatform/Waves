@@ -1,6 +1,6 @@
 package com.wavesplatform.ride.app
 
-import akka.actor.{ActorSystem, CoordinatedShutdown}
+import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
@@ -31,7 +31,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
 
     log.info("Starting...")
     implicit val actorSystem = ActorSystem("ride-runner", globalConfig)
-    val cs                   = CoordinatedShutdown(actorSystem)
+    val cs                   = new Cleanup(actorSystem)
 
     val metrics = new Metrics(globalConfig)
     cs.cleanup(CustomShutdownPhase.Metrics) { metrics.close() }

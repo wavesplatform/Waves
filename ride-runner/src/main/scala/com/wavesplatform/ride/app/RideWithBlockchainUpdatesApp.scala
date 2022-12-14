@@ -1,6 +1,6 @@
 package com.wavesplatform.ride.app
 
-import akka.actor.{ActorSystem, CoordinatedShutdown}
+import akka.actor.ActorSystem
 import com.wavesplatform.account.Address
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
@@ -41,7 +41,7 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
 
     log.info("Starting...")
     implicit val actorSystem = ActorSystem("ride-runner", globalConfig)
-    val cs                   = CoordinatedShutdown(actorSystem)
+    val cs                   = new Cleanup(actorSystem)
 
     log.info("Initializing thread pools...")
 
@@ -182,6 +182,6 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
     Await.result(events, Duration.Inf)
 
     log.info("Done")
-    Await.result(cs.run(CoordinatedShutdown.JvmExitReason), Duration.Inf)
+    cs.forceStop()
   }
 }
