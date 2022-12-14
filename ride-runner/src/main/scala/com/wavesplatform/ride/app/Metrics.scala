@@ -19,8 +19,5 @@ class Metrics(globalConfig: Config) extends AutoCloseable with ScorexLogging {
     log.info("Metrics disabled")
   }
 
-  override def close(): Unit = {
-    log.info("Stopping metrics")
-    Try(Await.result(Kamon.stop(), 5 seconds))
-  }
+  override def close(): Unit = Try(Await.result(Kamon.stop(), 5 seconds))
 }

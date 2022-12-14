@@ -5,7 +5,7 @@ import monix.reactive.Observer
 
 class MonixWrappedDownstream[RequestT, EventT](s: Observer[WrappedEvent[EventT]]) extends ManualGrpcObserver[RequestT, EventT] {
   override def close(): Unit = {
-    log.info("Closing")
+    log.info("Closing...")
     super.close()
   }
 

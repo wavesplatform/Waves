@@ -37,7 +37,8 @@ object AppInitializer extends ScorexLogging {
     }
 
     val settings = RideRunnerGlobalSettings.fromRootConfig(config)
-    val network = settings.blockchain.addressSchemeCharacter
+    val network  = settings.blockchain.addressSchemeCharacter
+    log.info(s"Starting ${Version.VersionString}...")
     log.info(s"Chosen network: $network / ${network.toByte}")
 
     // Initialize global var with actual address scheme
@@ -45,7 +46,6 @@ object AppInitializer extends ScorexLogging {
       override val chainId: Byte = network.toByte
     }
 
-    log.info(s"Starting ${Version.VersionString}...")
     (config, settings)
   }
 }

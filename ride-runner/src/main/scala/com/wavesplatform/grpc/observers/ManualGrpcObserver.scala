@@ -14,7 +14,7 @@ class ManualGrpcObserver[RequestT, EventT] extends ClientResponseObserver[Reques
   private var requestStream: ClientCallStreamObserver[RequestT] = null
 
   override def beforeStart(requestStream: ClientCallStreamObserver[RequestT]): Unit = {
-    log.info("Starting")
+    log.info("Starting...")
     this.requestStream = requestStream
     requestStream.disableAutoRequestWithInitial(1)
 

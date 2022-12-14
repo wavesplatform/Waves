@@ -1,19 +1,20 @@
 package com.wavesplatform.ride.app
 
-import akka.actor.ActorSystem
+import akka.Done
+import akka.actor.{ActorSystem, CoordinatedShutdown}
 import akka.http.scaladsl.Http
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
 import com.wavesplatform.events.WrappedEvent
-import com.wavesplatform.grpc.{DefaultBlockchainApi, GrpcConnector}
+import com.wavesplatform.grpc.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.http.EvaluateApiRoute
-import com.wavesplatform.resources.*
 import com.wavesplatform.state.Height
 import com.wavesplatform.storage.LevelDbRequestsStorage
 import com.wavesplatform.storage.RequestsStorage.RequestKey
 import com.wavesplatform.storage.persistent.LevelDbPersistentCaches
 import com.wavesplatform.utils.ScorexLogging
+import io.grpc.ManagedChannel
 import io.netty.util.concurrent.DefaultThreadFactory
 import kamon.instrumentation.executor.ExecutorInstrumentation
 import monix.eval.Task
@@ -22,134 +23,159 @@ import sttp.client3.HttpURLConnectionBackend
 
 import java.io.File
 import java.util.concurrent.*
-import scala.concurrent.Await
 import scala.concurrent.duration.{Duration, DurationInt}
-import scala.util.Failure
+import scala.concurrent.{Await, Future}
 
 object RideWithBlockchainUpdatesService extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     val (globalConfig, settings) = AppInitializer.init(args.headOption.map(new File(_)))
 
-    val r = Using.Manager { use =>
-      use.acquire(new Metrics(globalConfig))
+    log.info("Starting...")
+    implicit val actorSystem = ActorSystem("ride-runner", globalConfig)
+    val cs                   = CoordinatedShutdown(actorSystem)
 
-      log.info("Initializing thread pools...")
-
-      def mkScheduler(name: String, threads: Int): Scheduler = {
-        val executor = use(
-          new ThreadPoolExecutor(
-            threads,
-            threads,
-            0,
-            TimeUnit.MILLISECONDS,
-            new LinkedBlockingQueue[Runnable],
-            new DefaultThreadFactory(name, true),
-            { (r: Runnable, executor: ThreadPoolExecutor) =>
-              log.error(s"$r has been rejected from $executor")
-              throw new RejectedExecutionException
-            }
-          )
-        )
-
-        use.acquireWithShutdown(
-          Scheduler(
-            executor = if (globalConfig.getBoolean("kamon.enable")) ExecutorInstrumentation.instrument(executor, name) else executor,
-            executionModel = ExecutionModel.AlwaysAsyncExecution
-          )
-        ) { resource =>
-          resource.shutdown()
-          resource.awaitTermination(5.seconds)
-        }
+    def cleanup(afterPhase: CustomShutdownPhase)(f: => Unit): Unit = cleanupTask(afterPhase, "general")(f)
+    def cleanupTask(afterPhase: CustomShutdownPhase, taskName: String)(f: => Unit): Unit =
+      cs.addTask(afterPhase.name, taskName) { () =>
+        Future {
+          f
+          Done
+        }(actorSystem.dispatcher)
       }
 
-      val blockchainEventsStreamScheduler = mkScheduler("blockchain-events", 2)
-      val rideScheduler = mkScheduler(
-        name = "ride",
-        threads = settings.restApi.heavyRequestProcessorPoolThreads.getOrElse((Runtime.getRuntime.availableProcessors() * 2).min(4))
-      )
+    val metrics = new Metrics(globalConfig)
+    cleanup(CustomShutdownPhase.Metrics) { metrics.close() }
 
-      val connector = use(new GrpcConnector(settings.rideRunner.grpcConnector))
-
-      log.info("Making gRPC channel to gRPC API...")
-      val grpcApiChannel = use(connector.mkChannel(settings.rideRunner.grpcApiChannel))
-
-      log.info("Making gRPC channel to Blockchain Updates API...")
-      val blockchainUpdatesApiChannel = use(connector.mkChannel(settings.rideRunner.blockchainUpdatesApiChannel))
-
-      val httpBackend = use.acquireWithShutdown(HttpURLConnectionBackend())(_.close())
-
-      val blockchainApi = new DefaultBlockchainApi(
-        settings = settings.rideRunner.blockchainApi,
-        grpcApiChannel = grpcApiChannel,
-        blockchainUpdatesApiChannel = blockchainUpdatesApiChannel,
-        httpBackend = httpBackend
-      )
-
-      val db                = use(openDB(settings.rideRunner.db.directory))
-      val dbCaches          = new LevelDbPersistentCaches(db)
-      val blockchainStorage = new SharedBlockchainData[RequestKey](settings.blockchain, dbCaches, blockchainApi)
-
-      val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
-      log.info(s"Current height: known=${blockchainStorage.height}, blockchain=$lastHeightAtStart")
-
-      val requestsStorage = new LevelDbRequestsStorage(db)
-      val processor = new BlockchainProcessor(
-        settings.rideRunner.processor,
-        blockchainStorage,
-        requestsStorage,
-        rideScheduler
-      )
-
-      log.info("Warm up caches...") // Also helps to figure out, which data is used by a script
-      Await.result(processor.runScripts(forceAll = true).runToFuture(rideScheduler), Duration.Inf)
-
-      val lastSafeKnownHeight = Height(math.max(0, blockchainStorage.height - 100 - 1)) // A rollback is not possible
-      val workingHeight       = Height(math.max(blockchainStorage.height, lastHeightAtStart))
-
-      val blockchainUpdates = use(blockchainApi.mkBlockchainUpdatesStream(blockchainEventsStreamScheduler))
-      // TODO #33 Move wrapped events from here: processing of Closed and Failed should be moved to blockchainUpdates.stream
-      val events = blockchainUpdates.stream
-        .doOnError(e => Task { log.error("Error!", e) })
-        .takeWhile {
-          case WrappedEvent.Next(_) => true
-          case WrappedEvent.Closed =>
-            log.info("Blockchain stream closed")
-            false
-          case WrappedEvent.Failed(error) =>
-            log.error("Blockchain stream failed", error)
-            false
+    log.info("Initializing thread pools...")
+    def mkScheduler(name: String, threads: Int): Scheduler = {
+      val executor = new ThreadPoolExecutor(
+        threads,
+        threads,
+        0,
+        TimeUnit.MILLISECONDS,
+        new LinkedBlockingQueue[Runnable],
+        new DefaultThreadFactory(name, true),
+        { (r: Runnable, executor: ThreadPoolExecutor) =>
+          log.error(s"$r has been rejected from $executor")
+          throw new RejectedExecutionException
         }
-        .collect { case WrappedEvent.Next(event) => event }
-        .scanEval(Task.now[BlockchainState](BlockchainState.Starting(workingHeight)))(BlockchainState(processor, _, _))
-        .lastL
-        .runToFuture(blockchainEventsStreamScheduler)
+      )
 
-      log.info(s"Watching blockchain updates...")
-      blockchainUpdates.start(lastSafeKnownHeight + 1)
+      val monixScheduler = Scheduler(
+        executor = if (globalConfig.getBoolean("kamon.enable")) ExecutorInstrumentation.instrument(executor, name) else executor,
+        executionModel = ExecutionModel.AlwaysAsyncExecution
+      )
 
-      implicit val actorSystem = use.acquireWithShutdown(ActorSystem("ride-runner", globalConfig)) { x =>
-        Await.ready(x.terminate(), 20.seconds)
+      cleanupTask(CustomShutdownPhase.ThreadPools, name) {
+        monixScheduler.shutdown()
+        monixScheduler.awaitTermination(5.seconds)
+
+        executor.shutdown()
+        try executor.awaitTermination(5, TimeUnit.SECONDS)
+        finally executor.shutdownNow()
       }
 
-      val apiRoutes = Seq(
-        EvaluateApiRoute(Function.tupled(processor.getCachedResultOrRun(_, _).runToFuture(rideScheduler)))
+      monixScheduler
+    }
+
+    val blockchainEventsStreamScheduler = mkScheduler("blockchain-events", 2)
+    val rideScheduler = mkScheduler(
+      name = "ride",
+      threads = settings.restApi.heavyRequestProcessorPoolThreads.getOrElse((Runtime.getRuntime.availableProcessors() * 2).min(4))
+    )
+
+    val grpcConnector = new GrpcConnector(settings.rideRunner.grpcConnector)
+    cleanup(CustomShutdownPhase.GrpcConnector) { grpcConnector.close() }
+
+    def mkGrpcChannel(name: String, settings: GrpcChannelSettings): ManagedChannel = {
+      val grpcApiChannel = grpcConnector.mkChannel(settings)
+      cleanupTask(CustomShutdownPhase.ApiClient, name) {
+        grpcApiChannel.shutdown()
+        try grpcApiChannel.awaitTermination(5, TimeUnit.SECONDS)
+        finally grpcApiChannel.shutdownNow()
+      }
+      grpcApiChannel
+    }
+
+    log.info("Making gRPC channel to gRPC API...")
+    val grpcApiChannel = mkGrpcChannel("grpcApi", settings.rideRunner.grpcApiChannel)
+
+    log.info("Making gRPC channel to Blockchain Updates API...")
+    val blockchainUpdatesApiChannel = mkGrpcChannel("blockchainUpdatesApi", settings.rideRunner.blockchainUpdatesApiChannel)
+
+    log.info("Creating general API gateway...")
+    val httpBackend = HttpURLConnectionBackend()
+    cleanupTask(CustomShutdownPhase.ApiClient, "httpBackend") { httpBackend.close() }
+
+    val blockchainApi = new DefaultBlockchainApi(
+      settings = settings.rideRunner.blockchainApi,
+      grpcApiChannel = grpcApiChannel,
+      blockchainUpdatesApiChannel = blockchainUpdatesApiChannel,
+      httpBackend = httpBackend
+    )
+
+    log.info("Opening a caches DB...")
+    val db = openDB(settings.rideRunner.db.directory)
+    cleanup(CustomShutdownPhase.Db) { db.close() }
+    val dbCaches          = new LevelDbPersistentCaches(db)
+    val blockchainStorage = new SharedBlockchainData[RequestKey](settings.blockchain, dbCaches, blockchainApi)
+
+    val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
+    log.info(s"Current height: known=${blockchainStorage.height}, blockchain=$lastHeightAtStart")
+
+    val requestsStorage = new LevelDbRequestsStorage(db)
+    val processor = new BlockchainProcessor(
+      settings.rideRunner.processor,
+      blockchainStorage,
+      requestsStorage,
+      rideScheduler
+    )
+
+    log.info("Warming up caches...") // Helps to figure out, which data is used by a script
+    Await.result(processor.runScripts(forceAll = true).runToFuture(rideScheduler), Duration.Inf)
+
+    val lastSafeKnownHeight = Height(math.max(0, blockchainStorage.height - 100 - 1)) // A rollback is not possible
+    val workingHeight       = Height(math.max(blockchainStorage.height, lastHeightAtStart))
+
+    log.info(s"Watching blockchain updates...")
+    val blockchainUpdates = blockchainApi.mkBlockchainUpdatesStream(blockchainEventsStreamScheduler)
+    cleanup(CustomShutdownPhase.BlockchainUpdatesStream) { blockchainUpdates.close() }
+
+    // TODO #33 Move wrapped events from here: processing of Closed and Failed should be moved to blockchainUpdates.stream
+    val events = blockchainUpdates.stream
+      .doOnError(e =>
+        Task {
+          log.error("Error!", e)
+        }
       )
+      .takeWhile {
+        case WrappedEvent.Next(_) => true
+        case WrappedEvent.Closed =>
+          log.info("Blockchain stream closed")
+          false
+        case WrappedEvent.Failed(error) =>
+          log.error("Blockchain stream failed", error)
+          false
+      }
+      .collect { case WrappedEvent.Next(event) => event }
+      .scanEval(Task.now[BlockchainState](BlockchainState.Starting(workingHeight)))(BlockchainState(processor, _, _))
+      .lastL
+      .runToFuture(blockchainEventsStreamScheduler)
 
-      val httpService = CompositeHttpService(apiRoutes, settings.restApi)
-      val httpFuture = Http()
-        .newServerAt(settings.restApi.bindAddress, settings.restApi.port)
-        .bindFlow(httpService.loggingCompositeRoute)
+    blockchainUpdates.start(lastSafeKnownHeight + 1)
 
-      log.info(s"REST API binging on ${settings.restApi.bindAddress}:${settings.restApi.port}")
-      Await.result(httpFuture, 20.seconds)
-      log.info("REST API was bound")
+    log.info(s"Initializing REST API on ${settings.restApi.bindAddress}:${settings.restApi.port}...")
+    val apiRoutes = Seq(
+      EvaluateApiRoute(Function.tupled(processor.getCachedResultOrRun(_, _).runToFuture(rideScheduler)))
+    )
 
-      Await.result(events, Duration.Inf)
-    }
+    val httpService = CompositeHttpService(apiRoutes, settings.restApi)
+    val httpFuture = Http()
+      .newServerAt(settings.restApi.bindAddress, settings.restApi.port)
+      .bindFlow(httpService.loggingCompositeRoute)
+    Await.result(httpFuture, 20.seconds)
 
-    r match {
-      case Failure(e) => log.error("Got an error", e)
-      case _          => log.info("Done")
-    }
+    log.info("Initialization completed")
+    Await.result(events, Duration.Inf)
   }
 }
