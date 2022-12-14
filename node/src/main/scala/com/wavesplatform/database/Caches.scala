@@ -99,8 +99,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
       .toMap
 
   override def loadCacheData(addresses: Seq[Address]): Unit = {
-//    addressIdCache.putAll(loadAddressIds(addresses).asJava)
-//    balancesCache.putAll(loadWavesBalances(addresses.map(_ -> Waves)).asJava)
     addressIdCache.getAll(addresses.asJava)
     balancesCache.getAll(addresses.map(_ -> Waves).asJava)
     leaseBalanceCache.getAll(addresses.asJava)
