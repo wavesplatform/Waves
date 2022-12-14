@@ -177,7 +177,7 @@ object ExpressionCompiler {
         ifTrue.parseNodeExpr,
         ifFalse.parseNodeExpr,
         Some(t),
-        saveExprContext.toOption(ctx.getSimpleContext())
+        saveExprContext.toOption(ctx.simpleContext)
       )
       errorList = condWithErr._1.errors ++ ifTrue.errors ++ ifFalse.errors
 
@@ -274,7 +274,7 @@ object ExpressionCompiler {
       }
       ifCasesWithErr <- inspectFlat[Id, CompilerContext, CompilationError, Expressions.EXPR](
         updatedCtx => {
-          val ref = Expressions.REF(p, PART.VALID(p, refTmpKey), ctxOpt = saveExprContext.toOption(updatedCtx.getSimpleContext()))
+          val ref = Expressions.REF(p, PART.VALID(p, refTmpKey), ctxOpt = saveExprContext.toOption(updatedCtx.simpleContext))
           mkIfCases(cases, matchTypes, ref, defaultType, allowShadowVarName, updatedCtx).toCompileM
         }
       ).handleError()
@@ -285,7 +285,7 @@ object ExpressionCompiler {
           Expressions.INVALID(
             p,
             ifCasesWithErr._2.map(e => Show[CompilationError].show(e)).mkString("\n"),
-            ctxOpt = saveExprContext.toOption(ctx.getSimpleContext())
+            ctxOpt = saveExprContext.toOption(ctx.simpleContext)
           )
         ),
         saveExprContext,
@@ -322,7 +322,7 @@ object ExpressionCompiler {
           ctx,
           FAILED_EXPR(),
           NOTHING,
-          Expressions.MATCH(p, typedExpr.parseNodeExpr, cases, ctxOpt = saveExprContext.toOption(ctx.getSimpleContext())),
+          Expressions.MATCH(p, typedExpr.parseNodeExpr, cases, ctxOpt = saveExprContext.toOption(ctx.simpleContext)),
           errorList ++ typedExpr.errors
         )
       }
@@ -508,7 +508,7 @@ object ExpressionCompiler {
         compLetResult.parseNodeExpr,
         compiledBody.parseNodeExpr,
         compiledBody.parseNodeExpr.resultType,
-        saveExprContext.toOption(compiledBody.ctx.getSimpleContext())
+        saveExprContext.toOption(compiledBody.ctx.simpleContext)
       )
       result = if (!compLetResult.dec.isItFailed) {
         LET_BLOCK(compLetResult.dec.asInstanceOf[LET], compiledBody.expr)
@@ -540,7 +540,7 @@ object ExpressionCompiler {
         compFuncStepRes.parseNodeExpr,
         compiledBody.parseNodeExpr,
         compiledBody.parseNodeExpr.resultType,
-        ctxOpt = saveExprContext.toOption(compFuncStepRes.ctx.getSimpleContext())
+        ctxOpt = saveExprContext.toOption(compFuncStepRes.ctx.simpleContext)
       )
     } yield CompilationStepResultExpr(compiledBody.ctx, expr, compiledBody.t, parseNodeExpr, compFuncStepRes.errors ++ compiledBody.errors)
   }
@@ -561,7 +561,7 @@ object ExpressionCompiler {
         .handleError()
 
       errorList     = fieldWithErr._2 ++ getterWithErr._2
-      parseNodeExpr = Expressions.GETTER(p, compiledRef.parseNodeExpr, fieldPart, ctxOpt = saveExprContext.toOption(ctx.getSimpleContext()))
+      parseNodeExpr = Expressions.GETTER(p, compiledRef.parseNodeExpr, fieldPart, ctxOpt = saveExprContext.toOption(ctx.simpleContext))
 
       result = if (errorList.isEmpty) {
         val (ctx, expr, t) = getterWithErr._1.get
@@ -606,7 +606,7 @@ object ExpressionCompiler {
         namePart,
         compiledArgs.map(_.parseNodeExpr),
         funcCallWithErr._1.map(_._2),
-        saveExprContext.toOption(ctx.getSimpleContext())
+        saveExprContext.toOption(ctx.simpleContext)
       )
 
       result = if (errorList.isEmpty) {
@@ -649,14 +649,14 @@ object ExpressionCompiler {
           ctx,
           REF(keyWithErr._1.get),
           typeWithErr._1.get,
-          Expressions.REF(p, keyPart, typeWithErr._1, saveExprContext.toOption(ctx.getSimpleContext()))
+          Expressions.REF(p, keyPart, typeWithErr._1, saveExprContext.toOption(ctx.simpleContext))
         )
       } else {
         CompilationStepResultExpr(
           ctx,
           FAILED_EXPR(),
           NOTHING,
-          Expressions.REF(p, keyPart, ctxOpt = saveExprContext.toOption(ctx.getSimpleContext())),
+          Expressions.REF(p, keyPart, ctxOpt = saveExprContext.toOption(ctx.simpleContext)),
           errorList
         )
       }

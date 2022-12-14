@@ -43,10 +43,9 @@ case class CompilerContext(
       varDefs.get(name)
     }
 
-  def getSimpleContext(): Map[String, Pos] = {
-    (varDefs.map(el => el._1 -> el._2.pos) ++ functionDefs.map(el => el._1 -> el._2.pos))
-      .filter(_._2.start != -1)
-  }
+  val simpleContext: Map[String, Pos] =
+    varDefs.collect { case (name, decl) if decl.pos.start != -1 => name -> decl.pos } ++
+      functionDefs.collect { case (name, decl) if decl.pos.start != -1 => name -> decl.pos }
 }
 
 object CompilerContext {
