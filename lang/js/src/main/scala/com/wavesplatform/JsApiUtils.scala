@@ -17,7 +17,7 @@ object JsApiUtils {
 
   def serPart[T](f: T => js.Any)(part: PART[T]): js.Object = {
     val partValue = Expressions.PART.toOption(part).fold(null: Any)(f)
-    jObj.applyDynamic("apply")(
+    jObj(
       "value"    -> partValue,
       "posStart" -> part.position.start,
       "posEnd"   -> part.position.end
@@ -26,7 +26,7 @@ object JsApiUtils {
 
   def serPartStr(part: PART[String]): js.Object = {
     val partValue = Expressions.PART.toOption(part).getOrElse("").toString
-    jObj.applyDynamic("apply")(
+    jObj(
       "value"    -> partValue,
       "posStart" -> part.position.start,
       "posEnd"   -> part.position.end
@@ -38,7 +38,7 @@ object JsApiUtils {
     def serAnnFunc(annFunc: Expressions.ANNOTATEDFUNC): js.Object = {
 
       def serAnnotation(ann: Expressions.ANNOTATION): js.Object = {
-        jObj.applyDynamic("apply")(
+        jObj(
           "type"     -> "ANNOTATION",
           "posStart" -> annFunc.position.start,
           "posEnd"   -> annFunc.position.end,
@@ -47,7 +47,7 @@ object JsApiUtils {
         )
       }
 
-      jObj.applyDynamic("apply")(
+      jObj(
         "type"     -> "ANNOTATEDFUNC",
         "posStart" -> annFunc.position.start,
         "posEnd"   -> annFunc.position.end,
@@ -65,35 +65,34 @@ object JsApiUtils {
     )
   }
 
-  def expressionScriptToJs(ast: Expressions.SCRIPT): js.Object = {
-    jObj.applyDynamic("apply")(
+  def expressionScriptToJs(ast: Expressions.SCRIPT): js.Object =
+    jObj(
       "type"     -> "SCRIPT",
       "posStart" -> ast.position.start,
       "posEnd"   -> ast.position.end,
       "expr"     -> serExpr(ast.expr)
     )
-  }
 
   def serExpr(expr: Expressions.EXPR): js.Object = {
 
     def serType(t: FINAL): js.Object = {
       t match {
         case ut: UNION =>
-          jObj.applyDynamic("apply")(
+          jObj(
             "unionTypes" -> ut.typeList.toJSArray.map(serType(_))
           )
         case lt: LIST =>
-          jObj.applyDynamic("apply")(
+          jObj(
             "listOf" -> serType(lt.innerType)
           )
         case someT =>
-          jObj.applyDynamic("apply")(
+          jObj(
             "type" -> someT.toString()
           )
       }
     }
 
-    val commonDataObj = jObj.applyDynamic("apply")(
+    val commonDataObj = jObj(
       "type"       -> expr.getName,
       "posStart"   -> expr.position.start,
       "posEnd"     -> expr.position.end,
@@ -102,66 +101,60 @@ object JsApiUtils {
     )
 
     expr match {
-      case x: Expressions.CONST_LONG    => commonDataObj
-      case x: Expressions.CONST_BYTESTR => commonDataObj
-      case x: Expressions.CONST_STRING  => commonDataObj
-      case x: Expressions.TRUE          => commonDataObj
-      case x: Expressions.FALSE         => commonDataObj
+      case _: Expressions.CONST_LONG    => commonDataObj
+      case _: Expressions.CONST_BYTESTR => commonDataObj
+      case _: Expressions.CONST_STRING  => commonDataObj
+      case _: Expressions.TRUE          => commonDataObj
+      case _: Expressions.FALSE         => commonDataObj
 
-      case x: Expressions.REF => {
-        val additionalDataObj = jObj.applyDynamic("apply")("name" -> Expressions.PART.toOption[String](x.key).getOrElse("").toString)
+      case x: Expressions.REF =>
+        val additionalDataObj = jObj("name" -> Expressions.PART.toOption[String](x.key).getOrElse("").toString)
         mergeJSObjects(commonDataObj, additionalDataObj)
-      }
 
-      case Expressions.GETTER(_, ref, field, _, _, _) => {
-        val additionalDataObj = jObj.applyDynamic("apply")(
+      case Expressions.GETTER(_, ref, field, _, _, _) =>
+        val additionalDataObj = jObj(
           "ref"   -> serExpr(ref),
           "field" -> serPartStr(field)
         )
         mergeJSObjects(commonDataObj, additionalDataObj)
-      }
 
-      case Expressions.BLOCK(_, dec, body, _, _) => {
-        val additionalDataObj = jObj.applyDynamic("apply")(
+      case Expressions.BLOCK(_, dec, body, _, _) =>
+        val additionalDataObj = jObj(
           "dec"  -> serDec(dec),
           "body" -> serExpr(body)
         )
         mergeJSObjects(commonDataObj, additionalDataObj)
-      }
 
-      case Expressions.IF(_, cond, ifTrue, ifFalse, _, _) => {
-        val additionalDataObj = jObj.applyDynamic("apply")(
+      case Expressions.IF(_, cond, ifTrue, ifFalse, _, _) =>
+        val additionalDataObj = jObj(
           "cond"    -> serExpr(cond),
           "ifTrue"  -> serExpr(ifTrue),
           "ifFalse" -> serExpr(ifFalse)
         )
         mergeJSObjects(commonDataObj, additionalDataObj)
-      }
 
-      case Expressions.FUNCTION_CALL(_, name, args, _, _) => {
-        val additionalDataObj = jObj.applyDynamic("apply")(
+      case Expressions.FUNCTION_CALL(_, name, args, _, _) =>
+        val additionalDataObj = jObj(
           "name" -> serPartStr(name),
           "args" -> args.toJSArray.map(serExpr)
         )
         mergeJSObjects(commonDataObj, additionalDataObj)
-      }
 
       case Expressions.FOLD(_, limit, value, acc, func, _, _) =>
-        val additionalDataObj = jObj.applyDynamic("apply")(
+        val additionalDataObj = jObj(
           "name" -> s"FOLD<$limit>",
           "args" -> js.Array(serExpr(value), serExpr(acc), func.key.toString: js.Any)
         )
         mergeJSObjects(commonDataObj, additionalDataObj)
 
-      case Expressions.MATCH(_, expr, cases, _, ctxOpt) => {
-        val additionalDataObj = jObj.applyDynamic("apply")(
+      case Expressions.MATCH(_, expr, cases, _, ctxOpt) =>
+        val additionalDataObj = jObj(
           "expr"  -> serExpr(expr),
           "cases" -> cases.toJSArray.map(serMatchCase(_, ctxOpt.getOrElse(Map.empty)))
         )
         mergeJSObjects(commonDataObj, additionalDataObj)
-      }
 
-      case t => jObj.applyDynamic("apply")("[not_supported]stringRepr" -> t.toString)
+      case t => jObj("[not_supported]stringRepr" -> t.toString)
     }
   }
 
@@ -178,7 +171,7 @@ object JsApiUtils {
     val vars = c.pattern.subpatterns.collect { case (Expressions.TypedVar(Some(newVarName), caseType), _) =>
       (serPartStr(newVarName), serType(caseType))
     }
-    jObj.applyDynamic("apply")(
+    jObj(
       "type"       -> "MATCH_CASE",
       "posStart"   -> c.position.start,
       "posEnd"     -> c.position.end,
@@ -192,7 +185,7 @@ object JsApiUtils {
 
   def serCtx(simpleCtx: Map[String, Pos]): js.Object = {
     simpleCtx.toJSArray.map { ctxEl =>
-      jObj.applyDynamic("apply")(
+      jObj(
         "name"     -> ctxEl._1,
         "posStart" -> ctxEl._2.start,
         "posEnd"   -> ctxEl._2.end
@@ -203,21 +196,21 @@ object JsApiUtils {
   def serType(t: Type): js.Object =
     t match {
       case Expressions.AnyType(_) =>
-        jObj.applyDynamic("apply")(
+        jObj(
           "typeName" -> "Any"
         )
       case Expressions.Single(name, parameter) =>
-        jObj.applyDynamic("apply")(
+        jObj(
           "typeName"  -> serPartStr(name),
           "typeParam" -> parameter.map(serPart(serType)).orUndefined
         )
       case Expressions.Union(types) =>
-        jObj.applyDynamic("apply")(
+        jObj(
           "isUnion"  -> "true",
           "typeList" -> types.toJSArray.map(serType)
         )
       case Expressions.Tuple(types) =>
-        jObj.applyDynamic("apply")(
+        jObj(
           "isTuple"  -> "true",
           "typeList" -> types.toJSArray.map(serType)
         )
@@ -225,14 +218,14 @@ object JsApiUtils {
 
   def serDec(dec: Expressions.Declaration): js.Object = {
     def serFuncArg(argName: PART[String], argType: Type): js.Object =
-      jObj.applyDynamic("apply")(
+      jObj(
         "argName" -> serPartStr(argName),
         "type"    -> serType(argType)
       )
 
     dec match {
       case Expressions.LET(p, name, expr, _, _) =>
-        jObj.applyDynamic("apply")(
+        jObj(
           "type"     -> "LET",
           "posStart" -> p.start,
           "posEnd"   -> p.end,
@@ -240,7 +233,7 @@ object JsApiUtils {
           "expr"     -> serExpr(expr)
         )
       case Expressions.FUNC(p, expr, name, args) =>
-        jObj.applyDynamic("apply")(
+        jObj(
           "type"     -> "FUNC",
           "posStart" -> p.start,
           "posEnd"   -> p.end,
@@ -248,29 +241,29 @@ object JsApiUtils {
           "argList"  -> args.toJSArray.map(arg => serFuncArg(arg._1, arg._2)),
           "expr"     -> serExpr(expr)
         )
-      case t => jObj.applyDynamic("apply")("[not_supported]stringRepr" -> t.toString)
+      case t => jObj("[not_supported]stringRepr" -> t.toString)
     }
   }
 
   def compilationErrToJs(err: CompilationError): js.Object = {
-    jObj.applyDynamic("apply")("posStart" -> err.start, "posEnd" -> err.end, "msg" -> err.message)
+    jObj("posStart" -> err.start, "posEnd" -> err.end, "msg" -> err.message)
   }
 
   def toJs(ast: EXPR): js.Object = {
     def r(expr: EXPR): js.Object = {
       expr match {
-        case CONST_LONG(t)      => jObj.applyDynamic("apply")("type" -> "LONG", "value" -> t.toDouble)
-        case GETTER(ref, field) => jObj.applyDynamic("apply")("type" -> "GETTER", "ref" -> r(ref), "field" -> field)
-        case CONST_BYTESTR(bs)  => jObj.applyDynamic("apply")("type" -> "BYTESTR", "value" -> bs.arr.toJSArray)
-        case CONST_STRING(s)    => jObj.applyDynamic("apply")("type" -> "STRING", "value" -> s)
+        case CONST_LONG(t)      => jObj("type" -> "LONG", "value" -> t.toDouble)
+        case GETTER(ref, field) => jObj("type" -> "GETTER", "ref" -> r(ref), "field" -> field)
+        case CONST_BYTESTR(bs)  => jObj("type" -> "BYTESTR", "value" -> bs.arr.toJSArray)
+        case CONST_STRING(s)    => jObj("type" -> "STRING", "value" -> s)
         case LET_BLOCK(let, body) =>
-          jObj.applyDynamic("apply")("type" -> "BLOCK", "let" -> jObj("name" -> let.name, "value" -> r(let.value)), "body" -> r(body))
+          jObj("type" -> "BLOCK", "let" -> jObj("name" -> let.name, "value" -> r(let.value)), "body" -> r(body))
         case IF(cond, ifTrue, ifFalse) =>
-          jObj.applyDynamic("apply")("type" -> "IF", "condition" -> r(cond), "true" -> r(ifTrue), "false" -> r(ifFalse))
-        case REF(key)         => jObj.applyDynamic("apply")("type" -> "REF", "key" -> key)
-        case CONST_BOOLEAN(b) => jObj.applyDynamic("apply")("type" -> "BOOL", "value" -> b)
+          jObj("type" -> "IF", "condition" -> r(cond), "true" -> r(ifTrue), "false" -> r(ifFalse))
+        case REF(key)         => jObj("type" -> "REF", "key" -> key)
+        case CONST_BOOLEAN(b) => jObj("type" -> "BOOL", "value" -> b)
         case FUNCTION_CALL(function, args) =>
-          jObj.applyDynamic("apply")(
+          jObj(
             "type" -> "CALL",
             "name" -> (function match {
               case Native(name)          => name.toString()
@@ -278,7 +271,7 @@ object JsApiUtils {
             }),
             "args" -> args.toJSArray.map(r)
           )
-        case t => jObj.applyDynamic("apply")("[not_supported]stringRepr" -> t.toString)
+        case t => jObj("[not_supported]stringRepr" -> t.toString)
       }
     }
 
@@ -292,8 +285,8 @@ object JsApiUtils {
   def typeRepr(t: TYPE): js.Any = t match {
     case UNION(l, _) => l.toJSArray.map(typeRepr)
     case CASETYPEREF(name, fields, false) =>
-      js.Dynamic.literal("typeName" -> name, "fields" -> fields.toJSArray.map(f => js.Dynamic.literal("name" -> f._1, "type" -> typeRepr(f._2))))
-    case LIST(t) => js.Dynamic.literal("listOf" -> typeRepr(t))
+      jObj("typeName" -> name, "fields" -> fields.toJSArray.map(f => jObj("name" -> f._1, "type" -> typeRepr(f._2))))
+    case LIST(t) => jObj("listOf" -> typeRepr(t))
     case t       => t.toString
   }
 }
