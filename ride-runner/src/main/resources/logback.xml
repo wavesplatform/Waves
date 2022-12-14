@@ -23,6 +23,9 @@
     <logger name="io.grpc.Context" level="INFO"/> <!-- To ignore "Storage override doesn't exist. Using default" -->
     <logger name="org.reflections" level="WARN"/>
 
+    <!-- Process and host metrics -->
+    <logger name="oshi" level="WARN"/>
+
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <target>System.out</target>
         <encoder>

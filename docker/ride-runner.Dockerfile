@@ -1,9 +1,9 @@
 # To build: docker build -t wavesplatform/ride-runner:latest -f docker/ride-runner.Dockerfile docker
 FROM openjdk:11-jre-slim
 
-ENV WAVES_LOG_LEVEL=INFO
-ENV WAVES_HEAP_SIZE=2g
-ENV WAVES_NETWORK=mainnet
+ENV RIDE_LOG_LEVEL=INFO
+ENV RIDE_HEAP_SIZE=2g
+ENV RIDE_NETWORK=mainnet
 
 ENV YOURKIT_VERSION=2022.9
 
@@ -17,30 +17,30 @@ RUN apt-get update && apt-get install -y wget unzip gosu || exit 1; \
     apt-get remove -y wget unzip && apt-get autoremove -y && apt-get autoclean && rm -rf /var/lib/apt/lists/*
 
 # RIDE runner files
-ENV WVDATA=/var/lib/ride-runner
-ENV WAVES_INSTALL_PATH=/usr/share/ride-runner
-ENV WAVES_CONFIG=/etc/ride-runner/ride-runner.conf
-ENV WAVES_LOGBACK_CONFIG=$WAVES_INSTALL_PATH/doc/logback.sample.xml
+ENV RDATA=/var/lib/ride-runner
+ENV RIDE_INSTALL_PATH=/usr/share/ride-runner
+ENV RIDE_CONFIG=/etc/ride-runner/ride-runner.conf
+ENV RIDE_LOGBACK_CONFIG=$RIDE_INSTALL_PATH/doc/logback.sample.xml
 
 COPY ride-runner-target /tmp/
-COPY ride-runner.conf.template $WAVES_CONFIG
+COPY ride-runner.conf.template $RIDE_CONFIG
 
 # Setup node
-COPY ride-runner.entrypoint.sh $WAVES_INSTALL_PATH/bin/entrypoint.sh
-RUN mkdir -p $WVDATA $WVLOG; \
+COPY ride-runner.entrypoint.sh $RIDE_INSTALL_PATH/bin/entrypoint.sh
+RUN mkdir -p $RDATA; \
     # Create user
     groupadd -r ride --gid=999; \
-    useradd -r -g ride --uid=999 --home-dir=$WVDATA --shell=/bin/bash ride; \
+    useradd -r -g ride --uid=999 --home-dir=$RDATA --shell=/bin/bash ride; \
     # Unpack tgz packages
-    tar zxvf /tmp/ride-runner.tgz -C $WAVES_INSTALL_PATH --strip-components=1; \
+    tar zxvf /tmp/ride-runner.tgz -C $RIDE_INSTALL_PATH --strip-components=1; \
     # Set permissions
-    chown -R ride:ride $WVDATA $WAVES_INSTALL_PATH && chmod 755 $WVDATA; \
+    chown -R ride:ride $RDATA $RIDE_INSTALL_PATH && chmod 755 $RDATA; \
     # Cleanup
     rm -rf /tmp/*
 
-EXPOSE 6890
-VOLUME $WVDATA
-WORKDIR $WVDATA
+EXPOSE 6890 9095
+VOLUME $RDATA
+WORKDIR $RDATA
 
 STOPSIGNAL SIGINT
 ENTRYPOINT ["/usr/share/ride-runner/bin/entrypoint.sh"]

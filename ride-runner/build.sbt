@@ -13,6 +13,9 @@ enablePlugins(
 )
 
 libraryDependencies ++= Dependencies.rideRunner.value
+
+// Causes "OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended".
+// May ignore
 javaAgents ++= Dependencies.kanela
 
 inConfig(Compile)(

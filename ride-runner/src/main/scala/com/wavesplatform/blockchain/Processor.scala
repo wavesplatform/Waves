@@ -10,6 +10,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
+import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
@@ -18,6 +19,7 @@ import com.wavesplatform.storage.RequestsStorage.RequestKey
 import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
 import com.wavesplatform.storage.{DataKey, RequestsStorage}
 import com.wavesplatform.utils.ScorexLogging
+import kamon.Kamon
 import monix.eval.Task
 import monix.execution.Scheduler
 import play.api.libs.json.JsObject
@@ -184,12 +186,7 @@ class BlockchainProcessor(
     accumulatedChanges = ProcessResult(affectedScripts = accumulatedChanges.affectedScripts -- xs.map(_.key))
 
     Task
-      .parTraverseUnordered(xs) { s =>
-        Task(runScript(height, s))
-          .tapError { e =>
-            Task(log.error(s"An error during running ${s.key}", e))
-          }
-      }
+      .parTraverseUnordered(xs)(runScript(_, hasCaches = true))
       .as(())
       .executeOn(runScriptsScheduler)
   }
@@ -198,21 +195,26 @@ class BlockchainProcessor(
 
   override def removeFrom(height: Height): Unit = blockchainStorage.blockHeaders.removeFrom(height)
 
-  private def runScript(height: Int, script: RestApiScript): Unit = {
-    val start     = System.nanoTime()
-    val refreshed = script.refreshed(settings.enableTraces, settings.evaluateScriptComplexityLimit, settings.maxTxErrorLogSize)
-    val key       = script.key
+  private val runScriptTimer = Kamon.timer("processor.run-script")
+  private def runScript(script: RestApiScript, hasCaches: Boolean): Task[JsObject] = Task {
+    val refreshed = runScriptTimer.withTag("has-caches", hasCaches).measure {
+      script.refreshed(settings.enableTraces, settings.evaluateScriptComplexityLimit, settings.maxTxErrorLogSize)
+    }
+    val key = script.key
     storage.put(key, refreshed)
 
     val lastResult = refreshed.lastResult
     if ((lastResult \ "error").isEmpty) {
       val complexity = lastResult.value("complexity").as[Int]
       val result     = lastResult.value("result").as[JsObject].value("value")
-      log.info(f"[$height, $key] complexity: $complexity in ${(System.nanoTime() - start) / 1e9d}%5f s, apiResult: $result")
+      log.info(f"[$key] complexity: $complexity, apiResult: $result")
     } else {
-      log.info(f"[$height, $key] failed: $lastResult")
+      log.info(f"[$key] failed: $lastResult")
     }
+    lastResult
   }
+    .tapError { e => Task(log.error(s"An error during running ${script.key}", e)) }
+    .executeOn(runScriptsScheduler)
 
   override def getCachedResultOrRun(address: Address, request: JsObject): Task[JsObject] = {
     val key = (address, request)
@@ -225,14 +227,7 @@ class BlockchainProcessor(
             // TODO #19 Change/move an error to an appropriate layer
             Task.raiseError(ApiException(CustomValidationError(s"Address $address is not dApp")))
 
-          case _ =>
-            Task {
-              val script = RestApiScript(address, blockchainStorage, request)
-                // TODO dup
-                .refreshed(settings.enableTraces, settings.evaluateScriptComplexityLimit, settings.maxTxErrorLogSize)
-              storage.putIfAbsent(key, script)
-              script.lastResult
-            }.executeOn(runScriptsScheduler)
+          case _ => runScript(RestApiScript(address, blockchainStorage, request), hasCaches = false)
         }
     }
   }
