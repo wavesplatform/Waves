@@ -7,6 +7,7 @@ import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
 import com.wavesplatform.storage.persistent.PersistentCache
 import com.wavesplatform.utils.ScorexLogging
+import kamon.instrumentation.caffeine.KamonStatsCounter
 
 import scala.util.chaining.*
 
@@ -14,7 +15,10 @@ import scala.util.chaining.*
   */
 trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging {
   storage =>
-  protected val values = Caffeine.newBuilder().build[KeyT, RemoteData[ValueT]]()
+  protected val values = Caffeine
+    .newBuilder()
+    .recordStats(() => new KamonStatsCounter(name))
+    .build[KeyT, RemoteData[ValueT]]()
 
   protected val tags                       = Caffeine.newBuilder().build[KeyT, Set[TagT]]()
   private def tagsOf(key: KeyT): Set[TagT] = Option(tags.getIfPresent(key)).getOrElse(Set.empty)

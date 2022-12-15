@@ -33,7 +33,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     implicit val actorSystem = ActorSystem("ride-runner", globalConfig)
     val cs                   = new Cleanup(actorSystem)
 
-    val metrics = new Metrics(globalConfig)
+    val metrics = new RideRunnerMetrics(globalConfig)
     cs.cleanup(CustomShutdownPhase.Metrics) { metrics.close() }
 
     log.info("Initializing thread pools...")

@@ -10,16 +10,15 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
-import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
+import com.wavesplatform.ride.app.RideRunnerMetrics.*
 import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.storage.RequestsStorage.RequestKey
 import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
 import com.wavesplatform.storage.{DataKey, RequestsStorage}
 import com.wavesplatform.utils.ScorexLogging
-import kamon.Kamon
 import monix.eval.Task
 import monix.execution.Scheduler
 import play.api.libs.json.JsObject
@@ -72,62 +71,68 @@ class BlockchainProcessor(
     // Almost all scripts use the height, so we can run all of them
     val withUpdatedHeight = accumulatedChanges.copy(newHeight = h) // TODO #31 Affect all scripts if height is increased
 
-    val txs = append.body match {
+    val (txs, timer) = append.body match {
       // PBBlocks.vanilla(block.getBlock.getHeader)
-      case Body.Block(block)           => block.getBlock.transactions
-      case Body.MicroBlock(microBlock) => microBlock.getMicroBlock.getMicroBlock.transactions
-      case Body.Empty                  => Seq.empty
+      case Body.Block(block)           => (block.getBlock.transactions, blockProcessingTime.some)
+      case Body.MicroBlock(microBlock) => (microBlock.getMicroBlock.getMicroBlock.transactions, microBlockProcessingTime.some)
+      case Body.Empty                  => (Seq.empty, none)
     }
 
-    val stateUpdate = (append.getStateUpdate +: append.transactionStateUpdates).view
-    val txsView     = txs.view.map(_.transaction)
-    withUpdatedHeight
-      .pipe(stateUpdate.flatMap(_.assets).foldLeft(_) { case (r, x) =>
-        r.withAppendResult(blockchainStorage.assets.append(h, x))
-      })
-      .pipe(stateUpdate.flatMap(_.balances).foldLeft(_) { case (r, x) =>
-        r.withAppendResult(blockchainStorage.accountBalances.append(h, x))
-      })
-      .pipe(stateUpdate.flatMap(_.leasingForAddress).foldLeft(_) { case (r, x) =>
-        r.withAppendResult(blockchainStorage.accountLeaseBalances.append(h, x))
-      })
-      .pipe(stateUpdate.flatMap(_.dataEntries).foldLeft(_) { case (r, x) =>
-        r.withAppendResult(blockchainStorage.data.append(h, x))
-      })
-      .pipe(
-        txsView
-          .flatMap {
-            case Transaction.WavesTransaction(tx) =>
-              tx.data match {
-                case Data.SetScript(txData) => (tx.senderPublicKey.toPublicKey, txData.script).some
-                case _                      => none
-              }
-            case _ => none
-          }
-          .foldLeft(_) { case (r, (pk, script)) =>
-            r.withAppendResult(blockchainStorage.accountScripts.append(h, pk, script))
-          }
-      )
-      .pipe(
-        txsView
-          .flatMap {
-            case Transaction.WavesTransaction(tx) =>
-              tx.data match {
-                case Data.CreateAlias(txData) => (txData.alias, tx.senderPublicKey.toPublicKey).some
-                case _                        => none
-              }
-            case _ => none
-          }
-          .foldLeft(_) { case (r, (alias, pk)) =>
-            r.withAppendResult(blockchainStorage.aliases.append(h, alias, pk))
-          }
-      )
-      .pipe(append.transactionIds.foldLeft(_) { case (r, txId) =>
-        r.withAppendResult(blockchainStorage.transactions.setHeight(txId, h))
-      })
+    timer match {
+      case None => withUpdatedHeight
+      case Some(timer) =>
+        timer.measure {
+          val stateUpdate = (append.getStateUpdate +: append.transactionStateUpdates).view
+          val txsView     = txs.view.map(_.transaction)
+          withUpdatedHeight
+            .pipe(stateUpdate.flatMap(_.assets).foldLeft(_) { case (r, x) =>
+              r.withAppendResult(blockchainStorage.assets.append(h, x))
+            })
+            .pipe(stateUpdate.flatMap(_.balances).foldLeft(_) { case (r, x) =>
+              r.withAppendResult(blockchainStorage.accountBalances.append(h, x))
+            })
+            .pipe(stateUpdate.flatMap(_.leasingForAddress).foldLeft(_) { case (r, x) =>
+              r.withAppendResult(blockchainStorage.accountLeaseBalances.append(h, x))
+            })
+            .pipe(stateUpdate.flatMap(_.dataEntries).foldLeft(_) { case (r, x) =>
+              r.withAppendResult(blockchainStorage.data.append(h, x))
+            })
+            .pipe(
+              txsView
+                .flatMap {
+                  case Transaction.WavesTransaction(tx) =>
+                    tx.data match {
+                      case Data.SetScript(txData) => (tx.senderPublicKey.toPublicKey, txData.script).some
+                      case _                      => none
+                    }
+                  case _ => none
+                }
+                .foldLeft(_) { case (r, (pk, script)) =>
+                  r.withAppendResult(blockchainStorage.accountScripts.append(h, pk, script))
+                }
+            )
+            .pipe(
+              txsView
+                .flatMap {
+                  case Transaction.WavesTransaction(tx) =>
+                    tx.data match {
+                      case Data.CreateAlias(txData) => (txData.alias, tx.senderPublicKey.toPublicKey).some
+                      case _                        => none
+                    }
+                  case _ => none
+                }
+                .foldLeft(_) { case (r, (alias, pk)) =>
+                  r.withAppendResult(blockchainStorage.aliases.append(h, alias, pk))
+                }
+            )
+            .pipe(append.transactionIds.foldLeft(_) { case (r, txId) =>
+              r.withAppendResult(blockchainStorage.transactions.setHeight(txId, h))
+            })
+        }
+    }
   }
 
-  private def process(h: Height, rollback: BlockchainUpdated.Rollback): ProcessResult[RequestKey] = {
+  private def process(h: Height, rollback: BlockchainUpdated.Rollback): ProcessResult[RequestKey] = rollbackProcessingTime.measure {
     // TODO #20 The height will be eventually > if this is a rollback, so we need to run all scripts
     // Almost all scripts use the height
     val withUpdatedHeight = accumulatedChanges.copy(newHeight = h)
@@ -195,9 +200,8 @@ class BlockchainProcessor(
 
   override def removeFrom(height: Height): Unit = blockchainStorage.blockHeaders.removeFrom(height)
 
-  private val runScriptTimer = Kamon.timer("processor.run-script")
   private def runScript(script: RestApiScript, hasCaches: Boolean): Task[JsObject] = Task {
-    val refreshed = runScriptTimer.withTag("has-caches", hasCaches).measure {
+    val refreshed = rideScriptRunTime.withTag("has-caches", hasCaches).measure {
       script.refreshed(settings.enableTraces, settings.evaluateScriptComplexityLimit, settings.maxTxErrorLogSize)
     }
     val key = script.key
@@ -218,11 +222,16 @@ class BlockchainProcessor(
 
   override def getCachedResultOrRun(address: Address, request: JsObject): Task[JsObject] = {
     val key = (address, request)
-    requestsStorage.append(key)
     storage.get(key) match {
-      case Some(r) => Task.now(r.lastResult)
+      case Some(r) =>
+        rideScriptCacheHits.increment()
+        Task.now(r.lastResult)
       case None =>
-        Task(blockchainStorage.accountScripts.getUntagged(blockchainStorage.height, address)).flatMap {
+        Task {
+          rideScriptCacheMisses.increment()
+          requestsStorage.append(key)
+          blockchainStorage.accountScripts.getUntagged(blockchainStorage.height, address)
+        }.flatMap {
           case None =>
             // TODO #19 Change/move an error to an appropriate layer
             Task.raiseError(ApiException(CustomValidationError(s"Address $address is not dApp")))
