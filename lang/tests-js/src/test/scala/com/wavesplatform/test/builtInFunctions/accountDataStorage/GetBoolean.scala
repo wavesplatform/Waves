@@ -3,6 +3,7 @@ package com.wavesplatform.test.builtInFunctions.accountDataStorage
 import com.wavesplatform.JsTestBase
 import _root_.testHelpers.GeneratorContractsForBuiltInFunctions
 import _root_.testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomInt, randomStringArrayElement}
+import testHelpers.TestDataConstantsAndMethods.thisVariable
 import utest.{Tests, test}
 
 object GetBoolean extends JsTestBase {
@@ -40,6 +41,32 @@ object GetBoolean extends JsTestBase {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.codeFromMatchingAndCase(
           randomAddressDataArrayElement,
+          getBooleanArgBeforeFunc,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getBoolean compiles for 'this'") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        val script = precondition.codeFromMatchingAndCase(
+          thisVariable,
+          getBoolean,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getBoolean compiles (argument before function) for 'this'") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        val script = precondition.codeFromMatchingAndCase(
+          thisVariable,
           getBooleanArgBeforeFunc,
           testData.rideV3Result,
           testData.GreaterV3ResultBooleanEntry
@@ -116,6 +143,32 @@ object GetBoolean extends JsTestBase {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.codeFromMatchingAndCase(
           randomAddressDataArrayElement,
+          getBooleanValueArgBeforeFunc,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getBooleanValue compiles for 'this'") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        val script = precondition.codeFromMatchingAndCase(
+          thisVariable,
+          getBooleanValue,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getBooleanValue compiles (argument before function) for 'this'") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        val script = precondition.codeFromMatchingAndCase(
+          thisVariable,
           getBooleanValueArgBeforeFunc,
           testData.rideV3Result,
           testData.GreaterV3ResultBooleanEntry

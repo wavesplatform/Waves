@@ -3,6 +3,7 @@ package com.wavesplatform.test.builtInFunctions.accountDataStorage
 import com.wavesplatform.JsTestBase
 import _root_.testHelpers.GeneratorContractsForBuiltInFunctions
 import _root_.testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomInt, randomStringArrayElement}
+import testHelpers.TestDataConstantsAndMethods.thisVariable
 import utest.{Tests, test}
 
 object GetInteger extends JsTestBase {
@@ -41,6 +42,34 @@ object GetInteger extends JsTestBase {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
           randomAddressDataArrayElement,
+          getIntegerArgBeforeFunc,
+          testData.rideV3Result,
+          testData.GreaterV3ResultIntegerEntry
+        )
+
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getInteger compiles for 'this'") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeFromMatchingAndCase(
+          thisVariable,
+          getInteger,
+          testData.rideV3Result,
+          testData.GreaterV3ResultIntegerEntry
+        )
+
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getInteger compiles (argument before function) for 'this'") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeFromMatchingAndCase(
+          thisVariable,
           getIntegerArgBeforeFunc,
           testData.rideV3Result,
           testData.GreaterV3ResultIntegerEntry
@@ -123,6 +152,34 @@ object GetInteger extends JsTestBase {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
           randomAddressDataArrayElement,
+          getIntegerValueArgBeforeFunc,
+          testData.rideV3Result,
+          testData.GreaterV3ResultIntegerEntry
+        )
+
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getIntegerValue compiles for 'this'") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeFromMatchingAndCase(
+          thisVariable,
+          getIntegerValue,
+          testData.rideV3Result,
+          testData.GreaterV3ResultIntegerEntry
+        )
+
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getIntegerValue compiles (argument before function) for 'this'") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeFromMatchingAndCase(
+          thisVariable,
           getIntegerValueArgBeforeFunc,
           testData.rideV3Result,
           testData.GreaterV3ResultIntegerEntry

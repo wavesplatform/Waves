@@ -3,6 +3,7 @@ package com.wavesplatform.test.builtInFunctions.accountDataStorage
 import com.wavesplatform.JsTestBase
 import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomInt, randomStringArrayElement}
 import testHelpers.GeneratorContractsForBuiltInFunctions
+import testHelpers.TestDataConstantsAndMethods.thisVariable
 import utest.{Tests, test}
 
 object GetString extends JsTestBase {
@@ -40,6 +41,32 @@ object GetString extends JsTestBase {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.codeFromMatchingAndCase(
           randomAddressDataArrayElement,
+          getStringArgBeforeFunc,
+          testData.rideV3Result,
+          testData.GreaterV3ResultStringEntry
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getString compiles for 'this'") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
+        val script = precondition.codeFromMatchingAndCase(
+          thisVariable,
+          getString,
+          testData.rideV3Result,
+          testData.GreaterV3ResultStringEntry
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getString compiles (argument before function) for 'this'") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
+        val script = precondition.codeFromMatchingAndCase(
+          thisVariable,
           getStringArgBeforeFunc,
           testData.rideV3Result,
           testData.GreaterV3ResultStringEntry
@@ -116,6 +143,32 @@ object GetString extends JsTestBase {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.codeFromMatchingAndCase(
           randomAddressDataArrayElement,
+          getStringValueArgBeforeFunc,
+          testData.rideV3Result,
+          testData.GreaterV3ResultStringEntry
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getStringValue compiles for 'this'") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
+        val script = precondition.codeFromMatchingAndCase(
+          thisVariable,
+          getStringValue,
+          testData.rideV3Result,
+          testData.GreaterV3ResultStringEntry
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getStringValue compiles (argument before function) for 'this'") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
+        val script = precondition.codeFromMatchingAndCase(
+          thisVariable,
           getStringValueArgBeforeFunc,
           testData.rideV3Result,
           testData.GreaterV3ResultStringEntry

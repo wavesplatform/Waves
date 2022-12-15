@@ -3,6 +3,7 @@ package com.wavesplatform.test.builtInFunctions.accountDataStorage
 import com.wavesplatform.JsTestBase
 import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomInt, randomStringArrayElement, randomUnionArrayElement}
 import testHelpers.GeneratorContractsForBuiltInFunctions
+import testHelpers.TestDataConstantsAndMethods.thisVariable
 import utest.{Tests, test}
 
 object GetBinary extends JsTestBase {
@@ -42,6 +43,34 @@ object GetBinary extends JsTestBase {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
           randomAddressDataArrayElement,
+          getBinaryArgBeforeFunc,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBinaryEntry
+        )
+
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getBinary accountDataStorage compiles for 'this'") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
+        val script = precondition.codeFromMatchingAndCase(
+          thisVariable,
+          getBinary,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBinaryEntry
+        )
+
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getBinary accountDataStorage compiles (argument before function) for 'this'") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
+        val script = precondition.codeFromMatchingAndCase(
+          thisVariable,
           getBinaryArgBeforeFunc,
           testData.rideV3Result,
           testData.GreaterV3ResultBinaryEntry
@@ -124,6 +153,34 @@ object GetBinary extends JsTestBase {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
           randomAddressDataArrayElement,
+          getBinaryValueArgBeforeFunc,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBinaryEntry
+        )
+
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getBinaryValue accountDataStorage compiles for 'this'") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
+        val script = precondition.codeFromMatchingAndCase(
+          thisVariable,
+          getBinaryValue,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBinaryEntry
+        )
+
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function getBinaryValue accountDataStorage compiles (argument before function) for 'this'") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
+        val script = precondition.codeFromMatchingAndCase(
+          thisVariable,
           getBinaryValueArgBeforeFunc,
           testData.rideV3Result,
           testData.GreaterV3ResultBinaryEntry

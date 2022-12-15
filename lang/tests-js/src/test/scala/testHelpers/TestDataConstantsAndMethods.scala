@@ -16,6 +16,7 @@ object TestDataConstantsAndMethods {
   val UNDEFINED_TYPE                                            = "Undefined type: `BigInt`"
   val stringList                                                = "[\"a\", \"b\", \"c\", \"d\", \"e\", \"f\", \"g\"]"
   val intList                                                   = "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]"
+  val thisVariable                                              = "this"
 
   def nonMatchingTypes(expectType: String): String = {
     s"Non-matching types: expected: $expectType"

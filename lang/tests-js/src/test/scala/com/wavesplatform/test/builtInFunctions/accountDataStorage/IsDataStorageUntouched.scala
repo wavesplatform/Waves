@@ -3,6 +3,7 @@ package com.wavesplatform.test.builtInFunctions.accountDataStorage
 import com.wavesplatform.JsTestBase
 import _root_.testHelpers.GeneratorContractsForBuiltInFunctions
 import _root_.testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomInt}
+import testHelpers.TestDataConstantsAndMethods.thisVariable
 import utest.{Tests, test}
 
 object IsDataStorageUntouched extends JsTestBase {
@@ -31,6 +32,32 @@ object IsDataStorageUntouched extends JsTestBase {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeWithoutMatcher(
           randomAddressDataArrayElement,
+          isDataStorageUntouchedArgBeforeFunc,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function isDataStorageUntouched compiles for 'this'") {
+      for (version <- testData.versionsSupportingTheNewFeatures) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeWithoutMatcher(
+          thisVariable,
+          isDataStorageUntouched,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function isDataStorageUntouched compiles (argument before function) for 'this'") {
+      for (version <- testData.versionsSupportingTheNewFeatures) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeWithoutMatcher(
+          thisVariable,
           isDataStorageUntouchedArgBeforeFunc,
           testData.rideV3Result,
           testData.GreaterV3ResultBooleanEntry
