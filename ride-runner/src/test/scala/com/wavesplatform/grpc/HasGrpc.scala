@@ -1,12 +1,9 @@
 package com.wavesplatform.grpc
 
 import com.wavesplatform.events.api.grpc.protobuf.BlockchainUpdatesApiGrpc.BlockchainUpdatesApi
-import com.wavesplatform.resources.*
 import io.grpc.inprocess.{InProcessChannelBuilder, InProcessServerBuilder}
 import io.grpc.util.MutableHandlerRegistry
 import io.grpc.{ManagedChannel, ServerServiceDefinition}
-
-import scala.util.Using
 
 trait HasGrpc {
   def withGrpc[T](serviceImpl: BlockchainUpdatesApi)(test: ManagedChannel => T): T = {
@@ -19,9 +16,12 @@ trait HasGrpc {
     val serviceRegistry = new MutableHandlerRegistry()
     serviceRegistry.addService(serviceDef)
 
-    Using.resources(
-      InProcessServerBuilder.forName(serverName).fallbackHandlerRegistry(serviceRegistry).directExecutor().build().start(),
-      InProcessChannelBuilder.forName(serverName).directExecutor().build()
-    )((_, channel) => f(channel))
+    val server  = InProcessServerBuilder.forName(serverName).fallbackHandlerRegistry(serviceRegistry).directExecutor().build().start()
+    val channel = InProcessChannelBuilder.forName(serverName).directExecutor().build()
+    try f(channel)
+    finally {
+      channel.shutdownNow()
+      server.shutdown()
+    }
   }
 }

@@ -22,7 +22,7 @@ object RequestsStorage {
 class LevelDbRequestsStorage(db: DB) extends RequestsStorage {
   private val lastIndexKey = CacheKeys.RequestsLastIndex.mkKey(())
   private val lastIndex    = new AtomicInteger(db.readOnly(_.getOpt(lastIndexKey).getOrElse(-1)))
-  rideScriptTotalNumber.update(lastIndex.get())
+  refreshCounter()
 
   override def all(): List[RequestKey] = db.readOnly { ro =>
     var r = List.empty[RequestKey]
@@ -35,8 +35,10 @@ class LevelDbRequestsStorage(db: DB) extends RequestsStorage {
   override def append(x: RequestKey): Unit = db.readWrite { rw =>
     val newIndex = lastIndex.incrementAndGet()
     val key      = CacheKeys.Requests.mkKey(newIndex)
-    rideScriptTotalNumber.update(newIndex + 1) // Because it starts from 0
     rw.put(lastIndexKey, newIndex)
     rw.put(key, x)
+    refreshCounter()
   }
+
+  private def refreshCounter(): Unit = rideScriptTotalNumber.update(lastIndex.get() + 1)
 }
