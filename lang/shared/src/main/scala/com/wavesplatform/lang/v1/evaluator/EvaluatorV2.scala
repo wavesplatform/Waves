@@ -34,6 +34,7 @@ class EvaluatorV2(
     val stdLibVersion: StdLibVersion,
     val correctFunctionCallScope: Boolean,
     val newMode: Boolean,
+    val enableExecutionLog: Boolean,
     val checkConstructorArgsTypes: Boolean = false
 ) {
   private val overheadCost: Int = if (newMode) 0 else 1
@@ -265,7 +266,7 @@ class EvaluatorV2(
           .flatMap { unusedArgsComplexity =>
             val argsEvaluated = fc.args.forall(_.isInstanceOf[EVALUATED])
             if (argsEvaluated && unusedArgsComplexity > 0) {
-              logFunc(fc, ctx, stdLibVersion, unusedArgsComplexity)
+              logFunc(fc, ctx, stdLibVersion, unusedArgsComplexity, enableExecutionLog)
               evaluateFunction(fc, startArgs, unusedArgsComplexity)
             } else
               EvaluationResult(unusedArgsComplexity)
@@ -368,8 +369,8 @@ object EvaluatorV2 {
       DisabledLogEvaluationContext[Environment, Id](ctx)
     }
     var ref = expr.deepCopy.value
-    logCall(loggedCtx, logExtraInfo, ref)
-    new EvaluatorV2(loggedCtx, stdLibVersion, correctFunctionCallScope, newMode, checkConstructorArgsTypes)
+    logCall(loggedCtx, logExtraInfo, ref, enableExecutionLog)
+    new EvaluatorV2(loggedCtx, stdLibVersion, correctFunctionCallScope, newMode, enableExecutionLog, checkConstructorArgsTypes)
       .root(ref, v => EvaluationResult { ref = v }, limit, Nil)
       .map((ref, _))
       .value
@@ -433,7 +434,12 @@ object EvaluatorV2 {
       enableExecutionLog
     )
 
-  private def logCall(loggedCtx: LoggedEvaluationContext[Environment, Id], logExtraInfo: LogExtraInfo, exprCopy: EXPR): Unit = {
+  private def logCall(
+      loggedCtx: LoggedEvaluationContext[Environment, Id],
+      logExtraInfo: LogExtraInfo,
+      exprCopy: EXPR,
+      enableExecutionLog: Boolean
+  ): Unit = {
     @tailrec
     def findInvArgLet(expr: EXPR, let: LET): Option[LET] = {
       expr match {
@@ -442,35 +448,46 @@ object EvaluatorV2 {
         case _                                                          => None
       }
     }
-    logExtraInfo.dAppAddress.foreach { addr =>
-      val addrObj = Bindings.senderObject(addr)
-      loggedCtx.log(LET(InvokedDApp, addrObj), addrObj.asRight[ExecutionError])
-    }
 
-    logExtraInfo.invokedFuncName.foreach { funcName =>
-      val invokedFuncName = CONST_STRING(funcName)
-      invokedFuncName.foreach(name => loggedCtx.log(LET(InvokedFuncName, name), invokedFuncName))
-    }
+    if (enableExecutionLog) {
+      logExtraInfo.dAppAddress.foreach { addr =>
+        val addrObj = Bindings.senderObject(addr)
+        loggedCtx.log(LET(InvokedDApp, addrObj), addrObj.asRight[ExecutionError])
+      }
 
-    logExtraInfo.invArg.flatMap(findInvArgLet(exprCopy, _)).foreach {
-      case let @ LET(_, obj: CaseObj) => loggedCtx.log(let, obj.asRight[ExecutionError])
-      case _                          =>
+      logExtraInfo.invokedFuncName.foreach { funcName =>
+        val invokedFuncName = CONST_STRING(funcName)
+        invokedFuncName.foreach(name => loggedCtx.log(LET(InvokedFuncName, name), invokedFuncName))
+      }
+
+      logExtraInfo.invArg.flatMap(findInvArgLet(exprCopy, _)).foreach {
+        case let @ LET(_, obj: CaseObj) => loggedCtx.log(let, obj.asRight[ExecutionError])
+        case _                          =>
+      }
     }
   }
 
-  private def logFunc(fc: FUNCTION_CALL, ctx: LoggedEvaluationContext[Environment, Id], stdLibVersion: StdLibVersion, limit: Int): Unit = {
-    val func     = ctx.ec.functions.get(fc.function)
-    val funcName = func.map(_.name).getOrElse(fc.function.funcName)
-    func match {
-      case Some(f) =>
-        val cost = f.costByLibVersion(stdLibVersion)
-        if (limit >= cost) {
+  private def logFunc(
+      fc: FUNCTION_CALL,
+      ctx: LoggedEvaluationContext[Environment, Id],
+      stdLibVersion: StdLibVersion,
+      limit: Int,
+      enableExecutionLog: Boolean
+  ): Unit = {
+    if (enableExecutionLog) {
+      val func     = ctx.ec.functions.get(fc.function)
+      val funcName = func.map(_.name).getOrElse(fc.function.funcName)
+      func match {
+        case Some(f) =>
+          val cost = f.costByLibVersion(stdLibVersion)
+          if (limit >= cost) {
+            logFuncArgs(fc, funcName, ctx)
+            ctx.log(LET(s"$funcName.$Complexity", TRUE), CONST_LONG(cost).asRight[ExecutionError])
+            ctx.log(LET(ComplexityLimit, TRUE), CONST_LONG(limit - cost).asRight[ExecutionError])
+          }
+        case None =>
           logFuncArgs(fc, funcName, ctx)
-          ctx.log(LET(s"$funcName.$Complexity", TRUE), CONST_LONG(cost).asRight[ExecutionError])
-          ctx.log(LET(ComplexityLimit, TRUE), CONST_LONG(limit - cost).asRight[ExecutionError])
-        }
-      case None =>
-        logFuncArgs(fc, funcName, ctx)
+      }
     }
   }
 

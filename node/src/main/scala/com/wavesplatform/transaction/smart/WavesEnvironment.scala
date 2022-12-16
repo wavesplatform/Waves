@@ -406,7 +406,11 @@ class DAppEnvironment(
       availablePayments = remainingPayments
       availableData = remainingData
       availableDataSize = remainingDataSize
-      (evaluated, diff.scriptsComplexity.toInt, DiffToLogConverter.convert(diff, tx.id(), func, availableComplexity))
+      (
+        evaluated,
+        diff.scriptsComplexity.toInt,
+        if (enableExecutionLog) DiffToLogConverter.convert(diff, tx.id(), func, availableComplexity) else List.empty
+      )
     }
 
     r.v.map {

@@ -19,7 +19,7 @@ import scala.annotation.tailrec
 object EvaluatorV2Benchmark {
   val pureContext: CTX[Environment]                       = PureContext.build(V1, useNewPowPrecision = true).withEnvironment[Environment]
   val pureEvalContext: EvaluationContext[Environment, Id] = pureContext.evaluationContext(Common.emptyBlockchainEnvironment())
-  val evaluatorV2: EvaluatorV2                            = new EvaluatorV2(DisabledLogEvaluationContext(pureEvalContext), V1, true, true)
+  val evaluatorV2: EvaluatorV2                            = new EvaluatorV2(DisabledLogEvaluationContext(pureEvalContext), V1, true, true, false)
 }
 
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
