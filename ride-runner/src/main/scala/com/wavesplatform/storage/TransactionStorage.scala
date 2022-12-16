@@ -9,18 +9,26 @@ import com.wavesplatform.state.{Height, TransactionId}
 import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
 import com.wavesplatform.storage.persistent.TransactionPersistentCache
 import com.wavesplatform.utils.ScorexLogging
+import kamon.instrumentation.caffeine.KamonStatsCounter
 
 import scala.util.chaining.scalaUtilChainingOps
 
-class TransactionsStorage[TagT](
+class TransactionStorage[TagT](
     blockchainApi: BlockchainApi,
     persistentCache: TransactionPersistentCache
 ) extends ScorexLogging {
   storage =>
 
-  protected val values = Caffeine.newBuilder().build[TransactionId, RemoteData[Height]]()
+  protected val values = Caffeine
+    .newBuilder()
+    .recordStats(() => new KamonStatsCounter("TransactionStorage.values"))
+    .build[TransactionId, RemoteData[Height]]()
 
-  protected val tags                                = Caffeine.newBuilder().build[TransactionId, Set[TagT]]()
+  protected val tags = Caffeine
+    .newBuilder()
+    .recordStats(() => new KamonStatsCounter("TransactionStorage.tags"))
+    .build[TransactionId, Set[TagT]]()
+
   private def tagsOf(key: TransactionId): Set[TagT] = Option(tags.getIfPresent(key)).getOrElse(Set.empty)
 
   def getFromBlockchain(key: TransactionId): Option[Height] = blockchainApi.getTransactionHeight(key)

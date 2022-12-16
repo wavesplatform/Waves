@@ -61,7 +61,7 @@ class SharedBlockchainData[TagT](val settings: BlockchainSettings, persistentCac
 
   val accountLeaseBalances = new AccountLeaseBalanceStorage[TagT](blockchainApi, persistentCaches.accountLeaseBalances)
 
-  val transactions = new TransactionsStorage[TagT](blockchainApi, persistentCaches.transactions)
+  val transactions = new TransactionStorage[TagT](blockchainApi, persistentCaches.transactions)
 
   private def estimator: ScriptEstimator = EstimatorProvider.byActivatedFeatures(settings.functionalitySettings, activatedFeatures, height)
 

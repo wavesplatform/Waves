@@ -302,8 +302,8 @@ object CacheKeys {
 
   object Transactions extends CacheKey[TransactionId, Option[Int]](18)
 
-  object RequestsNumber extends CacheKey[Unit, Int](19)
-  object Requests       extends CacheKey[Int, (Address, JsObject)](20)
+  object RequestsLastIndex extends CacheKey[Unit, Int](19)
+  object Requests          extends CacheKey[Int, (Address, JsObject)](20)
 
   implicit val jsObjectAsBytes: AsBytes[JsObject] = AsBytes[String].transform(
     s =>
