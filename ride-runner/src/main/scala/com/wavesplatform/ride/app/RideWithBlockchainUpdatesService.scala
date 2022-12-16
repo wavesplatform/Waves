@@ -167,5 +167,8 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
 
     log.info("Initialization completed")
     Await.result(events, Duration.Inf)
+
+    log.info("Done")
+    cs.forceStop()
   }
 }
