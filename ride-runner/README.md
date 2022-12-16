@@ -108,3 +108,7 @@ services:
       - ./ride-runner/config/local.conf:/etc/ride-runner/local.conf:ro
       - ./ride-runner/data:/var/lib/ride-runner
 ```
+
+### Grafana
+
+There is an [example](./doc/grafana-prometheus-dashboard.json) dashboard for Grafana and Prometheus.
