@@ -12,7 +12,7 @@ import play.api.libs.json.{JsValue, Json}
 import scala.collection.mutable
 import scala.util.Using
 
-class TXDB(baseDirectory: String) extends StrictLogging {
+class TXDB(baseDirectory: String, apiBase: String) extends StrictLogging {
   private val entries: mutable.AnyRefMap[ByteStr, Transaction] =  {
     val pairs = Json
       .parse(new BufferedInputStream(new FileInputStream(new File(baseDirectory, "txdb.json"))))
@@ -29,7 +29,7 @@ class TXDB(baseDirectory: String) extends StrictLogging {
 
   private def loadFromPool(id: ByteStr): Transaction = {
     logger.debug(s"Loading $id")
-    val url  = new URL(s"https://nodes.wavesnodes.com/transactions/info/${id}")
+    val url  = new URL(s"$apiBase${id}")
     val json = Json.parse(url.openStream())
     Using(new FileOutputStream(s"$baseDirectory/${id}.json")) { fos =>
       val bos = new BufferedOutputStream(fos)

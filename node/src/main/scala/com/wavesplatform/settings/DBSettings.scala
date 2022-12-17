@@ -12,5 +12,6 @@ case class DBSettings(
     maxRollbackDepth: Int,
     rememberBlocks: FiniteDuration,
     useBloomFilter: Boolean,
-    inMemory: InMemorySettings
+    inMemory: InMemorySettings,
+    txdbUrl: String
 )

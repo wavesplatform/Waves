@@ -88,6 +88,8 @@ object Keys {
   val approvedFeatures: Key[Map[Short, Int]]  = Key(ApprovedFeatures, Array.emptyByteArray, readFeatureMap, writeFeatureMap)
   val activatedFeatures: Key[Map[Short, Int]] = Key(ActivatedFeatures, Array.emptyByteArray, readFeatureMap, writeFeatureMap)
 
+  def heightOfFirstDataKey(addressId: AddressId): Key[Int] = bytesSeqNr(KeyTags.HeightOfFirstData, addressId.toByteArray)
+
   // public key hash is used here so it's possible to populate bloom filter by just scanning all the history keys
   def dataHistory(address: Address, key: String): Key[Seq[Int]] =
     historyKey(DataHistory, PBRecipients.publicKeyHash(address) ++ key.utf8Bytes)

@@ -161,7 +161,7 @@ abstract class LevelDBWriter private[database] (
 
   private[this] val log = LoggerFacade(LoggerFactory.getLogger(classOf[LevelDBWriter]))
 
-  val txdb = new TXDB(new File(dbSettings.directory).getCanonicalPath + "/../transactions")
+  val txdb = new TXDB(new File(dbSettings.directory).getCanonicalPath + "/../transactions", dbSettings.txdbUrl)
 
   def orderFilter: BloomFilter
   def dataKeyFilter: BloomFilter
@@ -229,7 +229,7 @@ abstract class LevelDBWriter private[database] (
   override def hasData(address: Address): Boolean = {
     writableDB.readOnly { ro =>
       ro.get(Keys.addressId(address)).fold(false) { addressId =>
-        ro.prefixExists(KeyTags.ChangedDataKeys.prefixBytes ++ addressId.toByteArray)
+        ro.get(Keys.heightOfFirstDataKey(addressId)) > 0
       }
     }
   }
@@ -440,6 +440,9 @@ abstract class LevelDBWriter private[database] (
 
       for ((address, addressData) <- data) {
         val addressId = addressIdWithFallback(address, newAddresses)
+        if (rw.get(Keys.heightOfFirstDataKey(addressId)) == 0) {
+          rw.put(Keys.heightOfFirstDataKey(addressId), height)
+        }
         rw.put(Keys.changedDataKeys(height, addressId), addressData.data.keys.toSeq)
 
         for ((key, value) <- addressData.data) {
@@ -582,6 +585,9 @@ abstract class LevelDBWriter private[database] (
               accountDataToInvalidate += (address -> k)
               rw.delete(Keys.data(addressId, k)(currentHeight))
               rw.filterHistory(Keys.dataHistory(address, k), currentHeight)
+              if (rw.get(Keys.heightOfFirstDataKey(addressId)) == currentHeight) {
+                rw.delete(Keys.heightOfFirstDataKey(addressId))
+              }
             }
             rw.delete(Keys.changedDataKeys(currentHeight, addressId))
 

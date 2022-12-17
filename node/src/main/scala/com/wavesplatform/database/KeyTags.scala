@@ -33,6 +33,7 @@ object KeyTags extends Enumeration {
   ActivatedFeatures,
   DataHistory,
   Data,
+  HeightOfFirstData,
   SponsorshipHistory,
   Sponsorship,
   CarryFee,
