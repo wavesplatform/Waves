@@ -4,8 +4,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.compiler.Types.*
 
-import scala.collection.View
-
 object Expressions {
 
   sealed trait Pos {
