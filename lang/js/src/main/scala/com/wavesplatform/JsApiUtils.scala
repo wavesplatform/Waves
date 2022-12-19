@@ -2,16 +2,16 @@ package com.wavesplatform
 
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
-import com.wavesplatform.lang.v1.compiler.CompilationError
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL, LIST, NOTHING, TYPE, UNION}
+import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext}
 import com.wavesplatform.lang.v1.parser.Expressions
-import com.wavesplatform.lang.v1.parser.Expressions.{PART, Pos, Type}
+import com.wavesplatform.lang.v1.parser.Expressions.{PART, Type}
 
 import scala.scalajs.js
 import scala.scalajs.js.Any
-import scala.scalajs.js.Dynamic.{literal => jObj}
-import scala.scalajs.js.JSConverters._
+import scala.scalajs.js.Dynamic.literal as jObj
+import scala.scalajs.js.JSConverters.*
 
 object JsApiUtils {
 
@@ -97,7 +97,7 @@ object JsApiUtils {
       "posStart"   -> expr.position.start,
       "posEnd"     -> expr.position.end,
       "resultType" -> serType(expr.resultType.getOrElse(NOTHING)),
-      "ctx"        -> serCtx(expr.ctxOpt.getOrElse(Map.empty))
+      "ctx"        -> serCtx(expr.ctxOpt.getOrElse(CompilerContext.empty))
     )
 
     expr match {
@@ -109,21 +109,21 @@ object JsApiUtils {
 
       case x: Expressions.REF =>
         val additionalDataObj = jObj("name" -> Expressions.PART.toOption[String](x.key).getOrElse("").toString)
-        mergeJSObjects(commonDataObj, additionalDataObj)
+        js.Object.assign(commonDataObj, additionalDataObj)
 
       case Expressions.GETTER(_, ref, field, _, _, _) =>
         val additionalDataObj = jObj(
           "ref"   -> serExpr(ref),
           "field" -> serPartStr(field)
         )
-        mergeJSObjects(commonDataObj, additionalDataObj)
+        js.Object.assign(additionalDataObj, commonDataObj)
 
       case Expressions.BLOCK(_, dec, body, _, _) =>
         val additionalDataObj = jObj(
           "dec"  -> serDec(dec),
           "body" -> serExpr(body)
         )
-        mergeJSObjects(commonDataObj, additionalDataObj)
+        js.Object.assign(additionalDataObj, commonDataObj)
 
       case Expressions.IF(_, cond, ifTrue, ifFalse, _, _) =>
         val additionalDataObj = jObj(
@@ -131,43 +131,34 @@ object JsApiUtils {
           "ifTrue"  -> serExpr(ifTrue),
           "ifFalse" -> serExpr(ifFalse)
         )
-        mergeJSObjects(commonDataObj, additionalDataObj)
+        js.Object.assign(commonDataObj, additionalDataObj)
 
       case Expressions.FUNCTION_CALL(_, name, args, _, _) =>
         val additionalDataObj = jObj(
           "name" -> serPartStr(name),
           "args" -> args.toJSArray.map(serExpr)
         )
-        mergeJSObjects(commonDataObj, additionalDataObj)
+        js.Object.assign(additionalDataObj, commonDataObj)
 
       case Expressions.FOLD(_, limit, value, acc, func, _, _) =>
         val additionalDataObj = jObj(
           "name" -> s"FOLD<$limit>",
           "args" -> js.Array(serExpr(value), serExpr(acc), func.key.toString: js.Any)
         )
-        mergeJSObjects(commonDataObj, additionalDataObj)
+        js.Object.assign(additionalDataObj, commonDataObj)
 
       case Expressions.MATCH(_, expr, cases, _, ctxOpt) =>
         val additionalDataObj = jObj(
           "expr"  -> serExpr(expr),
-          "cases" -> cases.toJSArray.map(serMatchCase(_, ctxOpt.getOrElse(Map.empty)))
+          "cases" -> cases.toJSArray.map(serMatchCase(_, ctxOpt.getOrElse(CompilerContext.empty)))
         )
-        mergeJSObjects(commonDataObj, additionalDataObj)
+        js.Object.assign(additionalDataObj, commonDataObj)
 
       case t => jObj("[not_supported]stringRepr" -> t.toString)
     }
   }
 
-  def mergeJSObjects(objs: js.Dynamic*): js.Object = {
-    val result = js.Dictionary.empty[Any]
-    for (source <- objs) {
-      for ((key, value) <- source.asInstanceOf[js.Dictionary[Any]])
-        result(key) = value
-    }
-    result.asInstanceOf[js.Object]
-  }
-
-  def serMatchCase(c: Expressions.MATCH_CASE, simpleCtx: Map[String, Pos]): js.Object = {
+  def serMatchCase(c: Expressions.MATCH_CASE, simpleCtx: CompilerContext): js.Object = {
     val vars = c.pattern.subpatterns.collect { case (Expressions.TypedVar(Some(newVarName), caseType), _) =>
       (serPartStr(newVarName), serType(caseType))
     }
@@ -183,14 +174,18 @@ object JsApiUtils {
     )
   }
 
-  def serCtx(simpleCtx: Map[String, Pos]): js.Object = {
-    simpleCtx.toJSArray.map { ctxEl =>
-      jObj(
-        "name"     -> ctxEl._1,
-        "posStart" -> ctxEl._2.start,
-        "posEnd"   -> ctxEl._2.end
-      )
-    }
+  def serCtx(ctx: CompilerContext): js.Object = {
+    val r = js.Array[js.Dynamic]()
+    def addInfo(decl: (String, CompilerContext.PositionedInfo)): Unit =
+      if (decl._2.pos.start != -1)
+        r += jObj(
+          "name"     -> decl._1,
+          "posStart" -> decl._2.pos.start,
+          "posEnd"   -> decl._2.pos.end
+        )
+    ctx.varDefs.foreach(addInfo)
+    ctx.functionDefs.foreach(addInfo)
+    r
   }
 
   def serType(t: Type): js.Object =
