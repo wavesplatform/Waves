@@ -95,6 +95,41 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
     }
   }
 
+  routePath("/balance") in withDomain(balances = Seq(AddrWithBalance(TxHelpers.defaultAddress))) { d =>
+    val route =
+      addressApiRoute
+        .copy(blockchain = d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(() => d.liquidDiff, d.db, d.blockchainUpdater))
+        .route
+    val address       = TxHelpers.signer(1).toAddress
+    val transferCount = 5
+
+    val issue = TxHelpers.issue(TxHelpers.defaultSigner)
+    d.appendBlock(issue)
+
+    for (_ <- 1 until transferCount)
+      d.appendBlock(
+        TxHelpers.transfer(TxHelpers.defaultSigner, address, amount = 1),
+        TxHelpers.transfer(TxHelpers.defaultSigner, address, asset = issue.asset, amount = 2)
+      )
+
+    Get(routePath(s"/balance?address=$address&height=$transferCount")) ~> route ~> check {
+      responseAs[JsValue] shouldBe Json.arr(Json.obj("id" -> address.toString, "balance" -> (transferCount - 2)))
+    }
+    Post(routePath(s"/balance"), Json.obj("height" -> transferCount, "addresses" -> Seq(address.toString))) ~> route ~> check {
+      responseAs[JsValue] shouldBe Json.arr(Json.obj("id" -> address.toString, "balance" -> (transferCount - 2)))
+    }
+
+    Get(routePath(s"/balance?address=$address&height=$transferCount&asset=${issue.assetId}")) ~> route ~> check {
+      responseAs[JsValue] shouldBe Json.arr(Json.obj("id" -> address.toString, "balance" -> 2 * (transferCount - 2)))
+    }
+    Post(
+      routePath(s"/balance"),
+      Json.obj("height" -> transferCount, "addresses" -> Seq(address.toString), "asset" -> issue.assetId)
+    ) ~> route ~> check {
+      responseAs[JsValue] shouldBe Json.arr(Json.obj("id" -> address.toString, "balance" -> 2 * (transferCount - 2)))
+    }
+  }
+
   routePath("/seq/{from}/{to}") in {
     val r1 = Get(routePath("/seq/1/4")) ~> route ~> check {
       val response = responseAs[Seq[String]]

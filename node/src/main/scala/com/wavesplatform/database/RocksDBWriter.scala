@@ -962,8 +962,31 @@ abstract class RocksDBWriter private[database] (
     .recordStats()
     .build[(Int, AddressId), LeaseBalanceNode]()
 
-  // FIXME: implement
-  override def balanceAtHeight(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)] = None
+  override def balanceAtHeight(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)] = readOnly { db =>
+    @tailrec
+    def getBalanceAtHeight(h: Height, key: Height => Key[BalanceNode]): (Int, Long) = {
+      val balance = db.get(key(h))
+      if (h <= height) {
+        h -> balance.balance
+      } else {
+        getBalanceAtHeight(balance.prevHeight, key)
+      }
+    }
+
+    db.get(Keys.addressId(address)).map { aid =>
+      val (balance, balanceNodeKey) =
+        assetId match {
+          case Waves                  => (db.get(Keys.wavesBalance(aid)), Keys.wavesBalanceAt(aid, _))
+          case asset @ IssuedAsset(_) => (db.get(Keys.assetBalance(aid, asset)), Keys.assetBalanceAt(aid, asset, _))
+        }
+
+      if (balance.height > height) {
+        getBalanceAtHeight(balance.prevHeight, balanceNodeKey)
+      } else {
+        balance.height -> balance.balance
+      }
+    }
+  }
 
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = readOnly { db =>
     addressId(address).fold(Seq(BalanceSnapshot(1, 0, 0, 0))) { addressId =>
