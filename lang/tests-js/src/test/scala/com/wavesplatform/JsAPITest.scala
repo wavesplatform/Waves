@@ -178,14 +178,14 @@ object JsAPITest extends JsTestBase {
           | func f() = 1
         """.stripMargin
 
-      val result = JsAPI.parseAndCompile(library, 3).exprAst.expr
+      val result = JsAPI.parseAndCompile(library, 3)
       val expected = """
                        |{
                        |  "type": "BLOCK",
                        |  "posStart": 62,
                        |  "posEnd": 88,
                        |  "resultType": {
-                       |    "type": "Unit"
+                       |    "type": "Boolean"
                        |  },
                        |  "ctx": [],
                        |  "dec": {
@@ -209,24 +209,18 @@ object JsAPITest extends JsTestBase {
                        |    }
                        |  },
                        |  "body": {
-                       |    "type": "REF",
+                       |    "type": "TRUE",
                        |    "posStart": 84,
                        |    "posEnd": 88,
                        |    "resultType": {
-                       |      "type": "Unit"
+                       |      "type": "Boolean"
                        |    },
-                       |    "ctx": [
-                       |      {
-                       |        "name": "f",
-                       |        "posStart": 62,
-                       |        "posEnd": 74
-                       |      }
-                       |    ],
-                       |    "name": "unit"
+                       |    "ctx": []
                        |  }
                        |}
                      """.stripMargin
-      JSON.stringify(result) ==> JSON.stringify(JSON.parse(expected))
+      JSON.stringify(result.exprAst.expr) ==> JSON.stringify(JSON.parse(expected))
+      JSON.stringify(result.errorList) ==> "[]"
     }
   }
 }

@@ -116,7 +116,7 @@ object API {
       case Expression =>
         parseAndCompileExpression(ds, input, offset, estimator, stdLibVer)
       case Library =>
-        parseAndCompileExpression(ds, input + "\nunit", offset, estimator, stdLibVer)
+        parseAndCompileExpression(ds, input + "\ntrue", offset, estimator, stdLibVer)
       case DAppType =>
         G.parseAndCompileContract(
           input,
@@ -135,11 +135,11 @@ object API {
 
   private def parseAndCompileExpression(
       ds: DirectiveSet,
-      input: ExecutionLog,
+      input: String,
       offset: Int,
       estimator: ScriptEstimator,
       stdLibVer: StdLibVersion
-  ): Either[ExecutionLog, CompileAndParseResult.Expression] =
+  ): Either[String, CompileAndParseResult.Expression] =
     G.parseAndCompileExpression(
       input,
       offset,
