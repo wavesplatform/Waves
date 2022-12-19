@@ -52,6 +52,7 @@ object KeyTags extends Enumeration {
   HitSource,
   DisabledAliases,
   AssetStaticInfo,
+  ERC20AssetId,
   NftCount,
   NftPossession,
   BloomFilterChecksum,

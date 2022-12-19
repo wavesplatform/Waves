@@ -51,12 +51,17 @@ case class Order(
     case OrderAuthentication.OrderProofs(_, _)          => None
   }
 
+  override protected def verifyFirstProof(): Either[GenericError, Unit] = orderAuthentication match {
+    case OrderAuthentication.OrderProofs(_, _)  => super.verifyFirstProof()
+    case OrderAuthentication.Eip712Signature(_) => Right(())
+  }
+
   val proofs: Proofs = orderAuthentication match {
     case OrderAuthentication.OrderProofs(_, proofs) => proofs
     case OrderAuthentication.Eip712Signature(_)     => Proofs.empty
   }
 
-  lazy val sender: PublicKey      = senderPublicKey
+  lazy val sender: PublicKey = senderPublicKey
   def senderAddress: Address = sender.toAddress
 
   def withProofs(proofs: Proofs): Order = {

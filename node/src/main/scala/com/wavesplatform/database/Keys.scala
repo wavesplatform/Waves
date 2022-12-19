@@ -4,13 +4,13 @@ import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.protobuf.{BlockMeta as PBBlockMeta, EthereumTransactionMeta, TransactionMeta}
+import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, TransactionMeta, BlockMeta as PBBlockMeta}
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state
 import com.wavesplatform.state.*
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.{ERC20Address, Transaction}
 import com.wavesplatform.utils.*
 
 case class CurrentBalance(balance: Long, height: Height, prevHeight: Height)
@@ -50,6 +50,9 @@ object Keys {
   def assetDetailsHistory(asset: IssuedAsset): Key[Seq[Int]] = historyKey(AssetDetailsHistory, asset.id.arr)
   def assetDetails(asset: IssuedAsset)(height: Int): Key[(AssetInfo, AssetVolumeInfo)] =
     Key(AssetDetails, hBytes(asset.id.arr, height), readAssetDetails, writeAssetDetails)
+
+  def erc20AssetId(address: ERC20Address): Key[Option[IssuedAsset]] =
+    Key.opt(ERC20AssetId, address.arr, bs => IssuedAsset(ByteStr(bs)), (ia: IssuedAsset) => ia.id.arr)
 
   def issuedAssets(height: Int): Key[Seq[IssuedAsset]] =
     Key(IssuedAssets, h(height), d => readAssetIds(d).map(IssuedAsset(_)), ias => writeAssetIds(ias.map(_.id)))

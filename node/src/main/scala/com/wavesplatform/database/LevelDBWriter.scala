@@ -403,6 +403,7 @@ abstract class LevelDBWriter private[database] (
       for ((asset, NewAssetInfo(staticInfo, info, volumeInfo)) <- issuedAssets) {
         rw.put(Keys.assetStaticInfo(asset), staticInfo.some)
         rw.put(Keys.assetDetails(asset)(height), (info, volumeInfo))
+        rw.put(Keys.erc20AssetId(ERC20Address(asset.id.take(20))), Some(asset))
       }
 
       for ((asset, infoToUpdate) <- updatedAssets) {
@@ -873,12 +874,6 @@ abstract class LevelDBWriter private[database] (
   }
 
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] = writableDB.withResource { r =>
-    import scala.jdk.CollectionConverters.*
-    r.iterator.seek(Bytes.concat(KeyTags.AssetStaticInfo.prefixBytes, address.arr))
-    r.iterator.asScala
-      .to(LazyList)
-      .headOption
-      .map(e => IssuedAsset(ByteStr(e.getKey.drop(2))))
-      .filter(asset => asset.id.size == 32 && ERC20Address(asset) == address)
+    r.get(Keys.erc20AssetId(address))
   }
 }
