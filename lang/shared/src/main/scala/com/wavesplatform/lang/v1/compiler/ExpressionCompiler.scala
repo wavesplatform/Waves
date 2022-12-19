@@ -888,7 +888,7 @@ object ExpressionCompiler {
   }
 
   private def makeIfCase(cond: Expressions.EXPR, ifTrue: Expressions.EXPR, ifFalse: Expressions.EXPR): Expressions.IF =
-    Expressions.IF(Pos(cond.position.start, ifFalse.position.start)(0), cond, ifTrue, ifFalse)
+    Expressions.IF(Pos(cond.position.start, ifFalse.position.end)(0), cond, ifTrue, ifFalse)
 
   private def mkGet(path: Seq[(PART[String], Option[Single])], ref: Expressions.EXPR, pos: Pos): Expressions.EXPR =
     path.map(_._1).foldRight(ref) { (field, exp) =>
