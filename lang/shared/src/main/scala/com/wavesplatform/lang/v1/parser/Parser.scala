@@ -157,26 +157,20 @@ object Parser {
   }
 
   def ifP[A: P]: P[IF] = {
-    def optionalPart(keyword: String, branch: String): P[EXPR] = (Index ~ (keyword ~/ Index ~ baseExpr.?).?).map { case (ifTruePos, ifTrueRaw) =>
-      ifTrueRaw
-        .map { case (pos, expr) => expr.getOrElse(INVALID(Pos(pos, pos), s"expected a $branch branch's expression")) }
-        .getOrElse(INVALID(Pos(ifTruePos, ifTruePos), s"expected a $branch branch"))
-    }
+    def optionalPart(keyword: String, branch: String): P[EXPR] = (Index ~ (keyword ~/ Index ~ baseExpr.?).?)
+      .map { case (ifTruePos, ifTrueRaw) =>
+        ifTrueRaw
+          .map { case (pos, expr) => expr.getOrElse(INVALID(Pos(pos, pos), s"expected a $branch branch's expression")) }
+          .getOrElse(INVALID(Pos(ifTruePos, ifTruePos), s"expected a $branch branch"))
+      }
 
     def thenPart[AA: P] = optionalPart("then", "true")
     def elsePart[AA: P] = optionalPart("else", "false")
 
-    P(Index ~~ "if" ~~ &(border) ~/ Index ~ baseExpr.? ~ thenPart ~ elsePart ~~ Index).map { case (start, condPos, condRaw, ifTrue, ifFalse, end) =>
-      val cond = condRaw.getOrElse(INVALID(Pos(condPos, condPos), "expected a condition"))
-      IF(Pos(start, end), cond, ifTrue, ifFalse)
-    } |
-      P(Index ~~ "then" ~~ &(border) ~/ Index ~ baseExpr.? ~ elsePart ~~ Index).map { case (start, ifTrueExprPos, ifTrueRaw, ifFalse, end) =>
-        val ifTrue = ifTrueRaw.getOrElse(INVALID(Pos(ifTrueExprPos, ifTrueExprPos), "expected a true branch's expression"))
-        IF(Pos(start, end), INVALID(Pos(start, start), "expected a condition"), ifTrue, ifFalse)
-      } |
-      P(Index ~~ "else" ~~ &(border) ~/ Index ~ baseExpr.? ~~ Index).map { case (start, ifFalseExprPos, ifFalseRaw, end) =>
-        val ifFalse = ifFalseRaw.getOrElse(INVALID(Pos(ifFalseExprPos, ifFalseExprPos), "expected a false branch's expression"))
-        IF(Pos(start, end), INVALID(Pos(start, start), "expected a condition"), INVALID(Pos(start, start), "expected a true branch"), ifFalse)
+    P(Index ~~ "if" ~~ &(border) ~/ Index ~ baseExpr.? ~ thenPart ~ elsePart ~~ Index)
+      .map { case (start, condPos, condRaw, ifTrue, ifFalse, end) =>
+        val cond = condRaw.getOrElse(INVALID(Pos(condPos, condPos), "expected a condition"))
+        IF(Pos(start, end), cond, ifTrue, ifFalse)
       }
   }
 
