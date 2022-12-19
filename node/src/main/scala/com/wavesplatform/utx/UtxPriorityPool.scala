@@ -22,7 +22,7 @@ final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging wi
   @volatile private[this] var priorityDiffs         = Seq.empty[PriorityData]
   @volatile private[this] var priorityDiffsCombined = Diff.empty
 
-  def validPriorityDiffs: Seq[Diff]          = priorityDiffs.collect { case PriorityData(diff, true) => diff }
+  def validPriorityDiffs: Seq[Diff]          = priorityDiffs.takeWhile(_.isValid).map(_.diff)
   def priorityTransactions: Seq[Transaction] = priorityDiffs.flatMap(_.diff.transactionsValues)
   def priorityTransactionIds: Seq[ByteStr]   = priorityTransactions.map(_.id())
 
@@ -52,7 +52,7 @@ final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging wi
     updateDiffs(_.map { pd =>
       if (pd.diff.transactionIds.exists(removed)) {
         val keep = pd.diff.transactions.filterNot(nti => removed(nti.transaction.id()))
-        pd.copy(pd.diff.copy(keep), isValid = false)
+        pd.copy(Diff.withTransactions(keep), isValid = false)
       } else pd
     })
 
@@ -87,7 +87,7 @@ final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging wi
   }
 
   def transactionById(txId: ByteStr): Option[Transaction] =
-    priorityDiffsCombined.transactions.find(_.transaction.id() == txId).map(_.transaction)
+    priorityDiffsCombined.transaction(txId).map(_.transaction)
 
   def contains(txId: ByteStr): Boolean = transactionById(txId).nonEmpty
 
@@ -148,8 +148,8 @@ final class UtxPriorityPool(realBlockchain: Blockchain) extends ScorexLogging wi
 
 private object UtxPriorityPool {
   implicit class DiffExt(private val diff: Diff) extends AnyVal {
-    def contains(txId: ByteStr): Boolean        = diff.transactions.exists(_.transaction.id() == txId)
+    def contains(txId: ByteStr): Boolean        = diff.transaction(txId).isDefined
     def transactionsValues: Seq[Transaction]    = diff.transactions.map(_.transaction)
-    def transactionIds: collection.Set[ByteStr] = diff.transactions.map(_.transaction.id()).toSet
+    def transactionIds: collection.Set[ByteStr] = transactionsValues.map(_.id()).toSet
   }
 }

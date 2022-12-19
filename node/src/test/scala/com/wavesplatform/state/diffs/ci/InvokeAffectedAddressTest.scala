@@ -58,7 +58,7 @@ class InvokeAffectedAddressTest extends PropSpec with WithDomain {
           d.liquidDiff.errorMessage(invokeTx.id()) shouldBe defined
         } else
           d.appendAndAssertSucceed(aliasTx, invokeTx)
-        d.liquidDiff.transactions.find(_.transaction.id() == invokeTx.id()).get.affected shouldBe Set(defaultAddress, secondAddress)
+        d.liquidDiff.transaction(invokeTx.id()).get.affected shouldBe Set(defaultAddress, secondAddress)
       }
     }
   }

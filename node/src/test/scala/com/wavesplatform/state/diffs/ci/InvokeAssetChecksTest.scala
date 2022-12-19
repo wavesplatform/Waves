@@ -58,8 +58,8 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
 
         val dAppAddress = master.toAddress
 
-        def invokeInfo(succeeded: Boolean): NewTransactionInfo =
-          NewTransactionInfo(invoke, Set(invoke.senderAddress, dAppAddress), succeeded, if (!succeeded) 8L else 18L)
+        def invokeInfo(succeeded: Boolean): Vector[NewTransactionInfo] =
+          Vector(NewTransactionInfo(invoke, Set(invoke.senderAddress, dAppAddress), succeeded, if (!succeeded) 8L else 18L))
 
         val expectedResult =
           if (activated) {
@@ -68,7 +68,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
                 lengthError
               else
                 nonExistentError
-            Diff.withTransaction(
+            Diff.withTransactions(
               invokeInfo(false),
               portfolios = Map(
                 invoke.senderAddress -> Portfolio(-invoke.fee.value),
@@ -79,7 +79,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
             )
           } else {
             val asset = if (func == "invalidLength") invalidLengthAsset else nonExistentAsset
-            Diff.withTransaction(
+            Diff.withTransactions(
               invokeInfo(true),
               portfolios = Map(
                 invoke.senderAddress -> Portfolio(-invoke.fee.value, assets = Map(asset -> 0)),

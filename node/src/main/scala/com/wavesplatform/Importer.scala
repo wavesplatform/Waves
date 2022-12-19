@@ -28,7 +28,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Proven, Signed, Transaction}
 import com.wavesplatform.utils.*
-import com.wavesplatform.utx.UtxPool
+import com.wavesplatform.utx.{UtxForAppender, UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
 import kamon.Kamon
 import monix.eval.Task
@@ -291,8 +291,19 @@ object Importer extends ScorexLogging {
     val db = openDB(settings.dbSettings)
     val (blockchainUpdater, levelDb) =
       StorageFactory(settings, db, time, Observer.empty, BlockchainUpdateTriggers.combined(triggers))
-    val pos         = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
-    val extAppender = BlockAppender(blockchainUpdater, time, (_: Seq[Diff]) => {}, pos, scheduler, importOptions.verify) _
+    val utxPool = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
+    val pos     = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
+    val extAppender = BlockAppender(
+      blockchainUpdater,
+      time,
+      new UtxForAppender {
+        override def setPriorityDiffs(diffs: Seq[Diff]): Unit = {}
+        override def scheduleCleanup(): Unit                  = {}
+      },
+      pos,
+      scheduler,
+      importOptions.verify
+    ) _
 
     val extensions = Seq.empty[Extension]
     checkGenesis(settings, blockchainUpdater, Miner.Disabled)

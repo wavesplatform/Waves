@@ -36,7 +36,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     utx.putIfNew(tx, forceValidate = false).resultE should produce("reached err")
     utx.putIfNew(tx, forceValidate = true).resultE should produce("reached err")
 
-    utx.addAndCleanup(Seq(tx))
+    utx.addAndScheduleCleanup(Seq(tx))
     eventually {
       utx.size shouldBe 0
     }
@@ -50,7 +50,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     utx.putIfNew(tx, forceValidate = true).resultE should produce("reached err")
     utx.putIfNew(tx, forceValidate = false).resultE shouldBe Right(true)
 
-    utx.addAndCleanup(Nil)
+    utx.addAndScheduleCleanup(Nil)
     Thread.sleep(5000)
     utx.size shouldBe 1
 
@@ -107,7 +107,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     utx.putIfNew(tx, forceValidate = true).resultE should produce(s"Transfer error: asset '${TestValues.asset}' is not found on the blockchain")
     utx.putIfNew(tx, forceValidate = false).resultE shouldBe Right(true)
 
-    utx.addAndCleanup(Nil)
+    utx.addAndScheduleCleanup(Nil)
     Thread.sleep(5000)
     utx.size shouldBe 1
 
@@ -147,7 +147,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     utx.putIfNew(tx, forceValidate = true).resultE should produce("reached err")
     utx.putIfNew(tx, forceValidate = false).resultE shouldBe Right(true)
 
-    utx.addAndCleanup(Nil)
+    utx.addAndScheduleCleanup(Nil)
     Thread.sleep(5000)
     utx.size shouldBe 1
 
@@ -165,7 +165,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     utx.putIfNew(tx, forceValidate = false).resultE should produce("reached err")
     utx.putIfNew(tx, forceValidate = true).resultE should produce("reached err")
 
-    utx.addAndCleanup(Seq(tx))
+    utx.addAndScheduleCleanup(Seq(tx))
     eventually {
       utx.size shouldBe 0
     }
@@ -185,7 +185,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     utx.putIfNew(tx, forceValidate = true).resultE should produce("reached err")
     utx.putIfNew(tx, forceValidate = false).resultE shouldBe Right(true)
 
-    utx.addAndCleanup(Nil)
+    utx.addAndScheduleCleanup(Nil)
     Thread.sleep(5000)
     utx.size shouldBe 1
 
@@ -196,23 +196,23 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     val (script, _) = ScriptCompiler
       .compile(
         """
-        |{-# STDLIB_VERSION 4 #-}
-        |{-# CONTENT_TYPE DAPP #-}
-        |{-# SCRIPT_TYPE ACCOUNT #-}
-        |
-        |@Callable(i)
-        |func test1000() = {
-        |  if (height % 2 == 0) then
-        |    []
-        |  else
-        |    if (!sigVerify(base58'', base58'', base58'')
-        |    && !sigVerify(base58'', base58'', base58'')
-        |    && !sigVerify(base58'', base58'', base58'')
-        |    && !sigVerify(base58'', base58'', base58'')) then
-        |      throw("height is odd")
-        |    else [IntegerEntry("h", height)]
-        |  }
-        |  """.stripMargin,
+          |{-# STDLIB_VERSION 4 #-}
+          |{-# CONTENT_TYPE DAPP #-}
+          |{-# SCRIPT_TYPE ACCOUNT #-}
+          |
+          |@Callable(i)
+          |func test1000() = {
+          |  if (height % 2 == 0) then
+          |    []
+          |  else
+          |    if (!sigVerify(base58'', base58'', base58'')
+          |    && !sigVerify(base58'', base58'', base58'')
+          |    && !sigVerify(base58'', base58'', base58'')
+          |    && !sigVerify(base58'', base58'', base58'')) then
+          |      throw("height is odd")
+          |    else [IntegerEntry("h", height)]
+          |  }
+          |  """.stripMargin,
         ScriptEstimatorV3(fixOverflow = true, overhead = true)
       )
       .explicitGet()
@@ -227,7 +227,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
 
     utx.size shouldBe 100
     d.appendBlock() // Height is odd
-    utx.addAndCleanup(Nil)
+    utx.addAndScheduleCleanup(Nil)
     eventually(timeout(10 seconds), interval(500 millis)) {
       utx.size shouldBe 0
       utx.all shouldBe Nil
@@ -236,25 +236,25 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
 
   private[this] def genExpr(targetComplexity: Int, result: Boolean): String = {
     s"""
-         |if ($result) then
-         |  ${"sigVerify(base58'', base58'', base58'') ||" * ((targetComplexity / 200) - 1)} true
-         |else
-         |  ${"sigVerify(base58'', base58'', base58'') ||" * ((targetComplexity / 200) - 1)} false""".stripMargin
+       |if ($result) then
+       |  ${"sigVerify(base58'', base58'', base58'') ||" * ((targetComplexity / 200) - 1)} true
+       |else
+       |  ${"sigVerify(base58'', base58'', base58'') ||" * ((targetComplexity / 200) - 1)} false""".stripMargin
   }
 
   private[this] def genScript(targetComplexity: Int, result: Boolean = false): Script = {
     val expr = genExpr(targetComplexity, result) // ((1 to (targetComplexity / 2) - 2).map(_ => "true") :+ result.toString).mkString("&&")
 
     val scriptText = s"""
-         |{-#STDLIB_VERSION 4#-}
-         |{-#SCRIPT_TYPE ACCOUNT#-}
-         |{-#CONTENT_TYPE DAPP#-}
-         |
-         |@Callable(i)
-         |func default() = {
-         |  if ($expr) then [] else throw("reached err")
-         |}
-         |""".stripMargin
+                        |{-#STDLIB_VERSION 4#-}
+                        |{-#SCRIPT_TYPE ACCOUNT#-}
+                        |{-#CONTENT_TYPE DAPP#-}
+                        |
+                        |@Callable(i)
+                        |func default() = {
+                        |  if ($expr) then [] else throw("reached err")
+                        |}
+                        |""".stripMargin
     TxHelpers.script(scriptText.stripMargin)
   }
 
@@ -295,7 +295,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     val balances = AddrWithBalance.enoughBalances(TxHelpers.defaultSigner, dApp)
 
     withDomain(settings, balances) { d =>
-      val utx = new UtxPoolImpl(ntpTime, d.blockchainUpdater, settings.utxSettings, settings.minerSettings.enable)
+      val utx = new UtxPoolImpl(ntpTime, d.blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
       f(d, utx)
       utx.close()
     }

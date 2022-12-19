@@ -296,7 +296,7 @@ object Verifier extends ScorexLogging {
         case (sb, (k, Right(v))) =>
           sb.append(s"\nEvaluated `$k` to ")
           v match {
-            case obj: EVALUATED => TermPrinter.print(str => sb.append(str), obj); sb
+            case obj: EVALUATED => TermPrinter().print(str => sb.append(str), obj); sb
             case a              => sb.append(a.toString)
           }
         case (sb, (k, Left(err))) => sb.append(s"\nFailed to evaluate `$k`: $err")

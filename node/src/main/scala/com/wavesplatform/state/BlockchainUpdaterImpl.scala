@@ -81,7 +81,7 @@ class BlockchainUpdaterImpl(
       ngState
         .flatMap(_.totalDiffOf(id))
         .map { case (_, diff, _, _, _) =>
-          diff.transactions.map(info => (TxMeta(Height(height), info.applied, info.spentComplexity), info.transaction))
+          diff.transactions.toSeq.map(info => (TxMeta(Height(height), info.applied, info.spentComplexity), info.transaction))
         }
     )
 
@@ -333,11 +333,11 @@ class BlockchainUpdaterImpl(
                           block,
                           hitSource,
                           differResult.carry,
-                          reward
+                          None
                         )
                         miner.scheduleMining(Some(tempBlockchain))
 
-                        blockchainUpdateTriggers.onProcessBlock(block, differResult.detailedDiff, reward, referencedBlockchain)
+                        blockchainUpdateTriggers.onProcessBlock(block, differResult.detailedDiff, reward, this)
 
                         leveldb.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)
                         BlockStats.appended(referencedForgedBlock, referencedLiquidDiff.scriptsComplexity)

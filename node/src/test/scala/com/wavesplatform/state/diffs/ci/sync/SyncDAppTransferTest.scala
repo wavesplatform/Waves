@@ -126,7 +126,7 @@ class SyncDAppTransferTest extends PropSpec with WithDomain {
       blockDiff.scriptsRun shouldBe 2
       blockDiff.portfolios(recipient.toAddress).balance shouldBe transferAmount
       blockDiff.portfolios(senderDApp.toAddress).balance shouldBe -transferAmount
-      blockDiff.containsTransaction(invoke.id())
+      blockDiff.transaction(invoke.id()) shouldBe defined
     }
   }
 
@@ -151,7 +151,7 @@ class SyncDAppTransferTest extends PropSpec with WithDomain {
       blockDiff.scriptsRun shouldBe 2
       blockDiff.portfolios(recipient.toAddress).balance shouldBe transferAmount
       blockDiff.portfolios(senderDApp.toAddress).balance shouldBe -transferAmount
-      blockDiff.containsTransaction(invoke.id())
+      blockDiff.transaction(invoke.id()) shouldBe defined
     }
   }
 
@@ -195,7 +195,7 @@ class SyncDAppTransferTest extends PropSpec with WithDomain {
       blockDiff.scriptsRun shouldBe 2
       blockDiff.portfolios(recipient.toAddress).balance shouldBe transferAmount
       blockDiff.portfolios(invokerDApp.toAddress).balance shouldBe -transferAmount
-      blockDiff.containsTransaction(invoke.id())
+      blockDiff.transaction(invoke.id()) shouldBe defined
     }
   }
 

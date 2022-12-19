@@ -11,6 +11,7 @@ import com.wavesplatform.utx.UtxPool.PackStrategy
 
 trait UtxForAppender {
   def setPriorityDiffs(diffs: Seq[Diff]): Unit
+  def scheduleCleanup(): Unit
 }
 
 trait UtxPool extends UtxForAppender with AutoCloseable {

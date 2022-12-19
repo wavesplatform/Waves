@@ -296,8 +296,8 @@ object TransactionDiffer {
         case e: EthereumTransaction => EthereumTransactionDiff.meta(blockchain)(e)
         case _                      => Diff.empty
       }
-      Diff.withTransaction(
-        NewTransactionInfo(tx, affectedAddresses, applied = false, spentComplexity),
+      Diff.withTransactions(
+        Vector(NewTransactionInfo(tx, affectedAddresses, applied = false, spentComplexity)),
         portfolios = portfolios,
         scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
         scriptsComplexity = spentComplexity

@@ -38,6 +38,7 @@ package object appender {
           .measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify))
           .map { discardedDiffs =>
             utx.setPriorityDiffs(discardedDiffs)
+            utx.scheduleCleanup()
             Some(blockchainUpdater.height)
           }
 

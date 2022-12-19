@@ -1090,7 +1090,37 @@ class TransactionsRouteSpec
           val dappTrace = (responseAs[JsObject] \ "trace").as[Seq[JsObject]].find(jsObject => (jsObject \ "type").as[String] == "dApp").get
 
           (dappTrace \ "error").get shouldEqual JsNull
-          (dappTrace \ "vars" \\ "name").map(_.as[String]) should contain theSameElementsAs Seq("leaseToAddress", "leaseToAlias", "leaseId")
+          (dappTrace \ "vars" \\ "name").map(_.as[String]) should contain theSameElementsAs Seq(
+            "i",
+            "default.@args",
+            "Address.@args",
+            "Lease.@args",
+            "Lease.@complexity",
+            "@complexityLimit",
+            "leaseToAddress",
+            "calculateLeaseId.@args",
+            "calculateLeaseId.@complexity",
+            "@complexityLimit",
+            "leaseId",
+            "==.@args",
+            "==.@complexity",
+            "@complexityLimit",
+            "Alias.@args",
+            "Lease.@args",
+            "Lease.@complexity",
+            "@complexityLimit",
+            "leaseToAlias",
+            "LeaseCancel.@args",
+            "cons.@args",
+            "cons.@complexity",
+            "@complexityLimit",
+            "cons.@args",
+            "cons.@complexity",
+            "@complexityLimit",
+            "cons.@args",
+            "cons.@complexity",
+            "@complexityLimit"
+          )
         }
       }
     }

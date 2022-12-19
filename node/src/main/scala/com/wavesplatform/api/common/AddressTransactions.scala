@@ -88,7 +88,7 @@ object AddressTransactions {
   ): Seq[(TxMeta, Transaction)] =
     (for {
       (height, diff) <- maybeDiff.toSeq
-      nti            <- diff.transactions.reverse
+      nti            <- diff.transactions.toSeq.reverse
       if nti.affected(subject)
     } yield (TxMeta(height, nti.applied, nti.spentComplexity), nti.transaction))
       .dropWhile { case (_, tx) => fromId.isDefined && !fromId.contains(tx.id()) }
