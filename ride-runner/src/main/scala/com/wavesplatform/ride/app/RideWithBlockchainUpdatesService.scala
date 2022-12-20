@@ -148,6 +148,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
           false
       }
       .collect { case WrappedEvent.Next(event) => event }
+      // <--- TODO catch error here
       .scanEval(Task.now[BlockchainState](BlockchainState.Starting(workingHeight)))(BlockchainState(processor, _, _))
       .lastL
       .runToFuture(blockchainEventsStreamScheduler)

@@ -36,7 +36,7 @@ import com.wavesplatform.protobuf.block.Block
 import com.wavesplatform.protobuf.transaction.PBTransactions.{toVanillaDataEntry, toVanillaScript}
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, DataEntry, Height}
 import com.wavesplatform.transaction.Asset
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.utils.{Schedulers, ScorexLogging}
 import io.grpc.*
 import io.grpc.stub.ClientCalls
 import monix.eval.Task
@@ -70,57 +70,36 @@ class DefaultBlockchainApi(
       private val working         = new AtomicBoolean(true)
       private val currentObserver = new AtomicReference(new ManualGrpcObserver[SubscribeRequest, SubscribeEvent])
 
-//      private val origStream = s
-//        .doOnError(e => Task(log.error("[stream] Error in stream", e)))
-//        .doOnNextAck((_, _) => Task(currentObserver.get().requestNext()))
-//        .doOnComplete(Task(log.info("[stream] Complete stream")))
-
       // TODO #33 https://monix.io/docs/current/reactive/observable.html#connectableobservable ?
       override val stream: Observable[WrappedEvent[SubscribeEvent]] = s
-//        .timeoutOnSlowUpstream( // WARN: it start working from "stream" creation
-//          settings.blockchainUpdatesApi.noDataTimeout
-////          Observable
-////            .fromTask {
-////              Task(log.info("[stream] Got timeout, stopping...")) *>
-////                Task(closeUpstream()).as(WrappedEvent.Failed(UpstreamTimeoutException(settings.blockchainUpdatesApi.noDataTimeout)))
-////            }
-////            .flatMap { _ =>
-////              if (working.get()) stream.doOnNext(x => Task(log.info(s"[stream] onNext 2: $x"))).delayExecution(100.millis)
-////              else Observable.now(WrappedEvent.Closed)
-////            }
-//        )
-
-//        .doOnError(e => Task(log.error("[stream] Error in stream", e)))
-//        .doOnComplete(Task(log.info("[stream] Complete stream")))
-
-        //        .onErrorHandleWith {
-//          case _: UpstreamTimeoutException =>
-//            Observable.fromTask {
-//              Task(log.info("[stream] Got timeout, stopping...")) *>
-//                Task(closeUpstream()) *>
-//                Task(log.info("[stream] Sending a Failed event..."))
-//                  .as(WrappedEvent.Failed(UpstreamTimeoutException(settings.blockchainUpdatesApi.noDataTimeout)))
-//            }
-//
-//          case _ => Observable.empty
-//        }
-//        .doOnError {
-//          case _: UpstreamTimeoutException =>
-//            Task(log.info("[stream] Got timeout, stopping...")) *>
-//              Task(closeUpstream()) *>
-//              Task(log.info("[stream] Sending a Failed event..."))
-//                .as(WrappedEvent.Failed(UpstreamTimeoutException(settings.blockchainUpdatesApi.noDataTimeout)))
-//
-//          case _ => Task.unit
-//        }
-//        .onErrorRestartIf {
-//          case _: UpstreamTimeoutException => true
-//          case _                           => false
-//        }
-        .doOnNextAck { (_, _) =>
-          Task(log.info("Requesting next...")) *> Task(currentObserver.get().requestNext())
-        }
+        .doOnNextAck { (_, _) => Task(log.debug("Requesting next...")) *> Task(currentObserver.get().requestNext()) }
+        .doOnNext { x => Task(log.info(s"onNext class: $x")) }
         .asyncBoundary(OverflowStrategy.BackPressure(settings.blockchainUpdatesApi.bufferSize))
+        .timeoutOnSlowUpstream(settings.blockchainUpdatesApi.noDataTimeout) // WARN: it start working from "stream" creation
+        .doOnError { // TODO async, because onErrorRestartIf waits
+          case e: UpstreamTimeoutException =>
+//            Task(log.info(s"[stream] Got a timeout, restarting again from ${currentHeight.get() - 1}...")) *>
+//              Task(stream.start(currentHeight.get() - 1)).delayExecution(500.millis)
+            {
+              Task(log.info("Propagate Failed")) *>
+                Task
+                  .defer(Task.fromFuture(s.onNext(WrappedEvent.Failed(e))))
+                  .flatMap { x => Task(log.info(s"Propagated? $x")) }
+            }.delayExecution(100.millis).as(()).runToFuture(scheduler)
+            Task(closeUpstream())
+          case _ => Task.unit
+        }
+        // TODO ---- Why don't this send next?
+        .onErrorRestartIf {
+          case _: UpstreamTimeoutException =>
+            log.info("===> restarting")
+            true
+          case _ => false
+        }
+      //        .onErrorRestartIf {
+      //          case _: UpstreamTimeoutException /*if working.get()*/ => true
+//          case _                                            => false
+//        }
 
       override def start(fromHeight: Int): Unit = start(fromHeight, toHeight = 0)
 

@@ -3,7 +3,9 @@ package com.wavesplatform.events
 sealed trait WrappedEvent[+T] extends Product with Serializable
 object WrappedEvent {
   case class Next[T](payload: T)      extends WrappedEvent[T]
-  case class Failed(error: Throwable) extends WrappedEvent[Nothing]
+  case class Failed(error: Throwable) extends WrappedEvent[Nothing] {
+    override def toString: String = s"WrappedEvent.Failed($error)"
+  }
   case object Closed                  extends WrappedEvent[Nothing]
 
   implicit final class Ops[A](val self: WrappedEvent[A]) extends AnyVal {

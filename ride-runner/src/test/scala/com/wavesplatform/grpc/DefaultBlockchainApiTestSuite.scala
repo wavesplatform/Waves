@@ -122,32 +122,32 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
           val stream        = blockchainApi.mkBlockchainUpdatesStream(global)
           val currentHeight = new AtomicInteger(0)
           val r = stream.stream
+            .doOnNext { x =>
+              Task(log.info(s"onNext test: $x")) *> {
+                x match {
+                  case WrappedEvent.Next(x) => Task(currentHeight.set(x.getUpdate.height))
+                  case WrappedEvent.Failed(_: UpstreamTimeoutException) =>
+                    Task(stream.start(currentHeight.get() - 1)).delayExecution(500.millis)
+                  case _ => Task.unit
+                }
+              }
+            }
             .takeWhile {
               case WrappedEvent.Closed => false
               case _ => true
             }
-            .timeoutOnSlowUpstream( // WARN: it start working from "stream" creation
-              1.second
-            )
-            .doOnNext { x =>
-              Task(log.info(s"onNext: $x")) *> Task {
-                x match {
-                  case WrappedEvent.Next(x) => currentHeight.set(x.getUpdate.height)
-                  case _                    =>
-                }
-              }
-            }
-            .doOnError {
-              case _: UpstreamTimeoutException =>
-                Task(log.info(s"[stream] Got a timeout, restarting again from ${currentHeight.get() - 1}...")) *>
-                  Task(stream.start(currentHeight.get() - 1)).delayExecution(500.millis)
-
-              case _ => Task.unit
-            }
-            .onErrorRestartIf {
-              case _: UpstreamTimeoutException => true
-              case _                           => false
-            }
+            // A client part
+//            .doOnError {
+//              case _: UpstreamTimeoutException =>
+//                Task(log.info(s"[stream] Got a timeout, restarting again from ${currentHeight.get() - 1}...")) *>
+//                  Task(stream.start(currentHeight.get() - 1)).delayExecution(500.millis)
+//
+//              case _ => Task.unit
+//            }
+//            .onErrorRestartIf {
+//              case _: UpstreamTimeoutException => true
+//              case _ => false
+//            }
             .runAsyncGetLast
 
           log.info("Before 2")
