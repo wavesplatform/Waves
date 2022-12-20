@@ -24,4 +24,30 @@ class DeclarationSpacesTest extends PropSpec {
         |true
       """.stripMargin.trim
   }
+
+  property("big spaces between between tuple declarations should not be significant") {
+    val script =
+      """
+        | let (
+        |  a ,
+        |  b ,
+        |  c
+        | ) =
+        |  (
+        |    1 ,
+        |    2 ,
+        |    3
+        |  )
+        | true
+      """.stripMargin
+    val compiled = TestCompiler(V6).compileExpression(script).expr
+    Decompiler(compiled, getDecompilerContext(V6, Expression)) shouldBe
+      """
+        |let $t0258 = $Tuple3(1, 2, 3)
+        |let a = $t0258._1
+        |let b = $t0258._2
+        |let c = $t0258._3
+        |true
+      """.stripMargin.trim
+  }
 }
