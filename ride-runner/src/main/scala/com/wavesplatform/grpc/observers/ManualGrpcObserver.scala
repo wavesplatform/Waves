@@ -23,10 +23,10 @@ class ManualGrpcObserver[RequestT, EventT] extends ClientResponseObserver[Reques
     // requestStream.setOnReadyHandler(() => )
   }
 
-  def requestNext(): Unit = requestStream.request(1)
+  def requestNext(): Unit = ifWorking { requestStream.request(1) }
 
-  override def close(): Unit = {
-    working.set(false)
+  override def close(): Unit = if (working.compareAndSet(true, false)) {
+    log.info("Closing by a client...")
     Option(requestStream).foreach(_.cancel("Closed by a client", null))
   }
 

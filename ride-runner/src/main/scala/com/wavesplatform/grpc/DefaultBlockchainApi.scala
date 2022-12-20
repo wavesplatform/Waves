@@ -41,14 +41,15 @@ import io.grpc.*
 import io.grpc.stub.ClientCalls
 import monix.eval.Task
 import monix.execution.Scheduler
+import monix.execution.exceptions.UpstreamTimeoutException
 import monix.reactive.subjects.ConcurrentSubject
-import monix.reactive.{MulticastStrategy, OverflowStrategy}
+import monix.reactive.{MulticastStrategy, Observable, Observer, OverflowStrategy}
 import play.api.libs.json.{Json, Reads}
 import sttp.client3.{Identity, SttpBackend, UriContext, asString, basicRequest}
 
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.duration.FiniteDuration
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.jdk.CollectionConverters.IteratorHasAsScala
 import scala.util.chaining.scalaUtilChainingOps
 
@@ -66,10 +67,59 @@ class DefaultBlockchainApi(
     val s = ConcurrentSubject[WrappedEvent[SubscribeEvent]](MulticastStrategy.publish)(scheduler)
 
     new BlockchainUpdatesStream {
+      private val working         = new AtomicBoolean(true)
       private val currentObserver = new AtomicReference(new ManualGrpcObserver[SubscribeRequest, SubscribeEvent])
-      override val stream = s
-        .doOnNextAck((_, _) => Task(currentObserver.get().requestNext()))
-        .timeoutOnSlowUpstream(settings.blockchainUpdatesApi.noDataTimeout) // TODO #33
+
+//      private val origStream = s
+//        .doOnError(e => Task(log.error("[stream] Error in stream", e)))
+//        .doOnNextAck((_, _) => Task(currentObserver.get().requestNext()))
+//        .doOnComplete(Task(log.info("[stream] Complete stream")))
+
+      // TODO #33 https://monix.io/docs/current/reactive/observable.html#connectableobservable ?
+      override val stream: Observable[WrappedEvent[SubscribeEvent]] = s
+//        .timeoutOnSlowUpstream( // WARN: it start working from "stream" creation
+//          settings.blockchainUpdatesApi.noDataTimeout
+////          Observable
+////            .fromTask {
+////              Task(log.info("[stream] Got timeout, stopping...")) *>
+////                Task(closeUpstream()).as(WrappedEvent.Failed(UpstreamTimeoutException(settings.blockchainUpdatesApi.noDataTimeout)))
+////            }
+////            .flatMap { _ =>
+////              if (working.get()) stream.doOnNext(x => Task(log.info(s"[stream] onNext 2: $x"))).delayExecution(100.millis)
+////              else Observable.now(WrappedEvent.Closed)
+////            }
+//        )
+
+//        .doOnError(e => Task(log.error("[stream] Error in stream", e)))
+//        .doOnComplete(Task(log.info("[stream] Complete stream")))
+
+        //        .onErrorHandleWith {
+//          case _: UpstreamTimeoutException =>
+//            Observable.fromTask {
+//              Task(log.info("[stream] Got timeout, stopping...")) *>
+//                Task(closeUpstream()) *>
+//                Task(log.info("[stream] Sending a Failed event..."))
+//                  .as(WrappedEvent.Failed(UpstreamTimeoutException(settings.blockchainUpdatesApi.noDataTimeout)))
+//            }
+//
+//          case _ => Observable.empty
+//        }
+//        .doOnError {
+//          case _: UpstreamTimeoutException =>
+//            Task(log.info("[stream] Got timeout, stopping...")) *>
+//              Task(closeUpstream()) *>
+//              Task(log.info("[stream] Sending a Failed event..."))
+//                .as(WrappedEvent.Failed(UpstreamTimeoutException(settings.blockchainUpdatesApi.noDataTimeout)))
+//
+//          case _ => Task.unit
+//        }
+//        .onErrorRestartIf {
+//          case _: UpstreamTimeoutException => true
+//          case _                           => false
+//        }
+        .doOnNextAck { (_, _) =>
+          Task(log.info("Requesting next...")) *> Task(currentObserver.get().requestNext())
+        }
         .asyncBoundary(OverflowStrategy.BackPressure(settings.blockchainUpdatesApi.bufferSize))
 
       override def start(fromHeight: Int): Unit = start(fromHeight, toHeight = 0)
@@ -88,9 +138,12 @@ class DefaultBlockchainApi(
 
       override def closeUpstream(): Unit = currentObserver.get().close() // Closes if failed
 
-      override def closeDownstream(): Unit = s.onComplete()
+      override def closeDownstream(): Unit = {
+        log.info("Closing the downstream...")
+        s.onComplete()
+      }
 
-      override def close(): Unit = {
+      override def close(): Unit = if (working.compareAndSet(true, false)) {
         closeDownstream()
         closeUpstream()
       }

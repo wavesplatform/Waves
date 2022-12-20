@@ -32,8 +32,9 @@ linuxScriptReplacements += ("network" -> network.value.toString)
 inConfig(Universal)(
   Seq(
     mappings ++= Seq(
-      baseDirectory.value / "ride-runner-sample.conf"     -> "doc/ride-runner.conf.sample",
-      (Compile / resourceDirectory).value / "logback.xml" -> "doc/logback.sample.xml" // Logback doesn't allow .xml.sample
+      baseDirectory.value / "ride-runner-sample.conf" -> "doc/ride-runner.conf.sample",
+      // Logback doesn't allow .xml.sample. Need this, because we have node logback.xml in classpath too
+      (Compile / resourceDirectory).value / "logback.xml" -> "doc/logback.sample.xml"
     ),
     javaOptions ++= Seq(
       // -J prefix is required by the bash script
