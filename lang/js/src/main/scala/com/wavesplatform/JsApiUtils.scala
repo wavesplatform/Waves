@@ -56,13 +56,17 @@ object JsApiUtils {
       )
     }
 
-    jObj(
+    val start = js.Date.now()
+    val r = jObj(
       "type"        -> "DAPP",
       "posStart"    -> ast.position.start,
       "posEnd"      -> ast.position.end,
       "decList"     -> ast.decs.toJSArray.map(serDec),
       "annFuncList" -> ast.fs.toJSArray.map(serAnnFunc)
     )
+    val end = js.Date.now()
+    println(s"dAppToJs: ${(end - start) / 1000d}s")
+    r
   }
 
   def expressionScriptToJs(ast: Expressions.SCRIPT): js.Object =

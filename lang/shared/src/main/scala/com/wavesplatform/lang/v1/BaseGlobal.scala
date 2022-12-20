@@ -134,17 +134,26 @@ trait BaseGlobal {
       needCompaction: Boolean,
       removeUnusedCode: Boolean
   ): Either[String, (Array[Byte], (Long, Map[String, Long]), Expressions.DAPP, Iterable[CompilationError])] = {
+    val start = System.currentTimeMillis()
     (for {
       compRes <- ContractCompiler.compileWithParseResult(input, ctx, stdLibVersion, needCompaction, removeUnusedCode)
+      compileWithParseResultT                = System.currentTimeMillis()
       (compDAppOpt, exprDApp, compErrorList) = compRes
       complexityWithMap <-
         if (compDAppOpt.nonEmpty && compErrorList.isEmpty)
           ContractScript.estimateFully(stdLibVersion, compDAppOpt.get, estimator).map(de => (de.maxAnnotatedComplexity._2, de.annotatedComplexities)).leftMap((_, 0, 0))
         else Right((0L, Map.empty[String, Long]))
+      complexityWithMapT = System.currentTimeMillis()
       bytes <-
         if (compDAppOpt.nonEmpty && compErrorList.isEmpty) serializeContract(compDAppOpt.get, stdLibVersion).leftMap((_, 0, 0))
         else Right(Array.empty[Byte])
-    } yield (bytes, complexityWithMap, exprDApp, compErrorList))
+      bytesT = System.currentTimeMillis()
+    } yield {
+      println(s"parseAndCompile: ${(compileWithParseResultT - start) / 1000d}s")
+      println(s"estimate: ${(complexityWithMapT - compileWithParseResultT) / 1000d}s")
+      println(s"serialize: ${(bytesT - complexityWithMapT) / 1000d}s")
+      (bytes, complexityWithMap, exprDApp, compErrorList)
+    })
       .recover { case (e, start, end) =>
         (Array.empty[Byte], (0L, Map.empty[String, Long]), Expressions.DAPP(AnyPos, List.empty, List.empty), List(Generic(start, end, e)))
       }
@@ -208,26 +217,37 @@ trait BaseGlobal {
       estimator: ScriptEstimator,
       needCompaction: Boolean,
       removeUnusedCode: Boolean
-  ): Either[String, DAppInfo] =
+  ): Either[String, DAppInfo] = {
+    val start = System.currentTimeMillis()
     for {
       dApp  <- ContractCompiler.compile(input, ctx, version, CallableFunction, needCompaction, removeUnusedCode)
+      compileEnd = System.currentTimeMillis()
       bytes <- serializeContract(dApp, version)
       _     <- ContractScript.validateBytes(bytes)
+      serializeEnd = System.currentTimeMillis()
       de @ DAppEstimation(annotatedComplexities, globalLetsCosts, globalFunctionsCosts) <- ContractScript.estimateFully(version, dApp, estimator)
       _ <- ContractScript.checkComplexity(version, dApp, de.maxAnnotatedComplexity, annotatedComplexities, useReducedVerifierLimit = true)
+      estimateEnd = System.currentTimeMillis()
       (verifierComplexity, callableComplexities) = dApp.verifierFuncOpt.fold(
         (0L, annotatedComplexities)
       )(v => (annotatedComplexities(v.u.name), annotatedComplexities - v.u.name))
-    } yield DAppInfo(
-      bytes,
-      dApp,
-      de.maxAnnotatedComplexity,
-      annotatedComplexities,
-      verifierComplexity,
-      callableComplexities,
-      globalFunctionsCosts,
-      globalLetsCosts
-    )
+    } yield {
+      println(s"compile: ${(compileEnd - start) / 1000d}s")
+      println(s"serialize: ${(serializeEnd - compileEnd) / 1000d}s")
+      println(s"estimate: ${(estimateEnd - serializeEnd) / 1000d}s")
+      println()
+      DAppInfo(
+        bytes,
+        dApp,
+        de.maxAnnotatedComplexity,
+        annotatedComplexities,
+        verifierComplexity,
+        callableComplexities,
+        globalFunctionsCosts,
+        globalLetsCosts
+      )
+    }
+  }
 
   def checkContract(
       version: StdLibVersion,
