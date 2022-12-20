@@ -11,7 +11,6 @@ class ContractGlobalDeclarationTest extends PropSpec {
   property("estimate contract script with user functions") {
     val neutrinoScript =
       """
-        |#
         |# Main Smart Contract of Neutrino Protocol
         |# Implemented actions: Swap, Bond Liquidation, Leasing
         |#
@@ -83,6 +82,7 @@ class ContractGlobalDeclarationTest extends PropSpec {
         |
         |#-------------------Constants---------------------------
         |let SEP = "__"
+        |let LISTSEP = ":"
         |let WAVELET = 100000000
         |let PAULI = 1000000
         |let PRICELET = 1000000 # 10^6
@@ -104,16 +104,18 @@ class ContractGlobalDeclarationTest extends PropSpec {
         |let IdxControlCfgNsbtStakingDapp  = 8
         |let IdxControlCfgMediatorDapp     = 9
         |let IdxControlCfgSurfStakingDapp  = 10
-        |let IdxControlCfgGnsbtControllerDapp  = 11
+        |let IdxControlCfgGnsbtControllerDapp = 11
+        |let IdxControlCfgRestV2Dapp       = 12
+        |let IdxControlCfgGovernanceDapp   = 13
         |
         |func keyControlAddress() = "%s%s__config__controlAddress"
         |func keyControlCfg()     = "%s__controlConfig"
         |
-        |func readControlCfgOrFail(control: Address) = control.getStringOrFail(keyControlCfg()).split(SEP)
+        |func readControlCfgOrFail(control: Address) = split_4C(control.getStringOrFail(keyControlCfg()), SEP)
         |func getContractAddressOrFail(cfg: List[String], idx: Int) = cfg[idx].addressFromString()
         |  .valueOrErrorMessage("Control cfg doesn't contain address at index " + idx.toString())
         |
-        |# GLOBAL Lets
+        |# GLOBAL VARIABLES
         |let controlContract = this.getString(keyControlAddress()).valueOrElse("3P5Bfd58PPfNvBM2Hy8QfbcDqMeNtzg7KfP").addressFromStringValue()
         |let controlCfg = controlContract.readControlCfgOrFail()
         |let mathContract = controlCfg.getContractAddressOrFail(IdxControlCfgMathDapp)
@@ -122,6 +124,7 @@ class ContractGlobalDeclarationTest extends PropSpec {
         |let gnsbtControllerContract = controlCfg.getContractAddressOrFail(IdxControlCfgGnsbtControllerDapp)
         |let auctionContract = controlCfg.getContractAddressOrFail(IdxControlCfgAuctionDapp)
         |let nodeRegistryContract = controlCfg.getContractAddressOrFail(IdxControlCfgNodeRegistryDapp)
+        |let govContract = controlCfg.getContractAddressOrFail(IdxControlCfgGovernanceDapp)
         |
         |#-------------------Constructor-------------------------
         |let NeutrinoAssetIdKey = "neutrino_asset_id"
@@ -246,21 +249,11 @@ class ContractGlobalDeclarationTest extends PropSpec {
         |let sIdxSwapType                 = 1
         |let sIdxStatus                   = 2
         |let sIdxInAmount                 = 3
-        |let sIdxPrice                    = 4
-        |let sIdxOutNetAmount             = 5
-        |let sIdxOutFeeAmount             = 6
         |let sIdxStartHeight              = 7
         |let sIdxStartTimestamp           = 8
-        |let sIdxEndHeight                = 9
-        |let sIdxEndTimestamp             = 10
         |let sIdxSelfUnlockHeight         = 11
-        |let sIdxRandUnlockHeight         = 12
-        |let sIdxIndex                    = 13
-        |let sIdxWithdrawTxId             = 14
         |let sIdxMinRand                  = 15
         |let sIdxMaxRand                  = 16
-        |let sIdxOutSurfAmount            = 17
-        |let sIdxBR                       = 18
         |
         |func swapKEY(userAddress: String, txId: String) = {
         |  makeString(["%s%s", userAddress, txId], SEP)
@@ -586,7 +579,7 @@ class ContractGlobalDeclarationTest extends PropSpec {
         |    let outNetAmount    = withdrawTuple._1
         |    let outAssetId      = withdrawTuple._2
         |    let outSurfAmt      = withdrawTuple._3
-        |    let inAmtToSurfPart = withdrawTuple._4
+        |    #let inAmtToSurfPart = withdrawTuple._4
         |    let unleaseAmt      = withdrawTuple._5
         |    let outFeeAmount    = withdrawTuple._6
         |    let outAmtGross     = withdrawTuple._7
@@ -609,6 +602,29 @@ class ContractGlobalDeclarationTest extends PropSpec {
         |    } else 0
         |
         |    (state, AttachedPayment(outAssetId, outFeeAmount), unleaseAmt)
+        |}
+        |
+        |# governance contract
+        |func keyApplyInProgress() = "%s__applyInProgress"
+        |func keyProposalDataById(proposalId: Int) = "%s%d__proposalData__" + proposalId.toString()
+        |
+        |# indices to access proposal data fields (static)
+        |let govIdxTxIds = 9
+        |
+        |# The transaction cannot be added to the blockchain if the timestamp value is more than 2 hours behind
+        |# or 1.5 hours ahead of current block timestamp
+        |func validateUpdate(tx: Transaction|Order) = {
+        |    match(tx) {
+        |        case o: Order => throw("Orders aren't allowed")
+        |        case t: Transaction => {
+        |            let txId = toBase58String(t.id)
+        |            let proposalId = govContract.getInteger(keyApplyInProgress()).valueOrErrorMessage("Apply is not happening")
+        |            let txList = govContract.getStringOrFail(keyProposalDataById(proposalId)).split(SEP)[govIdxTxIds].split(LISTSEP)
+        |            if (!txList.indexOf(txId).isDefined()) then throw("Unknown txId: " + txId + " for proposalId=" + proposalId.toString()) else
+        |
+        |            true
+        |        }
+        |    }
         |}
         |
         |#-------------------Callable----------------------
@@ -746,11 +762,12 @@ class ContractGlobalDeclarationTest extends PropSpec {
         |    [ScriptTransfer(addressFromStringValue(addr), amount, neutrinoAssetId)]
         |}
         |
-        |# Accept waves from auction.ride after buyNsbt() to lease them immediately
+        |# Accept waves from auction after buyNsbt/buySurf to lease them immediately
+        |# also from governance after creating new voting
         |@Callable(i)
         |func acceptWaves() = {
-        |    if (i.caller != auctionContract)
-        |        then throw("Currently only auction contract is allowed to call")
+        |    if (i.caller != auctionContract && i.caller != govContract)
+        |        then throw("Currently only auction and governance contracts are allowed to call")
         |    else
         |        (prepareUnleaseAndLease(0), "success")
         |}
@@ -899,9 +916,7 @@ class ContractGlobalDeclarationTest extends PropSpec {
         |}
         |
         |@Verifier(tx)
-        | func verify() = {
-        |    let id = toBase58String(tx.id)
-        |
+        |func verify() = {
         |    let pubKeyAdminsListStr = makeString([
         |        "GJdLSaLiv5K7xuejac8mcRcHoyo3dPrESrvktG3a6MAR",
         |        "EYwZmURd5KKaQRBjsVa6g8DPisFoS6SovRJtFiL5gMHU",
@@ -918,11 +933,14 @@ class ContractGlobalDeclarationTest extends PropSpec {
         |        (if(sigVerify(tx.bodyBytes, tx.proofs[1], fromBase58String(pubKeyAdminsList[1]))) then 1 else 0) +
         |        (if(sigVerify(tx.bodyBytes, tx.proofs[2], fromBase58String(pubKeyAdminsList[2]))) then 1 else 0) +
         |        (if(sigVerify(tx.bodyBytes, tx.proofs[3], fromBase58String(pubKeyAdminsList[3]))) then 2 else 0)
-        |    match tx {
-        |        case sponsorTx: SponsorFeeTransaction =>
-        |            checkIsValidMinSponsoredFee(sponsorTx) && count >= 3
-        |        case _ => {
-        |            count >= 3
+        |
+        |    if (isBlocked &&
+        |      controlContract.getStringValue("is_blocked_caller") == govContract.toString()) then validateUpdate(tx) else {
+        |        match tx {
+        |            case sponsorTx: SponsorFeeTransaction =>
+        |                checkIsValidMinSponsoredFee(sponsorTx) && count >= 3
+        |            case _ =>
+        |                count >= 3
         |        }
         |    }
         |}
