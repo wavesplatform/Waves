@@ -25,7 +25,7 @@ class Parser(implicit offset: Int) {
   implicit def hack(p: fastparse.P[Any]): fastparse.P[Unit] = p.map(_ => ())
 
   val keywords       = Set("let", "strict", "base58", "base64", "true", "false", "if", "then", "else", "match", "case", "func")
-  val excludeInError = Set('(', ')', ':', ']', '[', '=')
+  val excludeInError = Set('(', ')', ':', ']', '[', '=', ',', ';')
 
   def lowerChar[A: P]          = CharIn("a-z")
   def upperChar[A: P]          = CharIn("A-Z")
