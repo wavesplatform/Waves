@@ -132,7 +132,7 @@ object FunctionalitySettings {
     minAssetInfoUpdateInterval = 10,
     estimationOverflowFixHeight = 1078680,
     estimatorSumOverflowFixHeight = 1097419,
-    ethInvokePaymentsCheckHeight = Int.MaxValue
+    ethInvokePaymentsCheckHeight = 1311110
   )
 
   val configPath = "waves.blockchain.custom.functionality"
