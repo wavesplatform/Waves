@@ -1,14 +1,16 @@
 package com.wavesplatform.state.diffs
 
+import cats.implicits.toBifunctorOps
 import com.google.protobuf.ByteString
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBRecipients}
-import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
+import com.wavesplatform.state.diffs.invoke.{InvokeScriptTransactionDiff, InvokeScriptTransactionLike}
 import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.EthereumTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.validation.impl.InvokeScriptTxValidator
 
 object EthereumTransactionDiff {
   def meta(blockchain: Blockchain)(e: EthereumTransaction): Diff = {
@@ -61,6 +63,7 @@ object EthereumTransactionDiff {
       case ei: EthereumTransaction.Invocation =>
         for {
           invocation <- TracedResult(ei.toInvokeScriptLike(e, blockchain))
+          _          <- checkPaymentsAmount(blockchain, invocation)
           diff       <- InvokeScriptTransactionDiff(blockchain, currentBlockTs, limitedExecution)(invocation)
           result     <- TransactionDiffer.assetsVerifierDiff(blockchain, invocation, verify = true, diff, Int.MaxValue)
         } yield result
@@ -68,4 +71,13 @@ object EthereumTransactionDiff {
 
     baseDiff.flatMap(bd => TracedResult(bd.combineE(this.meta(blockchain)(e))))
   }
+
+  private def checkPaymentsAmount(
+      blockchain: Blockchain,
+      invocation: InvokeScriptTransactionLike
+  ): TracedResult[ValidationError, Unit] =
+    if (blockchain.height >= blockchain.settings.functionalitySettings.ethInvokePaymentsCheckHeight)
+      TracedResult(InvokeScriptTxValidator.checkAmounts(invocation.payments).toEither.leftMap(_.head))
+    else
+      TracedResult.wrapValue(())
 }

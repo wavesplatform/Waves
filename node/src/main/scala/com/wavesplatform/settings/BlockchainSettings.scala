@@ -61,7 +61,8 @@ case class FunctionalitySettings(
     delayDelta: Int = 8,
     estimationOverflowFixHeight: Int = 0,
     estimatorSumOverflowFixHeight: Int = 0,
-    enforceTransferValidationAfter: Int = 0
+    enforceTransferValidationAfter: Int = 0,
+    ethInvokePaymentsCheckHeight: Int = 0
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int              = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil: Long                       = lastTimeBasedForkParameter
@@ -106,7 +107,8 @@ object FunctionalitySettings {
     estimatorPreCheckHeight = 1847610,
     estimationOverflowFixHeight = 2858710,
     estimatorSumOverflowFixHeight = 2897510,
-    enforceTransferValidationAfter = 2959447
+    enforceTransferValidationAfter = 2959447,
+    ethInvokePaymentsCheckHeight = 3180000
   )
 
   val TESTNET: FunctionalitySettings = apply(
@@ -118,7 +120,8 @@ object FunctionalitySettings {
     estimatorPreCheckHeight = 817380,
     estimationOverflowFixHeight = 1793770,
     estimatorSumOverflowFixHeight = 1832520,
-    enforceTransferValidationAfter = 1698800
+    enforceTransferValidationAfter = 1698800,
+    ethInvokePaymentsCheckHeight = 2064000
   )
 
   val STAGENET: FunctionalitySettings = apply(
@@ -128,7 +131,8 @@ object FunctionalitySettings {
     doubleFeaturesPeriodsAfterHeight = 1000000000,
     minAssetInfoUpdateInterval = 10,
     estimationOverflowFixHeight = 1078680,
-    estimatorSumOverflowFixHeight = 1097419
+    estimatorSumOverflowFixHeight = 1097419,
+    ethInvokePaymentsCheckHeight = Int.MaxValue
   )
 
   val configPath = "waves.blockchain.custom.functionality"
