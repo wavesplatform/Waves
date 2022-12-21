@@ -7,7 +7,7 @@ import org.slf4j.LoggerFactory
 
 import java.util.concurrent.atomic.AtomicBoolean
 
-class ManualGrpcObserver[RequestT, EventT] extends ClientResponseObserver[RequestT, EventT] with AutoCloseable with ScorexLogging {
+class ManualGrpcObserver[RequestT, EventT] extends ClientResponseObserver[RequestT, EventT] with ScorexLogging {
   protected override lazy val log = LoggerFacade(LoggerFactory.getLogger(s"${getSimpleName(this)}#${hashCode()}"))
 
   private val working                                           = new AtomicBoolean(true)
@@ -25,9 +25,9 @@ class ManualGrpcObserver[RequestT, EventT] extends ClientResponseObserver[Reques
 
   def requestNext(): Unit = ifWorking { requestStream.request(1) }
 
-  override def close(): Unit = if (working.compareAndSet(true, false)) {
+  def close(cause: Throwable): Unit = if (working.compareAndSet(true, false)) {
     log.info("Closing by a client...")
-    Option(requestStream).foreach(_.cancel("Closed by a client", null))
+    Option(requestStream).foreach(_.cancel("Closed by a client", cause))
   }
 
   override def onNext(value: EventT): Unit = {}

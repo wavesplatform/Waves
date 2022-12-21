@@ -156,7 +156,7 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
     }
 
     // TODO #33 Move wrapped events from here: processing of Closed and Failed should be moved to blockchainUpdates.stream
-    val events = blockchainUpdates.stream
+    val events = blockchainUpdates.downstream
       .doOnError(e =>
         Task {
           log.error("Error!", e)

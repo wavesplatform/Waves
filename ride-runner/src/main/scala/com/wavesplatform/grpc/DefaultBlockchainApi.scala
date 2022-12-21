@@ -28,7 +28,7 @@ import com.wavesplatform.concurrent.MayBeSemaphore
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.*
 import com.wavesplatform.grpc.BlockchainApi.BlockchainUpdatesStream
-import com.wavesplatform.grpc.DefaultBlockchainApi.{HttpBlockHeader, Settings}
+import com.wavesplatform.grpc.DefaultBlockchainApi.{HttpBlockHeader, ReplaceWithNewException, Settings, StopException}
 import com.wavesplatform.grpc.observers.{ManualGrpcObserver, MonixWrappedDownstream}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.ByteStringExt
@@ -36,22 +36,24 @@ import com.wavesplatform.protobuf.block.Block
 import com.wavesplatform.protobuf.transaction.PBTransactions.{toVanillaDataEntry, toVanillaScript}
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, DataEntry, Height}
 import com.wavesplatform.transaction.Asset
-import com.wavesplatform.utils.{Schedulers, ScorexLogging}
+import com.wavesplatform.utils.ScorexLogging
 import io.grpc.*
 import io.grpc.stub.ClientCalls
 import monix.eval.Task
-import monix.execution.Scheduler
 import monix.execution.exceptions.UpstreamTimeoutException
+import monix.execution.{Cancelable, Scheduler}
+import monix.reactive.internal.operators.extraSyntax.*
 import monix.reactive.subjects.ConcurrentSubject
-import monix.reactive.{MulticastStrategy, Observable, Observer, OverflowStrategy}
+import monix.reactive.{MulticastStrategy, Observable, OverflowStrategy}
 import play.api.libs.json.{Json, Reads}
 import sttp.client3.{Identity, SttpBackend, UriContext, asString, basicRequest}
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
-import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters.IteratorHasAsScala
 import scala.util.chaining.scalaUtilChainingOps
+import scala.util.control.NoStackTrace
 
 class DefaultBlockchainApi(
     settings: Settings,
@@ -68,38 +70,19 @@ class DefaultBlockchainApi(
 
     new BlockchainUpdatesStream {
       private val working         = new AtomicBoolean(true)
-      private val currentObserver = new AtomicReference(new ManualGrpcObserver[SubscribeRequest, SubscribeEvent])
+      private val currentUpstream = new AtomicReference(new ManualGrpcObserver[SubscribeRequest, SubscribeEvent])
 
-      // TODO #33 https://monix.io/docs/current/reactive/observable.html#connectableobservable ?
-      override val stream: Observable[WrappedEvent[SubscribeEvent]] = s
-        .doOnNextAck { (_, _) => Task(log.debug("Requesting next...")) *> Task(currentObserver.get().requestNext()) }
-        .doOnNext { x => Task(log.info(s"onNext class: $x")) }
+      private val downstreamConnection = new AtomicReference(Cancelable.empty)
+      private val connectableDownstream = s
+        .doOnNextAck { (_, _) => Task(log.debug("Requesting next...")) *> Task(currentUpstream.get().requestNext()) }
         .asyncBoundary(OverflowStrategy.BackPressure(settings.blockchainUpdatesApi.bufferSize))
-        .timeoutOnSlowUpstream(settings.blockchainUpdatesApi.noDataTimeout) // WARN: it start working from "stream" creation
-        .doOnError { // TODO async, because onErrorRestartIf waits
-          case e: UpstreamTimeoutException =>
-//            Task(log.info(s"[stream] Got a timeout, restarting again from ${currentHeight.get() - 1}...")) *>
-//              Task(stream.start(currentHeight.get() - 1)).delayExecution(500.millis)
-            {
-              Task(log.info("Propagate Failed")) *>
-                Task
-                  .defer(Task.fromFuture(s.onNext(WrappedEvent.Failed(e))))
-                  .flatMap { x => Task(log.info(s"Propagated? $x")) }
-            }.delayExecution(100.millis).as(()).runToFuture(scheduler)
-            Task(closeUpstream())
-          case _ => Task.unit
-        }
-        // TODO ---- Why don't this send next?
-        .onErrorRestartIf {
-          case _: UpstreamTimeoutException =>
-            log.info("===> restarting")
-            true
-          case _ => false
-        }
-      //        .onErrorRestartIf {
-      //          case _: UpstreamTimeoutException /*if working.get()*/ => true
-//          case _                                            => false
-//        }
+        // Guarantees that we won't receive any message after WrapperEvent.Failed until we subscribe again
+        .timeoutOnSlowUpstream(settings.blockchainUpdatesApi.noDataTimeout)
+        .doOnError { case _: UpstreamTimeoutException => Task(closeUpstream()) }
+        .onErrorRestartWith { case e: UpstreamTimeoutException if working.get() => WrappedEvent.Failed(e) }
+        .publish(scheduler)
+
+      override val downstream: Observable[WrappedEvent[SubscribeEvent]] = connectableDownstream
 
       override def start(fromHeight: Int): Unit = start(fromHeight, toHeight = 0)
 
@@ -109,17 +92,19 @@ class DefaultBlockchainApi(
         val call     = blockchainUpdatesApiChannel.newCall(BlockchainUpdatesApiGrpc.METHOD_SUBSCRIBE, CallOptions.DEFAULT)
         val observer = new MonixWrappedDownstream[SubscribeRequest, SubscribeEvent](s)
 
-        currentObserver.getAndSet(observer).close()
+        currentUpstream.getAndSet(observer).close(ReplaceWithNewException)
+        downstreamConnection.compareAndSet(Cancelable.empty, connectableDownstream.connect()) // Can't connect twice
 
         log.info("Start receiving updates from {}", fromHeight)
         ClientCalls.asyncServerStreamingCall(call, SubscribeRequest(fromHeight = fromHeight, toHeight = toHeight), observer)
       }
 
-      override def closeUpstream(): Unit = currentObserver.get().close() // Closes if failed
+      override def closeUpstream(): Unit = currentUpstream.get().close(StopException)
 
       override def closeDownstream(): Unit = {
         log.info("Closing the downstream...")
         s.onComplete()
+        downstreamConnection.get().cancel()
       }
 
       override def close(): Unit = if (working.compareAndSet(true, false)) {
@@ -380,4 +365,7 @@ object DefaultBlockchainApi {
     import com.wavesplatform.utils.byteStrFormat
     implicit val httpBlockHeaderReads: Reads[HttpBlockHeader] = Json.using[Json.WithDefaultValues].reads
   }
+
+  private case object StopException           extends RuntimeException("By a request") with NoStackTrace
+  private case object ReplaceWithNewException extends RuntimeException("Replace with a new observer") with NoStackTrace
 }

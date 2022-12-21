@@ -30,10 +30,11 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
           .doOnNext { x =>
             Task(log.info(s"Got $x"))
           }
-          .doOnError {
-            case _: UpstreamTimeoutException => Task(log.info("Got timeout"))
-            case _                           => Task.unit
-          }
+//          .doOnError {
+//            case _: UpstreamTimeoutException => Task(log.info("Got timeout"))
+//            case _                           => Task.unit
+//          }
+          .onErrorRecover { _ => 999 }
           .onErrorRestartIf {
             case _: UpstreamTimeoutException => true
             case _                           => false
@@ -65,12 +66,12 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
           override def subscribe(request: SubscribeRequest, responseObserver: StreamObserver[SubscribeEvent]): Unit = if (working.get()) {
             val curr = new AtomicInteger(request.fromHeight)
             if (subscriptions.getAndIncrement() == 0) {
-              val x = curr.get()
-              log.info(s"Sending to #${responseObserver.hashCode()}: $x")
-              responseObserver.onNext(mkAppend(x))
-
               // TODO Has Monix a fake timer?
               val t = Task {
+                val x = curr.get()
+                log.info(s"Sending to #${responseObserver.hashCode()}: $x")
+                responseObserver.onNext(mkAppend(x))
+              } *> Task {
                 val x = curr.incrementAndGet()
                 log.info(s"Sending to #${responseObserver.hashCode()}: $x")
                 responseObserver.onNext(mkAppend(x))
@@ -107,55 +108,42 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
         }
 
         withGrpc(blockchainUpdatesGrpcService) { channel =>
+          val upstreamTimeout = 1.second
           val blockchainApi = new DefaultBlockchainApi(
             DefaultBlockchainApi.Settings(
               "",
               DefaultBlockchainApi.GrpcApiSettings(None),
-              DefaultBlockchainApi.BlockchainUpdatesApiSettings(1.second, 2)
+              DefaultBlockchainApi.BlockchainUpdatesApiSettings(upstreamTimeout, 2)
             ),
             EmptyChannel,
             channel,
             SttpBackendStub.synchronous
           )
 
-          log.info("Before 1")
           val stream        = blockchainApi.mkBlockchainUpdatesStream(global)
           val currentHeight = new AtomicInteger(0)
-          val r = stream.stream
-            .doOnNext { x =>
-              Task(log.info(s"onNext test: $x")) *> {
-                x match {
-                  case WrappedEvent.Next(x) => Task(currentHeight.set(x.getUpdate.height))
-                  case WrappedEvent.Failed(_: UpstreamTimeoutException) =>
-                    Task(stream.start(currentHeight.get() - 1)).delayExecution(500.millis)
-                  case _ => Task.unit
-                }
-              }
+          val r = stream.downstream
+            .doOnNext {
+              case WrappedEvent.Next(x)                             => Task(currentHeight.set(x.getUpdate.height))
+              case WrappedEvent.Closed                              => Task(stream.closeDownstream())
+              case WrappedEvent.Failed(_: UpstreamTimeoutException) =>
+                // Delay execution to test helps to test, that:
+                // 1. We won't receive a message with height of 3 from a stale gRPC stream
+                // 2. An upstream timeout during reconnecting doesn't affect whole behaviour
+                Task(stream.start(currentHeight.get() - 1)).delayExecution(upstreamTimeout * 3 / 2)
             }
-            .takeWhile {
-              case WrappedEvent.Closed => false
-              case _ => true
-            }
-            // A client part
-//            .doOnError {
-//              case _: UpstreamTimeoutException =>
-//                Task(log.info(s"[stream] Got a timeout, restarting again from ${currentHeight.get() - 1}...")) *>
-//                  Task(stream.start(currentHeight.get() - 1)).delayExecution(500.millis)
-//
-//              case _ => Task.unit
-//            }
-//            .onErrorRestartIf {
-//              case _: UpstreamTimeoutException => true
-//              case _ => false
-//            }
-            .runAsyncGetLast
+            .doOnComplete(Task(log.info("Done")))
+            .doOnSubscriptionCancel(Task(log.info("Cancel")))
+            .toListL
+            .runToFuture
 
-          log.info("Before 2")
           stream.start(1)
+          val xs = Await.result(r, 7.seconds)
 
-          // TODO detect close upstream and restart
-          Await.result(r, 5.seconds).value shouldBe a[WrappedEvent[SubscribeEvent]]
           subscriptions.get() shouldBe 2
+
+          val receivedHeights = xs.collect { case WrappedEvent.Next(x) => x.getUpdate.height }
+          receivedHeights shouldBe List(1, 2, 1, 2)
         }
       }
     }
