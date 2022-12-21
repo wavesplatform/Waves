@@ -27,7 +27,7 @@ import monix.execution.ExecutionModel
 import monix.execution.schedulers.SchedulerService
 
 object BlockDiffer {
-  implicit val sigverify: SchedulerService = Schedulers.fixedPool(4, "sigverify", executionModel = ExecutionModel.BatchedExecution(5))
+  implicit val sigverify: SchedulerService = Schedulers.fixedPool(4, "sigverify")
 
   final case class DetailedDiff(parentDiff: Diff, transactionDiffs: List[Diff])
   final case class Result(diff: Diff, carry: Long, totalFee: Long, constraint: MiningConstraint, detailedDiff: DetailedDiff)
@@ -184,15 +184,13 @@ object BlockDiffer {
     val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, verify, enableExecutionLog = enableExecutionLog) _
     val hasSponsorship = currentBlockHeight >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
 
-    if (verify) {
-      txs
-        .parUnorderedTraverse {
-          case tx: ProvenTransaction => Task(tx.firstProofIsValidSignature).void
-          case _                     => Task.unit
-        }
-        .executeOn(sigverify)
-        .runAsyncAndForget
-    }
+    // TODO: uncomment
+//    if (verify) {
+//      txs.parUnorderedTraverse {
+//        case tx: ProvenTransaction => Task(tx.firstProofIsValidSignature).void
+//        case _                     => Task.unit
+//      }.runAsyncAndForget
+//    }
 
     prepareCaches(blockchain, blockGenerator, txs)
 

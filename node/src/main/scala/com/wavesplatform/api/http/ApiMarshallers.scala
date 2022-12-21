@@ -104,6 +104,7 @@ trait ApiMarshallers extends JsonFormats {
     }
   }
 
+  // FIXME: support large-significand-format
   def jsonBytesStreamMarshaller(
       prefix: String = "[",
       delimiter: String = ",",

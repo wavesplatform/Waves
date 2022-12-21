@@ -2,9 +2,8 @@ package com.wavesplatform
 
 import java.io.*
 import java.net.{MalformedURLException, URL}
-
 import akka.actor.ActorSystem
-import cats.implicits.catsSyntaxEitherId
+import cats.implicits.{catsSyntaxEitherId, catsSyntaxParallelTraverse1}
 import com.google.common.io.ByteStreams
 import com.google.common.primitives.Ints
 import com.wavesplatform.Exporter.Formats
@@ -20,13 +19,14 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.Miner
-import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.protobuf.block.{PBBlocks, VanillaBlock}
+import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.appender.BlockAppender
+import com.wavesplatform.state.diffs.BlockDiffer.sigverify
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Proven, Signed, Transaction}
+import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Proven, ProvenTransaction, Signed, Transaction}
 import com.wavesplatform.utils.*
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -37,12 +37,14 @@ import monix.reactive.{Observable, Observer}
 import org.rocksdb.RocksDB
 import scopt.OParser
 
+import java.util.concurrent.ConcurrentLinkedDeque
+import scala.annotation.tailrec
+import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Success, Try}
 
 object Importer extends ScorexLogging {
-  import monix.execution.Scheduler.Implicits.global
 
   type AppendBlock = Block => Task[Either[ValidationError, Option[BigInt]]]
 
@@ -176,10 +178,10 @@ object Importer extends ScorexLogging {
       blockchain: Blockchain,
       appendBlock: AppendBlock,
       importOptions: ImportOptions,
-      skipBlocks: Boolean
+      skipBlocks: Boolean,
+      funcSettings: FunctionalitySettings,
+      appender: Scheduler
   ): Unit = {
-    val sigverify = Schedulers.fixedPool(4, "sigverify", executionModel = ExecutionModel.BatchedExecution(5))
-
     val lenBytes = new Array[Byte](Ints.BYTES)
     val start    = System.nanoTime()
     var counter  = 0
@@ -200,62 +202,83 @@ object Importer extends ScorexLogging {
       )
     }
 
-    while (!quit && counter < blocksToApply) lock.synchronized {
-      val s1 = ByteStreams.read(inputStream, lenBytes, 0, Ints.BYTES)
-      if (s1 == Ints.BYTES) {
-        val blockSize = Ints.fromByteArray(lenBytes)
+    val maxSize = funcSettings.featureCheckBlocksPeriod
+    val queue   = new mutable.Queue[VanillaBlock](maxSize)
 
-        lazy val blockBytes = new Array[Byte](blockSize)
-        val factReadSize =
-          if (blocksToSkip > 0) {
-            // File IO optimization
-            ByteStreams.skipFully(inputStream, blockSize)
-            blockSize
-          } else {
-            ByteStreams.read(inputStream, blockBytes, 0, blockSize)
-          }
+    @tailrec
+    def readBlocks(queue: mutable.Queue[VanillaBlock], remainCount: Int, maxCount: Int): Unit = {
+      if (remainCount == 0) ()
+      else {
+        val s1 = ByteStreams.read(inputStream, lenBytes, 0, Ints.BYTES)
+        if (s1 == Ints.BYTES) {
+          val blockSize = Ints.fromByteArray(lenBytes)
 
-        if (factReadSize == blockSize) {
-          if (blocksToSkip > 0) {
-            blocksToSkip -= 1
-          } else {
-            val blockV5               = blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, blockchain.height + 1)
-            lazy val parsedProtoBlock = PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(blockBytes)), unsafe = true)
-
-            val block = (if (!blockV5) Block.parseBytes(blockBytes) else parsedProtoBlock).orElse(parsedProtoBlock).get
-
-            Task
-              .parTraverse(block.transactionData) {
-                case p: Proven => Task(p.firstProofIsValidSignature)
-                case s: Signed => Task(s.signaturesValid())
-                case _         => Task.unit
-              }
-              .executeOn(sigverify)
-              .runSyncUnsafe()
-
-            Await.result(prevAppendTask, Duration.Inf) match {
-              case Left(ve) =>
-                log.error(s"Error appending block: $ve")
-                quit = true
-              case _ =>
-                counter = counter + 1
-                if (blockchain.lastBlockId.contains(block.header.reference)) {
-                  prevAppendTask = appendBlock(block).runAsyncLogErr
-                } else {
-                  log.warn(s"Block $block is not a child of the last block ${blockchain.lastBlockId.get}")
-                }
+          lazy val blockBytes = new Array[Byte](blockSize)
+          val factReadSize =
+            if (blocksToSkip > 0) {
+              // File IO optimization
+              ByteStreams.skipFully(inputStream, blockSize)
+              blockSize
+            } else {
+              ByteStreams.read(inputStream, blockBytes, 0, blockSize)
             }
 
+          if (factReadSize == blockSize) {
+            if (blocksToSkip > 0) {
+              blocksToSkip -= 1
+            } else {
+              val blockV5               = blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, blockchain.height + (maxCount - remainCount) + 1)
+              lazy val parsedProtoBlock = PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(blockBytes)), unsafe = true)
+
+              val block = (if (!blockV5) Block.parseBytes(blockBytes) else parsedProtoBlock).orElse(parsedProtoBlock).get
+
+              block.transactionData
+                .parTraverse {
+                  case tx: ProvenTransaction => Task(tx.firstProofIsValidSignature).void
+//                case b: Block              => Task(b.signatureValid()).void
+                  case _ => Task.unit
+                }
+                .executeOn(sigverify)
+                .runAsyncAndForget
+
+              queue.enqueue(block)
+            }
+            readBlocks(queue, remainCount - 1, maxCount)
+          } else {
+            log.info(s"$factReadSize != expected $blockSize")
+            quit = true
           }
         } else {
-          log.info(s"$factReadSize != expected $blockSize")
+          if (inputStream.available() > 0) log.info(s"Expecting to read ${Ints.BYTES} but got $s1 (${inputStream.available()})")
           quit = true
         }
-      } else {
-        if (inputStream.available() > 0) log.info(s"Expecting to read ${Ints.BYTES} but got $s1 (${inputStream.available()})")
-        quit = true
       }
     }
+
+    while ((!quit || queue.nonEmpty) && counter < blocksToApply)
+      if (!quit && queue.isEmpty) {
+        readBlocks(queue, maxSize, maxSize)
+      } else if (!quit && queue.size < maxSize / 2) {
+        readBlocks(queue, maxSize / 2, maxSize / 2)
+      } else {
+        lock.synchronized {
+          val block = queue.dequeue()
+          Await.result(prevAppendTask, Duration.Inf) match {
+            case Left(ve) =>
+              log.error(s"Error appending block: $ve")
+              queue.clear()
+              quit = true
+            case _ =>
+              counter = counter + 1
+              if (blockchain.lastBlockId.contains(block.header.reference)) {
+                prevAppendTask = appendBlock(block).runAsyncLogErr(appender)
+              } else {
+                log.warn(s"Block $block is not a child of the last block ${blockchain.lastBlockId.get}")
+                prevAppendTask
+              }
+          }
+        }
+      }
   }
 
   def main(args: Array[String]): Unit = {
@@ -366,7 +389,15 @@ object Importer extends ScorexLogging {
       inputStream.close()
     }
 
-    startImport(inputStream, blockchainUpdater, extAppender, importOptions, importFileOffset == 0)
+    startImport(
+      inputStream,
+      blockchainUpdater,
+      extAppender,
+      importOptions,
+      importFileOffset == 0,
+      settings.blockchainSettings.functionalitySettings,
+      scheduler
+    )
     Await.result(Kamon.stopModules(), 10.seconds)
   }
 }
