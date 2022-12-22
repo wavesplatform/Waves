@@ -34,7 +34,7 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
             val tasks = if (subscriptionId == 1) {
               Task {
                 responseObserver.onNext(mkAppend(currHeight.get()))
-              }.delayExecution(1.millis) *> Task {
+              }.delayExecution(1.milli) *> Task {
                 responseObserver.onNext(mkAppend(currHeight.incrementAndGet()))
               }.delayExecution(10.millis) *> Task {
                 responseObserver.onNext(mkAppend(currHeight.incrementAndGet()))
@@ -92,7 +92,7 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
           stream.start(1)
 
           testScheduler.tickOne()        // Subscribe
-          testScheduler.tick(1.millis)   // Sending "1"
+          testScheduler.tick(1.milli)    // Sending "1"
           testScheduler.tick(10.millis)  // Sending "2"
           testScheduler.tick(1.second)   // Timeout
           testScheduler.tick(50.millis)  // Sending "3" (1s + 50ms since sending "2")
@@ -137,7 +137,7 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
             val tasks = if (subscriptionId == 1) {
               Task {
                 responseObserver.onNext(mkAppend(currHeight.get()))
-              }.delayExecution(1.millis) *> Task {
+              }.delayExecution(1.milli) *> Task {
                 responseObserver.onNext(mkAppend(currHeight.incrementAndGet()))
               }.delayExecution(10.millis) *> Task {
                 responseObserver.onCompleted()
@@ -190,7 +190,7 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
           stream.start(1)
 
           testScheduler.tickOne()        // Subscribe
-          testScheduler.tick(1.millis)   // Sending "1"
+          testScheduler.tick(1.milli)    // Sending "1"
           testScheduler.tick(10.millis)  // Sending "2"
           testScheduler.tick(50.millis)  // Sending Completed
           testScheduler.tick(900.millis) // Starting again
@@ -218,6 +218,101 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
               case WrappedEvent.Closed => true
               case _                   => false
             } shouldBe 2
+          }
+        }
+      }
+
+      "multiple restarts" in {
+        implicit val testScheduler = TestScheduler()
+        val subscriptions          = new AtomicInteger(0)
+        val upstreamTimeout        = 1.second
+
+        val blockchainUpdatesGrpcService = new BlockchainUpdatesApiGrpc.BlockchainUpdatesApi {
+          override def subscribe(request: SubscribeRequest, responseObserver: StreamObserver[SubscribeEvent]): Unit = {
+            val subscriptionId = subscriptions.incrementAndGet()
+            val currHeight     = new AtomicInteger(request.fromHeight)
+
+            val tasks =
+              if (subscriptionId == 1)
+                Task.sequence((1 to 4).map { _ =>
+                  Task {
+                    responseObserver.onNext(mkAppend(currHeight.getAndIncrement()))
+                  }.delayExecution(1.milli)
+                })
+              else if (subscriptionId == 3)
+                Task { responseObserver.onNext(mkAppend(currHeight.getAndIncrement())) }.delayExecution(1.milli) *>
+                  Task { responseObserver.onCompleted() }.delayExecution(10.millis)
+              else Task.unit
+
+            tasks.runToFuture(testScheduler)
+          }
+
+          override def getBlockUpdatesRange(request: GetBlockUpdatesRangeRequest): Future[GetBlockUpdatesRangeResponse] = ???
+
+          override def getBlockUpdate(request: GetBlockUpdateRequest): Future[GetBlockUpdateResponse] = ???
+        }
+
+        withGrpc(blockchainUpdatesGrpcService) { channel =>
+          val blockchainApi = new DefaultBlockchainApi(
+            DefaultBlockchainApi.Settings(
+              "",
+              DefaultBlockchainApi.GrpcApiSettings(None),
+              DefaultBlockchainApi.BlockchainUpdatesApiSettings(upstreamTimeout, 2)
+            ),
+            EmptyChannel,
+            channel,
+            SttpBackendStub.synchronous
+          )
+
+          val stream        = blockchainApi.mkBlockchainUpdatesStream(testScheduler)
+          val currentHeight = new AtomicInteger(0)
+          val r = stream.downstream
+            .doOnNext {
+              case WrappedEvent.Next(x)                             => Task(currentHeight.set(x.getUpdate.height))
+              case WrappedEvent.Closed                              => Task(stream.close())
+              case WrappedEvent.Failed(_: UpstreamTimeoutException) => Task { stream.start(currentHeight.get() - 1) }
+              case x                                                => fail(s"Unexpected message: $x")
+            }
+            .toListL
+            .runToFuture(testScheduler)
+
+          stream.start(1)
+
+          testScheduler.tickOne()       // Subscribe
+          testScheduler.tick(1.milli)   // Sending "1"
+          testScheduler.tick(1.milli)   // Sending "2"
+          testScheduler.tick(1.milli)   // Sending "3"
+          testScheduler.tick(1.milli)   // Sending "4"
+          testScheduler.tick(1.second)  // Timeout
+          testScheduler.tick(1.second)  // Timeout
+          testScheduler.tick(1.milli)   // Sending "3"
+          testScheduler.tick(10.millis) // Sending Completed
+
+          withClue("completed") {
+            r.isCompleted shouldBe true
+          }
+          withClue("only three completions") {
+            subscriptions.get() shouldBe 3
+          }
+
+          val xs = r.value.value.success.value
+          withClue("received heights") {
+            val receivedHeights = xs.collect { case WrappedEvent.Next(x) => x.getUpdate.height }
+            receivedHeights shouldBe List(1, 2, 3, 4, 3)
+          }
+
+          withClue("two failed events") {
+            xs.count {
+              case WrappedEvent.Failed(_) => true
+              case _                      => false
+            } shouldBe 2
+          }
+
+          withClue("one closed event") {
+            xs.count {
+              case WrappedEvent.Closed => true
+              case _                   => false
+            } shouldBe 1
           }
         }
       }
