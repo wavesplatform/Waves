@@ -896,7 +896,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
     "simple expression" in {
       withDomain(RideV5) { d =>
         val blockchain = d.blockchain
-        val api        = utilsApi.copy(blockchain = blockchain)
+        val api        = utilsApi.copy(blockchain = blockchain, settings = utilsApi.settings.copy(evaluateScriptComplexityLimit = 26000))
         val route      = seal(api.route)
 
         evalScript("testNone()") ~> route ~> check {
@@ -1708,7 +1708,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
                |  {
                |    "name": "@complexityLimit",
                |    "type": "Int",
-               |    "value": 25984
+               |    "value": 51984
                |  },
                |  {
                |    "name": "check",
