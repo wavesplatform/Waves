@@ -5,22 +5,7 @@ import com.google.protobuf.empty.Empty
 import com.google.protobuf.{ByteString, UnsafeByteOperations}
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.api.grpc.BalanceResponse.Balance
-import com.wavesplatform.api.grpc.{
-  AccountRequest,
-  AccountsApiGrpc,
-  ActivationStatusRequest,
-  AssetRequest,
-  AssetsApiGrpc,
-  BalanceResponse,
-  BalancesRequest,
-  BlockRangeRequest,
-  BlockRequest,
-  BlockchainApiGrpc,
-  BlocksApiGrpc,
-  DataRequest,
-  TransactionsApiGrpc,
-  TransactionsByIdRequest
-}
+import com.wavesplatform.api.grpc.{AccountRequest, AccountsApiGrpc, ActivationStatusRequest, AssetRequest, AssetsApiGrpc, BalanceResponse, BalancesRequest, BlockRangeRequest, BlockRequest, BlockchainApiGrpc, BlocksApiGrpc, DataRequest, TransactionsApiGrpc, TransactionsByIdRequest}
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.collections.syntax.*
 import com.wavesplatform.common.state.ByteStr
@@ -49,6 +34,7 @@ import play.api.libs.json.{Json, Reads}
 import sttp.client3.{Identity, SttpBackend, UriContext, asString, basicRequest}
 
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters.IteratorHasAsScala
@@ -93,9 +79,10 @@ class DefaultBlockchainApi(
         val observer = new MonixWrappedDownstream[SubscribeRequest, SubscribeEvent](s)
 
         currentUpstream.getAndSet(observer).close(ReplaceWithNewException)
-        downstreamConnection.compareAndSet(Cancelable.empty, connectableDownstream.connect()) // Can't connect twice
+        connectableDownstream.connect()
+//        downstreamConnection.compareAndSet(Cancelable.empty, connectableDownstream.connect()) // Can't connect twice
 
-        log.info("Start receiving updates from {}", fromHeight)
+        log.info(s"[${scheduler.clockMonotonic(TimeUnit.MILLISECONDS)}] Start receiving updates from {}", fromHeight)
         ClientCalls.asyncServerStreamingCall(call, SubscribeRequest(fromHeight = fromHeight, toHeight = toHeight), observer)
       }
 

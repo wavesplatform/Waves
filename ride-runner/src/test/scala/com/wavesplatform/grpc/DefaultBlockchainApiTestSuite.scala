@@ -9,22 +9,27 @@ import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.StreamObserver
 import io.grpc.{CallOptions, Channel, ClientCall, MethodDescriptor}
 import monix.eval.Task
-import monix.execution.Scheduler.Implicits.global
+import monix.execution.{ExecutionModel, UncaughtExceptionReporter}
 import monix.execution.exceptions.UpstreamTimeoutException
-import monix.reactive.MulticastStrategy
+import monix.execution.schedulers.TestScheduler
+import monix.reactive.{MulticastStrategy, Observable}
+import monix.reactive.observers.Subscriber
 import monix.reactive.subjects.ConcurrentSubject
 import sttp.client3.testing.SttpBackendStub
 
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future}
+import scala.util.chaining.scalaUtilChainingOps
 
 class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with ScorexLogging {
   "DefaultBlockchainApi" - {
     log.info("Before")
     "mkBlockchainUpdatesStream" - {
       "restart stream test" in {
-        val s = ConcurrentSubject[Int](MulticastStrategy.Publish)
+        implicit val testScheduler = TestScheduler()
+        val s                      = ConcurrentSubject[Int](MulticastStrategy.Publish)
         val r = s
           .timeoutOnSlowUpstream(100.millis)
           .doOnNext { x =>
@@ -59,48 +64,60 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
       }
 
       "restart on slow upstream" in {
-        val subscriptions = new AtomicInteger(0)
-        val blockchainUpdatesGrpcService = new BlockchainUpdatesApiGrpc.BlockchainUpdatesApi {
-          private val working = new AtomicBoolean(true)
+        val testScheduler = TestScheduler(ExecutionModel.AlwaysAsyncExecution)
 
-          override def subscribe(request: SubscribeRequest, responseObserver: StreamObserver[SubscribeEvent]): Unit = if (working.get()) {
-            val curr = new AtomicInteger(request.fromHeight)
-            if (subscriptions.getAndIncrement() == 0) {
-              // TODO Has Monix a fake timer?
-              val t = Task {
-                val x = curr.get()
-                log.info(s"Sending to #${responseObserver.hashCode()}: $x")
-                responseObserver.onNext(mkAppend(x))
-              } *> Task {
-                val x = curr.incrementAndGet()
-                log.info(s"Sending to #${responseObserver.hashCode()}: $x")
-                responseObserver.onNext(mkAppend(x))
-              }.delayExecution(10.millis) *>
-                Task {
-                  val x = curr.incrementAndGet()
-                  log.info(s"Sending to #${responseObserver.hashCode()}: $x")
-                  responseObserver.onNext(mkAppend(x))
-                }.delayExecution(1.second + 50.millis)
-
-              t.runToFuture
-            } else {
-              val t = Task {
-                val x = curr.get()
-                log.info(s"Sending to #${responseObserver.hashCode()}: $x")
-                responseObserver.onNext(mkAppend(x))
-              }.delayExecution(10.millis) *> Task {
-                val x = curr.incrementAndGet()
-                log.info(s"Sending to #${responseObserver.hashCode()}: $x")
-                responseObserver.onNext(mkAppend(x))
-              }.delayExecution(10.millis) *> Task {
-                if (working.compareAndSet(true, false)) {
-                  log.info(s"Closing #${responseObserver.hashCode()}")
-                  responseObserver.onCompleted()
-                }
-              }.delayExecution(10.millis)
-
-              t.runToFuture
+        def dumpTasks(label: String): Unit = {
+          val tasks    = testScheduler.state.tasks
+          val currTime = testScheduler.state.clock
+          val tasksStr = tasks
+            .map { x =>
+              val runIn = x.runsAt - currTime
+              s"$x in $runIn"
             }
+            .mkString("\n")
+          log.info(s"$label: $tasksStr")
+        }
+
+        val subscriptions   = new AtomicInteger(0)
+        val upstreamTimeout = 1.second
+
+        val blockchainUpdatesGrpcService = new BlockchainUpdatesApiGrpc.BlockchainUpdatesApi {
+          override def subscribe(request: SubscribeRequest, responseObserver: StreamObserver[SubscribeEvent]): Unit = {
+            val currSub = subscriptions.incrementAndGet()
+            log.info(s"[${testScheduler.clockMonotonic(TimeUnit.MILLISECONDS)}] In, #${responseObserver.hashCode()}, subN=$currSub")
+            val curr = new AtomicInteger(request.fromHeight)
+            val tasks = if (currSub == 1) {
+              Task {
+                val x1 = curr.get()
+                log.info(s"[${testScheduler.clockMonotonic(TimeUnit.MILLISECONDS)}] Sending to 1, #${responseObserver.hashCode()}: $x1")
+                responseObserver.onNext(mkAppend(x1))
+              }.delayExecution(1.millis) *> Task {
+                val x2 = curr.incrementAndGet()
+                log.info(s"[${testScheduler.clockMonotonic(TimeUnit.MILLISECONDS)}] Sending to 1, #${responseObserver.hashCode()}: $x2")
+                responseObserver.onNext(mkAppend(x2))
+              }.delayExecution(10.millis) *> Task {
+                val x3 = curr.incrementAndGet()
+                log.info(s"[${testScheduler.clockMonotonic(TimeUnit.MILLISECONDS)}] Sending to 1, #${responseObserver.hashCode()}: $x3")
+                responseObserver.onNext(mkAppend(x3))
+              }.delayExecution(upstreamTimeout + 50.millis) // After timeout, we should not receive this
+            } else if (currSub == 2) {
+              Task {
+                val x1 = curr.get()
+                log.info(s"[${testScheduler.clockMonotonic(TimeUnit.MILLISECONDS)}] Sending to 2, #${responseObserver.hashCode()}: $x1")
+                responseObserver.onNext(mkAppend(x1))
+              }.delayExecution(10.millis) *> Task {
+                val x2 = curr.incrementAndGet()
+                log.info(s"[${testScheduler.clockMonotonic(TimeUnit.MILLISECONDS)}] Sending to 2, #${responseObserver.hashCode()}: $x2")
+                responseObserver.onNext(mkAppend(x2))
+              }.delayExecution(10.millis) *> Task {
+                log.info(s"[${testScheduler.clockMonotonic(TimeUnit.MILLISECONDS)}] Closing 2, #${responseObserver.hashCode()}")
+                responseObserver.onCompleted()
+              }.delayExecution(10.millis)
+            } else Task.unit
+
+            log.info(s"[${testScheduler.clockMonotonic(TimeUnit.MILLISECONDS)}] Out, #${responseObserver.hashCode()}")
+            tasks.runToFuture(testScheduler) // Why don't we receive messages?
+            dumpTasks("grpc")
           }
 
           override def getBlockUpdatesRange(request: GetBlockUpdatesRangeRequest): Future[GetBlockUpdatesRangeResponse] = ???
@@ -108,7 +125,6 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
         }
 
         withGrpc(blockchainUpdatesGrpcService) { channel =>
-          val upstreamTimeout = 1.second
           val blockchainApi = new DefaultBlockchainApi(
             DefaultBlockchainApi.Settings(
               "",
@@ -120,27 +136,54 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
             SttpBackendStub.synchronous
           )
 
-          val stream        = blockchainApi.mkBlockchainUpdatesStream(global)
+          val stream        = blockchainApi.mkBlockchainUpdatesStream(testScheduler)
           val currentHeight = new AtomicInteger(0)
           val r = stream.downstream
+            .doOnNext { x => Task { log.info(s"[${testScheduler.clockMonotonic(TimeUnit.MILLISECONDS)}] Before: $x") } }
             .doOnNext {
               case WrappedEvent.Next(x)                             => Task(currentHeight.set(x.getUpdate.height))
-              case WrappedEvent.Closed                              => Task(stream.closeDownstream())
+              case WrappedEvent.Closed                              => Task(stream.close()) // Task(stream.closeDownstream())
               case WrappedEvent.Failed(_: UpstreamTimeoutException) =>
                 // Delay execution to test helps to test, that:
                 // 1. We won't receive a message with height of 3 from a stale gRPC stream
                 // 2. An upstream timeout during reconnecting doesn't affect whole behaviour
-                Task(stream.start(currentHeight.get() - 1)).delayExecution(upstreamTimeout * 3 / 2)
+                Task {
+                  stream.start(currentHeight.get() - 1)
+                }.delayExecution(upstreamTimeout - 50.millis).runToFuture(testScheduler)
+                Task.unit
             }
-            .doOnComplete(Task(log.info("Done")))
-            .doOnSubscriptionCancel(Task(log.info("Cancel")))
+            .doOnNext(x => Task(log.info(s"[${testScheduler.clockMonotonic(TimeUnit.MILLISECONDS)}] After: $x")))
+            .takeWhile {
+              case WrappedEvent.Closed =>
+                log.info("WrappedEvent.Closed")
+                false
+              case _ => true
+            }
+//            .doOnComplete(Task(log.info(s"[${testScheduler.clockMonotonic(TimeUnit.MILLISECONDS)}] Done")))
+//            .doOnSubscriptionCancel(Task(log.info(s"[${testScheduler.clockMonotonic(TimeUnit.MILLISECONDS)}] Cancel")))
+//            .doOnError(e => Task(log.error("Got", e)))
+//            .doOnSubscribe(Task(log.info("Subscribe")))
+//            .doOnEarlyStop(Task(log.info("Early stop")))
             .toListL
-            .runToFuture
+            .runToFuture(testScheduler)
 
           stream.start(1)
-          val xs = Await.result(r, 7.seconds)
 
-          subscriptions.get() shouldBe 2
+          testScheduler.tickOne()        // Subscribe
+          testScheduler.tick(1.millis)   // Sending "1"
+          testScheduler.tick(10.millis)  // Sending "2"
+          testScheduler.tick(1.second)   // Timeout
+          testScheduler.tick(50.millis)  // Sending "3" (1s + 50ms since sending "2")
+          testScheduler.tick(900.millis) // Starting again
+          testScheduler.tick(10.millis)  // Sending "1"
+          testScheduler.tick(10.millis)  // Sending "2"
+          testScheduler.tick(10.millis)  // Sending Complete
+
+          log.info(s"[${testScheduler.clockMonotonic(TimeUnit.MILLISECONDS)}] r: $r")
+          withClue("completed") { r.isCompleted shouldBe true }
+          val xs = r.value.value.success.value
+
+          withClue("only two completions") { subscriptions.get() shouldBe 2 }
 
           val receivedHeights = xs.collect { case WrappedEvent.Next(x) => x.getUpdate.height }
           receivedHeights shouldBe List(1, 2, 1, 2)
