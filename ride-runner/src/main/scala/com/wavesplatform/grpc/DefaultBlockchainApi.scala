@@ -25,8 +25,8 @@ import com.wavesplatform.utils.ScorexLogging
 import io.grpc.*
 import io.grpc.stub.ClientCalls
 import monix.eval.Task
+import monix.execution.Scheduler
 import monix.execution.exceptions.UpstreamTimeoutException
-import monix.execution.{Cancelable, Scheduler}
 import monix.reactive.internal.operators.extraSyntax.*
 import monix.reactive.subjects.ConcurrentSubject
 import monix.reactive.{MulticastStrategy, Observable, OverflowStrategy}
@@ -34,7 +34,6 @@ import play.api.libs.json.{Json, Reads}
 import sttp.client3.{Identity, SttpBackend, UriContext, asString, basicRequest}
 
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters.IteratorHasAsScala
@@ -58,14 +57,20 @@ class DefaultBlockchainApi(
       private val working         = new AtomicBoolean(true)
       private val currentUpstream = new AtomicReference(new ManualGrpcObserver[SubscribeRequest, SubscribeEvent])
 
-      private val downstreamConnection = new AtomicReference(Cancelable.empty)
       private val connectableDownstream = s
-        .doOnNextAck { (_, _) => Task(log.debug("Requesting next...")) *> Task(currentUpstream.get().requestNext()) }
+        .doOnNextAck { (_, _) =>
+          Task {
+            log.trace("Requesting next")
+            currentUpstream.get().requestNext()
+          }
+        }
         .asyncBoundary(OverflowStrategy.BackPressure(settings.blockchainUpdatesApi.bufferSize))
         // Guarantees that we won't receive any message after WrapperEvent.Failed until we subscribe again
         .timeoutOnSlowUpstream(settings.blockchainUpdatesApi.noDataTimeout)
         .doOnError { case _: UpstreamTimeoutException => Task(closeUpstream()) }
         .onErrorRestartWith { case e: UpstreamTimeoutException if working.get() => WrappedEvent.Failed(e) }
+        .doOnSubscriptionCancel(Task(log.info("doOnSubscriptionCancel")))
+        .doOnComplete(Task(log.info("Complete")))
         .publish(scheduler)
 
       override val downstream: Observable[WrappedEvent[SubscribeEvent]] = connectableDownstream
@@ -79,10 +84,11 @@ class DefaultBlockchainApi(
         val observer = new MonixWrappedDownstream[SubscribeRequest, SubscribeEvent](s)
 
         currentUpstream.getAndSet(observer).close(ReplaceWithNewException)
-        connectableDownstream.connect()
-//        downstreamConnection.compareAndSet(Cancelable.empty, connectableDownstream.connect()) // Can't connect twice
 
-        log.info(s"[${scheduler.clockMonotonic(TimeUnit.MILLISECONDS)}] Start receiving updates from {}", fromHeight)
+        // Works only once, see publish > unsafeMulticast > ConnectableObservable.unsafeMulticast
+        connectableDownstream.connect()
+
+        log.info("Start receiving updates from {}", fromHeight)
         ClientCalls.asyncServerStreamingCall(call, SubscribeRequest(fromHeight = fromHeight, toHeight = toHeight), observer)
       }
 
@@ -91,7 +97,6 @@ class DefaultBlockchainApi(
       override def closeDownstream(): Unit = {
         log.info("Closing the downstream...")
         s.onComplete()
-        downstreamConnection.get().cancel()
       }
 
       override def close(): Unit = if (working.compareAndSet(true, false)) {
