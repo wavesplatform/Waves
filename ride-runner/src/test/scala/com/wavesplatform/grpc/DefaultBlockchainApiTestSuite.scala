@@ -240,7 +240,7 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
                   }.delayExecution(1.milli)
                 })
               else if (subscriptionId == 3)
-                Task { responseObserver.onNext(mkAppend(currHeight.getAndIncrement())) }.delayExecution(1.milli) *>
+                Task { responseObserver.onNext(mkAppend(currHeight.getAndIncrement())) } *>
                   Task { responseObserver.onCompleted() }.delayExecution(10.millis)
               else Task.unit
 
@@ -285,7 +285,7 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
           testScheduler.tick(1.milli)   // Sending "4"
           testScheduler.tick(1.second)  // Timeout
           testScheduler.tick(1.second)  // Timeout
-          testScheduler.tick(1.milli)   // Sending "3"
+          testScheduler.tickOne()       // Sending "3"
           testScheduler.tick(10.millis) // Sending Completed
 
           withClue("completed") {

@@ -5,7 +5,22 @@ import com.google.protobuf.empty.Empty
 import com.google.protobuf.{ByteString, UnsafeByteOperations}
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.api.grpc.BalanceResponse.Balance
-import com.wavesplatform.api.grpc.{AccountRequest, AccountsApiGrpc, ActivationStatusRequest, AssetRequest, AssetsApiGrpc, BalanceResponse, BalancesRequest, BlockRangeRequest, BlockRequest, BlockchainApiGrpc, BlocksApiGrpc, DataRequest, TransactionsApiGrpc, TransactionsByIdRequest}
+import com.wavesplatform.api.grpc.{
+  AccountRequest,
+  AccountsApiGrpc,
+  ActivationStatusRequest,
+  AssetRequest,
+  AssetsApiGrpc,
+  BalanceResponse,
+  BalancesRequest,
+  BlockRangeRequest,
+  BlockRequest,
+  BlockchainApiGrpc,
+  BlocksApiGrpc,
+  DataRequest,
+  TransactionsApiGrpc,
+  TransactionsByIdRequest
+}
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.collections.syntax.*
 import com.wavesplatform.common.state.ByteStr
@@ -58,10 +73,12 @@ class DefaultBlockchainApi(
       private val currentUpstream = new AtomicReference(new ManualGrpcObserver[SubscribeRequest, SubscribeEvent])
 
       private val connectableDownstream = s
-        .doOnNextAck { (_, _) =>
-          Task {
-            log.trace("Requesting next")
-            currentUpstream.get().requestNext()
+        .doOnNextAck { (_, ack) =>
+          Task.fromFuture(ack).flatMap { _ =>
+            Task {
+              log.trace("Requesting next")
+              currentUpstream.get().requestNext()
+            }
           }
         }
         .asyncBoundary(OverflowStrategy.BackPressure(settings.blockchainUpdatesApi.bufferSize))
@@ -69,8 +86,6 @@ class DefaultBlockchainApi(
         .timeoutOnSlowUpstream(settings.blockchainUpdatesApi.noDataTimeout)
         .doOnError { case _: UpstreamTimeoutException => Task(closeUpstream()) }
         .onErrorRestartWith { case e: UpstreamTimeoutException if working.get() => WrappedEvent.Failed(e) }
-        .doOnSubscriptionCancel(Task(log.info("doOnSubscriptionCancel")))
-        .doOnComplete(Task(log.info("Complete")))
         .publish(scheduler)
 
       override val downstream: Observable[WrappedEvent[SubscribeEvent]] = connectableDownstream
@@ -78,17 +93,17 @@ class DefaultBlockchainApi(
       override def start(fromHeight: Int): Unit = start(fromHeight, toHeight = 0)
 
       override def start(fromHeight: Int, toHeight: Int): Unit = {
-        // How to know the source of data: you can wrap blockchainUpdatesApiChannel by MetadataUtils.newCaptureMetadataInterceptor
-        // and get HTTP headers in Metadata.
-        val call     = blockchainUpdatesApiChannel.newCall(BlockchainUpdatesApiGrpc.METHOD_SUBSCRIBE, CallOptions.DEFAULT)
         val observer = new MonixWrappedDownstream[SubscribeRequest, SubscribeEvent](s)
-
         currentUpstream.getAndSet(observer).close(ReplaceWithNewException)
 
+        // How to know the source of data: you can wrap blockchainUpdatesApiChannel by MetadataUtils.newCaptureMetadataInterceptor
+        // and get HTTP headers in Metadata.
+        val call = blockchainUpdatesApiChannel.newCall(BlockchainUpdatesApiGrpc.METHOD_SUBSCRIBE, CallOptions.DEFAULT)
+
+        log.info("Start receiving updates from {}", fromHeight)
         // Works only once, see publish > unsafeMulticast > ConnectableObservable.unsafeMulticast
         connectableDownstream.connect()
 
-        log.info("Start receiving updates from {}", fromHeight)
         ClientCalls.asyncServerStreamingCall(call, SubscribeRequest(fromHeight = fromHeight, toHeight = toHeight), observer)
       }
 

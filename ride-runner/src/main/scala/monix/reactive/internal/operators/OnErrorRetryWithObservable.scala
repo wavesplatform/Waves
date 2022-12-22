@@ -10,13 +10,15 @@ import scala.concurrent.Future
 import scala.util.Success
 import scala.util.control.NonFatal
 
-private[reactive] final class OnErrorRetryWithObservable[+A](source: Observable[A], p: PartialFunction[Throwable, A]) extends Observable[A] {
+private[reactive] final class OnErrorRetryWithObservable[A](source: Observable[A], p: PartialFunction[Throwable, A]) extends Observable[A] {
 
-  private def loop(subscriber: Subscriber[A], task: OrderedCancelable, retryIdx: Long): Unit = {
+  private def loop(subscriber: Subscriber[A], task: OrderedCancelable, retryIdx: Long, firstMessage: Option[A]): Unit = {
     val cancelable = source.unsafeSubscribeFn(new Subscriber[A] {
-      implicit val scheduler: Scheduler  = subscriber.scheduler
-      private[this] var isDone           = false
-      private[this] var ack: Future[Ack] = Continue
+      implicit val scheduler: Scheduler = subscriber.scheduler
+      private[this] var isDone          = false
+
+      // This should be here, calling subscriber.onNext in onError doesn't work
+      private[this] var ack: Future[Ack] = firstMessage.fold[Future[Ack]](Continue)(subscriber.onNext)
 
       def onNext(elem: A): Future[Ack] = {
         ack = subscriber.onNext(elem)
@@ -39,21 +41,17 @@ private[reactive] final class OnErrorRetryWithObservable[+A](source: Observable[
           // protocol calls, then the behavior should be undefined.
           var streamError = true
           try {
-            val shouldRetry = p.lift(ex)
+            val firstMessageAfterRecover = p.lift(ex)
             streamError = false
 
             // NOTE: The code is the same as in OnErrorRetryIfObservable, except this place
-            shouldRetry match {
-              case Some(message) =>
+            firstMessageAfterRecover match {
+              case Some(_) =>
                 // need asynchronous execution to avoid a synchronous loop
                 // blowing out the call stack
-                ack = ack.flatMap { _ =>
-                  subscriber.onNext(message)
-                }
-
                 ack.onComplete {
                   case Success(Continue) =>
-                    loop(subscriber, task, retryIdx + 1)
+                    loop(subscriber, task, retryIdx + 1, firstMessageAfterRecover)
                   case _ =>
                     () // stop
                 }
@@ -76,7 +74,7 @@ private[reactive] final class OnErrorRetryWithObservable[+A](source: Observable[
 
   def unsafeSubscribeFn(subscriber: Subscriber[A]): Cancelable = {
     val task = OrderedCancelable()
-    loop(subscriber, task, retryIdx = 0)
+    loop(subscriber, task, retryIdx = 0, firstMessage = None)
     task
   }
 }
