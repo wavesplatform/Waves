@@ -212,9 +212,7 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
       }
     }
 
-    "should survive invalid rollback" in withDomainAndRepo(
-      SettingsFromDefaultConfig.copy(dbSettings = SettingsFromDefaultConfig.dbSettings.copy(maxRollbackDepth = 0))
-    ) { (d, repo) =>
+    "should survive invalid rollback" in withDomainAndRepo(RideV6.copy(dbSettings = dbSettings.copy(maxRollbackDepth = 0))) { (d, repo) =>
       for (_ <- 1 to 10) d.appendBlock()
       intercept[RuntimeException](d.rollbackTo(1)) // Should fail
       d.appendBlock()
