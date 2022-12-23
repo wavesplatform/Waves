@@ -4,6 +4,7 @@ import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
+import com.wavesplatform.grpc.BlockchainApi.BlockchainUpdatesStream
 import com.wavesplatform.grpc.observers.ClosedByRemotePart
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.state.Height
@@ -69,7 +70,12 @@ object BlockchainState extends ScorexLogging {
       )
   }
 
-  def apply(processor: Processor, orig: BlockchainState, event: WrappedEvent[SubscribeEvent]): Task[BlockchainState] = {
+  def apply(
+      processor: Processor,
+      blockchainUpdatesStream: BlockchainUpdatesStream,
+      orig: BlockchainState,
+      event: WrappedEvent[SubscribeEvent]
+  ): Task[BlockchainState] = {
     event match {
       case WrappedEvent.Next(event) => apply(processor, orig, event)
       case ClosedByRemotePart() =>
@@ -81,6 +87,7 @@ object BlockchainState extends ScorexLogging {
           }
 
           processor.removeFrom(currHeight)
+          blockchainUpdatesStream.start(currHeight)
           orig.forceRollback
         }
 
