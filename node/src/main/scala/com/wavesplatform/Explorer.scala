@@ -298,7 +298,7 @@ object Explorer extends ScorexLogging {
           var assetCounter = 0
           db.iterateOver(KeyTags.AssetStaticInfo) { e =>
             assetCounter += 1
-            val thisAssetId = e.getKey.drop(2)
+            val thisAssetId = readAssetStaticInfo(e.getValue).id.arr
             if (prevAssetId.nonEmpty) {
               var counter = 0
               while (counter < PrefixLength && prevAssetId(counter) == thisAssetId(counter)) counter += 1

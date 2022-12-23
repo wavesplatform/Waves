@@ -4,13 +4,13 @@ import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.protobuf.{BlockMeta as PBBlockMeta, EthereumTransactionMeta, OldTransactionMeta, TransactionMeta}
+import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, OldTransactionMeta, TransactionMeta, BlockMeta as PBBlockMeta}
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state
 import com.wavesplatform.state.*
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.{ERC20Address, Transaction}
 import com.wavesplatform.utils.*
 
 case class CurrentBalance(balance: Long, height: Height, prevHeight: Height)
@@ -214,7 +214,10 @@ object Keys {
   )
 
   def assetStaticInfo(asset: IssuedAsset): Key[Option[AssetStaticInfo]] =
-    Key.opt(AssetStaticInfo, asset.id.arr, readAssetStaticInfo, writeAssetStaticInfo)
+    Key.opt(AssetStaticInfo, asset.id.arr.take(20), readAssetStaticInfo, writeAssetStaticInfo)
+
+  def assetStaticInfo(addr: ERC20Address): Key[Option[AssetStaticInfo]] =
+    Key.opt(AssetStaticInfo, addr.arr, readAssetStaticInfo, writeAssetStaticInfo)
 
   def nftCount(addressId: AddressId): Key[Int] =
     Key(NftCount, addressId.toByteArray, Option(_).fold(0)(Ints.fromByteArray), Ints.toByteArray)

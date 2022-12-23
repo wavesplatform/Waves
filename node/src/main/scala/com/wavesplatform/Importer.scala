@@ -26,18 +26,17 @@ import com.wavesplatform.state.diffs.BlockDiffer.sigverify
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Proven, ProvenTransaction, Signed, Transaction}
+import com.wavesplatform.transaction.{Asset, DiscardedBlocks, ProvenTransaction, Transaction}
 import com.wavesplatform.utils.*
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import kamon.Kamon
 import monix.eval.Task
-import monix.execution.{ExecutionModel, Scheduler}
+import monix.execution.Scheduler
 import monix.reactive.{Observable, Observer}
 import org.rocksdb.RocksDB
 import scopt.OParser
 
-import java.util.concurrent.ConcurrentLinkedDeque
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.concurrent.duration.*
@@ -232,11 +231,11 @@ object Importer extends ScorexLogging {
 
               val block = (if (!blockV5) Block.parseBytes(blockBytes) else parsedProtoBlock).orElse(parsedProtoBlock).get
 
-              block.transactionData
+              (block +: block.transactionData)
                 .parTraverse {
                   case tx: ProvenTransaction => Task(tx.firstProofIsValidSignature).void
-//                case b: Block              => Task(b.signatureValid()).void
-                  case _ => Task.unit
+                  case b: Block              => Task(b.signatureValid()).void
+                  case _                     => Task.unit
                 }
                 .executeOn(sigverify)
                 .runAsyncAndForget

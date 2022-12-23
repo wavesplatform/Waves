@@ -6,7 +6,7 @@ import cats.syntax.option.*
 import cats.syntax.semigroup.*
 import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
-import com.google.common.primitives.{Bytes, Ints}
+import com.google.common.primitives.Ints
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
@@ -1060,14 +1060,8 @@ abstract class RocksDBWriter private[database] (
     db.get(Keys.stateHash(height))
   }
 
-  override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] = writableDB.withResource { r =>
-    r.prefixIterator.seek(Bytes.concat(KeyTags.AssetStaticInfo.prefixBytes, address.arr))
-
-    if (r.prefixIterator.isValid)
-      Option(IssuedAsset(ByteStr(r.prefixIterator.key().drop(2))))
-        .filter(asset => asset.id.size == 32 && ERC20Address(asset) == address)
-    else None
-  }
+  override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] =
+    readOnly(_.get(Keys.assetStaticInfo(address)).map(assetInfo => IssuedAsset(assetInfo.id)))
 
   override def compositeBlockchain: Blockchain = this
 }

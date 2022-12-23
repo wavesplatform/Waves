@@ -89,6 +89,7 @@ message StaticAssetInfo {
   bytes issuer_public_key = 2;
   int32 decimals = 3;
   bool is_nft = 4;
+  bytes id = 5;
 }
 
 message DataEntry {

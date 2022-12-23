@@ -23,7 +23,6 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTran
 import com.wavesplatform.transaction.{Asset, Authorized, GenesisTransaction, PaymentTransaction, ProvenTransaction, Transaction}
 import com.wavesplatform.utils.Schedulers
 import monix.eval.Task
-import monix.execution.ExecutionModel
 import monix.execution.schedulers.SchedulerService
 
 object BlockDiffer {
@@ -184,13 +183,15 @@ object BlockDiffer {
     val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, verify, enableExecutionLog = enableExecutionLog) _
     val hasSponsorship = currentBlockHeight >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
 
-    // TODO: uncomment
-//    if (verify) {
-//      txs.parUnorderedTraverse {
-//        case tx: ProvenTransaction => Task(tx.firstProofIsValidSignature).void
-//        case _                     => Task.unit
-//      }.runAsyncAndForget
-//    }
+    if (verify) {
+      txs
+        .parUnorderedTraverse {
+          case tx: ProvenTransaction => Task(tx.firstProofIsValidSignature).void
+          case _                     => Task.unit
+        }
+        .executeOn(sigverify)
+        .runAsyncAndForget
+    }
 
     prepareCaches(blockchain, blockGenerator, txs)
 

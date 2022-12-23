@@ -553,7 +553,7 @@ object InvokeDiffsCommon {
             TracedResult(Left(FailOrRejectError(error)))
           }
         } else {
-          val staticInfo = AssetStaticInfo(TransactionId @@ itx.txId, pk, issue.decimals, blockchain.isNFT(issue))
+          val staticInfo = AssetStaticInfo(asset.id, TransactionId @@ itx.txId, pk, issue.decimals, blockchain.isNFT(issue))
           val volumeInfo = AssetVolumeInfo(issue.isReissuable, BigInt(issue.quantity))
           val info       = AssetInfo(ByteString.copyFromUtf8(issue.name), ByteString.copyFromUtf8(issue.description), Height @@ blockchain.height)
           Right(

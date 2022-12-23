@@ -56,7 +56,7 @@ object AssetInfo {
     AssetInfo(ByteString.copyFromUtf8(name), ByteString.copyFromUtf8(description), lastUpdatedAt)
 }
 
-case class AssetStaticInfo(source: TransactionId, issuer: PublicKey, decimals: Int, nft: Boolean)
+case class AssetStaticInfo(id: ByteStr, source: TransactionId, issuer: PublicKey, decimals: Int, nft: Boolean)
 
 case class AssetVolumeInfo(isReissuable: Boolean, volume: BigInt)
 object AssetVolumeInfo {

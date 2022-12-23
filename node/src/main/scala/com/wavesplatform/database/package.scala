@@ -402,12 +402,14 @@ package object database {
       ByteString.copyFrom(sai.source.arr),
       ByteString.copyFrom(sai.issuer.arr),
       sai.decimals,
-      sai.nft
+      sai.nft,
+      ByteString.copyFrom(sai.id.arr)
     ).toByteArray
 
   def readAssetStaticInfo(bb: Array[Byte]): AssetStaticInfo = {
     val sai = pb.StaticAssetInfo.parseFrom(bb)
     AssetStaticInfo(
+      sai.id.toByteStr,
       TransactionId(sai.sourceId.toByteStr),
       PublicKey(sai.issuerPublicKey.toByteArray),
       sai.decimals,

@@ -31,11 +31,11 @@ object AssetTransactionsDiff {
     // First 20 bytes of id should be unique
     def requireUnique(): Boolean = blockchain.resolveERC20Address(ERC20Address(tx.asset)).isEmpty
 
-    val staticInfo = AssetStaticInfo(TransactionId @@ tx.id(), tx.sender, tx.decimals.value, blockchain.isNFT(tx))
+    val asset = IssuedAsset(tx.id())
+
+    val staticInfo = AssetStaticInfo(asset.id, TransactionId @@ tx.id(), tx.sender, tx.decimals.value, blockchain.isNFT(tx))
     val volumeInfo = AssetVolumeInfo(tx.reissuable, BigInt(tx.quantity.value))
     val info       = AssetInfo(tx.name, tx.description, Height @@ blockchain.height)
-
-    val asset = IssuedAsset(tx.id())
 
     for {
       _ <- Either.cond(requireValidUtf(), (), GenericError("Valid UTF-8 strings required"))
