@@ -86,7 +86,7 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
   def rollback(rollbackHeight: Int, key: KeyT, after: Option[ValueT]): RollbackResult[TagT] =
     Option(values.getIfPresent(key)) match {
       case None => RollbackResult.ignored
-      case Some(orig) =>
+      case Some(_) =>
         log.info(s"Rollback $name($key)")
 
         val tags = tagsOf(key)

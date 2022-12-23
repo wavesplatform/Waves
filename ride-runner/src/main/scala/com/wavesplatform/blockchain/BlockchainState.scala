@@ -12,27 +12,21 @@ import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 
 // TODO #8: move. Doesn't relate to blockchain itself, move to the business domain
-sealed trait BlockchainState extends Product with Serializable {
-  def forceRollback: BlockchainState
-}
+sealed trait BlockchainState extends Product with Serializable
 
 object BlockchainState extends ScorexLogging {
   private def rolledBackHeight(orig: Height): Height = Height(math.max(1, orig - 1))
 
   case class Starting(currHeight: Height, workingHeight: Height, foundDifferentBlocks: Boolean = false) extends BlockchainState {
-    override def forceRollback: BlockchainState = copy(currHeight = rolledBackHeight(currHeight))
     def withDifferentBlocks: Starting           = copy(foundDifferentBlocks = true)
   }
 
   case class Working(height: Height) extends BlockchainState {
-    override def forceRollback: BlockchainState = copy(height = rolledBackHeight(height))
     def withHeight(height: Height): Working     = copy(height = height)
     override def toString: String               = s"Working($height)"
   }
 
   case class ResolvingFork(origHeight: Height, currHeight: Height, microBlockNumber: Int) extends BlockchainState {
-    override def forceRollback: BlockchainState = copy(currHeight = rolledBackHeight(currHeight), microBlockNumber = 0)
-
     def apply(event: SubscribeEvent): ResolvingFork =
       copy(
         currHeight = Height(event.getUpdate.height),
@@ -88,7 +82,9 @@ object BlockchainState extends ScorexLogging {
 
           processor.removeFrom(currHeight)
           blockchainUpdatesStream.start(currHeight)
-          orig.forceRollback
+          log.info(s"Closed by remote part, restarting from $currHeight. Reason: $event")
+
+          ResolvingFork(currHeight, Height(currHeight - 1), microBlockNumber = 0)
         }
 
       case _ => Task.raiseError(new RuntimeException(s"An unexpected event: $event"))

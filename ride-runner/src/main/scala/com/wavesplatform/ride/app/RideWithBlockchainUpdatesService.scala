@@ -5,7 +5,6 @@ import akka.http.scaladsl.Http
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
-import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.grpc.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.http.EvaluateApiRoute
 import com.wavesplatform.state.Height
@@ -132,13 +131,10 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream) { blockchainUpdates.close() }
 
     val events = blockchainUpdates.downstream
-      .doOnError(e =>
-        Task {
-          log.error("Error!", e)
-        }
-      )
-      .collect { case WrappedEvent.Next(event) => event }
-      .scanEval(Task.now[BlockchainState](BlockchainState.Starting(lastSafeKnownHeight, workingHeight)))(BlockchainState(processor, _, _))
+      .doOnError(e => Task { log.error("Error!", e) })
+      .scanEval(Task.now[BlockchainState](BlockchainState.Starting(lastSafeKnownHeight, workingHeight))) {
+        BlockchainState(processor, blockchainUpdates, _, _)
+      }
       .lastL
       .runToFuture(blockchainEventsStreamScheduler)
 
