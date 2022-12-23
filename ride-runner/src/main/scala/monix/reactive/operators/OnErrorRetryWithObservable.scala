@@ -1,4 +1,4 @@
-package monix.reactive.internal.operators
+package monix.reactive.operators
 
 import monix.execution.Ack.Continue
 import monix.execution.cancelables.OrderedCancelable
@@ -10,7 +10,7 @@ import scala.concurrent.Future
 import scala.util.Success
 import scala.util.control.NonFatal
 
-private[reactive] final class OnErrorRetryWithObservable[A](source: Observable[A], p: PartialFunction[Throwable, A]) extends Observable[A] {
+private final class OnErrorRetryWithObservable[A](source: Observable[A], p: PartialFunction[Throwable, A]) extends Observable[A] {
 
   private def loop(subscriber: Subscriber[A], task: OrderedCancelable, retryIdx: Long, firstMessage: Option[A]): Unit = {
     val cancelable = source.unsafeSubscribeFn(new Subscriber[A] {

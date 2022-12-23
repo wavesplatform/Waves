@@ -155,7 +155,6 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
       blockchainUpdates.close()
     }
 
-    // TODO #33 Move wrapped events from here: processing of Closed and Failed should be moved to blockchainUpdates.stream
     val events = blockchainUpdates.downstream
       .doOnError(e =>
         Task {
@@ -172,7 +171,7 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
           false
       }
       .collect { case WrappedEvent.Next(event) => event }
-      .scanEval(Task.now[BlockchainState](BlockchainState.Starting(workingHeight)))(BlockchainState(processor, _, _))
+      .scanEval(Task.now[BlockchainState](BlockchainState.Starting(lastSafeKnownHeight, workingHeight)))(BlockchainState(processor, _, _))
       .lastL
       .runToFuture(blockchainEventsStreamScheduler)
 

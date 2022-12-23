@@ -1,9 +1,9 @@
-package monix.reactive.internal.operators
+package monix.reactive.operators
 
 import monix.reactive.Observable
 
 trait ObservableExtraSyntax {
-  @`inline` implicit final def ObservableExtraSyntaxRange[T](self: Observable[T]): ObservableExtraOps[T] = new ObservableExtraOps(self)
+  @`inline` implicit final def observableExtraSyntaxRange[T](self: Observable[T]): ObservableExtraOps[T] = new ObservableExtraOps(self)
 }
 
 final class ObservableExtraOps[T](private val self: Observable[T]) extends AnyVal {

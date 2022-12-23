@@ -131,25 +131,14 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     val blockchainUpdates = blockchainApi.mkBlockchainUpdatesStream(blockchainEventsStreamScheduler)
     cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream) { blockchainUpdates.close() }
 
-    // TODO #33 Move wrapped events from here: processing of Closed and Failed should be moved to blockchainUpdates.stream
     val events = blockchainUpdates.downstream
       .doOnError(e =>
         Task {
           log.error("Error!", e)
         }
       )
-      .takeWhile {
-        case WrappedEvent.Next(_) => true
-        case WrappedEvent.Closed =>
-          log.info("Blockchain stream closed")
-          false
-        case WrappedEvent.Failed(error) =>
-          log.error("Blockchain stream failed", error)
-          false
-      }
       .collect { case WrappedEvent.Next(event) => event }
-      // <--- TODO catch error here
-      .scanEval(Task.now[BlockchainState](BlockchainState.Starting(workingHeight)))(BlockchainState(processor, _, _))
+      .scanEval(Task.now[BlockchainState](BlockchainState.Starting(lastSafeKnownHeight, workingHeight)))(BlockchainState(processor, _, _))
       .lastL
       .runToFuture(blockchainEventsStreamScheduler)
 

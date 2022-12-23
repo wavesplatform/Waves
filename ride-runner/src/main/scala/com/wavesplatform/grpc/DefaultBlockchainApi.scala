@@ -42,7 +42,7 @@ import io.grpc.stub.ClientCalls
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.exceptions.UpstreamTimeoutException
-import monix.reactive.internal.operators.extraSyntax.*
+import monix.reactive.operators.extraSyntax.*
 import monix.reactive.subjects.ConcurrentSubject
 import monix.reactive.{MulticastStrategy, Observable, OverflowStrategy}
 import play.api.libs.json.{Json, Reads}
@@ -84,7 +84,10 @@ class DefaultBlockchainApi(
         .asyncBoundary(OverflowStrategy.BackPressure(settings.blockchainUpdatesApi.bufferSize))
         // Guarantees that we won't receive any message after WrapperEvent.Failed until we subscribe again
         .timeoutOnSlowUpstream(settings.blockchainUpdatesApi.noDataTimeout)
-        .doOnError { case _: UpstreamTimeoutException => Task(closeUpstream()) }
+        .doOnError {
+          case _: UpstreamTimeoutException => Task(closeUpstream())
+          case _                           => Task.unit
+        }
         .onErrorRestartWith { case e: UpstreamTimeoutException if working.get() => WrappedEvent.Failed(e) }
         .publish(scheduler)
 

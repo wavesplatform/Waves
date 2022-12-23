@@ -1,3 +1,3 @@
-package monix.reactive.internal.operators
+package monix.reactive.operators
 
 object extraSyntax extends ObservableExtraSyntax

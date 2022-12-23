@@ -1,32 +1,41 @@
 package com.wavesplatform.blockchain
 
+import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
+import com.wavesplatform.grpc.observers.ClosedByRemotePart
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 
 // TODO #8: move. Doesn't relate to blockchain itself, move to the business domain
-sealed trait BlockchainState extends Product with Serializable
+sealed trait BlockchainState extends Product with Serializable {
+  def forceRollback: BlockchainState
+}
 
 object BlockchainState extends ScorexLogging {
-  case class Starting(workingHeight: Height, foundDifferentBlocks: Boolean = false) extends BlockchainState {
-    def withDifferentBlocks: Starting = copy(foundDifferentBlocks = true)
+  private def rolledBackHeight(orig: Height): Height = Height(math.max(1, orig - 1))
+
+  case class Starting(currHeight: Height, workingHeight: Height, foundDifferentBlocks: Boolean = false) extends BlockchainState {
+    override def forceRollback: BlockchainState = copy(currHeight = rolledBackHeight(currHeight))
+    def withDifferentBlocks: Starting           = copy(foundDifferentBlocks = true)
   }
 
   case class Working(height: Height) extends BlockchainState {
-    def withHeight(height: Height): Working = copy(height = height)
-
-    override def toString: String = s"Working($height)"
+    override def forceRollback: BlockchainState = copy(height = rolledBackHeight(height))
+    def withHeight(height: Height): Working     = copy(height = height)
+    override def toString: String               = s"Working($height)"
   }
 
   case class ResolvingFork(origHeight: Height, currHeight: Height, microBlockNumber: Int) extends BlockchainState {
-    def withAction(action: SubscribeEvent): ResolvingFork =
+    override def forceRollback: BlockchainState = copy(currHeight = rolledBackHeight(currHeight), microBlockNumber = 0)
+
+    def apply(event: SubscribeEvent): ResolvingFork =
       copy(
-        currHeight = Height(action.getUpdate.height),
-        microBlockNumber = action.getUpdate.update match {
+        currHeight = Height(event.getUpdate.height),
+        microBlockNumber = event.getUpdate.update match {
           case Update.Empty       => microBlockNumber
           case _: Update.Rollback => 0
           case Update.Append(append) =>
@@ -42,7 +51,8 @@ object BlockchainState extends ScorexLogging {
 
     def isRollbackResolved: Boolean = {
       val resolveHeight = origHeight + 1
-      // Rollback is resolved, when the new fork height > an old fork height. But we will wait a micro block or a next block.
+      // Rollback is resolved, when the new fork height > an old fork height.
+      // But we will wait a micro block or a next block, because lost transactions will highly likely appear in the next micro block
       currHeight > resolveHeight ||
       currHeight == resolveHeight && microBlockNumber >= 1
     }
@@ -57,6 +67,25 @@ object BlockchainState extends ScorexLogging {
         currHeight = Height(event.getUpdate.height),
         microBlockNumber = 0
       )
+  }
+
+  def apply(processor: Processor, orig: BlockchainState, event: WrappedEvent[SubscribeEvent]): Task[BlockchainState] = {
+    event match {
+      case WrappedEvent.Next(event) => apply(processor, orig, event)
+      case ClosedByRemotePart() =>
+        Task {
+          val currHeight = orig match {
+            case orig: Starting      => orig.currHeight
+            case Working(height)     => height
+            case orig: ResolvingFork => orig.currHeight
+          }
+
+          processor.removeFrom(currHeight)
+          orig.forceRollback
+        }
+
+      case _ => Task.raiseError(new RuntimeException(s"An unexpected event: $event"))
+    }
   }
 
   // Why do we require the processor instead of returning a list of actions?
@@ -99,7 +128,7 @@ object BlockchainState extends ScorexLogging {
             if (h >= comparedBlocks.workingHeight) {
               log.debug(s"[$h] Reached the current height, run all scripts")
               processor.runScripts().as(Working(h))
-            } else Task.now(comparedBlocks)
+            } else Task.now(comparedBlocks.copy(currHeight = h))
 
           case _: Update.Rollback =>
             processor.removeFrom(Height(h + 1))
@@ -127,14 +156,14 @@ object BlockchainState extends ScorexLogging {
         update match {
           case _: Update.Append =>
             processor.process(event.getUpdate)
-            val updated = orig.withAction(event)
+            val updated = orig.apply(event)
             if (updated.isRollbackResolved) processor.runScripts().as(Working(updated.currHeight))
             else Task.now(updated)
 
           case _: Update.Rollback =>
             processor.removeFrom(Height(h + 1))
             processor.process(event.getUpdate)
-            Task.now(orig.withAction(event))
+            Task.now(orig.apply(event))
 
           case Update.Empty => Task.now(orig.withHeight(h))
         }
