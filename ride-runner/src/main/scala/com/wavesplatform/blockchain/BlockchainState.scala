@@ -2,28 +2,28 @@ package com.wavesplatform.blockchain
 
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
+import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.grpc.BlockchainApi.BlockchainUpdatesStream
-import com.wavesplatform.grpc.observers.ClosedByRemotePart
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
+import io.grpc.{Status, StatusRuntimeException}
 import monix.eval.Task
+import monix.execution.exceptions.UpstreamTimeoutException
 
 // TODO #8: move. Doesn't relate to blockchain itself, move to the business domain
 sealed trait BlockchainState extends Product with Serializable
 
 object BlockchainState extends ScorexLogging {
-  private def rolledBackHeight(orig: Height): Height = Height(math.max(1, orig - 1))
-
   case class Starting(currHeight: Height, workingHeight: Height, foundDifferentBlocks: Boolean = false) extends BlockchainState {
-    def withDifferentBlocks: Starting           = copy(foundDifferentBlocks = true)
+    def withDifferentBlocks: Starting = copy(foundDifferentBlocks = true)
   }
 
   case class Working(height: Height) extends BlockchainState {
-    def withHeight(height: Height): Working     = copy(height = height)
-    override def toString: String               = s"Working($height)"
+    def withHeight(height: Height): Working = copy(height = height)
+    override def toString: String           = s"Working($height)"
   }
 
   case class ResolvingFork(origHeight: Height, currHeight: Height, microBlockNumber: Int) extends BlockchainState {
@@ -70,24 +70,43 @@ object BlockchainState extends ScorexLogging {
       orig: BlockchainState,
       event: WrappedEvent[SubscribeEvent]
   ): Task[BlockchainState] = {
+    def forceRestart(): BlockchainState = {
+      val currHeight = orig match {
+        case orig: Starting      => orig.currHeight
+        case Working(height)     => height
+        case orig: ResolvingFork => orig.currHeight
+      }
+      require(currHeight > 1, "Uncaught case") // TODO
+
+      val startingHeight = Height(currHeight - 1)
+      processor.rollbackAll(startingHeight)
+
+      blockchainUpdatesStream.start(currHeight)
+
+      log.info(s"Closed by remote part, restarting from $currHeight. Reason: $event")
+      ResolvingFork(currHeight, startingHeight, microBlockNumber = 0)
+    }
+
     event match {
       case WrappedEvent.Next(event) => apply(processor, orig, event)
-      case ClosedByRemotePart() =>
+      case WrappedEvent.Closed      => Task(forceRestart())
+      case WrappedEvent.Failed(e)   =>
         Task {
-          val currHeight = orig match {
-            case orig: Starting      => orig.currHeight
-            case Working(height)     => height
-            case orig: ResolvingFork => orig.currHeight
+          e match {
+            // RST_STREAM closed stream. HTTP/2 error code: INTERNAL_ERROR
+            case e: StatusRuntimeException if e.getStatus.getCode == Status.Code.INTERNAL => forceRestart()
+            case _: UpstreamTimeoutException                                              => forceRestart()
+
+            case _ =>
+              val message = e match {
+                case e: StatusRuntimeException => s"Got an unhandled StatusRuntimeException, ${e.getStatus}, ${e.getTrailers.toString}"
+                case _                         => "Got an unexpected error"
+              }
+              log.error(s"$message. Contact with developers", e)
+              blockchainUpdatesStream.close()
+              orig
           }
-
-          processor.removeFrom(currHeight)
-          blockchainUpdatesStream.start(currHeight)
-          log.info(s"Closed by remote part, restarting from $currHeight. Reason: $event")
-
-          ResolvingFork(currHeight, Height(currHeight - 1), microBlockNumber = 0)
         }
-
-      case _ => Task.raiseError(new RuntimeException(s"An unexpected event: $event"))
     }
   }
 
@@ -99,16 +118,6 @@ object BlockchainState extends ScorexLogging {
     val update = event.getUpdate.update
     val h      = Height(event.getUpdate.height)
 
-    val tpe = update match {
-      case Update.Append(append) =>
-        append.body match {
-          case Body.Empty         => "unknown body"
-          case _: Body.Block      => "append b"
-          case _: Body.MicroBlock => "append mb"
-        }
-      case _: Update.Rollback => "rollback to"
-      case Update.Empty       => "unknown append"
-    }
     val currBlockId = event.getUpdate.id.toByteStr
     log.info(s"$orig + $tpe(id=${currBlockId.take(5)}, h=$h)")
 
@@ -174,5 +183,16 @@ object BlockchainState extends ScorexLogging {
 
     log.debug(f"Processed in ${(System.nanoTime() - start) / 1e9d}%5f s")
     r
+  }
+
+  private def getUpdateType(update: BlockchainUpdated.Update): String = update match {
+    case Update.Append(append) =>
+      append.body match {
+        case Body.Empty         => "unknown body"
+        case _: Body.Block      => "append b"
+        case _: Body.MicroBlock => "append mb"
+      }
+    case _: Update.Rollback => "rollback to"
+    case Update.Empty       => "unknown append"
   }
 }
