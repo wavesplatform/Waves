@@ -26,7 +26,7 @@ class ManualGrpcObserver[RequestT, EventT] extends ClientResponseObserver[Reques
   def requestNext(): Unit = ifWorking { requestStream.request(1) }
 
   def close(cause: Throwable): Unit = if (working.compareAndSet(true, false)) {
-    log.info("Closing by a client...")
+    log.warn("Closing by a client...", cause)
     Option(requestStream).foreach(_.cancel("Closed by a client", cause))
   }
 

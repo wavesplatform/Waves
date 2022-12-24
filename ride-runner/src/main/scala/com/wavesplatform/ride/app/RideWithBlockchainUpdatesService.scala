@@ -127,18 +127,24 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     val workingHeight       = Height(math.max(blockchainStorage.height, lastHeightAtStart))
 
     log.info(s"Watching blockchain updates...")
-    val blockchainUpdates = blockchainApi.mkBlockchainUpdatesStream(blockchainEventsStreamScheduler)
-    cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream) { blockchainUpdates.close() }
+    val blockchainUpdatesStream = blockchainApi.mkBlockchainUpdatesStream(blockchainEventsStreamScheduler)
+    cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream) { blockchainUpdatesStream.close() }
 
-    val events = blockchainUpdates.downstream
+    val events = blockchainUpdatesStream.downstream
       .doOnError(e => Task { log.error("Error!", e) })
       .scanEval(Task.now[BlockchainState](BlockchainState.Starting(lastSafeKnownHeight, workingHeight))) {
-        BlockchainState(processor, blockchainUpdates, _, _)
+        BlockchainState(processor, blockchainUpdatesStream, _, _)
+      }
+      .doOnError { e =>
+        Task {
+          log.error("Got an unhandled error, closing streams. Contact with developers", e)
+          blockchainUpdatesStream.close()
+        }
       }
       .lastL
       .runToFuture(blockchainEventsStreamScheduler)
 
-    blockchainUpdates.start(lastSafeKnownHeight + 1)
+    blockchainUpdatesStream.start(lastSafeKnownHeight + 1)
 
     log.info(s"Initializing REST API on ${settings.restApi.bindAddress}:${settings.restApi.port}...")
     val apiRoutes = Seq(
