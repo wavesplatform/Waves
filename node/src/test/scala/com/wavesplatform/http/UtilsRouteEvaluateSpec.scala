@@ -80,7 +80,7 @@ class UtilsRouteEvaluateSpec
          |func testCallable() = [BinaryEntry("test", i.caller.bytes)]
          |
          |@Callable(i)
-         |func testSyncinvoke() = {
+         |func testSyncInvoke() = {
          |  strict r = invoke(this, "testCallable", [], [])
          |  [BinaryEntry("testSyncInvoke", i.caller.bytes)]
          |}
@@ -132,8 +132,44 @@ class UtilsRouteEvaluateSpec
         }
 
         evalScript("testCallable()") ~> route ~> check {
-          responseAs[JsValue] should matchJson(
-            """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"test"},"value":{"type":"ByteVector","value":"11111111111111111111111111"}}}]},"complexity":5,"expr":"testCallable()","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
+          val result = responseAs[JsValue]
+          (result \ "result").as[JsObject] should matchJson(
+            """
+              |{
+              |    "type" : "Array",
+              |    "value" : [ {
+              |      "type" : "BinaryEntry",
+              |      "value" : {
+              |        "key" : {
+              |          "type" : "String",
+              |          "value" : "test"
+              |        },
+              |        "value" : {
+              |          "type" : "ByteVector",
+              |          "value" : "11111111111111111111111111"
+              |        }
+              |      }
+              |    } ]
+              |  }
+            """.stripMargin
+          )
+          (result \ "complexity").as[Int] shouldBe 5
+          (result \ "expr").as[String] shouldBe "testCallable()"
+          (result \ "address").as[String] shouldBe "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+          (result \ "stateChanges").as[JsObject] shouldBe Json.parse(
+            """
+              |{
+              |    "data" : [ {"key":"test","type":"binary","value":"base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="} ],
+              |    "transfers" : [ ],
+              |    "issues" : [ ],
+              |    "reissues" : [ ],
+              |    "burns" : [ ],
+              |    "sponsorFees" : [ ],
+              |    "leases" : [ ],
+              |    "leaseCancels" : [ ],
+              |    "invokes" : [ ]
+              |  }
+            """.stripMargin
           )
         }
 
@@ -218,8 +254,9 @@ class UtilsRouteEvaluateSpec
           .returning(LeaseBalance.empty)
           .anyNumberOfTimes()
 
-        evalScript(""" testSyncinvoke() """) ~> route ~> check {
-          responseAs[JsValue] should matchJson(
+        evalScript(""" testSyncInvoke() """) ~> route ~> check {
+          val result = responseAs[JsObject]
+          (result - "stateChanges") should matchJson(
             """
               |{
               |  "result" : {
@@ -239,8 +276,49 @@ class UtilsRouteEvaluateSpec
               |    } ]
               |  },
               |  "complexity" : 92,
-              |  "expr" : " testSyncinvoke() ",
+              |  "expr" : " testSyncInvoke() ",
               |  "address" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+              |}
+            """.stripMargin
+          )
+          (result \ "stateChanges").as[JsObject] shouldBe Json.parse(
+            """
+              |{
+              |  "data" : [ {
+              |    "key" : "testSyncInvoke",
+              |    "type" : "binary",
+              |    "value" : "base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+              |  } ],
+              |  "transfers" : [ ],
+              |  "issues" : [ ],
+              |  "reissues" : [ ],
+              |  "burns" : [ ],
+              |  "sponsorFees" : [ ],
+              |  "leases" : [ ],
+              |  "leaseCancels" : [ ],
+              |  "invokes" : [ {
+              |    "dApp" : "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9",
+              |    "call" : {
+              |      "function" : "testCallable",
+              |      "args" : [ ]
+              |    },
+              |    "payment" : [ ],
+              |    "stateChanges" : {
+              |      "data" : [ {
+              |        "key" : "test",
+              |        "type" : "binary",
+              |        "value" : "base64:AVQv1P2H4On4q9JvwDzjIpknHO4wLHCiOl4="
+              |      } ],
+              |      "transfers" : [ ],
+              |      "issues" : [ ],
+              |      "reissues" : [ ],
+              |      "burns" : [ ],
+              |      "sponsorFees" : [ ],
+              |      "leases" : [ ],
+              |      "leaseCancels" : [ ],
+              |      "invokes" : [ ]
+              |    }
+              |  } ]
               |}
             """.stripMargin
           )
@@ -257,18 +335,18 @@ class UtilsRouteEvaluateSpec
         }
 
         evalScript(""" testWriteEntryType("abc") """) ~> route ~> check {
-          responseAs[JsValue] should matchJson(
+          (responseAs[JsObject] - "stateChanges") should matchJson(
             """{"error":306,"message":"InvokeRejectError(error = Passed args (bytes, abc) are unsuitable for constructor BinaryEntry(String, ByteVector), log = \n\ttestWriteEntryType.@args = [\n\t\t\"abc\"\n\t]\n\tb = \"abc\"\n\tBinaryEntry.@args = [\n\t\t\"bytes\",\n\t\t\"abc\"\n\t]\n)","expr":" testWriteEntryType(\"abc\") ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
           )
         }
         evalScript(""" testWriteEntryType(base58'aaaa') """) ~> route ~> check {
-          responseAs[JsValue] should matchJson(
+          (responseAs[JsObject] - "stateChanges") should matchJson(
             """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"bytes"},"value":{"type":"ByteVector","value":"aaaa"}}}]},"complexity":3,"expr":" testWriteEntryType(base58'aaaa') ","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
           )
         }
 
         evalScript(s"""parseBigIntValue("${PureContext.BigIntMax}")""") ~> route ~> check {
-          responseAs[JsValue] should matchJson(
+          (responseAs[JsObject] - "stateChanges") should matchJson(
             s"""{"result":{"type":"BigInt","value":${PureContext.BigIntMax}},"complexity":65,"expr":"parseBigIntValue(\\"${PureContext.BigIntMax}\\")","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
           )
         }
@@ -287,7 +365,7 @@ class UtilsRouteEvaluateSpec
         d.helpers.setScript(dAppAccount2, testScript2)
 
         evalScript(""" callable() """, dAppAddress2) ~> route ~> check {
-          responseAs[JsValue] should matchJson(
+          (responseAs[JsObject] - "stateChanges") should matchJson(
             """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"testSyncInvoke"},"value":{"type":"ByteVector","value":"11111111111111111111111111"}}}]},"complexity":297,"expr":" callable() ","address":"3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"}"""
           )
         }
