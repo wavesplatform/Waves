@@ -119,6 +119,7 @@ object UtilsEvaluator {
               log
             )
             .resultE
+            .leftMap(_.toString)
         )
         .leftMap(_ => InvokeScriptResult.empty)
         .merge
