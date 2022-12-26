@@ -173,7 +173,7 @@ object InvokeDiffsCommon {
     val verifierCount          = if (blockchain.hasPaidVerifier(tx.sender.toAddress)) 1 else 0
     val additionalScriptsCount = actions.complexities.size + verifierCount + tx.paymentAssets.count(blockchain.hasAssetScript)
     for {
-      isr <- actionsToScriptResult(actions, version, dAppAddress, storingComplexity, tx, limitedExecution, totalComplexityLimit, log)
+      _ <- checkActions(actions, version, dAppAddress, storingComplexity, tx, limitedExecution, totalComplexityLimit, log)
       feeDiff <-
         if (isSyncCall)
           TracedResult.wrapValue(Map[Address, Portfolio]())
@@ -206,6 +206,7 @@ object InvokeDiffsCommon {
           case failed: FailedTransactionError => failed.addComplexity(storingComplexity).withLog(log)
           case other                          => other
         }
+      isr <- actionsToScriptResult(actions, storingComplexity, tx, log)
       resultDiff = compositeDiff
         .withScriptRuns(if (isSyncCall) 0 else additionalScriptsCount + 1)
         .withScriptResults(Map(tx.txId -> isr))
@@ -213,7 +214,7 @@ object InvokeDiffsCommon {
     } yield resultDiff
   }
 
-  def actionsToScriptResult(
+  def checkActions(
       actions: StructuredCallableActions,
       version: StdLibVersion,
       dAppAddress: Address,
@@ -222,7 +223,7 @@ object InvokeDiffsCommon {
       limitedExecution: Boolean,
       totalComplexityLimit: Int,
       log: Log[Id]
-  ): TracedResult[ValidationError, InvokeScriptResult] = {
+  ): TracedResult[ValidationError, Unit] = {
     import actions.*
     for {
       _ <- TracedResult(checkDataEntries(blockchain, tx, dataEntries, version)).leftMap(
@@ -246,6 +247,17 @@ object InvokeDiffsCommon {
           FailedTransactionError.feeForActions(s"Invoke complexity limit = $totalComplexityLimit is exceeded", storingComplexity, log)
         )
       )
+    } yield ()
+  }
+
+  def actionsToScriptResult(
+      actions: StructuredCallableActions,
+      storingComplexity: Int,
+      tx: InvokeScriptLike,
+      log: Log[Id]
+  ): TracedResult[ValidationError, InvokeScriptResult] = {
+    import actions.*
+    for {
       resultTransfers <- transferList.traverse { transfer =>
         resolveAddress(transfer.address, blockchain)
           .map(InvokeScriptResult.Payment(_, Asset.fromCompatId(transfer.assetId), transfer.amount))
@@ -256,7 +268,7 @@ object InvokeDiffsCommon {
       }
       leaseListWithIds <- leaseList.traverse { case l @ Lease(recipient, amount, nonce) =>
         val id = Lease.calculateId(l, tx.txId)
-        AddressOrAlias.fromRide(recipient).bimap(FailedTransactionError.asFailedScriptError, r => InvokeScriptResult.Lease(r, amount, nonce, id))
+        AddressOrAlias.fromRide(recipient).map(r => InvokeScriptResult.Lease(r, amount, nonce, id))
       }
     } yield InvokeScriptResult(
       dataEntries,
@@ -447,7 +459,7 @@ object InvokeDiffsCommon {
         val AssetTransfer(addressRepr, recipient, amount, asset) = transfer
 
         for {
-          address <- TracedResult(Address.fromBytes(addressRepr.bytes.arr))
+          address <- resolveAddress(addressRepr, blockchain)
           diff <- Asset.fromCompatId(asset) match {
             case Waves =>
               TracedResult(Diff.combine(Map(address -> Portfolio(amount)), Map(dAppAddress -> Portfolio(-amount))).map(p => Diff(portfolios = p)))

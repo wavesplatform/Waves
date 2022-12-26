@@ -1,7 +1,7 @@
 package com.wavesplatform.api.http.utils
 
 import cats.Id
-import cats.implicits.catsSyntaxSemigroup
+import cats.implicits.{catsSyntaxApply, catsSyntaxSemigroup}
 import cats.syntax.either.*
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
@@ -19,7 +19,8 @@ import com.wavesplatform.lang.v1.traits.Environment.Tthis
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.{ValidationError, utils}
-import com.wavesplatform.state.diffs.invoke.{InvokeDiffsCommon, InvokeScriptTransactionLike, StructuredCallableActions}
+import com.wavesplatform.state.diffs.invoke.InvokeDiffsCommon.{actionsToScriptResult, checkActions}
+import com.wavesplatform.state.diffs.invoke.{InvokeScriptTransactionLike, StructuredCallableActions}
 import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TransactionType.TransactionType
@@ -108,19 +109,11 @@ object UtilsEvaluator {
         .fromObj(ctx, ByteStr.empty, evaluated, ds.stdLibVersion, 0)
         .bimap(
           _ => Right(InvokeScriptResult.empty),
-          r =>
-            InvokeDiffsCommon
-              .actionsToScriptResult(
-                StructuredCallableActions(r.actions, blockchain),
-                ds.stdLibVersion,
-                address,
-                usedComplexity,
-                invoke,
-                limitedExecution = false,
-                limit,
-                log
-              )
-              .resultE
+          { r =>
+            val actions = StructuredCallableActions(r.actions, blockchain)
+            val check   = checkActions(actions, ds.stdLibVersion, address, usedComplexity, invoke, limitedExecution = false, limit, log)
+            (check *> actionsToScriptResult(actions, usedComplexity, invoke, log)).resultE
+          }
         )
         .merge
       scriptResult = environment.currentDiff.scriptResults.values.fold(InvokeScriptResult.empty)(_ |+| _) |+| rootScriptResult
