@@ -48,7 +48,7 @@ object TransactionDiffer {
       blockchain: Blockchain,
       tx: Transaction
   ): TracedResult[ValidationError, Diff] = {
-    validate(prevBlockTimestamp, currentBlockTimestamp, verify = verify, limitedExecution = transactionMayFail(tx) && acceptFailed(blockchain))(
+    validate(prevBlockTimestamp, currentBlockTimestamp, verify = verify, limitedExecution = false)(
       blockchain,
       tx
     )
