@@ -675,15 +675,14 @@ package object database {
     def iterateOver(prefix: Array[Byte], seekPrefix: Array[Byte] = Array.emptyByteArray)(f: DBEntry => Unit): Unit = {
       @tailrec
       def loop(iter: RocksIterator): Unit = {
-        val key = iter.key()
-        if (iter.isValid) {
-          f(Maps.immutableEntry(key, iter.value()))
+        if (iter.isValid && iter.key().startsWith(prefix)) {
+          f(Maps.immutableEntry(iter.key(), iter.value()))
           iter.next()
           loop(iter)
         } else ()
       }
 
-      val iterator = db.newIterator(new ReadOptions().setTotalOrderSeek(false).setPrefixSameAsStart(true))
+      val iterator = db.newIterator(new ReadOptions().setTotalOrderSeek(true))
       try {
         iterator.seek(Bytes.concat(prefix, seekPrefix))
         loop(iterator)

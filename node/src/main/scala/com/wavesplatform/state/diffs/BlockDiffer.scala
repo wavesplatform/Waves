@@ -44,9 +44,10 @@ object BlockDiffer {
       constraint: MiningConstraint,
       hitSource: ByteStr,
       verify: Boolean = true,
-      enableExecutionLog: Boolean = false
+      enableExecutionLog: Boolean = false,
+      txSignParCheck: Boolean = true
   ): Either[ValidationError, Result] =
-    fromBlockTraced(blockchain, maybePrevBlock, block, constraint, hitSource, verify, enableExecutionLog).resultE
+    fromBlockTraced(blockchain, maybePrevBlock, block, constraint, hitSource, verify, enableExecutionLog, txSignParCheck).resultE
 
   def fromBlockTraced(
       blockchain: Blockchain,
@@ -55,7 +56,8 @@ object BlockDiffer {
       constraint: MiningConstraint,
       hitSource: ByteStr,
       verify: Boolean,
-      enableExecutionLog: Boolean = false
+      enableExecutionLog: Boolean,
+      txSignParCheck: Boolean
   ): TracedResult[ValidationError, Result] = {
     val stateHeight = blockchain.height
 
@@ -109,8 +111,9 @@ object BlockDiffer {
         resultDiff,
         stateHeight >= ngHeight,
         block.transactionData,
-        verify,
-        enableExecutionLog
+        verify = verify,
+        enableExecutionLog = enableExecutionLog,
+        txSignParCheck = txSignParCheck
       )
     } yield r
   }
@@ -131,7 +134,8 @@ object BlockDiffer {
       micro: MicroBlock,
       constraint: MiningConstraint,
       verify: Boolean = true,
-      enableExecutionLog: Boolean = false
+      enableExecutionLog: Boolean = false,
+      txSignParCheck: Boolean = true
   ): TracedResult[ValidationError, Result] = {
     for {
       // microblocks are processed within block which is next after 40-only-block which goes on top of activated height
@@ -151,7 +155,8 @@ object BlockDiffer {
         hasNg = true,
         micro.transactionData,
         verify = verify,
-        enableExecutionLog = enableExecutionLog
+        enableExecutionLog = enableExecutionLog,
+        txSignParCheck = txSignParCheck
       )
     } yield r
   }
@@ -171,7 +176,8 @@ object BlockDiffer {
       hasNg: Boolean,
       txs: Seq[Transaction],
       verify: Boolean,
-      enableExecutionLog: Boolean
+      enableExecutionLog: Boolean,
+      txSignParCheck: Boolean
   ): TracedResult[ValidationError, Result] = {
     def updateConstraint(constraint: MiningConstraint, blockchain: Blockchain, tx: Transaction, diff: Diff): MiningConstraint =
       constraint.put(blockchain, tx, diff)
@@ -183,7 +189,7 @@ object BlockDiffer {
     val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, verify, enableExecutionLog = enableExecutionLog) _
     val hasSponsorship = currentBlockHeight >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
 
-    if (verify) {
+    if (verify && txSignParCheck) {
       txs
         .parUnorderedTraverse {
           case tx: ProvenTransaction => Task(tx.firstProofIsValidSignature).void

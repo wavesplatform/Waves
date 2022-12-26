@@ -27,11 +27,12 @@ object BlockAppender extends ScorexLogging {
       utxStorage: UtxForAppender,
       pos: PoSSelector,
       scheduler: Scheduler,
-      verify: Boolean = true
+      verify: Boolean = true,
+      txSignParCheck: Boolean = true
   )(newBlock: Block): Task[Either[ValidationError, Option[BigInt]]] =
     Task {
       if (blockchainUpdater.isLastBlockId(newBlock.header.reference)) {
-        appendKeyBlock(blockchainUpdater, utxStorage, pos, time, verify)(newBlock).map(_ => Some(blockchainUpdater.score))
+        appendKeyBlock(blockchainUpdater, utxStorage, pos, time, verify, txSignParCheck)(newBlock).map(_ => Some(blockchainUpdater.score))
       } else if (blockchainUpdater.contains(newBlock.id()) || blockchainUpdater.isLastBlockId(newBlock.id()))
         Right(None)
       else

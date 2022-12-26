@@ -29,13 +29,14 @@ package object appender {
       utx: UtxForAppender,
       pos: PoSSelector,
       time: Time,
-      verify: Boolean
+      verify: Boolean,
+      txSignParCheck: Boolean
   )(block: Block): Either[ValidationError, Option[Int]] =
     for {
       hitSource <- if (verify) validateBlock(blockchainUpdater, pos, time)(block) else pos.validateGenerationSignature(block)
       newHeight <-
         metrics.appendBlock
-          .measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify))
+          .measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify, txSignParCheck))
           .map { discardedDiffs =>
             utx.setPriorityDiffs(discardedDiffs)
             Some(blockchainUpdater.height)

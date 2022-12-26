@@ -181,7 +181,12 @@ class BlockchainUpdaterImpl(
       .orElse(lastBlockReward)
   }
 
-  override def processBlock(block: Block, hitSource: ByteStr, verify: Boolean = true): Either[ValidationError, Seq[Diff]] =
+  override def processBlock(
+      block: Block,
+      hitSource: ByteStr,
+      verify: Boolean = true,
+      txSignParCheck: Boolean = true
+  ): Either[ValidationError, Seq[Diff]] =
     writeLock {
       val height                             = rocksdb.height
       val notImplementedFeatures: Set[Short] = rocksdb.activatedFeaturesAt(height).diff(BlockchainFeatures.implemented)
@@ -213,7 +218,8 @@ class BlockchainUpdaterImpl(
                       block,
                       miningConstraints.total,
                       hitSource,
-                      verify
+                      verify,
+                      txSignParCheck = txSignParCheck
                     )
                     .map { r =>
                       val updatedBlockchain = CompositeBlockchain(rocksdb, r.diff, block, hitSource, r.carry, reward)
@@ -238,7 +244,8 @@ class BlockchainUpdaterImpl(
                       block,
                       miningConstraints.total,
                       hitSource,
-                      verify
+                      verify,
+                      txSignParCheck = txSignParCheck
                     )
                     .map { r =>
                       log.trace(
@@ -268,7 +275,8 @@ class BlockchainUpdaterImpl(
                         block,
                         miningConstraints.total,
                         hitSource,
-                        verify
+                        verify,
+                        txSignParCheck = txSignParCheck
                       )
                       .map { r =>
                         blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, ng.reward, referencedBlockchain)
@@ -323,7 +331,8 @@ class BlockchainUpdaterImpl(
                             block,
                             constraint,
                             hitSource,
-                            verify
+                            verify,
+                            txSignParCheck = txSignParCheck
                           )
                       } yield {
                         val tempBlockchain = CompositeBlockchain(
@@ -661,7 +670,6 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.resolveAlias(alias)
   }
 
-  // TODO: optimize for batch requests (get compositeBlockchain)
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readLock {
     compositeBlockchain.leaseDetails(leaseId)
   }
