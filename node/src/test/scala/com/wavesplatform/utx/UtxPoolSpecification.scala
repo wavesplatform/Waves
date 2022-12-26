@@ -855,7 +855,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         utx.close()
       }
 
-      "InvokeScriptTransaction is fully validated in forceValidate mode and before 1000 complexity otherwise" in withDomain(
+      "InvokeScriptTransaction is fully validated always" in withDomain(
         RideV5,
         AddrWithBalance.enoughBalances(defaultSigner, secondSigner)
       ) { d =>
@@ -877,7 +877,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         )
 
         d.appendBlock(setScript(secondSigner, dApp(5)))
-        utx.putIfNew(invoke()).resultE shouldBe Right(true)
+        utx.putIfNew(invoke()).resultE should produce("Explicit script termination")
         utx.putIfNew(invoke(), forceValidate = true).resultE should produce("Explicit script termination")
 
         d.appendBlock(setScript(secondSigner, dApp(4)))
@@ -885,7 +885,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         utx.putIfNew(invoke(), forceValidate = true).resultE should produce("Explicit script termination")
       }
 
-      "sync calls are fully validated in forceValidate mode and before 1000 complexity otherwise" in withDomain(
+      "sync calls are fully validated always" in withDomain(
         RideV5,
         AddrWithBalance.enoughBalances(defaultSigner, secondSigner, signer(2))
       ) { d =>
@@ -917,7 +917,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         d.appendBlock(setScript(signer(2), innerDApp))
 
         d.appendBlock(setScript(secondSigner, dApp(5)))
-        utx.putIfNew(invoke(signer(2).toAddress)).resultE shouldBe Right(true)
+        utx.putIfNew(invoke(signer(2).toAddress)).resultE should produce("Explicit script termination")
         utx.putIfNew(invoke(signer(2).toAddress), forceValidate = true).resultE should produce("Explicit script termination")
 
         d.appendBlock(setScript(secondSigner, dApp(4)))
@@ -1152,26 +1152,19 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
     )
 
     Seq(
-      (simpleContract, Seq.empty),
-      (selfInvokeContract, Seq(CONST_LONG(9)))
-    ).foreach { case (contract, args) =>
+      (simpleContract, Seq.empty, "Negative amount"),
+      (selfInvokeContract, Seq(CONST_LONG(9)), "DApp self-transfer is forbidden")
+    ).foreach { case (contract, args, error) =>
       withDomain(settings, balances = AddrWithBalance.enoughBalances(dApp, invoker)) { d =>
         val setScript = TxHelpers.setScript(dApp, contract)
         val invoke    = TxHelpers.invoke(dApp.toAddress, func = Some("test"), args = args, invoker = invoker)
 
         d.appendBlock(setScript)
-        d.utxPool.addTransaction(invoke, verify = true)
-
-        d.utxPool.size shouldBe 1
+        d.utxPool.addTransaction(invoke, verify = true).resultE should produce(error)
+        d.utxPool.size shouldBe 0
 
         d.utxPool.cleanUnconfirmed()
-
-        val expectedResult = if (!isMiningEnabled && forceValidateInCleanup) {
-          None
-        } else {
-          Some(invoke)
-        }
-        d.utxPool.transactionById(invoke.id()) shouldBe expectedResult
+        d.utxPool.transactionById(invoke.id()) shouldBe None
       }
     }
   }
