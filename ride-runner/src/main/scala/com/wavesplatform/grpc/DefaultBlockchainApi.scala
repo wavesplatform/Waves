@@ -85,13 +85,8 @@ class DefaultBlockchainApi(
         // Guarantees that we won't receive any message after WrapperEvent.Failed until we subscribe again
         .timeoutOnSlowUpstream(settings.blockchainUpdatesApi.noDataTimeout)
         .doOnError {
-          case _: UpstreamTimeoutException =>
-            Task {
-              log.warn(s"Upstream timeout: no data during ${settings.blockchainUpdatesApi.noDataTimeout}")
-              closeUpstream()
-            }
-
-          case _ => Task.unit
+          case _: UpstreamTimeoutException => Task(closeUpstream())
+          case _                           => Task.unit
         }
         .onErrorRestartWith { case e: UpstreamTimeoutException if working.get() => WrappedEvent.Failed(e) }
         .publish(scheduler)

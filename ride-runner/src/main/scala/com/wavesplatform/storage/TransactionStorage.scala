@@ -1,5 +1,6 @@
 package com.wavesplatform.storage
 
+import cats.syntax.option.*
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.google.protobuf.ByteString
 import com.wavesplatform.blockchain.RemoteData
@@ -11,6 +12,7 @@ import com.wavesplatform.storage.persistent.TransactionPersistentCache
 import com.wavesplatform.utils.ScorexLogging
 import kamon.instrumentation.caffeine.KamonStatsCounter
 
+import scala.jdk.CollectionConverters.ConcurrentMapHasAsScala
 import scala.util.chaining.scalaUtilChainingOps
 
 class TransactionStorage[TagT](

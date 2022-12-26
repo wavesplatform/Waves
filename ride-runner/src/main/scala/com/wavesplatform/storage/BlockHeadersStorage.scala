@@ -17,7 +17,7 @@ import com.wavesplatform.utils.ScorexLogging
 import scala.util.chaining.scalaUtilChainingOps
 
 class BlockHeadersStorage(blockchainApi: BlockchainApi, persistentCache: BlockPersistentCache) extends ScorexLogging {
-  // TODO #?
+  // TODO use locks instead, because of get
   @volatile private var liquidBlocks: NonEmptyList[BlockInfo] = NonEmptyList.one {
     val height = persistentCache.getLastHeight.getOrElse(blockchainApi.getCurrentBlockchainHeight() - 1)
     val x      = getInternal(height).getOrElse(throw new RuntimeException(s"Can't find a block at $height"))

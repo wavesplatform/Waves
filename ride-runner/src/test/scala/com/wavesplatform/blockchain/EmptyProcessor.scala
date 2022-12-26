@@ -13,7 +13,7 @@ class EmptyProcessor extends Processor {
 
   override def getCachedResultOrRun(address: Address, request: JsObject): Task[JsObject] = Task.raiseError(new RuntimeException("Test"))
 
-  override def removeFrom(height: Height): Unit = {
+  override def removeBlocksFrom(height: Height): Unit = {
     actions = actions.appended(RemoveFrom(height))
   }
 

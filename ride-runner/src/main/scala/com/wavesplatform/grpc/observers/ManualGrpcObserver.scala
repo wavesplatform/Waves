@@ -31,8 +31,8 @@ class ManualGrpcObserver[RequestT, EventT] extends ClientResponseObserver[Reques
   }
 
   override def onNext(value: EventT): Unit = {}
-  override def onError(t: Throwable): Unit = {}
-  override def onCompleted(): Unit         = {}
+  override def onError(t: Throwable): Unit = working.set(false)
+  override def onCompleted(): Unit         = working.set(false)
 
   protected def ifWorking(f: => Unit): Unit = if (working.get()) f
 }

@@ -83,14 +83,14 @@ object BlockchainState extends ScorexLogging {
 
       blockchainUpdatesStream.start(currHeight)
 
-      log.info(s"Closed by remote part, restarting from $currHeight. Reason: $event")
+      log.warn(s"Closed by a remote part, restarting from $currHeight. Reason: $event")
       ResolvingFork(currHeight, startingHeight, microBlockNumber = 0)
     }
 
     event match {
       case WrappedEvent.Next(event) => apply(processor, orig, event)
       case WrappedEvent.Closed      => Task(forceRestart())
-      case WrappedEvent.Failed(e)   =>
+      case WrappedEvent.Failed(e) =>
         Task {
           e match {
             // RST_STREAM closed stream. HTTP/2 error code: INTERNAL_ERROR
@@ -119,7 +119,7 @@ object BlockchainState extends ScorexLogging {
     val h      = Height(event.getUpdate.height)
 
     val currBlockId = event.getUpdate.id.toByteStr
-    log.info(s"$orig + $tpe(id=${currBlockId.take(5)}, h=$h)")
+    log.info(s"$orig + ${getUpdateType(update)}(id=${currBlockId.take(5)}, h=$h)")
 
     val ignore = Task.now(orig)
     val r = orig match {
@@ -132,7 +132,7 @@ object BlockchainState extends ScorexLogging {
                 processor.hasLocalBlockAt(h, currBlockId) match {
                   case Some(true) | None => orig // true - same blocks
                   case _ =>
-                    processor.removeFrom(h)
+                    processor.removeBlocksFrom(h)
                     orig.withDifferentBlocks
                 }
 
@@ -143,7 +143,8 @@ object BlockchainState extends ScorexLogging {
             } else Task.now(comparedBlocks.copy(currHeight = h))
 
           case _: Update.Rollback =>
-            processor.removeFrom(Height(h + 1))
+            // It works even for micro blocks, because we have a restored version of data in event
+            processor.removeBlocksFrom(Height(h + 1))
             processor.process(event.getUpdate)
             ignore
 
@@ -157,7 +158,7 @@ object BlockchainState extends ScorexLogging {
             processor.runScripts().as(orig.withHeight(h))
 
           case _: Update.Rollback =>
-            processor.removeFrom(Height(h + 1))
+            processor.removeBlocksFrom(Height(h + 1))
             processor.process(event.getUpdate)
             Task.now(ResolvingFork.from(orig.height, event))
 
@@ -173,7 +174,7 @@ object BlockchainState extends ScorexLogging {
             else Task.now(updated)
 
           case _: Update.Rollback =>
-            processor.removeFrom(Height(h + 1))
+            processor.removeBlocksFrom(Height(h + 1))
             processor.process(event.getUpdate)
             Task.now(orig.apply(event))
 

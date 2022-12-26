@@ -33,7 +33,13 @@ trait Processor {
     */
   def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean]
 
-  def removeFrom(height: Height): Unit
+  def removeBlocksFrom(height: Height): Unit
+
+  /**
+    * Includes removeBlocksFrom
+    * @param toHeight
+    */
+  //def rollbackAll(toHeight: Height): Unit
 
   def process(event: BlockchainUpdated): Unit
 
