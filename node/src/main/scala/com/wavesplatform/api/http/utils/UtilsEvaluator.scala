@@ -104,24 +104,24 @@ object UtilsEvaluator {
         case (eval: EVALUATED, unusedComplexity, log) => Right((eval, limit - unusedComplexity, log))
         case (_: EXPR, _, log)                        => Left(InvokeRejectError(s"Calculation complexity limit exceeded", log))
       }
-      rootScriptResult = ScriptResult
+      rootScriptResult <- ScriptResult
         .fromObj(ctx, ByteStr.empty, evaluated, ds.stdLibVersion, 0)
-        .flatMap(r =>
-          InvokeDiffsCommon
-            .actionsToScriptResult(
-              StructuredCallableActions(r.actions, blockchain),
-              ds.stdLibVersion,
-              address,
-              usedComplexity,
-              invoke,
-              limitedExecution = false,
-              limit,
-              log
-            )
-            .resultE
-            .leftMap(_.toString)
+        .bimap(
+          _ => Right(InvokeScriptResult.empty),
+          r =>
+            InvokeDiffsCommon
+              .actionsToScriptResult(
+                StructuredCallableActions(r.actions, blockchain),
+                ds.stdLibVersion,
+                address,
+                usedComplexity,
+                invoke,
+                limitedExecution = false,
+                limit,
+                log
+              )
+              .resultE
         )
-        .leftMap(_ => InvokeScriptResult.empty)
         .merge
       scriptResult = environment.currentDiff.scriptResults.values.fold(InvokeScriptResult.empty)(_ |+| _) |+| rootScriptResult
     } yield (evaluated, usedComplexity, log, scriptResult)
