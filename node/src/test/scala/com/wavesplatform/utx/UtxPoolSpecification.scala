@@ -1,7 +1,5 @@
 package com.wavesplatform.utx
 
-import java.nio.file.{Files, Path}
-
 import cats.data.NonEmptyList
 import com.wavesplatform
 import com.wavesplatform.*
@@ -49,6 +47,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
 import org.scalatest.concurrent.Eventually
 
+import java.nio.file.{Files, Path}
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration.*
 import scala.util.Random
@@ -889,14 +888,15 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         RideV5,
         AddrWithBalance.enoughBalances(defaultSigner, secondSigner)
       ) { d =>
+        val recipient = signer(3).toAddress
         val dApp = TestCompiler(V5).compileContract(
           s"""
              | @Callable(i)
              | func default() = {
              |   strict c = ${(1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}
-             |   []
+             |   [ScriptTransfer(Address(base58'$recipient'), 1, unit)]
              | }
-         """.stripMargin
+           """.stripMargin
         )
         val events = new ListBuffer[UtxEvent]
         val utx = new UtxPoolImpl(
@@ -913,7 +913,9 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         utx.putIfNew(invokeTx)
         val event = events.head.asInstanceOf[UtxEvent.TxAdded]
         event.tx.id() shouldBe invokeTx.id()
-        event.diff.scriptsComplexity shouldBe 1009
+        event.diff.scriptsComplexity shouldBe 1011
+        event.diff.portfolios(secondAddress) shouldBe Portfolio.waves(-1)
+        event.diff.portfolios(recipient) shouldBe Portfolio.waves(1)
       }
 
       "sync calls are fully validated always" in withDomain(
