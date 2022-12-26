@@ -885,6 +885,37 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         utx.putIfNew(invoke(), forceValidate = true).resultE should produce("Explicit script termination")
       }
 
+      "correct events for InvokeScriptTransaction with big complexity on standard validate mode" in withDomain(
+        RideV5,
+        AddrWithBalance.enoughBalances(defaultSigner, secondSigner)
+      ) { d =>
+        val dApp = TestCompiler(V5).compileContract(
+          s"""
+             | @Callable(i)
+             | func default() = {
+             |   strict c = ${(1 to 5).map(_ => "sigVerify(base58'', base58'', base58'')").mkString(" || ")}
+             |   []
+             | }
+         """.stripMargin
+        )
+        val events = new ListBuffer[UtxEvent]
+        val utx = new UtxPoolImpl(
+          ntpTime,
+          d.blockchainUpdater,
+          DefaultWavesSettings.utxSettings,
+          DefaultWavesSettings.maxTxErrorLogSize,
+          isMiningEnabled = false,
+          events += _
+        )
+        d.appendBlock(setScript(secondSigner, dApp))
+
+        val invokeTx = invoke()
+        utx.putIfNew(invokeTx)
+        val event = events.head.asInstanceOf[UtxEvent.TxAdded]
+        event.tx.id() shouldBe invokeTx.id()
+        event.diff.scriptsComplexity shouldBe 1009
+      }
+
       "sync calls are fully validated always" in withDomain(
         RideV5,
         AddrWithBalance.enoughBalances(defaultSigner, secondSigner, signer(2))
