@@ -79,7 +79,7 @@ object BlockchainState extends ScorexLogging {
       require(currHeight > 1, "Uncaught case") // TODO
 
       val startingHeight = Height(currHeight - 1)
-      processor.rollbackAll(startingHeight)
+      // processor.rollbackAll(startingHeight)
 
       blockchainUpdatesStream.start(currHeight)
 

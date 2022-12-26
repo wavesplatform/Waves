@@ -204,7 +204,7 @@ class BlockchainProcessor(
 
   override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] = blockchainStorage.blockHeaders.getLocal(height).map(_.id() == id)
 
-  override def removeFrom(height: Height): Unit = blockchainStorage.blockHeaders.removeFrom(height)
+  override def removeBlocksFrom(height: Height): Unit = blockchainStorage.blockHeaders.removeFrom(height)
 
   private def runScript(script: RestApiScript, hasCaches: Boolean): Task[JsObject] = Task {
     val refreshed = rideScriptRunTime.withTag("has-caches", hasCaches).measure {
