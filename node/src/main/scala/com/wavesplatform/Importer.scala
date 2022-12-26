@@ -53,7 +53,8 @@ object Importer extends ScorexLogging {
       importHeight: Int = Int.MaxValue,
       format: String = Formats.Binary,
       verify: Boolean = true,
-      dryRun: Boolean = false
+      dryRun: Boolean = false,
+      maxQueueSize: Int = 100
   )
 
   def parseOptions(args: Array[String]): ImportOptions = {
@@ -90,6 +91,10 @@ object Importer extends ScorexLogging {
         opt[Unit]('n', "no-verify")
           .text("Disable signatures verification")
           .action((_, c) => c.copy(verify = false)),
+        opt[Int]('q', "max-queue-size")
+          .text("Max size of blocks' queue")
+          .action((maxSize, c) => c.copy(maxQueueSize = maxSize))
+          .validate(maxSize => if (maxSize > 0) success else failure("Max blocks' queue size must be > 0")),
         help("help").hidden()
       )
     }
@@ -201,7 +206,7 @@ object Importer extends ScorexLogging {
       )
     }
 
-    val maxSize = funcSettings.featureCheckBlocksPeriod
+    val maxSize = importOptions.maxQueueSize
     val queue   = new mutable.Queue[VanillaBlock](maxSize)
 
     @tailrec
