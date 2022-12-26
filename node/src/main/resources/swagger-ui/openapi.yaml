@@ -1852,6 +1852,9 @@ paths:
                       type:
                         type: string
                       value: { }
+                  complexity:
+                    type: integer
+                    format: int64
                   stateChanges:
                     $ref: '#/components/schemas/StateChanges'
         '400':
