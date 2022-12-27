@@ -75,4 +75,19 @@ class CommonParseErrorTest extends ParseErrorTest {
         utils.compilerContext(V6, Expression, false)
       ) shouldBe Left(("Parse error: expected only latin charset for definitions in 6-9", 6, 9))
   }
+
+  property("error inside block passed to function") {
+    assert(
+      """
+        | func g(x: Int) = 1
+        | func f() = g({
+        |   let a = 1
+        | })
+      """.stripMargin,
+      """Parse error: expected expression""",
+      48,
+      49,
+      "1"
+    )
+  }
 }
