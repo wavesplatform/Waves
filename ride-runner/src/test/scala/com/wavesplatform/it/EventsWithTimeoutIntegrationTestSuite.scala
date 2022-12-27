@@ -47,101 +47,9 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
   private val alice     = Wallet.generateNewAccount("alice".getBytes(StandardCharsets.UTF_8), 0)
   private val aliceAddr = alice.toAddress(chainId)
 
-  private def toPb(pk: PublicKey): ByteString = UnsafeByteOperations.unsafeWrap(pk.arr)
+  private val initX = 0
 
   "a transaction received after a timeout" - {
-    val initX = 0
-
-    /** @param xGt0
-      *   An expected script result, x > 0?
-      */
-    def test(expectedEvents: List[WrappedEvent[SubscribeEvent]], xGt0: Boolean): Unit = Using.Manager { use =>
-      implicit val testScheduler = TestScheduler()
-
-      val blockchainApi = new TestBlockchainApi() {
-        override def getCurrentBlockchainHeight(): Int = 2
-
-        override def getBlockHeader(height: Int): Option[SignedBlockHeader] = toVanilla(mkPbBlock(height)).some
-
-        override def getActivatedFeatures(height: Int): Map[Short, Int] = settings.functionalitySettings.preActivatedFeatures
-
-        override def getAccountScript(address: Address): Option[Script] =
-          if (address == aliceAddr) mkScript().some
-          else super.getAccountScript(address)
-
-        override def getAccountDataEntry(address: Address, key: String): Option[DataEntry[?]] =
-          if (address == aliceAddr && key == "x") IntegerDataEntry("x", initX).some
-          else super.getAccountDataEntry(address, key)
-      }
-
-      val testDb   = use(TestDb.mk())
-      val dbCaches = new LevelDbPersistentCaches(testDb.db)
-      val blockchainStorage = new SharedBlockchainData[RequestKey](
-        settings,
-        dbCaches,
-        blockchainApi
-      )
-
-      val request: (Address, JsObject) = aliceAddr -> Json.obj(
-        "expr" -> "foo()"
-      )
-      val processor = new BlockchainProcessor(
-        BlockchainProcessor.Settings(
-          enableTraces = false,
-          evaluateScriptComplexityLimit = 52000,
-          maxTxErrorLogSize = 0
-        ),
-        blockchainStorage,
-        new RequestsStorage {
-          override def all(): List[(Address, JsObject)] = List(request)
-
-          override def append(x: (Address, JsObject)): Unit = {} // Ignore, because no way to evaluate a new expr
-        },
-        testScheduler
-      )
-
-      processor.runScripts(forceAll = true).runToFuture
-      testScheduler.tick()
-
-      val blockchainUpdatesStream = use(blockchainApi.mkBlockchainUpdatesStream(testScheduler))
-
-      val workingHeight = Height(1)
-      val events = blockchainUpdatesStream.downstream
-        .doOnError(e =>
-          Task {
-            log.error("Error!", e)
-          }
-        )
-        .take(expectedEvents.size)
-        .scanEval(Task.now[BlockchainState](BlockchainState.Starting(Height(0), workingHeight))) {
-          BlockchainState(processor, blockchainUpdatesStream, _, _)
-        }
-        .doOnError { e =>
-          Task {
-            log.error("Got an unhandled error, closing streams. Contact with developers", e)
-            blockchainUpdatesStream.close()
-          }
-        }
-        .lastL
-        .runToFuture
-
-      blockchainUpdatesStream.start(1)
-      expectedEvents.foreach(blockchainApi.blockchainUpdatesUpstream.onNext)
-
-      testScheduler.tick()
-
-      withClue(dumpedTasks) {
-        testScheduler.state.tasks shouldBe empty
-      }
-      Await.result(events, 5.seconds)
-
-      val newResultTask = processor.getCachedResultOrRun(request._1, request._2).runToFuture
-      val r             = Await.result(newResultTask, 5.seconds)
-      withClue(Json.prettyPrint(r)) {
-        (r \ "result" \ "value" \ "_2" \ "value").as[Boolean] shouldBe xGt0
-      }
-    }
-
     "block" in test(
       expectedEvents = List(
         WrappedEvent.Next(mkBlockAppendEvent(1, 1)),
@@ -190,6 +98,96 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
       ),
       xGt0 = true
     )
+  }
+
+  /** @param xGt0
+    *   An expected script result, x > 0?
+    */
+  private def test(expectedEvents: List[WrappedEvent[SubscribeEvent]], xGt0: Boolean): Unit = Using.Manager { use =>
+    implicit val testScheduler = TestScheduler()
+
+    val blockchainApi = new TestBlockchainApi() {
+      override def getCurrentBlockchainHeight(): Int = 2
+
+      override def getBlockHeader(height: Int): Option[SignedBlockHeader] = toVanilla(mkPbBlock(height)).some
+
+      override def getActivatedFeatures(height: Int): Map[Short, Int] = settings.functionalitySettings.preActivatedFeatures
+
+      override def getAccountScript(address: Address): Option[Script] =
+        if (address == aliceAddr) mkScript().some
+        else super.getAccountScript(address)
+
+      override def getAccountDataEntry(address: Address, key: String): Option[DataEntry[?]] =
+        if (address == aliceAddr && key == "x") IntegerDataEntry("x", initX).some
+        else super.getAccountDataEntry(address, key)
+    }
+
+    val testDb   = use(TestDb.mk())
+    val dbCaches = new LevelDbPersistentCaches(testDb.db)
+    val blockchainStorage = new SharedBlockchainData[RequestKey](
+      settings,
+      dbCaches,
+      blockchainApi
+    )
+
+    val request: (Address, JsObject) = aliceAddr -> Json.obj(
+      "expr" -> "foo()"
+    )
+    val processor = new BlockchainProcessor(
+      BlockchainProcessor.Settings(
+        enableTraces = false,
+        evaluateScriptComplexityLimit = 52000,
+        maxTxErrorLogSize = 0
+      ),
+      blockchainStorage,
+      new RequestsStorage {
+        override def all(): List[(Address, JsObject)] = List(request)
+
+        override def append(x: (Address, JsObject)): Unit = {} // Ignore, because no way to evaluate a new expr
+      },
+      testScheduler
+    )
+
+    processor.runScripts(forceAll = true).runToFuture
+    testScheduler.tick()
+
+    val blockchainUpdatesStream = use(blockchainApi.mkBlockchainUpdatesStream(testScheduler))
+
+    val workingHeight = Height(1)
+    val events = blockchainUpdatesStream.downstream
+      .doOnError(e =>
+        Task {
+          log.error("Error!", e)
+        }
+      )
+      .take(expectedEvents.size)
+      .scanEval(Task.now[BlockchainState](BlockchainState.Starting(Height(0), workingHeight))) {
+        BlockchainState(processor, blockchainUpdatesStream, _, _)
+      }
+      .doOnError { e =>
+        Task {
+          log.error("Got an unhandled error, closing streams. Contact with developers", e)
+          blockchainUpdatesStream.close()
+        }
+      }
+      .lastL
+      .runToFuture
+
+    blockchainUpdatesStream.start(1)
+    expectedEvents.foreach(blockchainApi.blockchainUpdatesUpstream.onNext)
+
+    testScheduler.tick()
+
+    withClue(dumpedTasks) {
+      testScheduler.state.tasks shouldBe empty
+    }
+    Await.result(events, 5.seconds)
+
+    val newResultTask = processor.getCachedResultOrRun(request._1, request._2).runToFuture
+    val r             = Await.result(newResultTask, 5.seconds)
+    withClue(Json.prettyPrint(r)) {
+      (r \ "result" \ "value" \ "_2" \ "value").as[Boolean] shouldBe xGt0
+    }
   }
 
   private def mkScript(): Script = {
@@ -264,6 +262,8 @@ func foo() = {
 
   private def mkPbBlock(height: Int) =
     Block.defaultInstance.withHeader(Block.Header.defaultInstance.withGenerator(toPb(miner.publicKey)).withTimestamp(height))
+
+  private def toPb(pk: PublicKey): ByteString = UnsafeByteOperations.unsafeWrap(pk.arr)
 
   private def toByteString32(xs: Int*): ByteString = {
     require(xs.size < 4)
