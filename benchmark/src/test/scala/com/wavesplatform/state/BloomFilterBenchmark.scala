@@ -31,7 +31,7 @@ class BloomFilterBenchmark {
 
   @Benchmark
   def verifyExchangeTxSign(bh: Blackhole, st: St): Unit = {
-    bh.consume(Verifier.verifyAsEllipticCurveSignature(st.exchangeTransactions(Random.nextInt(1000)), checkWeakPk = false))
+    bh.consume(Verifier.verifyAsEllipticCurveSignature(st.exchangeTransactions(Random.nextInt(1000)), isRideV6Activated = false))
   }
 }
 

@@ -232,15 +232,23 @@ object Importer extends ScorexLogging {
               blocksToSkip -= 1
             } else {
               val blockV5               = blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, blockchain.height + (maxCount - remainCount) + 1)
+              val rideV6                = blockchain.isFeatureActivated(BlockchainFeatures.RideV6, blockchain.height + (maxCount - remainCount) + 1)
               lazy val parsedProtoBlock = PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(blockBytes)), unsafe = true)
 
               val block = (if (!blockV5) Block.parseBytes(blockBytes) else parsedProtoBlock).orElse(parsedProtoBlock).get
 
               (block +: block.transactionData)
                 .parTraverse {
-                  case tx: ProvenTransaction => Task(tx.firstProofIsValidSignature).void
-                  case b: Block              => Task(b.signatureValid()).void
-                  case _                     => Task.unit
+                  case tx: ProvenTransaction =>
+                    Task {
+                      if (rideV6) {
+                        tx.firstProofIsValidSignatureAfterV6
+                      } else {
+                        tx.firstProofIsValidSignatureBeforeV6
+                      }
+                    }.void
+                  case b: Block => Task(b.signatureValid()).void
+                  case _        => Task.unit
                 }
                 .executeOn(sigverify)
                 .runAsyncAndForget

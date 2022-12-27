@@ -185,6 +185,7 @@ object BlockDiffer {
     val currentBlockHeight = blockchain.height
     val timestamp          = blockchain.lastBlockTimestamp.get
     val blockGenerator     = blockchain.lastBlockHeader.get.header.generator.toAddress
+    val rideV6Activated    = blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
 
     val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, verify, enableExecutionLog = enableExecutionLog) _
     val hasSponsorship = currentBlockHeight >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
@@ -192,8 +193,15 @@ object BlockDiffer {
     if (verify && txSignParCheck) {
       txs
         .parUnorderedTraverse {
-          case tx: ProvenTransaction => Task(tx.firstProofIsValidSignature).void
-          case _                     => Task.unit
+          case tx: ProvenTransaction =>
+            Task {
+              if (rideV6Activated) {
+                tx.firstProofIsValidSignatureAfterV6
+              } else {
+                tx.firstProofIsValidSignatureBeforeV6
+              }
+            }.void
+          case _ => Task.unit
         }
         .executeOn(sigverify)
         .runAsyncAndForget

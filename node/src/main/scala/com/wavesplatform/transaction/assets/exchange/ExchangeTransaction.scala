@@ -35,12 +35,16 @@ case class ExchangeTransaction(
 
   val (buyOrder, sellOrder) = if (order1.orderType == OrderType.BUY) (order1, order2) else (order2, order1)
 
-  override protected def verifyFirstProof(): Either[GenericError, Unit] =
-    super.verifyFirstProof().tap { _ =>
-      order1.firstProofIsValidSignature
-      order2.firstProofIsValidSignature
+  override protected def verifyFirstProof(isRideV6Activated: Boolean): Either[GenericError, Unit] =
+    super.verifyFirstProof(isRideV6Activated).tap { _ =>
+      if (isRideV6Activated) {
+        order1.firstProofIsValidSignatureAfterV6
+        order2.firstProofIsValidSignatureAfterV6
+      } else {
+        order1.firstProofIsValidSignatureBeforeV6
+        order2.firstProofIsValidSignatureBeforeV6
+      }
     }
-
 
   override val sender: PublicKey = buyOrder.matcherPublicKey
 

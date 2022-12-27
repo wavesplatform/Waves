@@ -28,11 +28,9 @@ case class PaymentTransaction(
 
   def proofs: Proofs = Proofs(signature)
 
+  // FIXME: error message
   lazy val signatureValid: Either[InvalidSignature, PaymentTransaction] =
-    Either.cond(
-    crypto.verify(signature, bodyBytes(), sender),
-      this, InvalidSignature(???))
-
+    Either.cond(crypto.verify(signature, bodyBytes(), sender), this, InvalidSignature(???))
 
   override val id: Coeval[ByteStr] = Coeval.evalOnce(signature)
 

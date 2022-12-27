@@ -320,17 +320,21 @@ object Verifier extends ScorexLogging {
     } yield matcherComplexity + sellerComplexity + buyerComplexity
   }
 
-  def verifyOrderSignature(order: Order, checkWeakPk: Boolean): Either[GenericError, Order] =
+  def verifyOrderSignature(order: Order, isRideV6Activated: Boolean): Either[GenericError, Order] =
     order.eip712Signature match {
       case Some(ethSignature) =>
         val signerKey = EthOrders.recoverEthSignerKey(order, ethSignature.arr)
         Either.cond(signerKey == order.senderPublicKey, order, GenericError(s"Ethereum signature invalid for $order"))
 
-      case _ => verifyAsEllipticCurveSignature(order, checkWeakPk)
+      case _ => verifyAsEllipticCurveSignature(order, isRideV6Activated)
     }
 
-  def verifyAsEllipticCurveSignature[T <: Proven](pt: T, checkWeakPk: Boolean): Either[GenericError, T] =
-    pt.firstProofIsValidSignature.map(_ => pt)
+  def verifyAsEllipticCurveSignature[T <: Proven](pt: T, isRideV6Activated: Boolean): Either[GenericError, T] =
+    (if (isRideV6Activated) {
+       pt.firstProofIsValidSignatureAfterV6
+     } else {
+       pt.firstProofIsValidSignatureBeforeV6
+     }).map(_ => pt)
 
   @VisibleForTesting
   private[smart] def buildLogs(

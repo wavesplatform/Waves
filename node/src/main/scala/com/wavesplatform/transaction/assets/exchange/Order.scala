@@ -107,12 +107,12 @@ case class Order(
 
   val json: Coeval[JsObject] = Coeval.evalOnce(OrderSerializer.toJson(this))
 
-  override protected def verifyFirstProof(): Either[GenericError, Unit] =
+  override protected def verifyFirstProof(isRideV6Activated: Boolean): Either[GenericError, Unit] =
     eip712Signature match {
       case Some(ethSignature) =>
         val signerKey = EthOrders.recoverEthSignerKey(this, ethSignature.arr)
         Either.cond(signerKey == senderPublicKey, (), GenericError(s"Ethereum signature invalid for $this"))
-      case _ => super.verifyFirstProof()
+      case _ => super.verifyFirstProof(isRideV6Activated)
     }
 
   override def toString: String = {

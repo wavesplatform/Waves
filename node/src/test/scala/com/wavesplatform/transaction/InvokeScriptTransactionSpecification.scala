@@ -40,8 +40,8 @@ class InvokeScriptTransactionSpecification extends PropSpec {
     deser.timestamp shouldEqual transaction.timestamp
     deser.proofs shouldEqual transaction.proofs
     bytes shouldEqual deser.bytes()
-    Verifier.verifyAsEllipticCurveSignature(transaction, checkWeakPk = false) should beRight
-    Verifier.verifyAsEllipticCurveSignature(deser, checkWeakPk = false) should beRight // !!!!!!!!!!!!!!!
+    Verifier.verifyAsEllipticCurveSignature(transaction, isRideV6Activated = false) should beRight
+    Verifier.verifyAsEllipticCurveSignature(deser, isRideV6Activated = false) should beRight // !!!!!!!!!!!!!!!
   }
 
   property("protobuf roundtrip") {
@@ -119,7 +119,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
 
   property("JSON format validation for InvokeScriptTransaction") {
     val dApp = KeyPair("test5".getBytes("UTF-8")).toAddress('D')
-    val js   = Json.parse(s"""{
+    val js = Json.parse(s"""{
                          "type": 16,
                          "id": "6z3CsQBFzV8Wfp1DDiXw5c75LrrwxktPPJTcXYBfTetN",
                          "sender": "3FX9SibfqAWcdnhrmFzqM1mGqya6DkVVnps",
@@ -167,7 +167,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
 
   property("JSON format validation for InvokeScriptTransaction without FUNCTION_CALL") {
     val dApp = KeyPair("test6".getBytes("UTF-8")).toAddress('D')
-    val js   = Json.parse(s"""{
+    val js = Json.parse(s"""{
                          "type": 16,
                          "id": "4sxYQWNDmWvaLwVcmfX1Znj8RfAy7JAWnSQUFgAFFixC",
                          "sender": "3FX9SibfqAWcdnhrmFzqM1mGqya6DkVVnps",
