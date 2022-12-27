@@ -82,12 +82,14 @@ class CommonParseErrorTest extends ParseErrorTest {
         | func g(x: Int) = 1
         | func f() = g({
         |   let a = 1
+        |   let b = 2
+        |   let c = 3
         | })
       """.stripMargin,
       """Parse error: expected expression""",
-      48,
-      49,
-      "1"
+      75,
+      78,
+      "\n }"
     )
   }
 }

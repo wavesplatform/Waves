@@ -667,12 +667,12 @@ object Parser {
       .leftMap(errorWithPosition(source, _))
 
   private val moveRightKeywords =
-    Seq(""""func"""", """"let"""", " expression", "1 underscore", "end-of-input", "latin charset", "definition")
+    Seq(""""func"""", """"let"""", "expression", "1 underscore", "end-of-input", "latin charset", "definition")
 
   private def errorPosition(input: String, f: Failure): (Int, Int) =
     if (moveRightKeywords.exists(f.label.contains)) {
-      val end = input.indexWhere(_.isWhitespace, f.index)
-      (f.index, if (end == -1) f.index else end)
+      val end = if (f.label.contains("expression")) input.indexWhere(_ == '}', f.index) + 1 else input.indexWhere(_.isWhitespace, f.index)
+      (f.index, if (end <= 0) f.index else end)
     } else {
       val start =
         if (input(f.index - 1).isWhitespace)
