@@ -28,7 +28,7 @@ import com.wavesplatform.concurrent.MayBeSemaphore
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.*
 import com.wavesplatform.grpc.BlockchainApi.BlockchainUpdatesStream
-import com.wavesplatform.grpc.DefaultBlockchainApi.{HttpBlockHeader, ReplaceWithNewException, Settings, StopException}
+import com.wavesplatform.grpc.DefaultBlockchainApi.*
 import com.wavesplatform.grpc.observers.{ManualGrpcObserver, MonixWrappedDownstream}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.ByteStringExt
@@ -92,8 +92,6 @@ class DefaultBlockchainApi(
         .publish(scheduler)
 
       override val downstream: Observable[WrappedEvent[SubscribeEvent]] = connectableDownstream
-
-      override def start(fromHeight: Int): Unit = start(fromHeight, toHeight = 0)
 
       override def start(fromHeight: Int, toHeight: Int): Unit = {
         val observer = new MonixWrappedDownstream[SubscribeRequest, SubscribeEvent](s)
@@ -340,28 +338,6 @@ class DefaultBlockchainApi(
   }
 
   private def firstOf[T](xs: java.util.Iterator[T]): Option[T] = if (xs.hasNext) xs.next().some else none
-
-  private def toPb(address: Address): ByteString = UnsafeByteOperations.unsafeWrap(address.bytes)
-  private def toPb(asset: Asset): ByteString     = asset.fold(ByteString.EMPTY)(x => UnsafeByteOperations.unsafeWrap(x.id.arr))
-
-  private def toVanilla(block: Block): SignedBlockHeader = {
-    val header = block.getHeader
-    SignedBlockHeader(
-      header = BlockHeader(
-        version = header.version.toByte,
-        timestamp = header.timestamp,
-        reference = header.reference.toByteStr,
-        baseTarget = header.baseTarget,
-        generationSignature = header.generationSignature.toByteStr,
-        generator = PublicKey(header.generator.toByteArray),
-        featureVotes = header.featureVotes.map(_.toShort),
-        rewardVote = header.rewardVote,
-        transactionsRoot = header.transactionsRoot.toByteStr
-      ),
-      signature = block.signature.toByteStr
-    )
-  }
-
 }
 
 object DefaultBlockchainApi {
@@ -378,4 +354,25 @@ object DefaultBlockchainApi {
 
   private case object StopException           extends RuntimeException("By a request") with NoStackTrace
   private case object ReplaceWithNewException extends RuntimeException("Replace with a new observer") with NoStackTrace
+
+  def toPb(address: Address): ByteString = UnsafeByteOperations.unsafeWrap(address.bytes)
+  def toPb(asset: Asset): ByteString     = asset.fold(ByteString.EMPTY)(x => UnsafeByteOperations.unsafeWrap(x.id.arr))
+
+  def toVanilla(block: Block): SignedBlockHeader = {
+    val header = block.getHeader
+    SignedBlockHeader(
+      header = BlockHeader(
+        version = header.version.toByte,
+        timestamp = header.timestamp,
+        reference = header.reference.toByteStr,
+        baseTarget = header.baseTarget,
+        generationSignature = header.generationSignature.toByteStr,
+        generator = PublicKey(header.generator.toByteArray),
+        featureVotes = header.featureVotes.map(_.toShort),
+        rewardVote = header.rewardVote,
+        transactionsRoot = header.transactionsRoot.toByteStr
+      ),
+      signature = block.signature.toByteStr
+    )
+  }
 }

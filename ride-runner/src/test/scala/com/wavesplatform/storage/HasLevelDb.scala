@@ -12,7 +12,7 @@ trait HasLevelDb {
 }
 
 object HasLevelDb {
-  case class TestDb(path: Path, db: DB, clean: Boolean = true) {
+  case class TestDb(path: Path, db: DB, clean: Boolean = true) extends AutoCloseable {
     def withoutCleaning: TestDb = copy(clean = false)
 
     def withDb[A](f: DB => A): A = {
@@ -20,7 +20,7 @@ object HasLevelDb {
       finally close()
     }
 
-    private def close(): Unit = {
+    override def close(): Unit = {
       db.close()
       if (clean) MoreFiles.deleteRecursively(path)
     }

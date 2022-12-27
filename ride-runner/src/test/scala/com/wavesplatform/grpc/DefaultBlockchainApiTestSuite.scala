@@ -14,7 +14,6 @@ import monix.execution.exceptions.UpstreamTimeoutException
 import monix.execution.schedulers.TestScheduler
 import sttp.client3.testing.SttpBackendStub
 
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
@@ -318,20 +317,6 @@ class DefaultBlockchainApiTestSuite extends BaseTestSuite with HasGrpc with Scor
       }
     }
   }
-
-  def dumpTasks(label: String)(implicit testScheduler: TestScheduler): Unit = {
-    val tasks    = testScheduler.state.tasks
-    val currTime = testScheduler.state.clock
-    val tasksStr = tasks
-      .map { x =>
-        val runIn = x.runsAt - currTime
-        s"$x in $runIn"
-      }
-      .mkString("\n")
-    logWithClock(s"$label: $tasksStr")
-  }
-
-  def logWithClock(s: String)(implicit testScheduler: TestScheduler): Unit = log.info(s"[${testScheduler.clockMonotonic(TimeUnit.MILLISECONDS)}] $s")
 
   private def mkAppend(height: Int): SubscribeEvent =
     SubscribeEvent.defaultInstance.withUpdate(

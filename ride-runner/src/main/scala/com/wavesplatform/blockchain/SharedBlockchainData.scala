@@ -3,7 +3,7 @@ package com.wavesplatform.blockchain
 import cats.syntax.option.*
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.{BlockchainFeatures, ComplexityCheckPolicyProvider, EstimatorProvider}
-import com.wavesplatform.grpc.DefaultBlockchainApi
+import com.wavesplatform.grpc.BlockchainApi
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
@@ -15,7 +15,7 @@ import com.wavesplatform.utils.ScorexLogging
 
 import scala.util.chaining.scalaUtilChainingOps
 
-class SharedBlockchainData[TagT](val settings: BlockchainSettings, persistentCaches: PersistentCaches, blockchainApi: DefaultBlockchainApi)
+class SharedBlockchainData[TagT](val settings: BlockchainSettings, persistentCaches: PersistentCaches, blockchainApi: BlockchainApi)
     extends ScorexLogging {
   private val chainId = settings.addressSchemeCharacter.toByte
 
