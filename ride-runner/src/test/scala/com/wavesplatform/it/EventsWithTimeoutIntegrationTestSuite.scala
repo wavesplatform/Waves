@@ -116,6 +116,28 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
       ),
       xGt0 = false
     )
+
+    "micro block" in test(
+      events = List(
+        WrappedEvent.Next(mkBlockAppendEvent(1, 1)),
+        WrappedEvent.Next(mkBlockAppendEvent(2, 1)),
+        WrappedEvent.Next(
+          mkMicroBlockAppendEvent(
+            height = 2,
+            forkNumber = 1,
+            microBlockNumber = 1,
+            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
+          )
+        ),
+        WrappedEvent.Next(mkMicroBlockAppendEvent(2, 2, 2)),
+        WrappedEvent.Failed(UpstreamTimeoutException(1.minute)), // Removes the last block, so we didn't see the data update
+        WrappedEvent.Next(mkBlockAppendEvent(2, 2)),
+        WrappedEvent.Next(mkMicroBlockAppendEvent(2, 2, 1)) // Resolves a synthetic fork
+        // It's okay, that we don't wait for a next micro block (as on a previous fork), because by default a timeout happens after 90s,
+        // so there is a new block probably.
+      ),
+      xGt0 = false
+    )
   }
 
   /** @param xGt0

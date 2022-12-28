@@ -61,16 +61,23 @@ class BlockchainProcessor(
   }
 
   @volatile private var accumulatedChanges = new ProcessResult[RequestKey]()
-  @volatile private var lastEvent          = none[BlockchainUpdated]
+  @volatile private var lastEvents         = List.empty[BlockchainUpdated]
 
   override def process(event: BlockchainUpdated): Unit = {
-    lastEvent = event.some
-
     val height = Height(event.height)
     accumulatedChanges = event.update match {
-      case Update.Empty              => accumulatedChanges // Ignore
-      case Update.Append(append)     => process(height, append)
-      case Update.Rollback(rollback) => process(height, rollback)
+      case Update.Empty => accumulatedChanges // Ignore
+      case Update.Append(append) =>
+        append.body match {
+          case Body.Empty         =>
+          case _: Body.Block      => lastEvents = List(event)
+          case _: Body.MicroBlock => lastEvents = event :: lastEvents
+        }
+        process(height, append)
+
+      case Update.Rollback(rollback) =>
+        lastEvents = List(event)
+        process(height, rollback)
     }
 
     // Update this in the end, because a service could be suddenly turned off and we won't know, that we should re-read this block
@@ -213,17 +220,16 @@ class BlockchainProcessor(
     * @param toHeight
     */
   override def forceRollbackOne(): Unit = {
-    lastEvent match {
-      case None => throw new RuntimeException("Can't force rollback one")
-      case Some(lastEvent) =>
-        val rollbackToHeight = Height(lastEvent.height - 1) // -1 because we undo the lastEvent
-        // TODO use rollback with None changes
-        accumulatedChanges = lastEvent.update match {
-          case Update.Empty              => accumulatedChanges // Ignore
-          case Update.Append(append)     => processRollback(rollbackToHeight, append)
-          case Update.Rollback(rollback) => accumulatedChanges // TODO
-        }
-        removeBlocksFrom(Height(rollbackToHeight + 1))
+    if (lastEvents.isEmpty) throw new RuntimeException("Can't force rollback one")
+    lastEvents.foreach { lastEvent =>
+      val rollbackToHeight = Height(lastEvent.height - 1) // -1 because we undo the lastEvent
+      // TODO use rollback with None changes
+      accumulatedChanges = lastEvent.update match {
+        case Update.Empty              => accumulatedChanges // Ignore
+        case Update.Append(append)     => processRollback(rollbackToHeight, append)
+        case Update.Rollback(rollback) => accumulatedChanges // TODO
+      }
+      removeBlocksFrom(Height(rollbackToHeight + 1))
     }
   }
 
