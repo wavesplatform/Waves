@@ -80,7 +80,7 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
     }
   }
 
-  def reverseAppend(height: Int, key: KeyT): RollbackResult[TagT] = rollback(height, key, None)
+  def undoAppend(rollbackHeight: Int, key: KeyT): RollbackResult[TagT] = rollback(rollbackHeight, key, None)
 
   def rollback(rollbackHeight: Int, key: KeyT, after: ValueT): RollbackResult[TagT] = rollback(rollbackHeight, key, after.some)
 

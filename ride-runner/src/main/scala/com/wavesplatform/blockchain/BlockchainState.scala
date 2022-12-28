@@ -52,7 +52,7 @@ object BlockchainState extends ScorexLogging {
       currHeight == resolveHeight && microBlockNumber >= 1
     }
 
-    override def toString: String = s"Rollback($origHeight->$currHeight, mbn: $microBlockNumber)"
+    override def toString: String = s"ResolvingFork($currHeight-..->$origHeight, mbn: $microBlockNumber)"
   }
 
   object ResolvingFork {
@@ -71,19 +71,19 @@ object BlockchainState extends ScorexLogging {
       event: WrappedEvent[SubscribeEvent]
   ): Task[BlockchainState] = {
     def forceRestart(): BlockchainState = {
-      val currHeight = orig match {
-        case orig: Starting      => orig.currHeight
-        case Working(height)     => height
-        case orig: ResolvingFork => orig.currHeight
+      val (currHeight, workingStateHeight) = orig match {
+        // -1 because of how ResolvingFork.resolveFork works. TODO replace origHeight in ResolvingFork by resolveHeight
+        case orig: Starting      => (orig.currHeight, Height(orig.workingHeight - 1))
+        case Working(height)     => (height, Height(height - 1))
+        case orig: ResolvingFork => (orig.currHeight, orig.origHeight)
       }
       require(currHeight > 1, "Uncaught case") // TODO
 
       processor.forceRollbackOne()
       blockchainUpdatesStream.start(currHeight)
 
-      val startingHeight = Height(currHeight - 1)
-      log.warn(s"Closed by a remote part, restarting from $startingHeight. Reason: $event")
-      ResolvingFork(startingHeight, currHeight, microBlockNumber = 0)
+      log.warn(s"Closed by a remote part, restarting from $currHeight. Reason: $event")
+      ResolvingFork(workingStateHeight, Height(currHeight - 1), microBlockNumber = 0)
     }
 
     event match {
@@ -118,7 +118,7 @@ object BlockchainState extends ScorexLogging {
     val h      = Height(event.getUpdate.height)
 
     val currBlockId = event.getUpdate.id.toByteStr
-    log.info(s"$orig + ${getUpdateType(update)}(id=${currBlockId.take(5)}, h=$h)")
+    log.info(s"$orig + ${getUpdateType(update)}(id=$currBlockId, h=$h)")
 
     val ignore = Task.now(orig)
     val r = orig match {

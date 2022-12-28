@@ -16,8 +16,8 @@ class AccountDataStorage[TagT](blockchainApi: BlockchainApi, override val persis
   def append(height: Int, update: StateUpdate.DataEntryUpdate): AppendResult[TagT] =
     append(height, (update.address.toAddress, update.getDataEntry.key), update.dataEntry.map(toVanillaDataEntry))
 
-  def reverseAppend(height: Int, update: StateUpdate.DataEntryUpdate): RollbackResult[TagT] =
-    reverseAppend(height, (update.address.toAddress, update.getDataEntry.key))
+  def undoAppend(height: Int, update: StateUpdate.DataEntryUpdate): RollbackResult[TagT] =
+    undoAppend(height, (update.address.toAddress, update.getDataEntry.key))
 
   def rollback(height: Int, update: StateUpdate.DataEntryUpdate): RollbackResult[TagT] =
     rollback(height, (update.address.toAddress, update.getDataEntry.key), update.dataEntry.map(toVanillaDataEntry))

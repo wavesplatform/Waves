@@ -18,10 +18,10 @@ class AccountBalanceStorage[TagT](blockchainApi: BlockchainApi, override val per
     append(height, (address, asset), after)
   }
 
-  def reverseAppend(height: Int, update: StateUpdate.BalanceUpdate): RollbackResult[TagT] = {
+  def undoAppend(height: Int, update: StateUpdate.BalanceUpdate): RollbackResult[TagT] = {
     val address    = update.address.toAddress
     val (asset, _) = toAssetAndAmount(update.getAmountAfter)
-    reverseAppend(height, (address, asset))
+    undoAppend(height, (address, asset))
   }
 
   def rollback(rollbackHeight: Int, update: StateUpdate.BalanceUpdate): RollbackResult[TagT] = {

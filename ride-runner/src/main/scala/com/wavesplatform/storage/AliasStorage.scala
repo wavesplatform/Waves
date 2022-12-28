@@ -14,6 +14,6 @@ class AliasStorage[TagT](chainId: Byte, blockchainApi: BlockchainApi, override v
   def append(height: Int, rawAlias: String, account: PublicKey): AppendResult[TagT] =
     append(height, Alias.createWithChainId(rawAlias, chainId).explicitGet(), account.toAddress(chainId))
 
-  def reverseAppend(height: Int, rawAlias: String): RollbackResult[TagT] =
-    reverseAppend(height, Alias.createWithChainId(rawAlias, chainId).explicitGet())
+  def undoAppend(height: Int, rawAlias: String): RollbackResult[TagT] =
+    undoAppend(height, Alias.createWithChainId(rawAlias, chainId).explicitGet())
 }

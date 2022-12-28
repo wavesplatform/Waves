@@ -20,7 +20,7 @@ class AccountLeaseBalanceStorage[TagT](blockchainApi: BlockchainApi, override va
     append(height, address, toVanilla(update))
   }
 
-  def reverseAppend(height: Int, update: StateUpdate.LeasingUpdate): RollbackResult[TagT] = reverseAppend(height, update.address.toAddress)
+  def undoAppend(height: Int, update: StateUpdate.LeasingUpdate): RollbackResult[TagT] = undoAppend(height, update.address.toAddress)
 
   // TODO #21 Copy-paste from append
   def rollback(rollbackHeight: Int, update: StateUpdate.LeasingUpdate): RollbackResult[TagT] = {

@@ -76,7 +76,9 @@ class BlockchainProcessor(
         process(height, append)
 
       case Update.Rollback(rollback) =>
-        lastEvents = List(event)
+        lastEvents = lastEvents.dropWhile(x => x.height >= height && x.id != event.id)
+        // It wasn't a micro fork, so we have a useful information about changed keys
+        if (lastEvents.isEmpty) lastEvents = List(event)
         process(height, rollback)
     }
 
@@ -219,21 +221,23 @@ class BlockchainProcessor(
     *
     * @param toHeight
     */
-  override def forceRollbackOne(): Unit = {
+  override def forceRollbackOne(): Unit =
     if (lastEvents.isEmpty) throw new RuntimeException("Can't force rollback one")
-    lastEvents.foreach { lastEvent =>
-      val rollbackToHeight = Height(lastEvent.height - 1) // -1 because we undo the lastEvent
-      // TODO use rollback with None changes
-      accumulatedChanges = lastEvent.update match {
-        case Update.Empty              => accumulatedChanges // Ignore
-        case Update.Append(append)     => undo(rollbackToHeight, append)
-        case Update.Rollback(rollback) => accumulatedChanges // undo(rollbackToHeight, rollback)
+    else
+      lastEvents.foreach { lastEvent =>
+        val rollbackToHeight = Height(lastEvent.height - 1) // -1 because we undo the lastEvent
+        accumulatedChanges = lastEvent.update match {
+          case Update.Append(append) => undo(rollbackToHeight, ByteStr(lastEvent.id.toByteArray), append)
+          case _                     => accumulatedChanges
+        }
+        // TODO this should be done once
+        // TODO issue somewhere in -1 <--
+        removeBlocksFrom(Height(rollbackToHeight + 1))
       }
-      removeBlocksFrom(Height(rollbackToHeight + 1))
-    }
-  }
 
-  private def undo(h: Height, append: BlockchainUpdated.Append): ProcessResult[RequestKey] = {
+  private def undo(h: Height, id: ByteStr, append: BlockchainUpdated.Append): ProcessResult[RequestKey] = {
+    log.info(s"Undo id=$id to $h")
+
     // Almost all scripts use the height, so we can run all of them
     val withUpdatedHeight = accumulatedChanges.copy(newHeight = h) // TODO #31 Affect all scripts if height is increased
 
@@ -251,16 +255,16 @@ class BlockchainProcessor(
           val txsView     = txs.view.map(_.transaction)
           withUpdatedHeight
             .pipe(stateUpdate.flatMap(_.assets).foldLeft(_) { case (r, x) =>
-              r.withRollbackResult(blockchainStorage.assets.reverseAppend(h, x))
+              r.withRollbackResult(blockchainStorage.assets.undoAppend(h, x))
             })
             .pipe(stateUpdate.flatMap(_.balances).foldLeft(_) { case (r, x) =>
-              r.withRollbackResult(blockchainStorage.accountBalances.reverseAppend(h, x))
+              r.withRollbackResult(blockchainStorage.accountBalances.undoAppend(h, x))
             })
             .pipe(stateUpdate.flatMap(_.leasingForAddress).foldLeft(_) { case (r, x) =>
-              r.withRollbackResult(blockchainStorage.accountLeaseBalances.reverseAppend(h, x))
+              r.withRollbackResult(blockchainStorage.accountLeaseBalances.undoAppend(h, x))
             })
             .pipe(stateUpdate.flatMap(_.dataEntries).foldLeft(_) { case (r, x) =>
-              r.withRollbackResult(blockchainStorage.data.reverseAppend(h, x))
+              r.withRollbackResult(blockchainStorage.data.undoAppend(h, x))
             })
             .pipe(
               txsView
@@ -273,7 +277,7 @@ class BlockchainProcessor(
                   case _ => none
                 }
                 .foldLeft(_) { case (r, (pk, _)) =>
-                  r.withRollbackResult(blockchainStorage.accountScripts.reverseAppend(h, pk))
+                  r.withRollbackResult(blockchainStorage.accountScripts.undoAppend(h, pk))
                 }
             )
             .pipe(
@@ -287,7 +291,7 @@ class BlockchainProcessor(
                   case _ => none
                 }
                 .foldLeft(_) { case (r, (alias, _)) =>
-                  r.withRollbackResult(blockchainStorage.aliases.reverseAppend(h, alias))
+                  r.withRollbackResult(blockchainStorage.aliases.undoAppend(h, alias))
                 }
             )
             .pipe(append.transactionIds.foldLeft(_) { case (r, txId) =>
@@ -295,41 +299,6 @@ class BlockchainProcessor(
             })
         }
     }
-  }
-
-
-  private def undo(h: Height, rollback: BlockchainUpdated.Rollback): ProcessResult[RequestKey] = rollbackProcessingTime.measure {
-    // TODO #20 The height will be eventually > if this is a rollback, so we need to run all scripts
-    // Almost all scripts use the height
-    val withUpdatedHeight = accumulatedChanges.copy(newHeight = h)
-
-    blockchainStorage.vrf.removeFrom(h + 1)
-
-    val stateUpdate = rollback.getRollbackStateUpdate
-    withUpdatedHeight
-      .pipe(stateUpdate.assets.foldLeft(_) { case (r, x) =>
-        r.withRollbackResult(blockchainStorage.assets.rollback(h, x))
-      })
-      .pipe(stateUpdate.balances.foldLeft(_) { case (r, x) =>
-        r.withRollbackResult(blockchainStorage.accountBalances.rollback(h, x))
-      })
-      .pipe(stateUpdate.leasingForAddress.foldLeft(_) { case (r, x) =>
-        r.withRollbackResult(blockchainStorage.accountLeaseBalances.rollback(h, x))
-      })
-      .pipe(stateUpdate.dataEntries.foldLeft(_) { case (r, x) =>
-        r.withRollbackResult(blockchainStorage.data.rollback(h, x))
-      })
-      .pipe(rollback.removedTransactionIds.foldLeft(_) { case (r, txId) =>
-        r.withRollbackResult(blockchainStorage.transactions.remove(txId))
-      })
-    /* TODO #29: Will be fixed (or not) soon with a new BlockchainUpdates API
-       NOTE: Ignoring, because 1) almost impossible 2) transactions return to blockchain eventually
-      .pipe(stateUpdate.aliases.foldLeft(_) { case (r, x) =>
-        r.withRollbackResult(blockchainStorage.aliases.rollback(h, x))
-      })
-      .pipe(stateUpdate.accountScripts.foldLeft(_) { case (r, x) =>
-        r.withRollbackResult(blockchainStorage.accountScripts.rollback(h, x))
-      }) */
   }
 
   override def removeBlocksFrom(height: Height): Unit = blockchainStorage.blockHeaders.removeFrom(height)

@@ -26,8 +26,8 @@ class AccountScriptStorage[TagT](
   def append(height: Int, account: PublicKey, newScript: ByteString): AppendResult[TagT] =
     append(height, account.toAddress(chainId), toVanillaScript(newScript).map(toAccountScriptInfo(account, _)))
 
-  def reverseAppend(height: Int, account: PublicKey): RollbackResult[TagT] =
-    reverseAppend(height, account.toAddress(chainId))
+  def undoAppend(height: Int, account: PublicKey): RollbackResult[TagT] =
+    undoAppend(height, account.toAddress(chainId))
 
   def rollback(height: Int, account: PublicKey, newScript: ByteString): RollbackResult[TagT] =
     rollback(height, account.toAddress(chainId), toVanillaScript(newScript).map(toAccountScriptInfo(account, _)))
