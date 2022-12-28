@@ -49,8 +49,8 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
 
   private val initX = 0
 
-  "a transaction is received after a timeout" - {
-    "block" in test(
+  "a transaction is received after a timeout if the previous event is" - {
+    "block append" in test(
       events = List(
         WrappedEvent.Next(mkBlockAppendEvent(1, 1)),
         WrappedEvent.Next(
@@ -72,7 +72,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
       xGt0 = true
     )
 
-    "micro block" in test(
+    "a micro block append" in test(
       events = List(
         WrappedEvent.Next(mkBlockAppendEvent(1, 1)),
         WrappedEvent.Next(mkBlockAppendEvent(2, 1)),
@@ -97,9 +97,41 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
       ),
       xGt0 = true
     )
+
+    "a rollback" in test(
+      events = List(
+        WrappedEvent.Next(mkBlockAppendEvent(1, 1)),
+        WrappedEvent.Next(mkBlockAppendEvent(2, 1)),
+        WrappedEvent.Next(mkBlockAppendEvent(3, 1)),
+        WrappedEvent.Next(
+          mkMicroBlockAppendEvent(
+            height = 3,
+            forkNumber = 1,
+            microBlockNumber = 1,
+            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
+          )
+        ),
+        WrappedEvent.Next(mkRollbackEvent(
+          height = 2,
+          forkNumber = 1,
+          dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", 1, initX))
+        )),
+        WrappedEvent.Failed(UpstreamTimeoutException(1.minute)),
+        WrappedEvent.Next(mkBlockAppendEvent(2, 2)),
+        WrappedEvent.Next(
+          mkMicroBlockAppendEvent(
+            height = 2,
+            forkNumber = 2,
+            microBlockNumber = 1,
+            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
+          )
+        )
+      ),
+      xGt0 = true
+    )
   }
 
-  "a transaction isn't received after a timeout" - {
+  "a transaction isn't received after a timeout if the previous event is" - {
     "block" in test(
       events = List(
         WrappedEvent.Next(mkBlockAppendEvent(1, 1)),
@@ -138,6 +170,59 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
       ),
       xGt0 = false
     )
+
+    "a rollback" - {
+      "to a block" in test(
+        events = List(
+          WrappedEvent.Next(mkBlockAppendEvent(1, 1)),
+          WrappedEvent.Next(mkBlockAppendEvent(2, 1)),
+          WrappedEvent.Next(mkBlockAppendEvent(3, 1)),
+          WrappedEvent.Next(
+            mkMicroBlockAppendEvent(
+              height = 3,
+              forkNumber = 1,
+              microBlockNumber = 1,
+              dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
+            )
+          ),
+          WrappedEvent.Next(mkRollbackEvent(
+            height = 2,
+            forkNumber = 1,
+            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", 1, initX))
+          )),
+          WrappedEvent.Failed(UpstreamTimeoutException(1.minute)),
+          WrappedEvent.Next(mkBlockAppendEvent(2, 2)),
+          WrappedEvent.Next(mkBlockAppendEvent(3, 2))
+        ),
+        xGt0 = false
+      )
+
+      "to a micro block" in test(
+        events = List(
+          WrappedEvent.Next(mkBlockAppendEvent(1, 1)),
+          WrappedEvent.Next(mkBlockAppendEvent(2, 1)),
+          WrappedEvent.Next(mkMicroBlockAppendEvent(2, 1, 1)),
+          WrappedEvent.Next(
+            mkMicroBlockAppendEvent(
+              height = 2,
+              forkNumber = 1,
+              microBlockNumber = 1,
+              dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
+            )
+          ),
+          WrappedEvent.Next(mkRollbackEvent(
+            height = 2,
+            forkNumber = 1,
+            microBlockNumber = 1,
+            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", 1, initX))
+          )),
+          WrappedEvent.Failed(UpstreamTimeoutException(1.minute)),
+          WrappedEvent.Next(mkBlockAppendEvent(2, 2)),
+          WrappedEvent.Next(mkBlockAppendEvent(3, 2))
+        ),
+        xGt0 = false
+      )
+    }
   }
 
   /** @param xGt0
@@ -254,12 +339,20 @@ func foo() = {
     Script.fromBase64String(Base64.encode(compiledScript.bytes)).explicitGet()
   }
 
-  private def mkRollbackEvent(height: Int): SubscribeEvent = SubscribeEvent().withUpdate(
+  private def mkRollbackEvent(
+      height: Int,
+      forkNumber: Int,
+      microBlockNumber: Int = 0,
+      dataEntryUpdates: List[StateUpdate.DataEntryUpdate] = Nil
+  ): SubscribeEvent = SubscribeEvent().withUpdate(
     BlockchainUpdated()
+      .withId(toByteString32(forkNumber, height, microBlockNumber))
       .withHeight(height)
       .withUpdate(
         BlockchainUpdated.Update.Rollback(
-          BlockchainUpdated.Rollback()
+          BlockchainUpdated
+            .Rollback()
+            .withRollbackStateUpdate(StateUpdate.defaultInstance.withDataEntries(dataEntryUpdates))
         )
       )
   )

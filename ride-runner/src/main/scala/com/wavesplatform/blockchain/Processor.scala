@@ -226,14 +226,14 @@ class BlockchainProcessor(
       // TODO use rollback with None changes
       accumulatedChanges = lastEvent.update match {
         case Update.Empty              => accumulatedChanges // Ignore
-        case Update.Append(append)     => processRollback(rollbackToHeight, append)
-        case Update.Rollback(rollback) => accumulatedChanges // TODO
+        case Update.Append(append)     => undo(rollbackToHeight, append)
+        case Update.Rollback(rollback) => accumulatedChanges // undo(rollbackToHeight, rollback)
       }
       removeBlocksFrom(Height(rollbackToHeight + 1))
     }
   }
 
-  private def processRollback(h: Height, append: BlockchainUpdated.Append): ProcessResult[RequestKey] = {
+  private def undo(h: Height, append: BlockchainUpdated.Append): ProcessResult[RequestKey] = {
     // Almost all scripts use the height, so we can run all of them
     val withUpdatedHeight = accumulatedChanges.copy(newHeight = h) // TODO #31 Affect all scripts if height is increased
 
@@ -295,6 +295,41 @@ class BlockchainProcessor(
             })
         }
     }
+  }
+
+
+  private def undo(h: Height, rollback: BlockchainUpdated.Rollback): ProcessResult[RequestKey] = rollbackProcessingTime.measure {
+    // TODO #20 The height will be eventually > if this is a rollback, so we need to run all scripts
+    // Almost all scripts use the height
+    val withUpdatedHeight = accumulatedChanges.copy(newHeight = h)
+
+    blockchainStorage.vrf.removeFrom(h + 1)
+
+    val stateUpdate = rollback.getRollbackStateUpdate
+    withUpdatedHeight
+      .pipe(stateUpdate.assets.foldLeft(_) { case (r, x) =>
+        r.withRollbackResult(blockchainStorage.assets.rollback(h, x))
+      })
+      .pipe(stateUpdate.balances.foldLeft(_) { case (r, x) =>
+        r.withRollbackResult(blockchainStorage.accountBalances.rollback(h, x))
+      })
+      .pipe(stateUpdate.leasingForAddress.foldLeft(_) { case (r, x) =>
+        r.withRollbackResult(blockchainStorage.accountLeaseBalances.rollback(h, x))
+      })
+      .pipe(stateUpdate.dataEntries.foldLeft(_) { case (r, x) =>
+        r.withRollbackResult(blockchainStorage.data.rollback(h, x))
+      })
+      .pipe(rollback.removedTransactionIds.foldLeft(_) { case (r, txId) =>
+        r.withRollbackResult(blockchainStorage.transactions.remove(txId))
+      })
+    /* TODO #29: Will be fixed (or not) soon with a new BlockchainUpdates API
+       NOTE: Ignoring, because 1) almost impossible 2) transactions return to blockchain eventually
+      .pipe(stateUpdate.aliases.foldLeft(_) { case (r, x) =>
+        r.withRollbackResult(blockchainStorage.aliases.rollback(h, x))
+      })
+      .pipe(stateUpdate.accountScripts.foldLeft(_) { case (r, x) =>
+        r.withRollbackResult(blockchainStorage.accountScripts.rollback(h, x))
+      }) */
   }
 
   override def removeBlocksFrom(height: Height): Unit = blockchainStorage.blockHeaders.removeFrom(height)
