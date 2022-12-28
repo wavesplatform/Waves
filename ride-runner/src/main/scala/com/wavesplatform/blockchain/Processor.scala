@@ -6,6 +6,7 @@ import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.api.http.ApiException
 import com.wavesplatform.api.http.utils.UtilsApiRoute
 import com.wavesplatform.blockchain.BlockchainProcessor.{ProcessResult, Settings}
+import com.wavesplatform.blockchain.RestApiScript.LastUpdatedKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
@@ -21,8 +22,9 @@ import com.wavesplatform.storage.{DataKey, RequestsStorage}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.execution.Scheduler
-import play.api.libs.json.JsObject
+import play.api.libs.json.{JsNumber, JsObject}
 
+import java.util.concurrent.TimeUnit
 import scala.collection.concurrent.TrieMap
 import scala.util.chaining.scalaUtilChainingOps
 
@@ -35,11 +37,10 @@ trait Processor {
 
   def removeBlocksFrom(height: Height): Unit
 
-  /**
-    * Includes removeBlocksFrom
+  /** Includes removeBlocksFrom
     * @param toHeight
     */
-  //def rollbackAll(toHeight: Height): Unit
+  def forceRollbackOne(): Unit
 
   def process(event: BlockchainUpdated): Unit
 
@@ -60,8 +61,11 @@ class BlockchainProcessor(
   }
 
   @volatile private var accumulatedChanges = new ProcessResult[RequestKey]()
+  @volatile private var lastEvent          = none[BlockchainUpdated]
 
   override def process(event: BlockchainUpdated): Unit = {
+    lastEvent = event.some
+
     val height = Height(event.height)
     accumulatedChanges = event.update match {
       case Update.Empty              => accumulatedChanges // Ignore
@@ -204,11 +208,94 @@ class BlockchainProcessor(
 
   override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] = blockchainStorage.blockHeaders.getLocal(height).map(_.id() == id)
 
+  /** Includes removeBlocksFrom
+    *
+    * @param toHeight
+    */
+  override def forceRollbackOne(): Unit = {
+    lastEvent match {
+      case None => throw new RuntimeException("Can't force rollback one")
+      case Some(lastEvent) =>
+        val rollbackToHeight = Height(lastEvent.height - 1) // -1 because we undo the lastEvent
+        // TODO use rollback with None changes
+        accumulatedChanges = lastEvent.update match {
+          case Update.Empty              => accumulatedChanges // Ignore
+          case Update.Append(append)     => processRollback(rollbackToHeight, append)
+          case Update.Rollback(rollback) => accumulatedChanges // TODO
+        }
+        removeBlocksFrom(Height(rollbackToHeight + 1))
+    }
+  }
+
+  private def processRollback(h: Height, append: BlockchainUpdated.Append): ProcessResult[RequestKey] = {
+    // Almost all scripts use the height, so we can run all of them
+    val withUpdatedHeight = accumulatedChanges.copy(newHeight = h) // TODO #31 Affect all scripts if height is increased
+
+    val (txs, timer) = append.body match {
+      case Body.Block(block)           => (block.getBlock.transactions, blockProcessingTime.some)
+      case Body.MicroBlock(microBlock) => (microBlock.getMicroBlock.getMicroBlock.transactions, microBlockProcessingTime.some)
+      case Body.Empty                  => (Seq.empty, none)
+    }
+
+    timer match {
+      case None => withUpdatedHeight
+      case Some(timer) =>
+        timer.measure {
+          val stateUpdate = (append.getStateUpdate +: append.transactionStateUpdates).view
+          val txsView     = txs.view.map(_.transaction)
+          withUpdatedHeight
+            .pipe(stateUpdate.flatMap(_.assets).foldLeft(_) { case (r, x) =>
+              r.withRollbackResult(blockchainStorage.assets.reverseAppend(h, x))
+            })
+            .pipe(stateUpdate.flatMap(_.balances).foldLeft(_) { case (r, x) =>
+              r.withRollbackResult(blockchainStorage.accountBalances.reverseAppend(h, x))
+            })
+            .pipe(stateUpdate.flatMap(_.leasingForAddress).foldLeft(_) { case (r, x) =>
+              r.withRollbackResult(blockchainStorage.accountLeaseBalances.reverseAppend(h, x))
+            })
+            .pipe(stateUpdate.flatMap(_.dataEntries).foldLeft(_) { case (r, x) =>
+              r.withRollbackResult(blockchainStorage.data.reverseAppend(h, x))
+            })
+            .pipe(
+              txsView
+                .flatMap {
+                  case Transaction.WavesTransaction(tx) =>
+                    tx.data match {
+                      case Data.SetScript(txData) => (tx.senderPublicKey.toPublicKey, txData.script).some
+                      case _                      => none
+                    }
+                  case _ => none
+                }
+                .foldLeft(_) { case (r, (pk, _)) =>
+                  r.withRollbackResult(blockchainStorage.accountScripts.reverseAppend(h, pk))
+                }
+            )
+            .pipe(
+              txsView
+                .flatMap {
+                  case Transaction.WavesTransaction(tx) =>
+                    tx.data match {
+                      case Data.CreateAlias(txData) => (txData.alias, tx.senderPublicKey.toPublicKey).some
+                      case _                        => none
+                    }
+                  case _ => none
+                }
+                .foldLeft(_) { case (r, (alias, _)) =>
+                  r.withRollbackResult(blockchainStorage.aliases.reverseAppend(h, alias))
+                }
+            )
+            .pipe(append.transactionIds.foldLeft(_) { case (r, txId) =>
+              r.withRollbackResult(blockchainStorage.transactions.remove(txId))
+            })
+        }
+    }
+  }
+
   override def removeBlocksFrom(height: Height): Unit = blockchainStorage.blockHeaders.removeFrom(height)
 
   private def runScript(script: RestApiScript, hasCaches: Boolean): Task[JsObject] = Task {
     val refreshed = rideScriptRunTime.withTag("has-caches", hasCaches).measure {
-      script.refreshed(settings.enableTraces, settings.evaluateScriptComplexityLimit, settings.maxTxErrorLogSize)
+      script.refreshed(settings.enableTraces, settings.evaluateScriptComplexityLimit, settings.maxTxErrorLogSize, runScriptsScheduler)
     }
     val key = script.key
     storage.put(key, refreshed)
@@ -274,13 +361,22 @@ object BlockchainProcessor {
 case class RestApiScript(address: Address, blockchain: Blockchain, request: JsObject, lastResult: JsObject) {
   def key: RequestKey = (address, request)
 
-  def refreshed(trace: Boolean, evaluateScriptComplexityLimit: Int, maxTxErrorLogSize: Int): RestApiScript = {
-    val result = UtilsApiRoute.evaluate(evaluateScriptComplexityLimit, blockchain, address, request, trace, maxTxErrorLogSize)
-    copy(lastResult = result)
+  def refreshed(trace: Boolean, evaluateScriptComplexityLimit: Int, maxTxErrorLogSize: Int, scheduler: Scheduler): RestApiScript = {
+    val result = UtilsApiRoute.evaluate(
+      evaluateScriptComplexityLimit,
+      blockchain,
+      address,
+      request,
+      trace,
+      maxTxErrorLogSize
+    )
+    copy(lastResult = result + (LastUpdatedKey -> JsNumber(scheduler.clockMonotonic(TimeUnit.MILLISECONDS))))
   }
 }
 
 object RestApiScript {
+  val LastUpdatedKey = "__lastUpdated"
+
   def apply(address: Address, blockchainStorage: SharedBlockchainData[RequestKey], request: JsObject): RestApiScript = {
     new RestApiScript(address, new ScriptBlockchain[RequestKey](blockchainStorage, (address, request)), request, JsObject.empty)
   }

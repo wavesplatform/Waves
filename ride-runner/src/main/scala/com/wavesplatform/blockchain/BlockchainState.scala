@@ -78,13 +78,12 @@ object BlockchainState extends ScorexLogging {
       }
       require(currHeight > 1, "Uncaught case") // TODO
 
-      val startingHeight = Height(currHeight - 1)
-      // processor.rollbackAll(startingHeight)
-
+      processor.forceRollbackOne()
       blockchainUpdatesStream.start(currHeight)
 
-      log.warn(s"Closed by a remote part, restarting from $currHeight. Reason: $event")
-      ResolvingFork(currHeight, startingHeight, microBlockNumber = 0)
+      val startingHeight = Height(currHeight - 1)
+      log.warn(s"Closed by a remote part, restarting from $startingHeight. Reason: $event")
+      ResolvingFork(startingHeight, currHeight, microBlockNumber = 0)
     }
 
     event match {

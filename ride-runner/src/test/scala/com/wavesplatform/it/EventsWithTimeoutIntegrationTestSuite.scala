@@ -5,7 +5,7 @@ import com.google.common.primitives.Ints
 import com.google.protobuf.{ByteString, UnsafeByteOperations}
 import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.block.SignedBlockHeader
-import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
+import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, RestApiScript, SharedBlockchainData}
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.*
@@ -49,9 +49,9 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
 
   private val initX = 0
 
-  "a transaction received after a timeout" - {
+  "a transaction is received after a timeout" - {
     "block" in test(
-      expectedEvents = List(
+      events = List(
         WrappedEvent.Next(mkBlockAppendEvent(1, 1)),
         WrappedEvent.Next(
           mkBlockAppendEvent(
@@ -73,7 +73,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
     )
 
     "micro block" in test(
-      expectedEvents = List(
+      events = List(
         WrappedEvent.Next(mkBlockAppendEvent(1, 1)),
         WrappedEvent.Next(mkBlockAppendEvent(2, 1)),
         WrappedEvent.Next(
@@ -86,10 +86,9 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
         ),
         WrappedEvent.Failed(UpstreamTimeoutException(1.minute)),
         WrappedEvent.Next(mkBlockAppendEvent(2, 2)),
-        WrappedEvent.Next(mkBlockAppendEvent(3, 2)),
         WrappedEvent.Next(
           mkMicroBlockAppendEvent(
-            height = 3,
+            height = 2,
             forkNumber = 2,
             microBlockNumber = 1,
             dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
@@ -100,10 +99,29 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
     )
   }
 
+  "a transaction isn't received after a timeout" - {
+    "block" in test(
+      events = List(
+        WrappedEvent.Next(mkBlockAppendEvent(1, 1)),
+        WrappedEvent.Next(
+          mkBlockAppendEvent(
+            height = 2,
+            forkNumber = 1,
+            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
+          )
+        ),
+        WrappedEvent.Failed(UpstreamTimeoutException(1.minute)), // Removes the last block, so we didn't see the data update
+        WrappedEvent.Next(mkBlockAppendEvent(2, 2)),
+        WrappedEvent.Next(mkMicroBlockAppendEvent(2, 2, 1)) // Resolves a synthetic fork
+      ),
+      xGt0 = false
+    )
+  }
+
   /** @param xGt0
-    *   An expected script result, x > 0?
+    *   An expected script result, x > 0? The initial value is 0
     */
-  private def test(expectedEvents: List[WrappedEvent[SubscribeEvent]], xGt0: Boolean): Unit = Using.Manager { use =>
+  private def test(events: List[WrappedEvent[SubscribeEvent]], xGt0: Boolean): Unit = Using.Manager { use =>
     implicit val testScheduler = TestScheduler()
 
     val blockchainApi = new TestBlockchainApi() {
@@ -130,9 +148,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
       blockchainApi
     )
 
-    val request: (Address, JsObject) = aliceAddr -> Json.obj(
-      "expr" -> "foo()"
-    )
+    val request = aliceAddr -> Json.obj("expr" -> "foo()")
     val processor = new BlockchainProcessor(
       BlockchainProcessor.Settings(
         enableTraces = false,
@@ -141,26 +157,28 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
       ),
       blockchainStorage,
       new RequestsStorage {
-        override def all(): List[(Address, JsObject)] = List(request)
-
+        override def all(): List[(Address, JsObject)]     = List(request)
         override def append(x: (Address, JsObject)): Unit = {} // Ignore, because no way to evaluate a new expr
       },
       testScheduler
     )
 
     processor.runScripts(forceAll = true).runToFuture
-    testScheduler.tick()
+    testScheduler.tick(1.milli) // 1 millisecond to detect that script will be ran in the end
+
+    def getScriptResult = Await.result(processor.getCachedResultOrRun(request._1, request._2).runToFuture, 5.seconds)
+    val before          = getScriptResult
 
     val blockchainUpdatesStream = use(blockchainApi.mkBlockchainUpdatesStream(testScheduler))
 
     val workingHeight = Height(1)
-    val events = blockchainUpdatesStream.downstream
+    val eventsStream = blockchainUpdatesStream.downstream
       .doOnError(e =>
         Task {
           log.error("Error!", e)
         }
       )
-      .take(expectedEvents.size)
+      .take(events.size)
       .scanEval(Task.now[BlockchainState](BlockchainState.Starting(Height(0), workingHeight))) {
         BlockchainState(processor, blockchainUpdatesStream, _, _)
       }
@@ -174,21 +192,26 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
       .runToFuture
 
     blockchainUpdatesStream.start(1)
-    expectedEvents.foreach(blockchainApi.blockchainUpdatesUpstream.onNext)
+    events.foreach(blockchainApi.blockchainUpdatesUpstream.onNext)
 
     testScheduler.tick()
 
     withClue(dumpedTasks) {
       testScheduler.state.tasks shouldBe empty
     }
-    Await.result(events, 5.seconds)
+    log.info(s"The last result: ${Await.result(eventsStream, 5.seconds)}")
 
-    val newResultTask = processor.getCachedResultOrRun(request._1, request._2).runToFuture
-    val r             = Await.result(newResultTask, 5.seconds)
-    withClue(Json.prettyPrint(r)) {
-      (r \ "result" \ "value" \ "_2" \ "value").as[Boolean] shouldBe xGt0
+    val after = getScriptResult
+    withClue("was refreshed:") {
+      val runTimeBefore = (before \ RestApiScript.LastUpdatedKey).as[Long]
+      val runTimeAfter  = (after \ RestApiScript.LastUpdatedKey).as[Long]
+      runTimeAfter should be > runTimeBefore
     }
-  }
+
+    withClue(Json.prettyPrint(after)) {
+      (after \ "result" \ "value" \ "_2" \ "value").as[Boolean] shouldBe xGt0
+    }
+  }.get
 
   private def mkScript(): Script = {
     val scriptSrc =

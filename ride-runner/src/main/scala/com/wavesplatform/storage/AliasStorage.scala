@@ -3,7 +3,7 @@ package com.wavesplatform.storage
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.grpc.BlockchainApi
-import com.wavesplatform.storage.actions.AppendResult
+import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
 import com.wavesplatform.storage.persistent.PersistentCache
 
 // It seems, we don't need to update this. Only for some optimization needs
@@ -13,4 +13,7 @@ class AliasStorage[TagT](chainId: Byte, blockchainApi: BlockchainApi, override v
 
   def append(height: Int, rawAlias: String, account: PublicKey): AppendResult[TagT] =
     append(height, Alias.createWithChainId(rawAlias, chainId).explicitGet(), account.toAddress(chainId))
+
+  def reverseAppend(height: Int, rawAlias: String): RollbackResult[TagT] =
+    reverseAppend(height, Alias.createWithChainId(rawAlias, chainId).explicitGet())
 }
