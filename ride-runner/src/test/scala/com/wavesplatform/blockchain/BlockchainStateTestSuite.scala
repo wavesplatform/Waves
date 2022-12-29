@@ -16,7 +16,7 @@ class BlockchainStateTestSuite extends BaseTestSuite {
       "append" - {
         "reaching the blockchain height - become Working, process the event and run scripts" in {
           val event     = mkBlockAppendEvent(10)
-          val processor = new EmptyProcessor
+          val processor = new TestProcessor
 
           val updatedState = nextState(processor, BlockchainState.Starting(Height(9), Height(10)), event)
           updatedState shouldBe a[BlockchainState.Working]
@@ -28,13 +28,13 @@ class BlockchainStateTestSuite extends BaseTestSuite {
 
         "not reaching the blockchain height - still Starting" in {
           val event        = mkBlockAppendEvent(9)
-          val updatedState = nextState(new EmptyProcessor, BlockchainState.Starting(Height(9), Height(10)), event)
+          val updatedState = nextState(new TestProcessor, BlockchainState.Starting(Height(9), Height(10)), event)
           updatedState shouldBe a[BlockchainState.Starting]
         }
 
         "not found a block - only process the event" in {
           val event     = mkBlockAppendEvent(9)
-          val processor = new EmptyProcessor
+          val processor = new TestProcessor
 
           val _ = nextState(processor, BlockchainState.Starting(Height(8), Height(10)), event)
           processor.actions shouldBe Vector(Process(event))
@@ -42,7 +42,7 @@ class BlockchainStateTestSuite extends BaseTestSuite {
 
         "found the same block - only process the event" in {
           val event = mkBlockAppendEvent(9)
-          val processor = new EmptyProcessor {
+          val processor = new TestProcessor {
             override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] = Some(true)
           }
 
@@ -52,7 +52,7 @@ class BlockchainStateTestSuite extends BaseTestSuite {
 
         "found a difference - remove old fork data and process the event" in {
           val event = mkBlockAppendEvent(9)
-          val processor = new EmptyProcessor {
+          val processor = new TestProcessor {
             override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] = Some(false)
           }
 
@@ -66,7 +66,7 @@ class BlockchainStateTestSuite extends BaseTestSuite {
 
       "rollback - remove old fork data and process the event" in {
         val event     = mkRollbackEvent(1)
-        val processor = new EmptyProcessor
+        val processor = new TestProcessor
 
         val updatedState = nextState(processor, BlockchainState.Starting(Height(9), Height(10)), event)
         updatedState shouldBe a[BlockchainState.Starting]
@@ -81,7 +81,7 @@ class BlockchainStateTestSuite extends BaseTestSuite {
       "append" - {
         "block - process the event and run scripts" in {
           val event     = mkBlockAppendEvent(11)
-          val processor = new EmptyProcessor
+          val processor = new TestProcessor
 
           val updatedState = nextState(processor, BlockchainState.Working(Height(10)), event)
           updatedState shouldBe a[BlockchainState.Working]
@@ -93,7 +93,7 @@ class BlockchainStateTestSuite extends BaseTestSuite {
 
         "micro block - process the event and run scripts" in {
           val event     = mkMicroBlockAppendEvent(10)
-          val processor = new EmptyProcessor
+          val processor = new TestProcessor
 
           val updatedState = nextState(processor, BlockchainState.Working(Height(10)), event)
           updatedState shouldBe a[BlockchainState.Working]
@@ -106,7 +106,7 @@ class BlockchainStateTestSuite extends BaseTestSuite {
 
       "rollback - become ResolvingFork, remove old fork data and process the event" in {
         val event     = mkRollbackEvent(1)
-        val processor = new EmptyProcessor
+        val processor = new TestProcessor
 
         val updatedState = nextState(processor, BlockchainState.Working(Height(10)), event)
         updatedState shouldBe a[BlockchainState.ResolvingFork]
@@ -118,29 +118,11 @@ class BlockchainStateTestSuite extends BaseTestSuite {
     }
 
     "ResolvingFork" - {
-      "append" - {
-        "block - process the event" in {
-          val event     = mkBlockAppendEvent(11)
-          val processor = new EmptyProcessor
-
-          val _ = nextState(processor, BlockchainState.ResolvingFork(Height(10), Height(10), 0), event)
-          processor.actions shouldBe Vector(Process(event))
-        }
-
-        "micro block - process the event" in {
-          val event     = mkMicroBlockAppendEvent(10)
-          val processor = new EmptyProcessor
-
-          val _ = nextState(processor, BlockchainState.ResolvingFork(Height(10), Height(10), 0), event)
-          processor.actions shouldBe Vector(Process(event))
-        }
-      }
-
       "rollback - remove old fork data and process the event" in {
         val event     = mkRollbackEvent(1)
-        val processor = new EmptyProcessor
+        val processor = new TestProcessor
 
-        val updatedState = nextState(processor, BlockchainState.ResolvingFork(Height(10), Height(10), 0), event)
+        val updatedState = nextState(processor, BlockchainState.ResolvingFork(Height(10), 0, Height(10)), event)
         updatedState shouldBe a[BlockchainState.ResolvingFork]
         processor.actions shouldBe Vector(
           RemoveFrom.next(event),
@@ -151,19 +133,24 @@ class BlockchainStateTestSuite extends BaseTestSuite {
       "fork resolution" - {
         "doesn't resolve after reaching an origin fork height + 1" in {
           val event     = mkBlockAppendEvent(11)
-          val processor = new EmptyProcessor
+          val processor = new TestProcessor
 
-          val updatedState = nextState(processor, BlockchainState.ResolvingFork(Height(10), Height(10), 0), event)
-          updatedState shouldBe a[BlockchainState.ResolvingFork]
+          val updatedState = nextState(
+            processor,
+            BlockchainState.ResolvingFork.from(rollbackHeight = Height(10), origForkHeight = Height(10)),
+            event
+          )
+
+          isA[BlockchainState.ResolvingFork](updatedState).isRollbackResolved shouldBe false
           processor.actions shouldBe Vector(Process(event))
         }
 
         "resolve after and run scripts" - {
           "reaching an origin fork height + 2" in {
             val event     = mkBlockAppendEvent(12)
-            val processor = new EmptyProcessor
+            val processor = new TestProcessor
 
-            val updatedState = nextState(processor, BlockchainState.ResolvingFork(Height(11), Height(10), 0), event)
+            val updatedState = nextState(processor, BlockchainState.ResolvingFork(Height(11), 0, Height(10)), event)
             updatedState shouldBe a[BlockchainState.Working]
             processor.actions shouldBe Vector(
               Process(event),
@@ -173,9 +160,9 @@ class BlockchainStateTestSuite extends BaseTestSuite {
 
           "reaching an origin fork height + 1 and getting a micro block" in {
             val event     = mkMicroBlockAppendEvent(11)
-            val processor = new EmptyProcessor
+            val processor = new TestProcessor
 
-            val updatedState = nextState(processor, BlockchainState.ResolvingFork(Height(11), Height(10), 0), event)
+            val updatedState = nextState(processor, BlockchainState.ResolvingFork(Height(11), 0, Height(10)), event)
             updatedState shouldBe a[BlockchainState.Working]
             processor.actions shouldBe Vector(
               Process(event),

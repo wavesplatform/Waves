@@ -17,50 +17,57 @@ import monix.execution.exceptions.UpstreamTimeoutException
 sealed trait BlockchainState extends Product with Serializable
 
 object BlockchainState extends ScorexLogging {
-  case class Starting(currHeight: Height, workingHeight: Height, foundDifferentBlocks: Boolean = false) extends BlockchainState {
+  // TODO #66 Merge with ResolvingFork?
+  case class Starting(processedHeight: Height, workingHeight: Height, foundDifferentBlocks: Boolean = false) extends BlockchainState {
     def withDifferentBlocks: Starting = copy(foundDifferentBlocks = true)
   }
 
-  case class Working(height: Height) extends BlockchainState {
-    def withHeight(height: Height): Working = copy(height = height)
-    override def toString: String           = s"Working($height)"
+  case class Working(processedHeight: Height) extends BlockchainState {
+    def withHeight(height: Height): Working = copy(processedHeight = height)
+    override def toString: String           = s"Working($processedHeight)"
   }
 
-  case class ResolvingFork(currHeight: Height, origHeight: Height, microBlockNumber: Int) extends BlockchainState {
+  case class ResolvingFork(processedHeight: Height, processedMicroBlockNumber: Int, minResolveHeight: Height) extends BlockchainState {
     def apply(event: SubscribeEvent): ResolvingFork =
       copy(
-        currHeight = Height(event.getUpdate.height),
-        microBlockNumber = event.getUpdate.update match {
-          case Update.Empty       => microBlockNumber
+        processedHeight = Height(event.getUpdate.height),
+        processedMicroBlockNumber = event.getUpdate.update match {
+          case Update.Empty       => processedMicroBlockNumber
           case _: Update.Rollback => 0
           case Update.Append(append) =>
             append.body match {
-              case Body.Empty         => microBlockNumber
+              case Body.Empty         => processedMicroBlockNumber
               case _: Body.Block      => 0
-              case _: Body.MicroBlock => microBlockNumber + 1
+              case _: Body.MicroBlock => processedMicroBlockNumber + 1
             }
         }
       )
 
-    def withHeight(currHeight: Height): ResolvingFork = copy(currHeight = currHeight, microBlockNumber = 0)
+    def withProcessedHeight(height: Height): ResolvingFork = copy(processedHeight = height, processedMicroBlockNumber = 0)
 
     def isRollbackResolved: Boolean = {
-      val resolveHeight = origHeight + 1
       // Rollback is resolved, when the new fork height > an old fork height.
       // But we will wait a micro block or a next block, because lost transactions will highly likely appear in the next micro block
-      currHeight > resolveHeight ||
-      currHeight == resolveHeight && microBlockNumber >= 1
+      processedHeight > minResolveHeight ||
+      processedHeight == minResolveHeight && processedMicroBlockNumber >= 1
     }
 
-    override def toString: String = s"ResolvingFork($currHeight-..->$origHeight, mbn: $microBlockNumber)"
+    override def toString: String = s"ResolvingFork($processedHeight-..->$minResolveHeight, mbn: $processedMicroBlockNumber)"
   }
 
   object ResolvingFork {
-    def from(origHeight: Height, event: SubscribeEvent): ResolvingFork =
-      new ResolvingFork(
-        currHeight = Height(event.getUpdate.height),
-        origHeight = origHeight,
-        microBlockNumber = 0
+    def from(rollbackHeight: Height, origForkHeight: Height): ResolvingFork =
+      ResolvingFork(
+        processedHeight = rollbackHeight,
+        processedMicroBlockNumber = 0,
+        minResolveHeight = Height(origForkHeight + 1) // A new fork can't have a lesser height
+      )
+
+    def forceRollBackOne(processedHeight: Height, workingStateHeight: Height): ResolvingFork =
+      ResolvingFork(
+        processedHeight = Height(processedHeight - 1),
+        processedMicroBlockNumber = 0,
+        minResolveHeight = workingStateHeight
       )
   }
 
@@ -73,19 +80,20 @@ object BlockchainState extends ScorexLogging {
     def forceRestart(): BlockchainState = {
       val (currHeight, workingStateHeight) = orig match {
         // -1 because of how ResolvingFork.resolveFork works. TODO #62 replace origHeight in ResolvingFork by resolveHeight
-        case orig: Starting      => (orig.currHeight, Height(orig.workingHeight - 1))
-        case Working(height)     => (height, Height(height - 1))
-        case orig: ResolvingFork => (orig.currHeight, orig.origHeight)
+        case orig: Starting      => (orig.processedHeight, orig.workingHeight)
+        case Working(height)     => (height, height)
+        case orig: ResolvingFork => (orig.processedHeight, orig.minResolveHeight)
       }
 
       // Almost impossible on MainNet and TestNet, so we can neglect this
       require(currHeight > 1, "Uncaught case. Check a connectivity to gRPC servers, remove all caches and restart the service")
 
       processor.forceRollbackOne()
-      blockchainUpdatesStream.start(currHeight)
+      val r = ResolvingFork.forceRollBackOne(currHeight, workingStateHeight)
 
-      log.warn(s"Closed by a remote part, restarting from $currHeight. Reason: $event")
-      ResolvingFork(Height(currHeight - 1), workingStateHeight, microBlockNumber = 0)
+      blockchainUpdatesStream.start(r.processedHeight + 1)
+      log.warn(s"Closed by a remote part, restarting. Reason: $event")
+      r
     }
 
     event match {
@@ -141,7 +149,7 @@ object BlockchainState extends ScorexLogging {
             if (h >= comparedBlocks.workingHeight) {
               log.debug(s"[$h] Reached the current height, run all scripts")
               processor.runScripts().as(Working(h))
-            } else Task.now(comparedBlocks.copy(currHeight = h))
+            } else Task.now(comparedBlocks.copy(processedHeight = h))
 
           case _: Update.Rollback =>
             // It works even for micro blocks, because we have a restored version of data in event
@@ -161,7 +169,7 @@ object BlockchainState extends ScorexLogging {
           case _: Update.Rollback =>
             processor.removeBlocksFrom(Height(h + 1))
             processor.process(event.getUpdate)
-            Task.now(ResolvingFork.from(orig.height, event))
+            Task.now(ResolvingFork.from(Height(event.getUpdate.height), orig.processedHeight))
 
           case Update.Empty => Task.now(orig.withHeight(h))
         }
@@ -171,7 +179,7 @@ object BlockchainState extends ScorexLogging {
           case _: Update.Append =>
             processor.process(event.getUpdate)
             val updated = orig.apply(event)
-            if (updated.isRollbackResolved) processor.runScripts().as(Working(updated.currHeight))
+            if (updated.isRollbackResolved) processor.runScripts().as(Working(updated.processedHeight))
             else Task.now(updated)
 
           case _: Update.Rollback =>
@@ -179,7 +187,7 @@ object BlockchainState extends ScorexLogging {
             processor.process(event.getUpdate)
             Task.now(orig.apply(event))
 
-          case Update.Empty => Task.now(orig.withHeight(h))
+          case Update.Empty => Task.now(orig.withProcessedHeight(h))
         }
     }
 

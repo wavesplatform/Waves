@@ -2,7 +2,7 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.HttpRequest
 import com.wavesplatform.account.Address
-import com.wavesplatform.blockchain.EmptyProcessor
+import com.wavesplatform.blockchain.TestProcessor
 import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
 import monix.execution.Scheduler.global
@@ -16,7 +16,7 @@ class EvaluateApiRouteTestSuite extends RouteSpec("/utils") with RestAPISettings
 
   "EvaluateApiRoute" - {
     "POST /utils/script/evaluate/{address}" - {
-      val processor = new EmptyProcessor() {
+      val processor = new TestProcessor() {
         override def getCachedResultOrRun(address: Address, request: JsObject): Task[JsObject] =
           if (address == defaultAddr)
             Task.now(

@@ -8,7 +8,7 @@ import com.wavesplatform.state.Height
 import monix.eval.Task
 import play.api.libs.json.JsObject
 
-class EmptyProcessor extends Processor {
+class TestProcessor extends Processor {
   override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] = None
 
   override def getCachedResultOrRun(address: Address, request: JsObject): Task[JsObject] = Task.raiseError(new RuntimeException("Test"))
@@ -31,6 +31,8 @@ class EmptyProcessor extends Processor {
   }
 
   var actions: Vector[ProcessorAction] = Vector.empty
+
+  override def toString: String = s"TestProcessor(${actions.mkString(", ")})"
 }
 
 sealed trait ProcessorAction extends Product with Serializable
