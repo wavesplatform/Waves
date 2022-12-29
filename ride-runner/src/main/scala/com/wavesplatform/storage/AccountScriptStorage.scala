@@ -8,7 +8,7 @@ import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
 import com.wavesplatform.ride.input.EmptyPublicKey
 import com.wavesplatform.state.AccountScriptInfo
-import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
+import com.wavesplatform.storage.actions.AffectedTags
 import com.wavesplatform.storage.persistent.PersistentCache
 
 class AccountScriptStorage[TagT](
@@ -23,13 +23,13 @@ class AccountScriptStorage[TagT](
     }
   }
 
-  def append(height: Int, account: PublicKey, newScript: ByteString): AppendResult[TagT] =
+  def append(height: Int, account: PublicKey, newScript: ByteString): AffectedTags[TagT] =
     append(height, account.toAddress(chainId), toVanillaScript(newScript).map(toAccountScriptInfo(account, _)))
 
-  def undoAppend(height: Int, account: PublicKey): RollbackResult[TagT] =
+  def undoAppend(height: Int, account: PublicKey): AffectedTags[TagT] =
     undoAppend(height, account.toAddress(chainId))
 
-  def rollback(height: Int, account: PublicKey, newScript: ByteString): RollbackResult[TagT] =
+  def rollback(height: Int, account: PublicKey, newScript: ByteString): AffectedTags[TagT] =
     rollback(height, account.toAddress(chainId), toVanillaScript(newScript).map(toAccountScriptInfo(account, _)))
 
   def toAccountScriptInfo(account: PublicKey, script: Script): AccountScriptInfo = {

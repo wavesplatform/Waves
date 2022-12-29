@@ -6,7 +6,7 @@ import com.wavesplatform.grpc.BlockchainApi
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Height}
-import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
+import com.wavesplatform.storage.actions.AffectedTags
 import com.wavesplatform.storage.persistent.PersistentCache
 import com.wavesplatform.transaction.Asset.IssuedAsset
 
@@ -18,14 +18,14 @@ class AssetStorage[TagT](
 ) extends ExactWithHeightStorage[IssuedAsset, AssetDescription, TagT] {
   override def getFromBlockchain(key: IssuedAsset): Option[AssetDescription] = blockchainApi.getAssetDescription(key)
 
-  def append(height: Int, update: StateUpdate.AssetStateUpdate): AppendResult[TagT] = {
+  def append(height: Int, update: StateUpdate.AssetStateUpdate): AffectedTags[TagT] = {
     val asset = getAsset(update)
     append(height, asset, update.after.map(AssetStorage.toAssetDescription(asset, _)))
   }
 
-  def undoAppend(height: Int, update: StateUpdate.AssetStateUpdate): RollbackResult[TagT] = undoAppend(height, getAsset(update))
+  def undoAppend(height: Int, update: StateUpdate.AssetStateUpdate): AffectedTags[TagT] = undoAppend(height, getAsset(update))
 
-  def rollback(rollbackHeight: Int, update: StateUpdate.AssetStateUpdate): RollbackResult[TagT] = {
+  def rollback(rollbackHeight: Int, update: StateUpdate.AssetStateUpdate): AffectedTags[TagT] = {
     val asset = getAsset(update)
     rollback(rollbackHeight, asset, update.after.map(AssetStorage.toAssetDescription(asset, _)))
   }

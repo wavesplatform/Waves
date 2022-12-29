@@ -3,7 +3,7 @@ package com.wavesplatform.storage
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.grpc.BlockchainApi
-import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
+import com.wavesplatform.storage.actions.AffectedTags
 import com.wavesplatform.storage.persistent.PersistentCache
 
 // It seems, we don't need to update this. Only for some optimization needs
@@ -11,9 +11,9 @@ class AliasStorage[TagT](chainId: Byte, blockchainApi: BlockchainApi, override v
     extends ExactWithHeightStorage[Alias, Address, TagT] {
   override def getFromBlockchain(key: Alias): Option[Address] = blockchainApi.resolveAlias(key)
 
-  def append(height: Int, rawAlias: String, account: PublicKey): AppendResult[TagT] =
+  def append(height: Int, rawAlias: String, account: PublicKey): AffectedTags[TagT] =
     append(height, Alias.createWithChainId(rawAlias, chainId).explicitGet(), account.toAddress(chainId))
 
-  def undoAppend(height: Int, rawAlias: String): RollbackResult[TagT] =
+  def undoAppend(height: Int, rawAlias: String): AffectedTags[TagT] =
     undoAppend(height, Alias.createWithChainId(rawAlias, chainId).explicitGet())
 }

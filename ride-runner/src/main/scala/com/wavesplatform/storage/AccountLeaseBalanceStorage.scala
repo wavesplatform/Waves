@@ -5,7 +5,7 @@ import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.grpc.BlockchainApi
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.state.LeaseBalance
-import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
+import com.wavesplatform.storage.actions.AffectedTags
 import com.wavesplatform.storage.persistent.PersistentCache
 
 class AccountLeaseBalanceStorage[TagT](
@@ -18,15 +18,15 @@ class AccountLeaseBalanceStorage[TagT](
     Some(LeaseBalance(r.leaseIn, r.leaseOut))
   }
 
-  def append(height: Int, update: StateUpdate.LeasingUpdate): AppendResult[TagT] = {
+  def append(height: Int, update: StateUpdate.LeasingUpdate): AffectedTags[TagT] = {
     val address = toVanillaAddress(update.address, chainId)
     append(height, address, toVanilla(update))
   }
 
-  def undoAppend(height: Int, update: StateUpdate.LeasingUpdate): RollbackResult[TagT] = undoAppend(height, update.address.toAddress)
+  def undoAppend(height: Int, update: StateUpdate.LeasingUpdate): AffectedTags[TagT] = undoAppend(height, update.address.toAddress)
 
   // TODO #21 Copy-paste from append
-  def rollback(rollbackHeight: Int, update: StateUpdate.LeasingUpdate): RollbackResult[TagT] = {
+  def rollback(rollbackHeight: Int, update: StateUpdate.LeasingUpdate): AffectedTags[TagT] = {
     val address = toVanillaAddress(update.address, chainId)
     rollback(rollbackHeight, address, toVanilla(update))
   }

@@ -4,7 +4,7 @@ import cats.syntax.option.*
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.meta.getSimpleName
-import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
+import com.wavesplatform.storage.actions.AffectedTags
 import com.wavesplatform.storage.persistent.PersistentCache
 import com.wavesplatform.utils.ScorexLogging
 import kamon.instrumentation.caffeine.KamonStatsCounter
@@ -54,17 +54,11 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
       .mayBeValue
   }
 
-  // Use only for known before data
-  def reload(height: Int, key: KeyT): Unit = {
-    log.info(s"Invalidating $name($key)")
-    values.invalidate(key)
-  }
+  def append(height: Int, key: KeyT, update: ValueT): AffectedTags[TagT] = append(height, key, update.some)
 
-  def append(height: Int, key: KeyT, update: ValueT): AppendResult[TagT] = append(height, key, update.some)
-
-  def append(height: Int, key: KeyT, update: Option[ValueT]): AppendResult[TagT] = {
+  def append(height: Int, key: KeyT, update: Option[ValueT]): AffectedTags[TagT] = {
     Option(values.getIfPresent(key)) match {
-      case None => AppendResult.ignored
+      case None => AffectedTags.empty
       case Some(orig) =>
         val updated = RemoteData.loaded(update)
         log.debug(s"$key appended: $updated")
@@ -72,22 +66,22 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
         // TODO #36 This could be updated in a different thread
         persistentCache.set(height, key, updated) // Write here (not in "else"), because we want to preserve the height
 
-        if (updated == orig) AppendResult.ignored
+        if (updated == orig) AffectedTags.empty
         else {
           values.put(key, updated)
-          AppendResult.appended(mkDataKey(key), tagsOf(key))
+          AffectedTags(tagsOf(key))
         }
     }
   }
 
-  def undoAppend(rollbackHeight: Int, key: KeyT): RollbackResult[TagT] = rollback(rollbackHeight, key, None)
+  def undoAppend(rollbackHeight: Int, key: KeyT): AffectedTags[TagT] = rollback(rollbackHeight, key, None)
 
-  def rollback(rollbackHeight: Int, key: KeyT, after: ValueT): RollbackResult[TagT] = rollback(rollbackHeight, key, after.some)
+  def rollback(rollbackHeight: Int, key: KeyT, after: ValueT): AffectedTags[TagT] = rollback(rollbackHeight, key, after.some)
 
   // Micro blocks don't affect, because we know new values
-  def rollback(rollbackHeight: Int, key: KeyT, after: Option[ValueT]): RollbackResult[TagT] =
+  def rollback(rollbackHeight: Int, key: KeyT, after: Option[ValueT]): AffectedTags[TagT] =
     Option(values.getIfPresent(key)) match {
-      case None => RollbackResult.ignored
+      case None => AffectedTags.empty
       case Some(_) =>
         val tags   = tagsOf(key)
         val latest = persistentCache.remove(rollbackHeight + 1, key)
@@ -96,12 +90,11 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
             if (latest.loaded) {
               values.put(key, latest)
               log.debug(s"$key reloaded: ${latest.mayBeValue}")
-              RollbackResult.rolledBack(tags)
             } else {
-              values.put(key, RemoteData.Unknown) // TODO #64 do we still need uncertain keys?
+              values.put(key, RemoteData.Unknown) // Will be updated later during the run
               log.debug(s"$key: unknown")
-              RollbackResult.uncertain(mkDataKey(key), tags) // will be updated later
             }
+            AffectedTags(tags)
 
           case Some(after) =>
             val restored = RemoteData.Cached(after)
@@ -109,13 +102,7 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
             if (latest != restored) persistentCache.set(rollbackHeight, key, restored) // TODO #36 This could be updated in a different thread
             values.put(key, restored)
             log.trace(s"$key restored: $restored")
-            RollbackResult.rolledBack(tags)
+            AffectedTags(tags)
         }
     }
-
-  final def mkDataKey(key: KeyT): DataKey = StorageDataKey(key)
-
-  private case class StorageDataKey(key: KeyT) extends DataKey {
-    override def reload(height: Int): Unit = storage.reload(height, key)
-  }
 }

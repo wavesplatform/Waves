@@ -1,18 +1,16 @@
 package com.wavesplatform.storage
 
-import cats.syntax.option.*
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.google.protobuf.ByteString
 import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.grpc.BlockchainApi
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.state.{Height, TransactionId}
-import com.wavesplatform.storage.actions.{AppendResult, RollbackResult}
+import com.wavesplatform.storage.actions.AffectedTags
 import com.wavesplatform.storage.persistent.TransactionPersistentCache
 import com.wavesplatform.utils.ScorexLogging
 import kamon.instrumentation.caffeine.KamonStatsCounter
 
-import scala.jdk.CollectionConverters.ConcurrentMapHasAsScala
 import scala.util.chaining.scalaUtilChainingOps
 
 class TransactionStorage[TagT](
@@ -55,44 +53,39 @@ class TransactionStorage[TagT](
   }
 
   // Got a transaction, got a rollback, same transaction on new height/failed/removed
-  def setHeight(pbTxId: ByteString, height: Int): AppendResult[TagT] = {
+  def setHeight(pbTxId: ByteString, height: Int): AffectedTags[TagT] = {
     val txId = TransactionId(pbTxId.toByteStr)
     setHeight(txId, Height(height))
   }
 
-  def setHeight(txId: TransactionId, height: Height): AppendResult[TagT] =
+  def setHeight(txId: TransactionId, height: Height): AffectedTags[TagT] =
     Option(values.getIfPresent(txId)) match {
-      case None => AppendResult.ignored
+      case None => AffectedTags.empty
       case Some(orig) =>
         val updated = RemoteData.Cached(height)
-        if (updated == orig) AppendResult.ignored
+        if (updated == orig) AffectedTags.empty
         else {
           log.debug(s"Update Transactions($txId)")
           persistentCache.setHeight(txId, updated)
           values.put(txId, updated)
-          AppendResult.appended(mkDataKey(txId), tagsOf(txId))
+          AffectedTags(tagsOf(txId))
         }
     }
 
-  def remove(pbTxId: ByteString): RollbackResult[TagT] = remove(TransactionId(pbTxId.toByteStr))
-  def remove(txId: TransactionId): RollbackResult[TagT] =
+  def remove(pbTxId: ByteString): AffectedTags[TagT] = remove(TransactionId(pbTxId.toByteStr))
+  def remove(txId: TransactionId): AffectedTags[TagT] =
     Option(values.getIfPresent(txId)) match {
-      case None => RollbackResult.ignored
+      case None => AffectedTags.empty
       case _ =>
         log.info(s"Rollback Transactions($txId)")
         persistentCache.remove(txId)
-        RollbackResult.uncertain(mkDataKey(txId), tagsOf(txId)) // Will be updated later
+        values.put(txId, RemoteData.Absence)
+        AffectedTags(tagsOf(txId))
     }
 
   // Use only for known before data
   def reload(txId: TransactionId): Unit = {
     log.info(s"Invalidating Transactions($txId)")
     values.invalidate(txId)
-  }
-
-  final def mkDataKey(key: TransactionId): DataKey = StorageDataKey(key)
-
-  private case class StorageDataKey(txId: TransactionId) extends DataKey {
-    override def reload(height: Int): Unit = storage.reload(txId)
   }
 }
