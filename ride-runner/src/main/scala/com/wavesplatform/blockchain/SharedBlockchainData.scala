@@ -19,7 +19,7 @@ class SharedBlockchainData[TagT](val settings: BlockchainSettings, persistentCac
     extends ScorexLogging {
   private val chainId = settings.addressSchemeCharacter.toByte
 
-  val data = new AccountDataStorage[TagT](blockchainApi, persistentCaches.accountDataEntries)
+  val data = new AccountDataStorage[TagT](chainId, blockchainApi, persistentCaches.accountDataEntries)
 
   val accountScripts = new AccountScriptStorage[TagT](chainId, estimate, blockchainApi, persistentCaches.accountScripts)
 
@@ -57,9 +57,9 @@ class SharedBlockchainData[TagT](val settings: BlockchainSettings, persistentCac
 
   val aliases = new AliasStorage[TagT](chainId, blockchainApi, persistentCaches.aliases)
 
-  val accountBalances = new AccountBalanceStorage[TagT](blockchainApi, persistentCaches.accountBalances)
+  val accountBalances = new AccountBalanceStorage[TagT](chainId, blockchainApi, persistentCaches.accountBalances)
 
-  val accountLeaseBalances = new AccountLeaseBalanceStorage[TagT](blockchainApi, persistentCaches.accountLeaseBalances)
+  val accountLeaseBalances = new AccountLeaseBalanceStorage[TagT](chainId, blockchainApi, persistentCaches.accountLeaseBalances)
 
   val transactions = new TransactionStorage[TagT](blockchainApi, persistentCaches.transactions)
 

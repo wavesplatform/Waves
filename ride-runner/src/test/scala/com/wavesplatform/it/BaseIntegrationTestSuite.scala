@@ -3,7 +3,7 @@ package com.wavesplatform.it
 import cats.syntax.option.*
 import com.google.common.primitives.Ints
 import com.google.protobuf.{ByteString, UnsafeByteOperations}
-import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, RestApiScript, SharedBlockchainData}
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
@@ -12,7 +12,6 @@ import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.events.protobuf.{BlockchainUpdated, StateUpdate}
 import com.wavesplatform.grpc.DefaultBlockchainApi.*
 import com.wavesplatform.grpc.{DefaultBlockchainApi, HasGrpc}
-import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.lang.API
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
@@ -35,14 +34,6 @@ import scala.concurrent.duration.DurationInt
 import scala.util.Using
 
 abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with HasLevelDb with HasMonixHelpers {
-  protected val settings = DefaultBlockchainSettings
-  protected val chainId  = settings.addressSchemeCharacter.toByte
-
-  // TODO #65 AddressScheme in tests
-  AddressScheme.current = new AddressScheme {
-    override val chainId: Byte = settings.addressSchemeCharacter.toByte
-  }
-
   protected val miner     = Wallet.generateNewAccount("miner".getBytes(StandardCharsets.UTF_8), 0)
   protected val alice     = Wallet.generateNewAccount("alice".getBytes(StandardCharsets.UTF_8), 0)
   protected val aliceAddr = alice.toAddress(chainId)
@@ -60,7 +51,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
 
       override def getBlockHeader(height: Int): Option[SignedBlockHeader] = toVanilla(mkPbBlock(height)).some
 
-      override def getActivatedFeatures(height: Int): Map[Short, Int] = settings.functionalitySettings.preActivatedFeatures
+      override def getActivatedFeatures(height: Int): Map[Short, Int] = blockchainSettings.functionalitySettings.preActivatedFeatures
 
       override def getAccountScript(address: Address): Option[Script] =
         if (address == aliceAddr) mkScript().some
@@ -74,7 +65,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     val testDb   = use(TestDb.mk())
     val dbCaches = new LevelDbPersistentCaches(testDb.db)
     val blockchainStorage = new SharedBlockchainData[RequestKey](
-      settings,
+      blockchainSettings,
       dbCaches,
       blockchainApi
     )
