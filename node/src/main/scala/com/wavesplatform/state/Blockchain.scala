@@ -82,8 +82,10 @@ trait Blockchain {
 
   def resolveERC20Address(address: ERC20Address): Option[IssuedAsset]
 
+  // TODO: refactor
   def compositeBlockchain: Blockchain
 
+  // TODO: refactor
   def loadCacheData(addresses: Seq[Address]): Unit
 }
 

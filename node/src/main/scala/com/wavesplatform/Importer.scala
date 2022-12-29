@@ -20,7 +20,7 @@ import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.protobuf.block.{PBBlocks, VanillaBlock}
-import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.diffs.BlockDiffer.sigverify
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height}
@@ -183,7 +183,6 @@ object Importer extends ScorexLogging {
       appendBlock: AppendBlock,
       importOptions: ImportOptions,
       skipBlocks: Boolean,
-      funcSettings: FunctionalitySettings,
       appender: Scheduler
   ): Unit = {
     val lenBytes = new Array[Byte](Ints.BYTES)
@@ -270,24 +269,20 @@ object Importer extends ScorexLogging {
     while ((!quit || queue.nonEmpty) && counter < blocksToApply)
       if (!quit && queue.isEmpty) {
         readBlocks(queue, maxSize, maxSize)
-      } else if (!quit && queue.size < maxSize / 2) {
-        readBlocks(queue, maxSize / 2, maxSize / 2)
       } else {
         lock.synchronized {
           val block = queue.dequeue()
-          Await.result(prevAppendTask, Duration.Inf) match {
-            case Left(ve) =>
-              log.error(s"Error appending block: $ve")
-              queue.clear()
-              quit = true
-            case _ =>
-              counter = counter + 1
-              if (blockchain.lastBlockId.contains(block.header.reference)) {
-                prevAppendTask = appendBlock(block).runAsyncLogErr(appender)
-              } else {
-                log.warn(s"Block $block is not a child of the last block ${blockchain.lastBlockId.get}")
-                prevAppendTask
-              }
+          if (blockchain.lastBlockId.contains(block.header.reference)) {
+            Await.result(appendBlock(block).runAsyncLogErr(appender), Duration.Inf) match {
+              case Left(ve) =>
+                log.error(s"Error appending block: $ve")
+                queue.clear()
+                quit = true
+              case _ =>
+                counter = counter + 1
+            }
+          } else {
+            log.warn(s"Block $block is not a child of the last block ${blockchain.lastBlockId.get}")
           }
         }
       }
@@ -407,7 +402,6 @@ object Importer extends ScorexLogging {
       extAppender,
       importOptions,
       importFileOffset == 0,
-      settings.blockchainSettings.functionalitySettings,
       scheduler
     )
     Await.result(Kamon.stopModules(), 10.seconds)

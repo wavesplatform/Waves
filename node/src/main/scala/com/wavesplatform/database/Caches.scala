@@ -130,7 +130,17 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
     VolumeAndFee(curVf.volume, curVf.fee)
   }
 
-  private val scriptCache: LoadingCache[Address, Option[AccountScriptInfo]] = cache(dbSettings.maxCacheSize, loadScript)
+  private val scriptCache: LoadingCache[Address, Option[AccountScriptInfo]] =
+    CacheBuilder
+      .newBuilder()
+      .maximumWeight(128 << 20)
+      .weigher((_: Address, asi: Option[AccountScriptInfo]) => asi.map(_.script.bytes().size).getOrElse(0))
+      .recordStats()
+      .build(new CacheLoader[Address, Option[AccountScriptInfo]] {
+        override def load(key: Address): Option[AccountScriptInfo] = loadScript(key)
+        override def loadAll(keys: lang.Iterable[? <: Address]): util.Map[Address, Option[AccountScriptInfo]] =
+          new util.HashMap[Address, Option[AccountScriptInfo]]()
+      })
   protected def loadScript(address: Address): Option[AccountScriptInfo]
   protected def hasScriptBytes(address: Address): Boolean
   protected def discardScript(address: Address): Unit = scriptCache.invalidate(address)

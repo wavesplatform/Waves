@@ -279,7 +279,7 @@ case class AssetsApiRoute(
           .nftList(address, after)
           .concatMapIterable { a =>
             AssetsApiRoute
-              .jsonDetailsNew(compositeBlockchain)(a, full = true)
+              .jsonBytesDetails(compositeBlockchain)(a, full = true)
               .valueOr(err => throw new IllegalArgumentException(err))
           }
           .take(limit)
@@ -354,7 +354,7 @@ object AssetsApiRoute {
     } yield limit
   }
 
-  def jsonDetailsNew(blockchain: Blockchain)(assets: Seq[(IssuedAsset, AssetDescription)], full: Boolean): Either[String, Seq[ByteString]] = {
+  def jsonBytesDetails(blockchain: Blockchain)(assets: Seq[(IssuedAsset, AssetDescription)], full: Boolean): Either[String, Seq[ByteString]] = {
     def additionalInfo(ids: Seq[ByteStr]): Either[String, Seq[(TxTimestamp, Height)]] = {
       blockchain.transactionInfos(ids).traverse { infoOpt =>
         for {

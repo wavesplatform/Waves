@@ -52,7 +52,7 @@ object Verifier extends ScorexLogging {
       (pt, blockchain.accountScript(pt.sender.toAddress)) match {
         case (stx: PaymentTransaction, None) =>
           stats.signatureVerification
-            .measureForType(stx.tpe)(stx.signatureValid)
+            .measureForType(stx.tpe)(stx.firstProofIsValidSignatureBeforeV6)
             .as(0)
         case (et: ExchangeTransaction, scriptOpt) =>
           verifyExchange(

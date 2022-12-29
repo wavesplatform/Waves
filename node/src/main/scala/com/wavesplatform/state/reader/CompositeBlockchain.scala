@@ -121,6 +121,7 @@ final class CompositeBlockchain private (
       Some(bs)
     }
 
+  // TODO: remove heightOf
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] =
     if (maybeDiff.isEmpty || to.exists(id => inner.heightOf(id).isDefined)) {
       inner.balanceSnapshots(address, from, to)

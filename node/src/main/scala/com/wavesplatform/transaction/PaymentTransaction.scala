@@ -5,7 +5,6 @@ import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.TxValidationError.InvalidSignature
 import com.wavesplatform.transaction.serialization.impl.PaymentTxSerializer
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.PaymentTxValidator
@@ -27,10 +26,6 @@ case class PaymentTransaction(
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(PaymentTxSerializer.bodyBytes(this))
 
   def proofs: Proofs = Proofs(signature)
-
-  // FIXME: error message
-  lazy val signatureValid: Either[InvalidSignature, PaymentTransaction] =
-    Either.cond(crypto.verify(signature, bodyBytes(), sender), this, InvalidSignature(???))
 
   override val id: Coeval[ByteStr] = Coeval.evalOnce(signature)
 
