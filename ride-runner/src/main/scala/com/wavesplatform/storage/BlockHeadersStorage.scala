@@ -12,26 +12,24 @@ import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.storage.BlockHeadersStorage.BlockInfo
 import com.wavesplatform.storage.persistent.BlockPersistentCache
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
 
 import scala.util.chaining.scalaUtilChainingOps
 
-class BlockHeadersStorage(blockchainApi: BlockchainApi, persistentCache: BlockPersistentCache) extends ScorexLogging {
-  // TODO #63 Use locks instead, because of get
-  @volatile private var liquidBlocks: NonEmptyList[BlockInfo] = NonEmptyList.one {
+class BlockHeadersStorage(blockchainApi: BlockchainApi, persistentCache: BlockPersistentCache) extends OptimisticLockable with ScorexLogging {
+  private var liquidBlocks: NonEmptyList[BlockInfo] = NonEmptyList.one {
     val height = persistentCache.getLastHeight.getOrElse(blockchainApi.getCurrentBlockchainHeight() - 1)
     val x      = getInternal(height).getOrElse(throw new RuntimeException(s"Can't find a block at $height"))
     BlockInfo(height, x.id(), x)
   }
 
-  def last: BlockInfo = liquidBlocks.last
+  def last: BlockInfo = readLockCond(liquidBlocks.last)(_ => false)
 
   def getLocal(height: Int): Option[SignedBlockHeader] = persistentCache.get(height)
 
-  def get(height: Int): Option[SignedBlockHeader] = {
-    if (liquidBlocks.head.height == height) liquidBlocks.head.header.some
-    else getInternal(height)
-  }
+  def get(height: Int): Option[SignedBlockHeader] =
+    readLockCond(if (liquidBlocks.head.height == height) liquidBlocks.head.header.some else none)(_ => false)
+      .orElse(getInternal(height))
 
   private def getInternal(height: Int): Option[SignedBlockHeader] =
     persistentCache.get(height).orElse {
@@ -43,7 +41,7 @@ class BlockHeadersStorage(blockchainApi: BlockchainApi, persistentCache: BlockPe
       }
     }
 
-  def update(event: BlockchainUpdated): Unit = {
+  def update(event: BlockchainUpdated): Unit = writeLock {
     event.update match {
       case Update.Empty => // Ignore
       case Update.Append(append) =>
