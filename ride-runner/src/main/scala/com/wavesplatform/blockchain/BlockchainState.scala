@@ -72,12 +72,14 @@ object BlockchainState extends ScorexLogging {
   ): Task[BlockchainState] = {
     def forceRestart(): BlockchainState = {
       val (currHeight, workingStateHeight) = orig match {
-        // -1 because of how ResolvingFork.resolveFork works. TODO replace origHeight in ResolvingFork by resolveHeight
+        // -1 because of how ResolvingFork.resolveFork works. TODO #62 replace origHeight in ResolvingFork by resolveHeight
         case orig: Starting      => (orig.currHeight, Height(orig.workingHeight - 1))
         case Working(height)     => (height, Height(height - 1))
         case orig: ResolvingFork => (orig.currHeight, orig.origHeight)
       }
-      require(currHeight > 1, "Uncaught case") // TODO
+
+      // Almost impossible on MainNet and TestNet, so we can neglect this
+      require(currHeight > 1, "Uncaught case. Check a connectivity to gRPC servers, remove all caches and restart the service")
 
       processor.forceRollbackOne()
       blockchainUpdatesStream.start(currHeight)

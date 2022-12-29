@@ -38,7 +38,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
   protected val settings = DefaultBlockchainSettings
   protected val chainId  = settings.addressSchemeCharacter.toByte
 
-  // TODO
+  // TODO #65 AddressScheme in tests
   AddressScheme.current = new AddressScheme {
     override val chainId: Byte = settings.addressSchemeCharacter.toByte
   }

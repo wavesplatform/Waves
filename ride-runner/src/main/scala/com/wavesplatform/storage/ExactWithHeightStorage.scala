@@ -98,7 +98,7 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
               log.debug(s"$key reloaded: ${latest.mayBeValue}")
               RollbackResult.rolledBack(tags)
             } else {
-              values.put(key, RemoteData.Unknown) // TODO do we still need uncertain keys?
+              values.put(key, RemoteData.Unknown) // TODO #64 do we still need uncertain keys?
               log.debug(s"$key: unknown")
               RollbackResult.uncertain(mkDataKey(key), tags) // will be updated later
             }
