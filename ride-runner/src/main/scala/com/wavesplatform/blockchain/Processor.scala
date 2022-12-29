@@ -222,18 +222,19 @@ class BlockchainProcessor(
     * @param toHeight
     */
   override def forceRollbackOne(): Unit =
-    if (lastEvents.isEmpty) throw new RuntimeException("Can't force rollback one")
-    else
-      lastEvents.foreach { lastEvent =>
-        val rollbackToHeight = Height(lastEvent.height - 1) // -1 because we undo the lastEvent
-        accumulatedChanges = lastEvent.update match {
-          case Update.Append(append) => undo(rollbackToHeight, ByteStr(lastEvent.id.toByteArray), append)
-          case _                     => accumulatedChanges
+    lastEvents match {
+      case Nil => throw new RuntimeException("Can't force rollback one")
+      case last :: _ => // a liquid block with same height
+        val rollbackToHeight = Height(last.height - 1) // -1 because we undo the lastEvent
+        lastEvents.foreach { lastEvent =>
+          accumulatedChanges = lastEvent.update match {
+            case Update.Append(append) => undo(rollbackToHeight, ByteStr(lastEvent.id.toByteArray), append)
+            case _                     => accumulatedChanges
+          }
         }
-        // TODO this should be done once
-        // TODO issue somewhere in -1 <--
-        removeBlocksFrom(Height(rollbackToHeight + 1))
-      }
+
+        removeBlocksFrom(Height(last.height))
+    }
 
   private def undo(h: Height, id: ByteStr, append: BlockchainUpdated.Append): ProcessResult[RequestKey] = {
     log.info(s"Undo id=$id to $h")

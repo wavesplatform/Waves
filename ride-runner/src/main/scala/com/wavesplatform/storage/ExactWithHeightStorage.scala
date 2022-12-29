@@ -66,9 +66,9 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
     Option(values.getIfPresent(key)) match {
       case None => AppendResult.ignored
       case Some(orig) =>
-        log.debug(s"Update $name($key)")
-
         val updated = RemoteData.loaded(update)
+        log.debug(s"$key appended: $updated")
+
         // TODO #36 This could be updated in a different thread
         persistentCache.set(height, key, updated) // Write here (not in "else"), because we want to preserve the height
 
@@ -89,23 +89,26 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
     Option(values.getIfPresent(key)) match {
       case None => RollbackResult.ignored
       case Some(_) =>
-        log.info(s"Rollback $name($key)")
-
-        val tags = tagsOf(key)
-        persistentCache.remove(rollbackHeight + 1, key) match {
-          case RemoteData.Unknown =>
-            after match {
-              case None => RollbackResult.uncertain(mkDataKey(key), tags) // will be updated later
-              case Some(after) =>
-                val restored = RemoteData.Cached(after)
-                persistentCache.set(rollbackHeight, key, restored) // TODO #36 This could be updated in a different thread
-                values.put(key, restored)
-                RollbackResult.rolledBack(tags)
+        val tags   = tagsOf(key)
+        val latest = persistentCache.remove(rollbackHeight + 1, key)
+        after match {
+          case None =>
+            if (latest.loaded) {
+              values.put(key, latest)
+              log.debug(s"$key reloaded: ${latest.mayBeValue}")
+              RollbackResult.rolledBack(tags)
+            } else {
+              values.put(key, RemoteData.Unknown) // TODO do we still need uncertain keys?
+              log.debug(s"$key: unknown")
+              RollbackResult.uncertain(mkDataKey(key), tags) // will be updated later
             }
 
-          case latest => // Cached | Absence
-            // TODO #11: compare with afterRollback
-            values.put(key, latest)
+          case Some(after) =>
+            val restored = RemoteData.Cached(after)
+            // This could be a rollback to a micro block
+            if (latest != restored) persistentCache.set(rollbackHeight, key, restored) // TODO #36 This could be updated in a different thread
+            values.put(key, restored)
+            log.trace(s"$key restored: $restored")
             RollbackResult.rolledBack(tags)
         }
     }
