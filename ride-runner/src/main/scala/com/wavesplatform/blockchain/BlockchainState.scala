@@ -26,7 +26,7 @@ object BlockchainState extends ScorexLogging {
     override def toString: String           = s"Working($height)"
   }
 
-  case class ResolvingFork(origHeight: Height, currHeight: Height, microBlockNumber: Int) extends BlockchainState {
+  case class ResolvingFork(currHeight: Height, origHeight: Height, microBlockNumber: Int) extends BlockchainState {
     def apply(event: SubscribeEvent): ResolvingFork =
       copy(
         currHeight = Height(event.getUpdate.height),
@@ -58,8 +58,8 @@ object BlockchainState extends ScorexLogging {
   object ResolvingFork {
     def from(origHeight: Height, event: SubscribeEvent): ResolvingFork =
       new ResolvingFork(
-        origHeight = origHeight,
         currHeight = Height(event.getUpdate.height),
+        origHeight = origHeight,
         microBlockNumber = 0
       )
   }
@@ -85,7 +85,7 @@ object BlockchainState extends ScorexLogging {
       blockchainUpdatesStream.start(currHeight)
 
       log.warn(s"Closed by a remote part, restarting from $currHeight. Reason: $event")
-      ResolvingFork(workingStateHeight, Height(currHeight - 1), microBlockNumber = 0)
+      ResolvingFork(Height(currHeight - 1), workingStateHeight, microBlockNumber = 0)
     }
 
     event match {
