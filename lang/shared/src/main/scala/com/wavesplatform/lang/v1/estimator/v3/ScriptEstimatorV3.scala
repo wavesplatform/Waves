@@ -53,14 +53,24 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
   private def evalLetBlock(let: LET, inner: EXPR, funcArgs: Set[String]): EvalM[Long] =
     for {
       startCtx <- get[Id, EstimatorContext, EstimationError]
-      overlap = startCtx.usedRefs.contains(let.name)
-      _ <- update(usedRefs.modify(_)(_ - let.name))
-      letEval = evalHoldingFuncs(let.value, funcArgs)
+      overlap        = startCtx.usedRefs.contains(let.name)
+      overlappedCost = if (overlap) startCtx.refsCosts(let.name) else 0
+      letEval        = evalHoldingFuncs(let.value, funcArgs)
+      letCost <- local(letEval)
+      _ <- update(ctx =>
+        usedRefs
+          .modify(ctx)(_ - let.name)
+          .copy(refsCosts = ctx.refsCosts + (let.name -> letCost))
+      )
       nextCost <- evalExpr(inner, funcArgs)
       ctx      <- get[Id, EstimatorContext, EstimationError]
       letCost  <- if (ctx.usedRefs.contains(let.name)) letEval else const(0L)
-      _        <- update(usedRefs.modify(_)(r => if (overlap) r + let.name else r - let.name))
-      result   <- sum(nextCost, letCost)
+      _ <- update(
+        usedRefs
+          .modify(_)(r => if (overlap) r + let.name else r - let.name)
+          .copy(refsCosts = if (overlap) ctx.refsCosts + (let.name -> overlappedCost) else ctx.refsCosts - let.name)
+      )
+      result <- sum(nextCost, letCost)
     } yield result
 
   private def evalFuncBlock(func: FUNC, inner: EXPR, funcArgs: Set[String]): EvalM[Long] =
@@ -123,9 +133,12 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
       argsCosts    <- args.traverse(evalHoldingFuncs(_, funcArgs))
       argsCostsSum <- argsCosts.foldM(0L)(sum)
       bodyCostV         = bodyCost.value()
-      correctedBodyCost = if (!overhead && bodyCostV == 0) 1 else bodyCostV
+      correctedBodyCost = if (!overhead && bodyCostV == 0 && isBlankFunc(bodyUsedRefs, ctx.refsCosts)) 1 else bodyCostV
       result <- sum(argsCostsSum, correctedBodyCost)
     } yield result
+
+  private def isBlankFunc(bodyUsedRefs: Set[String], refsCosts: Map[String, Long]): Boolean =
+    !(letFixes && bodyUsedRefs.exists(refsCosts.get(_).exists(_ > 0)))
 
   private def update(f: EstimatorContext => EstimatorContext): EvalM[Unit] =
     modify[Id, EstimatorContext, EstimationError](f)

@@ -1,6 +1,5 @@
 package com.wavesplatform.lang.v1.estimator.v3
 
-
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.estimator.EstimationError
 import com.wavesplatform.lang.v1.task.TaskM
@@ -9,7 +8,8 @@ import shapeless.{Lens, lens}
 
 private[v3] case class EstimatorContext(
     funcs: Map[FunctionHeader, (Coeval[Long], Set[String])],
-    usedRefs: Set[String] = Set.empty
+    usedRefs: Set[String] = Set(),
+    refsCosts: Map[String, Long] = Map()
 )
 
 private[v3] object EstimatorContext {
