@@ -12,7 +12,7 @@ import monix.eval.Coeval
 
 import scala.util.Try
 
-case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean) extends ScriptEstimator {
+case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: Boolean) extends ScriptEstimator {
   private val overheadCost: Long = if (overhead) 1 else 0
 
   override val version: Int = 3
@@ -94,7 +94,7 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean) extends Sc
     } yield r2
 
   private def evalRef(key: String, funcArgs: List[String]): EvalM[Long] =
-    if (funcArgs.contains(key))
+    if (funcArgs.contains(key) && letFixes)
       const(overheadCost)
     else
       update(usedRefs.modify(_)(_ + key)).map(_ => overheadCost)

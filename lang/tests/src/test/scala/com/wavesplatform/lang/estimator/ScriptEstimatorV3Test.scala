@@ -14,11 +14,11 @@ import scala.collection.immutable.ArraySeq
 
 class ScriptEstimatorV3Test
     extends ScriptEstimatorTestBase(
-      ScriptEstimatorV3(fixOverflow = true, overhead = true),
-      ScriptEstimatorV3(fixOverflow = false, overhead = true)
+      ScriptEstimatorV3(fixOverflow = true, overhead = true, letFixes = false),
+      ScriptEstimatorV3(fixOverflow = false, overhead = true, letFixes = false)
     ) {
   private def estimateNoOverhead(script: String): Either[String, Long] =
-    ScriptEstimatorV3(fixOverflow = true, overhead = false)(lets, functionCosts(V6), compile(script)(V6))
+    ScriptEstimatorV3(fixOverflow = true, overhead = false, letFixes = false)(lets, functionCosts(V6), compile(script)(V6))
 
   property("multiple func calls") {
     val script =

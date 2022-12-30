@@ -18,5 +18,5 @@ trait ScriptEstimator {
 
 object ScriptEstimator {
   def all(fixOverflow: Boolean): List[ScriptEstimator] =
-    List(ScriptEstimatorV1, ScriptEstimatorV2, ScriptEstimatorV3(fixOverflow, overhead = false))
+    List(ScriptEstimatorV1, ScriptEstimatorV2, ScriptEstimatorV3(fixOverflow, overhead = false, letFixes = true))
 }
