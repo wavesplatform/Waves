@@ -23,10 +23,10 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
       expr: EXPR
   ): Either[String, Long] = {
     val ctxFuncs = funcs.view.mapValues((_, Set[String]())).toMap
-    evalExpr(expr, Nil).run(EstimatorContext(ctxFuncs)).value._2
+    evalExpr(expr, Set()).run(EstimatorContext(ctxFuncs)).value._2
   }
 
-  private def evalExpr(t: EXPR, funcArgs: List[String]): EvalM[Long] =
+  private def evalExpr(t: EXPR, funcArgs: Set[String]): EvalM[Long] =
     if (Thread.currentThread().isInterrupted)
       raiseError("Script estimation was interrupted")
     else
@@ -43,14 +43,14 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
         case _: FAILED_EXPR              => const(0)
       }
 
-  private def evalHoldingFuncs(expr: EXPR, funcArgs: List[String]): EvalM[Long] =
+  private def evalHoldingFuncs(expr: EXPR, funcArgs: Set[String]): EvalM[Long] =
     for {
       startCtx <- get[Id, EstimatorContext, EstimationError]
       cost     <- evalExpr(expr, funcArgs)
       _        <- update(funcs.set(_)(startCtx.funcs))
     } yield cost
 
-  private def evalLetBlock(let: LET, inner: EXPR, funcArgs: List[String]): EvalM[Long] =
+  private def evalLetBlock(let: LET, inner: EXPR, funcArgs: Set[String]): EvalM[Long] =
     for {
       startCtx <- get[Id, EstimatorContext, EstimationError]
       overlap = startCtx.usedRefs.contains(let.name)
@@ -63,7 +63,7 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
       result   <- sum(nextCost, letCost)
     } yield result
 
-  private def evalFuncBlock(func: FUNC, inner: EXPR, funcArgs: List[String]): EvalM[Long] =
+  private def evalFuncBlock(func: FUNC, inner: EXPR, funcArgs: Set[String]): EvalM[Long] =
     for {
       startCtx <- get[Id, EstimatorContext, EstimationError]
       _ <-
@@ -84,7 +84,7 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
       nextCost <- evalExpr(inner, funcArgs)
     } yield nextCost
 
-  private def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, funcArgs: List[String]): EvalM[Long] =
+  private def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, funcArgs: Set[String]): EvalM[Long] =
     for {
       cond  <- evalHoldingFuncs(cond, funcArgs)
       right <- evalHoldingFuncs(ifTrue, funcArgs)
@@ -93,16 +93,16 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
       r2    <- sum(r1, overheadCost)
     } yield r2
 
-  private def evalRef(key: String, funcArgs: List[String]): EvalM[Long] =
+  private def evalRef(key: String, funcArgs: Set[String]): EvalM[Long] =
     if (funcArgs.contains(key) && letFixes)
       const(overheadCost)
     else
       update(usedRefs.modify(_)(_ + key)).map(_ => overheadCost)
 
-  private def evalGetter(expr: EXPR, funcArgs: List[String]): EvalM[Long] =
+  private def evalGetter(expr: EXPR, funcArgs: Set[String]): EvalM[Long] =
     evalExpr(expr, funcArgs).flatMap(sum(_, overheadCost))
 
-  private def evalFuncCall(header: FunctionHeader, args: List[EXPR], funcArgs: List[String]): EvalM[Long] =
+  private def evalFuncCall(header: FunctionHeader, args: List[EXPR], funcArgs: Set[String]): EvalM[Long] =
     for {
       ctx <- get[Id, EstimatorContext, EstimationError]
       (bodyCost, bodyUsedRefs) <- funcs
