@@ -17,7 +17,8 @@ class RecursiveFunctionTest
       ScriptEstimatorV3(fixOverflow = true, overhead = true, letFixes = false),
       ScriptEstimatorV3(fixOverflow = true, overhead = false, letFixes = false),
       ScriptEstimatorV3(fixOverflow = false, overhead = true, letFixes = false),
-      ScriptEstimatorV3(fixOverflow = false, overhead = false, letFixes = false)
+      ScriptEstimatorV3(fixOverflow = false, overhead = false, letFixes = false),
+      ScriptEstimatorV3(fixOverflow = true, overhead = false, letFixes = true)   // <- all fixes
     ) {
 
   property("recursive func block") {
