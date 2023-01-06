@@ -29,13 +29,14 @@ object ContractScriptCompactor {
 
     def getUsedNames(expr: EXPR): Seq[String] = {
       expr match {
-        case BLOCK(dec, body)       => getUsedNames(dec.asInstanceOf[LET].value) ++ getUsedNames(body)
-        case LET_BLOCK(dec, body)   => getUsedNames(dec.value) ++ getUsedNames(body)
-        case FUNCTION_CALL(f, args) => f.funcName +: args.flatMap(getUsedNames)
-        case GETTER(gExpr, _)       => getUsedNames(gExpr)
-        case IF(cond, ifT, ifF)     => getUsedNames(cond) ++ getUsedNames(ifT) ++ getUsedNames(ifF)
-        case REF(key)               => List(key)
-        case _                      => List.empty
+        case BLOCK(let: LET, body)   => getUsedNames(let.value) ++ getUsedNames(body)
+        case BLOCK(func: FUNC, body) => getUsedNames(func.body) ++ getUsedNames(body)
+        case LET_BLOCK(dec, body)    => getUsedNames(dec.value) ++ getUsedNames(body)
+        case FUNCTION_CALL(f, args)  => f.funcName +: args.flatMap(getUsedNames)
+        case GETTER(gExpr, _)        => getUsedNames(gExpr)
+        case IF(cond, ifT, ifF)      => getUsedNames(cond) ++ getUsedNames(ifT) ++ getUsedNames(ifF)
+        case REF(key)                => List(key)
+        case _                       => List.empty
       }
     }
 

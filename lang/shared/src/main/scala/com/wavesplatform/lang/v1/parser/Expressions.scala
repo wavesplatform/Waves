@@ -12,7 +12,7 @@ object Expressions {
   }
 
   object Pos {
-    def apply(start: Int, end: Int): Pos = RealPos(start, end)
+    def apply(start: Int, end: Int)(implicit offset: Int): Pos = RealPos(start - offset, end - offset)
 
     override def equals(obj: scala.Any): Boolean = super.equals(obj)
 
