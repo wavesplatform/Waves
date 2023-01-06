@@ -103,13 +103,14 @@ trait BaseGlobal {
 
   def parseAndCompileExpression(
       input: String,
+      offset: Int,
       context: CompilerContext,
       letBlockOnly: Boolean,
       stdLibVersion: StdLibVersion,
       estimator: ScriptEstimator
   ): Either[String, (Array[Byte], Long, Expressions.SCRIPT, Iterable[CompilationError])] = {
     (for {
-      compRes <- ExpressionCompiler.compileWithParseResult(input, context)
+      compRes <- ExpressionCompiler.compileWithParseResult(input, offset, context)
       (compExpr, exprScript, compErrorList) = compRes
       illegalBlockVersionUsage              = letBlockOnly && com.wavesplatform.lang.v1.compiler.containsBlockV2(compExpr)
       _ <- Either.cond(!illegalBlockVersionUsage, (), "UserFunctions are only enabled in STDLIB_VERSION >= 3").leftMap((_, 0, 0))
@@ -127,6 +128,7 @@ trait BaseGlobal {
 
   def parseAndCompileContract(
       input: String,
+      offset: Int,
       ctx: CompilerContext,
       stdLibVersion: StdLibVersion,
       estimator: ScriptEstimator,
@@ -134,7 +136,7 @@ trait BaseGlobal {
       removeUnusedCode: Boolean
   ): Either[String, (Array[Byte], (Long, Map[String, Long]), Expressions.DAPP, Iterable[CompilationError])] = {
     (for {
-      compRes <- ContractCompiler.compileWithParseResult(input, ctx, stdLibVersion, needCompaction, removeUnusedCode)
+      compRes <- ContractCompiler.compileWithParseResult(input, offset, ctx, stdLibVersion, needCompaction, removeUnusedCode)
       (compDAppOpt, exprDApp, compErrorList) = compRes
       complexityWithMap <-
         if (compDAppOpt.nonEmpty && compErrorList.isEmpty)

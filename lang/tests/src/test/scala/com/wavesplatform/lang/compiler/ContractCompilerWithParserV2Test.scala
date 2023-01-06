@@ -16,7 +16,7 @@ class ContractCompilerWithParserV2Test extends PropSpec {
       directives <- DirectiveParser(script)
       ds         <- Directive.extractDirectives(directives)
       ctx = utils.compilerContext(ds)
-      compResult <- ContractCompiler.compileWithParseResult(script, ctx, ds.stdLibVersion, saveExprContext).leftMap(_._1)
+      compResult <- ContractCompiler.compileWithParseResult(script, 0, ctx, ds.stdLibVersion, saveExprContext).leftMap(_._1)
     } yield compResult
 
     result
