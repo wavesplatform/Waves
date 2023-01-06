@@ -382,35 +382,38 @@ object ContractCompiler {
 
   def compileWithParseResult(
       input: String,
+      offset: Int,
       ctx: CompilerContext,
       version: StdLibVersion,
       needCompaction: Boolean = false,
       removeUnusedCode: Boolean = false,
       saveExprContext: Boolean = true
   ): Either[(String, Int, Int), (Option[DApp], Expressions.DAPP, Iterable[CompilationError])] =
-    Parser.parseDAPPWithErrorRecovery(input).flatMap { case (parseResult, removedCharPosOpt) =>
-      compileContract(parseResult, version, needCompaction, removeUnusedCode, ScriptResultSource.CallableFunction, saveExprContext)
-        .run(ctx)
-        .map(
-          _._2
-            .map { compRes =>
-              val errorList =
-                compRes._3 ++
-                  (if (removedCharPosOpt.isEmpty) Nil
-                   else
-                     List(
-                       Generic(
-                         removedCharPosOpt.get.start,
-                         removedCharPosOpt.get.end,
-                         "Parsing failed. Some chars was removed as result of recovery process."
-                       )
-                     ))
-              (compRes._1, compRes._2, errorList)
-            }
-            .leftMap(e => (s"Compilation failed: ${Show[CompilationError].show(e)}", e.start, e.end))
-        )
-        .value
-    }
+    new Parser()(offset)
+      .parseDAPPWithErrorRecovery(input)
+      .flatMap { case (parseResult, removedCharPosOpt) =>
+        compileContract(parseResult, version, needCompaction, removeUnusedCode, ScriptResultSource.CallableFunction, saveExprContext)
+          .run(ctx)
+          .map(
+            _._2
+              .map { compRes =>
+                val errorList =
+                  compRes._3 ++
+                    (if (removedCharPosOpt.isEmpty) Nil
+                     else
+                       List(
+                         Generic(
+                           removedCharPosOpt.get.start,
+                           removedCharPosOpt.get.end,
+                           "Parsing failed. Some chars was removed as result of recovery process."
+                         )
+                       ))
+                (compRes._1, compRes._2, errorList)
+              }
+              .leftMap(e => (s"Compilation failed: ${Show[CompilationError].show(e)}", e.start, e.end))
+          )
+          .value
+      }
 
   def compileFreeCall(
       input: String,

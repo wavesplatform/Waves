@@ -1,14 +1,14 @@
 package com.wavesplatform.lang.script
 
 import cats.data.NonEmptyChain
-import cats.instances.either._
-import cats.instances.list._
-import cats.instances.map._
+import cats.instances.either.*
+import cats.instances.list.*
+import cats.instances.map.*
 import cats.kernel.CommutativeSemigroup
-import cats.syntax.foldable._
-import cats.syntax.option._
-import cats.syntax.traverse._
-import cats.syntax.unorderedTraverse._
+import cats.syntax.foldable.*
+import cats.syntax.option.*
+import cats.syntax.traverse.*
+import cats.syntax.unorderedTraverse.*
 import com.wavesplatform.lang.directives.values.{Imports, Library}
 import com.wavesplatform.lang.directives.{Directive, DirectiveKey, DirectiveParser}
 
@@ -17,7 +17,7 @@ object ScriptPreprocessor {
       scriptText: String,
       libraries: Map[String, String],
       imports: Imports
-  ): Either[String, String] =
+  ): Either[String, (String, Int)] =
     for {
       matchedLibraries <- resolveLibraries(libraries, imports)
       _                <- checkLibrariesDirectives(matchedLibraries)
@@ -58,8 +58,9 @@ object ScriptPreprocessor {
   private val directiveRegex = s"\\${DirectiveParser.start}.*${DirectiveParser.end}"
 
   private def gatherScriptText(src: String, libraries: Map[String, String]) = {
-    val additionalDecls = libraries.values.map(removeDirectives).mkString("\n")
-    src.replaceFirst(importRegex, additionalDecls)
+    val additionalDecls        = libraries.values.map(removeDirectives).mkString("\n")
+    val importDirectivesLength = importRegex.r.findFirstIn(src).map(_.length).getOrElse(0)
+    (src.replaceFirst(importRegex, additionalDecls), additionalDecls.length - importDirectivesLength)
   }
 
   private def removeDirectives(script: String): String =
