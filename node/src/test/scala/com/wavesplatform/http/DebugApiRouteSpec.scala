@@ -433,7 +433,7 @@ class DebugApiRouteSpec
                            |  }, {
                            |    "name" : "@complexityLimit",
                            |    "type" : "Int",
-                           |    "value" : 51994
+                           |    "value" : 51998
                            |  } ]
                            |}, {
                            |  "type" : "asset",
