@@ -84,7 +84,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
       )
       .id
     nftId = sender.broadcastIssue(issuer, "asset", "description", quantity = 1, decimals = 0, reissuable = false, script = None, waitForTx = true).id
-    val script = ScriptCompiler.compile(testDapp, ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64
+    val script = ScriptCompiler.compile(testDapp, ScriptEstimatorV3.latest).explicitGet()._1.bytes().base64
     sender.setScript(dApp, Some(script), waitForTx = true)
   }
 

@@ -71,7 +71,7 @@ class RideIssueTransactionSuite extends BaseTransactionSuite with CancelAfterFai
   }
 
   def compile(script: String): String =
-    ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true, overhead = false)).explicitGet()._1.bytes().base64
+    ScriptCompiler.compile(script, ScriptEstimatorV3.latest).explicitGet()._1.bytes().base64
 
   def assertSuccessIssue(txSender: KeyPair, script: String): Assertion = {
     val setScriptId = sender.setScript(txSender, Some(script), setScriptFee, waitForTx = true).id

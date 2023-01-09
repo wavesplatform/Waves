@@ -49,7 +49,7 @@ class PseudoTransactionSuite extends BaseTransactionSuite {
          |func transferAssetByAlias(r: String, a: ByteVector, q: Int) = [ScriptTransfer(Alias(r), q, a)]
          """.stripMargin,
       isAssetScript = false,
-      ScriptEstimatorV3(fixOverflow = true, overhead = false)
+      ScriptEstimatorV3.latest
     ).explicitGet()._1.bytes().base64
 
     sender.setScript(firstDApp, Some(dAppScript), waitForTx = true)
@@ -171,7 +171,7 @@ class PseudoTransactionSuite extends BaseTransactionSuite {
        |  }
          """.stripMargin,
       isAssetScript = true,
-      ScriptEstimatorV3(fixOverflow = true, overhead = false)
+      ScriptEstimatorV3.latest
     ).explicitGet()._1.bytes().base64
 
   private def invokeScriptTransaction(func: String, args: List[EXPR]): InvokeScriptTransaction =
