@@ -9,7 +9,6 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.smartcontract.setScrTxSupportedVersions
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction.{
   PBTransactions,
@@ -41,9 +40,9 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
         }
       """.stripMargin
 
-      val script = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV3.latest).explicitGet()._1
+      val script = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
       val scriptComplexity = Script
-        .estimate(Script.fromBase64String(script.bytes().base64).explicitGet(), ScriptEstimatorV3.latest, fixEstimateOfVerifier = true, useContractVerifierLimit = true)
+        .estimate(Script.fromBase64String(script.bytes().base64).explicitGet(), ScriptEstimatorV2, fixEstimateOfVerifier = true, useContractVerifierLimit = true)
         .explicitGet()
       val setScriptTx   = sender.setScript(contract, Right(Some(script)), setScriptFee, waitForTx = true)
       val setScriptTxId = PBTransactions.vanilla(setScriptTx, unsafe = false).explicitGet().id().toString
