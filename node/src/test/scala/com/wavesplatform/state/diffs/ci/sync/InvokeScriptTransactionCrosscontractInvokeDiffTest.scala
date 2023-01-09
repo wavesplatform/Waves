@@ -239,7 +239,7 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
                       | getIntegerValue(Address(base58'$thirdAcc'), "$invokeEntry1Key") == $invokeEntry1Val
                       |
                     """.stripMargin
-      ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()._1
+      ScriptCompiler.compile(script, ScriptEstimatorV3.latest).explicitGet()._1
     }
 
     def transferAssetScript(thirdAcc: Address): Script = {
@@ -251,7 +251,7 @@ class InvokeScriptTransactionCrosscontractInvokeDiffTest
                       | getIntegerValue(Address(base58'$thirdAcc'), "$invokeEntry1Key") == $invokeEntry1Val
                       |
                     """.stripMargin
-      ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()._1
+      ScriptCompiler.compile(script, ScriptEstimatorV3.latest).explicitGet()._1
     }
 
     def contractMain(secondAcc: Address, thirdAcc: Address, paymentAsset: ByteStr): Script = TestCompiler(V5).compileContract(s"""

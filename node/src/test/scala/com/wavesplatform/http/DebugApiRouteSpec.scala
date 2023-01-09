@@ -195,7 +195,7 @@ class DebugApiRouteSpec
         (blockchain.balance _).when(TxHelpers.defaultAddress, *).returns(Long.MaxValue)
 
         val (assetScript, comp) =
-          ScriptCompiler.compile("if true then throw(\"error\") else false", ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()
+          ScriptCompiler.compile("if true then throw(\"error\") else false", ScriptEstimatorV3.latest).explicitGet()
         (blockchain.assetScript _).when(TestValues.asset).returns(Some(AssetScriptInfo(assetScript, comp)))
         (blockchain.assetDescription _)
           .when(TestValues.asset)
@@ -240,7 +240,7 @@ class DebugApiRouteSpec
           .compile(
             "let test = true\n" +
               "if test then throw(\"error\") else !test",
-            ScriptEstimatorV3(fixOverflow = true, overhead = true)
+            ScriptEstimatorV3.latest
           )
           .explicitGet()
 
@@ -301,7 +301,7 @@ class DebugApiRouteSpec
                |@Callable(i)
                |func burn() = [Burn(base58'${TestValues.asset}', 1)]
                |""".stripMargin,
-            ScriptEstimatorV3(fixOverflow = true, overhead = true)
+            ScriptEstimatorV3.latest
           )
           .explicitGet()
 
@@ -1579,7 +1579,7 @@ class DebugApiRouteSpec
                |    else []
                |}
                |""".stripMargin,
-            ScriptEstimatorV3(fixOverflow = true, overhead = true)
+            ScriptEstimatorV3.latest
           )
           .explicitGet()
 
@@ -2103,7 +2103,7 @@ class DebugApiRouteSpec
                |  if (result == unit) then [] else []
                |}
                |""".stripMargin,
-            ScriptEstimatorV3(fixOverflow = true, overhead = true)
+            ScriptEstimatorV3.latest
           )
           .explicitGet()
 
@@ -2510,7 +2510,7 @@ class DebugApiRouteSpec
         (blockchain.balance _).when(*, *).returns(Long.MaxValue / 2)
 
         val (assetScript, assetScriptComplexity) =
-          ScriptCompiler.compile("false", ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()
+          ScriptCompiler.compile("false", ScriptEstimatorV3.latest).explicitGet()
         (blockchain.assetScript _).when(TestValues.asset).returns(Some(AssetScriptInfo(assetScript, assetScriptComplexity)))
         (blockchain.assetDescription _)
           .when(TestValues.asset)

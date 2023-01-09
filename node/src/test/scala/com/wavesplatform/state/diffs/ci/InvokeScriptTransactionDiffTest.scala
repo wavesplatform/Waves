@@ -1431,7 +1431,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
 
     val gTx1             = TxHelpers.genesis(dAppAddress)
     val gTx2             = TxHelpers.genesis(invokerAddress)
-    val (assetScript, _) = ScriptCompiler.compile("false", ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()
+    val (assetScript, _) = ScriptCompiler.compile("false", ScriptEstimatorV3.latest).explicitGet()
     val iTx              = TxHelpers.issue(dApp, amount = Long.MaxValue, script = Some(assetScript), fee = 1.004.waves)
 
     val ssTx = TxHelpers.setScript(dApp, contract(iTx.assetId.toString))

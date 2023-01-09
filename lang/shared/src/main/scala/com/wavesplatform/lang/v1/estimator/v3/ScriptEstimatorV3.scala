@@ -151,3 +151,7 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
     liftEither(Try(r).toEither.leftMap(_ => "Illegal script"))
   }
 }
+
+object ScriptEstimatorV3 {
+  val latest = ScriptEstimatorV3(fixOverflow = true, overhead = false, letFixes = true)
+}

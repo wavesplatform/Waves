@@ -655,7 +655,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
                      |{-# CONTENT_TYPE EXPRESSION #-}
                      |
                      |true""".stripMargin
-      ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()
+      ScriptCompiler.compile(script, ScriptEstimatorV3.latest).explicitGet()
     }
 
     def contract(asset: ByteStr): Script = TestCompiler(V5).compileContract(
@@ -732,7 +732,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
                      |{-# CONTENT_TYPE EXPRESSION #-}
                      |
                      |false""".stripMargin
-      ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()
+      ScriptCompiler.compile(script, ScriptEstimatorV3.latest).explicitGet()
     }
 
     def script(asset: ByteStr) = TestCompiler(V5).compileContract(
@@ -809,7 +809,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
                      |{-# CONTENT_TYPE EXPRESSION #-}
                      |
                      |false""".stripMargin
-      ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()
+      ScriptCompiler.compile(script, ScriptEstimatorV3.latest).explicitGet()
     }
 
     val contract = TestCompiler(V5).compileContract(
@@ -972,7 +972,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
                       | {-# CONTENT_TYPE EXPRESSION #-}
                       | assetBalance(this.issuer, this.id) == $startBalance
                     """.stripMargin
-      ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()._1
+      ScriptCompiler.compile(script, ScriptEstimatorV3.latest).explicitGet()._1
     }
 
     val transferScript = {
@@ -992,7 +992,7 @@ class SyncInvokeDiffTest extends PropSpec with WithDomain with DBCacheSettings w
                       | issuerBalance.regular == startWavesBalance                                              &&
                       | resultInvokerBalance == startInvokerBalance - $fee
                     """.stripMargin
-      ScriptCompiler.compile(script, ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()._1
+      ScriptCompiler.compile(script, ScriptEstimatorV3.latest).explicitGet()._1
     }
 
     val serviceDApp = TestCompiler(V5).compileContract(
