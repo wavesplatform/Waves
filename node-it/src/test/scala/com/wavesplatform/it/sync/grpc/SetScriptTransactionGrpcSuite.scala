@@ -41,7 +41,7 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
         }
       """.stripMargin
 
-      val script = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
+      val script = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV3.latest).explicitGet()._1
       val scriptComplexity = Script
         .estimate(Script.fromBase64String(script.bytes().base64).explicitGet(), ScriptEstimatorV3.latest, fixEstimateOfVerifier = true, useContractVerifierLimit = true)
         .explicitGet()
