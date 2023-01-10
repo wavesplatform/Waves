@@ -53,25 +53,34 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
   private def evalLetBlock(let: LET, inner: EXPR, funcArgs: Set[String]): EvalM[Long] =
     for {
       startCtx <- get[Id, EstimatorContext, EstimationError]
-      overlap        = startCtx.usedRefs.contains(let.name)
-      overlappedCost = if (overlap) startCtx.refsCosts(let.name) else 0
-      letEval        = evalHoldingFuncs(let.value, funcArgs)
-      letCost <- local(letEval)
+      letEval = evalHoldingFuncs(let.value, funcArgs)
+      _            <- beforeNextExprEval(let, letEval)
+      nextExprCost <- evalExpr(inner, funcArgs)
+      nextExprCtx  <- get[Id, EstimatorContext, EstimationError]
+      _            <- afterNextExprEval(let, startCtx)
+      letCost      <- if (nextExprCtx.usedRefs.contains(let.name)) letEval else const(0L)
+      result       <- sum(nextExprCost, letCost)
+    } yield result
+
+  private def beforeNextExprEval(let: LET, eval: EvalM[Long]): EvalM[Unit] =
+    for {
+      cost <- local(eval)
       _ <- update(ctx =>
         usedRefs
           .modify(ctx)(_ - let.name)
-          .copy(refsCosts = ctx.refsCosts + (let.name -> letCost))
+          .copy(refsCosts = ctx.refsCosts + (let.name -> cost))
       )
-      nextCost <- evalExpr(inner, funcArgs)
-      ctx      <- get[Id, EstimatorContext, EstimationError]
-      letCost  <- if (ctx.usedRefs.contains(let.name)) letEval else const(0L)
-      _ <- update(
-        usedRefs
-          .modify(_)(r => if (overlap) r + let.name else r - let.name)
-          .copy(refsCosts = if (overlap) ctx.refsCosts + (let.name -> overlappedCost) else ctx.refsCosts - let.name)
-      )
-      result <- sum(nextCost, letCost)
-    } yield result
+    } yield ()
+
+  private def afterNextExprEval(let: LET, startCtx: EstimatorContext): EvalM[Unit] = {
+    val overlap        = startCtx.usedRefs.contains(let.name)
+    val overlappedCost = if (overlap) startCtx.refsCosts(let.name) else 0
+    update(ctx =>
+      usedRefs
+        .modify(ctx)(r => if (overlap) r + let.name else r - let.name)
+        .copy(refsCosts = if (overlap) ctx.refsCosts + (let.name -> overlappedCost) else ctx.refsCosts - let.name)
+    )
+  }
 
   private def evalFuncBlock(func: FUNC, inner: EXPR, funcArgs: Set[String]): EvalM[Long] =
     for {
