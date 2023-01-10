@@ -1953,6 +1953,12 @@ paths:
           required: true
           schema:
             type: string
+        - name: trace
+          in: query
+          description: Trace display in function response
+          required: false
+          schema:
+            type: boolean
       requestBody:
         description: Expression to evaluate
         content:
