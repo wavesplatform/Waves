@@ -89,9 +89,7 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
         if (fixOverflow && startCtx.funcs.contains(FunctionHeader.User(func.name)))
           raiseError(s"Function '${func.name}${func.args.mkString("(", ", ", ")")}' shadows preceding declaration"): EvalM[Long]
         else const(0L)
-      funcCost    <- evalHoldingFuncs(func.body, funcArgs ++ func.args)
-      bodyEvalCtx <- get[Id, EstimatorContext, EstimationError]
-      usedRefsInBody = bodyEvalCtx.usedRefs diff startCtx.usedRefs
+      (funcCost, usedRefsInBody) <- withUsedRefs(evalHoldingFuncs(func.body, funcArgs ++ func.args))
       _ <- update(
         (funcs ~ usedRefs).modify(_) { case (funcs, _) =>
           (
@@ -139,15 +137,26 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
           )
         }
       )
-      argsCosts    <- args.traverse(evalHoldingFuncs(_, funcArgs))
-      argsCostsSum <- argsCosts.foldM(0L)(sum)
-      bodyCostV         = bodyCost.value()
-      correctedBodyCost = if (!overhead && bodyCostV == 0 && isBlankFunc(bodyUsedRefs, ctx.refsCosts)) 1 else bodyCostV
+      (argsCosts, argsUsedRefs) <- withUsedRefs(args.traverse(evalHoldingFuncs(_, funcArgs)))
+      argsCostsSum              <- argsCosts.foldM(0L)(sum)
+      bodyCostV = bodyCost.value()
+      argsWithBodyCost <- sum(argsCostsSum, bodyCostV)
+      correctedBodyCost =
+        if (!overhead && !letFixes && bodyCostV == 0) 1
+        else if (letFixes && argsWithBodyCost == 0 && isBlankFunc(bodyUsedRefs ++ argsUsedRefs, ctx.refsCosts)) 1
+        else bodyCostV
       result <- sum(argsCostsSum, correctedBodyCost)
     } yield result
 
-  private def isBlankFunc(bodyUsedRefs: Set[String], refsCosts: Map[String, Long]): Boolean =
-    !(letFixes && bodyUsedRefs.exists(refsCosts.get(_).exists(_ > 0)))
+  private def isBlankFunc(usedRefs: Set[String], refsCosts: Map[String, Long]): Boolean =
+    !usedRefs.exists(refsCosts.get(_).exists(_ > 0))
+
+  private def withUsedRefs[A](eval: EvalM[A]): EvalM[(A, Set[String])] =
+    for {
+      ctxBefore <- get[Id, EstimatorContext, EstimationError]
+      result    <- eval
+      ctxAfter  <- get[Id, EstimatorContext, EstimationError]
+    } yield (result, ctxAfter.usedRefs diff ctxBefore.usedRefs)
 
   private def update(f: EstimatorContext => EstimatorContext): EvalM[Unit] =
     modify[Id, EstimatorContext, EstimationError](f)
