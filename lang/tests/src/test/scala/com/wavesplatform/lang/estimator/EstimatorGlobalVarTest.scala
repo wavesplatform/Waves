@@ -16,11 +16,16 @@ class EstimatorGlobalVarTest extends ScriptEstimatorTestBase(ScriptEstimatorV3(f
   property("global variable cost should not overlap function argument cost") {
     val script =
       """
-        | func f(a: Boolean) = a
-        | let a = groth16Verify(base58'', base58'', base58'')
+        | func f(a: Boolean) = {
+        |   func g(b1: Boolean, b2: Boolean) = b1 || b2
+        |   a || g(true, true)
+        | }
+        | let a  = groth16Verify(base58'', base58'', base58'')
+        | let b1 = groth16Verify(base58'', base58'', base58'')
+        | let b2 = groth16Verify(base58'', base58'', base58'')
         | f(true)
       """.stripMargin
-    estimate(script) shouldBe Right(2701)
+    estimate(script) shouldBe Right(8101)
     estimateFixed(script) shouldBe Right(1)
   }
 
