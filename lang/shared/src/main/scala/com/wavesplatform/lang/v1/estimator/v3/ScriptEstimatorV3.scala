@@ -142,10 +142,9 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
       (argsCosts, argsUsedRefs) <- withUsedRefs(args.traverse(evalHoldingFuncs(_, activeFuncArgs)))
       argsCostsSum              <- argsCosts.foldM(0L)(sum)
       bodyCostV = bodyCost.value()
-      argsWithBodyCost <- sum(argsCostsSum, bodyCostV)
       correctedBodyCost =
         if (!overhead && !letFixes && bodyCostV == 0) 1
-        else if (letFixes && argsWithBodyCost == 0 && isBlankFunc(bodyUsedRefs ++ argsUsedRefs, ctx.refsCosts)) 1
+        else if (letFixes && bodyCostV == 0 && isBlankFunc(bodyUsedRefs ++ argsUsedRefs, ctx.refsCosts)) 1
         else bodyCostV
       result <- sum(argsCostsSum, correctedBodyCost)
     } yield result

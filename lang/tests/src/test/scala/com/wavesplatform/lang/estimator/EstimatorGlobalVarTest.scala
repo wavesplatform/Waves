@@ -40,16 +40,6 @@ class EstimatorGlobalVarTest extends ScriptEstimatorTestBase(ScriptEstimatorV3(f
     estimateFixed(script) shouldBe Right(2700)
   }
 
-  property("avoid redundant overhead for expression in function argument") {
-    val script =
-      """
-        | func f(a: Int) = a
-        | f(1 + 2 + 3)
-      """.stripMargin
-    estimate(script) shouldBe Right(3)
-    estimateFixed(script) shouldBe Right(2)
-  }
-
   property("avoid redundant overhead for function argument referencing to global variable") {
     val script =
       """
@@ -129,5 +119,15 @@ class EstimatorGlobalVarTest extends ScriptEstimatorTestBase(ScriptEstimatorV3(f
       """.stripMargin
     estimate(script) shouldBe Right(2701)
     estimateFixed(script) shouldBe Right(1)
+  }
+
+  property("overhead for expression in blank function argument (as evaluator)") {
+    val script =
+      """
+        | func f(a: Int) = a
+        | f(1 + 2 + 3)
+      """.stripMargin
+    estimate(script) shouldBe Right(3)
+    estimateFixed(script) shouldBe Right(3)
   }
 }
