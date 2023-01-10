@@ -26,36 +26,36 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
     evalExpr(expr, Set()).run(EstimatorContext(ctxFuncs)).value._2
   }
 
-  private def evalExpr(t: EXPR, funcArgs: Set[String]): EvalM[Long] =
+  private def evalExpr(t: EXPR, activeFuncArgs: Set[String]): EvalM[Long] =
     if (Thread.currentThread().isInterrupted)
       raiseError("Script estimation was interrupted")
     else
       t match {
-        case LET_BLOCK(let, inner)       => evalLetBlock(let, inner, funcArgs)
-        case BLOCK(let: LET, inner)      => evalLetBlock(let, inner, funcArgs)
-        case BLOCK(f: FUNC, inner)       => evalFuncBlock(f, inner, funcArgs)
+        case LET_BLOCK(let, inner)       => evalLetBlock(let, inner, activeFuncArgs)
+        case BLOCK(let: LET, inner)      => evalLetBlock(let, inner, activeFuncArgs)
+        case BLOCK(f: FUNC, inner)       => evalFuncBlock(f, inner, activeFuncArgs)
         case BLOCK(_: FAILED_DEC, _)     => const(0)
-        case REF(str)                    => evalRef(str, funcArgs)
+        case REF(str)                    => evalRef(str, activeFuncArgs)
         case _: EVALUATED                => const(overheadCost)
-        case IF(cond, t1, t2)            => evalIF(cond, t1, t2, funcArgs)
-        case GETTER(expr, _)             => evalGetter(expr, funcArgs)
-        case FUNCTION_CALL(header, args) => evalFuncCall(header, args, funcArgs)
+        case IF(cond, t1, t2)            => evalIF(cond, t1, t2, activeFuncArgs)
+        case GETTER(expr, _)             => evalGetter(expr, activeFuncArgs)
+        case FUNCTION_CALL(header, args) => evalFuncCall(header, args, activeFuncArgs)
         case _: FAILED_EXPR              => const(0)
       }
 
-  private def evalHoldingFuncs(expr: EXPR, funcArgs: Set[String]): EvalM[Long] =
+  private def evalHoldingFuncs(expr: EXPR, activeFuncArgs: Set[String]): EvalM[Long] =
     for {
       startCtx <- get[Id, EstimatorContext, EstimationError]
-      cost     <- evalExpr(expr, funcArgs)
+      cost     <- evalExpr(expr, activeFuncArgs)
       _        <- update(funcs.set(_)(startCtx.funcs))
     } yield cost
 
-  private def evalLetBlock(let: LET, inner: EXPR, funcArgs: Set[String]): EvalM[Long] =
+  private def evalLetBlock(let: LET, inner: EXPR, activeFuncArgs: Set[String]): EvalM[Long] =
     for {
       startCtx <- get[Id, EstimatorContext, EstimationError]
-      letEval = evalHoldingFuncs(let.value, funcArgs)
+      letEval = evalHoldingFuncs(let.value, activeFuncArgs)
       _            <- beforeNextExprEval(let, letEval)
-      nextExprCost <- evalExpr(inner, funcArgs)
+      nextExprCost <- evalExpr(inner, activeFuncArgs)
       nextExprCtx  <- get[Id, EstimatorContext, EstimationError]
       _            <- afterNextExprEval(let, startCtx)
       letCost      <- if (nextExprCtx.usedRefs.contains(let.name)) letEval else const(0L)
@@ -82,14 +82,14 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
     )
   }
 
-  private def evalFuncBlock(func: FUNC, inner: EXPR, funcArgs: Set[String]): EvalM[Long] =
+  private def evalFuncBlock(func: FUNC, inner: EXPR, activeFuncArgs: Set[String]): EvalM[Long] =
     for {
       startCtx <- get[Id, EstimatorContext, EstimationError]
       _ <-
         if (fixOverflow && startCtx.funcs.contains(FunctionHeader.User(func.name)))
           raiseError(s"Function '${func.name}${func.args.mkString("(", ", ", ")")}' shadows preceding declaration"): EvalM[Long]
         else const(0L)
-      (funcCost, usedRefsInBody) <- withUsedRefs(evalHoldingFuncs(func.body, funcArgs ++ func.args))
+      (funcCost, usedRefsInBody) <- withUsedRefs(evalHoldingFuncs(func.body, activeFuncArgs ++ func.args))
       _ <- update(
         (funcs ~ usedRefs).modify(_) { case (funcs, _) =>
           (
@@ -98,28 +98,28 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
           )
         }
       )
-      nextCost <- evalExpr(inner, funcArgs)
+      nextCost <- evalExpr(inner, activeFuncArgs)
     } yield nextCost
 
-  private def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, funcArgs: Set[String]): EvalM[Long] =
+  private def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, activeFuncArgs: Set[String]): EvalM[Long] =
     for {
-      cond  <- evalHoldingFuncs(cond, funcArgs)
-      right <- evalHoldingFuncs(ifTrue, funcArgs)
-      left  <- evalHoldingFuncs(ifFalse, funcArgs)
+      cond  <- evalHoldingFuncs(cond, activeFuncArgs)
+      right <- evalHoldingFuncs(ifTrue, activeFuncArgs)
+      left  <- evalHoldingFuncs(ifFalse, activeFuncArgs)
       r1    <- sum(cond, Math.max(right, left))
       r2    <- sum(r1, overheadCost)
     } yield r2
 
-  private def evalRef(key: String, funcArgs: Set[String]): EvalM[Long] =
-    if (funcArgs.contains(key) && letFixes)
+  private def evalRef(key: String, activeFuncArgs: Set[String]): EvalM[Long] =
+    if (activeFuncArgs.contains(key) && letFixes)
       const(overheadCost)
     else
       update(usedRefs.modify(_)(_ + key)).map(_ => overheadCost)
 
-  private def evalGetter(expr: EXPR, funcArgs: Set[String]): EvalM[Long] =
-    evalExpr(expr, funcArgs).flatMap(sum(_, overheadCost))
+  private def evalGetter(expr: EXPR, activeFuncArgs: Set[String]): EvalM[Long] =
+    evalExpr(expr, activeFuncArgs).flatMap(sum(_, overheadCost))
 
-  private def evalFuncCall(header: FunctionHeader, args: List[EXPR], funcArgs: Set[String]): EvalM[Long] =
+  private def evalFuncCall(header: FunctionHeader, args: List[EXPR], activeFuncArgs: Set[String]): EvalM[Long] =
     for {
       ctx <- get[Id, EstimatorContext, EstimationError]
       (bodyCost, bodyUsedRefs) <- funcs
@@ -137,7 +137,7 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
           )
         }
       )
-      (argsCosts, argsUsedRefs) <- withUsedRefs(args.traverse(evalHoldingFuncs(_, funcArgs)))
+      (argsCosts, argsUsedRefs) <- withUsedRefs(args.traverse(evalHoldingFuncs(_, activeFuncArgs)))
       argsCostsSum              <- argsCosts.foldM(0L)(sum)
       bodyCostV = bodyCost.value()
       argsWithBodyCost <- sum(argsCostsSum, bodyCostV)
