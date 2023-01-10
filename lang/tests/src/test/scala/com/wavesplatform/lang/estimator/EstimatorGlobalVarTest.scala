@@ -105,13 +105,27 @@ class EstimatorGlobalVarTest extends ScriptEstimatorTestBase(ScriptEstimatorV3(f
     estimateFixed(script) shouldBe Right(1)
   }
 
-  property("mixed case 2") {
+  property("direct call blank function f() adds 1 complexity") {
     val script =
       """
-        | func f(a: Boolean) = a
         | let a = groth16Verify(base58'', base58'', base58'')
-        | func g() = f(true)
-        | g()
+        | func f(x: Boolean) = x
+        | func g(y: Boolean) = f(y)
+        | func h(z: Boolean) = g(z)
+        | h(a)
+      """.stripMargin
+    estimate(script) shouldBe Right(2701)
+    estimateFixed(script) shouldBe Right(2701)
+  }
+
+  property("call chain with unused global variable") {
+    val script =
+      """
+        | let a = groth16Verify(base58'', base58'', base58'')
+        | func f(a: Boolean) = a
+        | func g(a: Boolean) = f(a)
+        | func h()           = g(true)
+        | h()
       """.stripMargin
     estimate(script) shouldBe Right(2701)
     estimateFixed(script) shouldBe Right(1)
