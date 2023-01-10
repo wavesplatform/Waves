@@ -72,15 +72,17 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
       )
     } yield ()
 
-  private def afterNextExprEval(let: LET, startCtx: EstimatorContext): EvalM[Unit] = {
-    val overlap        = startCtx.usedRefs.contains(let.name)
-    val overlappedCost = if (overlap) startCtx.refsCosts(let.name) else 0
+  private def afterNextExprEval(let: LET, startCtx: EstimatorContext): EvalM[Unit] =
     update(ctx =>
       usedRefs
-        .modify(ctx)(r => if (overlap) r + let.name else r - let.name)
-        .copy(refsCosts = if (overlap) ctx.refsCosts + (let.name -> overlappedCost) else ctx.refsCosts - let.name)
+        .modify(ctx)(r => if (startCtx.usedRefs.contains(let.name)) r + let.name else r - let.name)
+        .copy(refsCosts =
+          if (startCtx.refsCosts.contains(let.name))
+            ctx.refsCosts + (let.name -> startCtx.refsCosts(let.name))
+          else
+            ctx.refsCosts - let.name
+        )
     )
-  }
 
   private def evalFuncBlock(func: FUNC, inner: EXPR, activeFuncArgs: Set[String]): EvalM[Long] =
     for {
