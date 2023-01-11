@@ -3,7 +3,7 @@ package com.wavesplatform
 import com.wavesplatform.lang.directives.values.{V5, V6}
 import utest.*
 
-import scala.scalajs.js.{Array, Dynamic, JSON}
+import scala.scalajs.js.{Array, Dictionary, Dynamic, JSON}
 
 object JsAPITest extends JsTestBase {
   private def simpleDApp(result: String): String =
@@ -103,6 +103,124 @@ object JsAPITest extends JsTestBase {
       val letFold = compiled.dAppAst.decList.asInstanceOf[Array[Dynamic]].apply(2)
       letFold.name.value ==> "letFold"
       JSON.stringify(letFold.expr.resultType) ==> """{"listOf":{"type":"Int"}}"""
+    }
+
+    test("AST result should be fixed while using libraries") {
+      val script =
+        """
+          | {-# SCRIPT_TYPE ACCOUNT #-}
+          | {-# IMPORT lib1, lib2, lib3 #-}
+          | let a = 5
+          | func f() = 3
+          | true
+        """.stripMargin
+
+      val import1 =
+        "lib1" ->
+          """
+            | {-# SCRIPT_TYPE  ACCOUNT #-}
+            | {-# CONTENT_TYPE LIBRARY #-}
+            | func inc(a: Int) = a + 1
+          """.stripMargin
+
+      val anotherImport1 =
+        "lib1" ->
+          """
+            | {-# SCRIPT_TYPE  ACCOUNT #-}
+            | {-# CONTENT_TYPE LIBRARY #-}
+            | func inc(a: Int) = {
+            |   if (true) then throw() else a + 1
+            | }
+          """.stripMargin
+
+      val import2 =
+        "lib2" ->
+          """
+            | {-# SCRIPT_TYPE  ACCOUNT #-}
+            | {-# CONTENT_TYPE LIBRARY #-}
+            | func dec(a: Int) = a - 1
+          """.stripMargin
+
+      val import3 =
+        "lib3" ->
+          """
+            | {-# SCRIPT_TYPE  ACCOUNT #-}
+            | {-# CONTENT_TYPE LIBRARY #-}
+            | func multiply(a: Int, b: Int) = a * b
+          """.stripMargin
+
+      val r1 = JsAPI.parseAndCompile(script, 3, libraries = Dictionary(import1, import2, import3))
+      val r2 = JsAPI.parseAndCompile(script, 3, libraries = Dictionary(anotherImport1, import2, import3))
+
+      def checkPos(expr: Dynamic) = {
+        val let = expr.exprAst.expr.body.body.body.dec
+        let.`type` ==> "LET"
+        let.name.value ==> "a"
+        let.posStart ==> 64
+        let.posEnd ==> 73
+
+        val func = expr.exprAst.expr.body.body.body.body.dec
+        func.`type` ==> "FUNC"
+        func.name.value ==> "f"
+        func.posStart ==> 75
+        func.posEnd ==> 87
+      }
+
+      checkPos(r1)
+      checkPos(r2)
+    }
+
+    test("correct AST for library") {
+      val library =
+        """
+          | {-# SCRIPT_TYPE  ACCOUNT #-}
+          | {-# CONTENT_TYPE LIBRARY #-}
+          | func f() = 1
+        """.stripMargin
+
+      val result = JsAPI.parseAndCompile(library, 3)
+      val expected = """
+                       |{
+                       |  "type": "BLOCK",
+                       |  "posStart": 62,
+                       |  "posEnd": 88,
+                       |  "resultType": {
+                       |    "type": "Boolean"
+                       |  },
+                       |  "ctx": [],
+                       |  "dec": {
+                       |    "type": "FUNC",
+                       |    "posStart": 62,
+                       |    "posEnd": 74,
+                       |    "name": {
+                       |      "value": "f",
+                       |      "posStart": 67,
+                       |      "posEnd": 68
+                       |    },
+                       |    "argList": [],
+                       |    "expr": {
+                       |      "type": "CONST_LONG",
+                       |      "posStart": 73,
+                       |      "posEnd": 74,
+                       |      "resultType": {
+                       |        "type": "Int"
+                       |      },
+                       |      "ctx": []
+                       |    }
+                       |  },
+                       |  "body": {
+                       |    "type": "TRUE",
+                       |    "posStart": 84,
+                       |    "posEnd": 88,
+                       |    "resultType": {
+                       |      "type": "Boolean"
+                       |    },
+                       |    "ctx": []
+                       |  }
+                       |}
+                     """.stripMargin
+      JSON.stringify(result.exprAst.expr) ==> JSON.stringify(JSON.parse(expected))
+      JSON.stringify(result.errorList) ==> "[]"
     }
   }
 }
