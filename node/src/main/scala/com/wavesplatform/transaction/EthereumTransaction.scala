@@ -1,7 +1,6 @@
 package com.wavesplatform.transaction
 
-import java.math.BigInteger
-
+import cats.implicits.toBifunctorOps
 import com.wavesplatform.account.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.EthereumKeyLength
@@ -15,6 +14,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.serialization.impl.BaseTxJson
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
+import com.wavesplatform.transaction.validation.impl.InvokeScriptTxValidator
 import com.wavesplatform.transaction.validation.{TxConstraints, TxValidator, ValidatedV}
 import com.wavesplatform.utils.EthEncoding
 import monix.eval.Coeval
@@ -26,6 +26,7 @@ import org.web3j.crypto.Sign.SignatureData
 import org.web3j.utils.Convert
 import play.api.libs.json.*
 
+import java.math.BigInteger
 import scala.reflect.ClassTag
 
 final case class EthereumTransaction(
@@ -113,26 +114,32 @@ object EthereumTransaction {
   }
 
   case class Invocation(dApp: Address, hexCallData: String) extends Payload {
-    def toInvokeScriptLike(tx: EthereumTransaction, blockchain: Blockchain): Either[ValidationError, InvokeScriptTransactionLike] =
-      blockchain.accountScript(dApp).toRight(GenericError(s"No script at address $dApp")).flatMap { scriptInfo =>
-        ABIConverter(scriptInfo.script)
-          .decodeFunctionCall(hexCallData)
-          .map { case (extractedCall, extractedPayments) =>
-            new InvokeScriptTransactionLike {
-              override def funcCall: Terms.FUNCTION_CALL                  = extractedCall
-              override def payments: Seq[InvokeScriptTransaction.Payment] = extractedPayments
-              override def id: Coeval[ByteStr]                            = tx.id
-              override def dApp: AddressOrAlias                           = Invocation.this.dApp
-              override val sender: PublicKey                              = tx.signerPublicKey()
-              override def root: InvokeScriptTransactionLike              = this
-              override def assetFee: (Asset, TxTimestamp)                 = tx.assetFee
-              override def timestamp: TxTimestamp                         = tx.timestamp
-              override def chainId: TxVersion                             = tx.chainId
-              override def checkedAssets: Seq[Asset.IssuedAsset]          = this.paymentAssets
-              override val tpe: TransactionType                           = TransactionType.InvokeScript
-            }
-          }
-      }
+    def toInvokeScriptLike(tx: EthereumTransaction, blockchain: Blockchain): Either[ValidationError, InvokeScriptTransactionLike] = {
+      for {
+        scriptInfo      <- blockchain.accountScript(dApp).toRight(GenericError(s"No script at address $dApp"))
+        callAndPayments <- ABIConverter(scriptInfo.script).decodeFunctionCall(hexCallData)
+        invocation = new InvokeScriptTransactionLike {
+          override def funcCall: Terms.FUNCTION_CALL                  = callAndPayments._1
+          override def payments: Seq[InvokeScriptTransaction.Payment] = callAndPayments._2
+          override def id: Coeval[ByteStr]                            = tx.id
+          override def dApp: AddressOrAlias                           = Invocation.this.dApp
+          override val sender: PublicKey                              = tx.signerPublicKey()
+          override def root: InvokeScriptTransactionLike              = this
+          override def assetFee: (Asset, TxTimestamp)                 = tx.assetFee
+          override def timestamp: TxTimestamp                         = tx.timestamp
+          override def chainId: TxVersion                             = tx.chainId
+          override def checkedAssets: Seq[Asset.IssuedAsset]          = this.paymentAssets
+          override val tpe: TransactionType                           = TransactionType.InvokeScript
+        }
+        _ <- checkPaymentsAmount(blockchain, invocation)
+      } yield invocation
+    }
+
+    private def checkPaymentsAmount(blockchain: Blockchain, invocation: InvokeScriptTransactionLike): Either[ValidationError, Unit] =
+      if (blockchain.height >= blockchain.settings.functionalitySettings.ethInvokePaymentsCheckHeight)
+        InvokeScriptTxValidator.checkAmounts(invocation.payments).toEither.leftMap(_.head)
+      else
+        Right(())
   }
 
   implicit object EthereumTransactionValidator extends TxValidator[EthereumTransaction] {

@@ -6,6 +6,7 @@ import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.EthereumTransaction.Invocation
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.utils.EthConverters.*
@@ -62,8 +63,15 @@ class EthereumInvokePaymentTest extends PropSpec with WithDomain with EthHelpers
       def invoke   = EthTxGenerator.generateEthInvoke(defaultEthSigner, secondAddress, "default", Nil, payments)
       withDomain(settings, balances) { d =>
         d.appendBlock(issueTx, transfer(asset = token), setScript(secondSigner, dApp))
-        d.appendAndAssertSucceed(invoke)
-        d.appendBlockE(invoke) should produce("NonPositiveAmount")
+
+        val invoke1 = invoke
+        d.appendAndAssertSucceed(invoke1)
+        invoke1.payload.asInstanceOf[Invocation].toInvokeScriptLike(invoke, d.blockchain) shouldBe a[Right[_, _]]
+
+        val invoke2 = invoke
+        d.appendBlockE(invoke2) should produce("NonPositiveAmount")
+        d.appendBlock()
+        invoke2.payload.asInstanceOf[Invocation].toInvokeScriptLike(invoke, d.blockchain) should produce("NonPositiveAmount")
       }
     }
   }
