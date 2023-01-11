@@ -25,7 +25,7 @@ class ScriptPreprocessorTest extends PropSpec with ScriptGenParser {
       directives <- DirectiveParser(src)
       ds         <- Directive.extractDirectives(directives)
       linked     <- ScriptPreprocessor(src, libraries, ds.imports)
-      r          <- eval(linked)
+      r          <- eval(linked._1)
     } yield r
 
   private def eval(code: String): Either[String, EVALUATED] = {

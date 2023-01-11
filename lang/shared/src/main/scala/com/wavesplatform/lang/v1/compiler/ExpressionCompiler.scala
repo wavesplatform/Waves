@@ -60,10 +60,11 @@ object ExpressionCompiler {
 
   def compileWithParseResult(
       input: String,
+      offset: Int,
       ctx: CompilerContext,
       saveExprContext: Boolean = true
   ): Either[(String, Int, Int), (EXPR, Expressions.SCRIPT, Iterable[CompilationError])] =
-    Parser
+    new Parser()(offset)
       .parseExpressionWithErrorRecovery(input)
       .flatMap { case (parseResult, removedCharPosOpt) =>
         compileExprWithCtx(parseResult.expr, saveExprContext, allowIllFormedStrings = false)
@@ -808,18 +809,18 @@ object ExpressionCompiler {
                 case hType :: tTypes =>
                   val typeIf =
                     tTypes.foldLeft(isInst(hType))((other, matchType) => BINARY_OP(mc.position, isInst(matchType), BinaryOperation.OR_OP, other))
-                  Right(Expressions.IF(mc.position, typeIf, blockWithNewVar, further))
+                  Right(makeIfCase(typeIf, blockWithNewVar, further))
                 case Nil => ???
               }
             } yield cases
           case (_: TypedVar, t) =>
-            Right(Expressions.IF(mc.position, isInst(t.name), blockWithNewVar, further))
+            Right(makeIfCase(isInst(t.name), blockWithNewVar, further))
 
           case (ConstsPat(consts, _), _) =>
             val cond = consts
               .map(c => BINARY_OP(mc.position, c, BinaryOperation.EQ_OP, refTmp))
               .reduceRight((c, r) => BINARY_OP(mc.position, c, BinaryOperation.OR_OP, r))
-            Right(Expressions.IF(mc.position, cond, blockWithNewVar, further))
+            Right(makeIfCase(cond, blockWithNewVar, further))
 
           case (p: CompositePattern, _) =>
             val pos        = p.position
@@ -850,8 +851,7 @@ object ExpressionCompiler {
               } else
                 cond
             Right(
-              Expressions.IF(
-                mc.position,
+              makeIfCase(
                 p.caseType.fold(checkingCond)(
                   t =>
                     BINARY_OP(
@@ -886,6 +886,9 @@ object ExpressionCompiler {
         }
     }
   }
+
+  private def makeIfCase(cond: Expressions.EXPR, ifTrue: Expressions.EXPR, ifFalse: Expressions.EXPR): Expressions.IF =
+    Expressions.IF(Pos(cond.position.start, ifFalse.position.end)(0), cond, ifTrue, ifFalse)
 
   private def mkGet(path: Seq[(PART[String], Option[Single])], ref: Expressions.EXPR, pos: Pos): Expressions.EXPR =
     path.map(_._1).foldRight(ref) { (field, exp) =>

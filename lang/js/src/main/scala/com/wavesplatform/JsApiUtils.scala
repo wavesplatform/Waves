@@ -25,7 +25,7 @@ object JsApiUtils {
   }
 
   def serPartStr(part: PART[String]): js.Object = {
-    val partValue = Expressions.PART.toOption(part).getOrElse("").toString
+    val partValue = Expressions.PART.toOption(part).getOrElse("")
     jObj(
       "value"    -> partValue,
       "posStart" -> part.position.start,
@@ -56,17 +56,13 @@ object JsApiUtils {
       )
     }
 
-    val start = js.Date.now()
-    val r = jObj(
+    jObj(
       "type"        -> "DAPP",
       "posStart"    -> ast.position.start,
       "posEnd"      -> ast.position.end,
       "decList"     -> ast.decs.toJSArray.map(serDec),
       "annFuncList" -> ast.fs.toJSArray.map(serAnnFunc)
     )
-    val end = js.Date.now()
-    println(s"dAppToJs: ${(end - start) / 1000d}s")
-    r
   }
 
   def expressionScriptToJs(ast: Expressions.SCRIPT): js.Object =
@@ -257,6 +253,14 @@ object JsApiUtils {
         case CONST_STRING(s)    => jObj("type" -> "STRING", "value" -> s)
         case LET_BLOCK(let, body) =>
           jObj("type" -> "BLOCK", "let" -> jObj("name" -> let.name, "value" -> r(let.value)), "body" -> r(body))
+        case BLOCK(LET(name, value), body) =>
+          jObj("type" -> "BLOCK", "let" -> jObj("name" -> name, "value" -> r(value)), "body" -> r(body))
+        case BLOCK(FUNC(name, args, body), nextBody) =>
+          jObj(
+            "type" -> "BLOCK",
+            "func" -> jObj("name" -> name, "args" -> args.toJSArray, "body" -> r(body)),
+            "body" -> r(nextBody)
+          )
         case IF(cond, ifTrue, ifFalse) =>
           jObj("type" -> "IF", "condition" -> r(cond), "true" -> r(ifTrue), "false" -> r(ifFalse))
         case REF(key)         => jObj("type" -> "REF", "key" -> key)
