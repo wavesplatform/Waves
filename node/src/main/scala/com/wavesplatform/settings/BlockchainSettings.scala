@@ -107,8 +107,7 @@ object FunctionalitySettings {
     estimatorPreCheckHeight = 1847610,
     estimationOverflowFixHeight = 2858710,
     estimatorSumOverflowFixHeight = 2897510,
-    enforceTransferValidationAfter = 2959447,
-    ethInvokePaymentsCheckHeight = 3180000
+    enforceTransferValidationAfter = 2959447
   )
 
   val TESTNET: FunctionalitySettings = apply(
@@ -120,8 +119,7 @@ object FunctionalitySettings {
     estimatorPreCheckHeight = 817380,
     estimationOverflowFixHeight = 1793770,
     estimatorSumOverflowFixHeight = 1832520,
-    enforceTransferValidationAfter = 1698800,
-    ethInvokePaymentsCheckHeight = 2064000
+    enforceTransferValidationAfter = 1698800
   )
 
   val STAGENET: FunctionalitySettings = apply(
