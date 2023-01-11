@@ -115,7 +115,7 @@ object JsAPI {
               "result"           -> Global.toBuffer(bytes),
               "complexity"       -> verifierComplexity.toDouble,
               "complexityByFunc" -> callableComplexities.view.mapValues(_.toDouble).toMap.toJSDictionary,
-              "dAppAst"          -> (() => dAppToJs(expr)),
+              "dAppAst"          -> dAppToJs(expr),
               "errorList"        -> errors.map(compilationErrToJs).toJSArray
             )
           case CompileAndParseResult.Library(bytes, complexity, expr) =>
