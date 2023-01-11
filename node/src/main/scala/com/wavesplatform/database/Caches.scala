@@ -35,11 +35,12 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
 
   private def loadCurrentBlock() = {
     val height = loadHeight()
-    CurrentBlockInfo(height, loadBlockMeta(height), Seq.empty)
+    CurrentBlockInfo(height, loadBlockMeta(height), loadTxs(height))
   }
 
   protected def loadHeight(): Height
   protected def loadBlockMeta(height: Height): Option[PBBlockMeta]
+  protected def loadTxs(height: Height): Seq[Transaction]
 
   override def height: Int = current.height
 

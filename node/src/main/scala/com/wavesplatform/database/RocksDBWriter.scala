@@ -195,6 +195,10 @@ abstract class RocksDBWriter private[database] (
     db.get(Keys.blockMetaAt(height))
   }
 
+  override protected def loadTxs(height: Height): Seq[Transaction] = readOnly { db =>
+    loadTransactions(height, db).map(_._2)
+  }
+
   override protected def loadScript(address: Address): Option[AccountScriptInfo] = readOnly { db =>
     addressId(address).fold(Option.empty[AccountScriptInfo]) { addressId =>
       db.fromHistory(Keys.addressScriptHistory(addressId), Keys.addressScript(addressId)).flatten
