@@ -181,13 +181,6 @@ object JsAPITest extends JsTestBase {
       val result = JsAPI.parseAndCompile(library, 3)
       val expected = """
                        |{
-                       |  "type": "BLOCK",
-                       |  "posStart": 62,
-                       |  "posEnd": 88,
-                       |  "resultType": {
-                       |    "type": "Boolean"
-                       |  },
-                       |  "ctx": [],
                        |  "dec": {
                        |    "type": "FUNC",
                        |    "posStart": 62,
@@ -216,7 +209,14 @@ object JsAPITest extends JsTestBase {
                        |      "type": "Boolean"
                        |    },
                        |    "ctx": []
-                       |  }
+                       |  },
+                       |  "type": "BLOCK",
+                       |  "posStart": 62,
+                       |  "posEnd": 88,
+                       |  "resultType": {
+                       |    "type": "Boolean"
+                       |  },
+                       |  "ctx": []
                        |}
                      """.stripMargin
       JSON.stringify(result.exprAst.expr) ==> JSON.stringify(JSON.parse(expected))
