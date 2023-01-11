@@ -15,15 +15,15 @@ import com.wavesplatform.utils._
 import scala.util.Try
 
 object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
+  def checkAmounts(payments: Seq[Payment]): ValidatedNV = {
+    val invalid = payments.filter(_.amount <= 0)
+    if (invalid.nonEmpty)
+      Invalid(NonEmptyList.fromListUnsafe(invalid.toList).map(p => NonPositiveAmount(p.amount, p.assetId.fold("Waves")(_.toString))))
+    else Valid(())
+  }
+
   override def validate(tx: InvokeScriptTransaction): ValidatedV[InvokeScriptTransaction] = {
     import tx._
-
-    def checkAmounts(payments: Seq[Payment]): ValidatedNV = {
-      val invalid = payments.filter(_.amount <= 0)
-      if (invalid.nonEmpty)
-        Invalid(NonEmptyList.fromListUnsafe(invalid.toList).map(p => NonPositiveAmount(p.amount, p.assetId.fold("Waves")(_.toString))))
-      else Valid(())
-    }
 
     def checkLength: Either[GenericError, Unit] = {
       val length =
