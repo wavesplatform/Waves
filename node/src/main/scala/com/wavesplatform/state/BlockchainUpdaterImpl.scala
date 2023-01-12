@@ -1,7 +1,5 @@
 package com.wavesplatform.state
 
-import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
-
 import cats.syntax.either.*
 import cats.syntax.option.*
 import com.wavesplatform.account.{Address, Alias}
@@ -12,6 +10,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.Storage
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.BlockchainFeatures.ConsensusImprovements
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.{TxsInBlockchainStats, *}
 import com.wavesplatform.mining.{Miner, MiningConstraint, MiningConstraints}
@@ -27,6 +26,8 @@ import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceSt
 import kamon.Kamon
 import monix.reactive.subjects.ReplaySubject
 import monix.reactive.{Observable, Observer}
+
+import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
 class BlockchainUpdaterImpl(
     leveldb: Blockchain & Storage,
@@ -204,7 +205,7 @@ class BlockchainUpdaterImpl(
                 case lastBlockId =>
                   val height            = lastBlockId.fold(0)(leveldb.unsafeHeightOf)
                   val miningConstraints = MiningConstraints(leveldb, height)
-                  val reward            = nextReward()
+                  val reward            = if (height == 0 && leveldb.isFeatureActivated(ConsensusImprovements)) None else nextReward()
 
                   val referencedBlockchain = CompositeBlockchain(leveldb, reward)
                   BlockDiffer
