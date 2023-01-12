@@ -100,10 +100,11 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
       }
       .toMap
 
-  def loadCacheData(addresses: Seq[Address]): Unit = {
+  def loadCacheData(addresses: Set[Address], orders: Set[ByteStr]): Unit = {
     addressIdCache.getAll(addresses.asJava)
     balancesCache.getAll(addresses.map(_ -> Waves).asJava)
     leaseBalanceCache.getAll(addresses.asJava)
+    volumeAndFeeCache.getAll(orders.asJava)
   }
 
   override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] =
@@ -124,8 +125,10 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
   protected def discardAssetDescription(asset: IssuedAsset): Unit             = assetDescriptionCache.invalidate(asset)
   override def assetDescription(asset: IssuedAsset): Option[AssetDescription] = assetDescriptionCache.get(asset)
 
-  private val volumeAndFeeCache: LoadingCache[ByteStr, CurrentVolumeAndFee] = cache(dbSettings.maxCacheSize, loadVolumeAndFee)
+  private val volumeAndFeeCache: LoadingCache[ByteStr, CurrentVolumeAndFee] =
+    cache(dbSettings.maxCacheSize, loadVolumeAndFee, keys => loadVolumesAndFees(keys.asScala.toSeq).asJava)
   protected def loadVolumeAndFee(orderId: ByteStr): CurrentVolumeAndFee
+  protected def loadVolumesAndFees(orders: Seq[ByteStr]): Map[ByteStr, CurrentVolumeAndFee]
   protected def discardVolumeAndFee(orderId: ByteStr): Unit = volumeAndFeeCache.invalidate(orderId)
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee = {
     val curVf = volumeAndFeeCache.get(orderId)
@@ -389,11 +392,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
     scriptCache.putAll(diff.scripts.asJava)
     assetScriptCache.putAll(diff.assetScripts.asJava)
     accountDataCache.putAll(newData.asJava)
-
-    if (height % 1000 == 0) {
-      println(s"addressId:\n${addressIdCache.stats().toString}")
-      println(s"balances:\n${balancesCache.stats().toString}")
-    }
   }
 
   protected def doRollback(targetHeight: Int): Seq[(Block, ByteStr)]

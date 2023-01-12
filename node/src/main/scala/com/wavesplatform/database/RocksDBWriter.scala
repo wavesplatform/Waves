@@ -1,6 +1,7 @@
 package com.wavesplatform.database
 
 import java.util
+
 import cats.data.Ior
 import cats.syntax.option.*
 import cats.syntax.semigroup.*
@@ -222,12 +223,8 @@ abstract class RocksDBWriter private[database] (
   override def carryFee: Long = readOnly(_.get(Keys.carryFee(height)))
 
   override protected def loadAccountData(address: Address, key: String): Option[DataEntry[?]] =
-    loadWithFilter(dataKeyFilter, Keys.dataMetaHistory(address, key)) { (ro, history) =>
-      for {
-        aid    <- addressId(address)
-        (h, _) <- history.headOption
-        e      <- ro.get(Keys.data(aid, key)(h))
-      } yield e
+    loadWithFilter(dataKeyFilter, Keys.data(address, key)) { (_, cdn) =>
+      Some(cdn.entry)
     }
 
   override def hasData(address: Address): Boolean = {
@@ -326,6 +323,13 @@ abstract class RocksDBWriter private[database] (
 
   override protected def loadVolumeAndFee(orderId: ByteStr): CurrentVolumeAndFee = readOnly { ro =>
     ro.get(Keys.filledVolumeAndFee(orderId))
+  }
+
+  override protected def loadVolumesAndFees(orders: Seq[ByteStr]): Map[ByteStr, CurrentVolumeAndFee] = readOnly { ro =>
+    orders.view
+      .zip(ro.multiGet(orders.map(Keys.filledVolumeAndFee), 24))
+      .map { case (id, v) => id -> v.getOrElse(CurrentVolumeAndFee.Unavailable) }
+      .toMap
   }
 
   override protected def loadApprovedFeatures(): Map[Short, Int] = {
@@ -527,10 +531,11 @@ abstract class RocksDBWriter private[database] (
         rw.put(Keys.changedDataKeys(height, addressId), addressData.data.keys.toSeq)
 
         for ((key, value) <- addressData.data) {
-          val kdh  = Keys.dataMetaHistory(address, key)
-          val size = rw.put(Keys.data(addressId, key)(height), Some(value))
+          val kdh  = Keys.data(address, key)
+          val node = CurrentDataNode(value, Height(0), Height(0))
+          rw.put(kdh, node)
+          rw.put(Keys.dataAt(addressId, key)(height), Some(node))
           dataKeyFilter.put(kdh.suffix)
-          expiredKeys ++= updateMetaHistory(rw, kdh, threshold, Keys.data(addressId, key), size)
         }
       }
 
@@ -682,8 +687,7 @@ abstract class RocksDBWriter private[database] (
             for (k <- rw.get(Keys.changedDataKeys(currentHeight, addressId))) {
               log.trace(s"Discarding $k for $address at $currentHeight")
               accountDataToInvalidate += (address -> k)
-              rw.delete(Keys.data(addressId, k)(currentHeight))
-              rw.filterMetaHistory(Keys.dataMetaHistory(address, k), currentHeight)
+              rw.delete(Keys.dataAt(addressId, k)(currentHeight))
             }
             rw.delete(Keys.changedDataKeys(currentHeight, addressId))
 

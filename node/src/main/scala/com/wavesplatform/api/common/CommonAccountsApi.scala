@@ -8,7 +8,7 @@ import com.wavesplatform.api.common.CommonAccountsApi.AddressDataIterator.BatchS
 import com.wavesplatform.api.common.TransactionMeta.Ethereum
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{AddressId, DBExt, DBResource, Key, KeyTags, Keys}
+import com.wavesplatform.database.{AddressId, CurrentDataNode, DBExt, DBResource, Key, KeyTags, Keys}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBRecipients
@@ -24,9 +24,9 @@ import com.wavesplatform.transaction.{EthereumTransaction, TransactionType}
 import monix.eval.Task
 import monix.reactive.Observable
 import org.rocksdb.RocksDB
-
 import java.nio.ByteBuffer
 import java.util.regex.Pattern
+
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 
@@ -249,21 +249,21 @@ object CommonAccountsApi {
             dbEntry
           }
         case None =>
-          val keysBuffer  = new ArrayBuffer[Key[Option[DataEntry[?]]]]()
+          val keysBuffer  = new ArrayBuffer[Key[Option[CurrentDataNode]]]()
           val sizesBuffer = new ArrayBuffer[Int]()
           while (dbIterator.isValid && keysBuffer.length < BatchSize) {
             val key = new String(dbIterator.key().drop(2 + Address.HashLength), Charsets.UTF_8)
             if (matches(key)) {
               Option(dbIterator.value()).foreach { arr =>
                 val buf = ByteBuffer.wrap(arr)
-                keysBuffer.addOne(Keys.data(addressId, key)(buf.getInt))
+                keysBuffer.addOne(Keys.dataAt(addressId, key)(buf.getInt))
                 sizesBuffer.addOne(buf.getInt)
               }
             }
             dbIterator.next()
           }
           if (keysBuffer.nonEmpty) {
-            nextDbEntries = db.multiGetFlat(keysBuffer, sizesBuffer)
+            nextDbEntries = db.multiGetFlat(keysBuffer, sizesBuffer).map(_.entry)
             computeNext()
           } else if (nextIndex < length) {
             nextIndex += 1

@@ -43,7 +43,7 @@ object BlockDiffer {
       block: Block,
       constraint: MiningConstraint,
       hitSource: ByteStr,
-      loadCacheData: Seq[Address] => Unit = _ => (),
+      loadCacheData: (Set[Address], Set[ByteStr]) => Unit = (_, _) => (),
       verify: Boolean = true,
       enableExecutionLog: Boolean = false,
       txSignParCheck: Boolean = true
@@ -56,7 +56,7 @@ object BlockDiffer {
       block: Block,
       constraint: MiningConstraint,
       hitSource: ByteStr,
-      loadCacheData: Seq[Address] => Unit,
+      loadCacheData: (Set[Address], Set[ByteStr]) => Unit,
       verify: Boolean,
       enableExecutionLog: Boolean,
       txSignParCheck: Boolean
@@ -126,7 +126,7 @@ object BlockDiffer {
       prevBlockTimestamp: Option[Long],
       micro: MicroBlock,
       constraint: MiningConstraint,
-      loadCacheData: Seq[Address] => Unit = _ => (),
+      loadCacheData: (Set[Address], Set[ByteStr]) => Unit = (_, _) => (),
       verify: Boolean = true,
       enableExecutionLog: Boolean = false
   ): Either[ValidationError, Result] =
@@ -137,7 +137,7 @@ object BlockDiffer {
       prevBlockTimestamp: Option[Long],
       micro: MicroBlock,
       constraint: MiningConstraint,
-      loadCacheData: Seq[Address] => Unit = _ => (),
+      loadCacheData: (Set[Address], Set[ByteStr]) => Unit = (_, _) => (),
       verify: Boolean = true,
       enableExecutionLog: Boolean = false,
       txSignParCheck: Boolean = true
@@ -181,7 +181,7 @@ object BlockDiffer {
       initDiff: Diff,
       hasNg: Boolean,
       txs: Seq[Transaction],
-      loadCacheData: Seq[Address] => Unit,
+      loadCacheData: (Set[Address], Set[ByteStr]) => Unit,
       verify: Boolean,
       enableExecutionLog: Boolean,
       txSignParCheck: Boolean
@@ -266,12 +266,15 @@ object BlockDiffer {
       }
   }
 
-  private def prepareCaches(blockGenerator: Address, txs: Seq[Transaction], loadCacheData: Seq[Address] => Unit): Unit = {
-    val addresses = scala.collection.mutable.Set(blockGenerator)
+  private def prepareCaches(blockGenerator: Address, txs: Seq[Transaction], loadCacheData: (Set[Address], Set[ByteStr]) => Unit): Unit = {
+    val addresses = Set.newBuilder[Address].addOne(blockGenerator)
+    val orders    = Set.newBuilder[ByteStr]
 
     txs.foreach {
-      case tx: ExchangeTransaction => addresses.addAll(Seq(tx.sender.toAddress, tx.buyOrder.senderAddress, tx.sellOrder.senderAddress))
-      case tx: GenesisTransaction  => addresses.add(tx.recipient)
+      case tx: ExchangeTransaction =>
+        addresses.addAll(Seq(tx.sender.toAddress, tx.buyOrder.senderAddress, tx.sellOrder.senderAddress))
+        orders.addOne(tx.buyOrder.id()).addOne(tx.sellOrder.id())
+      case tx: GenesisTransaction => addresses.addOne(tx.recipient)
       case tx: InvokeScriptTransaction =>
         addresses.addAll(Seq(tx.senderAddress) ++ (tx.dApp match {
           case addr: Address => Some(addr)
@@ -290,10 +293,10 @@ object BlockDiffer {
           case addr: Address => Some(addr)
           case _             => None
         }))
-      case tx: Authorized => addresses.add(tx.sender.toAddress)
+      case tx: Authorized => addresses.addOne(tx.sender.toAddress)
       case _              => ()
     }
 
-    loadCacheData(addresses.toSeq)
+    loadCacheData(addresses.result(), orders.result())
   }
 }
