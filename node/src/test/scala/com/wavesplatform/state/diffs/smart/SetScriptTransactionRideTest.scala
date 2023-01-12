@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs.smart
 
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
-import com.wavesplatform.features.BlockchainFeatures.ContinuationTransaction
+import com.wavesplatform.features.BlockchainFeatures.ConsensusImprovements
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.test.DomainPresets.WavesSettingsOps
@@ -11,7 +11,7 @@ import com.wavesplatform.transaction.TxHelpers.{defaultSigner, secondSigner, set
 import com.wavesplatform.transaction.TxVersion
 
 class SetScriptTransactionRideTest extends PropSpec with WithDomain {
-  property(s"correct mapping SetScriptTransaction with > 32 KB script from $ContinuationTransaction") {
+  property(s"correct mapping SetScriptTransaction with > 32 KB script from $ConsensusImprovements") {
     val dAppVerifier = TestCompiler(V6).compileContract(
       s"""
          | @Verifier(tx)
@@ -39,7 +39,7 @@ class SetScriptTransactionRideTest extends PropSpec with WithDomain {
        """.stripMargin
     )
     withDomain(
-      DomainPresets.ContinuationTransaction.setFeaturesHeight(ContinuationTransaction -> 4),
+      DomainPresets.RideV6.setFeaturesHeight(ConsensusImprovements -> 4),
       AddrWithBalance.enoughBalances(secondSigner)
     ) { d =>
       d.appendBlock(setScript(defaultSigner, dAppVerifier), setScript(secondSigner, exprVerifier))

@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs.invoke
 
 import cats.syntax.semigroup.*
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.features.BlockchainFeatures.{ContinuationTransaction, SynchronousCalls}
+import com.wavesplatform.features.BlockchainFeatures.{ConsensusImprovements, SynchronousCalls}
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.values.{Account, DApp, StdLibVersion, V3}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
@@ -30,7 +30,7 @@ object CachedDAppCTX {
       (
         version,
         b.isFeatureActivated(SynchronousCalls) && b.height > b.settings.functionalitySettings.enforceTransferValidationAfter,
-        b.isFeatureActivated(ContinuationTransaction)
+        b.isFeatureActivated(ConsensusImprovements)
       )
     )
 }

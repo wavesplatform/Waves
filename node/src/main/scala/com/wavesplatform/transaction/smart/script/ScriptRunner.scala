@@ -52,7 +52,7 @@ object ScriptRunner {
       blockchain.checkEstimatorSumOverflow,
       blockchain.newEvaluatorMode,
       blockchain.isFeatureActivated(RideV6),
-      blockchain.isFeatureActivated(ContinuationTransaction)
+      blockchain.isFeatureActivated(ConsensusImprovements)
     )
 
   def applyGeneric(
