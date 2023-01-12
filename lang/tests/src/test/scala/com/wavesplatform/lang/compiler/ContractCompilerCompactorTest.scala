@@ -27,7 +27,7 @@ class ContractCompilerCompactorTest extends PropSpec {
 
   private def ctxForV(version: StdLibVersion): CTX[Environment] =
     PureContext.build(version, useNewPowPrecision = true).withEnvironment[Environment] |+|
-      WavesContext.build(Global, DirectiveSet(version, Account, DAppType).explicitGet())
+      WavesContext.build(Global, DirectiveSet(version, Account, DAppType).explicitGet(), fixBigScriptField = true)
 
   property("contract script compaction - V4, V5, V6") {
 

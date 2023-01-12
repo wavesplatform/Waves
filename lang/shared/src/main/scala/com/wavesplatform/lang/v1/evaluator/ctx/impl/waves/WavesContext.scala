@@ -13,8 +13,8 @@ import com.wavesplatform.lang.v1.traits.*
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
 
 object WavesContext {
-  def build(global: BaseGlobal, ds: DirectiveSet): CTX[Environment] =
-    invariableCtx |+| variableCtxCache(global, ds)
+  def build(global: BaseGlobal, ds: DirectiveSet, fixBigScriptField: Boolean): CTX[Environment] =
+    invariableCtx |+| variableCtx(global, ds, fixBigScriptField)
 
   private val commonFunctions =
     Array(
@@ -41,17 +41,7 @@ object WavesContext {
   private val invariableCtx =
     CTX(Seq(), Map(height), commonFunctions)
 
-  private val ctxCache = scala.collection.mutable.AnyRefMap.empty[(BaseGlobal, DirectiveSet), CTX[Environment]]
-
-  private def variableCtxCache(global: BaseGlobal, ds: DirectiveSet) =
-    ctxCache.getOrElse(
-      (global, ds),
-      ctxCache.synchronized {
-        ctxCache.getOrElseUpdate((global, ds), variableCtx(global, ds))
-      }
-    )
-
-  private def variableCtx(global: BaseGlobal, ds: DirectiveSet): CTX[Environment] = {
+  private def variableCtx(global: BaseGlobal, ds: DirectiveSet, fixBigScriptField: Boolean): CTX[Environment] = {
     val isTokenContext = ds.scriptType == Asset
     val proofsEnabled  = !isTokenContext
     val version        = ds.stdLibVersion
@@ -59,7 +49,7 @@ object WavesContext {
     val typeDefs       = types.view.map(t => t.name -> t).toMap
     CTX(
       types,
-      variableVars(isTokenContext, version, ds.contentType, proofsEnabled),
+      variableVars(isTokenContext, version, ds.contentType, proofsEnabled, fixBigScriptField),
       variableFuncs(global, ds, typeDefs, proofsEnabled)
     )
   }
@@ -142,9 +132,10 @@ object WavesContext {
       isTokenContext: Boolean,
       version: StdLibVersion,
       contentType: ContentType,
-      proofsEnabled: Boolean
+      proofsEnabled: Boolean,
+      fixBigScriptField: Boolean
   ): Map[String, (FINAL, ContextfulVal[Environment])] = {
-    val txVal = tx(isTokenContext, version, proofsEnabled)
+    val txVal = tx(isTokenContext, version, proofsEnabled, fixBigScriptField)
     version match {
       case V1 => Map(txVal)
       case V2 => Map(sell, buy, txVal)

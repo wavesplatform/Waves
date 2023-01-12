@@ -49,7 +49,8 @@ object VerifierLoggerBenchmark {
     private val dataTxObj: Terms.CaseObj = Bindings.transactionObject(
       RealTransactionWrapper(dataTx, ???, ???, ???).explicitGet(),
       proofsEnabled = true,
-      V4
+      V4,
+      fixBigScriptField = true
     )
 
     val value: (Log[Id], Either[String, EVALUATED]) =
