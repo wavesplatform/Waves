@@ -25,7 +25,7 @@ import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, BinaryDataEnt
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TxHelpers.{defaultAddress, genesis, issue, secondAddress, secondSigner}
+import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.*
@@ -562,7 +562,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
         d.appendBlock(genesis(secondAddress, 100.waves))
         val indexes =
           (1 to 5).flatMap { block =>
-            val txs = (1 to 3).map { count =>
+            val txs = (0 to 9).map { count =>
               val i   = block * 10 + count
               val tx1 = issue(defaultSigner, 1, name = s"NFT$i", reissuable = false)
               val tx2 = issue(secondSigner, 1, name = s"NFT$i", reissuable = false)
@@ -572,9 +572,9 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
             txs.map(_._1)
           }
         Seq(defaultAddress, secondAddress).foreach { address =>
-          Get(routePath(s"/nft/$address/limit/20")) ~> route ~> check {
+          Get(routePath(s"/nft/$address/limit/50")) ~> route ~> check {
             val nftList = responseAs[Seq[JsObject]]
-            nftList.size shouldEqual 15
+            nftList.size shouldEqual 50
             nftList.map { jso => (jso \ "name").as[String].drop(3).toInt } shouldBe indexes
           }
         }
