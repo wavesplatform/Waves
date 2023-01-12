@@ -895,13 +895,13 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         utx.putIfNew(invoke()).resultE shouldBe Right(true)
         utx.putIfNew(invoke(), forceValidate = true).resultE should produce("Explicit script termination")
 
-        d.appendBlock(setScript(secondSigner, dApp(4)))
-        utx.putIfNew(invoke()).resultE should produce("Explicit script termination")
-        utx.putIfNew(invoke(), forceValidate = true).resultE should produce("Explicit script termination")
-
         val unlimitedUtx = utx.copy(utxSettings = DefaultWavesSettings.utxSettings.copy(alwaysUnlimitedExecution = true))
         unlimitedUtx.putIfNew(invoke()).resultE should produce("Explicit script termination")
         unlimitedUtx.putIfNew(invoke(), forceValidate = true).resultE should produce("Explicit script termination")
+
+        d.appendBlock(setScript(secondSigner, dApp(4)))
+        utx.putIfNew(invoke()).resultE should produce("Explicit script termination")
+        utx.putIfNew(invoke(), forceValidate = true).resultE should produce("Explicit script termination")
       }
 
       "correct events for InvokeScriptTransaction with big complexity on alwaysUnlimitedExecution = true" in withDomain(
@@ -973,13 +973,13 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         utx.putIfNew(invoke(signer(2).toAddress)).resultE shouldBe Right(true)
         utx.putIfNew(invoke(signer(2).toAddress), forceValidate = true).resultE should produce("Explicit script termination")
 
-        d.appendBlock(setScript(secondSigner, dApp(4)))
-        utx.putIfNew(invoke(signer(2).toAddress)).resultE should produce("Explicit script termination")
-        utx.putIfNew(invoke(signer(2).toAddress), forceValidate = true).resultE should produce("Explicit script termination")
-
         val unlimitedUtx = utx.copy(utxSettings = DefaultWavesSettings.utxSettings.copy(alwaysUnlimitedExecution = true))
         unlimitedUtx.putIfNew(invoke(signer(2).toAddress)).resultE should produce("Explicit script termination")
         unlimitedUtx.putIfNew(invoke(signer(2).toAddress), forceValidate = true).resultE should produce("Explicit script termination")
+
+        d.appendBlock(setScript(secondSigner, dApp(4)))
+        utx.putIfNew(invoke(signer(2).toAddress)).resultE should produce("Explicit script termination")
+        utx.putIfNew(invoke(signer(2).toAddress), forceValidate = true).resultE should produce("Explicit script termination")
       }
 
       "invoke expression" in {
