@@ -11,6 +11,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.http.TransactionsApiRoute.TransactionJsonSerializer
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{PeerDatabase, PeerInfo, *}
@@ -213,7 +214,7 @@ case class DebugApiRoute(
       val blockchain = priorityPoolBlockchain()
       val startTime  = System.nanoTime()
 
-      val parsedTransaction = TransactionFactory.fromSignedRequest(jsv)
+      val parsedTransaction = TransactionFactory.fromSignedRequest(jsv, () => blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements))
 
       val tracedDiff = for {
         tx   <- TracedResult(parsedTransaction)

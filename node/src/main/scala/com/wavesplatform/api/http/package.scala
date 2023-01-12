@@ -35,8 +35,8 @@ package object http {
     val intToByteReads   = implicitly[Reads[Int]].map(_.toByte)
     val stringToByteReads = implicitly[Reads[String]]
       .map(s => Try(s.toByte))
-      .collect(JsonValidationError("Can't parse version")) {
-        case Success(v) => v
+      .collect(JsonValidationError("Can't parse version")) { case Success(v) =>
+        v
       }
 
     defaultByteReads orElse
@@ -44,7 +44,9 @@ package object http {
       stringToByteReads
   }
 
-  def createTransaction(senderPk: String, jsv: JsObject)(txToResponse: Transaction => ToResponseMarshallable): ToResponseMarshallable = {
+  def createTransaction(senderPk: String, jsv: JsObject, consensusImproveActivated: () => Boolean)(
+      txToResponse: Transaction => ToResponseMarshallable
+  ): ToResponseMarshallable = {
     val typeId = (jsv \ "type").as[Byte]
 
     (jsv \ "version").validateOpt[Byte](versionReads) match {
@@ -57,11 +59,13 @@ package object http {
           .fromBase58String(senderPk)
           .flatMap { senderPk =>
             TransactionType(typeId) match {
-              case TransactionType.Transfer         => txJson.as[TransferRequest].toTxFrom(senderPk)
-              case TransactionType.CreateAlias      => txJson.as[CreateAliasRequest].toTxFrom(senderPk)
-              case TransactionType.Lease            => txJson.as[LeaseRequest].toTxFrom(senderPk)
-              case TransactionType.LeaseCancel      => txJson.as[LeaseCancelRequest].toTxFrom(senderPk)
-              case TransactionType.Exchange         => txJson.as[ExchangeRequest].toTxFrom(senderPk)
+              case TransactionType.Transfer    => txJson.as[TransferRequest].toTxFrom(senderPk)
+              case TransactionType.CreateAlias => txJson.as[CreateAliasRequest].toTxFrom(senderPk)
+              case TransactionType.Lease       => txJson.as[LeaseRequest].toTxFrom(senderPk)
+              case TransactionType.LeaseCancel => txJson.as[LeaseCancelRequest].toTxFrom(senderPk)
+              case TransactionType.Exchange =>
+                implicit val exchangeRequestFormat: Format[ExchangeRequest] = ExchangeRequest.jsonFormat(consensusImproveActivated())
+                txJson.as[ExchangeRequest].toTxFrom(senderPk)
               case TransactionType.Issue            => txJson.as[IssueRequest].toTxFrom(senderPk)
               case TransactionType.Reissue          => txJson.as[ReissueRequest].toTxFrom(senderPk)
               case TransactionType.Burn             => txJson.as[BurnRequest].toTxFrom(senderPk)
@@ -80,12 +84,14 @@ package object http {
     }
   }
 
-  def parseOrCreateTransaction(jsv: JsObject)(txToResponse: Transaction => ToResponseMarshallable): ToResponseMarshallable = {
-    val result = TransactionFactory.fromSignedRequest(jsv)
+  def parseOrCreateTransaction(jsv: JsObject, consensusImproveActivated: () => Boolean)(
+      txToResponse: Transaction => ToResponseMarshallable
+  ): ToResponseMarshallable = {
+    val result = TransactionFactory.fromSignedRequest(jsv, consensusImproveActivated)
     if (result.isRight) {
       result.fold(ApiError.fromValidationError, txToResponse)
     } else {
-      createTransaction((jsv \ "senderPk").as[String], jsv)(txToResponse)
+      createTransaction((jsv \ "senderPk").as[String], jsv, consensusImproveActivated)(txToResponse)
     }
   }
 
@@ -161,15 +167,15 @@ package object http {
     * This directive can't handle __fatal__ errors from:
     *
     *   - Monix [[monix.eval.Task tasks]] with async boundaries:
-    *     {{{
+    * {{{
     *       get(complete(Task(throw new StackOverflowError()).executeAsync.runToFuture))
     *       get(complete(Task.evalAsync(throw new StackOverflowError()).runToFuture))
     *       get(complete(Task.deferFuture(Future(throw new StackOverflowError())).runToFuture))
-    *     }}}
+    * }}}
     *   - Async futures (i.e. which are not available at the time of handling):
-    *     {{{
+    * {{{
     *       get(complete(Future(throw new StackOverflowException())))
-    *     }}}
+    * }}}
     */
   def handleAllExceptions: Directive0 =
     Directive { inner => ctx =>

@@ -11,7 +11,7 @@ import com.wavesplatform.transaction.assets.exchange.Order.Version
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import com.wavesplatform.transaction.serialization.impl.OrderSerializer
 import monix.eval.Coeval
-import play.api.libs.json.{Format, JsObject}
+import play.api.libs.json.{JsObject, Reads, Writes}
 
 import scala.util.Try
 
@@ -37,18 +37,14 @@ case class Order(
     expiration: TxTimestamp,
     matcherFee: TxMatcherFee,
     matcherFeeAssetId: Asset = Waves,
-    priceMode: OrderPriceMode = OrderPriceMode.Default
+    priceMode: OrderPriceMode = OrderPriceMode.Default,
+    fixPkRecover: Boolean = false
 ) extends Proven {
   import Order.*
 
   lazy val senderPublicKey: PublicKey = orderAuthentication match {
     case OrderAuthentication.OrderProofs(publicKey, _)  => publicKey
-    case OrderAuthentication.Eip712Signature(signature) => EthOrders.recoverEthSignerKey(this, signature.arr, false)
-  }
-
-  lazy val senderPublicKeyFixed: PublicKey = orderAuthentication match {
-    case OrderAuthentication.OrderProofs(publicKey, _)  => publicKey
-    case OrderAuthentication.Eip712Signature(signature) => EthOrders.recoverEthSignerKey(this, signature.arr, true)
+    case OrderAuthentication.Eip712Signature(signature) => EthOrders.recoverEthSignerKey(this, signature.arr, fixPkRecover)
   }
 
   val eip712Signature: Option[ByteStr] = orderAuthentication match {
@@ -123,7 +119,8 @@ object Order {
   type Id      = ByteStr
   type Version = Byte
 
-  implicit lazy val jsonFormat: Format[Order] = com.wavesplatform.transaction.assets.exchange.OrderJson.orderFormat
+  def jsonReads(fixPkRecover: Boolean): Reads[Order] = com.wavesplatform.transaction.assets.exchange.OrderJson.orderReads(fixPkRecover)
+  implicit val jsonWrites: Writes[Order]             = com.wavesplatform.transaction.assets.exchange.OrderJson.orderWrites
 
   val MaxLiveTime: Long = 30L * 24L * 60L * 60L * 1000L
   val PriceConstant     = 100000000L

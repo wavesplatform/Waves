@@ -119,7 +119,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
 
   property("JSON format validation for InvokeScriptTransaction") {
     val dApp = KeyPair("test5".getBytes("UTF-8")).toAddress('D')
-    val js   = Json.parse(s"""{
+    val js = Json.parse(s"""{
                          "type": 16,
                          "id": "6z3CsQBFzV8Wfp1DDiXw5c75LrrwxktPPJTcXYBfTetN",
                          "sender": "3FX9SibfqAWcdnhrmFzqM1mGqya6DkVVnps",
@@ -162,12 +162,12 @@ class InvokeScriptTransactionSpecification extends PropSpec {
     )
 
     (tx.json() - "proofs") shouldEqual (js.asInstanceOf[JsObject] - "proofs")
-    TransactionFactory.fromSignedRequest(js) shouldBe Right(tx)
+    TransactionFactory.fromSignedRequest(js, () => false) shouldBe Right(tx)
   }
 
   property("JSON format validation for InvokeScriptTransaction without FUNCTION_CALL") {
     val dApp = KeyPair("test6".getBytes("UTF-8")).toAddress('D')
-    val js   = Json.parse(s"""{
+    val js = Json.parse(s"""{
                          "type": 16,
                          "id": "4sxYQWNDmWvaLwVcmfX1Znj8RfAy7JAWnSQUFgAFFixC",
                          "sender": "3FX9SibfqAWcdnhrmFzqM1mGqya6DkVVnps",
@@ -198,7 +198,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
 
     (tx.json() - "proofs") shouldEqual (js.asInstanceOf[JsObject] - "proofs" +
       ("call" -> JsObject(Map("function" -> JsString("default"), "args" -> JsArray()))))
-    TransactionFactory.fromSignedRequest(js) shouldBe Right(tx)
+    TransactionFactory.fromSignedRequest(js, () => false) shouldBe Right(tx)
   }
 
   property("Signed InvokeScriptTransactionRequest parser") {

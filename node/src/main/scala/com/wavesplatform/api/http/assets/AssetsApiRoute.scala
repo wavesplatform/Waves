@@ -30,7 +30,6 @@ import com.wavesplatform.transaction.{EthereumTransaction, TransactionFactory}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.assets.exchange.OrderJson.*
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
@@ -80,19 +79,20 @@ case class AssetsApiRoute(
         broadcast[BurnRequest](TransactionFactory.burn(_, wallet, time))
       } ~ (path("sponsor") & withAuth) {
         broadcast[SponsorFeeRequest](TransactionFactory.sponsor(_, wallet, time))
-      } ~ (path("order") & withAuth)(jsonPost[Order] { order =>
-        val address = if (blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements)) {
-          order.senderPublicKeyFixed.toAddress
-        } else {
-          order.senderPublicKey.toAddress
+      } ~ (path("order") & withAuth) {
+        implicit val orderReads: Reads[Order] = Order.jsonReads(blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements))
+        jsonPost[Order] { order =>
+          wallet.privateKeyAccount(order.senderPublicKey.toAddress).map(pk => Order.sign(order, pk.privateKey))
         }
-
-        wallet.privateKeyAccount(address).map(pk => Order.sign(order, pk.privateKey))
-      }) ~ pathPrefix("broadcast")(
+      } ~ pathPrefix("broadcast")(
         path("issue")(broadcast[IssueRequest](_.toTx)) ~
           path("reissue")(broadcast[ReissueRequest](_.toTx)) ~
           path("burn")(broadcast[BurnRequest](_.toTx)) ~
-          path("exchange")(broadcast[ExchangeRequest](_.toTx)) ~
+          path("exchange") {
+            implicit val exchangeRequestFormat: Format[ExchangeRequest] =
+              ExchangeRequest.jsonFormat(blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements))
+            broadcast[ExchangeRequest](_.toTx)
+          } ~
           path("transfer")(broadcast[TransferRequest](_.toTx))
       )
     }

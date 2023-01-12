@@ -56,14 +56,14 @@ object EthOrders extends App {
     encoder.hashStructuredData()
   }
 
-  def recoverEthSignerKey(order: Order, signature: Array[Byte], fixOrderPkRecover: Boolean): PublicKey = {
+  def recoverEthSignerKey(order: Order, signature: Array[Byte], fixPkRecover: Boolean): PublicKey = {
     val bytes = hashOrderStruct(order)
-    recoverEthSignerKey(bytes, signature, fixOrderPkRecover)
+    recoverEthSignerKey(bytes, signature, fixPkRecover)
   }
 
-  def recoverEthSignerKey(message: Array[Byte], signature: Array[Byte], fixOrderPkRecover: Boolean): PublicKey = {
+  def recoverEthSignerKey(message: Array[Byte], signature: Array[Byte], fixPkRecover: Boolean): PublicKey = {
     val signatureData = EthOrders.decodeSignature(signature)
-    val recId = if (fixOrderPkRecover) {
+    val recId = if (fixPkRecover) {
       val v = BigInt(1, signatureData.getV)
       if (v == 0 || v == 1) v else if (v > 28) v - AddressScheme.current.chainId * 2 - 35 else v - 27
     } else {
@@ -79,7 +79,7 @@ object EthOrders extends App {
       .takeRight(EthereumKeyLength)
 
     val numBytesToAdd = EthereumKeyLength - signerKey.length
-    val maybePaddedKey = if (fixOrderPkRecover && numBytesToAdd > 0) {
+    val maybePaddedKey = if (fixPkRecover && numBytesToAdd > 0) {
       Array.fill(numBytesToAdd)(0.toByte) ++ signerKey
     } else {
       signerKey

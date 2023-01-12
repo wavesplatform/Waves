@@ -56,7 +56,8 @@ object OrderJson {
       matcherFee: TxMatcherFee,
       signature: Option[Array[Byte]],
       proofs: Option[Array[Array[Byte]]],
-      version: Option[Byte]
+      version: Option[Byte],
+      fixPkRecover: Boolean
   ): Order = {
 
     val proofsValue =
@@ -77,7 +78,8 @@ object OrderJson {
       timestamp,
       expiration,
       matcherFee,
-      priceMode = OrderPriceMode.Default
+      priceMode = OrderPriceMode.Default,
+      fixPkRecover = fixPkRecover
     )
   }
 
@@ -96,7 +98,8 @@ object OrderJson {
       version: TxVersion,
       matcherFeeAssetId: Asset,
       eip712Signature: Option[Array[Byte]],
-      priceMode: OrderPriceMode
+      priceMode: OrderPriceMode,
+      fixPkRecover: Boolean
   ): Order = {
     val senderCredentials = eip712Signature match {
       case Some(value) =>
@@ -114,7 +117,21 @@ object OrderJson {
         )
     }
 
-    Order(version, senderCredentials, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, priceMode)
+    Order(
+      version,
+      senderCredentials,
+      matcher,
+      assetPair,
+      orderType,
+      amount,
+      price,
+      timestamp,
+      expiration,
+      matcherFee,
+      matcherFeeAssetId,
+      priceMode,
+      fixPkRecover
+    )
   }
 
   private val assetReads: Reads[Asset] = {
@@ -143,7 +160,7 @@ object OrderJson {
       case other           => JsError(s"Unexpected order price mode: $other")
     }
 
-  private val orderV1V2Reads: Reads[Order] = {
+  private def orderV1V2Reads(fixPkRecover: Boolean): Reads[Order] = {
     val r = (JsPath \ "senderPublicKey").read[PublicKey](accountPublicKeyReads) and
       (JsPath \ "matcherPublicKey").read[PublicKey](accountPublicKeyReads) and
       (JsPath \ "assetPair").read[AssetPair] and
@@ -164,11 +181,12 @@ object OrderJson {
       } and
       (JsPath \ "signature").readNullable[Array[Byte]] and
       (JsPath \ "proofs").readNullable[Array[Array[Byte]]] and
-      (JsPath \ "version").readNullable[Byte]
+      (JsPath \ "version").readNullable[Byte] and
+      Reads.pure(fixPkRecover)
     r(readOrderV1V2 _)
   }
 
-  private val orderV3V4Reads: Reads[Order] = {
+  private def orderV3V4Reads(fixPkRecover: Boolean): Reads[Order] = {
     val r = (JsPath \ "senderPublicKey").readNullable[PublicKey](accountPublicKeyReads) and
       (JsPath \ "matcherPublicKey").read[PublicKey](accountPublicKeyReads) and
       (JsPath \ "assetPair").read[AssetPair] and
@@ -197,20 +215,21 @@ object OrderJson {
         .readNullable[String]
         .map(_.map(EthEncoding.toBytes)) and
       (JsPath \ "priceMode")
-        .readWithDefault[OrderPriceMode](OrderPriceMode.Default)
+        .readWithDefault[OrderPriceMode](OrderPriceMode.Default) and
+      Reads.pure(fixPkRecover)
 
     r(readOrderV3V4 _)
   }
 
-  implicit val orderReads: Reads[Order] = {
+  def orderReads(fixPkRecover: Boolean): Reads[Order] = {
     case jsOrder @ JsObject(map) =>
       map.getOrElse("version", JsNumber(1)) match {
-        case JsNumber(n) if n == 1 || n == 2 => orderV1V2Reads.reads(jsOrder)
-        case JsNumber(n) if n >= 3           => orderV3V4Reads.reads(jsOrder)
+        case JsNumber(n) if n == 1 || n == 2 => orderV1V2Reads(fixPkRecover).reads(jsOrder)
+        case JsNumber(n) if n >= 3           => orderV3V4Reads(fixPkRecover).reads(jsOrder)
         case v                               => JsError(s"Invalid version: $v")
       }
     case invalidOrder => JsError(s"Order object expected: $invalidOrder")
   }
 
-  implicit val orderFormat: Format[Order] = Format(orderReads, Writes[Order](_.json()))
+  implicit val orderWrites: Writes[Order] = Writes[Order](_.json())
 }

@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.{Proofs, TxTimestamp, TxVersion}
-import play.api.libs.json.{Format, Json}
+import play.api.libs.json.{Format, Json, Reads}
 
 case class ExchangeRequest(
     order1: Order,
@@ -41,5 +41,8 @@ case class ExchangeRequest(
 }
 
 object ExchangeRequest {
-  implicit val jsonFormat: Format[ExchangeRequest] = Json.format
+  def jsonFormat(fixPkRecover: Boolean): Format[ExchangeRequest] = {
+    implicit val orderReads: Reads[Order] = Order.jsonReads(fixPkRecover)
+    Json.format[ExchangeRequest]
+  }
 }
