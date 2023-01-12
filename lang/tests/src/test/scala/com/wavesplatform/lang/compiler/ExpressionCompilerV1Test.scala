@@ -29,6 +29,7 @@ import com.wavesplatform.test.*
 import scala.util.Try
 
 class ExpressionCompilerV1Test extends PropSpec {
+  implicit val offset: Int = 0
 
   property("should infer generic function return type") {
     import com.wavesplatform.lang.v1.parser.Expressions.*

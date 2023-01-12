@@ -1,9 +1,7 @@
 package com.wavesplatform.lang.parser.error
 
-import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{Expression, V6}
-import com.wavesplatform.lang.utils
-import com.wavesplatform.lang.v1.compiler.{ContractCompiler, ExpressionCompiler, TestCompiler}
+import com.wavesplatform.lang.directives.values.V6
+import com.wavesplatform.lang.v1.compiler.TestCompiler
 
 class CommonParseErrorTest extends ParseErrorTest {
   property("empty script as expression") {
@@ -54,25 +52,5 @@ class CommonParseErrorTest extends ParseErrorTest {
       9,
       "煊镕不"
     )
-  }
-
-  property("alternative compile methods contains same message and error indexes") {
-    ContractCompiler
-      .compileWithParseResult(
-        """
-          | let 煊镕不 = []
-        """.stripMargin,
-        utils.compilerContext(DirectiveSet.contractDirectiveSet),
-        V6
-      ) shouldBe Left(("Parse error: expected only latin charset for definitions in 6-9", 6, 9))
-
-    ExpressionCompiler
-      .compileWithParseResult(
-        """
-          | let 煊镕不 = []
-          | true
-        """.stripMargin,
-        utils.compilerContext(V6, Expression, false)
-      ) shouldBe Left(("Parse error: expected only latin charset for definitions in 6-9", 6, 9))
   }
 }
