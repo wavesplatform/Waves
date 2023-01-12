@@ -138,7 +138,7 @@ final case class ABIConverter(script: Script) {
               xs.toVector.traverse {
                 case Terms.ARR(fields) =>
                   fields match {
-                    case Seq(Terms.CONST_BYTESTR(assetId), Terms.CONST_LONG(amount)) if amount > 0 =>
+                    case Seq(Terms.CONST_BYTESTR(assetId), Terms.CONST_LONG(amount)) =>
                       Right(
                         InvokeScriptTransaction.Payment(
                           amount,
