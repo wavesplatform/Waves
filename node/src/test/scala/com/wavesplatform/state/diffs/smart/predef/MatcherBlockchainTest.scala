@@ -94,7 +94,8 @@ class MatcherBlockchainTest extends PropSpec with MockFactory with WithDomain {
           useNewPowPrecision = true,
           checkEstimatorSumOverflow = true,
           newEvaluatorMode = true,
-          checkWeakPk = true
+          checkWeakPk = true,
+          fixBigScriptField = true
         )
         ._3 shouldBe Right(CONST_BOOLEAN(true))
     }

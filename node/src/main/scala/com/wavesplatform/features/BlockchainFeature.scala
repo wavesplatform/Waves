@@ -24,8 +24,8 @@ object BlockchainFeatures {
   val ConsensusImprovements           = BlockchainFeature(18, "Consensus improvements")
 
   // Not exposed
-  val ContinuationTransaction = BlockchainFeature(19, "Continuation Transaction")
-  val LeaseExpiration         = BlockchainFeature(20, "Lease Expiration")
+  val ContinuationTransaction         = BlockchainFeature(19, "Continuation Transaction")
+  val LeaseExpiration                 = BlockchainFeature(20, "Lease Expiration")
 
   // When next fork-parameter is created, you must replace all uses of the DummyFeature with the new one.
   val Dummy = BlockchainFeature(-1, "Non Votable!")

@@ -18,9 +18,10 @@ object Vals {
   def tx(
       isTokenContext: Boolean,
       version: StdLibVersion,
-      proofsEnabled: Boolean
+      proofsEnabled: Boolean,
+      fixBigScriptField: Boolean
   ): (String, (UNION, ContextfulVal[Environment])) =
-    ("tx", (scriptInputType(isTokenContext, version, proofsEnabled), inputEntityVal(version, proofsEnabled)))
+    ("tx", (scriptInputType(isTokenContext, version, proofsEnabled), inputEntityVal(version, proofsEnabled, fixBigScriptField)))
 
   private def scriptInputType(isTokenContext: Boolean, version: StdLibVersion, proofsEnabled: Boolean) =
     if (isTokenContext)
@@ -28,13 +29,13 @@ object Vals {
     else
       UNION(buildOrderType(proofsEnabled) :: buildActiveTransactionTypes(proofsEnabled, version))
 
-  private def inputEntityVal(version: StdLibVersion, proofsEnabled: Boolean): ContextfulVal[Environment] =
+  private def inputEntityVal(version: StdLibVersion, proofsEnabled: Boolean, fixBigScriptField: Boolean): ContextfulVal[Environment] =
     new ContextfulVal.Lifted[Environment] {
       override def liftF[F[_]: Monad](env: Environment[F]): Eval[Either[ExecutionError, EVALUATED]] =
         Eval.later(
           env.inputEntity
             .eliminate(
-              tx => transactionObject(tx, proofsEnabled, version).asRight[ExecutionError],
+              tx => transactionObject(tx, proofsEnabled, version, fixBigScriptField).asRight[ExecutionError],
               _.eliminate(
                 o => orderObject(o, proofsEnabled, version).asRight[ExecutionError],
                 _.eliminate(

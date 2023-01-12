@@ -701,7 +701,7 @@ object Functions {
             case CONST_BYTESTR(id: ByteStr) :: Nil =>
               env
                 .transactionById(id.arr)
-                .map(_.map(transactionObject(_, proofsEnabled, version)))
+                .map(_.map(transactionObject(_, proofsEnabled, version, fixBigScriptField = false)))
                 .map(fromOptionCO)
                 .map(_.asRight[ExecutionError])
             case xs =>
@@ -729,7 +729,7 @@ object Functions {
             case CONST_BYTESTR(id: ByteStr) :: Nil =>
               env
                 .transferTransactionById(id.arr)
-                .map(_.filter(version >= V6 || _.p.h.version > 0).map(transactionObject(_, proofsEnabled, version)))
+                .map(_.filter(version >= V6 || _.p.h.version > 0).map(transactionObject(_, proofsEnabled, version, fixBigScriptField = false)))
                 .map(fromOptionCO)
                 .map(_.asRight[ExecutionError])
             case xs =>
@@ -801,7 +801,7 @@ object Functions {
               env
                 .transferTransactionFromProto(bytes.arr)
                 .map(tx =>
-                  (tx.map(transactionObject(_, proofsEnabled, version)): EVALUATED)
+                  (tx.map(transactionObject(_, proofsEnabled, version, fixBigScriptField = false)): EVALUATED)
                     .asRight[ExecutionError]
                 )
 
