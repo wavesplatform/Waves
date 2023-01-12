@@ -197,7 +197,8 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           Set.empty,
           allowTransactionsFromSmartAccounts = true,
           allowSkipChecks = false,
-          forceValidateInCleanup = false
+          forceValidateInCleanup = false,
+          alwaysUnlimitedExecution = false
         ),
         Int.MaxValue,
         isMiningEnabled = true
@@ -223,7 +224,8 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         Set.empty,
         allowTransactionsFromSmartAccounts = true,
         allowSkipChecks = false,
-        forceValidateInCleanup = false
+        forceValidateInCleanup = false,
+        alwaysUnlimitedExecution = false
       )
     val utxPool = new UtxPoolImpl(time, bcu, settings, Int.MaxValue, isMiningEnabled = true)
     (sender, utxPool, txs)
@@ -245,7 +247,8 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         Set.empty,
         allowTransactionsFromSmartAccounts = true,
         allowSkipChecks = false,
-        forceValidateInCleanup = false
+        forceValidateInCleanup = false,
+        alwaysUnlimitedExecution = false
       )
     val utxPool = new UtxPoolImpl(time, bcu, settings, Int.MaxValue, isMiningEnabled = true)
     (sender, utxPool, txs)
@@ -267,7 +270,8 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         Set(sender.toAddress.toString),
         allowTransactionsFromSmartAccounts = true,
         allowSkipChecks = false,
-        forceValidateInCleanup = false
+        forceValidateInCleanup = false,
+        alwaysUnlimitedExecution = false
       )
     val utxPool = new UtxPoolImpl(time, bcu, settings, Int.MaxValue, isMiningEnabled = true)
     (sender, utxPool, txs)
@@ -293,7 +297,8 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           Set.empty,
           allowTransactionsFromSmartAccounts = true,
           allowSkipChecks = false,
-          forceValidateInCleanup = false
+          forceValidateInCleanup = false,
+          alwaysUnlimitedExecution = false
         )
       val utxPool = new UtxPoolImpl(time, bcu, settings, Int.MaxValue, isMiningEnabled = true)
       (sender, utxPool, txs)
@@ -330,7 +335,8 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           Set.empty,
           allowTransactionsFromSmartAccounts = true,
           allowSkipChecks = false,
-          forceValidateInCleanup = false
+          forceValidateInCleanup = false,
+          alwaysUnlimitedExecution = false
         ),
         Int.MaxValue,
         isMiningEnabled = true
@@ -371,7 +377,8 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           Set.empty,
           allowTransactionsFromSmartAccounts = scEnabled,
           allowSkipChecks = false,
-          forceValidateInCleanup = false
+          forceValidateInCleanup = false,
+          alwaysUnlimitedExecution = false
         ),
         Int.MaxValue,
         isMiningEnabled = true
@@ -399,7 +406,8 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         Set.empty,
         allowTransactionsFromSmartAccounts = true,
         allowSkipChecks = false,
-        forceValidateInCleanup = false
+        forceValidateInCleanup = false,
+        alwaysUnlimitedExecution = false
       )
     ) { (txs, utx, _) =>
       utx.putIfNew(txs.head).resultE should beRight
@@ -416,7 +424,8 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         Set.empty,
         allowTransactionsFromSmartAccounts = true,
         allowSkipChecks = false,
-        forceValidateInCleanup = false
+        forceValidateInCleanup = false,
+        alwaysUnlimitedExecution = false
       )
     ) { (txs, utx, _) =>
       utx.putIfNew(txs.head).resultE should beRight
@@ -444,7 +453,8 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
               Set.empty,
               allowTransactionsFromSmartAccounts = true,
               allowSkipChecks = allowSkipChecks == 1,
-              forceValidateInCleanup = false
+              forceValidateInCleanup = false,
+              alwaysUnlimitedExecution = false
             )
           val utx = new UtxPoolImpl(time, bcu, utxSettings, Int.MaxValue, isMiningEnabled = true)
 
@@ -490,7 +500,8 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
               Set(sender2.toAddress.toString, sender3.toAddress.toString),
               allowTransactionsFromSmartAccounts = true,
               allowSkipChecks = allowSkipChecks,
-              forceValidateInCleanup = false
+              forceValidateInCleanup = false,
+              alwaysUnlimitedExecution = false
             )
           val utx = new UtxPoolImpl(time, bcu, utxSettings, Int.MaxValue, isMiningEnabled = true)
 
@@ -510,7 +521,8 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         Set.empty,
         allowTransactionsFromSmartAccounts = true,
         allowSkipChecks = false,
-        forceValidateInCleanup = false
+        forceValidateInCleanup = false,
+        alwaysUnlimitedExecution = false
       )
     ) { (txs, utx, _) =>
       utx.putIfNew(txs.head).resultE should matchPattern { case Right(true) => }
@@ -562,7 +574,8 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
               Set(sender2.toAddress.toString, sender3.toAddress.toString),
               allowTransactionsFromSmartAccounts = true,
               allowSkipChecks = allowSkipChecks,
-              forceValidateInCleanup = false
+              forceValidateInCleanup = false,
+              alwaysUnlimitedExecution = false
             )
           val utx = new UtxPoolImpl(time, bcu, utxSettings, Int.MaxValue, isMiningEnabled = true)
 
@@ -643,7 +656,8 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
             Set.empty,
             allowTransactionsFromSmartAccounts = true,
             allowSkipChecks = false,
-            forceValidateInCleanup = false
+            forceValidateInCleanup = false,
+            alwaysUnlimitedExecution = false
           ),
           Int.MaxValue,
           isMiningEnabled = true
@@ -769,7 +783,8 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
               Set.empty,
               allowTransactionsFromSmartAccounts = true,
               allowSkipChecks = false,
-              forceValidateInCleanup = false
+              forceValidateInCleanup = false,
+              alwaysUnlimitedExecution = false
             )
           val utxPool = new UtxPoolImpl(time, bcu, settings, Int.MaxValue, isMiningEnabled = true, nanoTimeSource = () => nanoTimeSource())
 
@@ -789,7 +804,8 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
               allowTransactionsFromSmartAccounts = true,
               allowSkipChecks = false,
               fastLaneAddresses = Set.empty,
-              forceValidateInCleanup = false
+              forceValidateInCleanup = false,
+              alwaysUnlimitedExecution = false
             )
           val utxPool     = new UtxPoolImpl(ntpTime, d.blockchainUpdater, settings, Int.MaxValue, isMiningEnabled = true)
           val startTime   = System.nanoTime()
