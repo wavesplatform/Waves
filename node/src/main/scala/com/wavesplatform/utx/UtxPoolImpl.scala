@@ -38,7 +38,7 @@ import scala.jdk.CollectionConverters.*
 import scala.util.{Left, Right}
 
 //noinspection ScalaStyle
-class UtxPoolImpl(
+case class UtxPoolImpl(
     time: Time,
     blockchain: Blockchain,
     utxSettings: UtxSettings,

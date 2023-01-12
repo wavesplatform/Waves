@@ -48,13 +48,13 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     val tx = TxHelpers.invoke(dApp.toAddress)
 
     utx.putIfNew(tx, forceValidate = true).resultE should produce("reached err")
-    utx.putIfNew(tx, forceValidate = false).resultE should produce("reached err")
+    utx.putIfNew(tx, forceValidate = false).resultE shouldBe Right(true)
 
     utx.addAndScheduleCleanup(Nil)
     Thread.sleep(5000)
-    utx.size shouldBe 0
+    utx.size shouldBe 1
 
-    utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe None
+    utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe Some(Seq(tx))
   }
 
   it should s"reject Invoke with complexity > ${ContractLimits.FailFreeInvokeComplexity} and failed transfer" in utxTest { (d, utx) =>
@@ -74,10 +74,10 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     val tx = TxHelpers.invoke(dApp.toAddress)
 
     utx.putIfNew(tx, forceValidate = true).resultE should produce("negative asset balance")
-    utx.putIfNew(tx, forceValidate = false).resultE should produce("negative asset balance")
+    utx.putIfNew(tx, forceValidate = false).resultE shouldBe Right(true)
 
     utx.cleanUnconfirmed()
-    utx.all shouldBe Seq()
+    utx.all shouldBe Seq(tx)
 
     utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe None
     intercept[RuntimeException](d.appendBlock(tx))
@@ -105,13 +105,13 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     val tx = TxHelpers.invoke(dApp.toAddress)
 
     utx.putIfNew(tx, forceValidate = true).resultE should produce(s"Transfer error: asset '${TestValues.asset}' is not found on the blockchain")
-    utx.putIfNew(tx, forceValidate = false).resultE should produce(s"Transfer error: asset '${TestValues.asset}' is not found on the blockchain")
+    utx.putIfNew(tx, forceValidate = false).resultE shouldBe Right(true)
 
     utx.addAndScheduleCleanup(Nil)
     Thread.sleep(5000)
-    utx.size shouldBe 0
+    utx.size shouldBe 1
 
-    utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe None
+    utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe Some(Seq(tx))
     d.appendBlock(tx)
 
     d.blockchain.transactionMeta(tx.id()) shouldBe Some(TxMeta(Height(3), false, 1212))
@@ -140,18 +140,18 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     d.appendBlock(TxHelpers.setScript(dApp, genScript(0, result = true)), issue)
 
     val tx = TxHelpers.invoke(dApp.toAddress, payments = Seq(Payment(1L, issue.asset)), fee = TestValues.invokeFee(1))
-    assert(utx.putIfNew(tx, forceValidate = false).resultE.isLeft)
+    assert(utx.putIfNew(tx, forceValidate = false).resultE.isRight)
     utx.removeAll(Seq(tx))
     assert(utx.putIfNew(tx, forceValidate = true).resultE.isLeft)
 
     utx.putIfNew(tx, forceValidate = true).resultE should produce("reached err")
-    utx.putIfNew(tx, forceValidate = false).resultE should produce("reached err")
+    utx.putIfNew(tx, forceValidate = false).resultE shouldBe Right(true)
 
     utx.addAndScheduleCleanup(Nil)
     Thread.sleep(5000)
-    utx.size shouldBe 0
+    utx.size shouldBe 1
 
-    utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe None
+    utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe Some(Seq(tx))
   }
 
   it should s"drop failed Exchange with asset script with complexity <= ${ContractLimits.FailFreeInvokeComplexity}" in utxTest { (d, utx) =>
@@ -178,18 +178,18 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     val tx =
       TxHelpers.exchangeFromOrders(TxHelpers.orderV3(OrderType.BUY, issue.asset), TxHelpers.orderV3(OrderType.SELL, issue.asset))
 
-    assert(utx.putIfNew(tx, forceValidate = false).resultE.isLeft)
+    assert(utx.putIfNew(tx, forceValidate = false).resultE.isRight)
     utx.removeAll(Seq(tx))
     assert(utx.putIfNew(tx, forceValidate = true).resultE.isLeft)
 
     utx.putIfNew(tx, forceValidate = true).resultE should produce("reached err")
-    utx.putIfNew(tx, forceValidate = false).resultE should produce("reached err")
+    utx.putIfNew(tx, forceValidate = false).resultE shouldBe Right(true)
 
     utx.addAndScheduleCleanup(Nil)
     Thread.sleep(5000)
-    utx.size shouldBe 0
+    utx.size shouldBe 1
 
-    utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe None
+    utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited)._1 shouldBe Some(Seq(tx))
   }
 
   it should "cleanup transaction when script result changes" in utxTest { (d, utx) =>

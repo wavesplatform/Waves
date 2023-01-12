@@ -870,7 +870,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         utx.close()
       }
 
-      "InvokeScriptTransaction is fully validated always" in withDomain(
+      "InvokeScriptTransaction is fully validated in forceValidate mode, on alwaysUnlimitedExecution = true and before 1000 complexity otherwise" in withDomain(
         RideV5,
         AddrWithBalance.enoughBalances(defaultSigner, secondSigner)
       ) { d =>
@@ -892,15 +892,19 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         )
 
         d.appendBlock(setScript(secondSigner, dApp(5)))
-        utx.putIfNew(invoke()).resultE should produce("Explicit script termination")
+        utx.putIfNew(invoke()).resultE shouldBe Right(true)
         utx.putIfNew(invoke(), forceValidate = true).resultE should produce("Explicit script termination")
 
         d.appendBlock(setScript(secondSigner, dApp(4)))
         utx.putIfNew(invoke()).resultE should produce("Explicit script termination")
         utx.putIfNew(invoke(), forceValidate = true).resultE should produce("Explicit script termination")
+
+        val unlimitedUtx = utx.copy(utxSettings = DefaultWavesSettings.utxSettings.copy(alwaysUnlimitedExecution = true))
+        unlimitedUtx.putIfNew(invoke()).resultE should produce("Explicit script termination")
+        unlimitedUtx.putIfNew(invoke(), forceValidate = true).resultE should produce("Explicit script termination")
       }
 
-      "correct events for InvokeScriptTransaction with big complexity on standard validate mode" in withDomain(
+      "correct events for InvokeScriptTransaction with big complexity on alwaysUnlimitedExecution = true" in withDomain(
         RideV5,
         AddrWithBalance.enoughBalances(defaultSigner, secondSigner)
       ) { d =>
@@ -918,7 +922,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         val utx = new UtxPoolImpl(
           ntpTime,
           d.blockchainUpdater,
-          DefaultWavesSettings.utxSettings,
+          DefaultWavesSettings.utxSettings.copy(alwaysUnlimitedExecution = true),
           DefaultWavesSettings.maxTxErrorLogSize,
           isMiningEnabled = false,
           events += _
@@ -934,7 +938,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         event.diff.portfolios(recipient) shouldBe Portfolio.waves(1)
       }
 
-      "sync calls are fully validated always" in withDomain(
+      "sync calls are fully validated in forceValidate mode, on alwaysUnlimitedExecution = true and before 1000 complexity otherwise" in withDomain(
         RideV5,
         AddrWithBalance.enoughBalances(defaultSigner, secondSigner, signer(2))
       ) { d =>
@@ -966,12 +970,16 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         d.appendBlock(setScript(signer(2), innerDApp))
 
         d.appendBlock(setScript(secondSigner, dApp(5)))
-        utx.putIfNew(invoke(signer(2).toAddress)).resultE should produce("Explicit script termination")
+        utx.putIfNew(invoke(signer(2).toAddress)).resultE shouldBe Right(true)
         utx.putIfNew(invoke(signer(2).toAddress), forceValidate = true).resultE should produce("Explicit script termination")
 
         d.appendBlock(setScript(secondSigner, dApp(4)))
         utx.putIfNew(invoke(signer(2).toAddress)).resultE should produce("Explicit script termination")
         utx.putIfNew(invoke(signer(2).toAddress), forceValidate = true).resultE should produce("Explicit script termination")
+
+        val unlimitedUtx = utx.copy(utxSettings = DefaultWavesSettings.utxSettings.copy(alwaysUnlimitedExecution = true))
+        unlimitedUtx.putIfNew(invoke(signer(2).toAddress)).resultE should produce("Explicit script termination")
+        unlimitedUtx.putIfNew(invoke(signer(2).toAddress), forceValidate = true).resultE should produce("Explicit script termination")
       }
 
       "invoke expression" in {
@@ -1201,19 +1209,26 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
     )
 
     Seq(
-      (simpleContract, Seq.empty, "Negative amount"),
-      (selfInvokeContract, Seq(CONST_LONG(9)), "DApp self-transfer is forbidden")
-    ).foreach { case (contract, args, error) =>
+      (simpleContract, Seq.empty),
+      (selfInvokeContract, Seq(CONST_LONG(9)))
+    ).foreach { case (contract, args) =>
       withDomain(settings, balances = AddrWithBalance.enoughBalances(dApp, invoker)) { d =>
         val setScript = TxHelpers.setScript(dApp, contract)
         val invoke    = TxHelpers.invoke(dApp.toAddress, func = Some("test"), args = args, invoker = invoker)
 
         d.appendBlock(setScript)
-        d.utxPool.addTransaction(invoke, verify = true).resultE should produce(error)
-        d.utxPool.size shouldBe 0
+        d.utxPool.addTransaction(invoke, verify = true)
+
+        d.utxPool.size shouldBe 1
 
         d.utxPool.cleanUnconfirmed()
-        d.utxPool.transactionById(invoke.id()) shouldBe None
+
+        val expectedResult = if (!isMiningEnabled && forceValidateInCleanup) {
+          None
+        } else {
+          Some(invoke)
+        }
+        d.utxPool.transactionById(invoke.id()) shouldBe expectedResult
       }
     }
   }
