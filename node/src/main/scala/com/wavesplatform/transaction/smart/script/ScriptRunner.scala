@@ -144,9 +144,8 @@ object ScriptRunner {
       case ContractScript.ContractScriptImpl(v, DApp(_, decls, _, Some(vf))) =>
         val partialEvaluate: (DirectiveSet, EvaluationContext[Environment, Id]) => (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
           (directives, ctx) =>
-            val verify            = ContractEvaluator.verify(decls, vf, evaluate(ctx, _, _, v), _)
-            val bindingsVersion   = if (useCorrectScriptVersion) directives.stdLibVersion else V3
-            val fixBigScriptField = blockchain.isFeatureActivated(ContinuationTransaction)
+            val verify          = ContractEvaluator.verify(decls, vf, evaluate(ctx, _, _, v), _)
+            val bindingsVersion = if (useCorrectScriptVersion) directives.stdLibVersion else V3
             in.eliminate(
               t =>
                 RealTransactionWrapper(t, blockchain, directives.stdLibVersion, DAppTarget)
