@@ -46,8 +46,8 @@ object UtilsEvaluator {
     for {
       ds <- DirectiveSet(script.stdLibVersion, Account, DAppType).leftMap(GenericError(_))
       invoke = new InvokeScriptTransactionLike {
-        override def dApp: AddressOrAlias              = address
-        override def funcCall: Terms.FUNCTION_CALL     = Terms.FUNCTION_CALL(FunctionHeader.User(""), Nil)
+        override def dApp: AddressOrAlias          = address
+        override def funcCall: Terms.FUNCTION_CALL = Terms.FUNCTION_CALL(FunctionHeader.User(""), Nil)
         // Payments, that are mapped to RIDE structure, is taken from Invocation,
         // while this field used for validation inside InvokeScriptTransactionDiff,
         // that unused in the current implementation.
@@ -84,7 +84,7 @@ object UtilsEvaluator {
         currentDiff = Diff.empty,
         invocationRoot = DAppEnvironment.InvocationTreeTracker(DAppEnvironment.DAppInvocation(address, null, Nil))
       )
-      ctx  = BlockchainContext.build(ds, environment, fixUnicodeFunctions = true, useNewPowPrecision = true)
+      ctx  = BlockchainContext.build(ds, environment, fixUnicodeFunctions = true, useNewPowPrecision = true, fixBigScriptField = true)
       call = ContractEvaluator.buildSyntheticCall(ContractScriptCompactor.decompact(script.expr.asInstanceOf[DApp]), expr)
       limitedResult <- EvaluatorV2
         .applyLimitedCoeval(
