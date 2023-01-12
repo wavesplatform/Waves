@@ -10,6 +10,7 @@ import com.wavesplatform.events.StateUpdate.LeaseUpdate.LeaseStatus
 import com.wavesplatform.events.StateUpdate.{AssetStateUpdate, BalanceUpdate, DataEntryUpdate, LeaseUpdate, LeasingBalanceUpdate}
 import com.wavesplatform.events.protobuf.TransactionMetadata
 import com.wavesplatform.events.protobuf.TransactionMetadata.EthereumMetadata
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.transaction.InvokeScriptResult.Call.Argument
@@ -442,7 +443,11 @@ object StateUpdate {
               TransactionMetadata.ExchangeMetadata(
                 Seq(ext.order1, ext.order2).map(_.id().toByteString),
                 Seq(ext.order1, ext.order2).map(_.senderAddress.toByteString),
-                Seq(ext.order1, ext.order2).map(_.senderPublicKey.toByteString)
+                if (blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements)) {
+                  Seq(ext.order1, ext.order2).map(_.senderPublicKeyFixed.toByteString)
+                } else {
+                  Seq(ext.order1, ext.order2).map(_.senderPublicKey.toByteString)
+                }
               )
             )
 

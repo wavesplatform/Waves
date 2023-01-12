@@ -43,7 +43,12 @@ case class Order(
 
   lazy val senderPublicKey: PublicKey = orderAuthentication match {
     case OrderAuthentication.OrderProofs(publicKey, _)  => publicKey
-    case OrderAuthentication.Eip712Signature(signature) => EthOrders.recoverEthSignerKey(this, signature.arr)
+    case OrderAuthentication.Eip712Signature(signature) => EthOrders.recoverEthSignerKey(this, signature.arr, false)
+  }
+
+  lazy val senderPublicKeyFixed: PublicKey = orderAuthentication match {
+    case OrderAuthentication.OrderProofs(publicKey, _)  => publicKey
+    case OrderAuthentication.Eip712Signature(signature) => EthOrders.recoverEthSignerKey(this, signature.arr, true)
   }
 
   val eip712Signature: Option[ByteStr] = orderAuthentication match {
@@ -56,7 +61,7 @@ case class Order(
     case OrderAuthentication.Eip712Signature(_)     => Proofs.empty
   }
 
-  lazy val sender: PublicKey      = senderPublicKey
+  lazy val sender: PublicKey = senderPublicKey
   def senderAddress: Address = sender.toAddress
 
   def withProofs(proofs: Proofs): Order = {

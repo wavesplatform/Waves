@@ -19,6 +19,7 @@ import com.wavesplatform.api.http.*
 import com.wavesplatform.api.http.assets.AssetsApiRoute.DistributionParams
 import com.wavesplatform.api.http.requests.*
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
@@ -80,7 +81,13 @@ case class AssetsApiRoute(
       } ~ (path("sponsor") & withAuth) {
         broadcast[SponsorFeeRequest](TransactionFactory.sponsor(_, wallet, time))
       } ~ (path("order") & withAuth)(jsonPost[Order] { order =>
-        wallet.privateKeyAccount(order.senderPublicKey.toAddress).map(pk => Order.sign(order, pk.privateKey))
+        val address = if (blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements)) {
+          order.senderPublicKeyFixed.toAddress
+        } else {
+          order.senderPublicKey.toAddress
+        }
+
+        wallet.privateKeyAccount(address).map(pk => Order.sign(order, pk.privateKey))
       }) ~ pathPrefix("broadcast")(
         path("issue")(broadcast[IssueRequest](_.toTx)) ~
           path("reissue")(broadcast[ReissueRequest](_.toTx)) ~

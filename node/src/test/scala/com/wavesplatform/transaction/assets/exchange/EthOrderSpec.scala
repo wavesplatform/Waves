@@ -1,11 +1,12 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import com.wavesplatform.account.PublicKey
+import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.test.{FlatSpec, TestTime}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.BlockchainStubHelpers
 import com.wavesplatform.common.utils.*
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.transaction.{TxExchangeAmount, TxHelpers, TxMatcherFee, TxOrderPrice, TxVersion}
 import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, JsonMatchers}
@@ -40,9 +41,69 @@ class EthOrderSpec
       IssuedAsset(ByteStr(EthStubBytes32))
     )
 
-    val result = EthOrders.recoverEthSignerKey(testOrder, testOrder.eip712Signature.get.arr)
+    val result = EthOrders.recoverEthSignerKey(testOrder, testOrder.eip712Signature.get.arr, false)
     result shouldBe TestEthOrdersPublicKey
     result.toAddress shouldBe TestEthOrdersPublicKey.toAddress
+  }
+
+  it should s"recover signer public key with leading zeros correctly after ${BlockchainFeatures.ConsensusImprovements}" in {
+    AddressScheme.current = new AddressScheme {
+      override val chainId: Byte = 'W'
+    }
+
+    val testOrder = Order(
+      Order.V4,
+      EthSignature(
+        "0x4305a6f070179f7d5fa10557d764373d740ecb24a1177e8c2e01cc03f7c90eda78af2bdc88c964032ed3ae3807eed05c20c981ffe7b30e060f9f145290905b8a1b"
+      ),
+      PublicKey.fromBase58String("9cpfKN9suPNvfeUNphzxXMjcnn974eme8ZhWUjaktzU5").explicitGet(),
+      AssetPair(Waves, IssuedAsset(ByteStr(Base58.decode("34N9YcEETLWn93qYQ64EsP1x89tSruJU44RrEMSXXEPJ")))),
+      OrderType.BUY,
+      TxExchangeAmount.unsafeFrom(211125290L),
+      TxOrderPrice.unsafeFrom(2357071L),
+      1668605799020L,
+      1671111399020L,
+      TxMatcherFee.unsafeFrom(23627L),
+      IssuedAsset(ByteStr(Base58.decode("34N9YcEETLWn93qYQ64EsP1x89tSruJU44RrEMSXXEPJ"))),
+      OrderPriceMode.AssetDecimals
+    )
+
+    val thrown = the[IllegalArgumentException] thrownBy EthOrders.recoverEthSignerKey(testOrder, testOrder.eip712Signature.get.arr, false)
+    thrown.getMessage shouldBe "requirement failed: invalid public key length: 63"
+
+    val resultFixed = EthOrders.recoverEthSignerKey(testOrder, testOrder.eip712Signature.get.arr, true)
+    EthEncoding.toHexString(
+      resultFixed.arr
+    ) shouldBe "0x0052da038439eaba660a7e5764b7e278efaa22ef3f861b965dfd7a8101b27def602238ff11bdb36887da48afbec98026505e59cbcec23c71b9977ed855aaf3b2"
+
+    AddressScheme.current = new AddressScheme {
+      override val chainId: Byte = 'T'
+    }
+  }
+
+  it should "recover signer public key when v < 27 in signature data" in {
+    val testOrder = Order(
+      Order.V4,
+      EthSignature(
+        "0x12f72d3bba93bda930ee5c280e1d39b7e7dcc439d789c92eff40ea860480213a0e79323093c8aee04c2a269de01c7d587a18b02d02746dec75ec1457accb72a301"
+      ),
+      PublicKey.fromBase58String("8QUAqtTckM5B8gvcuP7mMswat9SjKUuafJMusEoSn1Gy").explicitGet(),
+      AssetPair(Waves, IssuedAsset(ByteStr(Base58.decode("25FEqEjRkqK6yCkiT7Lz6SAYz7gUFCtxfCChnrVFD5AT")))),
+      OrderType.BUY,
+      TxExchangeAmount.unsafeFrom(100000000L),
+      TxOrderPrice.unsafeFrom(14781968L),
+      1668520875679L,
+      1671026475679L,
+      TxMatcherFee.unsafeFrom(24884L),
+      IssuedAsset(ByteStr(Base58.decode("25FEqEjRkqK6yCkiT7Lz6SAYz7gUFCtxfCChnrVFD5AT"))),
+      OrderPriceMode.AssetDecimals
+    )
+
+    val thrown = the[RuntimeException] thrownBy EthOrders.recoverEthSignerKey(testOrder, testOrder.eip712Signature.get.arr, false)
+    thrown.getMessage shouldBe "recId must be in the range of [0, 3]"
+
+    val resultFixed = EthOrders.recoverEthSignerKey(testOrder, testOrder.eip712Signature.get.arr, true)
+    resultFixed.toAddress.toString shouldBe "3N8HNri7zQXVw8Bn9BZKGRpsznNUFXM24zL"
   }
 
   it should "recover public key at json parse stage" in {
