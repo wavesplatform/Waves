@@ -9,7 +9,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.Keys
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.BlockchainFeatures.ConsensusImprovements
+import com.wavesplatform.features.BlockchainFeatures.{BlockReward, ConsensusImprovements}
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
@@ -539,21 +539,21 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
   }
 
   s"Reward for genesis block should be 0 after activation of $ConsensusImprovements" in {
-    withDomain(RideV6) { d =>
+    withDomain(RideV6.setFeaturesHeight(BlockReward -> 0, ConsensusImprovements -> 999)) { d =>
       val block = d.appendBlock(TxHelpers.genesis(TxHelpers.secondAddress))
       d.blockchain.balance(block.sender.toAddress) shouldBe 6_0000_0000
       d.appendBlock()
       d.blockchain.balance(block.sender.toAddress) shouldBe 12_0000_0000
     }
 
-    withDomain(RideV6.setFeaturesHeight(ConsensusImprovements -> 0)) { d =>
+    withDomain(RideV6.setFeaturesHeight(BlockReward -> 0, ConsensusImprovements -> 0)) { d =>
       val block = d.appendBlock(TxHelpers.genesis(TxHelpers.secondAddress))
       d.blockchain.balance(block.sender.toAddress) shouldBe 0
       d.appendBlock()
       d.blockchain.balance(block.sender.toAddress) shouldBe 6_0000_0000
     }
 
-    withDomain(RideV6.setFeaturesHeight(ConsensusImprovements -> 1)) { d =>
+    withDomain(RideV6.setFeaturesHeight(BlockReward -> 0, ConsensusImprovements -> 1)) { d =>
       val block = d.appendBlock(TxHelpers.genesis(TxHelpers.secondAddress))
       d.blockchain.balance(block.sender.toAddress) shouldBe 6_0000_0000
       d.appendBlock()
