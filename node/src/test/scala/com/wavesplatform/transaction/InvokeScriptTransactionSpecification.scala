@@ -162,7 +162,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
     )
 
     (tx.json() - "proofs") shouldEqual (js.asInstanceOf[JsObject] - "proofs")
-    TransactionFactory.fromSignedRequest(js, () => false) shouldBe Right(tx)
+    TransactionFactory.fromSignedRequest(js) shouldBe Right(tx)
   }
 
   property("JSON format validation for InvokeScriptTransaction without FUNCTION_CALL") {
@@ -198,7 +198,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
 
     (tx.json() - "proofs") shouldEqual (js.asInstanceOf[JsObject] - "proofs" +
       ("call" -> JsObject(Map("function" -> JsString("default"), "args" -> JsArray()))))
-    TransactionFactory.fromSignedRequest(js, () => false) shouldBe Right(tx)
+    TransactionFactory.fromSignedRequest(js) shouldBe Right(tx)
   }
 
   property("Signed InvokeScriptTransactionRequest parser") {

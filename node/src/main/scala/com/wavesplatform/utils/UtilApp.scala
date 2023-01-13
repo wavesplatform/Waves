@@ -253,7 +253,7 @@ object UtilApp {
     def doSerializeTx(c: Command, data: Array[Byte]): ActionResult = {
       val jsv = Json.parse(data)
       TransactionFactory
-        .fromSignedRequest(jsv, () => true)
+        .fromSignedRequest(jsv)
         .left
         .map(_.toString)
         .map(_.bytes())
