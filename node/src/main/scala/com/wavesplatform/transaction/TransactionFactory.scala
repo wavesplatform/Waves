@@ -19,7 +19,7 @@ import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeS
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
-import play.api.libs.json.{Format, JsObject, JsValue}
+import play.api.libs.json.{JsObject, JsValue}
 
 object TransactionFactory {
   def transferAsset(request: TransferRequest, wallet: Wallet, time: Time): Either[ValidationError, TransferTransaction] =
@@ -406,22 +406,20 @@ object TransactionFactory {
     val version = (jsv \ "version").asOpt[Byte](versionReads).getOrElse(1.toByte)
 
     val pf: PartialFunction[TransactionType.TransactionType, Either[ValidationError, Transaction]] = {
-      case TransactionType.Transfer       => jsv.as[TransferRequest].toTx
-      case TransactionType.CreateAlias    => jsv.as[CreateAliasRequest].toTx
-      case TransactionType.Lease          => jsv.as[LeaseRequest].toTx
-      case TransactionType.LeaseCancel    => jsv.as[LeaseCancelRequest].toTx
-      case TransactionType.Issue          => jsv.as[IssueRequest].toTx
-      case TransactionType.Reissue        => jsv.as[ReissueRequest].toTx
-      case TransactionType.Burn           => jsv.as[BurnRequest].toTx
-      case TransactionType.MassTransfer   => jsv.as[SignedMassTransferRequest].toTx
-      case TransactionType.Data           => jsv.as[SignedDataRequest].toTx
-      case TransactionType.InvokeScript   => jsv.as[SignedInvokeScriptRequest].toTx
-      case TransactionType.SetScript      => jsv.as[SignedSetScriptRequest].toTx
-      case TransactionType.SetAssetScript => jsv.as[SignedSetAssetScriptRequest].toTx
-      case TransactionType.SponsorFee     => jsv.as[SignedSponsorFeeRequest].toTx
-      case TransactionType.Exchange =>
-        implicit val exchangeRequestFormat: Format[ExchangeRequest] = ExchangeRequest.jsonFormat(consensusImproveActivated())
-        jsv.as[ExchangeRequest].toTx
+      case TransactionType.Transfer         => jsv.as[TransferRequest].toTx
+      case TransactionType.CreateAlias      => jsv.as[CreateAliasRequest].toTx
+      case TransactionType.Lease            => jsv.as[LeaseRequest].toTx
+      case TransactionType.LeaseCancel      => jsv.as[LeaseCancelRequest].toTx
+      case TransactionType.Issue            => jsv.as[IssueRequest].toTx
+      case TransactionType.Reissue          => jsv.as[ReissueRequest].toTx
+      case TransactionType.Burn             => jsv.as[BurnRequest].toTx
+      case TransactionType.MassTransfer     => jsv.as[SignedMassTransferRequest].toTx
+      case TransactionType.Data             => jsv.as[SignedDataRequest].toTx
+      case TransactionType.InvokeScript     => jsv.as[SignedInvokeScriptRequest].toTx
+      case TransactionType.SetScript        => jsv.as[SignedSetScriptRequest].toTx
+      case TransactionType.SetAssetScript   => jsv.as[SignedSetAssetScriptRequest].toTx
+      case TransactionType.SponsorFee       => jsv.as[SignedSponsorFeeRequest].toTx
+      case TransactionType.Exchange         => jsv.as[ExchangeRequest].toTx
       case TransactionType.UpdateAssetInfo  => jsv.as[SignedUpdateAssetInfoRequest].toTx
       case TransactionType.InvokeExpression => jsv.as[SignedInvokeExpressionRequest].toTx
     }

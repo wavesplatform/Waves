@@ -11,7 +11,7 @@ import com.wavesplatform.transaction.{TxExchangeAmount, TxHelpers, TxMatcherFee,
 import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, JsonMatchers}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterAll
-import play.api.libs.json.{JsObject, Json, Reads}
+import play.api.libs.json.{JsObject, Json}
 
 class EthOrderSpec
     extends FlatSpec
@@ -40,7 +40,7 @@ class EthOrderSpec
       IssuedAsset(ByteStr(EthStubBytes32))
     )
 
-    val result = EthOrders.recoverEthSignerKey(testOrder, testOrder.eip712Signature.get.arr, false)
+    val result = EthOrders.recoverEthSignerKey(testOrder, testOrder.eip712Signature.get.arr)
     result shouldBe TestEthOrdersPublicKey
     result.toAddress shouldBe TestEthOrdersPublicKey.toAddress
   }
@@ -98,16 +98,11 @@ class EthOrderSpec
       OrderPriceMode.AssetDecimals
     )
 
-    val thrown = the[RuntimeException] thrownBy EthOrders.recoverEthSignerKey(testOrder, testOrder.eip712Signature.get.arr, false)
-    thrown.getMessage shouldBe "recId must be in the range of [0, 3]"
-
-    val resultFixed = EthOrders.recoverEthSignerKey(testOrder, testOrder.eip712Signature.get.arr, true)
-    resultFixed.toAddress.toString shouldBe "3N8HNri7zQXVw8Bn9BZKGRpsznNUFXM24zL"
+    val result = EthOrders.recoverEthSignerKey(testOrder, testOrder.eip712Signature.get.arr)
+    result.toAddress.toString shouldBe "3N8HNri7zQXVw8Bn9BZKGRpsznNUFXM24zL"
   }
 
   it should "recover public key at json parse stage" in {
-    implicit val reads: Reads[Order] = com.wavesplatform.transaction.assets.exchange.OrderJson.orderReads(false)
-
     val json  = Json.toJson(ethBuyOrder).as[JsObject] - "senderPublicKey"
     val order = Json.fromJson[Order](json).get
     order.senderPublicKey shouldBe ethBuyOrder.senderPublicKey

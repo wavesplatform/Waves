@@ -19,7 +19,6 @@ import com.wavesplatform.api.http.*
 import com.wavesplatform.api.http.assets.AssetsApiRoute.DistributionParams
 import com.wavesplatform.api.http.requests.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
@@ -79,20 +78,13 @@ case class AssetsApiRoute(
         broadcast[BurnRequest](TransactionFactory.burn(_, wallet, time))
       } ~ (path("sponsor") & withAuth) {
         broadcast[SponsorFeeRequest](TransactionFactory.sponsor(_, wallet, time))
-      } ~ (path("order") & withAuth) {
-        implicit val orderReads: Reads[Order] = Order.jsonReads(blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements))
-        jsonPost[Order] { order =>
-          wallet.privateKeyAccount(order.senderPublicKey.toAddress).map(pk => Order.sign(order, pk.privateKey))
-        }
-      } ~ pathPrefix("broadcast")(
+      } ~ (path("order") & withAuth)(jsonPost[Order] { order =>
+        wallet.privateKeyAccount(order.senderPublicKey.toAddress).map(pk => Order.sign(order, pk.privateKey))
+      }) ~ pathPrefix("broadcast")(
         path("issue")(broadcast[IssueRequest](_.toTx)) ~
           path("reissue")(broadcast[ReissueRequest](_.toTx)) ~
           path("burn")(broadcast[BurnRequest](_.toTx)) ~
-          path("exchange") {
-            implicit val exchangeRequestFormat: Format[ExchangeRequest] =
-              ExchangeRequest.jsonFormat(blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements))
-            broadcast[ExchangeRequest](_.toTx)
-          } ~
+          path("exchange")(broadcast[ExchangeRequest](_.toTx)) ~
           path("transfer")(broadcast[TransferRequest](_.toTx))
       )
     }

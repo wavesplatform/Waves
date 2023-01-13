@@ -9,8 +9,6 @@ import play.api.libs.functional.syntax.*
 import play.api.libs.json.{JsPath, Reads}
 
 object SignedExchangeRequestV2 {
-  implicit val orderReads: Reads[Order] = com.wavesplatform.transaction.assets.exchange.OrderJson.orderReads(false)
-
   implicit val signedExchangeRequestReads: Reads[SignedExchangeRequestV2] = (
     (JsPath \ "senderPublicKey").read[String] and
       (JsPath \ "order1").read[Order] and

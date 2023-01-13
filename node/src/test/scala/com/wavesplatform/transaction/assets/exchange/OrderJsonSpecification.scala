@@ -34,7 +34,7 @@ class OrderJsonSpecification extends PropSpec with JsonMatchers with EthHelpers 
           "signature": "signature"
         } """)
 
-    json.validate[Order](OrderJson.orderReads(false)) match {
+    json.validate[Order] match {
       case JsError(e) =>
         fail("Error: " + e.toString())
       case JsSuccess(o, _) =>
@@ -69,7 +69,7 @@ class OrderJsonSpecification extends PropSpec with JsonMatchers with EthHelpers 
           "matcherFeeAssetId": "29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b"
         } """)
 
-    jsonOV3.validate[Order](OrderJson.orderReads(false)) match {
+    jsonOV3.validate[Order] match {
       case JsError(e) =>
         fail("Error: " + e.toString())
       case JsSuccess(o, _) =>
@@ -105,7 +105,7 @@ class OrderJsonSpecification extends PropSpec with JsonMatchers with EthHelpers 
           "matcherFeeAssetId": "29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b"
         } """)
 
-    jsonOV4.validate[Order](OrderJson.orderReads(false)) match {
+    jsonOV4.validate[Order] match {
       case JsError(e) =>
         fail("Error: " + e.toString())
       case JsSuccess(o, _) =>
@@ -142,7 +142,7 @@ class OrderJsonSpecification extends PropSpec with JsonMatchers with EthHelpers 
           "eip712Signature": "0x40dd06c9f80215612a0397948a10dd82d6a58dda8a256544971e236a95a395ad6b87e75fb58789ece4f2ff7ed380849d120faefce135b6f7ddec9e11df169f971b"
         } """)
 
-    jsonOV4WithEthSig.validate[Order](OrderJson.orderReads(false)) match {
+    jsonOV4WithEthSig.validate[Order] match {
       case JsError(e) =>
         fail("Error: " + e.toString())
       case JsSuccess(o, _) =>
@@ -185,7 +185,7 @@ class OrderJsonSpecification extends PropSpec with JsonMatchers with EthHelpers 
           "signature": "signature"
         } """)
 
-    json.validate[Order](OrderJson.orderReads(false)) match {
+    json.validate[Order] match {
       case e: JsError =>
         val paths = e.errors.map(_._1)
         paths should contain.allOf(JsPath \ "matcherPublicKey", JsPath \ "senderPublicKey")
@@ -226,7 +226,7 @@ class OrderJsonSpecification extends PropSpec with JsonMatchers with EthHelpers 
   property("Parse signed Order") {
     forAll(orderGen) { order =>
       val json = order.json()
-      json.validate[Order](OrderJson.orderReads(false)) match {
+      json.validate[Order] match {
         case e: JsError =>
           fail("Error: " + JsError.toJson(e).toString())
 
@@ -262,7 +262,7 @@ class OrderJsonSpecification extends PropSpec with JsonMatchers with EthHelpers 
 
     jsons.foreach { case (priceAssetStr, rawJson) =>
       withClue(priceAssetStr) {
-        Json.parse(rawJson).validate[Order](OrderJson.orderReads(false)) match {
+        Json.parse(rawJson).validate[Order] match {
           case e: JsError =>
             fail("Error: " + JsError.toJson(e).toString())
           case s: JsSuccess[Order] =>

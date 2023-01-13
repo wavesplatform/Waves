@@ -59,13 +59,11 @@ package object http {
           .fromBase58String(senderPk)
           .flatMap { senderPk =>
             TransactionType(typeId) match {
-              case TransactionType.Transfer    => txJson.as[TransferRequest].toTxFrom(senderPk)
-              case TransactionType.CreateAlias => txJson.as[CreateAliasRequest].toTxFrom(senderPk)
-              case TransactionType.Lease       => txJson.as[LeaseRequest].toTxFrom(senderPk)
-              case TransactionType.LeaseCancel => txJson.as[LeaseCancelRequest].toTxFrom(senderPk)
-              case TransactionType.Exchange =>
-                implicit val exchangeRequestFormat: Format[ExchangeRequest] = ExchangeRequest.jsonFormat(consensusImproveActivated())
-                txJson.as[ExchangeRequest].toTxFrom(senderPk)
+              case TransactionType.Transfer         => txJson.as[TransferRequest].toTxFrom(senderPk)
+              case TransactionType.CreateAlias      => txJson.as[CreateAliasRequest].toTxFrom(senderPk)
+              case TransactionType.Lease            => txJson.as[LeaseRequest].toTxFrom(senderPk)
+              case TransactionType.LeaseCancel      => txJson.as[LeaseCancelRequest].toTxFrom(senderPk)
+              case TransactionType.Exchange         => txJson.as[ExchangeRequest].toTxFrom(senderPk)
               case TransactionType.Issue            => txJson.as[IssueRequest].toTxFrom(senderPk)
               case TransactionType.Reissue          => txJson.as[ReissueRequest].toTxFrom(senderPk)
               case TransactionType.Burn             => txJson.as[BurnRequest].toTxFrom(senderPk)

@@ -9,7 +9,7 @@ import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, OrderValidationError}
 import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.AssetDecimals
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderPriceMode, OrderType}
+import com.wavesplatform.transaction.assets.exchange.{EthOrders, ExchangeTransaction, Order, OrderPriceMode, OrderType}
 import com.wavesplatform.transaction.{Asset, TxVersion}
 
 import java.text.{DecimalFormat, DecimalFormatSymbols}
@@ -64,6 +64,8 @@ object ExchangeTransactionDiff {
       } yield (assetsScripted, buyerScripted, sellerScripted)
 
     for {
+      _                      <- checkOrderPkRecover(tx.order1, blockchain)
+      _                      <- checkOrderPkRecover(tx.order2, blockchain)
       buyerAndSellerScripted <- smartFeaturesChecks()
       portfolios             <- getPortfolios(blockchain, tx)
       _                      <- enoughVolume(tx, blockchain)
@@ -278,4 +280,27 @@ object ExchangeTransactionDiff {
     */
   private[diffs] def getOrderFeePortfolio(order: Order, fee: Long): Portfolio =
     Portfolio.build(order.matcherFeeAssetId, fee)
+
+  private def checkOrderPkRecover(order: Order, blockchain: Blockchain): Either[GenericError, Unit] = {
+    for {
+      _ <- Either.cond(
+        order.eip712Signature.isEmpty || !order.senderPublicKey.arr.headOption.contains(0.toByte) || blockchain.isFeatureActivated(
+          BlockchainFeatures.ConsensusImprovements
+        ),
+        (),
+        GenericError("Sender public key with leading zero byte is not allowed")
+      )
+      _ <- {
+        val sigData = order.eip712Signature.map(sig => EthOrders.decodeSignature(sig.arr))
+        Either.cond(
+          !sigData.exists { data =>
+            val v = BigInt(1, data.getV)
+            v == 0 || v == 1 || v > 28
+          } || blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements),
+          (),
+          GenericError("Signature has not allowed value of v")
+        )
+      }
+    } yield ()
+  }
 }

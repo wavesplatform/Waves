@@ -31,12 +31,13 @@ import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.{AssetDecima
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.utils.EthHelpers
 import com.wavesplatform.{TestValues, TestWallet, crypto}
 import org.scalatest.{EitherValues, Inside}
 
 import scala.util.{Random, Try}
 
-class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain with EitherValues with TestWallet {
+class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain with EitherValues with TestWallet with EthHelpers {
 
   private def wavesPortfolio(amt: Long) = Portfolio.waves(amt)
 

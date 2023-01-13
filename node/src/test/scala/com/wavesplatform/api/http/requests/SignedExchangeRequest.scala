@@ -6,7 +6,7 @@ import com.wavesplatform.transaction.assets.exchange.*
 import play.api.libs.json.{Format, Json, Reads}
 
 object SignedExchangeRequest {
-  implicit val orderReads: Reads[Order]                                   = com.wavesplatform.transaction.assets.exchange.OrderJson.orderReads(false)
+  implicit val orderReads: Reads[Order]                                   = com.wavesplatform.transaction.assets.exchange.OrderJson.orderReads
   implicit val signedExchangeRequestFormat: Format[SignedExchangeRequest] = Json.format
 }
 

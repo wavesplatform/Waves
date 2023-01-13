@@ -263,8 +263,7 @@ object Verifier extends ScorexLogging {
             .measureForType(typeId)(
               verifyOrderSignature(
                 order,
-                blockchain.isFeatureActivated(BlockchainFeatures.RideV6),
-                blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements)
+                blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
               ).as(0)
             )
         )
@@ -279,10 +278,10 @@ object Verifier extends ScorexLogging {
     } yield matcherComplexity + sellerComplexity + buyerComplexity
   }
 
-  def verifyOrderSignature(order: Order, checkWeakPk: Boolean, fixOrderPkRecover: Boolean): Either[GenericError, Order] =
+  def verifyOrderSignature(order: Order, checkWeakPk: Boolean): Either[GenericError, Order] =
     order.eip712Signature match {
       case Some(ethSignature) =>
-        val signerKey = EthOrders.recoverEthSignerKey(order, ethSignature.arr, fixOrderPkRecover)
+        val signerKey = EthOrders.recoverEthSignerKey(order, ethSignature.arr)
         Either.cond(signerKey == order.senderPublicKey, order, GenericError(s"Ethereum signature invalid for $order"))
 
       case _ => verifyAsEllipticCurveSignature(order, checkWeakPk)
