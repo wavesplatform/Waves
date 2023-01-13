@@ -7,6 +7,8 @@ import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order
 import com.wavesplatform.transaction.{Proofs, TxTimestamp, TxVersion}
 import play.api.libs.json.{Format, Json, Reads}
 
+import scala.annotation.nowarn
+
 case class ExchangeRequest(
     order1: Order,
     order2: Order,
@@ -42,6 +44,7 @@ case class ExchangeRequest(
 
 object ExchangeRequest {
   def jsonFormat(fixPkRecover: Boolean): Format[ExchangeRequest] = {
+    @nowarn
     implicit val orderReads: Reads[Order] = Order.jsonReads(fixPkRecover)
     Json.format[ExchangeRequest]
   }

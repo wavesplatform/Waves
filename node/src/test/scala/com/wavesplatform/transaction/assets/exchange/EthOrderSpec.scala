@@ -1,12 +1,11 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import com.wavesplatform.account.{AddressScheme, PublicKey}
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.test.{FlatSpec, TestTime}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.BlockchainStubHelpers
 import com.wavesplatform.common.utils.*
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.transaction.{TxExchangeAmount, TxHelpers, TxMatcherFee, TxOrderPrice, TxVersion}
 import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, JsonMatchers}
