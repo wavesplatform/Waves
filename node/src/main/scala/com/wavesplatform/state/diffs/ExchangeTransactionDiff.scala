@@ -298,7 +298,7 @@ object ExchangeTransactionDiff {
             v == 0 || v == 1 || v > 28
           } || blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements),
           (),
-          GenericError("Signature has not allowed value of v")
+          GenericError("Invalid signature")
         )
       }
     } yield ()
