@@ -45,40 +45,30 @@ class EthOrderSpec
     result.toAddress shouldBe TestEthOrdersPublicKey.toAddress
   }
 
-//  it should s"recover signer public key with leading zeros correctly after ${BlockchainFeatures.ConsensusImprovements}" in {
-//    AddressScheme.current = new AddressScheme {
-//      override val chainId: Byte = 'W'
-//    }
-//
-//    val testOrder = Order(
-//      Order.V4,
-//      EthSignature(
-//        "0x4305a6f070179f7d5fa10557d764373d740ecb24a1177e8c2e01cc03f7c90eda78af2bdc88c964032ed3ae3807eed05c20c981ffe7b30e060f9f145290905b8a1b"
-//      ),
-//      PublicKey.fromBase58String("9cpfKN9suPNvfeUNphzxXMjcnn974eme8ZhWUjaktzU5").explicitGet(),
-//      AssetPair(Waves, IssuedAsset(ByteStr(Base58.decode("34N9YcEETLWn93qYQ64EsP1x89tSruJU44RrEMSXXEPJ")))),
-//      OrderType.BUY,
-//      TxExchangeAmount.unsafeFrom(211125290L),
-//      TxOrderPrice.unsafeFrom(2357071L),
-//      1668605799020L,
-//      1671111399020L,
-//      TxMatcherFee.unsafeFrom(23627L),
-//      IssuedAsset(ByteStr(Base58.decode("34N9YcEETLWn93qYQ64EsP1x89tSruJU44RrEMSXXEPJ"))),
-//      OrderPriceMode.AssetDecimals
-//    )
-//
-//    val thrown = the[IllegalArgumentException] thrownBy EthOrders.recoverEthSignerKey(testOrder, testOrder.eip712Signature.get.arr, false)
-//    thrown.getMessage shouldBe "requirement failed: invalid public key length: 63"
-//
-//    val resultFixed = EthOrders.recoverEthSignerKey(testOrder, testOrder.eip712Signature.get.arr, true)
-//    EthEncoding.toHexString(
-//      resultFixed.arr
-//    ) shouldBe "0x0052da038439eaba660a7e5764b7e278efaa22ef3f861b965dfd7a8101b27def602238ff11bdb36887da48afbec98026505e59cbcec23c71b9977ed855aaf3b2"
-//
-//    AddressScheme.current = new AddressScheme {
-//      override val chainId: Byte = 'T'
-//    }
-//  }
+  it should s"recover signer public key with leading zeros correctly" in {
+
+    val testOrder = Order(
+      Order.V4,
+      EthSignature(
+        "0xc3b8c59ee779ef7b308e44d3c24b0f05687eaebc49f7f94fe0cc4f6fb13bae351adfce1419d6d35c41d5bd7fdefd87871f1ed3b9df8771d1eb76e981adf48e741b"
+      ),
+      PublicKey.fromBase58String("9cpfKN9suPNvfeUNphzxXMjcnn974eme8ZhWUjaktzU5").explicitGet(),
+      AssetPair(Waves, IssuedAsset(ByteStr(Base58.decode("34N9YcEETLWn93qYQ64EsP1x89tSruJU44RrEMSXXEPJ")))),
+      OrderType.BUY,
+      TxExchangeAmount.unsafeFrom(211125290L),
+      TxOrderPrice.unsafeFrom(2357071L),
+      1668605799020L,
+      1671111399020L,
+      TxMatcherFee.unsafeFrom(23627L),
+      IssuedAsset(ByteStr(Base58.decode("34N9YcEETLWn93qYQ64EsP1x89tSruJU44RrEMSXXEPJ"))),
+      OrderPriceMode.AssetDecimals
+    )
+
+    val resultFixed = EthOrders.recoverEthSignerKey(testOrder, testOrder.eip712Signature.get.arr)
+    EthEncoding.toHexString(
+      resultFixed.arr
+    ) shouldBe "0x00d7cf9ff594b07273228e7dd591707d38a1dba0a39492fd64445ba9cbb3bf66c862b9752f02bf8d1a0f00ccb11ae550a7616bd965c10f0101202d75580786ee"
+  }
 
   it should "recover signer public key when v < 27 in signature data" in {
     val testOrder = Order(

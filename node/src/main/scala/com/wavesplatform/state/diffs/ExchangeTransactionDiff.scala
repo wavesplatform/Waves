@@ -288,7 +288,7 @@ object ExchangeTransactionDiff {
           BlockchainFeatures.ConsensusImprovements
         ),
         (),
-        GenericError("Sender public key with leading zero byte is not allowed")
+        GenericError("Sender public key with leading zero byte is not allowed for Ethereum orders")
       )
       _ <- {
         val sigData = order.eip712Signature.map(sig => EthOrders.decodeSignature(sig.arr))
@@ -298,7 +298,7 @@ object ExchangeTransactionDiff {
             v == 0 || v == 1 || v > 28
           } || blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements),
           (),
-          GenericError("Invalid signature")
+          GenericError("Invalid order signature format")
         )
       }
     } yield ()
