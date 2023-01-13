@@ -214,7 +214,7 @@ case class DebugApiRoute(
       val blockchain = priorityPoolBlockchain()
       val startTime  = System.nanoTime()
 
-      val parsedTransaction = TransactionFactory.fromSignedRequest(jsv, () => blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements))
+      val parsedTransaction = TransactionFactory.fromSignedRequest(jsv)
 
       val tracedDiff = for {
         tx   <- TracedResult(parsedTransaction)

@@ -399,7 +399,7 @@ object TransactionFactory {
       tx.signWith(signer.privateKey)
     }
 
-  def fromSignedRequest(jsv: JsValue, consensusImproveActivated: () => Boolean): Either[ValidationError, Transaction] = {
+  def fromSignedRequest(jsv: JsValue): Either[ValidationError, Transaction] = {
     import InvokeScriptRequest.*
     val chainId = (jsv \ "chainId").asOpt[Byte]
     val typeId  = (jsv \ "type").as[Byte]

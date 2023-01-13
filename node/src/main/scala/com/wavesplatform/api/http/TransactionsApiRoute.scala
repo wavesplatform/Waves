@@ -156,7 +156,7 @@ case class TransactionsApiRoute(
         "sender" -> senderPk
       )
 
-      createTransaction(senderPk, enrichedJsv, () => blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements)) { tx =>
+      createTransaction(senderPk, enrichedJsv) { tx =>
         commonApi
           .calculateFee(tx)
           .map { case (assetId, assetAmount, _) => Json.obj("feeAssetId" -> assetId, "feeAmount" -> assetAmount) }
@@ -174,7 +174,7 @@ case class TransactionsApiRoute(
   }
 
   def signedBroadcast: Route = path("broadcast")(
-    broadcast[JsValue](TransactionFactory.fromSignedRequest(_, () => blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements)))
+    broadcast[JsValue](TransactionFactory.fromSignedRequest)
   )
 
   def merkleProof: Route = path("merkleProof") {

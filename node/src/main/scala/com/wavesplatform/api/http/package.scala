@@ -44,7 +44,7 @@ package object http {
       stringToByteReads
   }
 
-  def createTransaction(senderPk: String, jsv: JsObject, consensusImproveActivated: () => Boolean)(
+  def createTransaction(senderPk: String, jsv: JsObject)(
       txToResponse: Transaction => ToResponseMarshallable
   ): ToResponseMarshallable = {
     val typeId = (jsv \ "type").as[Byte]
@@ -82,14 +82,14 @@ package object http {
     }
   }
 
-  def parseOrCreateTransaction(jsv: JsObject, consensusImproveActivated: () => Boolean)(
+  def parseOrCreateTransaction(jsv: JsObject)(
       txToResponse: Transaction => ToResponseMarshallable
   ): ToResponseMarshallable = {
-    val result = TransactionFactory.fromSignedRequest(jsv, consensusImproveActivated)
+    val result = TransactionFactory.fromSignedRequest(jsv)
     if (result.isRight) {
       result.fold(ApiError.fromValidationError, txToResponse)
     } else {
-      createTransaction((jsv \ "senderPk").as[String], jsv, consensusImproveActivated)(txToResponse)
+      createTransaction((jsv \ "senderPk").as[String], jsv)(txToResponse)
     }
   }
 
