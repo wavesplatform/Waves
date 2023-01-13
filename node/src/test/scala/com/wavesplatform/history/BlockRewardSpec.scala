@@ -559,5 +559,12 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
       d.appendBlock()
       d.blockchain.balance(block.sender.toAddress) shouldBe 12_0000_0000
     }
+
+    withDomain(RideV6.setFeaturesHeight(BlockReward -> 1, ConsensusImprovements -> 1)) { d =>
+      val block = d.appendBlock(TxHelpers.genesis(TxHelpers.secondAddress))
+      d.blockchain.balance(block.sender.toAddress) shouldBe 6_0000_0000
+      d.appendBlock()
+      d.blockchain.balance(block.sender.toAddress) shouldBe 12_0000_0000
+    }
   }
 }
