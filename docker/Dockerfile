@@ -1,4 +1,4 @@
-FROM openjdk:11-jre-slim
+FROM eclipse-temurin:11.0.17_8-jre
 
 ENV WAVES_LOG_LEVEL=INFO
 ENV WAVES_HEAP_SIZE=2g
@@ -47,5 +47,13 @@ VOLUME $WVLOG
 VOLUME $WAVES_INSTALL_PATH/lib/plugins
 WORKDIR $WVDATA
 
+HEALTHCHECK CMD \
+  curl -f http://localhost:6869/node/status ||  \
+  curl -f http://localhost:6868/node/status ||  \
+  curl -f http://localhost:6863/node/status ||  \
+  curl -f http://localhost:6862/node/status ||  \
+  curl -f http://localhost:6870/node/status ||  \
+  exit 1
+
 STOPSIGNAL SIGINT
-ENTRYPOINT ["/usr/share/waves/bin/entrypoint.sh"]
+CMD ["/usr/share/waves/bin/entrypoint.sh"]
