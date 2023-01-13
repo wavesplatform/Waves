@@ -153,34 +153,37 @@ class BlockchainUpdaterImpl(
     val settings   = this.settings.rewardsSettings
     val nextHeight = this.height + 1
 
-    leveldb
-      .featureActivationHeight(BlockchainFeatures.BlockReward.id)
-      .filter(_ <= nextHeight)
-      .flatMap { activatedAt =>
-        val mayBeReward     = lastBlockReward
-        val mayBeTimeToVote = nextHeight - activatedAt
+    if (height == 0 && leveldb.isFeatureActivated(ConsensusImprovements))
+      None
+    else
+      leveldb
+        .featureActivationHeight(BlockchainFeatures.BlockReward.id)
+        .filter(_ <= nextHeight)
+        .flatMap { activatedAt =>
+          val mayBeReward     = lastBlockReward
+          val mayBeTimeToVote = nextHeight - activatedAt
 
-        mayBeReward match {
-          case Some(reward) if mayBeTimeToVote > 0 && mayBeTimeToVote % settings.term == 0 =>
-            Some((blockRewardVotes(this.height).filter(_ >= 0), reward))
-          case None if mayBeTimeToVote >= 0 =>
-            Some((Seq(), settings.initial))
-          case _ => None
+          mayBeReward match {
+            case Some(reward) if mayBeTimeToVote > 0 && mayBeTimeToVote % settings.term == 0 =>
+              Some((blockRewardVotes(this.height).filter(_ >= 0), reward))
+            case None if mayBeTimeToVote >= 0 =>
+              Some((Seq(), settings.initial))
+            case _ => None
+          }
         }
-      }
-      .flatMap { case (votes, currentReward) =>
-        val lt        = votes.count(_ < currentReward)
-        val gt        = votes.count(_ > currentReward)
-        val threshold = settings.votingInterval / 2 + 1
+        .flatMap { case (votes, currentReward) =>
+          val lt        = votes.count(_ < currentReward)
+          val gt        = votes.count(_ > currentReward)
+          val threshold = settings.votingInterval / 2 + 1
 
-        if (lt >= threshold)
-          Some(math.max(currentReward - settings.minIncrement, 0))
-        else if (gt >= threshold)
-          Some(currentReward + settings.minIncrement)
-        else
-          Some(currentReward)
-      }
-      .orElse(lastBlockReward)
+          if (lt >= threshold)
+            Some(math.max(currentReward - settings.minIncrement, 0))
+          else if (gt >= threshold)
+            Some(currentReward + settings.minIncrement)
+          else
+            Some(currentReward)
+        }
+        .orElse(lastBlockReward)
   }
 
   override def processBlock(block: Block, hitSource: ByteStr, verify: Boolean = true): Either[ValidationError, Seq[Diff]] =
@@ -205,7 +208,7 @@ class BlockchainUpdaterImpl(
                 case lastBlockId =>
                   val height            = lastBlockId.fold(0)(leveldb.unsafeHeightOf)
                   val miningConstraints = MiningConstraints(leveldb, height)
-                  val reward            = if (height == 0 && leveldb.isFeatureActivated(ConsensusImprovements)) None else nextReward()
+                  val reward            = nextReward()
 
                   val referencedBlockchain = CompositeBlockchain(leveldb, reward)
                   BlockDiffer
