@@ -526,15 +526,21 @@ package object database {
       case _: EmptyDataEntry          => pb.DataEntry.Value.Empty
     }).toByteArray
 
-  def readDataEntryNode(key: String)(bs: Array[Byte]): CurrentDataNode = if (bs == null) CurrentDataNode.empty(key) else
-    CurrentDataNode(
+  def readCurrentData(key: String)(bs: Array[Byte]): CurrentData = if (bs == null) CurrentData.empty(key) else
+    CurrentData(
       readDataEntry(key)(bs.drop(8)),
       Height(Ints.fromByteArray(bs.take(4))),
       Height(Ints.fromByteArray(bs.slice(4, 8)))
     )
 
-  def writeDataEntryNode(cdn: CurrentDataNode): Array[Byte] =
+  def writeCurrentData(cdn: CurrentData): Array[Byte] =
     Ints.toByteArray(cdn.height) ++ Ints.toByteArray(cdn.prevHeight) ++ writeDataEntry(cdn.entry)
+
+  def readDataNode(key: String)(bs: Array[Byte]): DataNode = if (bs == null) DataNode.empty(key) else
+    DataNode(readDataEntry(key)(bs.drop(4)), Height(Ints.fromByteArray(bs.take(4))))
+
+  def writeDataNode(dn: DataNode): Array[Byte] =
+    Ints.toByteArray(dn.prevHeight) ++ writeDataEntry(dn.entry)
 
   def readCurrentBalance(bs: Array[Byte]): CurrentBalance = if (bs != null && bs.length == 16)
     CurrentBalance(Longs.fromByteArray(bs.take(8)), Height(Ints.fromByteArray(bs.slice(8, 12))), Height(Ints.fromByteArray(bs.takeRight(4))))

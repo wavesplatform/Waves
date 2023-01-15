@@ -55,6 +55,7 @@ package object serialization {
     }
 
     def getByteArray(size: Int): Array[Byte] = {
+      require(size < (10 << 20), s"requested array size $size exceeds 10MB limit")
       val result = new Array[Byte](size)
       buf.get(result)
       result

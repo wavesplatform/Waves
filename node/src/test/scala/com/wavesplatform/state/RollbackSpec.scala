@@ -366,22 +366,25 @@ class RollbackSpec extends FreeSpec with WithDomain {
     "data transaction" in {
       val sender         = TxHelpers.signer(1)
       val initialBalance = 100.waves
-      val dataEntry      = StringDataEntry("str", "test")
+      val dataEntry      = StringDataEntry("str", "test-1")
       withDomain(createSettings(BlockchainFeatures.DataTransaction -> 0), Seq(AddrWithBalance(sender.toAddress, initialBalance))) { d =>
         val genesisBlockId = d.lastBlockId
 
-        d.appendBlock(
-          TestBlock.create(
-            nextTs,
-            genesisBlockId,
-            Seq(TxHelpers.dataEntry(sender, dataEntry))
-          )
+        val firstBlock = TestBlock.create(
+          nextTs,
+          genesisBlockId,
+          Seq(TxHelpers.dataEntry(sender, dataEntry))
         )
-
+        d.appendBlock(firstBlock)
         d.blockchainUpdater.accountData(sender.toAddress, dataEntry.key) should contain(dataEntry)
 
-        d.rollbackTo(genesisBlockId)
-        d.blockchainUpdater.accountData(sender.toAddress, dataEntry.key) shouldBe empty
+        val secondEntry = StringDataEntry("str", "test-2")
+        d.appendBlock(TxHelpers.data(sender, Seq(secondEntry)))
+        d.appendBlock()
+        d.blockchain.accountData(sender.toAddress, "str") shouldEqual Some(secondEntry)
+
+        d.rollbackTo(firstBlock.id())
+        d.blockchainUpdater.accountData(sender.toAddress, dataEntry.key) shouldEqual Some(dataEntry)
       }
     }
 

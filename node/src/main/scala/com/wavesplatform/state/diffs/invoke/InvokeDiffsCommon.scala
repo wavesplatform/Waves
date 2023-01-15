@@ -535,7 +535,7 @@ object InvokeDiffsCommon {
       }
 
       def applyDataItem(item: DataOp): TracedResult[FailedTransactionError, Diff] =
-        TracedResult.wrapValue(Diff(accountData = Map(dAppAddress -> AccountDataInfo(Map(item.key -> dataItemToEntry(item))))))
+        TracedResult.wrapValue(Diff(accountData = Map(dAppAddress -> Map(item.key -> dataItemToEntry(item)))))
 
       def applyIssue(itx: InvokeScriptLike, pk: PublicKey, issue: Issue): TracedResult[ValidationError, Diff] = {
         val asset = IssuedAsset(issue.id)

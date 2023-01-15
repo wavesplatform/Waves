@@ -8,7 +8,7 @@ import com.wavesplatform.api.common.CommonAccountsApi.AddressDataIterator.BatchS
 import com.wavesplatform.api.common.TransactionMeta.Ethereum
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{AddressId, CurrentDataNode, DBExt, DBResource, Key, KeyTags, Keys}
+import com.wavesplatform.database.{AddressId, CurrentData, DBExt, DBResource, Key, KeyTags, Keys}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBRecipients
@@ -117,7 +117,7 @@ object CommonAccountsApi {
       val pattern = regex.map(_.r.pattern)
       val entriesFromDiff = compositeBlockchain().diff.accountData
         .get(address)
-        .fold(Array.empty[DataEntry[?]])(_.data.filter { case (k, _) => pattern.forall(_.matcher(k).matches()) }.values.toArray.sortBy(_.key))
+        .fold(Array.empty[DataEntry[?]])(_.filter { case (k, _) => pattern.forall(_.matcher(k).matches()) }.values.toArray.sortBy(_.key))
 
       db.resourceObservable.flatMap { dbResource =>
         dbResource
@@ -249,14 +249,14 @@ object CommonAccountsApi {
             dbEntry
           }
         case None =>
-          val keysBuffer  = new ArrayBuffer[Key[Option[CurrentDataNode]]]()
+          val keysBuffer  = new ArrayBuffer[Key[Option[CurrentData]]]()
           val sizesBuffer = new ArrayBuffer[Int]()
           while (dbIterator.isValid && keysBuffer.length < BatchSize) {
             val key = new String(dbIterator.key().drop(2 + Address.HashLength), Charsets.UTF_8)
             if (matches(key)) {
               Option(dbIterator.value()).foreach { arr =>
                 val buf = ByteBuffer.wrap(arr)
-                keysBuffer.addOne(Keys.dataAt(addressId, key)(buf.getInt))
+//                keysBuffer.addOne(Keys.dataAt(addressId, key)(buf.getInt))
                 sizesBuffer.addOne(buf.getInt)
               }
             }

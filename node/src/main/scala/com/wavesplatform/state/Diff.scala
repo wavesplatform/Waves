@@ -83,21 +83,6 @@ case class AssetDescription(
     nft: Boolean
 )
 
-case class AccountDataInfo(data: Map[String, DataEntry[?]])
-
-object AccountDataInfo {
-  implicit val accountDataInfoMonoid: Monoid[AccountDataInfo] = new Monoid[AccountDataInfo] {
-    override def empty: AccountDataInfo = AccountDataInfo(Map.empty)
-
-    override def combine(x: AccountDataInfo, y: AccountDataInfo): AccountDataInfo = AccountDataInfo(x.data ++ y.data)
-  }
-
-  implicit class AccountDataInfoExt(private val ad: AccountDataInfo) extends AnyVal {
-    def filterEmpty: AccountDataInfo =
-      ad.copy(ad.data.filterNot(_._2.isEmpty))
-  }
-}
-
 sealed abstract class Sponsorship
 case class SponsorshipValue(minFee: Long) extends Sponsorship
 case object SponsorshipNoInfo             extends Sponsorship
@@ -158,7 +143,7 @@ case class Diff private (
     leaseState: Map[ByteStr, LeaseDetails],
     scripts: Map[Address, Option[AccountScriptInfo]],
     assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]],
-    accountData: Map[Address, AccountDataInfo],
+    accountData: Map[Address, Map[String, DataEntry[?]]],
     sponsorship: Map[IssuedAsset, Sponsorship],
     scriptsRun: Int,
     scriptsComplexity: Long,
@@ -207,7 +192,7 @@ case class Diff private (
           leaseState = leaseState ++ newer.leaseState,
           scripts = scripts ++ newer.scripts,
           assetScripts = assetScripts ++ newer.assetScripts,
-          accountData = accountData.combine(newer.accountData),
+          accountData = accountData ++ newer.accountData,
           sponsorship = sponsorship.combine(newer.sponsorship),
           scriptsRun = scriptsRun + newer.scriptsRun,
           scriptResults = scriptResults.combine(newer.scriptResults),
@@ -228,7 +213,7 @@ object Diff {
       leaseState: Map[ByteStr, LeaseDetails] = Map.empty,
       scripts: Map[Address, Option[AccountScriptInfo]] = Map.empty,
       assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] = Map.empty,
-      accountData: Map[Address, AccountDataInfo] = Map.empty,
+      accountData: Map[Address, Map[String, DataEntry[?]]] = Map.empty,
       sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
       scriptsRun: Int = 0,
       scriptsComplexity: Long = 0,
@@ -264,7 +249,7 @@ object Diff {
       leaseState: Map[ByteStr, LeaseDetails] = Map.empty,
       scripts: Map[Address, Option[AccountScriptInfo]] = Map.empty,
       assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] = Map.empty,
-      accountData: Map[Address, AccountDataInfo] = Map.empty,
+      accountData: Map[Address, Map[String, DataEntry[?]]] = Map.empty,
       sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
       scriptsRun: Int = 0,
       scriptsComplexity: Long = 0,

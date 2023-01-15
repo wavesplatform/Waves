@@ -180,7 +180,7 @@ abstract class RocksDBWriter private[database] (
     }
     else None
 
-  override protected def loadMaxAddressId(): Long = readOnly(db => db.get(Keys.lastAddressId).getOrElse(0L))
+  override protected def loadMaxAddressId(): Long = writableDB.get(Keys.lastAddressId).getOrElse(0L)
 
   override protected def loadAddressId(address: Address): Option[AddressId] = loadWithFilter(addressFilter, Keys.addressId(address)) { (_, id) => id }
 
@@ -190,11 +190,10 @@ abstract class RocksDBWriter private[database] (
 
   override protected def loadHeight(): Height = RocksDBWriter.loadHeight(writableDB)
 
-  override def safeRollbackHeight: Int = readOnly(_.get(Keys.safeRollbackHeight))
+  override def safeRollbackHeight: Int = writableDB.get(Keys.safeRollbackHeight)
 
-  override protected def loadBlockMeta(height: Height): Option[PBBlockMeta] = readOnly { db =>
-    db.get(Keys.blockMetaAt(height))
-  }
+  override protected def loadBlockMeta(height: Height): Option[PBBlockMeta] =
+    writableDB.get(Keys.blockMetaAt(height))
 
   override protected def loadTxs(height: Height): Seq[Transaction] = readOnly { db =>
     loadTransactions(height, db).map(_._2)
@@ -220,12 +219,12 @@ abstract class RocksDBWriter private[database] (
     db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScriptPresent(asset)).flatten.nonEmpty
   }
 
-  override def carryFee: Long = readOnly(_.get(Keys.carryFee(height)))
+  override def carryFee: Long = writableDB.get(Keys.carryFee(height))
 
-  override protected def loadAccountData(address: Address, key: String): Option[DataEntry[?]] =
+  override protected def loadAccountData(address: Address, key: String): CurrentData =
     loadWithFilter(dataKeyFilter, Keys.data(address, key)) { (_, cdn) =>
-      Some(cdn.entry)
-    }
+      Some(cdn)
+    }.getOrElse(CurrentData.empty(key))
 
   override def hasData(address: Address): Boolean = {
     writableDB.readOnly { ro =>
@@ -239,9 +238,9 @@ abstract class RocksDBWriter private[database] (
     addressId(req._1).fold(CurrentBalance.Unavailable) { addressId =>
       req._2 match {
         case asset @ IssuedAsset(_) =>
-          writableDB.readOnly(_.get(Keys.assetBalance(addressId, asset)))
+          writableDB.get(Keys.assetBalance(addressId, asset))
         case Waves =>
-          writableDB.readOnly(_.get(Keys.wavesBalance(addressId)))
+          writableDB.get(Keys.wavesBalance(addressId))
       }
     }
 
@@ -321,9 +320,7 @@ abstract class RocksDBWriter private[database] (
   override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] =
     writableDB.withResource(r => database.loadAssetDescription(r, asset))
 
-  override protected def loadVolumeAndFee(orderId: ByteStr): CurrentVolumeAndFee = readOnly { ro =>
-    ro.get(Keys.filledVolumeAndFee(orderId))
-  }
+  override protected def loadVolumeAndFee(orderId: ByteStr): CurrentVolumeAndFee = writableDB.get(Keys.filledVolumeAndFee(orderId))
 
   override protected def loadVolumesAndFees(orders: Seq[ByteStr]): Map[ByteStr, CurrentVolumeAndFee] = readOnly { ro =>
     orders.view
@@ -332,12 +329,11 @@ abstract class RocksDBWriter private[database] (
       .toMap
   }
 
-  override protected def loadApprovedFeatures(): Map[Short, Int] = {
-    readOnly(_.get(Keys.approvedFeatures))
-  }
+  override protected def loadApprovedFeatures(): Map[Short, Int] =
+    writableDB.get(Keys.approvedFeatures)
 
   override protected def loadActivatedFeatures(): Map[Short, Int] = {
-    val stateFeatures = readOnly(_.get(Keys.activatedFeatures))
+    val stateFeatures = writableDB.get(Keys.activatedFeatures)
     stateFeatures ++ settings.functionalitySettings.preActivatedFeatures
   }
 
@@ -357,22 +353,6 @@ abstract class RocksDBWriter private[database] (
     val (c1, c2) = history.partition(_ >= threshold)
     rw.put(key, (height +: c1) ++ c2.headOption)
     c2.drop(1).map(kf(_).keyBytes)
-  }
-
-  private def updateMetaHistory(rw: RW, key: Key[Seq[(Int, Int)]], threshold: Int, kf: Int => Key[?], size: Int): Seq[Array[Byte]] =
-    updateMetaHistory(rw, rw.get(key), key, threshold, kf, size)
-
-  private def updateMetaHistory(
-      rw: RW,
-      history: Seq[(Int, Int)],
-      key: Key[Seq[(Int, Int)]],
-      threshold: Int,
-      kf: Int => Key[?],
-      size: Int
-  ): Seq[Array[Byte]] = {
-    val (c1, c2) = history.partition(_._1 >= threshold)
-    rw.put(key, ((height, size) +: c1) ++ c2.headOption)
-    c2.drop(1).map { case (h, _) => kf(h).keyBytes }
   }
 
   private def appendBalances(
@@ -416,6 +396,24 @@ abstract class RocksDBWriter private[database] (
     }
   }
 
+  private def appendData(newAddresses: Map[Address, AddressId], data: Map[(Address, String), (CurrentData, DataNode)], rw: RW): Unit = {
+    val changedKeys = MultimapBuilder.hashKeys().hashSetValues().build[AddressId, String]()
+
+    for (((address, key), (currentData, dataNode)) <- data) {
+      val addressId = addressIdWithFallback(address, newAddresses)
+      changedKeys.put(addressId, key)
+
+      val kdh = Keys.data(address, key)
+      rw.put(kdh, currentData)
+      rw.put(Keys.dataAt(addressId, key)(height), dataNode)
+      dataKeyFilter.put(kdh.suffix)
+    }
+
+    changedKeys.asMap().forEach { (addressId, keys) =>
+      rw.put(Keys.changedDataKeys(height, addressId), keys.asScala.toSeq)
+    }
+  }
+
   // noinspection ScalaStyle
   override protected def doAppend(
       blockMeta: PBBlockMeta,
@@ -430,7 +428,7 @@ abstract class RocksDBWriter private[database] (
       filledQuantity: Map[ByteStr, (CurrentVolumeAndFee, VolumeAndFeeNode)],
       scripts: Map[AddressId, Option[AccountScriptInfo]],
       assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]],
-      data: Map[Address, AccountDataInfo],
+      data: Map[(Address, String), (CurrentData, DataNode)],
       aliases: Map[Alias, AddressId],
       sponsorship: Map[IssuedAsset, Sponsorship],
       scriptResults: Map[ByteStr, InvokeScriptResult],
@@ -473,6 +471,7 @@ abstract class RocksDBWriter private[database] (
       val threshold = newSafeRollbackHeight
 
       appendBalances(balances, issuedAssets, rw)
+      appendData(newAddresses, data, rw)
 
       val changedAddresses = (addressTransactions.asScala.keys ++ balances.keys.map(_._1)).toSet
       rw.put(Keys.changedAddresses(height), changedAddresses.toSeq)
@@ -524,19 +523,6 @@ abstract class RocksDBWriter private[database] (
       for ((asset, script) <- assetScripts) {
         expiredKeys ++= updateHistory(rw, Keys.assetScriptHistory(asset), threshold, Keys.assetScript(asset))
         if (script.isDefined) rw.put(Keys.assetScript(asset)(height), script)
-      }
-
-      for ((address, addressData) <- data) {
-        val addressId = addressIdWithFallback(address, newAddresses)
-        rw.put(Keys.changedDataKeys(height, addressId), addressData.data.keys.toSeq)
-
-        for ((key, value) <- addressData.data) {
-          val kdh  = Keys.data(address, key)
-          val node = CurrentDataNode(value, Height(0), Height(0))
-          rw.put(kdh, node)
-          rw.put(Keys.dataAt(addressId, key)(height), Some(node))
-          dataKeyFilter.put(kdh.suffix)
-        }
       }
 
       val txSizes = transactions.map { case (id, (txm, tx, num)) =>
@@ -687,7 +673,9 @@ abstract class RocksDBWriter private[database] (
             for (k <- rw.get(Keys.changedDataKeys(currentHeight, addressId))) {
               log.trace(s"Discarding $k for $address at $currentHeight")
               accountDataToInvalidate += (address -> k)
+
               rw.delete(Keys.dataAt(addressId, k)(currentHeight))
+              rollbackDataHistory(rw, Keys.data(address, k), Keys.dataAt(addressId, k)(_), currentHeight)
             }
             rw.delete(Keys.changedDataKeys(currentHeight, addressId))
 
@@ -801,6 +789,15 @@ abstract class RocksDBWriter private[database] (
 
     log.debug(s"Rollback to block $targetBlockId at $targetHeight completed")
     discardedBlocks.reverse
+  }
+
+  private def rollbackDataHistory(rw: RW, currentDataKey: Key[CurrentData], dataNodeKey: Height => Key[DataNode], currentHeight: Height): Unit = {
+    val currentData = rw.get(currentDataKey)
+    if (currentData.height == currentHeight) {
+      val prevDataNode = rw.get(dataNodeKey(currentData.prevHeight))
+      rw.delete(dataNodeKey(currentHeight))
+      rw.put(currentDataKey, CurrentData(prevDataNode.entry, currentData.prevHeight, prevDataNode.prevHeight))
+    }
   }
 
   private def rollbackBalanceHistory(rw: RW, curBalanceKey: Key[CurrentBalance], balanceNodeKey: Height => Key[BalanceNode], height: Height): Unit = {

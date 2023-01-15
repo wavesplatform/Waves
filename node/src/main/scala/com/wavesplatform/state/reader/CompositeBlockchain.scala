@@ -120,7 +120,7 @@ final class CompositeBlockchain private (
     }
 
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] =
-    if (maybeDiff.isEmpty) {
+    if (maybeDiff.isEmpty || to != blockMeta.map(_._1.id())) {
       inner.balanceSnapshots(address, from, to)
     } else {
       val balance    = this.balance(address)
@@ -128,7 +128,7 @@ final class CompositeBlockchain private (
       val bs         = BalanceSnapshot(height, Portfolio(balance, lease))
       val height2Fix = this.height == 1 && inner.isFeatureActivated(RideV6) && from < this.height + 1
       if (inner.height > 0 && (from < this.height || height2Fix))
-        bs +: inner.balanceSnapshots(address, from, to)
+        bs +: inner.balanceSnapshots(address, from, None) // to == this liquid block, so no need to pass block id to inner blockchain
       else
         Seq(bs)
     }
@@ -148,7 +148,10 @@ final class CompositeBlockchain private (
     }
 
   override def accountData(acc: Address, key: String): Option[DataEntry[?]] =
-    diff.accountData.get(acc).orEmpty.data.get(key).orElse(inner.accountData(acc, key)).filterNot(_.isEmpty)
+    (for {
+      d <- diff.accountData.get(acc)
+      e <- d.get(key)
+    } yield e).orElse(inner.accountData(acc, key)).filterNot(_.isEmpty)
 
   override def hasData(acc: Address): Boolean = {
     diff.accountData.contains(acc) || inner.hasData(acc)

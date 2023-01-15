@@ -98,13 +98,13 @@ class BalancesV4Test extends PropSpec with WithState {
       val apiBalance =
         com.wavesplatform.api.common.CommonAccountsApi(() => CompositeBlockchain(s, d), db, s).balanceDetails(acc1.toAddress).explicitGet()
       val data = d.accountData(dapp.toAddress)
-      data.data("available") shouldBe IntegerDataEntry("available", apiBalance.available)
+      data("available") shouldBe IntegerDataEntry("available", apiBalance.available)
       apiBalance.available shouldBe 16 * Constants.UnitsInWave
-      data.data("regular") shouldBe IntegerDataEntry("regular", apiBalance.regular)
+      data("regular") shouldBe IntegerDataEntry("regular", apiBalance.regular)
       apiBalance.regular shouldBe 26 * Constants.UnitsInWave
-      data.data("generating") shouldBe IntegerDataEntry("generating", apiBalance.generating)
+      data("generating") shouldBe IntegerDataEntry("generating", apiBalance.generating)
       apiBalance.generating shouldBe 5 * Constants.UnitsInWave
-      data.data("effective") shouldBe IntegerDataEntry("effective", apiBalance.effective)
+      data("effective") shouldBe IntegerDataEntry("effective", apiBalance.effective)
       apiBalance.effective shouldBe 17 * Constants.UnitsInWave
 
     }

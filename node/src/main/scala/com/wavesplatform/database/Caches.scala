@@ -173,16 +173,21 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
   protected def addressIdWithFallback(address: Address, newAddresses: Map[Address, AddressId]): AddressId =
     newAddresses.getOrElse(address, addressIdCache.get(address).get)
 
-  private val accountDataCache: LoadingCache[(Address, String), Option[DataEntry[?]]] = cache(
+  private val accountDataCache: LoadingCache[(Address, String), CurrentData] = cache(
     dbSettings.maxCacheSize,
     { case (k, v) =>
       loadAccountData(k, v)
     }
   )
 
-  override def accountData(acc: Address, key: String): Option[DataEntry[?]] = accountDataCache.get((acc, key))
+  override def accountData(acc: Address, key: String): Option[DataEntry[?]] =
+    accountDataCache.get((acc, key)).entry match {
+      case _: EmptyDataEntry => None
+      case other => Some(other)
+    }
+
   protected def discardAccountData(addressWithKey: (Address, String)): Unit = accountDataCache.invalidate(addressWithKey)
-  protected def loadAccountData(acc: Address, key: String): Option[DataEntry[?]]
+  protected def loadAccountData(acc: Address, key: String): CurrentData
 
   private[database] def addressId(address: Address): Option[AddressId] = addressIdCache.get(address)
   private[database] def addressIds(addresses: Seq[Address]): Map[Address, Option[AddressId]] =
@@ -220,7 +225,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
       filledQuantity: Map[ByteStr, (CurrentVolumeAndFee, VolumeAndFeeNode)],
       scripts: Map[AddressId, Option[AccountScriptInfo]],
       assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]],
-      data: Map[Address, AccountDataInfo],
+      data: Map[(Address, String), (CurrentData, DataNode)],
       aliases: Map[Alias, AddressId],
       sponsorship: Map[IssuedAsset, Sponsorship],
       scriptResults: Map[ByteStr, InvokeScriptResult],
@@ -302,8 +307,9 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
         case Waves              => stateHash.addWavesBalance(address, balance)
         case asset: IssuedAsset => stateHash.addAssetBalance(address, asset, balance)
       }
-      val prevCurrentBalance = balancesCache.get((address, asset))
-      (address, asset) ->
+      val key = (address, asset)
+      val prevCurrentBalance = balancesCache.get(key)
+      key ->
         (CurrentBalance(balance, Height(newHeight), prevCurrentBalance.height), BalanceNode(balance, prevCurrentBalance.height))
     }
 
@@ -311,10 +317,15 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
       stateHash.addLeaseBalance(address, balance.in, balance.out)
     }
 
-    for {
+    val updatedData = for {
       (address, data) <- diff.accountData
-      entry           <- data.data.values
-    } stateHash.addDataEntry(address, entry)
+      entry           <- data.values
+    } yield {
+      stateHash.addDataEntry(address, entry)
+      val entryKey = (address, entry.key)
+      val prevHeight = accountDataCache.get(entryKey).height
+      entryKey -> (CurrentData(entry, Height(newHeight), prevHeight) -> DataNode(entry, prevHeight))
+    }
 
     diff.aliases.foreach { case (alias, address) =>
       stateHash.addAlias(address, alias.name)
@@ -357,7 +368,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
       newFills,
       diff.scripts.map { case (address, s) => addressIdWithFallback(address, newAddressIds) -> s },
       diff.assetScripts,
-      diff.accountData,
+      updatedData,
       diff.aliases.map { case (a, address) => a -> addressIdWithFallback(address, newAddressIds) },
       diff.sponsorship,
       diff.scriptResults,
@@ -365,17 +376,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
       stateHash.result(),
       diff.ethereumTransactionMeta
     )
-
-    val emptyData = Map.empty[(Address, String), Option[DataEntry[?]]]
-
-    val newData =
-      diff.accountData.foldLeft(emptyData) { case (data, (a, d)) =>
-        val updData = data ++ d.data.map { case (k, v) =>
-          (a, k) -> v.some
-        }
-
-        updData
-      }
 
     val assetsToInvalidate =
       diff.issuedAssets.keySet ++
@@ -391,7 +391,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
     leaseBalanceCache.putAll(leaseBalances.view.mapValues(_._1).toMap.asJava)
     scriptCache.putAll(diff.scripts.asJava)
     assetScriptCache.putAll(diff.assetScripts.asJava)
-    accountDataCache.putAll(newData.asJava)
+    accountDataCache.putAll(updatedData.view.mapValues(_._1).toMap.asJava)
   }
 
   protected def doRollback(targetHeight: Int): Seq[(Block, ByteStr)]

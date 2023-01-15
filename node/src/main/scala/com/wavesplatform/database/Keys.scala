@@ -43,9 +43,14 @@ object LeaseBalanceNode {
   val Empty: LeaseBalanceNode = LeaseBalanceNode(0, 0, Height(0))
 }
 
-case class CurrentDataNode(entry: DataEntry[?], height: Height, prevHeight: Height)
-object CurrentDataNode {
-  def empty(key: String): CurrentDataNode = CurrentDataNode(EmptyDataEntry(key), Height(0), Height(0))
+case class CurrentData(entry: DataEntry[?], height: Height, prevHeight: Height)
+object CurrentData {
+  def empty(key: String): CurrentData = CurrentData(EmptyDataEntry(key), Height(0), Height(0))
+}
+
+case class DataNode(entry: DataEntry[?], prevHeight: Height)
+object DataNode {
+  def empty(key: String): DataNode = DataNode(EmptyDataEntry(key), Height(0))
 }
 
 object Keys {
@@ -122,11 +127,11 @@ object Keys {
   val activatedFeatures: Key[Map[Short, Int]] = Key(ActivatedFeatures, Array.emptyByteArray, readFeatureMap, writeFeatureMap)
 
   // public key hash is used here so it's possible to populate bloom filter by just scanning all the history keys
-  def data(address: Address, key: String): Key[CurrentDataNode] =
-    Key(Data, PBRecipients.publicKeyHash(address) ++ key.utf8Bytes, readDataEntryNode(key), writeDataEntryNode)
+  def data(address: Address, key: String): Key[CurrentData] =
+    Key(Data, PBRecipients.publicKeyHash(address) ++ key.utf8Bytes, readCurrentData(key), writeCurrentData)
 
-  def dataAt(addressId: AddressId, key: String)(height: Int): Key[Option[CurrentDataNode]] =
-    Key.opt(DataHistory, hBytes(addressId.toByteArray ++ key.utf8Bytes, height), readDataEntryNode(key), writeDataEntryNode)
+  def dataAt(addressId: AddressId, key: String)(height: Int): Key[DataNode] =
+    Key(DataHistory, hBytes(addressId.toByteArray ++ key.utf8Bytes, height), readDataNode(key), writeDataNode)
 
   def sponsorshipHistory(asset: IssuedAsset): Key[Seq[Int]] = historyKey(SponsorshipHistory, asset.id.arr)
   def sponsorship(asset: IssuedAsset)(height: Int): Key[SponsorshipValue] =

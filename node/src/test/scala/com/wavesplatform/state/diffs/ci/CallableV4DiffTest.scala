@@ -131,7 +131,7 @@ class CallableV4DiffTest extends PropSpec with WithDomain with EitherValues {
       TestBlock.create(Seq(invoke)),
       features
     ) { case (diff, _) =>
-      diff.accountData(master.toAddress).data shouldBe
+      diff.accountData(master.toAddress) shouldBe
         Map(
           "key1" -> EmptyDataEntry("key1"),
           "key2" -> EmptyDataEntry("key2")

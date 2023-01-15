@@ -145,8 +145,8 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
       d.appendBlock(ethInvoke)
 
       d.liquidDiff.errorMessage(ethInvoke.id()) shouldBe None
-      d.liquidDiff.accountData(dApp).data("check").value shouldBe true
-      if (syncCall) d.liquidDiff.accountData(dApp2).data("check").value shouldBe true
+      d.liquidDiff.accountData(dApp)("check").value shouldBe true
+      if (syncCall) d.liquidDiff.accountData(dApp2)("check").value shouldBe true
 
       val assetsPortfolio = assets.map(Portfolio.build(_, paymentAmount)).fold(Portfolio())((p1, p2) => p1.combine(p2).explicitGet())
       d.liquidDiff.portfolios.getOrElse(dApp, Portfolio()) shouldBe assetsPortfolio
