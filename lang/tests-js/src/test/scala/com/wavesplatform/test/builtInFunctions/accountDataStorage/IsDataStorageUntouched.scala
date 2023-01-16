@@ -105,6 +105,19 @@ object IsDataStorageUntouched extends JsTestBase {
       }
     }
 
+    test.apply("compilation error: Can't find function isDataStorageUntouched (argument before function) for 'this'") {
+      for (version <- testData.oldVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeWithoutMatcher(
+          thisVariable,
+          isDataStorageUntouchedArgBeforeFunc,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileErrorDApp(script, version, testData.CANT_FIND_FUNCTION)
+      }
+    }
+
     test.apply("compilation error: Can't find function isDataStorageUntouched for alias") {
       for (version <- testData.oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
@@ -123,6 +136,19 @@ object IsDataStorageUntouched extends JsTestBase {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeWithoutMatcher(
           randomAddressDataArrayElement,
+          invalidFunction,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBooleanEntry
+        )
+        assertCompileErrorDApp(script, version, invalidFunctionErrorResult)
+      }
+    }
+
+    test.apply("compilation error: invalid function isDataStorageUntouched for 'this'") {
+      for (version <- testData.versionsSupportingTheNewFeatures) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
+        val script = precondition.codeWithoutMatcher(
+          thisVariable,
           invalidFunction,
           testData.rideV3Result,
           testData.GreaterV3ResultBooleanEntry
