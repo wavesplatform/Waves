@@ -65,22 +65,17 @@ object EthOrders extends App {
     val signatureData = EthOrders.decodeSignature(signature)
     val v             = BigInt(1, signatureData.getV)
     val recId         = if (v == 0 || v == 1) v else if (v > 28) v - AddressScheme.current.chainId * 2 - 35 else v - 27
-    val signerKey = Sign
-      .recoverFromSignature(
-        recId.intValue,
-        new ECDSASignature(new BigInteger(1, signatureData.getR), new BigInteger(1, signatureData.getS)),
-        message
-      )
-      .toByteArray
-      .takeRight(EthereumKeyLength)
+    val signerKey = org.web3j.utils.Numeric.toBytesPadded(
+      Sign
+        .recoverFromSignature(
+          recId.intValue,
+          new ECDSASignature(new BigInteger(1, signatureData.getR), new BigInteger(1, signatureData.getS)),
+          message
+        ),
+      EthereumKeyLength
+    )
 
-    val numBytesToAdd = EthereumKeyLength - signerKey.length
-    val maybePaddedKey = if (numBytesToAdd > 0) {
-      Array.fill(numBytesToAdd)(0.toByte) ++ signerKey
-    } else {
-      signerKey
-    }
-    PublicKey(ByteStr(maybePaddedKey))
+    PublicKey(ByteStr(signerKey))
   }
 
   def signOrder(order: Order, key: ECKeyPair): Array[Byte] = {

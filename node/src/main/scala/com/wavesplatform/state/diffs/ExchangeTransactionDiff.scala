@@ -8,6 +8,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, OrderValidationError}
+import com.wavesplatform.transaction.assets.exchange.OrderAuthentication.Eip712Signature
 import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.AssetDecimals
 import com.wavesplatform.transaction.assets.exchange.{EthOrders, ExchangeTransaction, Order, OrderPriceMode, OrderType}
 import com.wavesplatform.transaction.{Asset, TxVersion}
@@ -282,25 +283,23 @@ object ExchangeTransactionDiff {
     Portfolio.build(order.matcherFeeAssetId, fee)
 
   private def checkOrderPkRecover(order: Order, blockchain: Blockchain): Either[GenericError, Unit] = {
-    for {
-      _ <- Either.cond(
-        order.eip712Signature.isEmpty || !order.senderPublicKey.arr.headOption.contains(0.toByte) || blockchain.isFeatureActivated(
-          BlockchainFeatures.ConsensusImprovements
-        ),
-        (),
-        GenericError("Sender public key with leading zero byte is not allowed for Ethereum orders")
-      )
-      _ <- {
-        val sigData = order.eip712Signature.map(sig => EthOrders.decodeSignature(sig.arr))
-        Either.cond(
-          !sigData.exists { data =>
-            val v = BigInt(1, data.getV)
-            v == 0 || v == 1 || v > 28
-          } || blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements),
-          (),
-          GenericError("Invalid order signature format")
-        )
-      }
-    } yield ()
+    order.orderAuthentication match {
+      case Eip712Signature(signature) =>
+        for {
+          _ <- Either.cond(
+            !order.senderPublicKey.arr.headOption.contains(0.toByte) || blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements),
+            (),
+            GenericError("Sender public key with leading zero byte is not allowed for Ethereum orders")
+          )
+          sigData = EthOrders.decodeSignature(signature.arr)
+          v       = BigInt(1, sigData.getV)
+          _ <- Either.cond(
+            !(v == 0 || v == 1 || v > 28) || blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements),
+            (),
+            GenericError("Invalid order signature format")
+          )
+        } yield ()
+      case _ => Right(())
+    }
   }
 }

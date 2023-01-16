@@ -57,18 +57,12 @@ final case class EthereumTransaction(
     val sig        = new ECDSASignature(new BigInteger(1, signatureData.getR), new BigInteger(1, signatureData.getS))
 
     val signerKey =
-      Sign
-        .recoverFromSignature(recoveryId.intValue, sig, Hash.sha3(this.bodyBytes()))
-        .toByteArray
-        .takeRight(EthereumKeyLength)
+      org.web3j.utils.Numeric.toBytesPadded(
+        Sign.recoverFromSignature(recoveryId.intValue, sig, Hash.sha3(this.bodyBytes())),
+        EthereumKeyLength
+      )
 
-    val numBytesToAdd = EthereumKeyLength - signerKey.length
-    val maybePaddedKey = if (numBytesToAdd > 0) {
-      Array.fill(numBytesToAdd)(0.toByte) ++ signerKey
-    } else {
-      signerKey
-    }
-    PublicKey(ByteStr(maybePaddedKey))
+    PublicKey(ByteStr(signerKey))
   }
 
   val senderAddress: Coeval[Address] = Coeval.evalOnce(signerPublicKey().toAddress(chainId))

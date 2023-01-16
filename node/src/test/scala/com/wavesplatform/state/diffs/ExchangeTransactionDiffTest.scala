@@ -1888,7 +1888,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     }
   }
 
-  property(s"orders' public keys with leading zeros are allowed only after ${BlockchainFeatures.ConsensusImprovements} activation") {
+  property(s"orders' ETH public keys with leading zeros are allowed only after ${BlockchainFeatures.ConsensusImprovements} activation") {
     val signer =
       Bip32ECKeyPair.create(EthEncoding.toBytes("0x00db4a036ea48572bf27630c72a1513f48f0b4a6316606fd01c23318befdf984"), Array.emptyByteArray)
 
@@ -1924,6 +1924,31 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       )
       d.appendBlock()
       d.appendAndAssertSucceed(tx)
+    }
+  }
+
+  property(s"orders' native public keys with leading zeros are allowed before and after ${BlockchainFeatures.ConsensusImprovements} activation") {
+    val signer = KeyPair("h0".getBytes)
+    signer.publicKey.arr.head shouldBe 0.toByte
+
+    withDomain(
+      DomainPresets.RideV6.setFeaturesHeight(BlockchainFeatures.ConsensusImprovements -> 4),
+      AddrWithBalance.enoughBalances(signer)
+    ) { d =>
+      val issue     = TxHelpers.issue(TxHelpers.defaultSigner)
+      val buyOrder  = () => TxHelpers.order(OrderType.BUY, issue.asset, Waves, sender = signer)
+      val sellOrder = () => TxHelpers.order(OrderType.SELL, issue.asset, Waves)
+
+      val tx = () => TxHelpers.exchange(buyOrder(), sellOrder())
+
+      d.appendBlock(issue)
+      d.appendAndAssertSucceed(tx())
+
+      d.blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements) shouldBe false
+      d.appendBlock()
+      d.blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements) shouldBe true
+
+      d.appendAndAssertSucceed(tx())
     }
   }
 
