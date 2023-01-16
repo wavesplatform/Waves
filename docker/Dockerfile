@@ -47,13 +47,7 @@ VOLUME $WVLOG
 VOLUME $WAVES_INSTALL_PATH/lib/plugins
 WORKDIR $WVDATA
 
-HEALTHCHECK CMD \
-  curl -f http://localhost:6869/node/status ||  \
-  curl -f http://localhost:6868/node/status ||  \
-  curl -f http://localhost:6863/node/status ||  \
-  curl -f http://localhost:6862/node/status ||  \
-  curl -f http://localhost:6870/node/status ||  \
-  exit 1
+HEALTHCHECK CMD curl -f http://localhost:6869/node/status || exit 1
 
 STOPSIGNAL SIGINT
 CMD ["/usr/share/waves/bin/entrypoint.sh"]
