@@ -1,7 +1,7 @@
-package com.wavesplatform.grpc
+package com.wavesplatform.api
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder
-import com.wavesplatform.grpc.GrpcConnector.Settings
+import com.wavesplatform.api.GrpcConnector.Settings
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.ManagedChannel
 

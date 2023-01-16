@@ -1,4 +1,4 @@
-package com.wavesplatform.grpc.ops
+package com.wavesplatform.api.ops
 
 import io.grpc.{ClientCall, Grpc}
 

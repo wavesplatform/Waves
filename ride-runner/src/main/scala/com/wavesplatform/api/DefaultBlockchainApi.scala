@@ -1,4 +1,4 @@
-package com.wavesplatform.grpc
+package com.wavesplatform.api
 
 import cats.syntax.option.*
 import com.google.protobuf.empty.Empty
@@ -27,9 +27,9 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.concurrent.MayBeSemaphore
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.*
-import com.wavesplatform.grpc.BlockchainApi.BlockchainUpdatesStream
-import com.wavesplatform.grpc.DefaultBlockchainApi.*
-import com.wavesplatform.grpc.observers.{ManualGrpcObserver, MonixWrappedDownstream}
+import com.wavesplatform.api.BlockchainApi.BlockchainUpdatesStream
+import com.wavesplatform.api.DefaultBlockchainApi.*
+import com.wavesplatform.api.observers.{ManualGrpcObserver, MonixWrappedDownstream}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.Block

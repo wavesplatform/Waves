@@ -1,4 +1,4 @@
-package com.wavesplatform.grpc.observers
+package com.wavesplatform.api.observers
 
 import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}

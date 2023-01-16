@@ -5,7 +5,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
 import com.wavesplatform.events.WrappedEvent
-import com.wavesplatform.grpc.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
+import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.state.Height
 import com.wavesplatform.storage.RequestsStorage
 import com.wavesplatform.storage.RequestsStorage.RequestKey

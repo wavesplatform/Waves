@@ -2,7 +2,7 @@ package com.wavesplatform.storage
 
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.grpc.BlockchainApi
+import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.storage.actions.AffectedTags
 import com.wavesplatform.storage.persistent.PersistentCache
 

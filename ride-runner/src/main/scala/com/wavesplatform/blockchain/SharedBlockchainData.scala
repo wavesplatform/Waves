@@ -3,7 +3,7 @@ package com.wavesplatform.blockchain
 import cats.syntax.option.*
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.{BlockchainFeatures, ComplexityCheckPolicyProvider, EstimatorProvider}
-import com.wavesplatform.grpc.BlockchainApi
+import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator

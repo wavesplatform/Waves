@@ -2,7 +2,7 @@ package com.wavesplatform.storage
 
 import com.github.benmanes.caffeine.cache.{CacheLoader, Caffeine}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.grpc.BlockchainApi
+import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.storage.persistent.VrfPersistentCache
 import com.wavesplatform.utils.ScorexLogging
 import kamon.instrumentation.caffeine.KamonStatsCounter

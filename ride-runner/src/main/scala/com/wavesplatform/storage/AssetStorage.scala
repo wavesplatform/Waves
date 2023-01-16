@@ -2,7 +2,7 @@ package com.wavesplatform.storage
 
 import com.google.protobuf.UnsafeByteOperations
 import com.wavesplatform.events.protobuf.StateUpdate
-import com.wavesplatform.grpc.BlockchainApi
+import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Height}

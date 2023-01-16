@@ -25,16 +25,16 @@ object AppInitializer extends ScorexLogging {
     System.setProperty("waves.directory", config.getString("waves.directory"))
     if (config.hasPath("waves.config.directory")) System.setProperty("waves.config.directory", config.getString("waves.config.directory"))
 
-    val settings = RideRunnerGlobalSettings.fromRootConfig(config)
-    val network  = settings.blockchain.addressSchemeCharacter
-    log.info(s"Starting ${Version.VersionString}...")
-    log.info(s"Chosen network: $network / ${network.toByte}")
+    val network = config.getString("blockchain.address-scheme-character").head.toByte
+    log.info(s"Chosen network: ${network.toChar} / $network")
 
     // Initialize global var with actual address scheme
     AddressScheme.current = new AddressScheme {
-      override val chainId: Byte = network.toByte
+      override val chainId: Byte = network
     }
 
+    val settings = RideRunnerGlobalSettings.fromRootConfig(config)
+    log.info(s"Starting ${Version.VersionString}...")
     (config, settings)
   }
 }

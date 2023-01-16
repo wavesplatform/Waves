@@ -1,4 +1,4 @@
-package com.wavesplatform.grpc
+package com.wavesplatform.api
 
 import com.wavesplatform.events.api.grpc.protobuf.BlockchainUpdatesApiGrpc.BlockchainUpdatesApi
 import io.grpc.inprocess.{InProcessChannelBuilder, InProcessServerBuilder}

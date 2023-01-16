@@ -10,8 +10,8 @@ import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.events.protobuf.{BlockchainUpdated, StateUpdate}
-import com.wavesplatform.grpc.DefaultBlockchainApi.*
-import com.wavesplatform.grpc.{DefaultBlockchainApi, HasGrpc}
+import com.wavesplatform.api.DefaultBlockchainApi.*
+import com.wavesplatform.api.{DefaultBlockchainApi, HasGrpc}
 import com.wavesplatform.lang.API
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3

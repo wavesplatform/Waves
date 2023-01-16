@@ -2,7 +2,7 @@ package com.wavesplatform.storage
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.events.protobuf.StateUpdate
-import com.wavesplatform.grpc.BlockchainApi
+import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.state.LeaseBalance
 import com.wavesplatform.storage.actions.AffectedTags

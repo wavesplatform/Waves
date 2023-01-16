@@ -1,7 +1,7 @@
 package com.wavesplatform.storage
 
 import com.wavesplatform.events.protobuf.StateUpdate
-import com.wavesplatform.grpc.BlockchainApi
+import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.protobuf.transaction.PBAmounts.toAssetAndAmount
 import com.wavesplatform.storage.actions.AffectedTags
 import com.wavesplatform.storage.persistent.PersistentCache

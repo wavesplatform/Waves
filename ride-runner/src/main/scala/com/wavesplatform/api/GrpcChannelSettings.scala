@@ -1,6 +1,6 @@
-package com.wavesplatform.grpc
+package com.wavesplatform.api
 
-import com.wavesplatform.grpc.GrpcChannelSettings.ChannelOptionsSettings
+import com.wavesplatform.api.GrpcChannelSettings.ChannelOptionsSettings
 import io.grpc.netty.{InternalNettyChannelBuilder, NettyChannelBuilder}
 import io.netty.channel.ChannelOption
 
