@@ -2,10 +2,10 @@ package com.wavesplatform.transaction.assets.exchange
 
 import java.math.BigInteger
 import java.nio.ByteBuffer
-
 import com.google.common.base.CaseFormat
 import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto.EthereumKeyLength
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import org.web3j.crypto.Sign.SignatureData
@@ -63,14 +63,18 @@ object EthOrders extends App {
 
   def recoverEthSignerKey(message: Array[Byte], signature: Array[Byte]): PublicKey = {
     val signatureData = EthOrders.decodeSignature(signature)
-    val signerKey = Sign
-      .recoverFromSignature(
-        signatureData.getV.head - 27,
-        new ECDSASignature(new BigInteger(1, signatureData.getR), new BigInteger(1, signatureData.getS)),
-        message
-      )
-      .toByteArray
-      .takeRight(64)
+    val v             = BigInt(1, signatureData.getV)
+    val recId         = if (v == 0 || v == 1) v else if (v > 28) v - AddressScheme.current.chainId * 2 - 35 else v - 27
+    val signerKey = org.web3j.utils.Numeric.toBytesPadded(
+      Sign
+        .recoverFromSignature(
+          recId.intValue,
+          new ECDSASignature(new BigInteger(1, signatureData.getR), new BigInteger(1, signatureData.getS)),
+          message
+        ),
+      EthereumKeyLength
+    )
+
     PublicKey(ByteStr(signerKey))
   }
 
