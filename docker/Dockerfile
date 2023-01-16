@@ -1,4 +1,4 @@
-FROM eclipse-temurin:11.0.17_8-jre
+FROM eclipse-temurin:11-jre
 
 ENV WAVES_LOG_LEVEL=INFO
 ENV WAVES_HEAP_SIZE=2g
