@@ -21,7 +21,7 @@ object BlockchainFeatures {
   val BlockV5                         = BlockchainFeature(15, "Ride V4, VRF, Protobuf, Failed transactions")
   val SynchronousCalls                = BlockchainFeature(16, "Ride V5, dApp-to-dApp invocations")
   val RideV6                          = BlockchainFeature(17, "Ride V6, MetaMask support")
-  val ConsensusImprovements           = BlockchainFeature(18, "Consensus improvements")
+  val ConsensusImprovements           = BlockchainFeature(18, "Consensus and MetaMask updates")
 
   // Not exposed
   val ContinuationTransaction         = BlockchainFeature(19, "Continuation Transaction")
