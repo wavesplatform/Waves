@@ -153,7 +153,7 @@ class BlockchainUpdaterImpl(
     val settings   = this.settings.rewardsSettings
     val nextHeight = this.height + 1
 
-    if (height == 0 && leveldb.isFeatureActivated(ConsensusImprovements))
+    if (height == 0 && leveldb.featureActivationHeight(ConsensusImprovements.id).exists(_ <= 1))
       None
     else
       leveldb
