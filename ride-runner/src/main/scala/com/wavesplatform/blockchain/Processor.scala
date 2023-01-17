@@ -88,8 +88,15 @@ class BlockchainProcessor(
   }
 
   private def process(h: Height, append: BlockchainUpdated.Append): ProcessResult[RequestKey] = {
-    // Almost all scripts use the height, so we can run all of them
-    val withUpdatedHeight = accumulatedChanges.copy(newHeight = h) // TODO #31 Affect all scripts if height is increased
+    val withUpdatedHeight = {
+      // Almost all scripts use the height, so we can run all of them
+      val r =
+        if (accumulatedChanges.newHeight == h) accumulatedChanges
+        else accumulatedChanges.withAffectedTags(AffectedTags(storage.keySet.toSet))
+
+      // TODO #31 Affect all scripts if height is increased
+      r.copy(newHeight = h)
+    }
 
     val (txs, timer) = append.body match {
       // PBBlocks.vanilla(block.getBlock.getHeader)
@@ -308,8 +315,9 @@ class BlockchainProcessor(
       val result     = lastResult.value("result").as[JsObject].value("value")
       log.info(f"[$key] complexity: $complexity, apiResult: $result")
 
-      val prevResult = prev.value("result").as[JsObject].value("value")
-      if (result == prevResult) rideScriptUnnecessaryUpdateNumber.increment()
+      prev.value.get("result").map(_.as[JsObject].value("value")).foreach { prevResult =>
+        if (result == prevResult) rideScriptUnnecessaryUpdateNumber.increment()
+      }
     } else {
       log.info(f"[$key] failed: $lastResult")
     }
