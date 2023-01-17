@@ -1,6 +1,6 @@
 package com.wavesplatform.ride.app
 
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector, RideApi}
 import com.wavesplatform.blockchain.BlockchainProcessor
@@ -8,7 +8,8 @@ import com.wavesplatform.ride.app.RideRunnerSettings.DbSettings
 import com.wavesplatform.settings.*
 import net.ceedubs.ficus.Ficus.*
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
-import play.api.libs.json.JsObject
+import net.ceedubs.ficus.readers.{CollectionReaders, ValueReader}
+import play.api.libs.json.{JsObject, Json}
 
 case class RideRunnerGlobalSettings(
     rideRunner: RideRunnerSettings,
@@ -19,6 +20,24 @@ case class RideRunnerGlobalSettings(
 
 object RideRunnerGlobalSettings {
   def fromRootConfig(config: Config): RideRunnerGlobalSettings = config.getConfig("waves").as[RideRunnerGlobalSettings]
+
+  implicit val testRequestsValueReader: ValueReader[Map[Address, JsObject]] = CollectionReaders.mapValueReader[Config].map { xs =>
+    xs.map { case (k, v) =>
+      val key = Address.fromString(k) match {
+        case Right(x) => x
+        case Left(e)  => throw new RuntimeException(s"Can't parse key '$k' as Address: ${e.toString}")
+      }
+
+      val strV = v.root().render(ConfigRenderOptions.concise())
+      println(strV)
+      val value = Json.parse(strV) match {
+        case x: JsObject => x
+        case x           => throw new RuntimeException(s"Can't parse value as JsObject: $x")
+      }
+
+      key -> value
+    }
+  }
 }
 
 case class RideRunnerSettings(
