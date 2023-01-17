@@ -31,10 +31,11 @@ object ExternalSourcesTest extends App {
             val base64    = reader.readTree(response.body()).get("content").asText()
             val name      = entry.get("path")
             val script    = new String(Base64.decode(base64.replace("\n", "")))
+            throw new RuntimeException("TEST ERROR")
             API
               .compile(script, estimator)
               .fold(
-                error => err.println(s"$error on $name compilation"),
+                error => throw new RuntimeException(s"$error on $name compilation"),
                 _ => println(s"successfully compiled $name")
               )
           case "dir" =>
