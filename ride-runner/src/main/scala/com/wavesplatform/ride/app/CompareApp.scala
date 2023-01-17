@@ -7,16 +7,18 @@ import io.netty.util.concurrent.DefaultThreadFactory
 import kamon.instrumentation.executor.ExecutorInstrumentation
 import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
+import monix.reactive.Observable
 import sttp.client3.HttpURLConnectionBackend
 
 import java.io.File
 import java.util.concurrent.{LinkedBlockingQueue, RejectedExecutionException, ThreadPoolExecutor, TimeUnit}
 import scala.concurrent.Await
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.{Duration, DurationInt}
 
 object CompareApp extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     val (globalConfig, settings) = AppInitializer.init(args.headOption.map(new File(_)))
+    if (settings.compare.testRequests.isEmpty) throw new IllegalArgumentException("Specify waves.compare.test-requests in config")
 
     log.info("Starting...")
     implicit val actorSystem = ActorSystem("ride-runner", globalConfig)
@@ -61,19 +63,52 @@ object CompareApp extends ScorexLogging {
       monixScheduler
     }
 
-    val scheduler = mkScheduler("probes", 2)
-    val r = Task
+    val scheduler = mkScheduler("probes", 3)
+    val task: Task[Boolean] = Task
       .traverse(settings.compare.testRequests.toList) { case (address, request) =>
         rideApi
           .ask(address, request)
-          .map { r =>
-            if (r.rideRunner == r.node) log.info(s"Ok, ${r.node}")
-            else log.warn(s"Different:\n${r.rideRunner}\nvs:\n${r.node}")
+          .map { x =>
+            val prefix = s"[$address, $request]"
+            log.info(s"$prefix running")
+            val r = x.rideRunner == x.node
+            if (r) log.info(s"$prefix ok, ${x.node}")
+            else log.warn(s"$prefix different:\n${x.rideRunner}\nvs:\n${x.node}")
+            r
           }
       }
-      .tapError(e => Task(log.error("Error", e)))
-      .runToFuture(scheduler)
+      .map(_.forall(_ == true))
+      .onErrorRecoverWith { e =>
+        Task {
+          log.error("Error", e)
+          false
+        }
+      }
 
-    Await.result(r, 1.minute)
+    def now: Long = scheduler.clockMonotonic(TimeUnit.MILLISECONDS)
+    val loop = {
+      val s = Observable
+        .intervalWithFixedDelay(settings.compare.requestsDelay)
+        .mapEval(_ => task)
+        .scan(now) { case (lastSuccessTs, lastCheckSuccess) =>
+          if (lastCheckSuccess) now
+          else {
+            if (now - lastSuccessTs > settings.compare.failedChecksToleranceTimer.toMillis) log.error(s"Failed since $lastSuccessTs")
+            lastSuccessTs
+          }
+        }
+
+      settings.compare.maxChecks
+        .fold(s)(s.take)
+        .lastL
+        .runToFuture(scheduler)
+    }
+    cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream)(loop.cancel())
+
+    log.info("Initialization completed")
+    log.info(Await.result(loop, Duration.Inf).toString)
+
+    log.info("Done")
+    cs.forceStop()
   }
 }

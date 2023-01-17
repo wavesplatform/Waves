@@ -11,6 +11,8 @@ import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import net.ceedubs.ficus.readers.{CollectionReaders, ValueReader}
 import play.api.libs.json.{JsObject, Json}
 
+import scala.concurrent.duration.FiniteDuration
+
 case class RideRunnerGlobalSettings(
     rideRunner: RideRunnerSettings,
     blockchain: BlockchainSettings,
@@ -29,7 +31,6 @@ object RideRunnerGlobalSettings {
       }
 
       val strV = v.root().render(ConfigRenderOptions.concise())
-      println(strV)
       val value = Json.parse(strV) match {
         case x: JsObject => x
         case x           => throw new RuntimeException(s"Can't parse value as JsObject: $x")
@@ -53,4 +54,10 @@ object RideRunnerSettings {
   case class DbSettings(directory: String)
 }
 
-case class CompareSettings(rideApi: RideApi.Settings, testRequests: Map[Address, JsObject])
+case class CompareSettings(
+    requestsDelay: FiniteDuration,
+    failedChecksToleranceTimer: FiniteDuration,
+    maxChecks: Option[Long],
+    rideApi: RideApi.Settings,
+    testRequests: Map[Address, JsObject]
+)
