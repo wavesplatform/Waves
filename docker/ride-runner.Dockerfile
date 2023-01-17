@@ -1,9 +1,10 @@
 # To build: docker build -t wavesplatform/ride-runner:latest -f docker/ride-runner.Dockerfile docker
-FROM openjdk:11-jre-slim
+FROM eclipse-temurin:11-jre
 
 ENV RIDE_LOG_LEVEL=INFO
 ENV RIDE_HEAP_SIZE=2g
 ENV RIDE_NETWORK=mainnet
+ENV RIDE_APP=com.wavesplatform.ride.app.RideWithBlockchainUpdatesService
 
 ENV YOURKIT_VERSION=2022.9
 
@@ -43,4 +44,4 @@ VOLUME $RDATA
 WORKDIR $RDATA
 
 STOPSIGNAL SIGINT
-ENTRYPOINT ["/usr/share/ride-runner/bin/entrypoint.sh"]
+CMD ["/usr/share/ride-runner/bin/entrypoint.sh"]

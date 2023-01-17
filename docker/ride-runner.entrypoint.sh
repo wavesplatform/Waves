@@ -19,4 +19,4 @@ JAVA_OPTS="-javaagent:${RIDE_INSTALL_PATH}/kanela-agent/kanela-agent-1.0.16.jar
 echo "Ride runner is starting..."
 echo "JAVA_OPTS='${JAVA_OPTS}'"
 
-java $JAVA_OPTS -cp "${RIDE_INSTALL_PATH}/lib/*" com.wavesplatform.ride.app.RideWithBlockchainUpdatesService "$RIDE_CONFIG"
+java $JAVA_OPTS -cp "${RIDE_INSTALL_PATH}/lib/*" $RIDE_APP "$RIDE_CONFIG"
