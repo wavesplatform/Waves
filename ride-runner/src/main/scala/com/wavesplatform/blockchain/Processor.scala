@@ -294,6 +294,8 @@ class BlockchainProcessor(
   override def removeBlocksFrom(height: Height): Unit = blockchainStorage.blockHeaders.removeFrom(height)
 
   private def runScript(script: RestApiScript, hasCaches: Boolean): Task[JsObject] = Task {
+    val prev = script.lastResult
+
     val refreshed = rideScriptRunTime.withTag("has-caches", hasCaches).measure {
       script.refreshed(settings.enableTraces, settings.evaluateScriptComplexityLimit, settings.maxTxErrorLogSize, runScriptsScheduler)
     }
@@ -305,6 +307,9 @@ class BlockchainProcessor(
       val complexity = lastResult.value("complexity").as[Int]
       val result     = lastResult.value("result").as[JsObject].value("value")
       log.info(f"[$key] complexity: $complexity, apiResult: $result")
+
+      val prevResult = prev.value("result").as[JsObject].value("value")
+      if (result == prevResult) rideScriptUnnecessaryUpdateNumber.increment()
     } else {
       log.info(f"[$key] failed: $lastResult")
     }

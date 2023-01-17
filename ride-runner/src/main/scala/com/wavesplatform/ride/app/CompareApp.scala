@@ -76,7 +76,7 @@ object CompareApp extends ScorexLogging {
             log.info(s"$prefix running")
             val r = x.rideRunner == x.node
             if (r) log.info(s"$prefix ok, ${x.node}")
-            else log.warn(s"$prefix different:\n${x.rideRunner}\nvs:\n${x.node}")
+            else log.warn(s"$prefix different:\nride: ${x.rideRunner}\nnode: ${x.node}")
             r
           }
       }

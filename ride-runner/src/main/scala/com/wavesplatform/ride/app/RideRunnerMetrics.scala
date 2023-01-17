@@ -25,10 +25,11 @@ class RideRunnerMetrics(globalConfig: Config) extends AutoCloseable with ScorexL
 }
 
 object RideRunnerMetrics {
-  val rideScriptTotalNumber = Kamon.gauge("ride.script.number", "Total registered RIDE scripts").withoutTags()
-  val rideScriptCacheHits   = Kamon.counter("ride.script.cache.hit", "Cache hits for whole script").withoutTags()
-  val rideScriptCacheMisses = Kamon.counter("ride.script.cache.miss", "Cache misses for whole script").withoutTags()
-  val rideScriptRunTime     = Kamon.timer("ride.script.run", "Script running time")
+  val rideScriptTotalNumber             = Kamon.gauge("ride.script.number", "Total registered RIDE scripts").withoutTags()
+  val rideScriptCacheHits               = Kamon.counter("ride.script.cache.hit", "Cache hits for whole script").withoutTags()
+  val rideScriptCacheMisses             = Kamon.counter("ride.script.cache.miss", "Cache misses for whole script").withoutTags()
+  val rideScriptRunTime                 = Kamon.timer("ride.script.run", "Script running time")
+  val rideScriptUnnecessaryUpdateNumber = Kamon.counter("ride.script.unnecessary", "Unnecessary runs").withoutTags()
 
   private val anyEventProcessingTime = Kamon.timer("blockchain.event.process", "Blockchain events processing time")
   val blockProcessingTime            = anyEventProcessingTime.withTag("tpe", "b")
