@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs
 import cats.implicits.toFoldableOps
 import cats.syntax.either.*
 import com.wavesplatform.account.Address
+import com.wavesplatform.crypto.EthereumKeyLength
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.*
@@ -287,9 +288,11 @@ object ExchangeTransactionDiff {
       case Eip712Signature(signature) =>
         for {
           _ <- Either.cond(
-            !order.senderPublicKey.arr.headOption.contains(0.toByte) || blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements),
+            !(EthOrders.recoverEthSignerKeyBigInt(order, signature.arr).toByteArray.length < EthereumKeyLength) || blockchain.isFeatureActivated(
+              BlockchainFeatures.ConsensusImprovements
+            ),
             (),
-            GenericError("Sender public key with leading zero byte is not allowed for Ethereum orders")
+            GenericError("Invalid public key for Ethereum orders")
           )
           sigData = EthOrders.decodeSignature(signature.arr)
           v       = BigInt(1, sigData.getV)

@@ -5,6 +5,7 @@ import com.wavesplatform.account.{Address, AddressScheme, KeyPair, PrivateKey}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.crypto.EthereumKeyLength
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
@@ -1888,9 +1889,11 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
     }
   }
 
-  property(s"orders' ETH public keys with leading zeros are allowed only after ${BlockchainFeatures.ConsensusImprovements} activation") {
-    val signer =
-      Bip32ECKeyPair.create(EthEncoding.toBytes("0x00db4a036ea48572bf27630c72a1513f48f0b4a6316606fd01c23318befdf984"), Array.emptyByteArray)
+  property(
+    s"orders' ETH public keys with leading zeros and shortened byte representation are allowed only after ${BlockchainFeatures.ConsensusImprovements} activation"
+  ) {
+    val signer = Bip32ECKeyPair.generateKeyPair("i1".getBytes)
+    signer.getPublicKey.toByteArray.length shouldBe <(EthereumKeyLength)
 
     withDomain(
       DomainPresets.RideV6.setFeaturesHeight(BlockchainFeatures.ConsensusImprovements -> 4),
@@ -1919,7 +1922,7 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
       d.appendBlock(issue)
 
       d.appendAndCatchError(tx) shouldBe TransactionDiffer.TransactionValidationError(
-        GenericError("Sender public key with leading zero byte is not allowed for Ethereum orders"),
+        GenericError("Invalid public key for Ethereum orders"),
         tx
       )
       d.appendBlock()
