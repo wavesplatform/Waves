@@ -15,35 +15,42 @@ object ExternalSourcesTest extends App {
   private val estimator = ScriptEstimatorV3(true, false)
 
   private def compileFromGithub(dirUrl: String): Unit = {
-    val request  = HttpRequest.newBuilder().uri(new URI(dirUrl)).build()
-    val response = client.send(request, BodyHandlers.ofString)
+    val directoryTree = client.send(githubRequest(dirUrl), BodyHandlers.ofString).body()
     reader
-      .readTree(response.body())
+      .readTree(directoryTree)
       .elements()
       .asScala
       .foreach { entry =>
         entry.get("type").asText() match {
           case "dir" =>
             compileFromGithub(entry.get("_links").get("self").asText())
-          case "file" =>
-            val scriptUrl = new URI(entry.get("_links").get("git").asText())
-            val request   = HttpRequest.newBuilder().uri(scriptUrl).build()
-            val response  = client.send(request, BodyHandlers.ofString)
-            val base64    = reader.readTree(response.body()).get("content").asText()
-            val name      = entry.get("path")
-            val script    = new String(Base64.decode(base64.replace("\n", "")))
+          case "file" if entry.get("path").asText().endsWith(".ride") =>
+            val request  = githubRequest(entry.get("_links").get("git").asText())
+            val response = client.send(request, BodyHandlers.ofString).body()
+            val base64   = reader.readTree(response).get("content").asText()
+            val script   = new String(Base64.decode(base64.replace("\n", "")))
             API
               .compile(script, estimator)
               .fold(
-                error => throw new RuntimeException(s"$error on $name compilation"),
-                _ => println(s"successfully compiled $name")
+                error => throw new RuntimeException(s"$error on ${entry.get("path")} compilation"),
+                _ => println(s"successfully compiled ${entry.get("path")}")
               )
+          case _ =>
         }
       }
   }
+
+  private def githubRequest(url: String) =
+    HttpRequest
+      .newBuilder()
+      .uri(new URI(url))
+      .setHeader("Authorization", s"Bearer ${System.getenv("DUCKS_GITHUB_TOKEN")}")
+      .build()
 
   println("Compiling Neutrino contracts:")
   compileFromGithub("https://api.github.com/repos/waves-exchange/neutrino-contract/contents/script")
   println("Compiling WX contracts:")
   compileFromGithub("https://api.github.com/repos/waves-exchange/contracts/contents/ride")
+  println("Compiling Ducks contracts:")
+  compileFromGithub("https://api.github.com/repos/akharazyan/wavesducks-public/contents/ride")
 }
