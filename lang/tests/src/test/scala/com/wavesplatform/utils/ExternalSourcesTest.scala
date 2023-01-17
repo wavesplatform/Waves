@@ -23,6 +23,8 @@ object ExternalSourcesTest extends App {
       .asScala
       .foreach { entry =>
         entry.get("type").asText() match {
+          case "dir" =>
+            compileFromGithub(entry.get("_links").get("self").asText())
           case "file" =>
             val scriptUrl = new URI(entry.get("_links").get("git").asText())
             val request   = HttpRequest.newBuilder().uri(scriptUrl).build()
@@ -36,8 +38,6 @@ object ExternalSourcesTest extends App {
                 error => throw new RuntimeException(s"$error on $name compilation"),
                 _ => println(s"successfully compiled $name")
               )
-          case "dir" =>
-            compileFromGithub(entry.get("_links").get("self").asText())
         }
       }
   }
