@@ -14,7 +14,7 @@ object ExternalSourcesTest extends App {
   private val reader    = new ObjectMapper()
   private val estimator = ScriptEstimatorV3(true, false)
 
-  private def compileOnGithub(dirUrl: String): Unit = {
+  private def compileFromGithub(dirUrl: String): Unit = {
     val request  = HttpRequest.newBuilder().uri(new URI(dirUrl)).build()
     val response = client.send(request, BodyHandlers.ofString)
     reader
@@ -37,13 +37,13 @@ object ExternalSourcesTest extends App {
                 _ => println(s"successfully compiled $name")
               )
           case "dir" =>
-            compileOnGithub(entry.get("_links").get("self").asText())
+            compileFromGithub(entry.get("_links").get("self").asText())
         }
       }
   }
 
   println("Compiling Neutrino contracts:")
-  compileOnGithub("https://api.github.com/repos/waves-exchange/neutrino-contract/contents/script")
+  compileFromGithub("https://api.github.com/repos/waves-exchange/neutrino-contract/contents/script")
   println("Compiling WX contracts:")
-  compileOnGithub("https://api.github.com/repos/waves-exchange/contracts/contents/ride")
+  compileFromGithub("https://api.github.com/repos/waves-exchange/contracts/contents/ride")
 }
