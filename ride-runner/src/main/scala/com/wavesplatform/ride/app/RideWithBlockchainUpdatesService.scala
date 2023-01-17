@@ -32,8 +32,11 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     implicit val actorSystem = ActorSystem("ride-runner", globalConfig)
     val cs                   = new Cleanup(actorSystem)
 
-    val metrics = new RideRunnerMetrics(globalConfig)
-    cs.cleanup(CustomShutdownPhase.Metrics) { metrics.close() }
+    val metricsEnabled = globalConfig.getBoolean("kamon.enable")
+    if (metricsEnabled) {
+      val metrics = new RideRunnerMetrics(globalConfig)
+      cs.cleanup(CustomShutdownPhase.Metrics) { metrics.close() }
+    }
 
     log.info("Initializing thread pools...")
     def mkScheduler(name: String, threads: Int): Scheduler = {
@@ -51,7 +54,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
       )
 
       val monixScheduler = Scheduler(
-        executor = if (globalConfig.getBoolean("kamon.enable")) ExecutorInstrumentation.instrument(executor, name) else executor,
+        executor = if (metricsEnabled) ExecutorInstrumentation.instrument(executor, name) else executor,
         executionModel = ExecutionModel.AlwaysAsyncExecution
       )
 
