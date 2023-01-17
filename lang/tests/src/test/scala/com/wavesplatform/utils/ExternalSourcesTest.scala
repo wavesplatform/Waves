@@ -44,4 +44,6 @@ object ExternalSourcesTest extends App {
 
   println("Compiling Neutrino contracts:")
   compileOnGithub("https://api.github.com/repos/waves-exchange/neutrino-contract/contents/script")
+  println("Compiling WX contracts:")
+  compileOnGithub("https://api.github.com/repos/waves-exchange/contracts/contents/ride")
 }
