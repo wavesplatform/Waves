@@ -7,7 +7,6 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import java.net.URI
 import java.net.http.HttpResponse.BodyHandlers
 import java.net.http.{HttpClient, HttpRequest}
-import scala.Console.err
 import scala.jdk.CollectionConverters.*
 
 object ExternalSourcesTest extends App {
