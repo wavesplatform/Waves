@@ -7,6 +7,7 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import java.net.URI
 import java.net.http.HttpResponse.BodyHandlers
 import java.net.http.{HttpClient, HttpRequest}
+import scala.Console.err
 import scala.jdk.CollectionConverters.*
 
 object ExternalSourcesTest extends App {
@@ -15,24 +16,33 @@ object ExternalSourcesTest extends App {
   private val estimator = ScriptEstimatorV3(true, false)
 
   private def compileOnGithub(dirUrl: String): Unit = {
-    val response = client.send(HttpRequest.newBuilder().uri(new URI(dirUrl)).build(), BodyHandlers.ofString)
+    val request  = HttpRequest.newBuilder().uri(new URI(dirUrl)).build()
+    val response = client.send(request, BodyHandlers.ofString)
     reader
       .readTree(response.body())
       .elements()
       .asScala
       .foreach { entry =>
-        val entryType = entry.get("type").asText()
-        if (entryType == "file") {
-          val script  = client.send(HttpRequest.newBuilder().uri(new URI(entry.get("_links").get("git").asText())).build(), BodyHandlers.ofString)
-          val content = reader.readTree(script.body()).get("content").asText()
-          val result  = API.compile(new String(Base64.decode(content.replace("\n", ""))), estimator).isRight
-          if (result)
-            println(s"successfully compiled ${entry.get("path")}")
-        } else if (entryType == "dir") {
-          compileOnGithub(entry.get("_links").get("self").asText())
+        entry.get("type").asText() match {
+          case "file" =>
+            val scriptUrl = new URI(entry.get("_links").get("git").asText())
+            val request   = HttpRequest.newBuilder().uri(scriptUrl).build()
+            val response  = client.send(request, BodyHandlers.ofString)
+            val base64    = reader.readTree(response.body()).get("content").asText()
+            val name      = entry.get("path")
+            val script    = new String(Base64.decode(base64.replace("\n", "")))
+            API
+              .compile(script, estimator)
+              .fold(
+                error => err.println(s"$error on $name compilation"),
+                _ => println(s"successfully compiled $name")
+              )
+          case "dir" =>
+            compileOnGithub(entry.get("_links").get("self").asText())
         }
       }
   }
 
+  println("Compiling Neutrino contracts:")
   compileOnGithub("https://api.github.com/repos/waves-exchange/neutrino-contract/contents/script")
 }
