@@ -6,7 +6,7 @@ import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.collections.syntax.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{AddressId, DBExt, Key, RW, ReadOnlyDB}
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, Height, LeaseBalance, TransactionId}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, EmptyDataEntry, Height, LeaseBalance, TransactionId}
 import com.wavesplatform.storage.persistent.LevelDbPersistentCaches.{ReadOnlyDBOps, ReadWriteDBOps}
 import com.wavesplatform.storage.{AccountAssetKey, AccountDataKey}
 import com.wavesplatform.transaction.Asset
@@ -41,7 +41,11 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
           CacheKeys.AccountDataEntriesHistory.mkKey((addressId, key._2)),
           h => CacheKeys.AccountDataEntries.mkKey((addressId, key._2, h)),
           atHeight,
-          data
+          data.flatMap {
+            // HACK, see DataTxSerializer.serializeEntry because
+            case _: EmptyDataEntry => RemoteData.Absence
+            case x                 => RemoteData.Cached(x)
+          }
         )
       }
       log.trace(s"set($key, $atHeight)")

@@ -40,6 +40,12 @@ object RemoteData {
       case Absence   => Absence
       case Unknown   => Unknown
     }
+
+    def flatMap[B](f: A => RemoteData[B]): RemoteData[B] = self match {
+      case Cached(value) => f(value)
+      case Absence       => Absence
+      case Unknown       => Unknown
+    }
   }
 
   object Ops {
