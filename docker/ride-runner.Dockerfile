@@ -43,5 +43,7 @@ EXPOSE 6890 9095
 VOLUME $RDATA
 WORKDIR $RDATA
 
+HEALTHCHECK CMD curl -f http://localhost:6890/ride/status || exit 1
+
 STOPSIGNAL SIGINT
 CMD ["/usr/share/ride-runner/bin/entrypoint.sh"]

@@ -43,12 +43,15 @@ object RideRunnerGlobalSettings {
 
 case class RideRunnerSettings(
     db: DbSettings,
+    unhealthyIdleTimeout: FiniteDuration,
     processor: BlockchainProcessor.Settings,
     blockchainApi: DefaultBlockchainApi.Settings,
     grpcConnector: GrpcConnector.Settings,
     grpcApiChannel: GrpcChannelSettings,
     blockchainUpdatesApiChannel: GrpcChannelSettings
-)
+) {
+  val unhealthyIdleTimeoutMs = unhealthyIdleTimeout.toMillis
+}
 
 object RideRunnerSettings {
   case class DbSettings(directory: String)

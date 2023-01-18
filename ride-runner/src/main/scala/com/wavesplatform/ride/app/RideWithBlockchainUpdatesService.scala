@@ -3,9 +3,9 @@ package com.wavesplatform.ride.app
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import com.wavesplatform.api.http.CompositeHttpService
+import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
-import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.http.EvaluateApiRoute
 import com.wavesplatform.state.Height
 import com.wavesplatform.storage.LevelDbRequestsStorage
@@ -133,10 +133,24 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     val blockchainUpdatesStream = blockchainApi.mkBlockchainUpdatesStream(blockchainEventsStreamScheduler)
     cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream) { blockchainUpdatesStream.close() }
 
+    @volatile var lastServiceStatus = ServiceStatus()
     val events = blockchainUpdatesStream.downstream
       .doOnError(e => Task { log.error("Error!", e) })
       .scanEval(Task.now[BlockchainState](BlockchainState.Starting(lastSafeKnownHeight, workingHeight))) {
         BlockchainState(processor, blockchainUpdatesStream, _, _)
+      }
+      .doOnNext { state =>
+        Task {
+          lastServiceStatus = ServiceStatus(
+            maxObservedHeight = state.processedHeight,
+            lastProcessedHeight = math.max(lastServiceStatus.lastProcessedHeight, state.processedHeight),
+            lastProcessedTime = blockchainEventsStreamScheduler.clockMonotonic(TimeUnit.MILLISECONDS),
+            healthy = state match {
+              case _: BlockchainState.Working => true
+              case _                          => false
+            }
+          )
+        }
       }
       .doOnError { e =>
         Task {
@@ -151,7 +165,18 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
 
     log.info(s"Initializing REST API on ${settings.restApi.bindAddress}:${settings.restApi.port}...")
     val apiRoutes = Seq(
-      EvaluateApiRoute(Function.tupled(processor.getCachedResultOrRun(_, _).runToFuture(rideScheduler)))
+      EvaluateApiRoute(
+        Function.tupled(processor.getCachedResultOrRun(_, _).runToFuture(rideScheduler)),
+        { () =>
+          val now    = blockchainEventsStreamScheduler.clockMonotonic(TimeUnit.MILLISECONDS)
+          val idleMs = now - lastServiceStatus.lastProcessedTime
+          lastServiceStatus.copy(
+            nowTime = now,
+            idleMs = idleMs,
+            healthy = lastServiceStatus.healthy && idleMs < settings.rideRunner.unhealthyIdleTimeoutMs
+          )
+        }
+      )
     )
 
     val httpService = CompositeHttpService(apiRoutes, settings.restApi)

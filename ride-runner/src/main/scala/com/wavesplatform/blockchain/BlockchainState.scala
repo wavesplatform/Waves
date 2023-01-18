@@ -14,10 +14,11 @@ import monix.eval.Task
 import monix.execution.exceptions.UpstreamTimeoutException
 
 // TODO #8: move. Doesn't relate to blockchain itself, move to the business domain
-sealed trait BlockchainState extends Product with Serializable
+sealed trait BlockchainState extends Product with Serializable {
+  def processedHeight: Height
+}
 
 object BlockchainState extends ScorexLogging {
-  // TODO #66 Merge with ResolvingFork?
   case class Starting(processedHeight: Height, workingHeight: Height, foundDifferentBlocks: Boolean = false) extends BlockchainState {
     def withDifferentBlocks: Starting = copy(foundDifferentBlocks = true)
   }
