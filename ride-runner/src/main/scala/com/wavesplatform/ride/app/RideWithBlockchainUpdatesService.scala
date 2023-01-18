@@ -6,7 +6,7 @@ import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
-import com.wavesplatform.http.EvaluateApiRoute
+import com.wavesplatform.http.{EvaluateApiRoute, ServiceStatusRoute}
 import com.wavesplatform.state.Height
 import com.wavesplatform.storage.LevelDbRequestsStorage
 import com.wavesplatform.storage.RequestsStorage.RequestKey
@@ -165,18 +165,16 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
 
     log.info(s"Initializing REST API on ${settings.restApi.bindAddress}:${settings.restApi.port}...")
     val apiRoutes = Seq(
-      EvaluateApiRoute(
-        Function.tupled(processor.getCachedResultOrRun(_, _).runToFuture(rideScheduler)),
-        { () =>
-          val now    = blockchainEventsStreamScheduler.clockMonotonic(TimeUnit.MILLISECONDS)
-          val idleMs = now - lastServiceStatus.lastProcessedTime
-          lastServiceStatus.copy(
-            nowTime = now,
-            idleMs = idleMs,
-            healthy = lastServiceStatus.healthy && idleMs < settings.rideRunner.unhealthyIdleTimeoutMs
-          )
-        }
-      )
+      EvaluateApiRoute(Function.tupled(processor.getCachedResultOrRun(_, _).runToFuture(rideScheduler))),
+      ServiceStatusRoute({ () =>
+        val now    = blockchainEventsStreamScheduler.clockMonotonic(TimeUnit.MILLISECONDS)
+        val idleMs = now - lastServiceStatus.lastProcessedTime
+        lastServiceStatus.copy(
+          nowTime = now,
+          idleMs = idleMs,
+          healthy = lastServiceStatus.healthy && idleMs < settings.rideRunner.unhealthyIdleTimeoutMs
+        )
+      })
     )
 
     val httpService = CompositeHttpService(apiRoutes, settings.restApi)
