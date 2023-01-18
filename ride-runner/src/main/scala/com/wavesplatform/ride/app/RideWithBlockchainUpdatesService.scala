@@ -6,7 +6,7 @@ import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
-import com.wavesplatform.http.{EvaluateApiRoute, ServiceStatusRoute}
+import com.wavesplatform.http.{EvaluateApiRoute, HttpServiceStatus, ServiceStatusRoute}
 import com.wavesplatform.state.Height
 import com.wavesplatform.storage.LevelDbRequestsStorage
 import com.wavesplatform.storage.RequestsStorage.RequestKey
@@ -17,6 +17,7 @@ import io.netty.util.concurrent.DefaultThreadFactory
 import kamon.instrumentation.executor.ExecutorInstrumentation
 import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
+import play.api.libs.json.Json
 import sttp.client3.HttpURLConnectionBackend
 
 import java.io.File
@@ -144,7 +145,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
           lastServiceStatus = ServiceStatus(
             maxObservedHeight = state.processedHeight,
             lastProcessedHeight = math.max(lastServiceStatus.lastProcessedHeight, state.processedHeight),
-            lastProcessedTime = blockchainEventsStreamScheduler.clockMonotonic(TimeUnit.MILLISECONDS),
+            lastProcessedTimeMs = blockchainEventsStreamScheduler.clockMonotonic(TimeUnit.MILLISECONDS),
             healthy = state match {
               case _: BlockchainState.Working => true
               case _                          => false
@@ -167,12 +168,17 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     val apiRoutes = Seq(
       EvaluateApiRoute(Function.tupled(processor.getCachedResultOrRun(_, _).runToFuture(rideScheduler))),
       ServiceStatusRoute({ () =>
-        val now    = blockchainEventsStreamScheduler.clockMonotonic(TimeUnit.MILLISECONDS)
-        val idleMs = now - lastServiceStatus.lastProcessedTime
-        lastServiceStatus.copy(
-          nowTime = now,
-          idleMs = idleMs,
-          healthy = lastServiceStatus.healthy && idleMs < settings.rideRunner.unhealthyIdleTimeoutMs
+        val nowMs      = blockchainEventsStreamScheduler.clockMonotonic(TimeUnit.MILLISECONDS)
+        val idleTimeMs = nowMs - lastServiceStatus.lastProcessedTimeMs
+        HttpServiceStatus(
+          healthy = lastServiceStatus.healthy && idleTimeMs < settings.rideRunner.unhealthyIdleTimeoutMs,
+          debug = Json.obj(
+            "nowTime"             -> nowMs,
+            "lastProcessedTime"   -> lastServiceStatus.lastProcessedTimeMs,
+            "lastProcessedHeight" -> lastServiceStatus.lastProcessedHeight,
+            "idleTime"            -> idleTimeMs,
+            "maxObservedHeight"   -> lastServiceStatus.maxObservedHeight
+          )
         )
       })
     )
@@ -189,4 +195,13 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     log.info("Done")
     cs.forceStop()
   }
+
+  private case class ServiceStatus(
+      healthy: Boolean = false,
+      nowTimeMs: Long = 0,
+      lastProcessedTimeMs: Long = 0,
+      lastProcessedHeight: Int = 0,
+      idleTimeMs: Long = 0,
+      maxObservedHeight: Int = 0
+  )
 }

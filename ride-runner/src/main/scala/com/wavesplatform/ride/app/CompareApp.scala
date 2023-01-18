@@ -1,13 +1,17 @@
 package com.wavesplatform.ride.app
 
 import akka.actor.ActorSystem
+import akka.http.scaladsl.Http
 import com.wavesplatform.api.RideApi
+import com.wavesplatform.api.http.CompositeHttpService
+import com.wavesplatform.http.{HttpServiceStatus, ServiceStatusRoute}
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.util.concurrent.DefaultThreadFactory
 import kamon.instrumentation.executor.ExecutorInstrumentation
 import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
 import monix.reactive.Observable
+import play.api.libs.json.Json
 import sttp.client3.HttpURLConnectionBackend
 
 import java.io.File
@@ -75,8 +79,7 @@ object CompareApp extends ScorexLogging {
             val prefix = s"[$address, $request]"
             log.info(s"$prefix running")
             val r = x.rideRunner == x.node
-            if (r) log.info(s"$prefix ok, ${x.node}")
-            else log.warn(s"$prefix different:\nride: ${x.rideRunner}\nnode: ${x.node}")
+            if (!r) log.warn(s"$prefix different:\nride: ${x.rideRunner}\nnode: ${x.node}")
             r
           }
       }
@@ -88,15 +91,23 @@ object CompareApp extends ScorexLogging {
         }
       }
 
-    def now: Long = scheduler.clockMonotonic(TimeUnit.MILLISECONDS)
+    def now: Long                   = scheduler.clockMonotonic(TimeUnit.MILLISECONDS)
+    @volatile var lastServiceStatus = ServiceStatus()
     val loop = {
       val s = Observable
         .intervalWithFixedDelay(settings.compare.requestsDelay)
         .mapEval(_ => task)
         .scan(now) { case (lastSuccessTs, lastCheckSuccess) =>
-          if (lastCheckSuccess) now
-          else {
-            if (now - lastSuccessTs > settings.compare.failedChecksToleranceTimer.toMillis) log.error(s"Failed since $lastSuccessTs")
+          val n = now
+          lastServiceStatus = lastServiceStatus.copy(lastProcessedTimeMs = n, rideRunnerHealthy = true)
+          if (lastCheckSuccess) {
+            lastServiceStatus = lastServiceStatus.copy(lastSuccessTimeMs = n)
+            n
+          } else {
+            if (n - lastSuccessTs > settings.compare.failedChecksToleranceTimer.toMillis) {
+              lastServiceStatus = lastServiceStatus.copy(rideRunnerHealthy = false)
+              log.error(s"Failed since $lastSuccessTs")
+            }
             lastSuccessTs
           }
         }
@@ -108,10 +119,42 @@ object CompareApp extends ScorexLogging {
     }
     cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream)(loop.cancel())
 
+    log.info(s"Initializing REST API on ${settings.restApi.bindAddress}:${settings.restApi.port}...")
+    val apiRoutes = Seq(
+      ServiceStatusRoute({ () =>
+        val nowMs      = scheduler.clockMonotonic(TimeUnit.MILLISECONDS)
+        val idleTimeMs = nowMs - lastServiceStatus.lastProcessedTimeMs
+        HttpServiceStatus(
+          healthy = true, // Because we don't want to affect this container
+          debug = Json.obj(
+            "rideRunnerHealthy" -> lastServiceStatus.rideRunnerHealthy,
+            "nowTime"           -> nowMs,
+            "lastProcessedTime" -> lastServiceStatus.lastProcessedTimeMs,
+            "lastSuccessTime"   -> lastServiceStatus.lastProcessedTimeMs,
+            "idleTime"          -> idleTimeMs
+          )
+        )
+      })
+    )
+
+    val httpService = CompositeHttpService(apiRoutes, settings.restApi)
+    val httpFuture = Http()
+      .newServerAt(settings.restApi.bindAddress, settings.restApi.port)
+      .bindFlow(httpService.loggingCompositeRoute)
+    Await.result(httpFuture, 20.seconds)
+
     log.info("Initialization completed")
     log.info(Await.result(loop, Duration.Inf).toString)
 
     log.info("Done")
     cs.forceStop()
   }
+
+  private case class ServiceStatus(
+      rideRunnerHealthy: Boolean = false,
+      nowTimeMs: Long = 0,
+      lastProcessedTimeMs: Long = 0,
+      lastSuccessTimeMs: Long = 0,
+      idleTimeMs: Long = 0
+  )
 }
