@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import com.google.protobuf.ByteString
+import com.wavesplatform.crypto.EthereumKeyLength
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
@@ -76,9 +77,9 @@ object EthereumTransactionDiff {
   private def checkLeadingZeros(tx: EthereumTransaction, blockchain: Blockchain): TracedResult[ValidationError, Unit] = {
     TracedResult(
       Either.cond(
-        !tx.sender.arr.headOption.contains(0.toByte) || blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements),
+        !(tx.signerKeyBigInt().toByteArray.length < EthereumKeyLength) || blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements),
         (),
-        GenericError("Sender public key with leading zero byte is not allowed")
+        GenericError("Invalid public key")
       )
     )
   }

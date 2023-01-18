@@ -58,24 +58,18 @@ object EthOrders extends App {
 
   def recoverEthSignerKey(order: Order, signature: Array[Byte]): PublicKey = {
     val bytes = hashOrderStruct(order)
-    recoverEthSignerKey(bytes, signature)
-  }
 
-  def recoverEthSignerKey(message: Array[Byte], signature: Array[Byte]): PublicKey = {
-    val signatureData = EthOrders.decodeSignature(signature)
-    val v             = BigInt(1, signatureData.getV)
-    val recId         = if (v == 0 || v == 1) v else if (v > 28) v - AddressScheme.current.chainId * 2 - 35 else v - 27
     val signerKey = org.web3j.utils.Numeric.toBytesPadded(
-      Sign
-        .recoverFromSignature(
-          recId.intValue,
-          new ECDSASignature(new BigInteger(1, signatureData.getR), new BigInteger(1, signatureData.getS)),
-          message
-        ),
+      recoverEthSignerKeyBigInt(bytes, signature),
       EthereumKeyLength
     )
 
     PublicKey(ByteStr(signerKey))
+  }
+
+  def recoverEthSignerKeyBigInt(order: Order, signature: Array[Byte]): BigInteger = {
+    val bytes = hashOrderStruct(order)
+    recoverEthSignerKeyBigInt(bytes, signature)
   }
 
   def signOrder(order: Order, key: ECKeyPair): Array[Byte] = {
@@ -181,4 +175,16 @@ object EthOrders extends App {
        |  "message": {}
        |}
        |""".stripMargin
+
+  private def recoverEthSignerKeyBigInt(message: Array[Byte], signature: Array[Byte]): BigInteger = {
+    val signatureData = EthOrders.decodeSignature(signature)
+    val v             = BigInt(1, signatureData.getV)
+    val recId         = if (v == 0 || v == 1) v else if (v > 28) v - AddressScheme.current.chainId * 2 - 35 else v - 27
+    Sign
+      .recoverFromSignature(
+        recId.intValue,
+        new ECDSASignature(new BigInteger(1, signatureData.getR), new BigInteger(1, signatureData.getS)),
+        message
+      )
+  }
 }
