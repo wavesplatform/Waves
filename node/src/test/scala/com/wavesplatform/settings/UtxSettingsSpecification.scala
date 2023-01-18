@@ -18,6 +18,7 @@ class UtxSettingsSpecification extends FlatSpec {
         |    allow-transactions-from-smart-accounts = false
         |    allow-skip-checks = false
         |    force-validate-in-cleanup = false
+        |    always-unlimited-execution = true
         |  }
         |}""".stripMargin).resolve()
 
@@ -31,5 +32,6 @@ class UtxSettingsSpecification extends FlatSpec {
     settings.allowTransactionsFromSmartAccounts shouldBe false
     settings.allowSkipChecks shouldBe false
     settings.forceValidateInCleanup shouldBe false
+    settings.alwaysUnlimitedExecution shouldBe true
   }
 }

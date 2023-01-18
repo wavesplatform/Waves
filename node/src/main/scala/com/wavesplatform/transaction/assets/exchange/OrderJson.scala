@@ -114,7 +114,20 @@ object OrderJson {
         )
     }
 
-    Order(version, senderCredentials, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, priceMode)
+    Order(
+      version,
+      senderCredentials,
+      matcher,
+      assetPair,
+      orderType,
+      amount,
+      price,
+      timestamp,
+      expiration,
+      matcherFee,
+      matcherFeeAssetId,
+      priceMode
+    )
   }
 
   private val assetReads: Reads[Asset] = {
@@ -198,7 +211,6 @@ object OrderJson {
         .map(_.map(EthEncoding.toBytes)) and
       (JsPath \ "priceMode")
         .readWithDefault[OrderPriceMode](OrderPriceMode.Default)
-
     r(readOrderV3V4 _)
   }
 
