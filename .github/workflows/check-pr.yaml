@@ -28,6 +28,7 @@ jobs:
       - name: Check PR
         env:
           DUCKS_GITHUB_TOKEN: ${{ secrets.DUCKS_GITHUB_TOKEN }}
+          SWOPFI_GITLAB_TOKEN: ${{ secrets.SWOPFI_GITLAB_TOKEN }}
         run: |
           sbt --mem 6144 --batch checkPR
           find ~/.cache/coursier -type d -name '*SNAPSHOT' | xargs rm -vrf {} \;
