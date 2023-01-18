@@ -209,8 +209,8 @@ checkPRRaw := Def
       (`repl-js` / Compile / fastOptJS).value
       (`node-it` / Test / compile).value
       (benchmark / Test / compile).value
-      compileExternalSources.value
-    }
+    },
+    compileExternalSources
   )
   .value
 
