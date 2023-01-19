@@ -40,7 +40,7 @@ object BlockInfoByHeight extends JsTestBase {
         val precondition = new GeneratorContractsForBuiltInFunctions("BlockInfo", version)
         val script = precondition.onlyMatcherContract(
           randomAliasDataArrayElement,
-          blockInfoByHeightArgBeforeFunc
+          blockInfoByHeight
         )
         assertCompileErrorDApp(script, version, testData.nonMatchingTypes("Int"))
       }

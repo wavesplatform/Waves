@@ -42,7 +42,7 @@ object AssetInfo extends JsTestBase {
         val precondition = new GeneratorContractsForBuiltInFunctions("Asset", version)
         val script = precondition.onlyMatcherContract(
           randomAliasDataArrayElement,
-          assetInfoArgBeforeFunc
+          assetInfo
         )
         assertCompileErrorDApp(script, version, testData.nonMatchingTypes("ByteVector"))
       }

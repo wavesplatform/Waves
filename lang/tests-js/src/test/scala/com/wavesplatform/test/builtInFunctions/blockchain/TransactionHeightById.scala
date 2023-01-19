@@ -41,7 +41,7 @@ object TransactionHeightById extends JsTestBase {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.onlyMatcherContract(
           randomDigestAlgorithmTypeArrayElement,
-          transactionHeightByIdArgBeforeFunc
+          transactionHeightById
         )
         assertCompileErrorDApp(script, version, testData.nonMatchingTypes("ByteVector"))
       }

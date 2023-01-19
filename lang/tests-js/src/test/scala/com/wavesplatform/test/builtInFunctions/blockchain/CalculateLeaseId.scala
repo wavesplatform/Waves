@@ -88,7 +88,7 @@ object CalculateLeaseId extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: function calculateLeaseId for V5 and more Non-matching types") {
+    test.apply("compilation error: function calculateLeaseId for V5 and more requires 1 argument") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeForCalculateLeaseId(

@@ -40,7 +40,7 @@ object TransferTransactionById extends JsTestBase {
         val precondition = new GeneratorContractsForBuiltInFunctions("Unit", version)
         val script = precondition.onlyMatcherContract(
           randomDigestAlgorithmTypeArrayElement,
-          transferTransactionByIdArgBeforeFunc
+          transferTransactionById
         )
         assertCompileErrorDApp(script, version, testData.nonMatchingTypes("ByteVector"))
       }

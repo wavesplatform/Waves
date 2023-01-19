@@ -3,6 +3,7 @@ package com.wavesplatform.test.builtInFunctions.blockchain
 import com.wavesplatform.JsTestBase
 import testHelpers.GeneratorContractsForBuiltInFunctions
 import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomByteVectorArrayElement, randomUnionArrayElement}
+import testHelpers.TestDataConstantsAndMethods.thisVariable
 import utest.{Tests, test}
 
 object AssetBalance extends JsTestBase {
@@ -20,6 +21,19 @@ object AssetBalance extends JsTestBase {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeWithoutMatcher(
           address,
+          assetBalance,
+          testData.rideV3Result,
+          testData.GreaterV3ResultIntegerEntry
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function AssetBalance compiles for 'this'") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
+        val script = precondition.codeWithoutMatcher(
+          thisVariable,
           assetBalance,
           testData.rideV3Result,
           testData.GreaterV3ResultIntegerEntry
@@ -46,6 +60,19 @@ object AssetBalance extends JsTestBase {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeWithoutMatcher(
           address,
+          assetBalanceArgBeforeFunc,
+          testData.rideV3Result,
+          testData.GreaterV3ResultIntegerEntry
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function AssetBalance (argument before function) compiles for 'this'") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
+        val script = precondition.codeWithoutMatcher(
+          thisVariable,
           assetBalanceArgBeforeFunc,
           testData.rideV3Result,
           testData.GreaterV3ResultIntegerEntry

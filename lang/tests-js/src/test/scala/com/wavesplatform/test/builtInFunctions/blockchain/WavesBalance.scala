@@ -4,6 +4,7 @@ import com.wavesplatform.JsTestBase
 import com.wavesplatform.lang.directives.values.V3
 import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomDigestAlgorithmTypeArrayElement, randomInt}
 import testHelpers.GeneratorContractsForBuiltInFunctions
+import testHelpers.TestDataConstantsAndMethods.thisVariable
 import utest.{Tests, test}
 
 object WavesBalance extends JsTestBase {
@@ -29,6 +30,28 @@ object WavesBalance extends JsTestBase {
         val precondition = new GeneratorContractsForBuiltInFunctions("BalanceDetails", version)
         val script = precondition.onlyMatcherContract(
           randomAddressDataArrayElement,
+          wavesBalanceArgBeforeFunc
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function wavesBalance for version V4 and more compiles for 'this'") {
+      for (version <- testData.actualVersionsWithoutV3) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("BalanceDetails", version)
+        val script = precondition.onlyMatcherContract(
+          thisVariable,
+          wavesBalance
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function wavesBalance for version V4 and more (argument before function) compiles for 'this'") {
+      for (version <- testData.actualVersionsWithoutV3) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("BalanceDetails", version)
+        val script = precondition.onlyMatcherContract(
+          thisVariable,
           wavesBalanceArgBeforeFunc
         )
         assertCompileSuccessDApp(script, version)
@@ -62,7 +85,7 @@ object WavesBalance extends JsTestBase {
         val precondition = new GeneratorContractsForBuiltInFunctions("BalanceDetails", version)
         val script = precondition.onlyMatcherContract(
           randomDigestAlgorithmTypeArrayElement,
-          wavesBalanceArgBeforeFunc
+          wavesBalance
         )
         assertCompileErrorDApp(script, version, testData.nonMatchingTypes("Address|Alias"))
       }
@@ -108,6 +131,24 @@ object WavesBalance extends JsTestBase {
       assertCompileSuccessDApp(script, V3)
     }
 
+    test.apply("check: function wavesBalance for V3 compiles for 'this'") {
+      val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
+      val script = precondition.onlyMatcherContract(
+        thisVariable,
+        wavesBalance
+      )
+      assertCompileSuccessDApp(script, V3)
+    }
+
+    test.apply("check: function wavesBalance for V3 (argument before function) compiles for 'this'") {
+      val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
+      val script = precondition.onlyMatcherContract(
+        thisVariable,
+        wavesBalanceArgBeforeFunc
+      )
+      assertCompileSuccessDApp(script, V3)
+    }
+
     test.apply("check: function wavesBalance for V3 compiles for alias") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
       val script = precondition.onlyMatcherContract(
@@ -130,7 +171,7 @@ object WavesBalance extends JsTestBase {
       val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
       val script = precondition.onlyMatcherContract(
         randomDigestAlgorithmTypeArrayElement,
-        wavesBalanceArgBeforeFunc
+        wavesBalance
       )
       assertCompileErrorDApp(script, V3, testData.nonMatchingTypes("Address|Alias"))
     }

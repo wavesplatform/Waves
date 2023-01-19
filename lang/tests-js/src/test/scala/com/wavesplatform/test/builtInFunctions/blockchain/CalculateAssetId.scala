@@ -56,7 +56,7 @@ object CalculateAssetId extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: function calculateAssetId for V4 and more Non-matching types") {
+    test.apply("compilation error: function calculateAssetId for V4 and more requires 1 argument") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeForCalculateAssetId(

@@ -1,14 +1,9 @@
 package com.wavesplatform.test.builtInFunctions.blockchain
 
 import com.wavesplatform.JsTestBase
-import testHelpers.RandomDataGenerator.{
-  randomAddressDataArrayElement,
-  randomAliasDataArrayElement,
-  randomDigestAlgorithmTypeArrayElement,
-  randomIssuesArrayElement,
-  randomStringArrayElement
-}
+import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomDigestAlgorithmTypeArrayElement, randomIssuesArrayElement, randomStringArrayElement}
 import testHelpers.GeneratorContractsForBuiltInFunctions
+import testHelpers.TestDataConstantsAndMethods.thisVariable
 import utest.{Tests, test}
 
 object ScriptHash extends JsTestBase {
@@ -36,6 +31,32 @@ object ScriptHash extends JsTestBase {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
           randomAddressDataArrayElement,
+          scriptHashArgBeforeFunc,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBinaryEntry
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function scriptHash for V5 and more compiles for 'this'") {
+      for (version <- testData.versionsSupportingTheNewFeatures) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
+        val script = precondition.codeFromMatchingAndCase(
+          thisVariable,
+          scriptHash,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBinaryEntry
+        )
+        assertCompileSuccessDApp(script, version)
+      }
+    }
+
+    test.apply("check: function scriptHash for V5 and more (argument before function) compiles for 'this'") {
+      for (version <- testData.versionsSupportingTheNewFeatures) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
+        val script = precondition.codeFromMatchingAndCase(
+          thisVariable,
           scriptHashArgBeforeFunc,
           testData.rideV3Result,
           testData.GreaterV3ResultBinaryEntry

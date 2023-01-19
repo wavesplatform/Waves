@@ -3,6 +3,7 @@ package com.wavesplatform.test.builtInFunctions.blockchain
 import _root_.testHelpers.GeneratorContractsForBuiltInFunctions
 import _root_.testHelpers.RandomDataGenerator.*
 import com.wavesplatform.JsTestBase
+import testHelpers.TestDataConstantsAndMethods.thisVariable
 import utest.{Tests, test}
 
 object AddressFromRecipient extends JsTestBase {
@@ -16,6 +17,18 @@ object AddressFromRecipient extends JsTestBase {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeForAddressFromRecipient(
           randomAddressDataArrayElement,
+          addressFromRecipient,
+          randomAddressDataArrayElement
+        )
+        assertCompileSuccessExpression(script, version)
+      }
+    }
+
+    test.apply("check: function addressFromRecipient compiles for 'this'") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
+        val script = precondition.codeForAddressFromRecipient(
+          thisVariable,
           addressFromRecipient,
           randomAddressDataArrayElement
         )
@@ -40,6 +53,18 @@ object AddressFromRecipient extends JsTestBase {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeForAddressFromRecipient(
           randomAddressDataArrayElement,
+          addressFromRecipientArgBeforeFunc,
+          randomAddressDataArrayElement
+        )
+        assertCompileSuccessExpression(script, version)
+      }
+    }
+
+    test.apply("check: function addressFromRecipient (argument before function) compiles for 'this'") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
+        val script = precondition.codeForAddressFromRecipient(
+          thisVariable,
           addressFromRecipientArgBeforeFunc,
           randomAddressDataArrayElement
         )
