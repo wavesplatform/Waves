@@ -36,7 +36,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     utx.putIfNew(tx, forceValidate = false).resultE should produce("reached err")
     utx.putIfNew(tx, forceValidate = true).resultE should produce("reached err")
 
-    utx.addAndCleanup(Seq(tx))
+    utx.addAndScheduleCleanup(Seq(tx))
     eventually {
       utx.size shouldBe 0
     }
@@ -50,7 +50,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     utx.putIfNew(tx, forceValidate = true).resultE should produce("reached err")
     utx.putIfNew(tx, forceValidate = false).resultE shouldBe Right(true)
 
-    utx.addAndCleanup(Nil)
+    utx.addAndScheduleCleanup(Nil)
     Thread.sleep(5000)
     utx.size shouldBe 1
 
@@ -107,7 +107,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     utx.putIfNew(tx, forceValidate = true).resultE should produce(s"Transfer error: asset '${TestValues.asset}' is not found on the blockchain")
     utx.putIfNew(tx, forceValidate = false).resultE shouldBe Right(true)
 
-    utx.addAndCleanup(Nil)
+    utx.addAndScheduleCleanup(Nil)
     Thread.sleep(5000)
     utx.size shouldBe 1
 
@@ -147,7 +147,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     utx.putIfNew(tx, forceValidate = true).resultE should produce("reached err")
     utx.putIfNew(tx, forceValidate = false).resultE shouldBe Right(true)
 
-    utx.addAndCleanup(Nil)
+    utx.addAndScheduleCleanup(Nil)
     Thread.sleep(5000)
     utx.size shouldBe 1
 
@@ -165,7 +165,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     utx.putIfNew(tx, forceValidate = false).resultE should produce("reached err")
     utx.putIfNew(tx, forceValidate = true).resultE should produce("reached err")
 
-    utx.addAndCleanup(Seq(tx))
+    utx.addAndScheduleCleanup(Seq(tx))
     eventually {
       utx.size shouldBe 0
     }
@@ -185,7 +185,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
     utx.putIfNew(tx, forceValidate = true).resultE should produce("reached err")
     utx.putIfNew(tx, forceValidate = false).resultE shouldBe Right(true)
 
-    utx.addAndCleanup(Nil)
+    utx.addAndScheduleCleanup(Nil)
     Thread.sleep(5000)
     utx.size shouldBe 1
 
@@ -227,7 +227,7 @@ class UtxFailedTxsSpec extends FlatSpec with WithDomain with Eventually {
 
     utx.size shouldBe 100
     d.appendBlock() // Height is odd
-    utx.addAndCleanup(Nil)
+    utx.addAndScheduleCleanup(Nil)
     eventually(timeout(10 seconds), interval(500 millis)) {
       utx.size shouldBe 0
       utx.all shouldBe Nil

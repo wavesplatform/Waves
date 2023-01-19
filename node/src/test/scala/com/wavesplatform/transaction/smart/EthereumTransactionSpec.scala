@@ -17,7 +17,7 @@ import com.wavesplatform.utils.{DiffMatchers, EthEncoding, EthHelpers, JsonMatch
 import com.wavesplatform.{BlockchainStubHelpers, TestValues}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, Inside}
-import org.web3j.crypto.{RawTransaction, Sign, SignedRawTransaction, TransactionEncoder}
+import org.web3j.crypto.{Bip32ECKeyPair, RawTransaction, Sign, SignedRawTransaction, TransactionEncoder}
 import play.api.libs.json.Json
 
 import scala.concurrent.duration.*
@@ -39,6 +39,17 @@ class EthereumTransactionSpec
     val senderAddress = TxHelpers.defaultSigner.toEthWavesAddress
     val transaction   = EthTxGenerator.generateEthTransfer(senderAccount, senderAddress, 1, Waves)
     transaction.senderAddress() shouldBe senderAccount.toWavesAddress
+  }
+
+  it should "recover correct key with leading zeros" in {
+    val senderAcc = Bip32ECKeyPair.create(
+      EthEncoding.toBytes("0x00db4a036ea48572bf27630c72a1513f48f0b4a6316606fd01c23318befdf984"),
+      Array.emptyByteArray
+    )
+    val tx = EthTxGenerator.generateEthTransfer(senderAcc, senderAcc.toWavesAddress, 1, Waves)
+    EthEncoding.toHexString(
+      tx.signerPublicKey().arr
+    ) shouldBe "0x00d7cf9ff594b07273228e7dd591707d38a1dba0a39492fd64445ba9cbb3bf66c862b9752f02bf8d1a0f00ccb11ae550a7616bd965c10f0101202d75580786ee"
   }
 
   it should "recover correct address chainId" in {
@@ -269,6 +280,17 @@ class EthereumTransactionSpec
     val senderAddress = TxHelpers.defaultSigner.toEthWavesAddress
     val transaction   = EthTxGenerator.generateEthInvoke(senderAccount, senderAddress, "test", Nil, Nil)
     transaction.senderAddress() shouldBe senderAccount.toWavesAddress
+  }
+
+  it should "recover correct key with leading zeros" in {
+    val senderAcc = Bip32ECKeyPair.create(
+      EthEncoding.toBytes("0x00db4a036ea48572bf27630c72a1513f48f0b4a6316606fd01c23318befdf984"),
+      Array.emptyByteArray
+    )
+    val tx = EthTxGenerator.generateEthInvoke(senderAcc, senderAcc.toWavesAddress, "test", Nil, Nil)
+    EthEncoding.toHexString(
+      tx.signerPublicKey().arr
+    ) shouldBe "0x00d7cf9ff594b07273228e7dd591707d38a1dba0a39492fd64445ba9cbb3bf66c862b9752f02bf8d1a0f00ccb11ae550a7616bd965c10f0101202d75580786ee"
   }
 
   it should "work with all types of arguments except unions" in {

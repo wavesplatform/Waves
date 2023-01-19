@@ -119,7 +119,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
 
   property("JSON format validation for InvokeScriptTransaction") {
     val dApp = KeyPair("test5".getBytes("UTF-8")).toAddress('D')
-    val js   = Json.parse(s"""{
+    val js = Json.parse(s"""{
                          "type": 16,
                          "id": "6z3CsQBFzV8Wfp1DDiXw5c75LrrwxktPPJTcXYBfTetN",
                          "sender": "3FX9SibfqAWcdnhrmFzqM1mGqya6DkVVnps",
@@ -167,7 +167,7 @@ class InvokeScriptTransactionSpecification extends PropSpec {
 
   property("JSON format validation for InvokeScriptTransaction without FUNCTION_CALL") {
     val dApp = KeyPair("test6".getBytes("UTF-8")).toAddress('D')
-    val js   = Json.parse(s"""{
+    val js = Json.parse(s"""{
                          "type": 16,
                          "id": "4sxYQWNDmWvaLwVcmfX1Znj8RfAy7JAWnSQUFgAFFixC",
                          "sender": "3FX9SibfqAWcdnhrmFzqM1mGqya6DkVVnps",

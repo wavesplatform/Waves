@@ -140,12 +140,12 @@ class WavesEnvironment(
   }
 
   override def accountWavesBalanceOf(addressOrAlias: Recipient): Either[String, Environment.BalanceDetails] = {
-    (for {
-      aoa <- addressOrAlias match {
-        case Address(bytes) => AddressOrAlias.fromBytes(bytes.arr)
-        case Alias(name)    => com.wavesplatform.account.Alias.create(name)
-      }
-      address <- blockchain.resolveAlias(aoa)
+    val addressE: Either[ValidationError, account.Address] = addressOrAlias match {
+      case Address(bytes) => account.Address.fromBytes(bytes.arr)
+      case Alias(name)    => account.Alias.create(name).flatMap(a => blockchain.resolveAlias(a))
+    }
+    for {
+      address <- addressE.leftMap(_.toString)
       portfolio = currentBlockchain().wavesPortfolio(address)
       effectiveBalance <- portfolio.effectiveBalance
     } yield Environment.BalanceDetails(
@@ -153,7 +153,7 @@ class WavesEnvironment(
       portfolio.balance,
       blockchain.generatingBalance(address),
       effectiveBalance
-    )).left.map(_.toString)
+    )
   }
 
   override def transactionHeightById(id: Array[Byte]): Option[Long] =

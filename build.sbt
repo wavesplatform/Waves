@@ -123,7 +123,7 @@ lazy val `waves-node` = (project in file("."))
 
 inScope(Global)(
   Seq(
-    scalaVersion         := "2.13.8",
+    scalaVersion         := "2.13.10",
     organization         := "com.wavesplatform",
     organizationName     := "Waves Platform",
     organizationHomepage := Some(url("https://wavesplatform.com")),
@@ -144,7 +144,6 @@ inScope(Global)(
       "-Wconf:cat=deprecation&site=com.wavesplatform.state.InvokeScriptResult.*:s"
     ),
     crossPaths := false,
-    dependencyOverrides ++= Dependencies.enforcedVersions.value,
     cancelable        := true,
     parallelExecution := true,
     /* http://www.scalatest.org/user_guide/using_the_runner

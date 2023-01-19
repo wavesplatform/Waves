@@ -98,7 +98,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with WithDB with DBCacheSettin
           }
         })
 
-        val blockAppendTask = BlockAppender(bcu, ntpTime, utxPoolStub, pos, scheduler)(lastBlock).onErrorRecoverWith { case _: SecurityException =>
+        val blockAppendTask = BlockAppender(bcu, ntpTime, utxPoolStub, pos, scheduler)(lastBlock).onErrorRecoverWith[Any] { case _: SecurityException =>
           Task.unit
         }
         Await.result(blockAppendTask.runToFuture(scheduler), Duration.Inf)

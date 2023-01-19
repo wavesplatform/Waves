@@ -97,7 +97,7 @@ class EthereumInvokeTest extends PropSpec with WithDomain with EthHelpers {
 
   private def hexData(script: Script, assets: Seq[IssuedAsset]) = {
     val signature = ABIConverter(script).funcByMethodId.collectFirst { case (_, f) if f.name == "default" => f }.get
-    val args      = new Tuple(passingArg, Array[Tuple](assets.map(a => new Tuple(a.id.arr, paymentAmount))*))
+    val args      = Tuple.of(passingArg, Array[Tuple](assets.map(a => Tuple.of(a.id.arr, paymentAmount))*))
     val call      = new Function(signature.ethSignature).encodeCall(args).array()
     FastHex.encodeToString(call, 0, call.length)
   }
