@@ -1,11 +1,12 @@
 package com.wavesplatform.state
 
 import java.nio.charset.StandardCharsets
-
 import com.wavesplatform.TestValues
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.test.FunSuite
 import com.wavesplatform.transaction.Asset.IssuedAsset
+
+import scala.collection.immutable.VectorMap
 
 class PortfolioTest extends FunSuite {
   test("pessimistic - should return only withdraws") {
@@ -19,7 +20,7 @@ class PortfolioTest extends FunSuite {
         in = 11,
         out = 12
       ),
-      assets = Map(
+      assets = VectorMap(
         fooKey -> -13,
         barKey -> 14,
         bazKey -> 0

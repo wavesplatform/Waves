@@ -1,12 +1,12 @@
 package com.wavesplatform.state
 
-import cats.Monoid
-import cats.implicits.*
 import com.wavesplatform.state.diffs.BlockDiffer.Fraction
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.*
 
-case class Portfolio(balance: Long = 0L, lease: LeaseBalance = LeaseBalance.empty, assets: Map[IssuedAsset, Long] = Map.empty) {
+import scala.collection.immutable.VectorMap
+
+case class Portfolio(balance: Long = 0L, lease: LeaseBalance = LeaseBalance.empty, assets: VectorMap[IssuedAsset, Long] = VectorMap.empty) {
   import Portfolio.*
   lazy val effectiveBalance: Either[String, Long] = safeSum(balance, lease.in, "Effective balance").map(_ - lease.out)
   lazy val spendableBalance: Long                 = balance - lease.out
@@ -33,12 +33,12 @@ object Portfolio {
     try Right(Math.addExact(a, b))
     catch { case _: ArithmeticException => Left(error) }
 
-  def combineAssets(a: Map[IssuedAsset, Long], b: Map[IssuedAsset, Long]): Either[String, Map[IssuedAsset, Long]] = {
+  def combineAssets(a: VectorMap[IssuedAsset, Long], b: VectorMap[IssuedAsset, Long]): Either[String, VectorMap[IssuedAsset, Long]] = {
     if (a.isEmpty) Right(b)
     else if (b.isEmpty) Right(a)
     else
-      b.foldLeft[Either[String, Map[IssuedAsset, Long]]](Right(a)) {
-        case (Right(seed), kv @ (asset, balance)) =>
+      b.foldLeft[Either[String, VectorMap[IssuedAsset, Long]]](Right(a)) {
+        case (Right(seed), (asset, balance)) =>
           seed.get(asset) match {
             case None =>
               Right(seed.updated(asset, balance))
@@ -51,16 +51,25 @@ object Portfolio {
       }
   }
 
+  private def unsafeCombineAssets(a: VectorMap[IssuedAsset, Long], b: VectorMap[IssuedAsset, Long]): VectorMap[IssuedAsset, Long] =
+    if (a.isEmpty) b
+    else if (b.isEmpty) a
+    else
+      b.foldLeft(a) { case (seed, (asset, balance)) =>
+        val newBalance = seed.get(asset).fold(balance)(_ + balance)
+        seed.updated(asset, newBalance)
+      }
+
   def waves(amount: Long): Portfolio = build(Waves, amount)
 
   def build(af: (Asset, Long)): Portfolio = build(af._1, af._2)
 
   def build(a: Asset, amount: Long): Portfolio = a match {
     case Waves              => Portfolio(amount)
-    case t @ IssuedAsset(_) => Portfolio(assets = Map(t -> amount))
+    case t @ IssuedAsset(_) => Portfolio(assets = VectorMap(t -> amount))
   }
 
-  def build(wavesAmount: Long, a: IssuedAsset, amount: Long): Portfolio = Portfolio(wavesAmount, assets = Map(a -> amount))
+  def build(wavesAmount: Long, a: IssuedAsset, amount: Long): Portfolio = Portfolio(wavesAmount, assets = VectorMap(a -> amount))
 
   val empty: Portfolio = Portfolio()
 
@@ -77,10 +86,10 @@ object Portfolio {
     )
 
     def multiply(f: Fraction): Portfolio =
-      Portfolio(f(self.balance), LeaseBalance.empty, self.assets.view.mapValues(f.apply).toMap)
+      Portfolio(f(self.balance), LeaseBalance.empty, self.assets.view.mapValues(f.apply).to(VectorMap))
 
     def minus(other: Portfolio): Portfolio =
-      Portfolio(self.balance - other.balance, LeaseBalance.empty, Monoid.combine(self.assets, other.assets.view.mapValues(-_).to(Map)))
+      Portfolio(self.balance - other.balance, LeaseBalance.empty, unsafeCombineAssets(self.assets, other.assets.view.mapValues(- _).to(VectorMap)))
 
     def negate: Portfolio = Portfolio.empty minus self
 
