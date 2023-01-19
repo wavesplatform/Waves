@@ -31,6 +31,9 @@ jobs:
           SWOPFI_GITLAB_TOKEN: ${{ secrets.SWOPFI_GITLAB_TOKEN }}
         run: |
           sbt --mem 6144 --batch checkPR
+          ls -la
+          git clone https://github.com/waves-exchange/neutrino-contract
+          ls -la
           find ~/.cache/coursier -type d -name '*SNAPSHOT' | xargs rm -vrf {} \;
       - uses: dorny/paths-filter@v2
         id: filter
