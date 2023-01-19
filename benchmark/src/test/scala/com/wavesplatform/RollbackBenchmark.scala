@@ -1,7 +1,6 @@
 package com.wavesplatform
 
 import java.io.File
-
 import com.google.common.primitives.Ints
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
@@ -16,6 +15,8 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.utils.{NTP, ScorexLogging}
 import monix.reactive.Observer
+
+import scala.collection.immutable.VectorMap
 
 object RollbackBenchmark extends ScorexLogging {
   def main(args: Array[String]): Unit = {
@@ -66,7 +67,7 @@ object RollbackBenchmark extends ScorexLogging {
       )
       .explicitGet()
 
-    val map = assets.map(it => IssuedAsset(it.id()) -> 1L).toMap
+    val map = assets.map(it => IssuedAsset(it.id()) -> 1L).to(VectorMap)
     val portfolios = for {
       address <- addresses
     } yield address -> Portfolio(assets = map)
@@ -85,7 +86,7 @@ object RollbackBenchmark extends ScorexLogging {
       Block
         .buildAndSign(2.toByte, time.getTimestamp(), genesisBlock.id(), 1000, Block.GenesisGenerationSignature, Seq.empty, issuer, Seq.empty, -1)
         .explicitGet()
-    val nextDiff = Diff(portfolios = addresses.map(_ -> Portfolio(1, assets = Map(IssuedAsset(assets.head.id()) -> 1L))).toMap)
+    val nextDiff = Diff(portfolios = addresses.map(_ -> Portfolio(1, assets = VectorMap(IssuedAsset(assets.head.id()) -> 1L))).toMap)
 
     log.info("Appending next block")
     levelDBWriter.append(nextDiff, 0, 0, None, ByteStr.empty, nextBlock)

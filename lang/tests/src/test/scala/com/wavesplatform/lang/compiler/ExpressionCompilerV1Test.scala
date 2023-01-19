@@ -29,6 +29,7 @@ import com.wavesplatform.test.*
 import scala.util.Try
 
 class ExpressionCompilerV1Test extends PropSpec {
+  implicit val offset: Int = 0
 
   property("should infer generic function return type") {
     import com.wavesplatform.lang.v1.parser.Expressions.*
@@ -312,7 +313,8 @@ class ExpressionCompilerV1Test extends PropSpec {
           CryptoContext.build(com.wavesplatform.lang.Global, V4).withEnvironment[Environment],
           WavesContext.build(
             Global,
-            DirectiveSet(V4, Account, Expression).explicitGet()
+            DirectiveSet(V4, Account, Expression).explicitGet(),
+            fixBigScriptField = true
           )
         )
       )

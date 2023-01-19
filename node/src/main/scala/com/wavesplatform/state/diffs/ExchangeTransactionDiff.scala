@@ -3,13 +3,15 @@ package com.wavesplatform.state.diffs
 import cats.implicits.toFoldableOps
 import cats.syntax.either.*
 import com.wavesplatform.account.Address
+import com.wavesplatform.crypto.EthereumKeyLength
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, OrderValidationError}
+import com.wavesplatform.transaction.assets.exchange.OrderAuthentication.Eip712Signature
 import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.AssetDecimals
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderPriceMode, OrderType}
+import com.wavesplatform.transaction.assets.exchange.{EthOrders, ExchangeTransaction, Order, OrderPriceMode, OrderType}
 import com.wavesplatform.transaction.{Asset, TxVersion}
 
 import java.text.{DecimalFormat, DecimalFormatSymbols}
@@ -64,6 +66,8 @@ object ExchangeTransactionDiff {
       } yield (assetsScripted, buyerScripted, sellerScripted)
 
     for {
+      _                      <- checkOrderPkRecover(tx.order1, blockchain)
+      _                      <- checkOrderPkRecover(tx.order2, blockchain)
       buyerAndSellerScripted <- smartFeaturesChecks()
       portfolios             <- getPortfolios(blockchain, tx)
       _                      <- enoughVolume(tx, blockchain)
@@ -278,4 +282,27 @@ object ExchangeTransactionDiff {
     */
   private[diffs] def getOrderFeePortfolio(order: Order, fee: Long): Portfolio =
     Portfolio.build(order.matcherFeeAssetId, fee)
+
+  private def checkOrderPkRecover(order: Order, blockchain: Blockchain): Either[GenericError, Unit] = {
+    order.orderAuthentication match {
+      case Eip712Signature(signature) =>
+        for {
+          _ <- Either.cond(
+            !(EthOrders.recoverEthSignerKeyBigInt(order, signature.arr).toByteArray.length < EthereumKeyLength) || blockchain.isFeatureActivated(
+              BlockchainFeatures.ConsensusImprovements
+            ),
+            (),
+            GenericError("Invalid public key for Ethereum orders")
+          )
+          sigData = EthOrders.decodeSignature(signature.arr)
+          v       = BigInt(1, sigData.getV)
+          _ <- Either.cond(
+            !(v == 0 || v == 1 || v > 28) || blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements),
+            (),
+            GenericError("Invalid order signature format")
+          )
+        } yield ()
+      case _ => Right(())
+    }
+  }
 }

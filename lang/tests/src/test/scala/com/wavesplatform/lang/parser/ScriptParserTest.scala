@@ -15,6 +15,7 @@ import org.scalacheck.Gen
 import org.scalatest.exceptions.TestFailedException
 
 class ScriptParserTest extends PropSpec with ScriptGenParser {
+  implicit val offset: Int = 0
 
   private def parse(x: String): EXPR = Parser.parseExpr(x) match {
     case Success(r, _) => r
@@ -346,7 +347,7 @@ class ScriptParserTest extends PropSpec with ScriptGenParser {
   List("then", "else", "true").foreach { keyword =>
     property(s"reserved keywords are invalid variable names in block: $keyword") {
       val script =
-        s"""let ${keyword.padTo(4, " ").mkString} = 1
+        s"""let ${keyword.padTo(4, ' ').mkString} = 1
            |true""".stripMargin
       parse(script) shouldBe BLOCK(
         AnyPos,

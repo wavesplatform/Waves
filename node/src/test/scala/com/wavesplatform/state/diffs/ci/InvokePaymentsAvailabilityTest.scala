@@ -101,13 +101,13 @@ class InvokePaymentsAvailabilityTest extends PropSpec with Inside with DBCacheSe
       d.blockchain.balance(invoke.senderAddress, asset) shouldBe ENOUGH_AMT - paymentAmount
 
       val expectingProxyDAppBalance = 0
-      List(
+      List[Any](
         d.blockchain.balance(proxyDApp, asset),
         d.blockchain.accountData(proxyDApp, "balance_self").get.value
       ).foreach(_ shouldBe expectingProxyDAppBalance)
 
       val expectingCallingDAppBalance = paymentAmount
-      List(
+      List[Any](
         d.blockchain.balance(callingDApp, asset),
         d.blockchain.accountData(proxyDApp, "balance_calling_dApp").get.value
       ).foreach(_ shouldBe expectingCallingDAppBalance)
