@@ -143,7 +143,7 @@ inScope(Global)(
       "-Wconf:cat=deprecation&site=com.wavesplatform.protobuf.transaction.InvokeScriptResult.*:s", // Ignore deprecated argsBytes
       "-Wconf:cat=deprecation&site=com.wavesplatform.state.InvokeScriptResult.*:s"
     ),
-    crossPaths        := false,
+    crossPaths := false,
     cancelable        := true,
     parallelExecution := true,
     /* http://www.scalatest.org/user_guide/using_the_runner
@@ -188,29 +188,21 @@ buildTarballsForDocker := {
   IO.copyFile((`grpc-server` / Universal / packageZipTarball).value, new File(baseDirectory.value, "docker/target/waves-grpc-server.tgz"))
 }
 
-lazy val compileExternalSources = taskKey[Unit]("Compile external sources to test compiler")
-compileExternalSources := {
-  val r  = (`lang-tests` / Test / runner).value
-  val cp = (`lang-tests` / Test / fullClasspath).value.map(_.data)
-  r.run("com.wavesplatform.utils.ExternalCompiler", cp, Seq("true"), streams.value.log)
-}
-
 lazy val checkPRRaw = taskKey[Unit]("Build a project and run unit tests")
 checkPRRaw := Def
   .sequential(
-    //`waves-node` / clean,
-//    Def.task {
-//      (`lang-tests` / Test / test).value
-//      (`repl-jvm` / Test / test).value
-//      (`lang-js` / Compile / fastOptJS).value
-//      (`lang-tests-js` / Test / test).value
-//      (`grpc-server` / Test / test).value
-//      (node / Test / test).value
-//      (`repl-js` / Compile / fastOptJS).value
-//      (`node-it` / Test / compile).value
-//      (benchmark / Test / compile).value
-//    },
-    compileExternalSources
+    `waves-node` / clean,
+    Def.task {
+      (`lang-tests` / Test / test).value
+      (`repl-jvm` / Test / test).value
+      (`lang-js` / Compile / fastOptJS).value
+      (`lang-tests-js` / Test / test).value
+      (`grpc-server` / Test / test).value
+      (node / Test / test).value
+      (`repl-js` / Compile / fastOptJS).value
+      (`node-it` / Test / compile).value
+      (benchmark / Test / compile).value
+    }
   )
   .value
 
