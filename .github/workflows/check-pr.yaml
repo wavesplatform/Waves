@@ -31,9 +31,11 @@ jobs:
           git clone https://github.com/waves-exchange/neutrino-contract
           git clone https://github.com/waves-exchange/contracts
           git clone https://oauth2:${{ secrets.DUCKS_GITHUB_TOKEN }}@github.com/akharazyan/wavesducks-public
-          find neutrino-contract/script -name "*.ride" -type f -exec java -jar lang/tests/target/file-compiler.jar {} +;     
-          find contracts/ride           -name "*.ride" -type f -exec java -jar lang/tests/target/file-compiler.jar {} +;     
-          find wavesducks-public/ride   -name "*.ride" -type f -exec java -jar lang/tests/target/file-compiler.jar {} +;     
+          git clone https://oauth2:${{ secrets.SWOPFI_GITLAB_TOKEN }}@gitlabwp.wvservices.com/swopfi/swopfi-smart-contracts
+          find neutrino-contract/script     -name "*.ride" -type f -exec java -jar lang/tests/target/file-compiler.jar {} +;     
+          find contracts/ride               -name "*.ride" -type f -exec java -jar lang/tests/target/file-compiler.jar {} +;     
+          find wavesducks-public/ride       -name "*.ride" -type f -exec java -jar lang/tests/target/file-compiler.jar {} +;     
+          find swopfi-smart-contracts/dApps -name "*.ride" -type f -exec java -jar lang/tests/target/file-compiler.jar {} +;     
           find ~/.cache/coursier -type d -name '*SNAPSHOT' | xargs rm -vrf {} \;
       - uses: dorny/paths-filter@v2
         id: filter
