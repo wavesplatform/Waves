@@ -85,7 +85,7 @@ object UtilsEvaluator {
         currentDiff = Diff.empty,
         invocationRoot = DAppEnvironment.InvocationTreeTracker(DAppEnvironment.DAppInvocation(address, null, Nil))
       )
-      ctx  = BlockchainContext.build(ds, environment, fixUnicodeFunctions = true, useNewPowPrecision = true)
+      ctx  = BlockchainContext.build(ds, environment, fixUnicodeFunctions = true, useNewPowPrecision = true, fixBigScriptField = true)
       call = ContractEvaluator.buildSyntheticCall(ContractScriptCompactor.decompact(script.expr.asInstanceOf[DApp]), expr)
       limitedResult <- EvaluatorV2
         .applyLimitedCoeval(

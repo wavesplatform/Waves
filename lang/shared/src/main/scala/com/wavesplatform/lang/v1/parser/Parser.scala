@@ -10,18 +10,23 @@ import com.wavesplatform.lang.v1.parser.BinaryOperation.*
 import com.wavesplatform.lang.v1.parser.Expressions.*
 import com.wavesplatform.lang.v1.parser.Expressions.PART.VALID
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
+import com.wavesplatform.lang.v1.parser.Parser.*
 import com.wavesplatform.lang.v1.parser.UnaryOperation.*
 import com.wavesplatform.lang.v1.{ContractLimits, compiler}
 import fastparse.*
 import fastparse.MultiLineWhitespace.*
 import fastparse.Parsed.Failure
 
-object Parser {
+import scala.annotation.tailrec
+
+class Parser(implicit offset: Int) {
 
   private val Global                                        = com.wavesplatform.lang.hacks.Global // Hack for IDEA
   implicit def hack(p: fastparse.P[Any]): fastparse.P[Unit] = p.map(_ => ())
 
-  def keywords                 = Set("let", "strict", "base58", "base64", "true", "false", "if", "then", "else", "match", "case", "func")
+  val keywords = Set("let", "strict", "base58", "base64", "true", "false", "if", "then", "else", "match", "case", "func")
+  val exclude  = Set('(', ')', ':', ']', '[', '=', ',', ';')
+
   def lowerChar[A: P]          = CharIn("a-z")
   def upperChar[A: P]          = CharIn("A-Z")
   def nonLatinChar[A: P]       = (CharPred(_.isLetter) ~~/ Fail).opaque("only latin charset for definitions")
@@ -99,7 +104,6 @@ object Parser {
       .map { case (start, x, end) => PART.VALID(Pos(start, end), x) }
 
   def declNameP[A: P](check: Boolean = false): P[Unit] = {
-    val exclude           = Set('(', ')', ':', ']', '[', '=')
     def symbolsForError   = CharPred(c => !c.isWhitespace && !exclude.contains(c))
     def checkedUnderscore = ("_" ~~/ !"_".repX(1)).opaque("not more than 1 underscore in a row")
 
@@ -226,19 +230,6 @@ object Parser {
       byteVectorP | stringP | numberP | trueP | falseP | list |
       functionCallOrRef
   )
-
-  sealed trait Accessor
-  case class Method(name: PART[String], args: Seq[EXPR])     extends Accessor
-  case class Getter(name: PART[String])                      extends Accessor
-  case class ListIndex(index: EXPR)                          extends Accessor
-  case class GenericMethod(name: PART[String], `type`: Type) extends Accessor
-
-  object GenericMethod {
-    val ExactAs = "exactAs"
-    val As      = "as"
-
-    val KnownMethods: Set[String] = Set(ExactAs, As)
-  }
 
   def singleTypeP[A: P]: P[Single] = (anyVarName() ~~ ("[" ~~ Index ~ unionTypeP ~ Index ~~/ "]").?).map { case (t, param) =>
     Single(t, param.map { case (start, param, end) => VALID(Pos(start, end), param) })
@@ -555,7 +546,7 @@ object Parser {
         def newLines[A: P]                         = CharIn("\n\r").repX(1)
         val parser = P(Index ~~ operand ~~ P(!(newLines ~~ spacesOpt ~~ numberP) ~ operator ~ (NoCut(operand) | error)).rep)
         parser.map { case (start, left: EXPR, r: Seq[(BinaryOperation, EXPR)]) =>
-          r.foldLeft(left) { case (acc, (currKind, currOperand)) => currKind.expr(start, currOperand.position.end, acc, currOperand) }
+          r.foldLeft(left) { case (acc, (currKind, currOperand)) => currKind.expr(start, currOperand.position.end + offset, acc, currOperand) }
         }
       case Right(kinds) :: restOps =>
         def operand(implicit c: fastparse.P[Any]) = binaryOp(atom(_), restOps)
@@ -574,7 +565,7 @@ object Parser {
         P(Index ~~ operand ~ P(kind ~ (NoCut(operand) | Index.map(i => INVALID(Pos(i, i), "expected a second operator")))).rep).map {
           case (start, left: EXPR, r: Seq[(BinaryOperation, EXPR)]) =>
             val (ops, s) = revp(left, r)
-            ops.foldLeft(s) { case (acc, (currOperand, currKind)) => currKind.expr(start, currOperand.position.end, currOperand, acc) }
+            ops.foldLeft(s) { case (acc, (currOperand, currKind)) => currKind.expr(start, currOperand.position.end + offset, currOperand, acc) }
         }
     }
   }
@@ -631,8 +622,9 @@ object Parser {
       }
 
     parseWithError[SCRIPT](
-      scriptStr,
-      parse
+      new StringBuilder(scriptStr),
+      parse,
+      SCRIPT(Pos(0, scriptStr.length - 1), INVALID(Pos(0, scriptStr.length - 1), "Parsing failed. Unknown error."))
     ).map { exprAndErrorIndexes =>
       val removedCharPosOpt = if (exprAndErrorIndexes._2.isEmpty) None else Some(Pos(exprAndErrorIndexes._2.min, exprAndErrorIndexes._2.max))
       (exprAndErrorIndexes._1, removedCharPosOpt)
@@ -647,8 +639,9 @@ object Parser {
       }
 
     parseWithError[DAPP](
-      scriptStr,
-      parse
+      new StringBuilder(scriptStr),
+      parse,
+      DAPP(Pos(0, scriptStr.length - 1), Nil, Nil)
     ).map { dAppAndErrorIndexes =>
       val removedCharPosOpt = if (dAppAndErrorIndexes._2.isEmpty) None else Some(Pos(dAppAndErrorIndexes._2.min, dAppAndErrorIndexes._2.max))
       (dAppAndErrorIndexes._1, removedCharPosOpt)
@@ -656,27 +649,52 @@ object Parser {
   }
 
   private def parseWithError[T](
-      source: String,
-      parse: String => Either[Parsed.Failure, T]
+      source: StringBuilder,
+      parse: String => Either[Parsed.Failure, T],
+      defaultResult: T
   ): Either[(String, Int, Int), (T, Iterable[Int])] =
-    parse(source)
-      .map(dApp => (dApp, Nil))
-      .leftMap(errorWithPosition(source, _))
+    parse(source.toString())
+      .map((_, Nil))
+      .leftFlatMap {
+        case failure: Parsed.Failure =>
+          val lastRemovedCharPos = clearChar(source, failure.index - 1)
+          val baseErrorIndexes   = Set(failure.index, lastRemovedCharPos)
+          if (lastRemovedCharPos > 0)
+            parseWithError(source, parse, defaultResult)
+              .map { case (parsed, errorIndexes) => (parsed, baseErrorIndexes ++ errorIndexes) }
+          else
+            Right((defaultResult, baseErrorIndexes))
+        case _ =>
+          Left(("Unknown parsing error.", 0, 0))
+      }
+
+  @tailrec
+  private def clearChar(source: StringBuilder, pos: Int): Int =
+    if (pos >= 0)
+      if (" \n\r".contains(source.charAt(pos)))
+        clearChar(source, pos - 1)
+      else {
+        source.setCharAt(pos, ' ')
+        pos
+      }
+    else
+      0
 
   private val moveRightKeywords =
     Seq(""""func"""", """"let"""", " expression", "1 underscore", "end-of-input", "latin charset", "definition")
 
   private def errorPosition(input: String, f: Failure): (Int, Int) =
     if (moveRightKeywords.exists(f.label.contains)) {
-      val end = input.indexWhere(_.isWhitespace, f.index)
-      (f.index, if (end == -1) f.index else end)
+      val lastSpace = input.indexWhere(_.isWhitespace, f.index)
+      val end       = if (lastSpace == -1) f.index else lastSpace
+      (f.index - offset, end - offset)
     } else {
       val start =
         if (input(f.index - 1).isWhitespace)
           input.lastIndexWhere(!_.isWhitespace, f.index - 1)
         else
           input.lastIndexWhere(_.isWhitespace, f.index - 1) + 1
-      (start, f.index)
+      (start - offset, f.index - offset)
     }
 
   private def errorWithPosition(input: String, f: Failure): (String, Int, Int) = {
@@ -691,4 +709,30 @@ object Parser {
 
   def toString(input: String, f: Failure): String =
     errorWithPosition(input, f)._1
+}
+
+object Parser {
+  private val defaultParser                       = new Parser()(0)
+  def parseExpr(str: String): Parsed[EXPR]        = defaultParser.parseExpr(str)
+  def parseReplExpr(str: String): Parsed[EXPR]    = defaultParser.parseReplExpr(str)
+  def parseContract(str: String): Parsed[DAPP]    = defaultParser.parseContract(str)
+  def toString(input: String, f: Failure): String = defaultParser.toString(input, f)
+  def parseExpressionWithErrorRecovery(str: String): Either[(String, Int, Int), (SCRIPT, Option[Pos])] =
+    defaultParser.parseExpressionWithErrorRecovery(str)
+  def parseDAPPWithErrorRecovery(str: String): Either[(String, Int, Int), (DAPP, Option[Pos])] =
+    defaultParser.parseDAPPWithErrorRecovery(str)
+
+  sealed trait Accessor
+  case class Method(name: PART[String], args: Seq[EXPR])     extends Accessor
+  case class Getter(name: PART[String])                      extends Accessor
+  case class ListIndex(index: EXPR)                          extends Accessor
+  case class GenericMethod(name: PART[String], `type`: Type) extends Accessor
+
+  object GenericMethod {
+    val ExactAs                   = "exactAs"
+    val As                        = "as"
+    val KnownMethods: Set[String] = Set(ExactAs, As)
+  }
+
+  val keywords = Set("let", "strict", "base58", "base64", "true", "false", "if", "then", "else", "match", "case", "func")
 }

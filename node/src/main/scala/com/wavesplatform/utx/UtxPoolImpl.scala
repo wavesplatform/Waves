@@ -1,8 +1,5 @@
 package com.wavesplatform.utx
 
-import java.time.Duration
-import java.time.temporal.ChronoUnit
-import java.util.concurrent.ConcurrentHashMap
 import com.wavesplatform.ResponsivenessLogs
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
@@ -33,12 +30,15 @@ import monix.execution.atomic.AtomicBoolean
 import monix.execution.schedulers.SchedulerService
 import org.slf4j.LoggerFactory
 
+import java.time.Duration
+import java.time.temporal.ChronoUnit
+import java.util.concurrent.ConcurrentHashMap
 import scala.annotation.tailrec
 import scala.jdk.CollectionConverters.*
 import scala.util.{Left, Right}
 
 //noinspection ScalaStyle
-class UtxPoolImpl(
+case class UtxPoolImpl(
     time: Time,
     blockchain: Blockchain,
     utxSettings: UtxSettings,
@@ -204,7 +204,13 @@ class UtxPoolImpl(
             tx
           )
         else
-          TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), verify, enableExecutionLog = true)(
+          TransactionDiffer.limitedExecution(
+            blockchain.lastBlockTimestamp,
+            time.correctedTime(),
+            utxSettings.alwaysUnlimitedExecution,
+            verify,
+            enableExecutionLog = true
+          )(
             priorityPool.compositeBlockchain,
             tx
           )
@@ -277,7 +283,12 @@ class UtxPoolImpl(
               _
             )
           } else {
-            TransactionDiffer.limitedExecution(blockchain.lastBlockTimestamp, time.correctedTime(), enableExecutionLog = true)(
+            TransactionDiffer.limitedExecution(
+              blockchain.lastBlockTimestamp,
+              time.correctedTime(),
+              utxSettings.alwaysUnlimitedExecution,
+              enableExecutionLog = true
+            )(
               priorityPool.compositeBlockchain,
               _
             )

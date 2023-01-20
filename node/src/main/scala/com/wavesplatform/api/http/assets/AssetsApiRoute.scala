@@ -33,7 +33,6 @@ import com.wavesplatform.transaction.{EthereumTransaction, TransactionFactory, T
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.assets.exchange.OrderJson.*
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet

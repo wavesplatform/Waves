@@ -1,6 +1,5 @@
 package com.wavesplatform.state
 
-import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 import cats.syntax.either.*
 import cats.syntax.option.*
 import com.wavesplatform.account.{Address, Alias}
@@ -11,6 +10,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.RocksDBWriter
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.BlockchainFeatures.ConsensusImprovements
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.{TxsInBlockchainStats, *}
 import com.wavesplatform.mining.{Miner, MiningConstraint, MiningConstraints}
@@ -26,6 +26,8 @@ import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceSt
 import kamon.Kamon
 import monix.reactive.subjects.ReplaySubject
 import monix.reactive.{Observable, Observer}
+
+import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
 class BlockchainUpdaterImpl(
     rocksdb: RocksDBWriter,
@@ -151,34 +153,37 @@ class BlockchainUpdaterImpl(
     val settings   = this.settings.rewardsSettings
     val nextHeight = this.height + 1
 
-    rocksdb
-      .featureActivationHeight(BlockchainFeatures.BlockReward.id)
-      .filter(_ <= nextHeight)
-      .flatMap { activatedAt =>
-        val mayBeReward     = lastBlockReward
-        val mayBeTimeToVote = nextHeight - activatedAt
+    if (height == 0 && rocksdb.featureActivationHeight(ConsensusImprovements.id).exists(_ <= 1))
+      None
+    else
+      rocksdb
+        .featureActivationHeight(BlockchainFeatures.BlockReward.id)
+        .filter(_ <= nextHeight)
+        .flatMap { activatedAt =>
+          val mayBeReward     = lastBlockReward
+          val mayBeTimeToVote = nextHeight - activatedAt
 
-        mayBeReward match {
-          case Some(reward) if mayBeTimeToVote > 0 && mayBeTimeToVote % settings.term == 0 =>
-            Some((blockRewardVotes(this.height).filter(_ >= 0), reward))
-          case None if mayBeTimeToVote >= 0 =>
-            Some((Seq(), settings.initial))
-          case _ => None
+          mayBeReward match {
+            case Some(reward) if mayBeTimeToVote > 0 && mayBeTimeToVote % settings.term == 0 =>
+              Some((blockRewardVotes(this.height).filter(_ >= 0), reward))
+            case None if mayBeTimeToVote >= 0 =>
+              Some((Seq(), settings.initial))
+            case _ => None
+          }
         }
-      }
-      .flatMap { case (votes, currentReward) =>
-        val lt        = votes.count(_ < currentReward)
-        val gt        = votes.count(_ > currentReward)
-        val threshold = settings.votingInterval / 2 + 1
+        .flatMap { case (votes, currentReward) =>
+          val lt        = votes.count(_ < currentReward)
+          val gt        = votes.count(_ > currentReward)
+          val threshold = settings.votingInterval / 2 + 1
 
-        if (lt >= threshold)
-          Some(math.max(currentReward - settings.minIncrement, 0))
-        else if (gt >= threshold)
-          Some(currentReward + settings.minIncrement)
-        else
-          Some(currentReward)
-      }
-      .orElse(lastBlockReward)
+          if (lt >= threshold)
+            Some(math.max(currentReward - settings.minIncrement, 0))
+          else if (gt >= threshold)
+            Some(currentReward + settings.minIncrement)
+          else
+            Some(currentReward)
+        }
+        .orElse(lastBlockReward)
   }
 
   override def processBlock(

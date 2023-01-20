@@ -807,7 +807,7 @@ class DecompilerTest extends PropSpec {
     val ctx =
       Monoid.combine(
         PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment],
-        WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
+        WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet(), fixBigScriptField = true)
       )
 
     val dApp = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4).explicitGet()
@@ -869,7 +869,7 @@ class DecompilerTest extends PropSpec {
         Seq(
           PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, V4).withEnvironment[Environment],
-          WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
+          WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet(), fixBigScriptField = true)
         )
       )
 
@@ -910,7 +910,7 @@ class DecompilerTest extends PropSpec {
         Seq(
           PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, V4).withEnvironment[Environment],
-          WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet())
+          WavesContext.build(Global, DirectiveSet(V4, Account, DAppType).explicitGet(), fixBigScriptField = true)
         )
       )
 
@@ -942,7 +942,7 @@ class DecompilerTest extends PropSpec {
         Seq(
           PureContext.build(V5, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, V5).withEnvironment[Environment],
-          WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
+          WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet(), fixBigScriptField = true)
         )
       )
 
@@ -976,7 +976,7 @@ class DecompilerTest extends PropSpec {
         Seq(
           PureContext.build(V5, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, V5).withEnvironment[Environment],
-          WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
+          WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet(), fixBigScriptField = true)
         )
       )
 
@@ -1021,7 +1021,7 @@ class DecompilerTest extends PropSpec {
         Seq(
           PureContext.build(V5, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, V5).withEnvironment[Environment],
-          WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet())
+          WavesContext.build(Global, DirectiveSet(V5, Account, DAppType).explicitGet(), fixBigScriptField = true)
         )
       )
 

@@ -9,16 +9,18 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.Keys
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.BlockchainFeatures.{BlockReward, ConsensusImprovements}
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, RewardsSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.{Blockchain, Height}
+import com.wavesplatform.test.DomainPresets.{RideV6, WavesSettingsOps}
 import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{GenesisTransaction, TxHelpers}
 import org.scalacheck.Gen
 
 class BlockRewardSpec extends FreeSpec with WithDomain {
@@ -533,6 +535,36 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
       d.blockchainUpdater.height shouldBe 7
 
       d.blockchainUpdater.blockReward(7) shouldBe (7 * Constants.UnitsInWave).some
+    }
+  }
+
+  s"Reward for genesis block should be 0 after activation of $ConsensusImprovements" in {
+    withDomain(RideV6.setFeaturesHeight(BlockReward -> 0, ConsensusImprovements -> 999)) { d =>
+      val block = d.appendBlock(TxHelpers.genesis(TxHelpers.secondAddress))
+      d.blockchain.balance(block.sender.toAddress) shouldBe 6_0000_0000
+      d.appendBlock()
+      d.blockchain.balance(block.sender.toAddress) shouldBe 12_0000_0000
+    }
+
+    withDomain(RideV6.setFeaturesHeight(BlockReward -> 0, ConsensusImprovements -> 0)) { d =>
+      val block = d.appendBlock(TxHelpers.genesis(TxHelpers.secondAddress))
+      d.blockchain.balance(block.sender.toAddress) shouldBe 0
+      d.appendBlock()
+      d.blockchain.balance(block.sender.toAddress) shouldBe 6_0000_0000
+    }
+
+    withDomain(RideV6.setFeaturesHeight(BlockReward -> 0, ConsensusImprovements -> 1)) { d =>
+      val block = d.appendBlock(TxHelpers.genesis(TxHelpers.secondAddress))
+      d.blockchain.balance(block.sender.toAddress) shouldBe 0
+      d.appendBlock()
+      d.blockchain.balance(block.sender.toAddress) shouldBe 6_0000_0000
+    }
+
+    withDomain(RideV6.setFeaturesHeight(BlockReward -> 1, ConsensusImprovements -> 1)) { d =>
+      val block = d.appendBlock(TxHelpers.genesis(TxHelpers.secondAddress))
+      d.blockchain.balance(block.sender.toAddress) shouldBe 0
+      d.appendBlock()
+      d.blockchain.balance(block.sender.toAddress) shouldBe 6_0000_0000
     }
   }
 }

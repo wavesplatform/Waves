@@ -23,6 +23,7 @@ import com.wavesplatform.state.reader.CompositeBlockchain
 import play.api.libs.json.Json
 
 import scala.annotation.tailrec
+import scala.collection.immutable.VectorMap
 import scala.collection.mutable
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
@@ -37,7 +38,7 @@ object Explorer extends ScorexLogging {
     Portfolio(
       blockchain.balance(address),
       blockchain.leaseBalance(address),
-      db.withResource(r => AddressPortfolio.assetBalanceIterator(r, address, Diff.empty, _ => true).flatten.toMap)
+      db.withResource(r => AddressPortfolio.assetBalanceIterator(r, address, Diff.empty, _ => true).to(VectorMap))
     )
 
   def main(argsRaw: Array[String]): Unit = {

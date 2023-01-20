@@ -51,7 +51,8 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
         pureContext(version).withEnvironment[Environment],
         WavesContext.build(
           Global,
-          DirectiveSet(version, Account, Expression).explicitGet()
+          DirectiveSet(version, Account, Expression).explicitGet(),
+          fixBigScriptField = true
         )
       )
     )

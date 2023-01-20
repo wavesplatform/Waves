@@ -16,6 +16,8 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.{Asset, ERC20Address}
 
+import scala.collection.immutable.VectorMap
+
 object AssetTransactionsDiff {
   def issue(blockchain: Blockchain)(tx: IssueTransaction): Either[ValidationError, Diff] = { // TODO: unify with InvokeScript action diff?
     def requireValidUtf(): Boolean = {
@@ -45,7 +47,7 @@ object AssetTransactionsDiff {
         .flatTap(checkEstimationOverflow(blockchain, _))
         .map(script =>
           Diff(
-            portfolios = Map(tx.sender.toAddress -> Portfolio.build(-tx.fee.value, asset, tx.quantity.value)),
+            portfolios = VectorMap(tx.sender.toAddress -> Portfolio.build(-tx.fee.value, asset, tx.quantity.value)),
             issuedAssets = Map(asset -> NewAssetInfo(staticInfo, info, volumeInfo)),
             assetScripts = Map(asset -> script.map(AssetScriptInfo.tupled)),
             scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)

@@ -9,6 +9,7 @@ import fastparse.Parsed.{Failure, Success}
 import org.scalatest.exceptions.TestFailedException
 
 class ContractParserTest extends PropSpec with ScriptGenParser {
+  implicit val offset: Int = 0
 
   private def parse(x: String): DAPP = Parser.parseContract(x) match {
     case Success(r, _)      => r

@@ -44,7 +44,8 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec {
           CryptoContext.build(Global, version).withEnvironment[Environment],
           WavesContext.build(
             Global,
-            DirectiveSet(version, Account, Expression).explicitGet()
+            DirectiveSet(version, Account, Expression).explicitGet(),
+            fixBigScriptField = true
           )
         )
       )

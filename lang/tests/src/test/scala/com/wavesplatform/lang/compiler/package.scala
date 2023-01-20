@@ -39,7 +39,7 @@ package object compiler {
       .combineAll(Seq(
         PureContext.build(v, useNewPowPrecision = true).withEnvironment[Environment],
         CryptoContext.build(Global, v).withEnvironment[Environment],
-        WavesContext.build(Global, DirectiveSet(v, t, Expression).explicitGet()),
+        WavesContext.build(Global, DirectiveSet(v, t, Expression).explicitGet(), fixBigScriptField = true),
         CTX[NoContext](
           Seq(pointType, Common.pointTypeA, Common.pointTypeB, Common.pointTypeC),
           Map(

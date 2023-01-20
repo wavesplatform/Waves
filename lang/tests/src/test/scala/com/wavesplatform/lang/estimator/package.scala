@@ -17,7 +17,7 @@ import monix.eval.Coeval
 package object estimator {
   private val ctx =
     PureContext.build(V3, useNewPowPrecision = true).withEnvironment[Environment] |+|
-      WavesContext.build(Global, DirectiveSet.contractDirectiveSet)
+      WavesContext.build(Global, DirectiveSet.contractDirectiveSet, fixBigScriptField = true)
 
   private val environment = Common.emptyBlockchainEnvironment()
   private def evaluator(overhead: Boolean, expr: EXPR) =
