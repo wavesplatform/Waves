@@ -109,7 +109,7 @@ object JsApiUtils {
 
       case x: Expressions.REF =>
         val additionalDataObj = jObj("name" -> Expressions.PART.toOption[String](x.key).getOrElse("").toString)
-        js.Object.assign(commonDataObj, additionalDataObj)
+        js.Object.assign(additionalDataObj, commonDataObj)
 
       case Expressions.GETTER(_, ref, field, _, _, _) =>
         val additionalDataObj = jObj(
@@ -131,7 +131,7 @@ object JsApiUtils {
           "ifTrue"  -> serExpr(ifTrue),
           "ifFalse" -> serExpr(ifFalse)
         )
-        js.Object.assign(commonDataObj, additionalDataObj)
+        js.Object.assign(additionalDataObj, commonDataObj)
 
       case Expressions.FUNCTION_CALL(_, name, args, _, _) =>
         val additionalDataObj = jObj(
