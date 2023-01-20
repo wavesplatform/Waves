@@ -27,7 +27,6 @@ jobs:
           key: coursier-cache
       - name: Check PR
         run: |
-#          sbt --mem 6144 --batch checkPR
           sbt lang-tests/assembly
           git clone https://github.com/waves-exchange/neutrino-contract
           git clone https://github.com/waves-exchange/contracts
