@@ -13,7 +13,7 @@ object FileCompiler extends App {
       API
         .compile(script, estimator)
         .fold(
-          error => throw new RuntimeException(s"$error"),
+          error => throw new RuntimeException(s"$error while compiling $path"),
           _ => println(s"successfully compiled $path")
         )
     }
