@@ -16,6 +16,8 @@ import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.TxHelpers.{invoke, secondSigner, setScript}
 import org.scalatest.{EitherValues, Inside}
 
+import scala.collection.immutable.VectorMap
+
 class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBCacheSettings with WithDomain with EitherValues {
   import DomainPresets.*
 
@@ -82,7 +84,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
             Diff.withTransactions(
               invokeInfo(true),
               portfolios = Map(
-                invoke.senderAddress -> Portfolio(-invoke.fee.value, assets = Map(asset -> 0)),
+                invoke.senderAddress -> Portfolio(-invoke.fee.value, assets = VectorMap(asset -> 0)),
                 dAppAddress -> Portfolio.build(asset, 0),
                 miner -> Portfolio((setScriptTx.fee.value * 0.6 + invoke.fee.value * 0.4).toLong + 6.waves)
               ),

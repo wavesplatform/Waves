@@ -260,7 +260,12 @@ object Verifier extends ScorexLogging {
         }
         .getOrElse(
           stats.signatureVerification
-            .measureForType(typeId)(verifyOrderSignature(order, blockchain.isFeatureActivated(BlockchainFeatures.RideV6)).as(0))
+            .measureForType(typeId)(
+              verifyOrderSignature(
+                order,
+                blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
+              ).as(0)
+            )
         )
 
       TracedResult(verificationResult)

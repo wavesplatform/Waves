@@ -18,6 +18,8 @@ import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{ERC20Address, EthereumTransaction, GenesisTransaction, TxHelpers}
 import com.wavesplatform.utils.EthHelpers
 
+import scala.collection.immutable.VectorMap
+
 class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers {
   import DomainPresets.*
 
@@ -141,7 +143,7 @@ class EthereumTransferSmartTest extends PropSpec with WithDomain with EthHelpers
           d.liquidDiff.portfolios(recipient.toAddress) shouldBe Portfolio.build(asset, transferAmount)
           d.liquidDiff.portfolios(ethTransfer.senderAddress()) shouldBe Portfolio(
             -ethTransfer.underlying.getGasPrice.longValue(),
-            assets = Map(asset -> -transferAmount)
+            assets = VectorMap(asset -> -transferAmount)
           )
 
           d.liquidDiff.scriptsComplexity should be > 0L
