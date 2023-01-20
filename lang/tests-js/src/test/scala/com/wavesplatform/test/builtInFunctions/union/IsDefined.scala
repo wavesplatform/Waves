@@ -2,7 +2,7 @@ package com.wavesplatform.test.builtInFunctions.union
 
 import com.wavesplatform.JsTestBase
 import testHelpers.GeneratorContractsForBuiltInFunctions
-import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomDigestAlgorithmTypeArrayElement, randomInt, randomIssuesArrayElement, randomUnionArrayElement}
+import testHelpers.RandomDataGenerator.{randomDigestAlgorithmTypeArrayElement, randomInt, randomUnionArrayElement}
 import utest.{Tests, test}
 
 object IsDefined extends JsTestBase {
