@@ -3,12 +3,13 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4, V5}
-import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR.{DataEntrySize, NoLimit}
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invocation
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{converters, unit}
-import com.wavesplatform.lang.v1.traits.domain.Tx._
-import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.lang.v1.traits.domain.Tx.*
+import com.wavesplatform.lang.v1.traits.domain.*
 
 object Bindings {
 
@@ -217,7 +218,7 @@ object Bindings {
       version = version
     )
 
-  def transactionObject(tx: Tx, proofsEnabled: Boolean, version: StdLibVersion): CaseObj =
+  def transactionObject(tx: Tx, proofsEnabled: Boolean, version: StdLibVersion, fixBigScriptField: Boolean): CaseObj =
     tx match {
       case Tx.Genesis(h, amount, recipient) =>
         CaseObj(genesisTransactionType, Map("amount" -> CONST_LONG(amount)) ++ headerPart(h) + mapRecipient(recipient))
@@ -237,7 +238,7 @@ object Bindings {
               "description" -> (if (version >= V4) description.toUTF8String else description),
               "reissuable"  -> reissuable,
               "decimals"    -> decimals,
-              "script"      -> scriptOpt
+              "script"      -> mapScript(scriptOpt, fixBigScriptField)
             ),
             provenTxPart(p, proofsEnabled, version)
           )
@@ -289,11 +290,14 @@ object Bindings {
           )
         )
       case SetScript(p, scriptOpt) =>
-        CaseObj(buildSetScriptTransactionType(proofsEnabled), Map("script" -> fromOptionBV(scriptOpt)) ++ provenTxPart(p, proofsEnabled, version))
+        CaseObj(
+          buildSetScriptTransactionType(proofsEnabled),
+          Map("script" -> mapScript(scriptOpt, fixBigScriptField)) ++ provenTxPart(p, proofsEnabled, version)
+        )
       case SetAssetScript(p, assetId, scriptOpt) =>
         CaseObj(
           buildSetAssetScriptTransactionType(proofsEnabled),
-          combine(Map("script" -> fromOptionBV(scriptOpt), "assetId" -> assetId), provenTxPart(p, proofsEnabled, version))
+          combine(Map("script" -> mapScript(scriptOpt, fixBigScriptField), "assetId" -> assetId), provenTxPart(p, proofsEnabled, version))
         )
       case Sponsorship(p, assetId, minSponsoredAssetFee) =>
         sponsorshipTransactionObject(proofsEnabled, p, assetId, minSponsoredAssetFee, version)
@@ -365,6 +369,11 @@ object Bindings {
           )
         )
     }
+
+  private def mapScript(script: Option[ByteStr], fixBigScriptField: Boolean): EVALUATED = {
+    val limit = if (fixBigScriptField) NoLimit else DataEntrySize
+    script.flatMap(CONST_BYTESTR(_, limit).toOption).getOrElse(unit)
+  }
 
   private def reissueTransactionObject(
       proofsEnabled: Boolean,

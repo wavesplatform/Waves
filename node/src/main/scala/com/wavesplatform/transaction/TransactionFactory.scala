@@ -382,14 +382,19 @@ object TransactionFactory {
       )
     } yield tx
 
-  def updateAssetInfo(request: UpdateAssetInfoRequest, wallet: Wallet, signerAddress: String, time: Time): Either[ValidationError, UpdateAssetInfoTransaction] =
+  def updateAssetInfo(
+      request: UpdateAssetInfoRequest,
+      wallet: Wallet,
+      signerAddress: String,
+      time: Time
+  ): Either[ValidationError, UpdateAssetInfoTransaction] =
     for {
       sender <- request.sender match {
         case Some(sender) => wallet.findPrivateKey(sender)
-        case None => Left(GenericError("invalid.sender"))
+        case None         => Left(GenericError("invalid.sender"))
       }
       signer <- if (request.sender.contains(signerAddress)) Right(sender) else wallet.findPrivateKey(signerAddress)
-      tx <- request.copy(timestamp = request.timestamp.orElse(Some(time.getTimestamp()))).toTxFrom(sender.publicKey)
+      tx     <- request.copy(timestamp = request.timestamp.orElse(Some(time.getTimestamp()))).toTxFrom(sender.publicKey)
     } yield {
       tx.signWith(signer.privateKey)
     }
@@ -425,7 +430,7 @@ object TransactionFactory {
       try pf(TransactionType(typeId))
       catch {
         case _: NoSuchElementException => Left(UnsupportedTypeAndVersion(typeId, version))
-        case _: MatchError => Left(UnsupportedTransactionType)
+        case _: MatchError             => Left(UnsupportedTransactionType)
       }
   }
 
@@ -441,24 +446,25 @@ object TransactionFactory {
         val version = value getOrElse (1: Byte)
         val txJson  = jsv ++ Json.obj("version" -> version)
 
-        try (TransactionType(typeId): @unchecked) match {
-          case TransactionType.Transfer       => TransactionFactory.transferAsset(txJson.as[TransferRequest], wallet, signerAddress, time)
-          case TransactionType.CreateAlias    => TransactionFactory.createAlias(txJson.as[CreateAliasRequest], wallet, signerAddress, time)
-          case TransactionType.Lease          => TransactionFactory.lease(txJson.as[LeaseRequest], wallet, signerAddress, time)
-          case TransactionType.LeaseCancel    => TransactionFactory.leaseCancel(txJson.as[LeaseCancelRequest], wallet, signerAddress, time)
-          case TransactionType.Issue          => TransactionFactory.issue(txJson.as[IssueRequest], wallet, signerAddress, time)
-          case TransactionType.Reissue        => TransactionFactory.reissue(txJson.as[ReissueRequest], wallet, signerAddress, time)
-          case TransactionType.Burn           => TransactionFactory.burn(txJson.as[BurnRequest], wallet, signerAddress, time)
-          case TransactionType.MassTransfer   => TransactionFactory.massTransferAsset(txJson.as[MassTransferRequest], wallet, signerAddress, time)
-          case TransactionType.Data           => TransactionFactory.data(txJson.as[DataRequest], wallet, signerAddress, time)
-          case TransactionType.InvokeScript   => TransactionFactory.invokeScript(txJson.as[InvokeScriptRequest], wallet, signerAddress, time)
-          case TransactionType.SetScript      => TransactionFactory.setScript(txJson.as[SetScriptRequest], wallet, signerAddress, time)
-          case TransactionType.SetAssetScript => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], wallet, signerAddress, time)
-          case TransactionType.SponsorFee      => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], wallet, signerAddress, time)
-          case TransactionType.UpdateAssetInfo => TransactionFactory.updateAssetInfo(txJson.as[UpdateAssetInfoRequest], wallet, signerAddress, time)
-        } catch {
+        try
+          (TransactionType(typeId): @unchecked) match {
+            case TransactionType.Transfer        => TransactionFactory.transferAsset(txJson.as[TransferRequest], wallet, signerAddress, time)
+            case TransactionType.CreateAlias     => TransactionFactory.createAlias(txJson.as[CreateAliasRequest], wallet, signerAddress, time)
+            case TransactionType.Lease           => TransactionFactory.lease(txJson.as[LeaseRequest], wallet, signerAddress, time)
+            case TransactionType.LeaseCancel     => TransactionFactory.leaseCancel(txJson.as[LeaseCancelRequest], wallet, signerAddress, time)
+            case TransactionType.Issue           => TransactionFactory.issue(txJson.as[IssueRequest], wallet, signerAddress, time)
+            case TransactionType.Reissue         => TransactionFactory.reissue(txJson.as[ReissueRequest], wallet, signerAddress, time)
+            case TransactionType.Burn            => TransactionFactory.burn(txJson.as[BurnRequest], wallet, signerAddress, time)
+            case TransactionType.MassTransfer    => TransactionFactory.massTransferAsset(txJson.as[MassTransferRequest], wallet, signerAddress, time)
+            case TransactionType.Data            => TransactionFactory.data(txJson.as[DataRequest], wallet, signerAddress, time)
+            case TransactionType.InvokeScript    => TransactionFactory.invokeScript(txJson.as[InvokeScriptRequest], wallet, signerAddress, time)
+            case TransactionType.SetScript       => TransactionFactory.setScript(txJson.as[SetScriptRequest], wallet, signerAddress, time)
+            case TransactionType.SetAssetScript  => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], wallet, signerAddress, time)
+            case TransactionType.SponsorFee      => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], wallet, signerAddress, time)
+            case TransactionType.UpdateAssetInfo => TransactionFactory.updateAssetInfo(txJson.as[UpdateAssetInfoRequest], wallet, signerAddress, time)
+          } catch {
           case _: NoSuchElementException => Left(UnsupportedTypeAndVersion(typeId, version))
-          case _: MatchError => Left(UnsupportedTransactionType)
+          case _: MatchError             => Left(UnsupportedTransactionType)
         }
     }
   }

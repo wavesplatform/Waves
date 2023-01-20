@@ -722,7 +722,7 @@ class ContextFunctionsTest extends PropSpec with WithDomain with EthHelpers {
           val ctx =
             PureContext.build(version, useNewPowPrecision = true).withEnvironment[Environment] |+|
               CryptoContext.build(Global, version).withEnvironment[Environment] |+|
-              WavesContext.build(Global, DirectiveSet(version, Account, DApp).explicitGet())
+              WavesContext.build(Global, DirectiveSet(version, Account, DApp).explicitGet(), fixBigScriptField = true)
 
           val compiledScript = ContractScript(version, ContractCompiler(ctx.compilerContext, expr, version).explicitGet()).explicitGet()
           val setScriptTx    = TxHelpers.setScript(recipient, compiledScript)

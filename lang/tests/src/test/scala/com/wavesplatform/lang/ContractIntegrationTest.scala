@@ -28,7 +28,8 @@ class ContractIntegrationTest extends PropSpec with Inside {
       CTX[Environment](sampleTypes, Map.empty, Array.empty) |+|
       WavesContext.build(
         Global,
-        DirectiveSet(V3, Account, DApp).explicitGet()
+        DirectiveSet(V3, Account, DApp).explicitGet(),
+        fixBigScriptField = true
       )
 
   private val environment: Environment[Id] =
@@ -182,7 +183,7 @@ class ContractIntegrationTest extends PropSpec with Inside {
   def parseCompileAndVerify(script: String, tx: Tx): Either[ExecutionError, EVALUATED] = {
     val parsed   = Parser.parseContract(script).get.value
     val compiled = ContractCompiler(ctx.compilerContext, parsed, V3).explicitGet()
-    val txObject = Bindings.transactionObject(tx, proofsEnabled = true, V3)
+    val txObject = Bindings.transactionObject(tx, proofsEnabled = true, V3, fixBigScriptField = true)
     ContractEvaluator
       .verify(
         compiled.decs,
