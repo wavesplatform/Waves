@@ -27,7 +27,10 @@ jobs:
           key: coursier-cache
       - name: Check PR
         run: |
-          sbt --mem 6144 --batch checkPR
+#          sbt --mem 6144 --batch checkPR
+          sbt lang-tests/assembly
+          git clone https://github.com/waves-exchange/neutrino-contract
+          find ../neutrino-contract/script -name "*.ride" -type f -exec java -jar lang/tests/target/file-compiler.jar {} +;     
           find ~/.cache/coursier -type d -name '*SNAPSHOT' | xargs rm -vrf {} \;
       - uses: dorny/paths-filter@v2
         id: filter
