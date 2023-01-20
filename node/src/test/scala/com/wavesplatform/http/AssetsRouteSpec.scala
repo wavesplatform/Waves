@@ -569,7 +569,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
               val tx2 = issue(secondSigner, 1, name = s"NFT$i", reissuable = false)
               (i, Seq(tx1, tx2))
             }
-            d.appendBlock(txs.flatMap(_._2): _*)
+            d.appendBlock(txs.flatMap(_._2)*)
             txs.map(_._1)
           }
         Seq(defaultAddress, secondAddress).foreach { address =>

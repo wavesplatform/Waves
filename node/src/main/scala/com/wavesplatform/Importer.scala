@@ -234,7 +234,8 @@ object Importer extends ScorexLogging {
 
               val block = (if (!blockV5) Block.parseBytes(blockBytes) else parsedProtoBlock).orElse(parsedProtoBlock).get
 
-              (block +: block.transactionData)
+              val verifiedObjects: Seq[Any] = (block +: block.transactionData)
+              verifiedObjects
                 .parTraverse {
                   case tx: ProvenTransaction =>
                     Task {
