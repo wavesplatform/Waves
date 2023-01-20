@@ -2,8 +2,8 @@ package com.wavesplatform.storage
 
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.google.protobuf.ByteString
-import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.api.BlockchainApi
+import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.state.{Height, TransactionId}
 import com.wavesplatform.storage.actions.AffectedTags
@@ -52,7 +52,7 @@ class TransactionStorage[TagT](
       .mayBeValue
   }
 
-  // Got a transaction, got a rollback, same transaction on new height/failed/removed
+  // Use case: got a transaction, got a rollback, same transaction on new height
   def setHeight(pbTxId: ByteString, height: Int): AffectedTags[TagT] = {
     val txId = TransactionId(pbTxId.toByteStr)
     setHeight(txId, Height(height))
@@ -82,10 +82,4 @@ class TransactionStorage[TagT](
         values.put(txId, RemoteData.Absence)
         AffectedTags(tagsOf(txId))
     }
-
-  // Use only for known before data
-  def reload(txId: TransactionId): Unit = {
-    log.info(s"Invalidating Transactions($txId)")
-    values.invalidate(txId)
-  }
 }

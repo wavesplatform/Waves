@@ -152,6 +152,10 @@ class BlockchainProcessor(
                   r.withAffectedTags(blockchainStorage.aliases.append(h, alias, pk))
                 }
             )
+            // We have to do this, otherwise:
+            // 1. A transaction could be moved to a new block during NG process
+            // 2. We couldn't observe it, e.g. comes in a next micro block or even a block
+            // 3. So a script returns a wrong result until the next height, when we re-evaluate all scripts forcefully
             .pipe(append.transactionIds.foldLeft(_) { case (r, txId) =>
               r.withAffectedTags(blockchainStorage.transactions.setHeight(txId, h))
             })
