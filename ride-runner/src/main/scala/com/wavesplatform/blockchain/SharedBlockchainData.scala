@@ -2,13 +2,10 @@ package com.wavesplatform.blockchain
 
 import cats.syntax.option.*
 import com.wavesplatform.api.BlockchainApi
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.features.{BlockchainFeatures, ComplexityCheckPolicyProvider, EstimatorProvider}
-import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.script.Script.ComplexityInfo
+import com.wavesplatform.features.EstimatorProvider
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.ride.estimate
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state.Blockchain
 import com.wavesplatform.storage.*
 import com.wavesplatform.storage.persistent.PersistentCaches
 import com.wavesplatform.utils.ScorexLogging
@@ -21,18 +18,12 @@ class SharedBlockchainData[TagT](val settings: BlockchainSettings, persistentCac
 
   val data = new AccountDataStorage[TagT](chainId, blockchainApi, persistentCaches.accountDataEntries)
 
-  val accountScripts = new AccountScriptStorage[TagT](chainId, estimate, blockchainApi, persistentCaches.accountScripts)
-
-  // See DiffCommon.countVerifierComplexity
-  private def estimate(script: Script): Map[Int, ComplexityInfo] = {
-    val fixEstimateOfVerifier = Blockchain.isFeatureActivated(activatedFeatures, BlockchainFeatures.RideV6, height)
-
-    // !isAsset && blockchain.useReducedVerifierComplexityLimit, isAsset == false
-    val useContractVerifierLimit = ComplexityCheckPolicyProvider.useReducedVerifierComplexityLimit(activatedFeatures)
-
-    val r = Script.complexityInfo(script, estimator, fixEstimateOfVerifier, useContractVerifierLimit).explicitGet()
-    Map(estimator.version -> r)
-  }
+  val accountScripts = new AccountScriptStorage[TagT](
+    chainId,
+    script => Map(estimator.version -> estimate(height, activatedFeatures, estimator, script, isAsset = false)),
+    blockchainApi,
+    persistentCaches.accountScripts
+  )
 
   val blockHeaders = new BlockHeadersStorage(blockchainApi, persistentCaches.blockHeaders)
 
