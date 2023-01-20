@@ -23,7 +23,8 @@ class SharedBlockchainData[TagT](val settings: BlockchainSettings, persistentCac
 
   val accountScripts = new AccountScriptStorage[TagT](chainId, estimate, blockchainApi, persistentCaches.accountScripts)
 
-  // See DiffCommons.countVerifierComplexity
+  // TODO #70 Get rid of a custom complexity estimation
+  // See DiffCommon.countVerifierComplexity
   private def estimate(script: Script): Map[Int, ComplexityInfo] = {
     val fixEstimateOfVerifier = Blockchain.isFeatureActivated(activatedFeatures, BlockchainFeatures.RideV6, height)
 
@@ -32,7 +33,6 @@ class SharedBlockchainData[TagT](val settings: BlockchainSettings, persistentCac
     val useContractVerifierLimit = !isAsset && ComplexityCheckPolicyProvider.useReducedVerifierComplexityLimit(activatedFeatures)
 
     val currEstimator = estimator
-    // TODO #4 explicitGet?
     val r = Script.complexityInfo(script, currEstimator, fixEstimateOfVerifier, useContractVerifierLimit).explicitGet()
     Map(currEstimator.version -> r)
   }
