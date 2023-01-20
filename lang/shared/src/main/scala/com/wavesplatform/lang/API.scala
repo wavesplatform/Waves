@@ -97,15 +97,16 @@ object API {
         estimatorVersion,
         s"Version of estimator must be not greater than ${API.allEstimators.length}"
       )
-      directives  <- DirectiveParser(input)
-      ds          <- extractDirectives(directives)
-      linkedInput <- ScriptPreprocessor(input, libraries, ds.imports)
-      compiled    <- parseAndCompileScript(ds, linkedInput, API.allEstimators.toIndexedSeq(estimatorVer - 1), needCompaction, removeUnusedCode)
+      directives            <- DirectiveParser(input)
+      ds                    <- extractDirectives(directives)
+      (linkedInput, offset) <- ScriptPreprocessor(input, libraries, ds.imports)
+      compiled <- parseAndCompileScript(ds, linkedInput, offset, API.allEstimators.toIndexedSeq(estimatorVer - 1), needCompaction, removeUnusedCode)
     } yield compiled
 
   private def parseAndCompileScript(
       ds: DirectiveSet,
       input: String,
+      offset: Int,
       estimator: ScriptEstimator,
       needCompaction: Boolean,
       removeUnusedCode: Boolean
@@ -113,29 +114,13 @@ object API {
     val stdLibVer = ds.stdLibVersion
     ds.contentType match {
       case Expression =>
-        G.parseAndCompileExpression(
-          input,
-          utils.compilerContext(ds),
-          G.LetBlockVersions.contains(stdLibVer),
-          stdLibVer,
-          estimator
-        ).map { case (bytes, complexity, exprScript, errors) =>
-          CompileAndParseResult.Expression(bytes, complexity, exprScript, errors.toSeq)
-        }
+        parseAndCompileExpression(ds, input, offset, estimator, stdLibVer)
       case Library =>
-        G.compileDecls(
-          input,
-          utils.compilerContext(ds),
-          stdLibVer,
-          ds.scriptType,
-          estimator
-        ).map { case (bytes, expr, complexity) =>
-          CompileAndParseResult.Library(bytes, complexity, expr)
-        }
-
+        parseAndCompileExpression(ds, input + "\ntrue", offset, estimator, stdLibVer)
       case DAppType =>
         G.parseAndCompileContract(
           input,
+          offset,
           utils.compilerContext(ds),
           stdLibVer,
           estimator,
@@ -148,6 +133,24 @@ object API {
     }
   }
 
+  private def parseAndCompileExpression(
+      ds: DirectiveSet,
+      input: String,
+      offset: Int,
+      estimator: ScriptEstimator,
+      stdLibVer: StdLibVersion
+  ): Either[String, CompileAndParseResult.Expression] =
+    G.parseAndCompileExpression(
+      input,
+      offset,
+      utils.compilerContext(ds),
+      G.LetBlockVersions.contains(stdLibVer),
+      stdLibVer,
+      estimator
+    ).map { case (bytes, complexity, exprScript, errors) =>
+      CompileAndParseResult.Expression(bytes, complexity, exprScript, errors.toSeq)
+    }
+
   def compile(
       input: String,
       estimator: ScriptEstimator,
@@ -158,10 +161,10 @@ object API {
       allowFreeCall: Boolean = true
   ): Either[String, CompileResult] =
     for {
-      directives  <- DirectiveParser(input)
-      ds          <- extractDirectives(directives, defaultStdLib)
-      linkedInput <- ScriptPreprocessor(input, libraries, ds.imports)
-      compiled    <- compileScript(ds, linkedInput, estimator, needCompaction, removeUnusedCode, allowFreeCall)
+      directives       <- DirectiveParser(input)
+      ds               <- extractDirectives(directives, defaultStdLib)
+      (linkedInput, _) <- ScriptPreprocessor(input, libraries, ds.imports)
+      compiled         <- compileScript(ds, linkedInput, estimator, needCompaction, removeUnusedCode, allowFreeCall)
     } yield compiled
 
   def estimatorByVersion(version: Int): Either[String, ScriptEstimator] =

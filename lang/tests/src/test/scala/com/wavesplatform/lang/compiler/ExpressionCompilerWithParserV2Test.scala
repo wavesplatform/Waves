@@ -19,7 +19,7 @@ class ExpressionCompilerWithParserV2Test extends PropSpec {
       directives <- DirectiveParser(script)
       ds         <- Directive.extractDirectives(directives)
       ctx = utils.compilerContext(ds)
-      compResult <- ExpressionCompiler.compileWithParseResult(script, ctx, saveExprContext).leftMap(_._1)
+      compResult <- ExpressionCompiler.compileWithParseResult(script, 0, ctx, saveExprContext).leftMap(_._1)
     } yield compResult
 
     result.map(_._2.expr)

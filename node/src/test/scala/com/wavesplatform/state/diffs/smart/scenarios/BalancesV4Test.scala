@@ -115,7 +115,7 @@ class BalancesV4Test extends PropSpec with WithState {
         val directives = DirectiveSet(V4, AssetType, Expression).explicitGet()
         PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
-          WavesContext.build(Global, directives)
+          WavesContext.build(Global, directives, fixBigScriptField = true)
       }
 
       val script =
@@ -177,7 +177,7 @@ class BalancesV4Test extends PropSpec with WithState {
         val directives = DirectiveSet(V4, AssetType, Expression).explicitGet()
         PureContext.build(V4, useNewPowPrecision = true).withEnvironment[Environment] |+|
           CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
-          WavesContext.build(Global, directives)
+          WavesContext.build(Global, directives, fixBigScriptField = true)
       }
 
       val script =
