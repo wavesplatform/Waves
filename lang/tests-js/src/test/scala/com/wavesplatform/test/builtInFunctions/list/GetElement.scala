@@ -2,7 +2,7 @@ package com.wavesplatform.test.builtInFunctions.list
 
 import com.wavesplatform.JsTestBase
 import testHelpers.GeneratorContractsForBuiltInFunctions
-import testHelpers.RandomDataGenerator.{randomAliasDataArrayElement, randomInt, randomIssuesArrayElement, randomStringArrayElement}
+import testHelpers.RandomDataGenerator.{randomAliasDataArrayElement, randomInt, randomIssuesArrayElement}
 import testHelpers.TestDataConstantsAndMethods.{intList, stringList}
 import utest.{Tests, test}
 
