@@ -20,8 +20,9 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNC
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.LeaseCancel
 import com.wavesplatform.network.TransactionPublisher
-import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{Blockchain, Height, InvokeScriptResult, TxMeta}
+import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
+import com.wavesplatform.state.{Blockchain, Diff, Height, InvokeScriptResult, TxMeta}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -63,12 +64,19 @@ class TransactionsRouteSpec
   private val addressTransactions = mock[CommonTransactionsApi]
   private val utxPoolSize         = mockFunction[Int]
   private val testTime            = new TestTime
+  private val getCompositeBlockchain =
+    () => {
+      (() => blockchain.carryFee).expects().returns(0)
+      (() => blockchain.settings).expects().returns(WavesSettings.default().blockchainSettings)
+      CompositeBlockchain(blockchain, None)
+    }
 
   private val transactionsApiRoute = new TransactionsApiRoute(
     restAPISettings,
     addressTransactions,
     testWallet,
     blockchain,
+    getCompositeBlockchain,
     utxPoolSize,
     utxPoolSynchronizer,
     testTime,
@@ -126,6 +134,7 @@ class TransactionsRouteSpec
         d.commonApi.transactions,
         testWallet,
         d.blockchain,
+        () => d.blockchain.getCompositeBlockchain,
         () => 0,
         (t, _) => d.commonApi.transactions.broadcastTransaction(t),
         ntpTime,
@@ -239,7 +248,6 @@ class TransactionsRouteSpec
         forAll(addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect")) { case (address, limit) =>
           (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
           (addressTransactions.transactionsByAddress _).expects(*, *, *, None).returning(Observable.empty).once()
-          (() => blockchain.compositeBlockchain).expects().returns(blockchain)
           (() => blockchain.activatedFeatures).expects().returns(Map.empty)
           Get(routePath(s"/address/$address/limit/$limit")) ~> route ~> check {
             status shouldEqual StatusCodes.OK
@@ -251,7 +259,6 @@ class TransactionsRouteSpec
         forAll(addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect"), bytes32StrGen) { case (address, limit, txId) =>
           (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
           (addressTransactions.transactionsByAddress _).expects(*, *, *, *).returning(Observable.empty).once()
-          (() => blockchain.compositeBlockchain).expects().returns(blockchain)
           (() => blockchain.activatedFeatures).expects().returns(Map.empty)
           Get(routePath(s"/address/$address/limit/$limit?after=$txId")) ~> route ~> check {
             status shouldEqual StatusCodes.OK
@@ -264,7 +271,6 @@ class TransactionsRouteSpec
       val transaction = TxHelpers.invoke(account.toAddress)
 
       (() => blockchain.activatedFeatures).expects().returns(Map.empty).anyNumberOfTimes()
-      (() => blockchain.compositeBlockchain).expects().returns(blockchain).anyNumberOfTimes()
       (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
       (addressTransactions.transactionsByAddress _)
         .expects(account.toAddress, *, *, None)
@@ -318,7 +324,6 @@ class TransactionsRouteSpec
       (blockchain.transactionMeta _).expects(leaseCancelId).returning(Some(TxMeta(Height(1), true, 0L))).anyNumberOfTimes()
 
       (() => blockchain.activatedFeatures).expects().returning(Map.empty).anyNumberOfTimes()
-      (() => blockchain.compositeBlockchain).expects().returns(blockchain).anyNumberOfTimes()
       (addressTransactions.aliasesOfAddress _).expects(*).returning(Observable.empty).once()
       (addressTransactions.transactionsByAddress _)
         .expects(invokeAddress, *, *, None)

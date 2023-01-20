@@ -14,6 +14,7 @@ import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactio
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.*
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
@@ -63,6 +64,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       transactionsApi,
       testWallet,
       blockchain,
+      mock[() => CompositeBlockchain],
       () => utx.size,
       DummyTransactionPublisher.accepting,
       ntpTime,

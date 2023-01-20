@@ -11,6 +11,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
+import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -31,6 +32,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     stub[Wallet],
     DummyTransactionPublisher.rejecting(tx => TransactionValidationError(GenericError("foo"), tx)),
     stub[Blockchain],
+    stub[() => CompositeBlockchain],
     stub[Time],
     stub[CommonAccountsApi],
     stub[CommonAssetsApi],
@@ -176,6 +178,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
       stub[Wallet],
       DummyTransactionPublisher.accepting,
       stub[Blockchain],
+      stub[() => CompositeBlockchain],
       stub[Time],
       stub[CommonAccountsApi],
       stub[CommonAssetsApi],

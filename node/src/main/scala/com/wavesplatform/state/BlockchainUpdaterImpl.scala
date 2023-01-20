@@ -8,7 +8,7 @@ import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.Storage
+import com.wavesplatform.database.RocksDBWriter
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
@@ -28,7 +28,7 @@ import monix.reactive.subjects.ReplaySubject
 import monix.reactive.{Observable, Observer}
 
 class BlockchainUpdaterImpl(
-    rocksdb: Blockchain & Storage,
+    rocksdb: RocksDBWriter,
     spendableBalanceChanged: Observer[(Address, Asset)],
     wavesSettings: WavesSettings,
     time: Time,
@@ -218,6 +218,7 @@ class BlockchainUpdaterImpl(
                       block,
                       miningConstraints.total,
                       hitSource,
+                      rocksdb.loadCacheData,
                       verify,
                       txSignParCheck = txSignParCheck
                     )
@@ -244,6 +245,7 @@ class BlockchainUpdaterImpl(
                       block,
                       miningConstraints.total,
                       hitSource,
+                      rocksdb.loadCacheData,
                       verify,
                       txSignParCheck = txSignParCheck
                     )
@@ -275,6 +277,7 @@ class BlockchainUpdaterImpl(
                         block,
                         miningConstraints.total,
                         hitSource,
+                        rocksdb.loadCacheData,
                         verify,
                         txSignParCheck = txSignParCheck
                       )
@@ -331,6 +334,7 @@ class BlockchainUpdaterImpl(
                             block,
                             constraint,
                             hitSource,
+                            rocksdb.loadCacheData,
                             verify,
                             txSignParCheck = txSignParCheck
                           )
@@ -515,7 +519,7 @@ class BlockchainUpdaterImpl(
                   MicroBlockAppendError("Invalid total block signature", microBlock)
                 )
               blockDifferResult <- {
-                BlockDiffer.fromMicroBlock(this, rocksdb.lastBlockTimestamp, microBlock, restTotalConstraint, verify)
+                BlockDiffer.fromMicroBlock(this, rocksdb.lastBlockTimestamp, microBlock, restTotalConstraint, rocksdb.loadCacheData, verify)
               }
             } yield {
               val BlockDiffer.Result(diff, carry, totalFee, updatedMdConstraint, detailedDiff) = blockDifferResult
@@ -721,8 +725,6 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.balances(req)
   }
 
-  override def loadCacheData(addresses: Seq[Address]): Unit = readLock(compositeBlockchain.loadCacheData(addresses))
-
   override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] = readLock {
     compositeBlockchain.wavesBalances(addresses)
   }
@@ -746,7 +748,10 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.resolveERC20Address(address)
   }
 
-  override def compositeBlockchain: Blockchain =
+  def getCompositeBlockchain: CompositeBlockchain =
+    ngState.fold(CompositeBlockchain(rocksdb, Diff.empty))(CompositeBlockchain(rocksdb, _))
+
+  private[this] def compositeBlockchain: Blockchain =
     ngState.fold(rocksdb: Blockchain)(CompositeBlockchain(rocksdb, _))
 
   // noinspection ScalaStyle,TypeAnnotation

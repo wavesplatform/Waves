@@ -3,7 +3,7 @@ package com.wavesplatform
 import java.io.*
 import java.net.{MalformedURLException, URL}
 import akka.actor.ActorSystem
-import cats.implicits.{catsSyntaxEitherId, catsSyntaxParallelTraverse1}
+import cats.implicits.catsSyntaxParallelTraverse1
 import com.google.common.io.ByteStreams
 import com.google.common.primitives.Ints
 import com.wavesplatform.Exporter.Formats
@@ -149,7 +149,7 @@ object Importer extends ScorexLogging {
           override def blocksApi: CommonBlocksApi =
             CommonBlocksApi(blockchainUpdater, Application.loadBlockMetaAt(db, blockchainUpdater), Application.loadBlockInfoAt(db, blockchainUpdater))
           override def accountsApi: CommonAccountsApi =
-            CommonAccountsApi(() => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
+            CommonAccountsApi(() => blockchainUpdater.getCompositeBlockchain, db, blockchainUpdater)
           override def assetsApi: CommonAssetsApi =
             CommonAssetsApi(() => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
         }
@@ -194,8 +194,6 @@ object Importer extends ScorexLogging {
     val blocksToApply = importOptions.importHeight - startHeight + 1
 
     if (blocksToSkip > 0) log.info(s"Skipping $blocksToSkip block(s)")
-
-    var prevAppendTask = Future.successful(Option(BigInt(0)).asRight[ValidationError])
 
     sys.addShutdownHook {
       import scala.concurrent.duration.*

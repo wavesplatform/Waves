@@ -2,7 +2,6 @@ package com.wavesplatform
 
 import java.io.File
 import java.util
-
 import com.google.common.primitives.Longs
 import com.protonail.leveldb.jna.*
 import com.wavesplatform.account.Address
@@ -20,6 +19,7 @@ import com.wavesplatform.utils.ScorexLogging
 import monix.execution.{ExecutionModel, Scheduler}
 import org.rocksdb.{RocksDB, WriteBatch, WriteOptions}
 import com.google.common.hash.{Funnels, BloomFilter as GBloomFilter}
+import com.wavesplatform.state.reader.CompositeBlockchain
 import play.api.libs.json.Json
 
 import scala.annotation.tailrec
@@ -314,7 +314,7 @@ object Explorer extends ScorexLogging {
           val s = Scheduler.fixedPool("foo-bar", 8, executionModel = ExecutionModel.AlwaysAsyncExecution)
 
           def countEntries(): Future[Long] = {
-            CommonAccountsApi(() => Diff.empty, db, reader)
+            CommonAccountsApi(() => CompositeBlockchain(reader, Diff.empty), db, reader)
               .dataStream(Address.fromString("3PC9BfRwJWWiw9AREE2B3eWzCks3CYtg4yo").explicitGet(), None)
               .countL
               .runToFuture(s)

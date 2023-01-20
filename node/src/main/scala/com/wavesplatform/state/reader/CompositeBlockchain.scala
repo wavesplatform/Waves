@@ -41,8 +41,6 @@ final class CompositeBlockchain private (
     }
   }
 
-  override def loadCacheData(addresses: Seq[Address]): Unit = inner.loadCacheData(addresses)
-
   override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] =
     inner.wavesBalances(addresses).map { case (address, balance) =>
       address -> (balance + diff.portfolios.get(address).fold(0L)(_.balanceOf(Waves)))
@@ -121,9 +119,8 @@ final class CompositeBlockchain private (
       Some(bs)
     }
 
-  // TODO: remove heightOf
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] =
-    if (maybeDiff.isEmpty || to.exists(id => inner.heightOf(id).isDefined)) {
+    if (maybeDiff.isEmpty) {
       inner.balanceSnapshots(address, from, to)
     } else {
       val balance    = this.balance(address)
@@ -192,8 +189,6 @@ final class CompositeBlockchain private (
     inner
       .resolveERC20Address(address)
       .orElse(diff.issuedAssets.keys.find(id => ERC20Address(id) == address))
-
-  override def compositeBlockchain: Blockchain = this
 }
 
 object CompositeBlockchain {

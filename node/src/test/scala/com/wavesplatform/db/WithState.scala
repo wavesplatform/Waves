@@ -96,6 +96,7 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
         b,
         MiningConstraint.Unlimited,
         b.header.generationSignature,
+        _ => (),
         verify = true,
         enableExecutionLog = enableExecutionLog,
         txSignParCheck = true

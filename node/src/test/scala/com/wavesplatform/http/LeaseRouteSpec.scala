@@ -19,7 +19,7 @@ import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{BinaryDataEntry, Blockchain, Diff, Height, TxMeta}
+import com.wavesplatform.state.{BinaryDataEntry, Blockchain, Height, TxMeta}
 import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.TxHelpers.{defaultSigner, secondSigner, signer}
@@ -55,7 +55,7 @@ class LeaseRouteSpec
       domain.blockchain,
       (_, _) => Future.successful(TracedResult(Right(true))),
       ntpTime,
-      CommonAccountsApi(() => domain.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), domain.db, domain.blockchain),
+      CommonAccountsApi(() => domain.blockchainUpdater.getCompositeBlockchain, domain.db, domain.blockchain),
       new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
     )
 

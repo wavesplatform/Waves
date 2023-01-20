@@ -25,6 +25,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.EthereumTransaction.Invocation
@@ -48,6 +49,7 @@ case class AssetsApiRoute(
     wallet: Wallet,
     transactionPublisher: TransactionPublisher,
     blockchain: Blockchain,
+    compositeBlockchain: () => CompositeBlockchain,
     time: Time,
     commonAccountApi: CommonAccountsApi,
     commonAssetsApi: CommonAssetsApi,
@@ -273,13 +275,13 @@ case class AssetsApiRoute(
       import cats.syntax.either.*
       implicit val jsonStreamingSupport: ToResponseMarshaller[Source[ByteString, NotUsed]] = jsonBytesStreamMarshaller()
 
-      val compositeBlockchain = blockchain.compositeBlockchain
+      val compBlockchain = compositeBlockchain()
       routeTimeout.executeStreamed {
         commonAccountApi
           .nftList(address, after)
           .concatMapIterable { a =>
             AssetsApiRoute
-              .jsonBytesDetails(compositeBlockchain)(a, full = true)
+              .jsonBytesDetails(compBlockchain)(a, full = true)
               .valueOr(err => throw new IllegalArgumentException(err))
           }
           .take(limit)

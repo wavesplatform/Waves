@@ -234,7 +234,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override val blocksApi: CommonBlocksApi =
         CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockInfoAt(db, blockchainUpdater))
       override val accountsApi: CommonAccountsApi =
-        CommonAccountsApi(() => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
+        CommonAccountsApi(() => blockchainUpdater.getCompositeBlockchain, db, blockchainUpdater)
       override val assetsApi: CommonAssetsApi = CommonAssetsApi(() => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
     }
 
@@ -380,6 +380,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           extensionContext.transactionsApi,
           wallet,
           blockchainUpdater,
+          () => blockchainUpdater.getCompositeBlockchain,
           () => utxStorage.size,
           transactionPublisher,
           time,
@@ -435,6 +436,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           wallet,
           transactionPublisher,
           blockchainUpdater,
+          () => blockchainUpdater.getCompositeBlockchain,
           time,
           extensionContext.accountsApi,
           extensionContext.assetsApi,

@@ -13,8 +13,9 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.patch.CancelLeasesToDisabledAliases
+import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.reader.LeaseDetails.Status
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Diff, Height, InvokeScriptResult}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Height, InvokeScriptResult}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.EthereumTransaction.Invocation
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -63,7 +64,7 @@ object CommonAccountsApi {
 
   final case class BalanceDetails(regular: Long, generating: Long, available: Long, effective: Long, leaseIn: Long, leaseOut: Long)
 
-  def apply(diff: () => Diff, db: RocksDB, blockchain: Blockchain): CommonAccountsApi = new CommonAccountsApi {
+  def apply(compositeBlockchain: () => CompositeBlockchain, db: RocksDB, blockchain: Blockchain): CommonAccountsApi = new CommonAccountsApi {
 
     override def balance(address: Address, confirmations: Int = 0): Long =
       blockchain.balance(address, blockchain.height, confirmations)
@@ -90,22 +91,20 @@ object CommonAccountsApi {
 
     override def portfolio(address: Address): Observable[Seq[(IssuedAsset, Long)]] = {
       val featureNotActivated = !blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee)
-      val compositeBlockchain = blockchain.compositeBlockchain
+      val compBlockchain      = compositeBlockchain()
       def includeNft(assetId: IssuedAsset): Boolean =
-        featureNotActivated || !compositeBlockchain.assetDescription(assetId).exists(_.nft)
+        featureNotActivated || !compBlockchain.assetDescription(assetId).exists(_.nft)
 
-      val currentDiff = diff()
       db.resourceObservable.flatMap { resource =>
         Observable
-          .fromIterator(Task(assetBalanceIterator(resource, address, currentDiff, includeNft)))
+          .fromIterator(Task(assetBalanceIterator(resource, address, compBlockchain.diff, includeNft)))
       }
     }
 
     override def nftList(address: Address, after: Option[IssuedAsset]): Observable[Seq[(IssuedAsset, AssetDescription)]] = {
-      val currentDiff = diff()
       db.resourceObservable.flatMap { resource =>
         Observable
-          .fromIterator(Task(nftIterator(resource, address, currentDiff, after, blockchain.assetDescription)))
+          .fromIterator(Task(nftIterator(resource, address, compositeBlockchain().diff, after, blockchain.assetDescription)))
       }
     }
 
@@ -116,7 +115,7 @@ object CommonAccountsApi {
 
     override def dataStream(address: Address, regex: Option[String]): Observable[DataEntry[?]] = Observable.defer {
       val pattern = regex.map(_.r.pattern)
-      val entriesFromDiff = diff().accountData
+      val entriesFromDiff = compositeBlockchain().diff.accountData
         .get(address)
         .fold(Array.empty[DataEntry[?]])(_.data.filter { case (k, _) => pattern.forall(_.matcher(k).matches()) }.values.toArray.sortBy(_.key))
 
@@ -138,7 +137,7 @@ object CommonAccountsApi {
     override def activeLeases(address: Address): Observable[LeaseInfo] =
       addressTransactions(
         db,
-        Some(Height(blockchain.height) -> diff()),
+        Some(Height(blockchain.height) -> compositeBlockchain().diff),
         address,
         None,
         Set(TransactionType.Lease, TransactionType.InvokeScript, TransactionType.InvokeExpression, TransactionType.Ethereum),

@@ -1066,6 +1066,4 @@ abstract class RocksDBWriter private[database] (
 
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] =
     readOnly(_.get(Keys.assetStaticInfo(address)).map(assetInfo => IssuedAsset(assetInfo.id)))
-
-  override def compositeBlockchain: Blockchain = this
 }

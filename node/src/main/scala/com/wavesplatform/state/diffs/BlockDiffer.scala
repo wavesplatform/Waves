@@ -43,11 +43,12 @@ object BlockDiffer {
       block: Block,
       constraint: MiningConstraint,
       hitSource: ByteStr,
+      loadCacheData: Seq[Address] => Unit = _ => (),
       verify: Boolean = true,
       enableExecutionLog: Boolean = false,
       txSignParCheck: Boolean = true
   ): Either[ValidationError, Result] =
-    fromBlockTraced(blockchain, maybePrevBlock, block, constraint, hitSource, verify, enableExecutionLog, txSignParCheck).resultE
+    fromBlockTraced(blockchain, maybePrevBlock, block, constraint, hitSource, loadCacheData, verify, enableExecutionLog, txSignParCheck).resultE
 
   def fromBlockTraced(
       blockchain: Blockchain,
@@ -55,6 +56,7 @@ object BlockDiffer {
       block: Block,
       constraint: MiningConstraint,
       hitSource: ByteStr,
+      loadCacheData: Seq[Address] => Unit,
       verify: Boolean,
       enableExecutionLog: Boolean,
       txSignParCheck: Boolean
@@ -111,6 +113,7 @@ object BlockDiffer {
         resultDiff,
         stateHeight >= ngHeight,
         block.transactionData,
+        loadCacheData,
         verify = verify,
         enableExecutionLog = enableExecutionLog,
         txSignParCheck = txSignParCheck
@@ -123,16 +126,18 @@ object BlockDiffer {
       prevBlockTimestamp: Option[Long],
       micro: MicroBlock,
       constraint: MiningConstraint,
+      loadCacheData: Seq[Address] => Unit = _ => (),
       verify: Boolean = true,
       enableExecutionLog: Boolean = false
   ): Either[ValidationError, Result] =
-    fromMicroBlockTraced(blockchain, prevBlockTimestamp, micro, constraint, verify, enableExecutionLog).resultE
+    fromMicroBlockTraced(blockchain, prevBlockTimestamp, micro, constraint, loadCacheData, verify, enableExecutionLog).resultE
 
   def fromMicroBlockTraced(
       blockchain: Blockchain,
       prevBlockTimestamp: Option[Long],
       micro: MicroBlock,
       constraint: MiningConstraint,
+      loadCacheData: Seq[Address] => Unit = _ => (),
       verify: Boolean = true,
       enableExecutionLog: Boolean = false,
       txSignParCheck: Boolean = true
@@ -154,6 +159,7 @@ object BlockDiffer {
         Diff.empty,
         hasNg = true,
         micro.transactionData,
+        loadCacheData,
         verify = verify,
         enableExecutionLog = enableExecutionLog,
         txSignParCheck = txSignParCheck
@@ -175,6 +181,7 @@ object BlockDiffer {
       initDiff: Diff,
       hasNg: Boolean,
       txs: Seq[Transaction],
+      loadCacheData: Seq[Address] => Unit,
       verify: Boolean,
       enableExecutionLog: Boolean,
       txSignParCheck: Boolean
@@ -207,7 +214,7 @@ object BlockDiffer {
         .runAsyncAndForget
     }
 
-    prepareCaches(blockchain, blockGenerator, txs)
+    prepareCaches(blockGenerator, txs, loadCacheData)
 
     txs
       .foldLeft(TracedResult(Result(initDiff, 0L, 0L, initConstraint, DetailedDiff(initDiff, Nil)).asRight[ValidationError])) {
@@ -259,7 +266,7 @@ object BlockDiffer {
       }
   }
 
-  private def prepareCaches(blockchain: Blockchain, blockGenerator: Address, txs: Seq[Transaction]): Unit = {
+  private def prepareCaches(blockGenerator: Address, txs: Seq[Transaction], loadCacheData: Seq[Address] => Unit): Unit = {
     val addresses = scala.collection.mutable.Set(blockGenerator)
 
     txs.foreach {
@@ -287,6 +294,6 @@ object BlockDiffer {
       case _              => ()
     }
 
-    blockchain.loadCacheData(addresses.toSeq)
+    loadCacheData(addresses.toSeq)
   }
 }

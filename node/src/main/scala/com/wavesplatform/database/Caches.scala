@@ -25,6 +25,7 @@ import monix.reactive.Observer
 import scala.jdk.CollectionConverters.*
 import scala.reflect.ClassTag
 
+// TODO: remove spendableBalanceChanged?
 abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFilterSize: Int) extends Blockchain with Storage {
   import Caches.*
 
@@ -99,7 +100,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
       }
       .toMap
 
-  override def loadCacheData(addresses: Seq[Address]): Unit = {
+  def loadCacheData(addresses: Seq[Address]): Unit = {
     addressIdCache.getAll(addresses.asJava)
     balancesCache.getAll(addresses.map(_ -> Waves).asJava)
     leaseBalanceCache.getAll(addresses.asJava)

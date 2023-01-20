@@ -21,7 +21,7 @@ import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.protobuf.transaction.PBAmounts
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{Blockchain, InvokeScriptResult, TxMeta}
-import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.lease.*
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
@@ -30,7 +30,6 @@ import com.wavesplatform.utils.{EthEncoding, Time}
 import com.wavesplatform.wallet.Wallet
 import monix.eval.Task
 import play.api.libs.json.*
-
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta.Payload
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{
@@ -56,6 +55,7 @@ case class TransactionsApiRoute(
     commonApi: CommonTransactionsApi,
     wallet: Wallet,
     blockchain: Blockchain,
+    compositeBlockchain: () => CompositeBlockchain,
     utxPoolSize: () => Int,
     transactionPublisher: TransactionPublisher,
     time: Time,
@@ -224,7 +224,7 @@ case class TransactionsApiRoute(
         .memoize
 
     val blockV5Activation  = blockchain.activatedFeatures.get(BlockchainFeatures.BlockV5.id)
-    val improvedSerializer = serializer.copy(blockchain = blockchain.compositeBlockchain)
+    val improvedSerializer = serializer.copy(blockchain = compositeBlockchain())
 
     /** Produces compact representation for large transactions by stripping unnecessary data. Currently implemented for MassTransfer transaction only.
       */
@@ -242,7 +242,7 @@ case class TransactionsApiRoute(
            ) aliasesOfAddress.map(aliases => mtt.compactJson(address, aliases))
            else Task.now(mtt.compactJson(address, Set.empty))).map(a => ByteString(Json.stringify(a ++ improvedSerializer.transactionMetaJson(meta))))
 
-        case _ => Task.now(improvedSerializer.transactionWithMetaJsonNew(meta, h => blockV5Activation.exists(v5h => v5h <= h)))
+        case _ => Task.now(improvedSerializer.transactionWithMetaJsonBytes(meta, h => blockV5Activation.exists(v5h => v5h <= h)))
       }
     }
 
@@ -586,7 +586,7 @@ object TransactionsApiRoute {
     def transactionWithMetaJson(meta: TransactionMeta): JsObject =
       meta.transaction.json() ++ transactionMetaJson(meta)
 
-    def transactionWithMetaJsonNew(meta: TransactionMeta, isBlockV5: Int => Boolean): ByteString =
+    def transactionWithMetaJsonBytes(meta: TransactionMeta, isBlockV5: Int => Boolean): ByteString =
       meta match {
         case TransactionMeta.Invoke(height, transaction, succeeded, spentComplexity, invokeScriptResult) =>
           val invokeMeta = InvokeMeta(

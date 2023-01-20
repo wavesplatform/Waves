@@ -408,7 +408,7 @@ case class Domain(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDB
   )
 
   val accountsApi: CommonAccountsApi = CommonAccountsApi(
-    () => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty),
+    () => blockchainUpdater.getCompositeBlockchain,
     db,
     blockchain
   )

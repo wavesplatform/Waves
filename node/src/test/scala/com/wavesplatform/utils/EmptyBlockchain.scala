@@ -70,7 +70,7 @@ trait EmptyBlockchain extends Blockchain {
 
   override def assetScript(asset: IssuedAsset): Option[AssetScriptInfo] = None
 
-  override def accountData(acc: Address, key: String): Option[DataEntry[_]] = None
+  override def accountData(acc: Address, key: String): Option[DataEntry[?]] = None
 
   override def hasData(acc: Address): Boolean = false
 
@@ -85,10 +85,6 @@ trait EmptyBlockchain extends Blockchain {
   override def leaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance] = Map.empty
 
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] = None
-
-  override def compositeBlockchain: Blockchain = this
-
-  override def loadCacheData(addresses: Seq[Address]): Unit = ()
 }
 
 object EmptyBlockchain extends EmptyBlockchain
