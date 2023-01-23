@@ -9,6 +9,7 @@ object Take extends JsTestBase {
   private val take                     = s"take(callerTestData, $randomInt)"
   private val takeArgBeforeFunction    = s"callerTestData.take($randomInt)"
   private val invalidTake              = s"take(callerTestData)"
+  private val invalidTakeNotInt        = s"take(callerTestData, $randomByteVectorArrayElement)"
   private val invalidTakeArgBeforeFunc = s"callerTestData.take(callerTestData, $randomInt)"
 
   val tests: Tests = Tests {
@@ -38,12 +39,25 @@ object Take extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload, invalid data") {
+    test.apply("compilation error: Can't find a function overload, invalid first argument") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeWithoutMatcher(
           randomAddressDataArrayElement,
           take,
+          testData.rideV3Result,
+          testData.GreaterV3ResultBinaryEntry
+        )
+        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+      }
+    }
+
+    test.apply("compilation error: Can't find a function overload, invalid second argument") {
+      for (version <- testData.actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
+        val script = precondition.codeWithoutMatcher(
+          randomByteVectorArrayElement,
+          invalidTakeNotInt,
           testData.rideV3Result,
           testData.GreaterV3ResultBinaryEntry
         )

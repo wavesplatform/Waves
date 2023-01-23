@@ -9,7 +9,7 @@ object Size extends JsTestBase {
   private val size                     = s"size(callerTestData)"
   private val sizeArgBeforeFunction    = s"callerTestData.size()"
   private val invalidSize              = s"size()"
-  private val invalidSizeArgBeforeFunc = s"callerTestData.size(callerTestData, callerTestData)"
+  private val invalidSizeArgBeforeFunc = s"callerTestData.size(callerTestData)"
 
   val tests: Tests = Tests {
     test.apply("check: function size compiles") {

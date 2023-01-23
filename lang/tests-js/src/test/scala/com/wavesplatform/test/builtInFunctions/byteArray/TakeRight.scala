@@ -9,6 +9,7 @@ object TakeRight extends JsTestBase {
   private val takeRight                     = s"takeRight(callerTestData, $randomInt)"
   private val takeRightArgBeforeFunction    = s"callerTestData.takeRight($randomInt)"
   private val invalidTakeRight              = s"takeRight(callerTestData)"
+  private val invalidTakeRightNotInt = s"callerTestData.takeRight(callerTestData, $randomInt)"
   private val invalidTakeRightArgBeforeFunc = s"callerTestData.takeRight(callerTestData, $randomInt)"
 
   val tests: Tests = Tests {
