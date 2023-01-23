@@ -26,8 +26,6 @@ import com.wavesplatform.transaction.smart.script.trace.{TraceStep, TracedResult
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import play.api.libs.json.Json
 
-import scala.collection.immutable.VectorMap
-
 object TransactionDiffer {
   def apply(prevBlockTs: Option[Long], currentBlockTs: Long, verify: Boolean = true)(
       blockchain: Blockchain,
@@ -46,11 +44,12 @@ object TransactionDiffer {
   ): TracedResult[ValidationError, Diff] =
     validate(prevBlockTs, currentBlockTs, verify = true, limitedExecution = false)(blockchain, tx)
 
-  def limitedExecution(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, verify: Boolean = true)(
+  def limitedExecution(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, unlimited: Boolean, verify: Boolean = true)(
       blockchain: Blockchain,
       tx: Transaction
   ): TracedResult[ValidationError, Diff] = {
-    validate(prevBlockTimestamp, currentBlockTimestamp, verify = verify, limitedExecution = transactionMayFail(tx) && acceptFailed(blockchain))(
+    val limitedExecution = if (unlimited) false else transactionMayFail(tx) && acceptFailed(blockchain)
+    validate(prevBlockTimestamp, currentBlockTimestamp, verify = verify, limitedExecution)(
       blockchain,
       tx
     )
@@ -298,8 +297,8 @@ object TransactionDiffer {
         case e: EthereumTransaction => EthereumTransactionDiff.meta(blockchain)(e)
         case _                      => Diff.empty
       }
-      Diff(
-        transactions = VectorMap((tx.id(), NewTransactionInfo(tx, affectedAddresses, applied = false, spentComplexity))),
+      Diff.withTransactions(
+        Vector(NewTransactionInfo(tx, affectedAddresses, applied = false, spentComplexity)),
         portfolios = portfolios,
         scriptResults = scriptResult.fold(Map.empty[ByteStr, InvokeScriptResult])(sr => Map(tx.id() -> sr)),
         scriptsComplexity = spentComplexity

@@ -9,5 +9,6 @@ case class UtxSettings(
     fastLaneAddresses: Set[String],
     allowTransactionsFromSmartAccounts: Boolean,
     allowSkipChecks: Boolean,
-    forceValidateInCleanup: Boolean
+    forceValidateInCleanup: Boolean,
+    alwaysUnlimitedExecution: Boolean
 )

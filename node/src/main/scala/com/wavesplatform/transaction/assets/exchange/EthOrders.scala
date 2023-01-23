@@ -2,10 +2,10 @@ package com.wavesplatform.transaction.assets.exchange
 
 import java.math.BigInteger
 import java.nio.ByteBuffer
-
 import com.google.common.base.CaseFormat
 import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto.EthereumKeyLength
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import org.web3j.crypto.Sign.SignatureData
@@ -58,20 +58,18 @@ object EthOrders extends App {
 
   def recoverEthSignerKey(order: Order, signature: Array[Byte]): PublicKey = {
     val bytes = hashOrderStruct(order)
-    recoverEthSignerKey(bytes, signature)
+
+    val signerKey = org.web3j.utils.Numeric.toBytesPadded(
+      recoverEthSignerKeyBigInt(bytes, signature),
+      EthereumKeyLength
+    )
+
+    PublicKey(ByteStr(signerKey))
   }
 
-  def recoverEthSignerKey(message: Array[Byte], signature: Array[Byte]): PublicKey = {
-    val signatureData = EthOrders.decodeSignature(signature)
-    val signerKey = Sign
-      .recoverFromSignature(
-        signatureData.getV.head - 27,
-        new ECDSASignature(new BigInteger(1, signatureData.getR), new BigInteger(1, signatureData.getS)),
-        message
-      )
-      .toByteArray
-      .takeRight(64)
-    PublicKey(ByteStr(signerKey))
+  def recoverEthSignerKeyBigInt(order: Order, signature: Array[Byte]): BigInteger = {
+    val bytes = hashOrderStruct(order)
+    recoverEthSignerKeyBigInt(bytes, signature)
   }
 
   def signOrder(order: Order, key: ECKeyPair): Array[Byte] = {
@@ -177,4 +175,16 @@ object EthOrders extends App {
        |  "message": {}
        |}
        |""".stripMargin
+
+  private def recoverEthSignerKeyBigInt(message: Array[Byte], signature: Array[Byte]): BigInteger = {
+    val signatureData = EthOrders.decodeSignature(signature)
+    val v             = BigInt(1, signatureData.getV)
+    val recId         = if (v == 0 || v == 1) v else if (v > 28) v - AddressScheme.current.chainId * 2 - 35 else v - 27
+    Sign
+      .recoverFromSignature(
+        recId.intValue,
+        new ECDSASignature(new BigInteger(1, signatureData.getR), new BigInteger(1, signatureData.getS)),
+        message
+      )
+  }
 }

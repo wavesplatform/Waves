@@ -31,15 +31,15 @@ class EnvironmentFunctions[F[_]: Monad](environment: Environment[F]) {
   }
 
   def getData(addressOrAlias: CaseObj, key: String, dataType: DataType): F[Either[ExecutionError, Option[Any]]] = {
-    toScala(addressOrAlias).leftMap(CommonError).traverse(environment.data(_, key, dataType))
+    toScala(addressOrAlias).leftMap(CommonError(_)).traverse(environment.data(_, key, dataType))
   }
 
   def hasData(addressOrAlias: CaseObj): F[Either[ExecutionError, Boolean]] = {
-    toScala(addressOrAlias).leftMap(CommonError).traverse(environment.hasData)
+    toScala(addressOrAlias).leftMap(CommonError(_)).traverse(environment.hasData)
   }
 
   def addressFromAlias(name: String): F[Either[ExecutionError, Recipient.Address]] =
-    environment.resolveAlias(name).map(_.leftMap(CommonError))
+    environment.resolveAlias(name).map(_.leftMap(CommonError(_)))
 }
 
 object EnvironmentFunctions {

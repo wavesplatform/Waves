@@ -8,5 +8,5 @@ case class ParsedMeta(
 
 case class FunctionSignatures(
     version: Int,
-    argsWithFuncName: List[(String, List[(String, FINAL)])]
+    argsWithFuncName: Map[String, List[(String, FINAL)]]
 )

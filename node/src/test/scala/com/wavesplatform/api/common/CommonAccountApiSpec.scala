@@ -1,7 +1,7 @@
 package com.wavesplatform.api.common
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
@@ -10,7 +10,10 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.{DataEntry, Diff, EmptyDataEntry, StringDataEntry, diffs}
+import com.wavesplatform.test.DomainPresets.RideV4
 import com.wavesplatform.test.FreeSpec
+import com.wavesplatform.transaction.TxHelpers.data
+import com.wavesplatform.transaction.TxVersion.V2
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxHelpers}
 import com.wavesplatform.{BlocksTransactionsHelpers, history}
 import monix.execution.Scheduler.Implicits.global
@@ -23,47 +26,29 @@ class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransacti
       val entry2 = StringDataEntry("test1", "test")
       val entry3 = StringDataEntry("test2", "test")
 
-      val preconditions = for {
-        acc <- accountGen
-        ts = System.currentTimeMillis()
-        fee <- smallFeeGen
-        genesis        = GenesisTransaction.create(acc.toAddress, diffs.ENOUGH_AMT, ts).explicitGet()
-        data1          = DataTransaction.selfSigned(1.toByte, acc, Seq(entry1), fee, ts).explicitGet()
-        data2          = DataTransaction.selfSigned(1.toByte, acc, Seq(entry2), fee, ts).explicitGet()
-        data3          = DataTransaction.selfSigned(1.toByte, acc, Seq(entry3), fee, ts).explicitGet()
-        data4          = DataTransaction.selfSigned(2.toByte, acc, Seq(EmptyDataEntry("test"), EmptyDataEntry("test1")), fee, ts).explicitGet()
-        data5          = DataTransaction.selfSigned(2.toByte, acc, Seq(EmptyDataEntry("test2"), entry1, entry2), fee, ts).explicitGet()
-        (block1, mbs1) = UnsafeBlocks.unsafeChainBaseAndMicro(history.randomSig, Seq(genesis), Seq(Seq(data1)), acc, 3, ts)
-        (block2, mbs2) = UnsafeBlocks.unsafeChainBaseAndMicro(mbs1.last.totalResBlockSig, Seq(data2), Seq(Seq(data3)), acc, 3, ts)
-        (block3, mbs3) = UnsafeBlocks.unsafeChainBaseAndMicro(mbs2.last.totalResBlockSig, Seq(data4), Seq(Seq(data5)), acc, 3, ts)
-      } yield (acc, block1, mbs1.head, block2, mbs2.head, block3, mbs3.head)
+      val acc     = accountGen.sample.get
+      val genesis = TxHelpers.genesis(acc.toAddress)
+      val data1   = data(acc, Seq(entry1))
+      val data2   = data(acc, Seq(entry2))
+      val data3   = data(acc, Seq(entry3))
+      val data4   = data(acc, Seq(EmptyDataEntry("test"), EmptyDataEntry("test1")), version = V2)
+      val data5   = data(acc, Seq(EmptyDataEntry("test2"), entry1, entry2), version = V2)
 
-      forAll(preconditions) {
-        case (acc, block1, mb1, block2, mb2, block3, mb3) =>
-          withDomain(
-            domainSettingsWithFS(
-              TestFunctionalitySettings.withFeatures(
-                BlockchainFeatures.NG,
-                BlockchainFeatures.DataTransaction,
-                BlockchainFeatures.BlockV5
-              )
-            )
-          ) { d =>
-            val commonAccountsApi             = CommonAccountsApi(() => d.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), d.db, d.blockchainUpdater)
-            def dataList(): Set[DataEntry[_]] = commonAccountsApi.dataStream(acc.toAddress, None).toListL.runSyncUnsafe().toSet
+      withDomain(RideV4) { d =>
+        val commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), d.db, d.blockchainUpdater)
+        def dataList(): Set[DataEntry[_]] = commonAccountsApi.dataStream(acc.toAddress, None).toListL.runSyncUnsafe().toSet
 
-            d.appendBlock(block1)
-            d.appendMicroBlock(mb1)
-            dataList() shouldBe Set(entry1)
-            d.appendBlock(block2)
-            dataList() shouldBe Set(entry1, entry2)
-            d.appendMicroBlock(mb2)
-            dataList() shouldBe Set(entry1, entry2, entry3)
-            d.appendBlock(block3)
-            dataList() shouldBe Set(entry3)
-            d.appendMicroBlock(mb3)
-            dataList() shouldBe Set(entry1, entry2)
-          }
+        d.appendBlock(genesis)
+        d.appendMicroBlock(data1)
+        dataList() shouldBe Set(entry1)
+        d.appendBlock(data2)
+        dataList() shouldBe Set(entry1, entry2)
+        d.appendMicroBlock(data3)
+        dataList() shouldBe Set(entry1, entry2, entry3)
+        d.appendBlock(data4)
+        dataList() shouldBe Set(entry3)
+        d.appendMicroBlock(data5)
+        dataList() shouldBe Set(entry1, entry2)
       }
     }
 
@@ -84,21 +69,20 @@ class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransacti
         (block2, mbs2) = UnsafeBlocks.unsafeChainBaseAndMicro(mbs1.last.totalResBlockSig, Seq(data2), Seq(Seq(data3)), acc, 3, ts)
       } yield (acc, block1, mbs1.head, block2, mbs2.head)
 
-      forAll(preconditions) {
-        case (acc, block1, mb1, block2, mb2) =>
-          withDomain(domainSettingsWithFS(TestFunctionalitySettings.withFeatures(BlockchainFeatures.NG, BlockchainFeatures.DataTransaction))) { d =>
-            val commonAccountsApi             = CommonAccountsApi(() => d.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), d.db, d.blockchainUpdater)
-            def dataList(): Set[DataEntry[_]] = commonAccountsApi.dataStream(acc.toAddress, Some("test_.*")).toListL.runSyncUnsafe().toSet
+      forAll(preconditions) { case (acc, block1, mb1, block2, mb2) =>
+        withDomain(domainSettingsWithFS(TestFunctionalitySettings.withFeatures(BlockchainFeatures.NG, BlockchainFeatures.DataTransaction))) { d =>
+          val commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), d.db, d.blockchainUpdater)
+          def dataList(): Set[DataEntry[_]] = commonAccountsApi.dataStream(acc.toAddress, Some("test_.*")).toListL.runSyncUnsafe().toSet
 
-            d.appendBlock(block1)
-            dataList() shouldBe empty
-            d.appendMicroBlock(mb1)
-            dataList() shouldBe Set(entry1)
-            d.appendBlock(block2)
-            dataList() shouldBe Set(entry1)
-            d.appendMicroBlock(mb2)
-            dataList() shouldBe Set(entry1, entry3)
-          }
+          d.appendBlock(block1)
+          dataList() shouldBe empty
+          d.appendMicroBlock(mb1)
+          dataList() shouldBe Set(entry1)
+          d.appendBlock(block2)
+          dataList() shouldBe Set(entry1)
+          d.appendMicroBlock(mb2)
+          dataList() shouldBe Set(entry1, entry3)
+        }
       }
     }
   }

@@ -22,9 +22,10 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, BinaryDataEntry, Height}
-import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.*
@@ -33,8 +34,8 @@ import com.wavesplatform.transaction.utils.EthTxGenerator.Arg
 import com.wavesplatform.transaction.{AssetIdLength, GenesisTransaction, Transaction, TxHelpers, TxNonNegativeAmount, TxVersion}
 import com.wavesplatform.utils.Schedulers
 import org.scalatest.concurrent.Eventually
+import play.api.libs.json.*
 import play.api.libs.json.Json.JsValueWrapper
-import play.api.libs.json.{JsArray, JsObject, JsValue, Json, Writes}
 
 import scala.concurrent.duration.*
 
@@ -523,33 +524,60 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
     ) ~> route ~> check(checkErrorResponse())
   }
 
-  routePath("/nft/list") in routeTest() { (d, route) =>
-    val issuer = testWallet.generateNewAccount().get
-    val nfts = Seq.tabulate(5) { i =>
-      TxHelpers.issue(issuer, 1, name = s"NFT_0$i", reissuable = false, fee = 0.001.waves)
+  routePath("/nft/list") - {
+    "NFTs in 1 block" in {
+      routeTest() { (d, route) =>
+        val issuer = testWallet.generateNewAccount().get
+        val nfts = Seq.tabulate(5) { i =>
+          TxHelpers.issue(issuer, 1, name = s"NFT_0$i", reissuable = false, fee = 0.001.waves)
+        }
+        d.appendBlock(TxHelpers.genesis(issuer.toAddress, 100.waves))
+        val nonNFT = TxHelpers.issue(issuer, 100, 2.toByte)
+        d.appendBlock((nfts :+ nonNFT)*)
+
+        Get(routePath(s"/balance/${issuer.toAddress}/${nonNFT.id()}")) ~> route ~> check {
+          val balance = responseAs[JsObject]
+          (balance \ "address").as[String] shouldEqual issuer.toAddress.toString
+          (balance \ "balance").as[Long] shouldEqual nonNFT.quantity.value
+          (balance \ "assetId").as[String] shouldEqual nonNFT.id().toString
+        }
+
+        Get(routePath(s"/nft/${issuer.toAddress}/limit/6")) ~> route ~> check {
+          status shouldBe StatusCodes.OK
+          val nftList = responseAs[Seq[JsObject]]
+          nftList.size shouldEqual nfts.size
+          nftList.foreach { jso =>
+            val nftId = (jso \ "assetId").as[ByteStr]
+            val nft   = nfts.find(_.id() == nftId).get
+
+            nft.name.toStringUtf8 shouldEqual (jso \ "name").as[String]
+            nft.timestamp shouldEqual (jso \ "issueTimestamp").as[Long]
+            nft.id() shouldEqual (jso \ "originTransactionId").as[ByteStr]
+          }
+        }
+      }
     }
-    d.appendBlock(TxHelpers.genesis(issuer.toAddress, 100.waves))
-    val nonNFT = TxHelpers.issue(issuer, 100, 2.toByte)
-    d.appendBlock((nfts :+ nonNFT)*)
-
-    Get(routePath(s"/balance/${issuer.toAddress}/${nonNFT.id()}")) ~> route ~> check {
-      val balance = responseAs[JsObject]
-      (balance \ "address").as[String] shouldEqual issuer.toAddress.toString
-      (balance \ "balance").as[Long] shouldEqual nonNFT.quantity.value
-      (balance \ "assetId").as[String] shouldEqual nonNFT.id().toString
-    }
-
-    Get(routePath(s"/nft/${issuer.toAddress}/limit/6")) ~> route ~> check {
-      status shouldBe StatusCodes.OK
-      val nftList = responseAs[Seq[JsObject]]
-      nftList.size shouldEqual nfts.size
-      nftList.foreach { jso =>
-        val nftId = (jso \ "assetId").as[ByteStr]
-        val nft   = nfts.find(_.id() == nftId).get
-
-        nft.name.toStringUtf8 shouldEqual (jso \ "name").as[String]
-        nft.timestamp shouldEqual (jso \ "issueTimestamp").as[Long]
-        nft.id() shouldEqual (jso \ "originTransactionId").as[ByteStr]
+    "NFTs in multiple blocks" in {
+      routeTest() { (d, route) =>
+        d.appendBlock(genesis(secondAddress, 100.waves))
+        val indexes =
+          (1 to 5).flatMap { block =>
+            val txs = (0 to 9).map { count =>
+              val i   = block * 10 + count
+              val tx1 = issue(defaultSigner, 1, name = s"NFT$i", reissuable = false)
+              val tx2 = issue(secondSigner, 1, name = s"NFT$i", reissuable = false)
+              (i, Seq(tx1, tx2))
+            }
+            d.appendBlock(txs.flatMap(_._2): _*)
+            txs.map(_._1)
+          }
+        Seq(defaultAddress, secondAddress).foreach { address =>
+          Get(routePath(s"/nft/$address/limit/50")) ~> route ~> check {
+            val nftList = responseAs[Seq[JsObject]]
+            nftList.size shouldEqual 50
+            nftList.map { jso => (jso \ "name").as[String].drop(3).toInt } shouldBe indexes
+          }
+        }
       }
     }
   }

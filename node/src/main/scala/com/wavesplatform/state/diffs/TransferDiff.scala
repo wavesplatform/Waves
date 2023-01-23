@@ -15,7 +15,7 @@ import scala.util.control.NonFatal
 object TransferTransactionDiff {
   def apply(blockchain: Blockchain)(tx: TransferTransaction): Either[ValidationError, Diff] = {
     TransferDiff(blockchain)(tx.sender.toAddress, tx.recipient, tx.amount.value, tx.assetId, tx.fee.value, tx.feeAssetId)
-      .map(_.copy(scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)))
+      .map(_.withScriptRuns(DiffsCommon.countScriptRuns(blockchain, tx)))
   }
 }
 

@@ -45,7 +45,7 @@ object Verifier extends ScorexLogging {
   type ValidationResult[T] = Either[ValidationError, T]
 
   def apply(blockchain: Blockchain, limitedExecution: Boolean = false)(tx: Transaction): TracedResult[ValidationError, Int] = (tx: @unchecked) match {
-    case _: GenesisTransaction => Right(0)
+    case _: GenesisTransaction  => Right(0)
     case _: EthereumTransaction => Right(0)
     case pt: ProvenTransaction =>
       (pt, blockchain.accountScript(pt.sender.toAddress)) match {
@@ -61,7 +61,8 @@ object Verifier extends ScorexLogging {
           Left(GenericError("Can't process transaction with signature from scripted account"))
         case (_: InvokeExpressionTransaction, Some(script)) if forbidInvokeExpressionDueToVerifier(script.script) =>
           Left(
-            GenericError(s"Can't process InvokeExpressionTransaction from RIDE ${script.script.stdLibVersion} verifier, it might be used from $V6"))
+            GenericError(s"Can't process InvokeExpressionTransaction from RIDE ${script.script.stdLibVersion} verifier, it might be used from $V6")
+          )
         case (_, Some(script)) =>
           stats.accountScriptExecution
             .measureForType(pt.tpe)(verifyTx(blockchain, script.script, script.verifierComplexity.toInt, pt, None))
@@ -161,8 +162,8 @@ object Verifier extends ScorexLogging {
     val senderAddress = transaction.asInstanceOf[Authorized].sender.toAddress
 
     val resultE = Try {
-      val containerAddress = assetIdOpt.fold(Coproduct[Environment.Tthis](Recipient.Address(ByteStr(senderAddress.bytes))))(
-        v => Coproduct[Environment.Tthis](Environment.AssetId(v.arr))
+      val containerAddress = assetIdOpt.fold(Coproduct[Environment.Tthis](Recipient.Address(ByteStr(senderAddress.bytes))))(v =>
+        Coproduct[Environment.Tthis](Environment.AssetId(v.arr))
       )
       val (log, evaluatedComplexity, result) =
         ScriptRunner(Coproduct[TxOrd](transaction), blockchain, script, isAsset, containerAddress, complexityLimit)
@@ -208,18 +209,17 @@ object Verifier extends ScorexLogging {
       )
     ).toEither
       .leftMap(e => ScriptExecutionError(s"Uncaught execution error: $e", Nil, None))
-      .flatMap {
-        case (log, evaluatedComplexity, evaluationResult) =>
-          val complexity = if (blockchain.storeEvaluatedComplexity) evaluatedComplexity else script.verifierComplexity.toInt
-          val verifierResult = evaluationResult match {
-            case Left(execError) => Left(ScriptExecutionError(execError.message, log, None))
-            case Right(FALSE)    => Left(TransactionNotAllowedByScript(log, None))
-            case Right(TRUE)     => Right(complexity)
-            case Right(x)        => Left(GenericError(s"Script returned not a boolean result, but $x"))
-          }
-          val logId = s"order ${order.idStr()}"
-          logIfNecessary(verifierResult, logId, log, evaluationResult.leftMap(_.message))
-          verifierResult
+      .flatMap { case (log, evaluatedComplexity, evaluationResult) =>
+        val complexity = if (blockchain.storeEvaluatedComplexity) evaluatedComplexity else script.verifierComplexity.toInt
+        val verifierResult = evaluationResult match {
+          case Left(execError) => Left(ScriptExecutionError(execError.message, log, None))
+          case Right(FALSE)    => Left(TransactionNotAllowedByScript(log, None))
+          case Right(TRUE)     => Right(complexity)
+          case Right(x)        => Left(GenericError(s"Script returned not a boolean result, but $x"))
+        }
+        val logId = s"order ${order.idStr()}"
+        logIfNecessary(verifierResult, logId, log, evaluationResult.leftMap(_.message))
+        verifierResult
       }
 
   private def verifyExchange(
@@ -243,7 +243,10 @@ object Verifier extends ScorexLogging {
             TracedResult(Left(GenericError("Can't process transaction with signature from scripted account")))
           }
         }
-        .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(et, blockchain.isFeatureActivated(BlockchainFeatures.RideV6)).as(0)))
+        .getOrElse(
+          stats.signatureVerification
+            .measureForType(typeId)(verifyAsEllipticCurveSignature(et, blockchain.isFeatureActivated(BlockchainFeatures.RideV6)).as(0))
+        )
 
     def orderVerification(order: Order): TracedResult[ValidationError, Int] = {
       val verificationResult = blockchain
@@ -255,7 +258,15 @@ object Verifier extends ScorexLogging {
             Left(GenericError("Can't process order with signature from scripted account"))
           }
         }
-        .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyOrderSignature(order, blockchain.isFeatureActivated(BlockchainFeatures.RideV6)).as(0)))
+        .getOrElse(
+          stats.signatureVerification
+            .measureForType(typeId)(
+              verifyOrderSignature(
+                order,
+                blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
+              ).as(0)
+            )
+        )
 
       TracedResult(verificationResult)
     }
@@ -295,7 +306,7 @@ object Verifier extends ScorexLogging {
         case (sb, (k, Right(v))) =>
           sb.append(s"\nEvaluated `$k` to ")
           v match {
-            case obj: EVALUATED => TermPrinter.print(str => sb.append(str), obj); sb
+            case obj: EVALUATED => TermPrinter().print(str => sb.append(str), obj); sb
             case a              => sb.append(a.toString)
           }
         case (sb, (k, Left(err))) => sb.append(s"\nFailed to evaluate `$k`: $err")

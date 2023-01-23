@@ -103,29 +103,32 @@ trait BaseGlobal {
 
   def parseAndCompileExpression(
       input: String,
+      offset: Int,
       context: CompilerContext,
       letBlockOnly: Boolean,
       stdLibVersion: StdLibVersion,
       estimator: ScriptEstimator
   ): Either[String, (Array[Byte], Long, Expressions.SCRIPT, Iterable[CompilationError])] = {
     (for {
-      compRes <- ExpressionCompiler.compileWithParseResult(input, context)
+      compRes <- ExpressionCompiler.compileWithParseResult(input, offset, context)
       (compExpr, exprScript, compErrorList) = compRes
       illegalBlockVersionUsage              = letBlockOnly && com.wavesplatform.lang.v1.compiler.containsBlockV2(compExpr)
-      _ <- Either.cond(!illegalBlockVersionUsage, (), "UserFunctions are only enabled in STDLIB_VERSION >= 3")
+      _ <- Either.cond(!illegalBlockVersionUsage, (), "UserFunctions are only enabled in STDLIB_VERSION >= 3").leftMap((_, 0, 0))
       bytes = if (compErrorList.isEmpty) serializeExpression(compExpr, stdLibVersion) else Array.empty[Byte]
 
       vars  = utils.varNames(stdLibVersion, Expression)
       costs = utils.functionCosts(stdLibVersion, DAppType)
-      complexity <- if (compErrorList.isEmpty) estimator(vars, costs, compExpr) else Either.right(0L)
+      complexity <- if (compErrorList.isEmpty) estimator(vars, costs, compExpr).leftMap((_, 0, 0)) else Either.right(0L)
     } yield (bytes, complexity, exprScript, compErrorList))
-      .recover { case e =>
-        (Array.empty, 0, Expressions.SCRIPT(AnyPos, Expressions.INVALID(AnyPos, "Unknown error.")), List(Generic(0, 0, e)))
+      .recover { case (e, start, end) =>
+        (Array.empty[Byte], 0L, Expressions.SCRIPT(AnyPos, Expressions.INVALID(AnyPos, "Unknown error.")), List(Generic(start, end, e)))
       }
+      .leftMap(_._1)
   }
 
   def parseAndCompileContract(
       input: String,
+      offset: Int,
       ctx: CompilerContext,
       stdLibVersion: StdLibVersion,
       estimator: ScriptEstimator,
@@ -133,17 +136,18 @@ trait BaseGlobal {
       removeUnusedCode: Boolean
   ): Either[String, (Array[Byte], (Long, Map[String, Long]), Expressions.DAPP, Iterable[CompilationError])] = {
     (for {
-      compRes <- ContractCompiler.compileWithParseResult(input, ctx, stdLibVersion, needCompaction, removeUnusedCode)
+      compRes <- ContractCompiler.compileWithParseResult(input, offset, ctx, stdLibVersion, needCompaction, removeUnusedCode)
       (compDAppOpt, exprDApp, compErrorList) = compRes
       complexityWithMap <-
         if (compDAppOpt.nonEmpty && compErrorList.isEmpty)
-          ContractScript.estimateComplexity(stdLibVersion, compDAppOpt.get, estimator, fixEstimateOfVerifier = true)
+          ContractScript.estimateComplexity(stdLibVersion, compDAppOpt.get, estimator, fixEstimateOfVerifier = true).leftMap((_, 0, 0))
         else Right((0L, Map.empty[String, Long]))
-      bytes <- if (compDAppOpt.nonEmpty && compErrorList.isEmpty) serializeContract(compDAppOpt.get, stdLibVersion) else Right(Array.empty[Byte])
+      bytes <- if (compDAppOpt.nonEmpty && compErrorList.isEmpty) serializeContract(compDAppOpt.get, stdLibVersion).leftMap((_, 0, 0)) else Right(Array.empty[Byte])
     } yield (bytes, complexityWithMap, exprDApp, compErrorList))
-      .recover { case e =>
-        (Array.empty, (0, Map.empty), Expressions.DAPP(AnyPos, List.empty, List.empty), List(Generic(0, 0, e)))
+      .recover { case (e, start, end) =>
+        (Array.empty[Byte], (0L, Map.empty[String, Long]), Expressions.DAPP(AnyPos, List.empty, List.empty), List(Generic(start, end, e)))
       }
+      .leftMap(_._1)
   }
 
   val compileExpression: (String, CompilerContext, StdLibVersion, ScriptType, ScriptEstimator) => Either[String, (Array[Byte], EXPR, Long)] =
@@ -247,18 +251,14 @@ trait BaseGlobal {
       .fromBase64String(compiledCode.trim)
       .map(script => Script.decompile(script)._1)
 
-  def dAppFuncTypes(compiledCode: String): Either[ScriptParseError, FunctionSignatures] =
-    for {
-      script <- Script.fromBase64String(compiledCode.trim)
-      result <- dAppFuncTypes(script)
-    } yield result
-
   def dAppFuncTypes(script: Script): Either[ScriptParseError, FunctionSignatures] =
     script match {
-      case ContractScriptImpl(_, dApp) =>
-        MetaMapper.dicFromProto(dApp).bimap(ScriptParseError, combineMetaWithDApp(_, dApp))
-      case _ => Left(ScriptParseError("Expected DApp"))
+      case ContractScriptImpl(_, dApp) => dAppFuncTypes(dApp)
+      case _                           => Left(ScriptParseError("Expected DApp"))
     }
+
+  def dAppFuncTypes(dApp: DApp): Either[ScriptParseError, FunctionSignatures] =
+    MetaMapper.dicFromProto(dApp).bimap(ScriptParseError, combineMetaWithDApp(_, dApp))
 
   private def combineMetaWithDApp(meta: ParsedMeta, dApp: DApp): FunctionSignatures = {
     val argTypesWithFuncName =
@@ -268,7 +268,7 @@ trait BaseGlobal {
             func.u.name -> (func.u.args zip argTypes)
           }
       )
-    FunctionSignatures(meta.version, argTypesWithFuncName)
+    FunctionSignatures(meta.version, argTypesWithFuncName.toMap)
   }
 
   def merkleVerify(rootBytes: Array[Byte], proofBytes: Array[Byte], valueBytes: Array[Byte]): Boolean

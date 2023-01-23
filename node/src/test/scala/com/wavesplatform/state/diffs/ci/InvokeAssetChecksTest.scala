@@ -60,8 +60,8 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
 
         val dAppAddress = master.toAddress
 
-        def invokeInfo(succeeded: Boolean): VectorMap[ByteStr, NewTransactionInfo] =
-          VectorMap(invoke.id() -> NewTransactionInfo(invoke, Set(invoke.senderAddress, dAppAddress), succeeded, if (!succeeded) 8L else 18L))
+        def invokeInfo(succeeded: Boolean): Vector[NewTransactionInfo] =
+          Vector(NewTransactionInfo(invoke, Set(invoke.senderAddress, dAppAddress), succeeded, if (!succeeded) 8L else 18L))
 
         val expectedResult =
           if (activated) {
@@ -70,8 +70,8 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
                 lengthError
               else
                 nonExistentError
-            Diff(
-              transactions = invokeInfo(false),
+            Diff.withTransactions(
+              invokeInfo(false),
               portfolios = Map(
                 invoke.senderAddress -> Portfolio(-invoke.fee.value),
                 miner -> Portfolio((setScriptTx.fee.value * 0.6 + invoke.fee.value * 0.4).toLong + 6.waves)
@@ -81,10 +81,10 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
             )
           } else {
             val asset = if (func == "invalidLength") invalidLengthAsset else nonExistentAsset
-            Diff(
-              transactions = invokeInfo(true),
+            Diff.withTransactions(
+              invokeInfo(true),
               portfolios = Map(
-                invoke.senderAddress -> Portfolio(-invoke.fee.value, assets = Map(asset -> 0)),
+                invoke.senderAddress -> Portfolio(-invoke.fee.value, assets = VectorMap(asset -> 0)),
                 dAppAddress -> Portfolio.build(asset, 0),
                 miner -> Portfolio((setScriptTx.fee.value * 0.6 + invoke.fee.value * 0.4).toLong + 6.waves)
               ),

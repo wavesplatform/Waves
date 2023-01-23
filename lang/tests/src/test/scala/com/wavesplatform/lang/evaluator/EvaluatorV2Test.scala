@@ -9,6 +9,7 @@ import com.wavesplatform.lang.utils.lazyContexts
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, *}
 import com.wavesplatform.lang.v1.compiler.{Decompiler, ExpressionCompiler}
+import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.LogExtraInfo
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV2, FunctionIds}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.test.*
@@ -19,12 +20,20 @@ import scala.util.Random
 
 class EvaluatorV2Test extends PropSpec with Inside {
   private val version     = V4
-  private val ctx         = lazyContexts(DirectiveSet(version, Account, DApp).explicitGet() -> true)()
+  private val ctx         = lazyContexts((DirectiveSet(version, Account, DApp).explicitGet(), true, true))()
   private val environment = Common.emptyBlockchainEnvironment()
 
   private def evalEither(expr: EXPR, limit: Int, newMode: Boolean): Either[String, (EXPR, Int)] =
     EvaluatorV2
-      .applyLimitedCoeval(expr, limit, ctx.evaluationContext(environment), version, correctFunctionCallScope = true, newMode)
+      .applyLimitedCoeval(
+        expr,
+        LogExtraInfo(),
+        limit,
+        ctx.evaluationContext(environment),
+        version,
+        correctFunctionCallScope = true,
+        newMode
+      )
       .value()
       .bimap(_._1.message, { case (result, complexity, _) => (result, complexity) })
 

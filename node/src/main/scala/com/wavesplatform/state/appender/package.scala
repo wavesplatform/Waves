@@ -39,7 +39,7 @@ package object appender {
           .map { discardedDiffs =>
             utx.removeAll(block.transactionData)
             utx.setPriorityDiffs(discardedDiffs)
-            utx.runCleanup()
+            utx.scheduleCleanup()
             Some(blockchainUpdater.height)
           }
       }
