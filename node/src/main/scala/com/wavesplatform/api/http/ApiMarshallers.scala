@@ -1,10 +1,9 @@
 package com.wavesplatform.api.http
 
 import akka.NotUsed
-import akka.http.scaladsl.common.EntityStreamingSupport
-import akka.http.scaladsl.marshalling._
+import akka.http.scaladsl.marshalling.*
+import akka.http.scaladsl.model.*
 import akka.http.scaladsl.model.MediaTypes.{`application/json`, `text/plain`}
-import akka.http.scaladsl.model._
 import akka.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, PredefinedFromEntityUnmarshallers, Unmarshaller}
 import akka.http.scaladsl.util.FastFuture
 import akka.stream.scaladsl.{Flow, Source}
@@ -12,7 +11,7 @@ import akka.util.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import play.api.libs.json._
+import play.api.libs.json.*
 
 import scala.util.control.Exception.nonFatalCatch
 import scala.util.control.NoStackTrace
