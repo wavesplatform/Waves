@@ -96,15 +96,12 @@ package object database {
 
     file.getAbsoluteFile.getParentFile.mkdirs()
 
-//    new InMemoryDB(
     RocksDB.open(
       options,
       settings.directory,
       Collections.singletonList(new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfo)),
       new util.ArrayList[ColumnFamilyHandle]()
     )
-//      settings.inMemory
-//    )
   }
 
   final type DBEntry = JMap.Entry[Array[Byte], Array[Byte]]
