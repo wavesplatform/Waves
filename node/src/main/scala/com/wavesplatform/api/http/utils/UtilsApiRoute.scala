@@ -19,8 +19,8 @@ import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.lang.{API, CompileResult}
 import com.wavesplatform.serialization.ScriptValuesJson
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.FeeValidation
-import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvokeRejectError}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.TraceStep
@@ -276,19 +276,8 @@ object UtilsApiRoute {
       request: JsObject,
       trace: Boolean,
       maxTxErrorLogSize: Int
-  ): JsObject =
-    evaluate(evaluateScriptComplexityLimit, blockchain, blockchain.accountScript(_).get, address, request, trace, maxTxErrorLogSize)
-
-  def evaluate(
-      evaluateScriptComplexityLimit: Int,
-      blockchain: Blockchain,
-      getAccountScript: Address => AccountScriptInfo,
-      address: Address,
-      request: JsObject,
-      trace: Boolean,
-      maxTxErrorLogSize: Int
   ): JsObject = {
-    val scriptInfo = getAccountScript(address)
+    val scriptInfo = blockchain.accountScript(address).getOrElse(throw new RuntimeException(s"There is no script on '$address'"))
     val pk         = scriptInfo.publicKey
     val script     = scriptInfo.script
 

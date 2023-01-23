@@ -1,7 +1,6 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
-import com.wavesplatform.ride.app.ServiceStatus
 
 class ServiceStatusRouteTestSuite extends RouteSpec("/utils") with RestAPISettingsHelper {
   "ServiceStatusRoute" - {
@@ -9,7 +8,7 @@ class ServiceStatusRouteTestSuite extends RouteSpec("/utils") with RestAPISettin
       val request: HttpRequest = Get("/ride/status")
 
       val healthyRoute = seal(
-        ServiceStatusRoute(() => ServiceStatus(healthy = true)).route
+        ServiceStatusRoute(() => HttpServiceStatus(healthy = true)).route
       )
 
       "HttpStatus is OK when the service is healthy" in request ~> healthyRoute ~> check {
@@ -17,7 +16,7 @@ class ServiceStatusRouteTestSuite extends RouteSpec("/utils") with RestAPISettin
       }
 
       val unhealthyRoute = seal(
-        ServiceStatusRoute(() => ServiceStatus(healthy = false)).route
+        ServiceStatusRoute(() => HttpServiceStatus(healthy = false)).route
       )
 
       "HttpStatus is InternalServerError when the service is unhealthy" in request ~> unhealthyRoute ~> check {

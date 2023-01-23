@@ -23,7 +23,9 @@ import scala.util.Try
 
 // TODO #14: Longs in JS
 case class RideRunnerInput(
-    request: RunnerRequest,
+    address: Address,
+    request: JsObject, // RunnerRequest,
+    trace: Boolean = false,
     accounts: Map[Address, RunnerAccountState] = Map.empty,
     height: Int = 3296627,
     extraFeatures: Set[Short] = Set.empty,
