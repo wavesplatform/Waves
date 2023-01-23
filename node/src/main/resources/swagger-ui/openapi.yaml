@@ -1858,15 +1858,17 @@ paths:
                   stateChanges:
                     $ref: '#/components/schemas/StateChanges'
                   vars:
-                    type: object
-                    properties:
-                      name:
-                        type: string
-                      type:
-                        type: string
-                      value: { }
-                      error:
-                        type: string
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        type:
+                          type: string
+                        value: { }
+                        error:
+                          type: string
         '400':
           description: Conflicting request structure
           content:
