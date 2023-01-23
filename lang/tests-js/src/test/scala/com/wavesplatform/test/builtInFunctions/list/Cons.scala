@@ -15,7 +15,7 @@ object Cons extends JsTestBase {
   private val invalidErrorCons  = testData.invalidFunctionError("cons", 2)
 
   val tests: Tests = Tests {
-    test.apply("check: cons function compiles with a stringList") {
+    test("check: cons function compiles with a stringList") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -27,7 +27,7 @@ object Cons extends JsTestBase {
       }
     }
 
-    test.apply("check: cons function compiles with a intList") {
+    test("check: cons function compiles with a intList") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -39,7 +39,7 @@ object Cons extends JsTestBase {
       }
     }
 
-    test.apply("check: cons function compiles with a stringList (argument before function)") {
+    test("check: cons function compiles with a stringList (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -51,7 +51,7 @@ object Cons extends JsTestBase {
       }
     }
 
-    test.apply("check: cons function compiles with a intList (argument before function)") {
+    test("check: cons function compiles with a intList (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -63,7 +63,7 @@ object Cons extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: cons - Non-matching types") {
+    test("compilation error: cons - Non-matching types") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -75,7 +75,7 @@ object Cons extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: cons - Non-matching types (argument before function)") {
+    test("compilation error: cons - Non-matching types (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -87,7 +87,7 @@ object Cons extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload cons") {
+    test("compilation error: Can't find a function overload cons") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -99,7 +99,7 @@ object Cons extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload cons (argument before function)") {
+    test("compilation error: Can't find a function overload cons (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(

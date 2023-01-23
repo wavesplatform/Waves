@@ -13,7 +13,7 @@ object IndexOf extends JsTestBase {
   private val invalidIndexOf       = "indexOf()"
 
   val tests: Tests = Tests {
-    test.apply("check: indexOf function compiles with a stringList") {
+    test("check: indexOf function compiles with a stringList") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -25,7 +25,7 @@ object IndexOf extends JsTestBase {
       }
     }
 
-    test.apply("check: indexOf function compiles with a intList") {
+    test("check: indexOf function compiles with a intList") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -37,7 +37,7 @@ object IndexOf extends JsTestBase {
       }
     }
 
-    test.apply("check: indexOf function compiles with a stringList (argument before function)") {
+    test("check: indexOf function compiles with a stringList (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -49,7 +49,7 @@ object IndexOf extends JsTestBase {
       }
     }
 
-    test.apply("check: indexOf function compiles with a intList (argument before function)") {
+    test("check: indexOf function compiles with a intList (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -61,7 +61,7 @@ object IndexOf extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: indexOf - Non-matching types - Can't find a function overload") {
+    test("compilation error: indexOf - Non-matching types - Can't find a function overload") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -73,7 +73,7 @@ object IndexOf extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: indexOf - Non-matching types - Can't find a function overload") {
+    test("compilation error: indexOf - Non-matching types - Can't find a function overload") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -85,7 +85,7 @@ object IndexOf extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload indexOf") {
+    test("compilation error: Can't find a function overload indexOf") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(

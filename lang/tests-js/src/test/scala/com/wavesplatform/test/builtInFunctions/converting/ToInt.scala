@@ -14,7 +14,7 @@ object ToInt extends JsTestBase {
   private val invalidParseIntArgBeforeFunc = s"callerTestData.toInt(callerTestData, $randomInt)"
 
   val tests: Tests = Tests {
-    test.apply("check: The toInt function is compiled with ByteVector") {
+    test("check: The toInt function is compiled with ByteVector") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, toInt)
@@ -22,7 +22,7 @@ object ToInt extends JsTestBase {
       }
     }
 
-    test.apply("check: The toInt function is compiled with BigInt") {
+    test("check: The toInt function is compiled with BigInt") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(s"toBigInt($randomInt)", toInt)
@@ -30,7 +30,7 @@ object ToInt extends JsTestBase {
       }
     }
 
-    test.apply("check: The toInt function is compiled with ByteVector (argument before function)") {
+    test("check: The toInt function is compiled with ByteVector (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, toIntArgBeforeFunc)
@@ -38,7 +38,7 @@ object ToInt extends JsTestBase {
       }
     }
 
-    test.apply("check: The toInt function is compiled with BigInt (argument before function)") {
+    test("check: The toInt function is compiled with BigInt (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(s"toBigInt($randomInt)", toIntArgBeforeFunc)
@@ -46,7 +46,7 @@ object ToInt extends JsTestBase {
       }
     }
 
-    test.apply("check: The toIntOnIndex function is compiled with ByteVector") {
+    test("check: The toIntOnIndex function is compiled with ByteVector") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, toIntOnIndex)
@@ -54,7 +54,7 @@ object ToInt extends JsTestBase {
       }
     }
 
-    test.apply("check: The toIntOnIndex function is compiled with ByteVector (argument before function)") {
+    test("check: The toIntOnIndex function is compiled with ByteVector (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, toIntOnIndexArgBeforeFunc)
@@ -62,7 +62,7 @@ object ToInt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid data for function toIntOnIndex with BigInt (argument before function)") {
+    test("compilation error: invalid data for function toIntOnIndex with BigInt (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(s"toBigInt($randomInt)", toIntOnIndexArgBeforeFunc)
@@ -70,7 +70,7 @@ object ToInt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid data for function toInt") {
+    test("compilation error: invalid data for function toInt") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, toInt)
@@ -78,7 +78,7 @@ object ToInt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid data for function toInt (argument before function)") {
+    test("compilation error: invalid data for function toInt (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomDigestAlgorithmTypeArrayElement, toIntArgBeforeFunc)
@@ -86,7 +86,7 @@ object ToInt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid function toInt") {
+    test("compilation error: invalid function toInt") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, invalidFunctionParseInt)
@@ -94,7 +94,7 @@ object ToInt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid function toIntAtIndex (argument before function)") {
+    test("compilation error: invalid function toIntAtIndex (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomDigestAlgorithmTypeArrayElement, invalidParseIntArgBeforeFunc)
@@ -102,7 +102,7 @@ object ToInt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid data for function toIntOnIndex") {
+    test("compilation error: invalid data for function toIntOnIndex") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, toIntOnIndex)
@@ -110,7 +110,7 @@ object ToInt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid data for function toIntOnIndex (argument before function)") {
+    test("compilation error: invalid data for function toIntOnIndex (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomDigestAlgorithmTypeArrayElement, toIntOnIndexArgBeforeFunc)
@@ -118,7 +118,7 @@ object ToInt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid function toIntOnIndex") {
+    test("compilation error: invalid function toIntOnIndex") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, invalidFunctionParseInt)
@@ -126,7 +126,7 @@ object ToInt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid function toIntOnIndex (argument before function)") {
+    test("compilation error: invalid function toIntOnIndex (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomDigestAlgorithmTypeArrayElement, invalidParseIntArgBeforeFunc)

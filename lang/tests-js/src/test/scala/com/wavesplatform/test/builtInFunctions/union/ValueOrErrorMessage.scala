@@ -21,7 +21,7 @@ object ValueOrErrorMessage extends JsTestBase {
   private val valueOrErrorInvalidFunctionMessage      = testData.invalidFunctionError("valueOrErrorMessage", 2)
 
   val tests: Tests = Tests {
-    test.apply("check: function valueOrErrorMessage compiles with Int") {
+    test("check: function valueOrErrorMessage compiles with Int") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomInt.toString, valueOrErrorMessage)
@@ -29,7 +29,7 @@ object ValueOrErrorMessage extends JsTestBase {
       }
     }
 
-    test.apply("check: function valueOrErrorMessage compiles with Boolean") {
+    test("check: function valueOrErrorMessage compiles with Boolean") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script       = precondition.onlyMatcherContract(randomBoolean.toString, valueOrErrorMessage)
@@ -37,7 +37,7 @@ object ValueOrErrorMessage extends JsTestBase {
       }
     }
 
-    test.apply("check: function valueOrErrorMessage compiles with Boolean") {
+    test("check: function valueOrErrorMessage compiles with Boolean") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script       = precondition.onlyMatcherContract(randomStringArrayElement, valueOrErrorMessage)
@@ -45,7 +45,7 @@ object ValueOrErrorMessage extends JsTestBase {
       }
     }
 
-    test.apply("check: function valueOrErrorMessage compiles with ByteVector (argument before function)") {
+    test("check: function valueOrErrorMessage compiles with ByteVector (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, valueOrErrorMessageArgBeforeFunction)
@@ -53,7 +53,7 @@ object ValueOrErrorMessage extends JsTestBase {
       }
     }
 
-    test.apply("check: function valueOrErrorMessage compiles with Address (argument before function)") {
+    test("check: function valueOrErrorMessage compiles with Address (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Address", version)
         val script       = precondition.onlyMatcherContract(randomAddressDataArrayElement, valueOrErrorMessageArgBeforeFunction)
@@ -61,7 +61,7 @@ object ValueOrErrorMessage extends JsTestBase {
       }
     }
 
-    test.apply("check: function valueOrErrorMessage compiles with Alias (argument before function)") {
+    test("check: function valueOrErrorMessage compiles with Alias (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Alias", version)
         val script       = precondition.onlyMatcherContract(randomAliasDataArrayElement, valueOrErrorMessageArgBeforeFunction)
@@ -69,7 +69,7 @@ object ValueOrErrorMessage extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload, invalid data") {
+    test("compilation error: Can't find a function overload, invalid data") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Alias", version)
         val script       = precondition.onlyMatcherContract(randomAddressDataArrayElement, valueOrErrorMessage)
@@ -77,7 +77,7 @@ object ValueOrErrorMessage extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload, invalid data (argument before function)") {
+    test("compilation error: Can't find a function overload, invalid data (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, valueOrErrorMessageArgBeforeFunction)
@@ -85,7 +85,7 @@ object ValueOrErrorMessage extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid function valueOrErrorMessage Can't find a function overload") {
+    test("compilation error: invalid function valueOrErrorMessage Can't find a function overload") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script       = precondition.onlyMatcherContract(randomStringArrayElement, invalidValueOrErrorMessage)
@@ -93,7 +93,7 @@ object ValueOrErrorMessage extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid function valueOrErrorMessage Can't find a function overload (argument before function)") {
+    test("compilation error: invalid function valueOrErrorMessage Can't find a function overload (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, invalidValueOrErrorMessageArgBeforeFunc)

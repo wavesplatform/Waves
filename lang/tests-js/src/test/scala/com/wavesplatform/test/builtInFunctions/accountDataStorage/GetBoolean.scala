@@ -23,7 +23,7 @@ object GetBoolean extends JsTestBase {
   private val invalidGetBooleanValue = s"getBooleanValue(callerTestData)"
 
   val tests: Tests = Tests {
-    test.apply("check: function getBoolean compiles for address") {
+    test("check: function getBoolean compiles for address") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -36,7 +36,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test.apply("check: function getBoolean compiles (argument before function) for address") {
+    test("check: function getBoolean compiles (argument before function) for address") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -49,7 +49,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test.apply("check: function getBoolean compiles for 'this'") {
+    test("check: function getBoolean compiles for 'this'") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -62,7 +62,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test.apply("check: function getBoolean compiles (argument before function) for 'this'") {
+    test("check: function getBoolean compiles (argument before function) for 'this'") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -75,7 +75,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test.apply("check: function getBoolean compiles for alias") {
+    test("check: function getBoolean compiles for alias") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -88,7 +88,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test.apply("check: function getBoolean compiles (argument before function) for alias") {
+    test("check: function getBoolean compiles (argument before function) for alias") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -101,7 +101,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test.apply("check: function own data getBoolean compiles") {
+    test("check: function own data getBoolean compiles") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.codeOwnData(
@@ -113,7 +113,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test.apply("check: function own data getBoolean (argument before function) compiles") {
+    test("check: function own data getBoolean (argument before function) compiles") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.codeOwnData(
@@ -125,7 +125,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test.apply("check: function getBooleanValue compiles for address") {
+    test("check: function getBooleanValue compiles for address") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -138,7 +138,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test.apply("check: function getBooleanValue compiles (argument before function) for address") {
+    test("check: function getBooleanValue compiles (argument before function) for address") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -151,7 +151,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test.apply("check: function getBooleanValue compiles for 'this'") {
+    test("check: function getBooleanValue compiles for 'this'") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -164,7 +164,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test.apply("check: function getBooleanValue compiles (argument before function) for 'this'") {
+    test("check: function getBooleanValue compiles (argument before function) for 'this'") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -177,7 +177,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test.apply("check: function getBooleanValue compiles for alias") {
+    test("check: function getBooleanValue compiles for alias") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -190,7 +190,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test.apply("check: function getBooleanValue compiles (argument before function) for alias") {
+    test("check: function getBooleanValue compiles (argument before function) for alias") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -203,7 +203,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test.apply("check: function own data getBooleanValue (argument before function) compiles") {
+    test("check: function own data getBooleanValue (argument before function) compiles") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.codeOwnData(
@@ -215,7 +215,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test.apply("check: function own data getBooleanValue compiles") {
+    test("check: function own data getBooleanValue compiles") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.codeOwnData(
@@ -227,7 +227,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload getBoolean") {
+    test("compilation error: Can't find a function overload getBoolean") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -240,7 +240,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload getBooleanValue") {
+    test("compilation error: Can't find a function overload getBooleanValue") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -253,7 +253,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a own data function overload getBoolean") {
+    test("compilation error: Can't find a own data function overload getBoolean") {
       for (version <- testData.oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -266,7 +266,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a own data function overload getBooleanValue") {
+    test("compilation error: Can't find a own data function overload getBooleanValue") {
       for (version <- testData.oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -279,7 +279,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload getBoolean - invalid data") {
+    test("compilation error: Can't find a function overload getBoolean - invalid data") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -292,7 +292,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload getBooleanValue - invalid data") {
+    test("compilation error: Can't find a function overload getBooleanValue - invalid data") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -305,7 +305,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a own data function overload getBoolean - invalid data") {
+    test("compilation error: Can't find a own data function overload getBoolean - invalid data") {
       for (version <- testData.actualVersions) {
         val invalidFunction = s"getBooleanValue($randomInt)"
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
@@ -319,7 +319,7 @@ object GetBoolean extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a own data function overload getBooleanValue - invalid data") {
+    test("compilation error: Can't find a own data function overload getBooleanValue - invalid data") {
       for (version <- testData.actualVersions) {
         val invalidFunction = s"$randomInt.getBooleanValue()"
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)

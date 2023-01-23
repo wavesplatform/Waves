@@ -23,7 +23,7 @@ object ToBaseString extends JsTestBase {
   private val invalidErrorForToBase64String          = testData.invalidFunctionError("toBase64String", 1)
 
   val tests: Tests = Tests {
-    test.apply("check: function toBase16String compiles") {
+    test("check: function toBase16String compiles") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -34,7 +34,7 @@ object ToBaseString extends JsTestBase {
       }
     }
 
-    test.apply("check: function toBase16String compiles (argument before function)") {
+    test("check: function toBase16String compiles (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -45,7 +45,7 @@ object ToBaseString extends JsTestBase {
       }
     }
 
-    test.apply("check: function toBase58String compiles") {
+    test("check: function toBase58String compiles") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -56,7 +56,7 @@ object ToBaseString extends JsTestBase {
       }
     }
 
-    test.apply("check: function toBase58String compiles (argument before function)") {
+    test("check: function toBase58String compiles (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -67,7 +67,7 @@ object ToBaseString extends JsTestBase {
       }
     }
 
-    test.apply("check: function toBase64String compiles") {
+    test("check: function toBase64String compiles") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -78,7 +78,7 @@ object ToBaseString extends JsTestBase {
       }
     }
 
-    test.apply("check: function toBase64String compiles (argument before function)") {
+    test("check: function toBase64String compiles (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -90,7 +90,7 @@ object ToBaseString extends JsTestBase {
     }
 
     // invalid data
-    test.apply("compilation error: function toBase16String invalid data") {
+    test("compilation error: function toBase16String invalid data") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -101,7 +101,7 @@ object ToBaseString extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: function toBase16String invalid data (argument before function)") {
+    test("compilation error: function toBase16String invalid data (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -112,7 +112,7 @@ object ToBaseString extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: function toBase58String invalid data") {
+    test("compilation error: function toBase58String invalid data") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -123,7 +123,7 @@ object ToBaseString extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: function toBase58String invalid data (argument before function)") {
+    test("compilation error: function toBase58String invalid data (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -134,7 +134,7 @@ object ToBaseString extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: function toBase64String invalid data") {
+    test("compilation error: function toBase64String invalid data") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -145,7 +145,7 @@ object ToBaseString extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: function toBase64String invalid data (argument before function)") {
+    test("compilation error: function toBase64String invalid data (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -157,7 +157,7 @@ object ToBaseString extends JsTestBase {
     }
 
     // invalid function
-    test.apply("compilation error: invalid function toBase16String") {
+    test("compilation error: invalid function toBase16String") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -168,7 +168,7 @@ object ToBaseString extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid function toBase58String") {
+    test("compilation error: invalid function toBase58String") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -179,7 +179,7 @@ object ToBaseString extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid function toBase64String") {
+    test("compilation error: invalid function toBase64String") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -190,7 +190,7 @@ object ToBaseString extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid function toBase16String (argument before function)") {
+    test("compilation error: invalid function toBase16String (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -201,7 +201,7 @@ object ToBaseString extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid function toBase58String (argument before function)") {
+    test("compilation error: invalid function toBase58String (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -212,7 +212,7 @@ object ToBaseString extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid function toBase64String (argument before function)") {
+    test("compilation error: invalid function toBase64String (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(

@@ -14,7 +14,7 @@ object Keccak256_128Kb extends JsTestBase {
   private val invalidErrorKeccak256_128Kb         = testData.invalidFunctionError("keccak256_128Kb", 1)
 
   val tests: Tests = Tests {
-    test.apply("check: keccak256_128Kb function compiles with a ByteVector") {
+    test("check: keccak256_128Kb function compiles with a ByteVector") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, keccak256_128Kb)
@@ -22,7 +22,7 @@ object Keccak256_128Kb extends JsTestBase {
       }
     }
 
-    test.apply("check: keccak256_128Kb function compiles with a ByteVector(argument before function)") {
+    test("check: keccak256_128Kb function compiles with a ByteVector(argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, keccak256_128KbArgBeforeFunc)
@@ -30,7 +30,7 @@ object Keccak256_128Kb extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: keccak256_128Kb - Non-matching types: expected: ByteVector") {
+    test("compilation error: keccak256_128Kb - Non-matching types: expected: ByteVector") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, keccak256_128Kb)
@@ -38,7 +38,7 @@ object Keccak256_128Kb extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: keccak256_128Kb - Non-matching types: expected: ByteVector (argument before function)") {
+    test("compilation error: keccak256_128Kb - Non-matching types: expected: ByteVector (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script       = precondition.onlyMatcherContract(randomAddressDataArrayElement, keccak256_128KbArgBeforeFunc)
@@ -46,7 +46,7 @@ object Keccak256_128Kb extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload keccak256_128Kb") {
+    test("compilation error: Can't find a function overload keccak256_128Kb") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, invalidKeccak256_128Kb)
@@ -54,7 +54,7 @@ object Keccak256_128Kb extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload keccak256_128Kb (argument before function)") {
+    test("compilation error: Can't find a function overload keccak256_128Kb (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, invalidKeccak256_128KbArgBeforeFunc)

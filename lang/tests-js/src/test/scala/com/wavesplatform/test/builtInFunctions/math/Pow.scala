@@ -16,7 +16,7 @@ object Pow extends JsTestBase {
   private val powError: String = testData.invalidFunctionError("pow", 6)
 
   val tests: Tests = Tests {
-    test.apply("check: pow Int function compiles") {
+    test("check: pow Int function compiles") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.onlyMatcherContract(randomInt.toString, powInt)
@@ -24,7 +24,7 @@ object Pow extends JsTestBase {
       }
     }
 
-    test.apply("check: pow Int function compiles (argument before function)") {
+    test("check: pow Int function compiles (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.onlyMatcherContract(randomInt.toString, powIntArgBeforeFunc)
@@ -32,7 +32,7 @@ object Pow extends JsTestBase {
       }
     }
 
-    test.apply("check: pow BigInt function compiles") {
+    test("check: pow BigInt function compiles") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script = precondition.onlyMatcherContract(s"toBigInt(${randomInt.toString})", powBigInt)
@@ -40,7 +40,7 @@ object Pow extends JsTestBase {
       }
     }
 
-    test.apply("check: pow BigInt function compiles (argument before function)") {
+    test("check: pow BigInt function compiles (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script = precondition.onlyMatcherContract(s"toBigInt(${randomInt.toString})", powBigIntArgBeforeFunc)
@@ -48,7 +48,7 @@ object Pow extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid pow function") {
+    test("compilation error: invalid pow function") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.onlyMatcherContract(randomInt.toString, invalidPowInt)
@@ -60,7 +60,7 @@ object Pow extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid pow data") {
+    test("compilation error: invalid pow data") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.onlyMatcherContract(randomStringArrayElement, powInt)
@@ -72,7 +72,7 @@ object Pow extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid pow data (argument before function)") {
+    test("compilation error: invalid pow data (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.onlyMatcherContract(randomAddressDataArrayElement, powIntArgBeforeFunc)
@@ -84,7 +84,7 @@ object Pow extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid pow data BigInt") {
+    test("compilation error: invalid pow data BigInt") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script = precondition.onlyMatcherContract(randomStringArrayElement, powBigInt)
@@ -92,7 +92,7 @@ object Pow extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid pow data BigInt (argument before function)") {
+    test("compilation error: invalid pow data BigInt (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script = precondition.onlyMatcherContract(randomAliasDataArrayElement, powBigIntArgBeforeFunc)

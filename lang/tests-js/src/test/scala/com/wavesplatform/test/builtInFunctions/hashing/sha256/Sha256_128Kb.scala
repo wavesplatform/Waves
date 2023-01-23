@@ -14,7 +14,7 @@ object Sha256_128Kb extends JsTestBase {
   private val invalidErrorSha256_128Kb  = testData.invalidFunctionError("sha256_128Kb", 1)
 
   val tests: Tests = Tests {
-    test.apply("check: sha256_128Kb function compiles with a ByteVector") {
+    test("check: sha256_128Kb function compiles with a ByteVector") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -27,7 +27,7 @@ object Sha256_128Kb extends JsTestBase {
       }
     }
 
-    test.apply("check: sha256_128Kb function compiles with a ByteVector(argument before function)") {
+    test("check: sha256_128Kb function compiles with a ByteVector(argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -40,7 +40,7 @@ object Sha256_128Kb extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: sha256_128Kb - Non-matching types: expected: ByteVector") {
+    test("compilation error: sha256_128Kb - Non-matching types: expected: ByteVector") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -53,7 +53,7 @@ object Sha256_128Kb extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: sha256_128Kb - Non-matching types: expected: ByteVector (argument before function)") {
+    test("compilation error: sha256_128Kb - Non-matching types: expected: ByteVector (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -66,7 +66,7 @@ object Sha256_128Kb extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload sha256_128Kb") {
+    test("compilation error: Can't find a function overload sha256_128Kb") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -79,7 +79,7 @@ object Sha256_128Kb extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload sha256_128Kb (argument before function)") {
+    test("compilation error: Can't find a function overload sha256_128Kb (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(

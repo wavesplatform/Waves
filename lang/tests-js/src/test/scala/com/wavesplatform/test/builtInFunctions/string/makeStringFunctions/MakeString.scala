@@ -15,7 +15,7 @@ object MakeString extends JsTestBase {
   private val invalidErrorMakeString         = testData.invalidFunctionError("makeString", 2)
 
   val tests: Tests = Tests {
-    test.apply("check: makeString function compiles") {
+    test("check: makeString function compiles") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script       = precondition.simpleRideCode(randomStringArrayElement, stringList, makeString)
@@ -23,7 +23,7 @@ object MakeString extends JsTestBase {
       }
     }
 
-    test.apply("check: makeString function compiles (argument before function)") {
+    test("check: makeString function compiles (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script       = precondition.simpleRideCode(randomStringArrayElement, stringList, makeStringArgBeforeFunc)
@@ -31,7 +31,7 @@ object MakeString extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: makeString - Non-matching types") {
+    test("compilation error: makeString - Non-matching types") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.simpleRideCode(randomInt.toString, randomAliasDataArrayElement, makeStringArgBeforeFunc)
@@ -39,7 +39,7 @@ object MakeString extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: makeString - Non-matching types (argument before function)") {
+    test("compilation error: makeString - Non-matching types (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.simpleRideCode(randomInt.toString, randomIssuesArrayElement, makeStringArgBeforeFunc)
@@ -47,7 +47,7 @@ object MakeString extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload makeString") {
+    test("compilation error: Can't find a function overload makeString") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.simpleRideCode(randomInt.toString, randomAliasDataArrayElement, invalidMakeString)
@@ -55,7 +55,7 @@ object MakeString extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload makeString (argument before function)") {
+    test("compilation error: Can't find a function overload makeString (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(

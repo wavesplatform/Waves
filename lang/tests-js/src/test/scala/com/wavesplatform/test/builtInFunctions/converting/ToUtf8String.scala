@@ -13,7 +13,7 @@ object ToUtf8String extends JsTestBase {
   private val invalidToUtf8StringArgBeforeFunc = "callerTestData.toUtf8String(callerTestData)"
 
   val tests: Tests = Tests {
-    test.apply("check: toUtf8String function compiles with a ByteVector data type") {
+    test("check: toUtf8String function compiles with a ByteVector data type") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -26,7 +26,7 @@ object ToUtf8String extends JsTestBase {
       }
     }
 
-    test.apply("check: toUtf8String function compiles with a string data type (argument before function)") {
+    test("check: toUtf8String function compiles with a string data type (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -39,7 +39,7 @@ object ToUtf8String extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload toUtf8String") {
+    test("compilation error: Can't find a function overload toUtf8String") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -52,7 +52,7 @@ object ToUtf8String extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload toUtf8String (argument before function)") {
+    test("compilation error: Can't find a function overload toUtf8String (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -65,7 +65,7 @@ object ToUtf8String extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Function 'toUtf8String' requires 1 arguments toUtf8String") {
+    test("compilation error: Function 'toUtf8String' requires 1 arguments toUtf8String") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -78,7 +78,7 @@ object ToUtf8String extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Function 'toUtf8String' requires 1 arguments (argument before function)") {
+    test("compilation error: Function 'toUtf8String' requires 1 arguments (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.codeFromMatchingAndCase(

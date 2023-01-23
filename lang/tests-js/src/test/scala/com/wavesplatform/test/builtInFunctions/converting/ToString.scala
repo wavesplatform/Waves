@@ -19,7 +19,7 @@ object ToString extends JsTestBase {
   private val invalidToStrArgBeforeFunc = "callerTestData.toString(callerTestData)"
 
   val tests: Tests = Tests {
-    test.apply("check: toString function compiles with a address data type") {
+    test("check: toString function compiles with a address data type") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -30,7 +30,7 @@ object ToString extends JsTestBase {
       }
     }
 
-    test.apply("check: toString function compiles with a Integer data type") {
+    test("check: toString function compiles with a Integer data type") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -41,7 +41,7 @@ object ToString extends JsTestBase {
       }
     }
 
-    test.apply("check: toString function compiles with a Boolean data type") {
+    test("check: toString function compiles with a Boolean data type") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -52,7 +52,7 @@ object ToString extends JsTestBase {
       }
     }
 
-    test.apply("check: toString function compiles with a BigInt data type") {
+    test("check: toString function compiles with a BigInt data type") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -63,7 +63,7 @@ object ToString extends JsTestBase {
       }
     }
 
-    test.apply("check: toString function compiles with a address data type (argument before function)") {
+    test("check: toString function compiles with a address data type (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -74,7 +74,7 @@ object ToString extends JsTestBase {
       }
     }
 
-    test.apply("check: toString function compiles with a Integer data type (argument before function)") {
+    test("check: toString function compiles with a Integer data type (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -85,7 +85,7 @@ object ToString extends JsTestBase {
       }
     }
 
-    test.apply("check: toString function compiles with a Boolean data type (argument before function)") {
+    test("check: toString function compiles with a Boolean data type (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -96,7 +96,7 @@ object ToString extends JsTestBase {
       }
     }
 
-    test.apply("check: toString function compiles with a Boolean data type (argument before function)") {
+    test("check: toString function compiles with a Boolean data type (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -107,7 +107,7 @@ object ToString extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload toString - invalid data") {
+    test("compilation error: Can't find a function overload toString - invalid data") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -118,7 +118,7 @@ object ToString extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload toString (argument before function) - invalid data") {
+    test("compilation error: Can't find a function overload toString (argument before function) - invalid data") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -129,7 +129,7 @@ object ToString extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload toString - invalid function") {
+    test("compilation error: Can't find a function overload toString - invalid function") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(
@@ -140,7 +140,7 @@ object ToString extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload toString (argument before function) - invalid function") {
+    test("compilation error: Can't find a function overload toString (argument before function) - invalid function") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script = precondition.onlyMatcherContract(

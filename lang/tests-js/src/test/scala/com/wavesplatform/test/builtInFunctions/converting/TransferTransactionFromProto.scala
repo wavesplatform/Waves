@@ -13,7 +13,7 @@ object TransferTransactionFromProto extends JsTestBase {
   private val invalidTransferTransactionFromProtoArgBeforeFunction = "transferTransactionFromProto()"
 
   val tests: Tests = Tests {
-    test.apply("check: function transferTransactionFromProto for version V4 and more compiles for Issue") {
+    test("check: function transferTransactionFromProto for version V4 and more compiles for Issue") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("TransferTransaction", version)
         val script = precondition.onlyMatcherContract(
@@ -24,7 +24,7 @@ object TransferTransactionFromProto extends JsTestBase {
       }
     }
 
-    test.apply("check: function transferTransactionFromProto for version V4 and more (argument before function) compiles for Issue") {
+    test("check: function transferTransactionFromProto for version V4 and more (argument before function) compiles for Issue") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("TransferTransaction", version)
         val script = precondition.onlyMatcherContract(
@@ -35,7 +35,7 @@ object TransferTransactionFromProto extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: function transferTransactionFromProto for V4 and more Non-matching types") {
+    test("compilation error: function transferTransactionFromProto for V4 and more Non-matching types") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("TransferTransaction", version)
         val script = precondition.onlyMatcherContract(
@@ -46,7 +46,7 @@ object TransferTransactionFromProto extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: function transferTransactionFromProto for V4 and more Non-matching types (argument before function)") {
+    test("compilation error: function transferTransactionFromProto for V4 and more Non-matching types (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("TransferTransaction", version)
         val script = precondition.onlyMatcherContract(
@@ -57,7 +57,7 @@ object TransferTransactionFromProto extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: function transferTransactionFromProto for V4 and more Non-matching types") {
+    test("compilation error: function transferTransactionFromProto for V4 and more Non-matching types") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("TransferTransaction", version)
         val script = precondition.onlyMatcherContract(
@@ -68,7 +68,7 @@ object TransferTransactionFromProto extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: function transferTransactionFromProto for V4 and more Non-matching types (argument before function)") {
+    test("compilation error: function transferTransactionFromProto for V4 and more Non-matching types (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("TransferTransaction", version)
         val script = precondition.onlyMatcherContract(
@@ -79,7 +79,7 @@ object TransferTransactionFromProto extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: transferTransactionFromProto for V3 function is missing") {
+    test("compilation error: transferTransactionFromProto for V3 function is missing") {
       val precondition = new GeneratorContractsForBuiltInFunctions("TransferTransaction", V3)
       val script = precondition.onlyMatcherContract(
         randomByteVectorArrayElement,
@@ -88,7 +88,7 @@ object TransferTransactionFromProto extends JsTestBase {
       assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
     }
 
-    test.apply("compilation error: transferTransactionFromProto for V3 (argument before function) function is missing") {
+    test("compilation error: transferTransactionFromProto for V3 (argument before function) function is missing") {
       val precondition = new GeneratorContractsForBuiltInFunctions("TransferTransaction", V3)
       val script = precondition.onlyMatcherContract(
         randomByteVectorArrayElement,

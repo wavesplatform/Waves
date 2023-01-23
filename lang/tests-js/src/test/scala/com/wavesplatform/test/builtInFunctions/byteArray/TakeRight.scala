@@ -12,7 +12,7 @@ object TakeRight extends JsTestBase {
   private val invalidTakeRightArgBeforeFunc = s"callerTestData.takeRight(callerTestData, $randomInt)"
 
   val tests: Tests = Tests {
-    test.apply("check: function takeRight compiles") {
+    test("check: function takeRight compiles") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeWithoutMatcher(
@@ -25,7 +25,7 @@ object TakeRight extends JsTestBase {
       }
     }
 
-    test.apply("check: function takeRight compiles (argument before function)") {
+    test("check: function takeRight compiles (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeWithoutMatcher(
@@ -38,7 +38,7 @@ object TakeRight extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload, invalid data") {
+    test("compilation error: Can't find a function overload, invalid data") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeWithoutMatcher(
@@ -51,7 +51,7 @@ object TakeRight extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload, invalid data (argument before function)") {
+    test("compilation error: Can't find a function overload, invalid data (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeWithoutMatcher(
@@ -64,7 +64,7 @@ object TakeRight extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid function takeRight Can't find a function overload") {
+    test("compilation error: invalid function takeRight Can't find a function overload") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeWithoutMatcher(
@@ -77,7 +77,7 @@ object TakeRight extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid function takeRight Can't find a function overload (argument before function)") {
+    test("compilation error: invalid function takeRight Can't find a function overload (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeWithoutMatcher(

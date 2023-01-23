@@ -15,7 +15,7 @@ object CreateMerkleRoot extends JsTestBase {
   private val invalidErrorCreateMerkleRoot         = testData.invalidFunctionError("createMerkleRoot", 3)
 
   val tests: Tests = Tests {
-    test.apply("check: createMerkleRoot function compiles with a ByteVector") {
+    test("check: createMerkleRoot function compiles with a ByteVector") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, createMerkleRoot)
@@ -23,7 +23,7 @@ object CreateMerkleRoot extends JsTestBase {
       }
     }
 
-    test.apply("check: createMerkleRoot function compiles with a ByteVector(argument before function)") {
+    test("check: createMerkleRoot function compiles with a ByteVector(argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, createMerkleRootArgBeforeFunc)
@@ -31,7 +31,7 @@ object CreateMerkleRoot extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: createMerkleRoot - Non-matching types: expected: ByteVector") {
+    test("compilation error: createMerkleRoot - Non-matching types: expected: ByteVector") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, createMerkleRoot)
@@ -39,7 +39,7 @@ object CreateMerkleRoot extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: createMerkleRoot - Non-matching types: expected: ByteVector (argument before function)") {
+    test("compilation error: createMerkleRoot - Non-matching types: expected: ByteVector (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script       = precondition.onlyMatcherContract(randomAddressDataArrayElement, createMerkleRootArgBeforeFunc)
@@ -47,7 +47,7 @@ object CreateMerkleRoot extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload createMerkleRoot") {
+    test("compilation error: Can't find a function overload createMerkleRoot") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, invalidCreateMerkleRoot)
@@ -55,7 +55,7 @@ object CreateMerkleRoot extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload createMerkleRoot (argument before function)") {
+    test("compilation error: Can't find a function overload createMerkleRoot (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, invalidCreateMerkleRootArgBeforeFunc)
@@ -63,7 +63,7 @@ object CreateMerkleRoot extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function createMerkleRoot") {
+    test("compilation error: Can't find a function createMerkleRoot") {
       val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
       val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, createMerkleRoot)
       assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)

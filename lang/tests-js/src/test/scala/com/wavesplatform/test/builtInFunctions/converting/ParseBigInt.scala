@@ -20,7 +20,7 @@ object ParseBigInt extends JsTestBase {
   private val invalidFunctionErrorResultParseBigIntValue: String = testData.invalidFunctionError("parseBigIntValue", 1)
 
   val tests: Tests = Tests {
-    test.apply("check: function parseBigInt compiles") {
+    test("check: function parseBigInt compiles") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script = precondition.onlyMatcherContract(
@@ -31,7 +31,7 @@ object ParseBigInt extends JsTestBase {
       }
     }
 
-    test.apply("check: function parseBigInt compiles (argument before function)") {
+    test("check: function parseBigInt compiles (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script = precondition.onlyMatcherContract(
@@ -42,7 +42,7 @@ object ParseBigInt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find function parseBigInt (argument before function)") {
+    test("compilation error: Can't find function parseBigInt (argument before function)") {
       for (version <- testData.oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script = precondition.onlyMatcherContract(
@@ -53,7 +53,7 @@ object ParseBigInt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid function parseBigInt") {
+    test("compilation error: invalid function parseBigInt") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script = precondition.onlyMatcherContract(
@@ -64,7 +64,7 @@ object ParseBigInt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid function parseBigInt") {
+    test("compilation error: invalid function parseBigInt") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script = precondition.onlyMatcherContract(
@@ -75,7 +75,7 @@ object ParseBigInt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid data for function parseBigInt") {
+    test("compilation error: invalid data for function parseBigInt") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script = precondition.onlyMatcherContract(
@@ -86,7 +86,7 @@ object ParseBigInt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid data for function parseBigInt (argument before function)") {
+    test("compilation error: invalid data for function parseBigInt (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script = precondition.onlyMatcherContract(
@@ -97,7 +97,7 @@ object ParseBigInt extends JsTestBase {
       }
     }
 
-    test.apply("check: function parseBigIntValue compiles") {
+    test("check: function parseBigIntValue compiles") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script = precondition.onlyMatcherContract(
@@ -108,7 +108,7 @@ object ParseBigInt extends JsTestBase {
       }
     }
 
-    test.apply("check: function parseBigIntValue compiles (argument before function)") {
+    test("check: function parseBigIntValue compiles (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script = precondition.onlyMatcherContract(
@@ -119,7 +119,7 @@ object ParseBigInt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find function parseBigIntValue (argument before function)") {
+    test("compilation error: Can't find function parseBigIntValue (argument before function)") {
       for (version <- testData.oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script = precondition.onlyMatcherContract(
@@ -130,7 +130,7 @@ object ParseBigInt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid function parseBigIntValue") {
+    test("compilation error: invalid function parseBigIntValue") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script = precondition.onlyMatcherContract(
@@ -141,7 +141,7 @@ object ParseBigInt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid function parseBigIntValue") {
+    test("compilation error: invalid function parseBigIntValue") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script = precondition.onlyMatcherContract(
@@ -152,7 +152,7 @@ object ParseBigInt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid data for function parseBigIntValue") {
+    test("compilation error: invalid data for function parseBigIntValue") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script = precondition.onlyMatcherContract(
@@ -163,7 +163,7 @@ object ParseBigInt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid data for function parseBigIntValue (argument before function)") {
+    test("compilation error: invalid data for function parseBigIntValue (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script = precondition.onlyMatcherContract(

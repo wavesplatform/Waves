@@ -29,7 +29,7 @@ object NegativeTestsOfUnsupportedMethods extends JsTestBase {
   private val min = "min(callerTestData)"
 
   val tests: Tests = Tests {
-    test.apply("compilation error: Undefined type: `BigInt` for ride v3, v4") {
+    test("compilation error: Undefined type: `BigInt` for ride v3, v4") {
       for (version <- testData.oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script       = precondition.onlyMatcherContract(randomInt.toString, toBigInt)
@@ -37,7 +37,7 @@ object NegativeTestsOfUnsupportedMethods extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Undefined type: `BigInt` for ride v3, v4 (argument before function)") {
+    test("compilation error: Undefined type: `BigInt` for ride v3, v4 (argument before function)") {
       for (version <- testData.oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script       = precondition.onlyMatcherContract(randomStringArrayElement, toBigIntArgBeforeFunc)
@@ -45,7 +45,7 @@ object NegativeTestsOfUnsupportedMethods extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid data invoke for ride v3, v4 (argument before function)") {
+    test("compilation error: invalid data invoke for ride v3, v4 (argument before function)") {
       for (version <- testData.oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.codeForDAppInvocation(randomByteVectorArrayElement, randomAddressDataArrayElement, invokeArgBeforeFunc)
@@ -53,7 +53,7 @@ object NegativeTestsOfUnsupportedMethods extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: blake2b256_16Kb Can't find a function for V3") {
+    test("compilation error: blake2b256_16Kb Can't find a function for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
       val script = precondition.codeFromMatchingAndCase(
         randomByteVectorArrayElement,
@@ -64,7 +64,7 @@ object NegativeTestsOfUnsupportedMethods extends JsTestBase {
       assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
     }
 
-    test.apply("compilation error: blake2b256_32Kb Can't find a function for V3") {
+    test("compilation error: blake2b256_32Kb Can't find a function for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
       val script = precondition.codeFromMatchingAndCase(
         randomByteVectorArrayElement,
@@ -75,7 +75,7 @@ object NegativeTestsOfUnsupportedMethods extends JsTestBase {
       assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
     }
 
-    test.apply("compilation error: blake2b256_64Kb Can't find a function for V3") {
+    test("compilation error: blake2b256_64Kb Can't find a function for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
       val script = precondition.codeFromMatchingAndCase(
         randomByteVectorArrayElement,
@@ -86,7 +86,7 @@ object NegativeTestsOfUnsupportedMethods extends JsTestBase {
       assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
     }
 
-    test.apply("compilation error: blake2b256_128Kb Can't find a function for V3") {
+    test("compilation error: blake2b256_128Kb Can't find a function for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
       val script = precondition.codeFromMatchingAndCase(
         randomByteVectorArrayElement,
@@ -97,7 +97,7 @@ object NegativeTestsOfUnsupportedMethods extends JsTestBase {
       assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
     }
 
-    test.apply("compilation error: keccak256_16Kb Can't find a function for V3") {
+    test("compilation error: keccak256_16Kb Can't find a function for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
       val script = precondition.codeFromMatchingAndCase(
         randomByteVectorArrayElement,
@@ -108,7 +108,7 @@ object NegativeTestsOfUnsupportedMethods extends JsTestBase {
       assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
     }
 
-    test.apply("compilation error: keccak256_32Kb Can't find a function for V3") {
+    test("compilation error: keccak256_32Kb Can't find a function for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
       val script = precondition.codeFromMatchingAndCase(
         randomByteVectorArrayElement,
@@ -119,7 +119,7 @@ object NegativeTestsOfUnsupportedMethods extends JsTestBase {
       assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
     }
 
-    test.apply("compilation error: keccak256_64Kb Can't find a function for V3") {
+    test("compilation error: keccak256_64Kb Can't find a function for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
       val script = precondition.codeFromMatchingAndCase(
         randomByteVectorArrayElement,
@@ -130,7 +130,7 @@ object NegativeTestsOfUnsupportedMethods extends JsTestBase {
       assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
     }
 
-    test.apply("compilation error: keccak256_128Kb Can't find a function for V3") {
+    test("compilation error: keccak256_128Kb Can't find a function for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
       val script = precondition.codeFromMatchingAndCase(
         randomByteVectorArrayElement,
@@ -141,31 +141,31 @@ object NegativeTestsOfUnsupportedMethods extends JsTestBase {
       assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
     }
 
-    test.apply("compilation error: containsElement Can't find a function for V3") {
+    test("compilation error: containsElement Can't find a function for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("", V3)
       val script       = precondition.simpleRideCode(randomStringArrayElement, stringList, containsElement)
       assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
     }
 
-    test.apply("compilation error: indexOf Can't find a function for V3") {
+    test("compilation error: indexOf Can't find a function for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("", V3)
       val script       = precondition.simpleRideCode(randomInt.toString, intList, indexOf)
       assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
     }
 
-    test.apply("compilation error: max Can't find a function for V3") {
+    test("compilation error: max Can't find a function for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("", V3)
       val script       = precondition.simpleRideCode(randomInt.toString, intList, max)
       assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
     }
 
-    test.apply("compilation error: max Can't find a function for V3") {
+    test("compilation error: max Can't find a function for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("", V3)
       val script       = precondition.simpleRideCode(randomInt.toString, intList, min)
       assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
     }
 
-    test.apply("compilation error: removeByIndex Can't find a function for V3") {
+    test("compilation error: removeByIndex Can't find a function for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("", V3)
       val script       = precondition.simpleRideCode(randomInt.toString, intList, removeByIndex)
       assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)

@@ -14,7 +14,7 @@ object Size extends JsTestBase {
   private val invalidSizeArgBeforeFunc = "callerTestData.size(callerTestData)"
 
   val tests: Tests = Tests {
-    test.apply("check: size function compiles with a Int") {
+    test("check: size function compiles with a Int") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(intList, size)
@@ -22,7 +22,7 @@ object Size extends JsTestBase {
       }
     }
 
-    test.apply("check: size function compiles with a Int (argument before function)") {
+    test("check: size function compiles with a Int (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(intList, sizeArgBeforeFunc)
@@ -30,7 +30,7 @@ object Size extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: size - Non-matching types: expected: Int") {
+    test("compilation error: size - Non-matching types: expected: Int") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, size)
@@ -38,7 +38,7 @@ object Size extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: size - Non-matching types: expected: Int (argument before function)") {
+    test("compilation error: size - Non-matching types: expected: Int (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomAddressDataArrayElement, sizeArgBeforeFunc)
@@ -46,7 +46,7 @@ object Size extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload size") {
+    test("compilation error: Can't find a function overload size") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, invalidSize)
@@ -54,7 +54,7 @@ object Size extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload size (argument before function)") {
+    test("compilation error: Can't find a function overload size (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(intList, invalidSizeArgBeforeFunc)

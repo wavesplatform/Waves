@@ -15,7 +15,7 @@ object RemoveByIndex extends JsTestBase {
   private val invalidErrorRemoveByIndex         = testData.invalidFunctionError("removeByIndex", 2)
 
   val tests: Tests = Tests {
-    test.apply("check: removeByIndex function compiles") {
+    test("check: removeByIndex function compiles") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.simpleRideCode(randomInt.toString, stringList, removeByIndex)
@@ -23,7 +23,7 @@ object RemoveByIndex extends JsTestBase {
       }
     }
 
-    test.apply("check: removeByIndex function compiles (argument before function)") {
+    test("check: removeByIndex function compiles (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.simpleRideCode(randomInt.toString, stringList, removeByIndexArgBeforeFunc)
@@ -31,7 +31,7 @@ object RemoveByIndex extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: removeByIndex - Non-matching types") {
+    test("compilation error: removeByIndex - Non-matching types") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.simpleRideCode(randomInt.toString, randomAliasDataArrayElement, removeByIndexArgBeforeFunc)
@@ -39,7 +39,7 @@ object RemoveByIndex extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: removeByIndex - Non-matching types (argument before function)") {
+    test("compilation error: removeByIndex - Non-matching types (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.simpleRideCode(randomInt.toString, randomIssuesArrayElement, removeByIndexArgBeforeFunc)
@@ -47,7 +47,7 @@ object RemoveByIndex extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload removeByIndex") {
+    test("compilation error: Can't find a function overload removeByIndex") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.simpleRideCode(randomInt.toString, randomAliasDataArrayElement, invalidRemoveByIndex)
@@ -55,7 +55,7 @@ object RemoveByIndex extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload removeByIndex (argument before function)") {
+    test("compilation error: Can't find a function overload removeByIndex (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(

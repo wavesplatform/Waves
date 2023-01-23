@@ -13,7 +13,7 @@ object ToBytes extends JsTestBase {
   private val invalidToBytesArgBeforeFunc = "callerTestData.toBytes(callerTestData)"
 
   val tests: Tests = Tests {
-    test.apply("check: toBytes function compiles with a string data type") {
+    test("check: toBytes function compiles with a string data type") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -26,7 +26,7 @@ object ToBytes extends JsTestBase {
       }
     }
 
-    test.apply("check: toBytes function compiles with a Integer data type") {
+    test("check: toBytes function compiles with a Integer data type") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -39,7 +39,7 @@ object ToBytes extends JsTestBase {
       }
     }
 
-    test.apply("check: toBytes function compiles with a Boolean data type") {
+    test("check: toBytes function compiles with a Boolean data type") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -52,7 +52,7 @@ object ToBytes extends JsTestBase {
       }
     }
 
-    test.apply("check: toBytes function compiles with a BigInt data type") {
+    test("check: toBytes function compiles with a BigInt data type") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -65,7 +65,7 @@ object ToBytes extends JsTestBase {
       }
     }
 
-    test.apply("check: toBytes function compiles with a string data type (argument before function)") {
+    test("check: toBytes function compiles with a string data type (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -78,7 +78,7 @@ object ToBytes extends JsTestBase {
       }
     }
 
-    test.apply("check: toBytes function compiles with a Integer data type (argument before function)") {
+    test("check: toBytes function compiles with a Integer data type (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -91,7 +91,7 @@ object ToBytes extends JsTestBase {
       }
     }
 
-    test.apply("check: toBytes function compiles with a Boolean data type (argument before function)") {
+    test("check: toBytes function compiles with a Boolean data type (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -104,7 +104,7 @@ object ToBytes extends JsTestBase {
       }
     }
 
-    test.apply("check: toBytes function compiles with a BigInt data type (argument before function)") {
+    test("check: toBytes function compiles with a BigInt data type (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -117,7 +117,7 @@ object ToBytes extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload toBytes") {
+    test("compilation error: Can't find a function overload toBytes") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -130,7 +130,7 @@ object ToBytes extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload toBytes (argument before function)") {
+    test("compilation error: Can't find a function overload toBytes (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -143,7 +143,7 @@ object ToBytes extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload toBytes") {
+    test("compilation error: Can't find a function overload toBytes") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -156,7 +156,7 @@ object ToBytes extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload toBytes (argument before function)") {
+    test("compilation error: Can't find a function overload toBytes (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(

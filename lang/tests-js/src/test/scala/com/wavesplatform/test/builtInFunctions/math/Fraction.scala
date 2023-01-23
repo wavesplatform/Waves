@@ -33,7 +33,7 @@ object Fraction extends JsTestBase {
   private val fractionError: String                = testData.invalidFunctionError("fraction", 3)
 
   val tests: Tests = Tests {
-    test.apply("check: fraction Int function compiles") {
+    test("check: fraction Int function compiles") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomInt.toString, fractionInt)
@@ -41,7 +41,7 @@ object Fraction extends JsTestBase {
       }
     }
 
-    test.apply("check: fraction Int function compiles (argument before function)") {
+    test("check: fraction Int function compiles (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomInt.toString, fractionIntArgBeforeFunc)
@@ -49,7 +49,7 @@ object Fraction extends JsTestBase {
       }
     }
 
-    test.apply("check: fraction Int and union function compiles ") {
+    test("check: fraction Int and union function compiles ") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomInt.toString, fractionIntAndUnion)
@@ -57,7 +57,7 @@ object Fraction extends JsTestBase {
       }
     }
 
-    test.apply("check: fraction Int and union function compiles (argument before function)") {
+    test("check: fraction Int and union function compiles (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomInt.toString, fractionIntAndUnionArgBeforeFunc)
@@ -65,7 +65,7 @@ object Fraction extends JsTestBase {
       }
     }
 
-    test.apply("check: fraction BigInt function compiles") {
+    test("check: fraction BigInt function compiles") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script       = precondition.onlyMatcherContract(s"toBigInt(${randomInt.toString})", fractionBigInt)
@@ -73,7 +73,7 @@ object Fraction extends JsTestBase {
       }
     }
 
-    test.apply("check: fraction BigInt function compiles (argument before function)") {
+    test("check: fraction BigInt function compiles (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script       = precondition.onlyMatcherContract(s"toBigInt(${randomInt.toString})", fractionBigIntArgBeforeFunc)
@@ -81,7 +81,7 @@ object Fraction extends JsTestBase {
       }
     }
 
-    test.apply("check: fraction BigInt and union function compiles ") {
+    test("check: fraction BigInt and union function compiles ") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script = precondition.onlyMatcherContract(
@@ -92,7 +92,7 @@ object Fraction extends JsTestBase {
       }
     }
 
-    test.apply("check: fraction BigInt and union function compiles (argument before function)") {
+    test("check: fraction BigInt and union function compiles (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script       = precondition.onlyMatcherContract(s"toBigInt(${randomInt.toString})", fractionBigIntAndUnionArgBeforeFunc)
@@ -100,7 +100,7 @@ object Fraction extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid fraction function") {
+    test("compilation error: invalid fraction function") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomInt.toString, invalidFractionFunction)
@@ -112,7 +112,7 @@ object Fraction extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid fraction function (argument before function)") {
+    test("compilation error: invalid fraction function (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomInt.toString, invalidFractionFunctionArgBeforeFunc)
@@ -124,7 +124,7 @@ object Fraction extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid fraction data") {
+    test("compilation error: invalid fraction data") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomStringArrayElement, fractionInt)
@@ -136,7 +136,7 @@ object Fraction extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid fraction data (argument before function)") {
+    test("compilation error: invalid fraction data (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomAddressDataArrayElement, fractionIntArgBeforeFunc)
@@ -148,7 +148,7 @@ object Fraction extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid fraction data BigInt") {
+    test("compilation error: invalid fraction data BigInt") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script       = precondition.onlyMatcherContract(randomStringArrayElement, fractionBigInt)
@@ -156,7 +156,7 @@ object Fraction extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid fraction data BigInt (argument before function)") {
+    test("compilation error: invalid fraction data BigInt (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script       = precondition.onlyMatcherContract(randomAliasDataArrayElement, fractionBigIntArgBeforeFunc)
@@ -164,7 +164,7 @@ object Fraction extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid fraction data BigInt and unit") {
+    test("compilation error: invalid fraction data BigInt and unit") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script       = precondition.onlyMatcherContract(randomStringArrayElement, fractionBigIntAndUnion)
@@ -172,7 +172,7 @@ object Fraction extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid fraction data BigInt and unit (argument before function)") {
+    test("compilation error: invalid fraction data BigInt and unit (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script       = precondition.onlyMatcherContract(randomAliasDataArrayElement, fractionBigIntAndUnionArgBeforeFunc)
@@ -180,7 +180,7 @@ object Fraction extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: fraction Int and Union invalid data") {
+    test("compilation error: fraction Int and Union invalid data") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomIssuesArrayElement, fractionIntAndUnion)
@@ -188,7 +188,7 @@ object Fraction extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: fraction Int and Union invalid data (argument before function)") {
+    test("compilation error: fraction Int and Union invalid data (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, fractionIntAndUnionArgBeforeFunc)
@@ -196,7 +196,7 @@ object Fraction extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Function 'fraction' requires 3 arguments, but 4 are provided for V3, V4") {
+    test("compilation error: Function 'fraction' requires 3 arguments, but 4 are provided for V3, V4") {
       for (version <- testData.oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomInt.toString, fractionIntAndUnion)

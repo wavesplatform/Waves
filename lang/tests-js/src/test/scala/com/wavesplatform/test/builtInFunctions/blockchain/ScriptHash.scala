@@ -13,7 +13,7 @@ object ScriptHash extends JsTestBase {
   private val invalidScriptHashArgBeforeFunc = s"callerTestData.scriptHash($randomStringArrayElement)"
 
   val tests: Tests = Tests {
-    test.apply("check: function scriptHash for V5 and more compiles for address") {
+    test("check: function scriptHash for V5 and more compiles for address") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -26,7 +26,7 @@ object ScriptHash extends JsTestBase {
       }
     }
 
-    test.apply("check: function scriptHash for V5 and more (argument before function) compiles for address") {
+    test("check: function scriptHash for V5 and more (argument before function) compiles for address") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -39,7 +39,7 @@ object ScriptHash extends JsTestBase {
       }
     }
 
-    test.apply("check: function scriptHash for V5 and more compiles for 'this'") {
+    test("check: function scriptHash for V5 and more compiles for 'this'") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -52,7 +52,7 @@ object ScriptHash extends JsTestBase {
       }
     }
 
-    test.apply("check: function scriptHash for V5 and more (argument before function) compiles for 'this'") {
+    test("check: function scriptHash for V5 and more (argument before function) compiles for 'this'") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -65,7 +65,7 @@ object ScriptHash extends JsTestBase {
       }
     }
 
-    test.apply("check: function scriptHash for V5 and more compiles for alias") {
+    test("check: function scriptHash for V5 and more compiles for alias") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -78,7 +78,7 @@ object ScriptHash extends JsTestBase {
       }
     }
 
-    test.apply("check: function scriptHash for V5 and more (argument before function) compiles for alias") {
+    test("check: function scriptHash for V5 and more (argument before function) compiles for alias") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -91,7 +91,7 @@ object ScriptHash extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: scriptHash Non-matching types: expected: Address|Alias") {
+    test("compilation error: scriptHash Non-matching types: expected: Address|Alias") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -104,7 +104,7 @@ object ScriptHash extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: scriptHash Non-matching types: expected: Address|Alias (argument before function)") {
+    test("compilation error: scriptHash Non-matching types: expected: Address|Alias (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -117,7 +117,7 @@ object ScriptHash extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Function 'scriptHash' requires 1 arguments, but 0 are provided") {
+    test("compilation error: Function 'scriptHash' requires 1 arguments, but 0 are provided") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -130,7 +130,7 @@ object ScriptHash extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Function 'scriptHash' requires 1 arguments, but 0 are provided (argument before function)") {
+    test("compilation error: Function 'scriptHash' requires 1 arguments, but 0 are provided (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -143,7 +143,7 @@ object ScriptHash extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: scriptHash function is missing") {
+    test("compilation error: scriptHash function is missing") {
       for (version <- testData.oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -156,7 +156,7 @@ object ScriptHash extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: scriptHash (argument before function) function is missing") {
+    test("compilation error: scriptHash (argument before function) function is missing") {
       for (version <- testData.oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
