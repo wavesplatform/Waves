@@ -23,7 +23,7 @@ object GetInteger extends JsTestBase {
   private val invalidGetIntValue = s"getIntegerValue(callerTestData)"
 
   val tests: Tests = Tests {
-    test.apply("check: function getInteger compiles for address") {
+    test("check: function getInteger compiles for address") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -37,7 +37,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test.apply("check: function getInteger compiles (argument before function) for address") {
+    test("check: function getInteger compiles (argument before function) for address") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -51,7 +51,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test.apply("check: function getInteger compiles for 'this'") {
+    test("check: function getInteger compiles for 'this'") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -65,7 +65,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test.apply("check: function getInteger compiles (argument before function) for 'this'") {
+    test("check: function getInteger compiles (argument before function) for 'this'") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -79,7 +79,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test.apply("check: function getInteger compiles for alias") {
+    test("check: function getInteger compiles for alias") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -93,7 +93,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test.apply("check: function getInteger compiles (argument before function) for alias") {
+    test("check: function getInteger compiles (argument before function) for alias") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -107,7 +107,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test.apply("check: function own data getInteger compiles") {
+    test("check: function own data getInteger compiles") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeOwnData(
@@ -120,7 +120,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test.apply("check: function own data getInteger (argument before function) compiles") {
+    test("check: function own data getInteger (argument before function) compiles") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeOwnData(
@@ -133,7 +133,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test.apply("check: function getIntegerValue compiles for address") {
+    test("check: function getIntegerValue compiles for address") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -147,7 +147,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test.apply("check: function getIntegerValue compiles (argument before function) for address") {
+    test("check: function getIntegerValue compiles (argument before function) for address") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -161,7 +161,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test.apply("check: function getIntegerValue compiles for 'this'") {
+    test("check: function getIntegerValue compiles for 'this'") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -175,7 +175,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test.apply("check: function getIntegerValue compiles (argument before function) for 'this'") {
+    test("check: function getIntegerValue compiles (argument before function) for 'this'") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -189,7 +189,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test.apply("check: function getIntegerValue compiles for alias") {
+    test("check: function getIntegerValue compiles for alias") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -203,7 +203,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test.apply("check: function getIntegerValue compiles (argument before function) for alias") {
+    test("check: function getIntegerValue compiles (argument before function) for alias") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -217,7 +217,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test.apply("check: function own data getIntegerValue (argument before function) compiles") {
+    test("check: function own data getIntegerValue (argument before function) compiles") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeOwnData(
@@ -230,7 +230,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test.apply("check: function own data getIntegerValue compiles") {
+    test("check: function own data getIntegerValue compiles") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeOwnData(
@@ -243,7 +243,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload getInteger") {
+    test("compilation error: Can't find a function overload getInteger") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -257,7 +257,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload getIntegerValue") {
+    test("compilation error: Can't find a function overload getIntegerValue") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -271,7 +271,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a own data function overload getInteger") {
+    test("compilation error: Can't find a own data function overload getInteger") {
       for (version <- testData.oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -285,7 +285,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a own data function overload getIntegerValue") {
+    test("compilation error: Can't find a own data function overload getIntegerValue") {
       for (version <- testData.oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -299,7 +299,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload getInteger - invalid data") {
+    test("compilation error: Can't find a function overload getInteger - invalid data") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -312,7 +312,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload getIntegerValue - invalid data") {
+    test("compilation error: Can't find a function overload getIntegerValue - invalid data") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -325,7 +325,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a own data function overload getInteger - invalid data") {
+    test("compilation error: Can't find a own data function overload getInteger - invalid data") {
       for (version <- testData.actualVersions) {
         val invalidFunction = s"getIntegerValue($randomInt)"
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
@@ -339,7 +339,7 @@ object GetInteger extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a own data function overload getIntegerValue - invalid data") {
+    test("compilation error: Can't find a own data function overload getIntegerValue - invalid data") {
       for (version <- testData.actualVersions) {
         val invalidFunction = s"$randomInt.getIntegerValue()"
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)

@@ -14,37 +14,37 @@ object MakeString_2C extends JsTestBase {
   private val invalidErrorMakeString_2C    = testData.invalidFunctionError("makeString_2C", 2)
 
   val tests: Tests = Tests {
-    test.apply("check: makeString_2C function compiles") {
+    test("check: makeString_2C function compiles") {
       val precondition = new GeneratorContractsForBuiltInFunctions("String", V6)
       val script       = precondition.simpleRideCode(randomStringArrayElement, stringList, makeString_2C)
       assertCompileSuccessDApp(script, V6)
     }
 
-    test.apply("check: makeString_2C function compiles (argument before function)") {
+    test("check: makeString_2C function compiles (argument before function)") {
       val precondition = new GeneratorContractsForBuiltInFunctions("String", V6)
       val script       = precondition.simpleRideCode(randomStringArrayElement, stringList, makeString_2CArgBeforeFunc)
       assertCompileSuccessDApp(script, V6)
     }
 
-    test.apply("compilation error: invalid makeString_2C function") {
+    test("compilation error: invalid makeString_2C function") {
       val precondition = new GeneratorContractsForBuiltInFunctions("String", V6)
       val script       = precondition.simpleRideCode(randomStringArrayElement, stringList, invalidMakeString_2CFunction)
       assertCompileErrorDApp(script, V6, invalidErrorMakeString_2C)
     }
 
-    test.apply("compilation error: invalid makeString_2C data") {
+    test("compilation error: invalid makeString_2C data") {
       val precondition = new GeneratorContractsForBuiltInFunctions("String", V6)
       val script       = precondition.simpleRideCode(randomIssuesArrayElement, stringList, makeString_2C)
       assertCompileErrorDApp(script, V6, testData.nonMatchingTypes("String"))
     }
 
-    test.apply("compilation error: invalid makeString_2C data (argument before function)") {
+    test("compilation error: invalid makeString_2C data (argument before function)") {
       val precondition = new GeneratorContractsForBuiltInFunctions("String", V6)
       val script = precondition.simpleRideCode(randomInt.toString, stringList, makeString_2CArgBeforeFunc)
       assertCompileErrorDApp(script, V6, testData.nonMatchingTypes("String"))
     }
 
-    test.apply("compilation error: makeString_2C Can't find a function for V3 - V5") {
+    test("compilation error: makeString_2C Can't find a function for V3 - V5") {
       for (version <- testData.versionsWithoutV6) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script       = precondition.simpleRideCode(randomStringArrayElement, stringList, makeString_2C)
@@ -52,7 +52,7 @@ object MakeString_2C extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: makeString_2C Can't find a function for V3 - V5 (argument before function") {
+    test("compilation error: makeString_2C Can't find a function for V3 - V5 (argument before function") {
       for (version <- testData.versionsWithoutV6) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script       = precondition.simpleRideCode(randomStringArrayElement, stringList, makeString_2CArgBeforeFunc)

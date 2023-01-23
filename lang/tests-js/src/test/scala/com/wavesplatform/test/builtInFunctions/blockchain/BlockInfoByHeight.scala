@@ -13,7 +13,7 @@ object BlockInfoByHeight extends JsTestBase {
   private val invalidBlockInfoByHeightArg = s"$randomAliasDataArrayElement.blockInfoByHeight()"
 
   val tests: Tests = Tests {
-    test.apply("check: function blockInfoByHeight compiles") {
+    test("check: function blockInfoByHeight compiles") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BlockInfo", version)
         val script = precondition.onlyMatcherContract(
@@ -24,7 +24,7 @@ object BlockInfoByHeight extends JsTestBase {
       }
     }
 
-    test.apply("check: function blockInfoByHeight (argument before function) compiles") {
+    test("check: function blockInfoByHeight (argument before function) compiles") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BlockInfo", version)
         val script = precondition.onlyMatcherContract(
@@ -35,7 +35,7 @@ object BlockInfoByHeight extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: blockInfoByHeight Non-matching type") {
+    test("compilation error: blockInfoByHeight Non-matching type") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BlockInfo", version)
         val script = precondition.onlyMatcherContract(
@@ -46,7 +46,7 @@ object BlockInfoByHeight extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: blockInfoByHeight Non-matching type (argument before function)") {
+    test("compilation error: blockInfoByHeight Non-matching type (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BlockInfo", version)
         val script = precondition.onlyMatcherContract(
@@ -57,7 +57,7 @@ object BlockInfoByHeight extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Function 'blockInfoByHeight' requires 1 arguments") {
+    test("compilation error: Function 'blockInfoByHeight' requires 1 arguments") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BlockInfo", version)
         val script = precondition.onlyMatcherContract(

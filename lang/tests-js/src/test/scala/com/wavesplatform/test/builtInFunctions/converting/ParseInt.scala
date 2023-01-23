@@ -19,7 +19,7 @@ object ParseInt extends JsTestBase {
   private val invalidParseIntValueArgBeforeFunc = "callerTestData.parseIntValue(callerTestData)"
 
   val tests: Tests = Tests {
-    test.apply("check: function parseInt compiles") {
+    test("check: function parseInt compiles") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -32,7 +32,7 @@ object ParseInt extends JsTestBase {
       }
     }
 
-    test.apply("check: function parseInt compiles (argument before function)") {
+    test("check: function parseInt compiles (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -45,7 +45,7 @@ object ParseInt extends JsTestBase {
       }
     }
 
-    test.apply("check: function parseIntValue compiles") {
+    test("check: function parseIntValue compiles") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -58,7 +58,7 @@ object ParseInt extends JsTestBase {
       }
     }
 
-    test.apply("check: function parseIntValue compiles (argument before function)") {
+    test("check: function parseIntValue compiles (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -71,7 +71,7 @@ object ParseInt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: parseInt Non-matching types: expected: String, actual: Int") {
+    test("compilation error: parseInt Non-matching types: expected: String, actual: Int") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -84,7 +84,7 @@ object ParseInt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: parseInt Non-matching types: expected: String, actual: Int (argument before function)") {
+    test("compilation error: parseInt Non-matching types: expected: String, actual: Int (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -97,7 +97,7 @@ object ParseInt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: parseIntValue Non-matching types: expected: String, actual: Int") {
+    test("compilation error: parseIntValue Non-matching types: expected: String, actual: Int") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -110,7 +110,7 @@ object ParseInt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: parseIntValue Non-matching types: expected: String, actual: Int (argument before function)") {
+    test("compilation error: parseIntValue Non-matching types: expected: String, actual: Int (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -123,7 +123,7 @@ object ParseInt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Function 'parseInt' requires 1 arguments, but 2 are provided") {
+    test("compilation error: Function 'parseInt' requires 1 arguments, but 2 are provided") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -136,7 +136,7 @@ object ParseInt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Function 'parseInt' requires 1 arguments, but 2 are provided (argument before function)") {
+    test("compilation error: Function 'parseInt' requires 1 arguments, but 2 are provided (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -149,7 +149,7 @@ object ParseInt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error:Function 'parseIntValue' requires 1 arguments, but 2 are provided") {
+    test("compilation error:Function 'parseIntValue' requires 1 arguments, but 2 are provided") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -162,7 +162,7 @@ object ParseInt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Function 'parseIntValue' requires 1 arguments, but 2 are provided (argument before function)") {
+    test("compilation error: Function 'parseIntValue' requires 1 arguments, but 2 are provided (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeFromMatchingAndCase(

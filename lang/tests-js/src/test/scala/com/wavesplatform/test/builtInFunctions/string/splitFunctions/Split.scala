@@ -14,7 +14,7 @@ object Split extends JsTestBase {
   private val invalidErrorSplit         = testData.invalidFunctionError("split", 2)
 
   val tests: Tests = Tests {
-    test.apply("check: split function compiles") {
+    test("check: split function compiles") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script       = precondition.simpleRideCode(randomStringArrayElement, randomStringArrayElement, split)
@@ -22,7 +22,7 @@ object Split extends JsTestBase {
       }
     }
 
-    test.apply("check: split function compiles (argument before function)") {
+    test("check: split function compiles (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script       = precondition.simpleRideCode(randomStringArrayElement, randomStringArrayElement, splitArgBeforeFunc)
@@ -30,7 +30,7 @@ object Split extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: split - Non-matching types") {
+    test("compilation error: split - Non-matching types") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.simpleRideCode(randomInt.toString, randomAliasDataArrayElement, splitArgBeforeFunc)
@@ -38,7 +38,7 @@ object Split extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: split - Non-matching types (argument before function)") {
+    test("compilation error: split - Non-matching types (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.simpleRideCode(randomInt.toString, randomIssuesArrayElement, splitArgBeforeFunc)
@@ -46,7 +46,7 @@ object Split extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload split") {
+    test("compilation error: Can't find a function overload split") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.simpleRideCode(randomInt.toString, randomAliasDataArrayElement, invalidSplit)
@@ -54,7 +54,7 @@ object Split extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload split (argument before function)") {
+    test("compilation error: Can't find a function overload split (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(

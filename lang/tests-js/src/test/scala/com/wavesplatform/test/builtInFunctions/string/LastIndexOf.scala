@@ -15,7 +15,7 @@ object LastIndexOf extends JsTestBase {
   private val invalidLastIndexOf                 = "lastIndexOf()"
 
   val tests: Tests = Tests {
-    test.apply("check: lastIndexOf function compiles") {
+    test("check: lastIndexOf function compiles") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -27,7 +27,7 @@ object LastIndexOf extends JsTestBase {
       }
     }
 
-    test.apply("check: lastIndexOf function compiles with offset") {
+    test("check: lastIndexOf function compiles with offset") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -39,7 +39,7 @@ object LastIndexOf extends JsTestBase {
       }
     }
 
-    test.apply("check: lastIndexOf function compiles (argument before function)") {
+    test("check: lastIndexOf function compiles (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -51,7 +51,7 @@ object LastIndexOf extends JsTestBase {
       }
     }
 
-    test.apply("check: lastIndexOf function compiles with offset (argument before function)") {
+    test("check: lastIndexOf function compiles with offset (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -63,7 +63,7 @@ object LastIndexOf extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: lastIndexOf - Non-matching types - Can't find a function overload") {
+    test("compilation error: lastIndexOf - Non-matching types - Can't find a function overload") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -75,7 +75,7 @@ object LastIndexOf extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: lastIndexOf - Non-matching types - Can't find a function overload") {
+    test("compilation error: lastIndexOf - Non-matching types - Can't find a function overload") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -87,7 +87,7 @@ object LastIndexOf extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: lastIndexOf with offset - Non-matching types - Can't find a function overload") {
+    test("compilation error: lastIndexOf with offset - Non-matching types - Can't find a function overload") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -99,7 +99,7 @@ object LastIndexOf extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: lastIndexOf with overload - Non-matching types - Can't find a function overload") {
+    test("compilation error: lastIndexOf with overload - Non-matching types - Can't find a function overload") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -111,7 +111,7 @@ object LastIndexOf extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload lastIndexOf") {
+    test("compilation error: Can't find a function overload lastIndexOf") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(

@@ -16,7 +16,7 @@ object AddressFromString extends JsTestBase {
   private val invalidFunctionErrorForAddressFromStringValue = testData.invalidFunctionError("addressFromStringValue", 1)
 
   val tests: Tests = Tests {
-    test.apply("check: function addressFromString compiles") {
+    test("check: function addressFromString compiles") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Address", version)
         val script = precondition.onlyMatcherContract(
@@ -27,7 +27,7 @@ object AddressFromString extends JsTestBase {
       }
     }
 
-    test.apply("check: function addressFromString compiles (argument before function)") {
+    test("check: function addressFromString compiles (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Address", version)
         val script = precondition.onlyMatcherContract(
@@ -38,7 +38,7 @@ object AddressFromString extends JsTestBase {
       }
     }
 
-    test.apply("check: function addressFromStringValue compiles") {
+    test("check: function addressFromStringValue compiles") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Address", version)
         val script = precondition.onlyMatcherContract(
@@ -49,7 +49,7 @@ object AddressFromString extends JsTestBase {
       }
     }
 
-    test.apply("check: function addressFromStringValue compiles (argument before function)") {
+    test("check: function addressFromStringValue compiles (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Address", version)
         val script = precondition.onlyMatcherContract(
@@ -60,7 +60,7 @@ object AddressFromString extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: addressFromString invalid data") {
+    test("compilation error: addressFromString invalid data") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Address", version)
         val script = precondition.onlyMatcherContract(
@@ -71,7 +71,7 @@ object AddressFromString extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: addressFromString invalid data (argument before function)") {
+    test("compilation error: addressFromString invalid data (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Address", version)
         val script = precondition.onlyMatcherContract(
@@ -82,7 +82,7 @@ object AddressFromString extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: addressFromStringValue invalid data") {
+    test("compilation error: addressFromStringValue invalid data") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Address", version)
         val script = precondition.onlyMatcherContract(
@@ -93,7 +93,7 @@ object AddressFromString extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: addressFromStringValue invalid data (argument before function)") {
+    test("compilation error: addressFromStringValue invalid data (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Address", version)
         val script = precondition.onlyMatcherContract(
@@ -104,7 +104,7 @@ object AddressFromString extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: addressFromString invalid function") {
+    test("compilation error: addressFromString invalid function") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Address", version)
         val script = precondition.onlyMatcherContract(
@@ -115,7 +115,7 @@ object AddressFromString extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: addressFromStringValue invalid function") {
+    test("compilation error: addressFromStringValue invalid function") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Address", version)
         val script = precondition.onlyMatcherContract(

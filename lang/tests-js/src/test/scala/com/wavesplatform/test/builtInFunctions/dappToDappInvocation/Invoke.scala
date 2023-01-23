@@ -18,7 +18,7 @@ object Invoke extends JsTestBase {
   private val invalidFunctionErrorResult: String = testData.invalidFunctionError("invoke", 4)
 
   val tests: Tests = Tests {
-    test.apply("check: function invoke compiles") {
+    test("check: function invoke compiles") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.codeForDAppInvocation(randomByteVectorArrayElement, randomInt.toString, invoke)
@@ -26,7 +26,7 @@ object Invoke extends JsTestBase {
       }
     }
 
-    test.apply("check: function invoke compiles (argument before function)") {
+    test("check: function invoke compiles (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.codeForDAppInvocation(randomByteVectorArrayElement, randomInt.toString, invokeArgBeforeFunc)
@@ -34,7 +34,7 @@ object Invoke extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid data invoke") {
+    test("compilation error: invalid data invoke") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.codeForDAppInvocation(randomByteVectorArrayElement, randomAddressDataArrayElement, invoke)
@@ -42,7 +42,7 @@ object Invoke extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid data invoke (argument before function)") {
+    test("compilation error: invalid data invoke (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.codeForDAppInvocation(randomByteVectorArrayElement, randomAddressDataArrayElement, invokeArgBeforeFunc)
@@ -50,7 +50,7 @@ object Invoke extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid function invoke") {
+    test("compilation error: invalid function invoke") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.codeForDAppInvocation(randomByteVectorArrayElement, randomStringArrayElement, invalidInvokeFunction)
@@ -58,7 +58,7 @@ object Invoke extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid function invoke (argument before function)") {
+    test("compilation error: invalid function invoke (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.codeForDAppInvocation(randomByteVectorArrayElement, randomStringArrayElement, invalidInvokeArgBeforeFunc)

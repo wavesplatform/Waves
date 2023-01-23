@@ -13,37 +13,37 @@ object Split_4C extends JsTestBase {
   private val invalidErrorSplit_4C    = testData.invalidFunctionError("split_4C", 2)
 
   val tests: Tests = Tests {
-    test.apply("check: split_4C function compiles") {
+    test("check: split_4C function compiles") {
       val precondition = new GeneratorContractsForBuiltInFunctions("String", V6)
       val script       = precondition.simpleRideCode(randomStringArrayElement, randomStringArrayElement, split_4C)
       assertCompileSuccessDApp(script, V6)
     }
 
-    test.apply("check: split_4C function compiles (argument before function)") {
+    test("check: split_4C function compiles (argument before function)") {
       val precondition = new GeneratorContractsForBuiltInFunctions("String", V6)
       val script       = precondition.simpleRideCode(randomStringArrayElement, randomStringArrayElement, split_4CArgBeforeFunc)
       assertCompileSuccessDApp(script, V6)
     }
 
-    test.apply("compilation error: invalid split_4C function") {
+    test("compilation error: invalid split_4C function") {
       val precondition = new GeneratorContractsForBuiltInFunctions("String", V6)
       val script       = precondition.simpleRideCode(randomStringArrayElement, randomStringArrayElement, invalidSplit_4C)
       assertCompileErrorDApp(script, V6, invalidErrorSplit_4C)
     }
 
-    test.apply("compilation error: invalid split_4C data") {
+    test("compilation error: invalid split_4C data") {
       val precondition = new GeneratorContractsForBuiltInFunctions("String", V6)
       val script       = precondition.simpleRideCode(randomIssuesArrayElement, randomStringArrayElement, split_4C)
       assertCompileErrorDApp(script, V6, testData.nonMatchingTypes("String"))
     }
 
-    test.apply("compilation error: invalid split_4C data (argument before function)") {
+    test("compilation error: invalid split_4C data (argument before function)") {
       val precondition = new GeneratorContractsForBuiltInFunctions("String", V6)
       val script = precondition.simpleRideCode(randomInt.toString, randomStringArrayElement, split_4CArgBeforeFunc)
       assertCompileErrorDApp(script, V6, testData.nonMatchingTypes("String"))
     }
 
-    test.apply("compilation error: split_4C Can't find a function for V3 - V5") {
+    test("compilation error: split_4C Can't find a function for V3 - V5") {
       for (version <- testData.versionsWithoutV6) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script       = precondition.simpleRideCode(randomStringArrayElement, randomStringArrayElement, split_4C)
@@ -51,7 +51,7 @@ object Split_4C extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: split_4C Can't find a function for V3 - V5 (argument before function") {
+    test("compilation error: split_4C Can't find a function for V3 - V5 (argument before function") {
       for (version <- testData.versionsWithoutV6) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script       = precondition.simpleRideCode(randomStringArrayElement, randomStringArrayElement, split_4CArgBeforeFunc)

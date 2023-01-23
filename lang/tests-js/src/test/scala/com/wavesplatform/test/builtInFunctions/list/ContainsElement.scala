@@ -15,7 +15,7 @@ object ContainsElement extends JsTestBase {
   private val invalidErrorContainsElement         = testData.invalidFunctionError("containsElement", 2)
 
   val tests: Tests = Tests {
-    test.apply("check: containsElement function compiles with a stringList") {
+    test("check: containsElement function compiles with a stringList") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(randomStringArrayElement, stringList, containsElement)
@@ -23,7 +23,7 @@ object ContainsElement extends JsTestBase {
       }
     }
 
-    test.apply("check: containsElement function compiles with a intList") {
+    test("check: containsElement function compiles with a intList") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(randomInt.toString, intList, containsElement)
@@ -31,7 +31,7 @@ object ContainsElement extends JsTestBase {
       }
     }
 
-    test.apply("check: containsElement function compiles with a stringList (argument before function)") {
+    test("check: containsElement function compiles with a stringList (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(randomStringArrayElement, stringList, containsElementArgBeforeFunc)
@@ -39,7 +39,7 @@ object ContainsElement extends JsTestBase {
       }
     }
 
-    test.apply("check: containsElement function compiles with a intList (argument before function)") {
+    test("check: containsElement function compiles with a intList (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(randomInt.toString, intList, containsElementArgBeforeFunc)
@@ -47,7 +47,7 @@ object ContainsElement extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: containsElement - Non-matching types") {
+    test("compilation error: containsElement - Non-matching types") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(randomInt.toString, randomAliasDataArrayElement, containsElementArgBeforeFunc)
@@ -55,7 +55,7 @@ object ContainsElement extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: containsElement - Non-matching types (argument before function)") {
+    test("compilation error: containsElement - Non-matching types (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(randomInt.toString, randomIssuesArrayElement, containsElementArgBeforeFunc)
@@ -63,7 +63,7 @@ object ContainsElement extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload containsElement") {
+    test("compilation error: Can't find a function overload containsElement") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(randomInt.toString, randomAliasDataArrayElement, invalidContainsElement)
@@ -71,7 +71,7 @@ object ContainsElement extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload containsElement (argument before function)") {
+    test("compilation error: Can't find a function overload containsElement (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(randomInt.toString, randomAliasDataArrayElement, invalidContainsElementArgBeforeFunc)

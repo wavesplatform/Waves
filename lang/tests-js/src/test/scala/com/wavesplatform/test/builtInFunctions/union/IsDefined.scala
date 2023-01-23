@@ -14,7 +14,7 @@ object IsDefined extends JsTestBase {
   private val invalidErrorIsDefined         = testData.invalidFunctionError("isDefined", 1)
 
   val tests: Tests = Tests {
-    test.apply("check: isDefined function compiles") {
+    test("check: isDefined function compiles") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script       = precondition.onlyMatcherContract(randomInt.toString, isDefined)
@@ -22,7 +22,7 @@ object IsDefined extends JsTestBase {
       }
     }
 
-    test.apply("check: isDefined function compiles(argument before function)") {
+    test("check: isDefined function compiles(argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script       = precondition.onlyMatcherContract(randomDigestAlgorithmTypeArrayElement, isDefinedArgBeforeFunc)
@@ -30,7 +30,7 @@ object IsDefined extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload isDefined") {
+    test("compilation error: Can't find a function overload isDefined") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, invalidIsDefined)
@@ -38,7 +38,7 @@ object IsDefined extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload isDefined (argument before function)") {
+    test("compilation error: Can't find a function overload isDefined (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, invalidIsDefinedArgBeforeFunc)

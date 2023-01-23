@@ -24,7 +24,7 @@ object GetBinary extends JsTestBase {
 
 
   val tests: Tests = Tests {
-    test.apply("check: function getBinary accountDataStorage compiles for address") {
+    test("check: function getBinary accountDataStorage compiles for address") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -38,7 +38,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test.apply("check: function getBinary accountDataStorage compiles (argument before function) for address") {
+    test("check: function getBinary accountDataStorage compiles (argument before function) for address") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -52,7 +52,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test.apply("check: function getBinary accountDataStorage compiles for 'this'") {
+    test("check: function getBinary accountDataStorage compiles for 'this'") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -66,7 +66,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test.apply("check: function getBinary accountDataStorage compiles (argument before function) for 'this'") {
+    test("check: function getBinary accountDataStorage compiles (argument before function) for 'this'") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -80,7 +80,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test.apply("check: function getBinary accountDataStorage compiles for alias") {
+    test("check: function getBinary accountDataStorage compiles for alias") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -94,7 +94,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test.apply("check: function getBinary accountDataStorage compiles (argument before function) for alias") {
+    test("check: function getBinary accountDataStorage compiles (argument before function) for alias") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -108,7 +108,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test.apply("check: function own data getBinary accountDataStorage compiles") {
+    test("check: function own data getBinary accountDataStorage compiles") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeOwnData(
@@ -121,7 +121,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test.apply("check: function own data getBinary accountDataStorage (argument before function) compiles") {
+    test("check: function own data getBinary accountDataStorage (argument before function) compiles") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeOwnData(
@@ -134,7 +134,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test.apply("check: function getBinaryValue accountDataStorage compiles for address") {
+    test("check: function getBinaryValue accountDataStorage compiles for address") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -148,7 +148,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test.apply("check: function getBinaryValue accountDataStorage compiles (argument before function) for address") {
+    test("check: function getBinaryValue accountDataStorage compiles (argument before function) for address") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -162,7 +162,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test.apply("check: function getBinaryValue accountDataStorage compiles for 'this'") {
+    test("check: function getBinaryValue accountDataStorage compiles for 'this'") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -176,7 +176,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test.apply("check: function getBinaryValue accountDataStorage compiles (argument before function) for 'this'") {
+    test("check: function getBinaryValue accountDataStorage compiles (argument before function) for 'this'") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -190,7 +190,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test.apply("check: function getBinaryValue accountDataStorage compiles for alias") {
+    test("check: function getBinaryValue accountDataStorage compiles for alias") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -204,7 +204,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test.apply("check: function getBinaryValue accountDataStorage compiles (argument before function) for alias") {
+    test("check: function getBinaryValue accountDataStorage compiles (argument before function) for alias") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -218,7 +218,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test.apply("check: function own data getBinaryValue accountDataStorage (argument before function) compiles") {
+    test("check: function own data getBinaryValue accountDataStorage (argument before function) compiles") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeOwnData(
@@ -231,7 +231,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test.apply("check: function own data getBinaryValue accountDataStorage compiles") {
+    test("check: function own data getBinaryValue accountDataStorage compiles") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeOwnData(
@@ -244,7 +244,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload getBinary accountDataStorage") {
+    test("compilation error: Can't find a function overload getBinary accountDataStorage") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -258,7 +258,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload getBinaryValue accountDataStorage") {
+    test("compilation error: Can't find a function overload getBinaryValue accountDataStorage") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -272,7 +272,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a own data function overload getBinary accountDataStorage") {
+    test("compilation error: Can't find a own data function overload getBinary accountDataStorage") {
       for (version <- testData.oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -285,7 +285,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a own data function overload getBinaryValue accountDataStorage") {
+    test("compilation error: Can't find a own data function overload getBinaryValue accountDataStorage") {
       for (version <- testData.oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -298,7 +298,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload getBinary - invalid data") {
+    test("compilation error: Can't find a function overload getBinary - invalid data") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -311,7 +311,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload getBinaryValue - invalid data") {
+    test("compilation error: Can't find a function overload getBinaryValue - invalid data") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -324,7 +324,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a own data function overload getBinary - invalid data") {
+    test("compilation error: Can't find a own data function overload getBinary - invalid data") {
       for (version <- testData.actualVersions) {
         val invalidFunction = s"getBinaryValue($randomInt)"
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
@@ -338,7 +338,7 @@ object GetBinary extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a own data function overload getBinaryValue - invalid data") {
+    test("compilation error: Can't find a own data function overload getBinaryValue - invalid data") {
       for (version <- testData.actualVersions) {
         val invalidFunction = s"$randomInt.getBinaryValue()"
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)

@@ -15,7 +15,7 @@ object SigVerify_16Kb extends JsTestBase {
   private val invalidErrorSigVerify_16Kb         = testData.invalidFunctionError("sigVerify_16Kb", 3)
 
   val tests: Tests = Tests {
-    test.apply("check: sigVerify_16Kb function compiles with a ByteVector") {
+    test("check: sigVerify_16Kb function compiles with a ByteVector") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, sigVerify_16Kb)
@@ -23,7 +23,7 @@ object SigVerify_16Kb extends JsTestBase {
       }
     }
 
-    test.apply("check: sigVerify_16Kb function compiles with a ByteVector(argument before function)") {
+    test("check: sigVerify_16Kb function compiles with a ByteVector(argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, sigVerify_16KbArgBeforeFunc)
@@ -31,7 +31,7 @@ object SigVerify_16Kb extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: sigVerify_16Kb - Non-matching types: expected: ByteVector") {
+    test("compilation error: sigVerify_16Kb - Non-matching types: expected: ByteVector") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, sigVerify_16Kb)
@@ -39,7 +39,7 @@ object SigVerify_16Kb extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: sigVerify_16Kb - Non-matching types: expected: ByteVector (argument before function)") {
+    test("compilation error: sigVerify_16Kb - Non-matching types: expected: ByteVector (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script       = precondition.onlyMatcherContract(randomAddressDataArrayElement, sigVerify_16KbArgBeforeFunc)
@@ -47,7 +47,7 @@ object SigVerify_16Kb extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload sigVerify_16Kb") {
+    test("compilation error: Can't find a function overload sigVerify_16Kb") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, invalidSigVerify_16Kb)
@@ -55,7 +55,7 @@ object SigVerify_16Kb extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload sigVerify_16Kb (argument before function)") {
+    test("compilation error: Can't find a function overload sigVerify_16Kb (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, invalidSigVerify_16KbArgBeforeFunc)
@@ -63,7 +63,7 @@ object SigVerify_16Kb extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function sigVerify_16Kb") {
+    test("compilation error: Can't find a function sigVerify_16Kb") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
       val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, sigVerify_16Kb)
       assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)

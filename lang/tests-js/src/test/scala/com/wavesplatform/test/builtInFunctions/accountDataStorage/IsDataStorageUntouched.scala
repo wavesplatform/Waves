@@ -14,7 +14,7 @@ object IsDataStorageUntouched extends JsTestBase {
   private val invalidFunctionErrorResult: String = testData.invalidFunctionError("isDataStorageUntouched", 1)
 
   val tests: Tests = Tests {
-    test.apply("check: function isDataStorageUntouched compiles for address") {
+    test("check: function isDataStorageUntouched compiles for address") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeWithoutMatcher(
@@ -27,7 +27,7 @@ object IsDataStorageUntouched extends JsTestBase {
       }
     }
 
-    test.apply("check: function isDataStorageUntouched compiles (argument before function) for address") {
+    test("check: function isDataStorageUntouched compiles (argument before function) for address") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeWithoutMatcher(
@@ -40,7 +40,7 @@ object IsDataStorageUntouched extends JsTestBase {
       }
     }
 
-    test.apply("check: function isDataStorageUntouched compiles for 'this'") {
+    test("check: function isDataStorageUntouched compiles for 'this'") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeWithoutMatcher(
@@ -53,7 +53,7 @@ object IsDataStorageUntouched extends JsTestBase {
       }
     }
 
-    test.apply("check: function isDataStorageUntouched compiles (argument before function) for 'this'") {
+    test("check: function isDataStorageUntouched compiles (argument before function) for 'this'") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeWithoutMatcher(
@@ -66,7 +66,7 @@ object IsDataStorageUntouched extends JsTestBase {
       }
     }
 
-    test.apply("check: function isDataStorageUntouched compiles for alias") {
+    test("check: function isDataStorageUntouched compiles for alias") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeWithoutMatcher(
@@ -79,7 +79,7 @@ object IsDataStorageUntouched extends JsTestBase {
       }
     }
 
-    test.apply("check: function isDataStorageUntouched compiles (argument before function) for alias") {
+    test("check: function isDataStorageUntouched compiles (argument before function) for alias") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeWithoutMatcher(
@@ -92,7 +92,7 @@ object IsDataStorageUntouched extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find function isDataStorageUntouched (argument before function) for address") {
+    test("compilation error: Can't find function isDataStorageUntouched (argument before function) for address") {
       for (version <- testData.oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeWithoutMatcher(
@@ -105,7 +105,7 @@ object IsDataStorageUntouched extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find function isDataStorageUntouched (argument before function) for 'this'") {
+    test("compilation error: Can't find function isDataStorageUntouched (argument before function) for 'this'") {
       for (version <- testData.oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeWithoutMatcher(
@@ -118,7 +118,7 @@ object IsDataStorageUntouched extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find function isDataStorageUntouched for alias") {
+    test("compilation error: Can't find function isDataStorageUntouched for alias") {
       for (version <- testData.oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeWithoutMatcher(
@@ -131,7 +131,7 @@ object IsDataStorageUntouched extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid function isDataStorageUntouched for address") {
+    test("compilation error: invalid function isDataStorageUntouched for address") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeWithoutMatcher(
@@ -144,7 +144,7 @@ object IsDataStorageUntouched extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid function isDataStorageUntouched for 'this'") {
+    test("compilation error: invalid function isDataStorageUntouched for 'this'") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeWithoutMatcher(
@@ -157,7 +157,7 @@ object IsDataStorageUntouched extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid function isDataStorageUntouched for alias") {
+    test("compilation error: invalid function isDataStorageUntouched for alias") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeWithoutMatcher(
@@ -170,7 +170,7 @@ object IsDataStorageUntouched extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid data for function isDataStorageUntouched") {
+    test("compilation error: invalid data for function isDataStorageUntouched") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeWithoutMatcher(
@@ -183,7 +183,7 @@ object IsDataStorageUntouched extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid data for function isDataStorageUntouched (argument before function)") {
+    test("compilation error: invalid data for function isDataStorageUntouched (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeWithoutMatcher(

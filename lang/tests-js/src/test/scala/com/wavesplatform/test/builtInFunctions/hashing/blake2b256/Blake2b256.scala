@@ -18,7 +18,7 @@ object Blake2b256 extends JsTestBase {
   private val invalidErrorBlake2b256  = testData.invalidFunctionError("blake2b256", 1)
 
   val tests: Tests = Tests {
-    test.apply("check: blake2b256 function compiles with a ByteVector") {
+    test("check: blake2b256 function compiles with a ByteVector") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -31,7 +31,7 @@ object Blake2b256 extends JsTestBase {
       }
     }
 
-    test.apply("check: blake2b256 function compiles with a ByteVector(argument before function)") {
+    test("check: blake2b256 function compiles with a ByteVector(argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -44,7 +44,7 @@ object Blake2b256 extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: blake2b256 - Non-matching types: expected: ByteVector") {
+    test("compilation error: blake2b256 - Non-matching types: expected: ByteVector") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -57,7 +57,7 @@ object Blake2b256 extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: blake2b256 - Non-matching types: expected: ByteVector (argument before function)") {
+    test("compilation error: blake2b256 - Non-matching types: expected: ByteVector (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -70,7 +70,7 @@ object Blake2b256 extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload blake2b256") {
+    test("compilation error: Can't find a function overload blake2b256") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -83,7 +83,7 @@ object Blake2b256 extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload blake2b256 (argument before function)") {
+    test("compilation error: Can't find a function overload blake2b256 (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(

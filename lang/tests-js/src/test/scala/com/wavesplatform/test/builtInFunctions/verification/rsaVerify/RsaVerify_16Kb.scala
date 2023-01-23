@@ -20,7 +20,7 @@ object RsaVerify_16Kb extends JsTestBase {
   private val invalidErrorRsaVerify_16Kb         = testData.invalidFunctionError("rsaVerify_16Kb", 4)
 
   val tests: Tests = Tests {
-    test.apply("check: rsaVerify_16Kb function compiles with a ByteVector") {
+    test("check: rsaVerify_16Kb function compiles with a ByteVector") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, rsaVerify_16Kb)
@@ -28,7 +28,7 @@ object RsaVerify_16Kb extends JsTestBase {
       }
     }
 
-    test.apply("check: rsaVerify_16Kb function compiles with a ByteVector(argument before function)") {
+    test("check: rsaVerify_16Kb function compiles with a ByteVector(argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, rsaVerify_16KbArgBeforeFunc)
@@ -36,7 +36,7 @@ object RsaVerify_16Kb extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: rsaVerify_16Kb - Non-matching types: expected: ByteVector") {
+    test("compilation error: rsaVerify_16Kb - Non-matching types: expected: ByteVector") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, rsaVerify_16Kb)
@@ -44,7 +44,7 @@ object RsaVerify_16Kb extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: rsaVerify_16Kb - Non-matching types: expected: ByteVector (argument before function)") {
+    test("compilation error: rsaVerify_16Kb - Non-matching types: expected: ByteVector (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script       = precondition.onlyMatcherContract(randomAddressDataArrayElement, rsaVerify_16KbArgBeforeFunc)
@@ -52,7 +52,7 @@ object RsaVerify_16Kb extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload rsaVerify_16Kb") {
+    test("compilation error: Can't find a function overload rsaVerify_16Kb") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, invalidRsaVerify_16Kb)
@@ -60,7 +60,7 @@ object RsaVerify_16Kb extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload rsaVerify_16Kb (argument before function)") {
+    test("compilation error: Can't find a function overload rsaVerify_16Kb (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, invalidRsaVerify_16KbArgBeforeFunc)
@@ -68,7 +68,7 @@ object RsaVerify_16Kb extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function rsaVerify_16Kb") {
+    test("compilation error: Can't find a function rsaVerify_16Kb") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
       val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, rsaVerify_16Kb)
       assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)

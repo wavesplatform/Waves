@@ -16,7 +16,7 @@ object AssetBalance extends JsTestBase {
   private val invalidAssetBalanceFunc = "assetBalance()"
 
   val tests: Tests = Tests {
-    test.apply("check: function AssetBalance compiles for address") {
+    test("check: function AssetBalance compiles for address") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeWithoutMatcher(
@@ -29,7 +29,7 @@ object AssetBalance extends JsTestBase {
       }
     }
 
-    test.apply("check: function AssetBalance compiles for 'this'") {
+    test("check: function AssetBalance compiles for 'this'") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeWithoutMatcher(
@@ -42,7 +42,7 @@ object AssetBalance extends JsTestBase {
       }
     }
 
-    test.apply("check: function AssetBalance compiles for alias") {
+    test("check: function AssetBalance compiles for alias") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeWithoutMatcher(
@@ -55,7 +55,7 @@ object AssetBalance extends JsTestBase {
       }
     }
 
-    test.apply("check: function AssetBalance (argument before function) compiles for address") {
+    test("check: function AssetBalance (argument before function) compiles for address") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeWithoutMatcher(
@@ -68,7 +68,7 @@ object AssetBalance extends JsTestBase {
       }
     }
 
-    test.apply("check: function AssetBalance (argument before function) compiles for 'this'") {
+    test("check: function AssetBalance (argument before function) compiles for 'this'") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeWithoutMatcher(
@@ -81,7 +81,7 @@ object AssetBalance extends JsTestBase {
       }
     }
 
-    test.apply("check: function AssetBalance (argument before function) compiles for alias") {
+    test("check: function AssetBalance (argument before function) compiles for alias") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeWithoutMatcher(
@@ -94,7 +94,7 @@ object AssetBalance extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Function 'assetBalance' requires 1 arguments") {
+    test("compilation error: Function 'assetBalance' requires 1 arguments") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeWithoutMatcher(
@@ -107,7 +107,7 @@ object AssetBalance extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Function 'assetBalance' requires 2 arguments") {
+    test("compilation error: Function 'assetBalance' requires 2 arguments") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeWithoutMatcher(
@@ -120,7 +120,7 @@ object AssetBalance extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: assetBalance Non-matching types: expected: Address|Alias") {
+    test("compilation error: assetBalance Non-matching types: expected: Address|Alias") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeWithoutMatcher(

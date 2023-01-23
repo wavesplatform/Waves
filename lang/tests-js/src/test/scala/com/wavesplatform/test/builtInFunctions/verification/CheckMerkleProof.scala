@@ -16,44 +16,44 @@ object CheckMerkleProof extends JsTestBase {
   private val invalidErrorCheckMerkleProof         = testData.invalidFunctionError("checkMerkleProof", 3)
 
   val tests: Tests = Tests {
-    test.apply("check: checkMerkleProof function compiles") {
+    test("check: checkMerkleProof function compiles") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
       val script = precondition.onlyMatcherContract(randomByteVectorArrayElement, checkMerkleProof)
       assertCompileSuccessDApp(script, V3)
     }
 
-    test.apply("check: checkMerkleProof function compiles (argument before function)") {
+    test("check: checkMerkleProof function compiles (argument before function)") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
       val script = precondition.onlyMatcherContract(randomByteVectorArrayElement, checkMerkleProofArgBeforeFunc)
       assertCompileSuccessDApp(script, V3)
     }
 
-    test.apply("compilation error: checkMerkleProof - Non-matching types: expected") {
+    test("compilation error: checkMerkleProof - Non-matching types: expected") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
       val script = precondition.onlyMatcherContract(randomUnionArrayElement, checkMerkleProof)
       assertCompileErrorDApp(script, V3, testData.MATCHING_NOT_EXHAUSTIVE)
 
     }
 
-    test.apply("compilation error: checkMerkleProof - Non-matching types: expected: (argument before function)") {
+    test("compilation error: checkMerkleProof - Non-matching types: expected: (argument before function)") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
       val script = precondition.onlyMatcherContract(randomAddressDataArrayElement, checkMerkleProofArgBeforeFunc)
       assertCompileErrorDApp(script, V3, testData.MATCHING_NOT_EXHAUSTIVE)
     }
 
-    test.apply("compilation error: Can't find a function overload checkMerkleProof") {
+    test("compilation error: Can't find a function overload checkMerkleProof") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
       val script = precondition.onlyMatcherContract(randomUnionArrayElement, invalidCheckMerkleProof)
       assertCompileErrorDApp(script, V3, invalidErrorCheckMerkleProof)
     }
 
-    test.apply("compilation error: Can't find a function overload checkMerkleProof (argument before function)") {
+    test("compilation error: Can't find a function overload checkMerkleProof (argument before function)") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
       val script = precondition.onlyMatcherContract(randomUnionArrayElement, invalidCheckMerkleProofArgBeforeFunc)
       assertCompileErrorDApp(script, V3, invalidErrorCheckMerkleProof)
     }
 
-    test.apply("check: checkMerkleProof function compiles") {
+    test("check: checkMerkleProof function compiles") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.onlyMatcherContract(randomInt.toString, checkMerkleProof)
@@ -61,7 +61,7 @@ object CheckMerkleProof extends JsTestBase {
       }
     }
 
-    test.apply("check: checkMerkleProof function compiles (argument before function)") {
+    test("check: checkMerkleProof function compiles (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.onlyMatcherContract(randomInt.toString, checkMerkleProofArgBeforeFunc)

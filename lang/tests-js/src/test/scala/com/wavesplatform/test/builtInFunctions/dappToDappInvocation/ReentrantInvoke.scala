@@ -13,7 +13,7 @@ object ReentrantInvoke extends JsTestBase {
   private val invalidFunctionErrorResult: String  = testData.invalidFunctionError("reentrantInvoke", 4)
 
   val tests: Tests = Tests {
-    test.apply("check: function reentrantInvoke compiles") {
+    test("check: function reentrantInvoke compiles") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.codeForDAppInvocation(randomByteVectorArrayElement, randomInt.toString, reentrantInvoke)
@@ -21,7 +21,7 @@ object ReentrantInvoke extends JsTestBase {
       }
     }
 
-    test.apply("check: function reentrantInvoke compiles (argument before function)") {
+    test("check: function reentrantInvoke compiles (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.codeForDAppInvocation(randomByteVectorArrayElement, randomInt.toString, reentrantInvokeArgBeforeFunc)
@@ -29,7 +29,7 @@ object ReentrantInvoke extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid data reentrantInvoke") {
+    test("compilation error: invalid data reentrantInvoke") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.codeForDAppInvocation(randomByteVectorArrayElement, randomAddressDataArrayElement, reentrantInvoke)
@@ -37,7 +37,7 @@ object ReentrantInvoke extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid data reentrantInvoke (argument before function)") {
+    test("compilation error: invalid data reentrantInvoke (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeForDAppInvocation(randomByteVectorArrayElement, randomAddressDataArrayElement, reentrantInvokeArgBeforeFunc)
@@ -45,7 +45,7 @@ object ReentrantInvoke extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid function reentrantInvoke") {
+    test("compilation error: invalid function reentrantInvoke") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.codeForDAppInvocation(randomByteVectorArrayElement, randomStringArrayElement, invalidReentrantInvokeFunction)
@@ -53,7 +53,7 @@ object ReentrantInvoke extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid function reentrantInvoke (argument before function)") {
+    test("compilation error: invalid function reentrantInvoke (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeForDAppInvocation(randomByteVectorArrayElement, randomStringArrayElement, invalidReentrantInvokeArgBeforeFunc)

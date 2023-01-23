@@ -15,7 +15,7 @@ object Groth16Verify extends JsTestBase {
   private val invalidErrorGroth16Verify         = testData.invalidFunctionError("groth16Verify", 3)
 
   val tests: Tests = Tests {
-    test.apply("check: groth16Verify function compiles with a Boolean") {
+    test("check: groth16Verify function compiles with a Boolean") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, groth16Verify)
@@ -23,7 +23,7 @@ object Groth16Verify extends JsTestBase {
       }
     }
 
-    test.apply("check: groth16Verify function compiles with a Boolean (argument before function)") {
+    test("check: groth16Verify function compiles with a Boolean (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, groth16VerifyArgBeforeFunc)
@@ -31,7 +31,7 @@ object Groth16Verify extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: groth16Verify - Non-matching types: expected: ByteVector") {
+    test("compilation error: groth16Verify - Non-matching types: expected: ByteVector") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, groth16Verify)
@@ -39,7 +39,7 @@ object Groth16Verify extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: groth16Verify - Non-matching types: expected: ByteVector (argument before function)") {
+    test("compilation error: groth16Verify - Non-matching types: expected: ByteVector (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script       = precondition.onlyMatcherContract(randomAddressDataArrayElement, groth16VerifyArgBeforeFunc)
@@ -47,7 +47,7 @@ object Groth16Verify extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload groth16Verify") {
+    test("compilation error: Can't find a function overload groth16Verify") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, invalidGroth16Verify)
@@ -55,7 +55,7 @@ object Groth16Verify extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload groth16Verify (argument before function)") {
+    test("compilation error: Can't find a function overload groth16Verify (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, invalidGroth16VerifyArgBeforeFunc)
@@ -63,7 +63,7 @@ object Groth16Verify extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function groth16Verify") {
+    test("compilation error: Can't find a function groth16Verify") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
       val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, groth16Verify)
       assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)

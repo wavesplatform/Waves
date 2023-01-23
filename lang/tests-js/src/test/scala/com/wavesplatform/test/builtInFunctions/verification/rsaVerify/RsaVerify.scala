@@ -14,7 +14,7 @@ object RsaVerify extends JsTestBase {
   private val invalidErrorRsaVerify  = testData.invalidFunctionError("rsaVerify", 4)
 
   val tests: Tests = Tests {
-    test.apply("check: rsaVerify function compiles") {
+    test("check: rsaVerify function compiles") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.onlyMatcherContract(randomByteVectorArrayElement, rsaVerify)
@@ -22,7 +22,7 @@ object RsaVerify extends JsTestBase {
       }
     }
 
-    test.apply("check: rsaVerify function compiles(argument before function)") {
+    test("check: rsaVerify function compiles(argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.onlyMatcherContract(randomByteVectorArrayElement, rsaVerifyArgBeforeFunc)
@@ -30,7 +30,7 @@ object RsaVerify extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: rsaVerify - Non-matching types: expected: ByteVector") {
+    test("compilation error: rsaVerify - Non-matching types: expected: ByteVector") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.onlyMatcherContract(randomUnionArrayElement, rsaVerify)
@@ -38,7 +38,7 @@ object RsaVerify extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: rsaVerify - Non-matching types: expected: ByteVector (argument before function)") {
+    test("compilation error: rsaVerify - Non-matching types: expected: ByteVector (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.onlyMatcherContract(randomAddressDataArrayElement, rsaVerifyArgBeforeFunc)
@@ -46,7 +46,7 @@ object RsaVerify extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload rsaVerify") {
+    test("compilation error: Can't find a function overload rsaVerify") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.onlyMatcherContract(randomUnionArrayElement, invalidRsaVerify)
@@ -54,7 +54,7 @@ object RsaVerify extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload rsaVerify (argument before function)") {
+    test("compilation error: Can't find a function overload rsaVerify (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
         val script = precondition.onlyMatcherContract(randomUnionArrayElement, invalidRsaVerifyArgBeforeFunc)

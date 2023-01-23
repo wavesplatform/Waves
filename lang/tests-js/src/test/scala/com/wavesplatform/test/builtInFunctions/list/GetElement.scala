@@ -15,7 +15,7 @@ object GetElement extends JsTestBase {
   private val invalidErrorGetElement  = testData.invalidFunctionError("getElement", 2)
 
   val tests: Tests = Tests {
-    test.apply("check: getElement function compiles with a stringList") {
+    test("check: getElement function compiles with a stringList") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -27,7 +27,7 @@ object GetElement extends JsTestBase {
       }
     }
 
-    test.apply("check: getElement function compiles with a intList") {
+    test("check: getElement function compiles with a intList") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -39,7 +39,7 @@ object GetElement extends JsTestBase {
       }
     }
 
-    test.apply("check: getElement function compiles with a stringList (argument before function)") {
+    test("check: getElement function compiles with a stringList (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -51,7 +51,7 @@ object GetElement extends JsTestBase {
       }
     }
 
-    test.apply("check: getElement function compiles with a intList (argument before function)") {
+    test("check: getElement function compiles with a intList (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -63,7 +63,7 @@ object GetElement extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: getElement - Non-matching types") {
+    test("compilation error: getElement - Non-matching types") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -75,7 +75,7 @@ object GetElement extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: getElement - Non-matching types (argument before function)") {
+    test("compilation error: getElement - Non-matching types (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -87,7 +87,7 @@ object GetElement extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload getElement") {
+    test("compilation error: Can't find a function overload getElement") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -99,7 +99,7 @@ object GetElement extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload getElement (argument before function)") {
+    test("compilation error: Can't find a function overload getElement (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(

@@ -23,7 +23,7 @@ object ValueOrElse extends JsTestBase {
   private val invalidErrorValueOrElse         = testData.invalidFunctionError("valueOrElse", 2)
 
   val tests: Tests = Tests {
-    test.apply("check: valueOrElse function compiles with String") {
+    test("check: valueOrElse function compiles with String") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.simpleRideCode(randomStringArrayElement, randomStringArrayElement, valueOrElse)
@@ -31,7 +31,7 @@ object ValueOrElse extends JsTestBase {
       }
     }
 
-    test.apply("check: valueOrElse function compiles with Int") {
+    test("check: valueOrElse function compiles with Int") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.simpleRideCode(randomInt.toString, randomInt.toString, valueOrElse)
@@ -39,7 +39,7 @@ object ValueOrElse extends JsTestBase {
       }
     }
 
-    test.apply("check: valueOrElse function compiles with Alias") {
+    test("check: valueOrElse function compiles with Alias") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.simpleRideCode(randomAliasDataArrayElement, randomAliasDataArrayElement, valueOrElse)
@@ -47,7 +47,7 @@ object ValueOrElse extends JsTestBase {
       }
     }
 
-    test.apply("check: valueOrElse function compiles with Address (argument before function)") {
+    test("check: valueOrElse function compiles with Address (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.simpleRideCode(randomAddressDataArrayElement, randomAddressDataArrayElement, valueOrElseArgBeforeFunc)
@@ -55,7 +55,7 @@ object ValueOrElse extends JsTestBase {
       }
     }
 
-    test.apply("check: valueOrElse function compiles with byteVector (argument before function)") {
+    test("check: valueOrElse function compiles with byteVector (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.simpleRideCode(randomByteVectorArrayElement, randomByteVectorArrayElement, valueOrElseArgBeforeFunc)
@@ -63,7 +63,7 @@ object ValueOrElse extends JsTestBase {
       }
     }
 
-    test.apply("check: valueOrElse function compiles with boolean (argument before function)") {
+    test("check: valueOrElse function compiles with boolean (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.simpleRideCode(randomBoolean.toString, randomBoolean.toString, valueOrElseArgBeforeFunc)
@@ -71,7 +71,7 @@ object ValueOrElse extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: valueOrElse - Non-matching types") {
+    test("compilation error: valueOrElse - Non-matching types") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.simpleRideCode(randomInt.toString, randomAliasDataArrayElement, valueOrElseArgBeforeFunc)
@@ -79,7 +79,7 @@ object ValueOrElse extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: valueOrElse - Non-matching types (argument before function)") {
+    test("compilation error: valueOrElse - Non-matching types (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.simpleRideCode(randomInt.toString, randomIssuesArrayElement, valueOrElseArgBeforeFunc)
@@ -87,7 +87,7 @@ object ValueOrElse extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload valueOrElse") {
+    test("compilation error: Can't find a function overload valueOrElse") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.simpleRideCode(randomInt.toString, randomAliasDataArrayElement, invalidValueOrElse)
@@ -95,7 +95,7 @@ object ValueOrElse extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload valueOrElse (argument before function)") {
+    test("compilation error: Can't find a function overload valueOrElse (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.simpleRideCode(randomInt.toString, randomAliasDataArrayElement, invalidValueOrElseArgBeforeFunc)
@@ -103,14 +103,14 @@ object ValueOrElse extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function V3") {
+    test("compilation error: Can't find a function V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("", V3)
       val script       = precondition.simpleRideCode(randomAliasDataArrayElement, randomAliasDataArrayElement, valueOrElse)
       assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
 
     }
 
-    test.apply("compilation error: Can't find a function V3 (argument before function)") {
+    test("compilation error: Can't find a function V3 (argument before function)") {
       val precondition = new GeneratorContractsForBuiltInFunctions("", V3)
       val script       = precondition.simpleRideCode(randomAddressDataArrayElement, randomAddressDataArrayElement, valueOrElseArgBeforeFunc)
       assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)

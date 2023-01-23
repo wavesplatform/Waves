@@ -14,7 +14,7 @@ object Keccak256 extends JsTestBase {
   private val invalidErrorKeccak256  = testData.invalidFunctionError("keccak256", 1)
 
   val tests: Tests = Tests {
-    test.apply("check: keccak256 function compiles with a ByteVector") {
+    test("check: keccak256 function compiles with a ByteVector") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -27,7 +27,7 @@ object Keccak256 extends JsTestBase {
       }
     }
 
-    test.apply("check: keccak256 function compiles with a ByteVector(argument before function)") {
+    test("check: keccak256 function compiles with a ByteVector(argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -40,7 +40,7 @@ object Keccak256 extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: keccak256 - Non-matching types: expected: ByteVector") {
+    test("compilation error: keccak256 - Non-matching types: expected: ByteVector") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -53,7 +53,7 @@ object Keccak256 extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: keccak256 - Non-matching types: expected: ByteVector (argument before function)") {
+    test("compilation error: keccak256 - Non-matching types: expected: ByteVector (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -66,7 +66,7 @@ object Keccak256 extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload keccak256") {
+    test("compilation error: Can't find a function overload keccak256") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -79,7 +79,7 @@ object Keccak256 extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload keccak256 (argument before function)") {
+    test("compilation error: Can't find a function overload keccak256 (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(

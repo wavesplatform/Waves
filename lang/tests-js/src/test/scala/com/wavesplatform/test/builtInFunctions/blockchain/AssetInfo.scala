@@ -15,7 +15,7 @@ object AssetInfo extends JsTestBase {
 
 
   val tests: Tests = Tests {
-    test.apply("check: function assetInfo compiles") {
+    test("check: function assetInfo compiles") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Asset", version)
         val script = precondition.onlyMatcherContract(
@@ -26,7 +26,7 @@ object AssetInfo extends JsTestBase {
       }
     }
 
-    test.apply("check: function assetInfo (argument before function) compiles") {
+    test("check: function assetInfo (argument before function) compiles") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Asset", version)
         val script = precondition.onlyMatcherContract(
@@ -37,7 +37,7 @@ object AssetInfo extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: assetInfo Non-matching type") {
+    test("compilation error: assetInfo Non-matching type") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Asset", version)
         val script = precondition.onlyMatcherContract(
@@ -48,7 +48,7 @@ object AssetInfo extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: assetInfo Non-matching type (argument before function)") {
+    test("compilation error: assetInfo Non-matching type (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Asset", version)
         val script = precondition.onlyMatcherContract(
@@ -59,7 +59,7 @@ object AssetInfo extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Function 'assetInfo' requires 1 arguments") {
+    test("compilation error: Function 'assetInfo' requires 1 arguments") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Asset", version)
         val script = precondition.onlyMatcherContract(

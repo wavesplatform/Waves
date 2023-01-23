@@ -11,7 +11,7 @@ object CalculateLeaseId extends JsTestBase {
   private val invalidCalculateLeaseId       = "calculateLeaseId()"
 
   val tests: Tests = Tests {
-    test.apply("check: function calculateLeaseId for V5 and more compiles for address") {
+    test("check: function calculateLeaseId for V5 and more compiles for address") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeForCalculateLeaseId(
@@ -22,7 +22,7 @@ object CalculateLeaseId extends JsTestBase {
       }
     }
 
-    test.apply("check: function calculateLeaseId for V5 and more (argument before function) compiles for address") {
+    test("check: function calculateLeaseId for V5 and more (argument before function) compiles for address") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeForCalculateLeaseId(
@@ -33,7 +33,7 @@ object CalculateLeaseId extends JsTestBase {
       }
     }
 
-    test.apply("check: function calculateLeaseId for V5 and more compiles for alias") {
+    test("check: function calculateLeaseId for V5 and more compiles for alias") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeForCalculateLeaseId(
@@ -44,7 +44,7 @@ object CalculateLeaseId extends JsTestBase {
       }
     }
 
-    test.apply("check: function calculateLeaseId for V5 and more (argument before function) compiles for alias") {
+    test("check: function calculateLeaseId for V5 and more (argument before function) compiles for alias") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeForCalculateLeaseId(
@@ -55,7 +55,7 @@ object CalculateLeaseId extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: calculateLeaseId Can't find a function overload") {
+    test("compilation error: calculateLeaseId Can't find a function overload") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeForCalculateLeaseId(
@@ -66,7 +66,7 @@ object CalculateLeaseId extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: calculateLeaseId Can't find a function overload (argument before function)") {
+    test("compilation error: calculateLeaseId Can't find a function overload (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeForCalculateLeaseId(
@@ -77,7 +77,7 @@ object CalculateLeaseId extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: calculateLeaseId Can't find a function overload") {
+    test("compilation error: calculateLeaseId Can't find a function overload") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeForCalculateLeaseId(
@@ -88,7 +88,7 @@ object CalculateLeaseId extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: function calculateLeaseId for V5 and more requires 1 argument") {
+    test("compilation error: function calculateLeaseId for V5 and more requires 1 argument") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeForCalculateLeaseId(
@@ -99,7 +99,7 @@ object CalculateLeaseId extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: calculateLeaseId function is missing") {
+    test("compilation error: calculateLeaseId function is missing") {
       for (version <- testData.oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeForCalculateLeaseId(
@@ -110,7 +110,7 @@ object CalculateLeaseId extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: calculateLeaseId (argument before function) function is missing") {
+    test("compilation error: calculateLeaseId (argument before function) function is missing") {
       for (version <- testData.oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.codeForCalculateLeaseId(

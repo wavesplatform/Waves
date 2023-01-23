@@ -24,7 +24,7 @@ object Log extends JsTestBase {
   private val logError: String = testData.invalidFunctionError("log", 6)
 
   val tests: Tests = Tests {
-    test.apply("check: log Int function compiles") {
+    test("check: log Int function compiles") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.onlyMatcherContract(randomInt.toString, logInt)
@@ -32,7 +32,7 @@ object Log extends JsTestBase {
       }
     }
 
-    test.apply("check: log Int function compiles (argument before function)") {
+    test("check: log Int function compiles (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.onlyMatcherContract(randomInt.toString, logIntArgBeforeFunc)
@@ -40,7 +40,7 @@ object Log extends JsTestBase {
       }
     }
 
-    test.apply("check: log BigInt function compiles") {
+    test("check: log BigInt function compiles") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script = precondition.onlyMatcherContract(s"toBigInt(${randomInt.toString})", logBigInt)
@@ -48,7 +48,7 @@ object Log extends JsTestBase {
       }
     }
 
-    test.apply("check: log BigInt function compiles (argument before function)") {
+    test("check: log BigInt function compiles (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script = precondition.onlyMatcherContract(s"toBigInt(${randomInt.toString})", logBigIntArgBeforeFunc)
@@ -56,7 +56,7 @@ object Log extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid log function") {
+    test("compilation error: invalid log function") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.onlyMatcherContract(randomInt.toString, invalidLogInt)
@@ -68,7 +68,7 @@ object Log extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid log function (argument before function)") {
+    test("compilation error: invalid log function (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.onlyMatcherContract(randomInt.toString, invalidLogIntArgBeforeFunc)
@@ -80,7 +80,7 @@ object Log extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid log data") {
+    test("compilation error: invalid log data") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.onlyMatcherContract(randomStringArrayElement, logInt)
@@ -92,7 +92,7 @@ object Log extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid log data (argument before function)") {
+    test("compilation error: invalid log data (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.onlyMatcherContract(randomAddressDataArrayElement, logIntArgBeforeFunc)
@@ -104,7 +104,7 @@ object Log extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid log data BigInt") {
+    test("compilation error: invalid log data BigInt") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script = precondition.onlyMatcherContract(randomStringArrayElement, logBigInt)
@@ -112,7 +112,7 @@ object Log extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid log data BigInt (argument before function)") {
+    test("compilation error: invalid log data BigInt (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script = precondition.onlyMatcherContract(randomAliasDataArrayElement, logBigIntArgBeforeFunc)

@@ -18,7 +18,7 @@ object Min extends JsTestBase {
   private val invalidMaxForBigInt              = "[callerTestData].min([callerTestData], [callerTestData])"
 
   val tests: Tests = Tests {
-    test.apply("check: min function compiles with a address data type") {
+    test("check: min function compiles with a address data type") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(intList, min)
@@ -26,7 +26,7 @@ object Min extends JsTestBase {
       }
     }
 
-    test.apply("check: min function compiles with a address data type (argument before function)") {
+    test("check: min function compiles with a address data type (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(intList, minArgBeforeFunc)
@@ -34,7 +34,7 @@ object Min extends JsTestBase {
       }
     }
 
-    test.apply("check: min for BigInt function compiles with a address data type") {
+    test("check: min for BigInt function compiles with a address data type") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script       = precondition.onlyMatcherContract(s"toBigInt($randomInt)", minForBigInt)
@@ -42,7 +42,7 @@ object Min extends JsTestBase {
       }
     }
 
-    test.apply("check: min for BigInt function compiles with a address data type (argument before function)") {
+    test("check: min for BigInt function compiles with a address data type (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script       = precondition.onlyMatcherContract(s"toBigInt($randomInt)", minForBigIntArgBeforeFunc)
@@ -50,7 +50,7 @@ object Min extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: min - invalid data") {
+    test("compilation error: min - invalid data") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, min)
@@ -62,7 +62,7 @@ object Min extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload min (argument before function) - invalid data") {
+    test("compilation error: Can't find a function overload min (argument before function) - invalid data") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomDigestAlgorithmTypeArrayElement, minArgBeforeFunc)
@@ -74,7 +74,7 @@ object Min extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload min - invalid function") {
+    test("compilation error: Can't find a function overload min - invalid function") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, invalidMax)
@@ -86,7 +86,7 @@ object Min extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload min (argument before function) - invalid function") {
+    test("compilation error: Can't find a function overload min (argument before function) - invalid function") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, invalidMaxArgBeforeFunc)
@@ -98,7 +98,7 @@ object Min extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: min - invalid function") {
+    test("compilation error: min - invalid function") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.onlyMatcherContract(randomUnionArrayElement, invalidMaxForBigInt)

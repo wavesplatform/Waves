@@ -15,7 +15,7 @@ object Contains extends JsTestBase {
   private val invalidErrorContains         = testData.invalidFunctionError("contains", 2)
 
   val tests: Tests = Tests {
-    test.apply("check: contains function compiles") {
+    test("check: contains function compiles") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script       = precondition.simpleRideCode(randomStringArrayElement, randomStringArrayElement, contains)
@@ -23,7 +23,7 @@ object Contains extends JsTestBase {
       }
     }
 
-    test.apply("check: contains function compiles (argument before function)") {
+    test("check: contains function compiles (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
         val script       = precondition.simpleRideCode(randomStringArrayElement, randomStringArrayElement, containsArgBeforeFunc)
@@ -31,7 +31,7 @@ object Contains extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: contains - Non-matching types") {
+    test("compilation error: contains - Non-matching types") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.simpleRideCode(randomInt.toString, randomAliasDataArrayElement, containsArgBeforeFunc)
@@ -39,7 +39,7 @@ object Contains extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: contains - Non-matching types (argument before function)") {
+    test("compilation error: contains - Non-matching types (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.simpleRideCode(randomInt.toString, randomIssuesArrayElement, containsArgBeforeFunc)
@@ -47,7 +47,7 @@ object Contains extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload contains") {
+    test("compilation error: Can't find a function overload contains") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.simpleRideCode(randomInt.toString, randomAliasDataArrayElement, invalidContains)
@@ -55,7 +55,7 @@ object Contains extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload contains (argument before function)") {
+    test("compilation error: Can't find a function overload contains (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.simpleRideCode(
@@ -67,7 +67,7 @@ object Contains extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function for V3") {
+    test("compilation error: Can't find a function for V3") {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", V3)
         val script = precondition.simpleRideCode(randomStringArrayElement, randomStringArrayElement, contains)
       assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)

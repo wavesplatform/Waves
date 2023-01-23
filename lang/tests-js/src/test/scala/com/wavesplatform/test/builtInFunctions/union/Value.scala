@@ -14,7 +14,7 @@ object Value extends JsTestBase {
   private val invalidErrorValue         = testData.invalidFunctionError("value", 1)
 
   val tests: Tests = Tests {
-    test.apply("check: value function compiles") {
+    test("check: value function compiles") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomInt.toString, value)
@@ -22,7 +22,7 @@ object Value extends JsTestBase {
       }
     }
 
-    test.apply("check: value function compiles(argument before function)") {
+    test("check: value function compiles(argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomInt.toString, valueArgBeforeFunc)
@@ -30,7 +30,7 @@ object Value extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: value - Matching not exhaustive") {
+    test("compilation error: value - Matching not exhaustive") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, value)
@@ -38,7 +38,7 @@ object Value extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: value - Matching not exhaustive (argument before function)") {
+    test("compilation error: value - Matching not exhaustive (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomAddressDataArrayElement, valueArgBeforeFunc)
@@ -46,7 +46,7 @@ object Value extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload value") {
+    test("compilation error: Can't find a function overload value") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, invalidValue)
@@ -54,7 +54,7 @@ object Value extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload value (argument before function)") {
+    test("compilation error: Can't find a function overload value (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script       = precondition.onlyMatcherContract(randomUnionArrayElement, invalidValueArgBeforeFunc)

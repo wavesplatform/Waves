@@ -15,7 +15,7 @@ object Median extends JsTestBase {
   private val medianError: String = testData.invalidFunctionError("median", 1)
 
   val tests: Tests = Tests {
-    test.apply("check: median Int function compiles") {
+    test("check: median Int function compiles") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.onlyMatcherContract(randomInt.toString, medianInt)
@@ -23,7 +23,7 @@ object Median extends JsTestBase {
       }
     }
 
-    test.apply("check: median Int function compiles (argument before function)") {
+    test("check: median Int function compiles (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.onlyMatcherContract(randomInt.toString, medianIntArgBeforeFunc)
@@ -31,7 +31,7 @@ object Median extends JsTestBase {
       }
     }
 
-    test.apply("check: median BigInt function compiles") {
+    test("check: median BigInt function compiles") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script = precondition.onlyMatcherContract(s"[toBigInt(${randomInt.toString})]", medianBigInt)
@@ -39,7 +39,7 @@ object Median extends JsTestBase {
       }
     }
 
-    test.apply("check: median BigInt function compiles (argument before function)") {
+    test("check: median BigInt function compiles (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script = precondition.onlyMatcherContract(s"[toBigInt(${randomInt.toString})]", medianBigIntArgBeforeFunc)
@@ -47,7 +47,7 @@ object Median extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid median function") {
+    test("compilation error: invalid median function") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.onlyMatcherContract(randomInt.toString, invalidMedianInt)
@@ -59,7 +59,7 @@ object Median extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid median data") {
+    test("compilation error: invalid median data") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.onlyMatcherContract(randomStringArrayElement, medianInt)
@@ -71,7 +71,7 @@ object Median extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid median data (argument before function)") {
+    test("compilation error: invalid median data (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.onlyMatcherContract(randomAddressDataArrayElement, medianIntArgBeforeFunc)
@@ -83,7 +83,7 @@ object Median extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid median data BigInt") {
+    test("compilation error: invalid median data BigInt") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script = precondition.onlyMatcherContract(randomStringArrayElement, medianBigInt)
@@ -91,7 +91,7 @@ object Median extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: invalid median data BigInt (argument before function)") {
+    test("compilation error: invalid median data BigInt (argument before function)") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
         val script = precondition.onlyMatcherContract(randomAliasDataArrayElement, medianBigIntArgBeforeFunc)

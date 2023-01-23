@@ -12,7 +12,7 @@ object CalculateAssetId extends JsTestBase {
   private val invalidCalculateAssetId       = "calculateAssetId()"
 
   val tests: Tests = Tests {
-    test.apply("check: function calculateAssetId for version V4 and more compiles for Issue") {
+    test("check: function calculateAssetId for version V4 and more compiles for Issue") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeForCalculateAssetId(
@@ -23,7 +23,7 @@ object CalculateAssetId extends JsTestBase {
       }
     }
 
-    test.apply("check: function calculateAssetId for version V4 and more (argument before function) compiles for Issue") {
+    test("check: function calculateAssetId for version V4 and more (argument before function) compiles for Issue") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeForCalculateAssetId(
@@ -34,7 +34,7 @@ object CalculateAssetId extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: function calculateAssetId for V4 and more Non-matching types") {
+    test("compilation error: function calculateAssetId for V4 and more Non-matching types") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeForCalculateAssetId(
@@ -45,7 +45,7 @@ object CalculateAssetId extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: function calculateAssetId for V4 and more Non-matching types (argument before function)") {
+    test("compilation error: function calculateAssetId for V4 and more Non-matching types (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeForCalculateAssetId(
@@ -56,7 +56,7 @@ object CalculateAssetId extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: function calculateAssetId for V4 and more requires 1 argument") {
+    test("compilation error: function calculateAssetId for V4 and more requires 1 argument") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeForCalculateAssetId(
@@ -67,7 +67,7 @@ object CalculateAssetId extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: calculateAssetId for V3 function is missing") {
+    test("compilation error: calculateAssetId for V3 function is missing") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
       val script = precondition.codeForCalculateAssetId(
         randomIssuesArrayElement,
@@ -76,7 +76,7 @@ object CalculateAssetId extends JsTestBase {
       assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
     }
 
-    test.apply("compilation error: calculateAssetId for V3 (argument before function) function is missing") {
+    test("compilation error: calculateAssetId for V3 (argument before function) function is missing") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
       val script = precondition.codeForCalculateAssetId(
         randomIssuesArrayElement,

@@ -13,7 +13,7 @@ object TransferTransactionById extends JsTestBase {
   private val invalidTransferTransactionByIdArg = s"$randomAliasDataArrayElement.transferTransactionById()"
 
   val tests: Tests = Tests {
-    test.apply("check: function transferTransactionById compiles") {
+    test("check: function transferTransactionById compiles") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Unit", version)
         val script = precondition.onlyMatcherContract(
@@ -24,7 +24,7 @@ object TransferTransactionById extends JsTestBase {
       }
     }
 
-    test.apply("check: function transferTransactionById (argument before function) compiles") {
+    test("check: function transferTransactionById (argument before function) compiles") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Unit", version)
         val script = precondition.onlyMatcherContract(
@@ -35,7 +35,7 @@ object TransferTransactionById extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: transferTransactionById Non-matching type") {
+    test("compilation error: transferTransactionById Non-matching type") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Unit", version)
         val script = precondition.onlyMatcherContract(
@@ -46,7 +46,7 @@ object TransferTransactionById extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: transferTransactionById Non-matching type (argument before function)") {
+    test("compilation error: transferTransactionById Non-matching type (argument before function)") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Unit", version)
         val script = precondition.onlyMatcherContract(
@@ -57,7 +57,7 @@ object TransferTransactionById extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Function 'transferTransactionById' requires 1 arguments") {
+    test("compilation error: Function 'transferTransactionById' requires 1 arguments") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Unit", version)
         val script = precondition.onlyMatcherContract(

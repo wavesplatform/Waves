@@ -14,55 +14,55 @@ object Sqrt extends JsTestBase {
   private val invalidSqrtFunction          = s"sqrt(callerTestData)"
 
   val tests: Tests = Tests {
-    test.apply("check: sqrt Int function compiles") {
+    test("check: sqrt Int function compiles") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Int", V6)
       val script       = precondition.onlyMatcherContract(randomInt.toString, sqrtIntAndUnion)
       assertCompileSuccessDApp(script, V6)
     }
 
-    test.apply("check: sqrt Int function compiles (argument before function)") {
+    test("check: sqrt Int function compiles (argument before function)") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Int", V6)
       val script       = precondition.onlyMatcherContract(randomInt.toString, sqrtIntAndUnionArgBeforeFunc)
       assertCompileSuccessDApp(script, V6)
     }
 
-    test.apply("check: sqrt BigInt function compiles") {
+    test("check: sqrt BigInt function compiles") {
       val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", V6)
       val script = precondition.onlyMatcherContract(s"toBigInt(${randomInt.toString})", sqrtIntAndUnion)
       assertCompileSuccessDApp(script, V6)
     }
 
-    test.apply("check: sqrt BigInt function compiles (argument before function)") {
+    test("check: sqrt BigInt function compiles (argument before function)") {
       val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", V6)
       val script = precondition.onlyMatcherContract(s"toBigInt(${randomInt.toString})", sqrtIntAndUnionArgBeforeFunc)
       assertCompileSuccessDApp(script, V6)
     }
 
-    test.apply("compilation error: invalid sqrt Int function") {
+    test("compilation error: invalid sqrt Int function") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Int", V6)
       val script       = precondition.onlyMatcherContract(randomInt.toString, invalidSqrtFunction)
       assertCompileErrorDApp(script, V6, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
     }
 
-    test.apply("compilation error: invalid sqrt Int data") {
+    test("compilation error: invalid sqrt Int data") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Int", V6)
       val script       = precondition.onlyMatcherContract(randomStringArrayElement, sqrtIntAndUnion)
       assertCompileErrorDApp(script, V6, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
     }
 
-    test.apply("compilation error: invalid sqrt BigInt function") {
+    test("compilation error: invalid sqrt BigInt function") {
       val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", V6)
       val script = precondition.onlyMatcherContract(s"toBigInt(${randomInt.toString})", invalidSqrtFunction)
       assertCompileErrorDApp(script, V6, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
     }
 
-    test.apply("compilation error: invalid sqrt BigInt data") {
+    test("compilation error: invalid sqrt BigInt data") {
       val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", V6)
       val script = precondition.onlyMatcherContract(randomStringArrayElement, sqrtIntAndUnion)
       assertCompileErrorDApp(script, V6, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
     }
 
-    test.apply("compilation error: sqrt Int and Union Can't find a function for V3 - V5") {
+    test("compilation error: sqrt Int and Union Can't find a function for V3 - V5") {
       for (version <- testData.versionsWithoutV6) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.onlyMatcherContract(randomInt.toString, sqrtIntAndUnion)
@@ -70,7 +70,7 @@ object Sqrt extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: sqrt Int and Union Can't find a function for V3 - V5 (argument before function") {
+    test("compilation error: sqrt Int and Union Can't find a function for V3 - V5 (argument before function") {
       for (version <- testData.versionsWithoutV6) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
         val script = precondition.onlyMatcherContract(randomInt.toString, sqrtIntAndUnionArgBeforeFunc)

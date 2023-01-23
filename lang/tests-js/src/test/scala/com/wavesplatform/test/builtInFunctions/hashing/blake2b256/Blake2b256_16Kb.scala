@@ -14,7 +14,7 @@ object Blake2b256_16Kb extends JsTestBase {
   private val invalidErrorBlake2b256_16Kb  = testData.invalidFunctionError("blake2b256_16Kb", 1)
 
   val tests: Tests = Tests {
-    test.apply("check: blake2b256_16Kb function compiles with a ByteVector") {
+    test("check: blake2b256_16Kb function compiles with a ByteVector") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -27,7 +27,7 @@ object Blake2b256_16Kb extends JsTestBase {
       }
     }
 
-    test.apply("check: blake2b256_16Kb function compiles with a ByteVector(argument before function)") {
+    test("check: blake2b256_16Kb function compiles with a ByteVector(argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -40,7 +40,7 @@ object Blake2b256_16Kb extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: blake2b256_16Kb - Non-matching types: expected: ByteVector") {
+    test("compilation error: blake2b256_16Kb - Non-matching types: expected: ByteVector") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -53,7 +53,7 @@ object Blake2b256_16Kb extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: blake2b256_16Kb - Non-matching types: expected: ByteVector (argument before function)") {
+    test("compilation error: blake2b256_16Kb - Non-matching types: expected: ByteVector (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -66,7 +66,7 @@ object Blake2b256_16Kb extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload blake2b256_16Kb") {
+    test("compilation error: Can't find a function overload blake2b256_16Kb") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
@@ -79,7 +79,7 @@ object Blake2b256_16Kb extends JsTestBase {
       }
     }
 
-    test.apply("compilation error: Can't find a function overload blake2b256_16Kb (argument before function)") {
+    test("compilation error: Can't find a function overload blake2b256_16Kb (argument before function)") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
         val script = precondition.codeFromMatchingAndCase(
