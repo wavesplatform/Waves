@@ -23,19 +23,33 @@ class TestCompiler(version: StdLibVersion) {
 
   private lazy val compilerContext =
     (baseCompilerContext |+|
-      WavesContext.build(Global, DirectiveSet(version, Account, DAppType).explicitGet())).compilerContext
+      WavesContext.build(Global, DirectiveSet(version, Account, DAppType).explicitGet(), fixBigScriptField = true)).compilerContext
 
-  lazy val expressionContext: CTX[Environment] = WavesContext.build(Global, DirectiveSet(version, Account, Expression).explicitGet())
+  lazy val expressionContext: CTX[Environment] =
+    WavesContext.build(Global, DirectiveSet(version, Account, Expression).explicitGet(), fixBigScriptField = true)
+
   private lazy val expressionCompilerContext =
     (baseCompilerContext |+|
       expressionContext).compilerContext
 
   private lazy val assetCompilerContext =
     (baseCompilerContext |+|
-      WavesContext.build(Global, DirectiveSet(version, Asset, Expression).explicitGet())).compilerContext
+      WavesContext.build(Global, DirectiveSet(version, Asset, Expression).explicitGet(), fixBigScriptField = true)).compilerContext
 
-  def compile(script: String, allowIllFormedStrings: Boolean = false, compact: Boolean = false): Either[String, DApp] =
-    ContractCompiler.compile(script, compilerContext, version, allowIllFormedStrings = allowIllFormedStrings, needCompaction = compact)
+  def compile(
+      script: String,
+      allowIllFormedStrings: Boolean = false,
+      compact: Boolean = false,
+      removeUnused: Boolean = false
+  ): Either[String, DApp] =
+    ContractCompiler.compile(
+      script,
+      compilerContext,
+      version,
+      allowIllFormedStrings = allowIllFormedStrings,
+      needCompaction = compact,
+      removeUnusedCode = removeUnused
+    )
 
   def compileContract(script: String, allowIllFormedStrings: Boolean = false, compact: Boolean = false): ContractScriptImpl =
     ContractScript(version, compile(script, allowIllFormedStrings, compact).explicitGet()).explicitGet()
@@ -48,13 +62,9 @@ class TestCompiler(version: StdLibVersion) {
     ).explicitGet()
 
   def compileExpressionE(script: String, allowIllFormedStrings: Boolean = false, checkSize: Boolean = true): Either[String, ExprScript] =
-    ExpressionCompiler.compile(script, expressionCompilerContext, allowIllFormedStrings).map( s =>
-      ExprScript(
-        version,
-        s._1,
-        checkSize = checkSize
-      ).explicitGet()
-    )
+    ExpressionCompiler
+      .compile(script, expressionCompilerContext, allowIllFormedStrings)
+      .map(s => ExprScript(version, s._1, checkSize = checkSize).explicitGet())
 
   def compileAsset(script: String): Script =
     ExprScript(version, ExpressionCompiler.compile(script, assetCompilerContext).explicitGet()._1).explicitGet()

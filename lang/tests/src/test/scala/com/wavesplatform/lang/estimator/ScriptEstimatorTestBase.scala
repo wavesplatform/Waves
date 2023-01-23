@@ -41,7 +41,7 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*) extends PropSpec {
         Seq(
           PureContext.build(version, useNewPowPrecision = true).withEnvironment[Environment],
           CryptoContext.build(Global, version).withEnvironment[Environment],
-          WavesContext.build(Global, DirectiveSet(version, Account, DApp).explicitGet()),
+          WavesContext.build(Global, DirectiveSet(version, Account, DApp).explicitGet(), fixBigScriptField = true),
           CTX[NoContext](
             Seq(transactionType),
             Map(("tx", (transactionType, ContextfulVal.pure[NoContext](tx)))),

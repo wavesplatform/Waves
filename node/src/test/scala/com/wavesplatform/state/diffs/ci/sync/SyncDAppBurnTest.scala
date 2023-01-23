@@ -77,7 +77,7 @@ class SyncDAppBurnTest extends PropSpec with WithDomain {
       d.appendBlock(issue, setScript)
 
       d.appendBlockE(invoke) should produce(
-        s"AccountBalanceError(Map(${dApp.toAddress} -> negative asset balance: ${dApp.toAddress}, new portfolio: Map(${asset.id} -> -$assetAmount)"
+        s"AccountBalanceError(Map(${dApp.toAddress} -> negative asset balance: ${dApp.toAddress}, new portfolio: VectorMap(${asset.id} -> -$assetAmount)"
       )
     }
   }
@@ -101,7 +101,7 @@ class SyncDAppBurnTest extends PropSpec with WithDomain {
       d.appendBlock(issue, setScript)
 
       d.appendBlockE(invoke) should produce(
-        s"AccountBalanceError(Map(${dApp.toAddress} -> negative asset balance: ${dApp.toAddress}, new portfolio: Map(${asset.id} -> -$assetAmount)"
+        s"AccountBalanceError(Map(${dApp.toAddress} -> negative asset balance: ${dApp.toAddress}, new portfolio: VectorMap(${asset.id} -> -$assetAmount)"
       )
     }
   }

@@ -3,7 +3,6 @@ package com.wavesplatform
 import java.io.File
 import java.nio.ByteBuffer
 import java.util
-
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.AddressPortfolio
@@ -20,6 +19,7 @@ import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.DB
 
 import scala.annotation.tailrec
+import scala.collection.immutable.VectorMap
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 
@@ -31,7 +31,7 @@ object Explorer extends ScorexLogging {
     Portfolio(
       blockchain.balance(address),
       blockchain.leaseBalance(address),
-      db.withResource(r => AddressPortfolio.assetBalanceIterator(r, address, Diff.empty, _ => true).toMap)
+      db.withResource(r => AddressPortfolio.assetBalanceIterator(r, address, Diff.empty, _ => true).to(VectorMap))
     )
 
   def main(argsRaw: Array[String]): Unit = {

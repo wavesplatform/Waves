@@ -38,7 +38,7 @@ jobs:
               - 'build.sbt'
               - 'project/*'
       - name: Prepare version
-        if: steps.filter.outputs.lang == 'true'
+        if: false # steps.filter.outputs.lang == 'true'
         id: sbt-version
         run: |
           sbt_version=$(cut -d\" -f2 version.sbt)
@@ -61,7 +61,7 @@ jobs:
           fi
       - name: Publish lang
         run: sbt ci-release
-        if: steps.filter.outputs.lang == 'true'
+        if: false # steps.filter.outputs.lang == 'true'
         env:
           PGP_PASSPHRASE: ${{ secrets.OSSRH_GPG_PASSPHRASE }}
           PGP_SECRET: ${{ secrets.OSSRH_GPG_KEY_BASE64 }}

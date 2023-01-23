@@ -310,7 +310,7 @@ abstract class LevelDBWriter private[database] (
       balanceThreshold: Int
   ): Unit = {
     val changedAssetBalances = MultimapBuilder.hashKeys().hashSetValues().build[IssuedAsset, java.lang.Long]()
-    val updatedNftLists      = MultimapBuilder.hashKeys().hashSetValues().build[java.lang.Long, IssuedAsset]()
+    val updatedNftLists      = MultimapBuilder.hashKeys().linkedHashSetValues().build[java.lang.Long, IssuedAsset]()
 
     for ((addressId, updatedBalances) <- balances) {
       for ((asset, balance) <- updatedBalances) {
@@ -350,7 +350,7 @@ abstract class LevelDBWriter private[database] (
       val previousNftCount = rw.get(kCount)
       rw.put(kCount, previousNftCount + nftIds.size())
       for ((id, idx) <- nftIds.asScala.zipWithIndex) {
-        rw.put(Keys.nftAt(AddressId(addressId.toLong), idx, id), Some(()))
+        rw.put(Keys.nftAt(AddressId(addressId.toLong), previousNftCount + idx, id), Some(()))
       }
     }
 

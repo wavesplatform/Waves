@@ -87,12 +87,6 @@ trait ApiMarshallers extends JsonFormats {
   // preserve support for using plain strings as request entities
   implicit val stringMarshaller: ToEntityMarshaller[String] = PredefinedToEntityMarshallers.stringMarshaller(`text/plain`)
 
-  def jsonStream(prefix: String, delimiter: String, suffix: String): EntityStreamingSupport =
-    EntityStreamingSupport
-      .json()
-      .withContentType(ContentType(CustomJson.jsonWithNumbersAsStrings))
-      .withFramingRenderer(Flow[ByteString].intersperse(ByteString(prefix), ByteString(delimiter), ByteString(suffix)))
-
   private def selectMarshallingForContentType[T](marshallings: Seq[Marshalling[T]], contentType: ContentType): Option[() => T] = {
     contentType match {
       case _: ContentType.Binary | _: ContentType.WithFixedCharset | _: ContentType.WithMissingCharset =>

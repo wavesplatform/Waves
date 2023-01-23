@@ -11,6 +11,8 @@ import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxHelpers.*
 
+import scala.collection.immutable.VectorMap
+
 class InvokeFeeTest extends PropSpec with WithDomain {
   import DomainPresets.*
 
@@ -72,7 +74,7 @@ class InvokeFeeTest extends PropSpec with WithDomain {
       d.appendBlock(issueTx, sponsorTx, transferTx, setScript(dAppAcc, dApp))
       d.appendAndAssertFailed(invoke(invoker = invoker, dApp = dAppAcc.toAddress, fee = invokeFee / coeff, feeAssetId = asset))
       d.liquidDiff.portfolios(invoker.toAddress) shouldBe Portfolio.build(asset, -invokeFee / coeff)
-      d.liquidDiff.portfolios(issuer.toAddress) shouldBe Portfolio(-invokeFee, assets = Map(asset -> invokeFee / coeff))
+      d.liquidDiff.portfolios(issuer.toAddress) shouldBe Portfolio(-invokeFee, assets = VectorMap(asset -> invokeFee / coeff))
       d.liquidDiff.portfolios.get(dAppAcc.toAddress) shouldBe None
     }
   }

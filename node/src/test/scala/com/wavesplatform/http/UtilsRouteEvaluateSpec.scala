@@ -117,7 +117,7 @@ class UtilsRouteEvaluateSpec
     "simple expression" in {
       withDomain(RideV5) { d =>
         val blockchain = d.blockchain
-        val api        = utilsApi.copy(blockchain = blockchain)
+        val api        = utilsApi.copy(blockchain = blockchain, settings = utilsApi.settings.copy(evaluateScriptComplexityLimit = 26000))
         val route      = seal(api.route)
 
         evalScript("testNone()") ~> route ~> check {
@@ -522,7 +522,7 @@ class UtilsRouteEvaluateSpec
                |  {
                |    "name": "@complexityLimit",
                |    "type": "Int",
-               |    "value": 25999
+               |    "value": 51999
                |  },
                |  {
                |    "name": "==.@args",
@@ -556,7 +556,7 @@ class UtilsRouteEvaluateSpec
                |  {
                |    "name": "@complexityLimit",
                |    "type": "Int",
-               |    "value": 25998
+               |    "value": 51998
                |  },
                |  {
                |    "name": "i",
@@ -638,7 +638,7 @@ class UtilsRouteEvaluateSpec
                |  {
                |    "name": "@complexityLimit",
                |    "type": "Int",
-               |    "value": 25997
+               |    "value": 51997
                |  },
                |  {
                |    "name": "==.@args",
@@ -672,7 +672,7 @@ class UtilsRouteEvaluateSpec
                |  {
                |    "name": "@complexityLimit",
                |    "type": "Int",
-               |    "value": 25996
+               |    "value": 51996
                |  },
                |  {
                |    "name": "Address.@args",
@@ -692,7 +692,7 @@ class UtilsRouteEvaluateSpec
                |  {
                |    "name": "@complexityLimit",
                |    "type": "Int",
-               |    "value": 25995
+               |    "value": 51995
                |  },
                |  {
                |    "name": "==.@args",
@@ -726,7 +726,7 @@ class UtilsRouteEvaluateSpec
                |  {
                |    "name": "@complexityLimit",
                |    "type": "Int",
-               |    "value": 25994
+               |    "value": 51994
                |  },
                |  {
                |    "name": "==.@args",
@@ -750,7 +750,7 @@ class UtilsRouteEvaluateSpec
                |  {
                |    "name": "@complexityLimit",
                |    "type": "Int",
-               |    "value": 25993
+               |    "value": 51993
                |  },
                |  {
                |    "name": "==.@args",
@@ -774,7 +774,7 @@ class UtilsRouteEvaluateSpec
                |  {
                |    "name": "@complexityLimit",
                |    "type": "Int",
-               |    "value": 25992
+               |    "value": 51992
                |  },
                |  {
                |    "name": "==.@args",
@@ -798,7 +798,7 @@ class UtilsRouteEvaluateSpec
                |  {
                |    "name": "@complexityLimit",
                |    "type": "Int",
-               |    "value": 25991
+               |    "value": 51991
                |  },
                |  {
                |    "name": "AttachedPayment.@args",
@@ -822,7 +822,7 @@ class UtilsRouteEvaluateSpec
                |  {
                |    "name": "@complexityLimit",
                |    "type": "Int",
-               |    "value": 25990
+               |    "value": 51990
                |  },
                |  {
                |    "name": "cons.@args",
@@ -855,7 +855,7 @@ class UtilsRouteEvaluateSpec
                |  {
                |    "name": "@complexityLimit",
                |    "type": "Int",
-               |    "value": 25989
+               |    "value": 51989
                |  },
                |  {
                |    "name": "==.@args",
@@ -907,7 +907,7 @@ class UtilsRouteEvaluateSpec
                |  {
                |    "name": "@complexityLimit",
                |    "type": "Int",
-               |    "value": 25988
+               |    "value": 51988
                |  },
                |  {
                |    "name": "==.@args",
@@ -931,7 +931,7 @@ class UtilsRouteEvaluateSpec
                |  {
                |    "name": "@complexityLimit",
                |    "type": "Int",
-               |    "value": 25987
+               |    "value": 51987
                |  },
                |  {
                |    "name": "==.@args",
@@ -955,7 +955,7 @@ class UtilsRouteEvaluateSpec
                |  {
                |    "name": "@complexityLimit",
                |    "type": "Int",
-               |    "value": 25986
+               |    "value": 51986
                |  },
                |  {
                |    "name": "arg1",
@@ -984,7 +984,7 @@ class UtilsRouteEvaluateSpec
                |  {
                |    "name": "@complexityLimit",
                |    "type": "Int",
-               |    "value": 25985
+               |    "value": 51985
                |  },
                |  {
                |    "name": "arg2",
@@ -1013,7 +1013,7 @@ class UtilsRouteEvaluateSpec
                |  {
                |    "name": "@complexityLimit",
                |    "type": "Int",
-               |    "value": 25984
+               |    "value": 51984
                |  },
                |  {
                |    "name": "check",

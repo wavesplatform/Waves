@@ -39,6 +39,7 @@ import com.wavesplatform.transaction.{Asset, AssetIdLength, ERC20Address, PBSinc
 import com.wavesplatform.utils.*
 import shapeless.Coproduct
 
+import scala.collection.immutable.VectorMap
 import scala.util.{Failure, Right, Success, Try}
 
 object InvokeDiffsCommon {
@@ -468,8 +469,8 @@ object InvokeDiffsCommon {
               TracedResult(
                 Diff
                   .combine(
-                    Map(address     -> Portfolio(assets = Map(a -> amount))),
-                    Map(dAppAddress -> Portfolio(assets = Map(a -> -amount)))
+                    Map(address     -> Portfolio(assets = VectorMap(a -> amount))),
+                    Map(dAppAddress -> Portfolio(assets = VectorMap(a -> -amount)))
                   )
                   .bimap(GenericError(_), p => Diff(portfolios = p))
               ).flatMap(nextDiff =>
@@ -486,8 +487,8 @@ object InvokeDiffsCommon {
                       else
                         nextDiff.withPortfolios(
                           Map(
-                            address     -> Portfolio(assets = Map(a -> amount)),
-                            dAppAddress -> Portfolio(assets = Map(a -> -amount))
+                            address     -> Portfolio(assets = VectorMap(a -> amount)),
+                            dAppAddress -> Portfolio(assets = VectorMap(a -> -amount))
                           )
                         )
                     val pseudoTxRecipient =
@@ -551,7 +552,7 @@ object InvokeDiffsCommon {
           val info       = AssetInfo(ByteString.copyFromUtf8(issue.name), ByteString.copyFromUtf8(issue.description), Height @@ blockchain.height)
           Right(
             Diff(
-              portfolios = Map(pk.toAddress -> Portfolio(assets = Map(asset -> issue.quantity))),
+              portfolios = Map(pk.toAddress -> Portfolio(assets = VectorMap(asset -> issue.quantity))),
               issuedAssets = Map(asset -> NewAssetInfo(staticInfo, info, volumeInfo)),
               assetScripts = Map(asset -> None)
             )
