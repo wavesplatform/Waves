@@ -24,10 +24,10 @@ import scala.util.Try
 // TODO #14: Longs in JS
 case class RideRunnerInput(
     address: Address,
-    request: JsObject, // RunnerRequest,
+    request: JsObject,
     trace: Boolean = false,
     accounts: Map[Address, RunnerAccountState] = Map.empty,
-    height: Int = 3296627,
+    height: Int = 3296626,
     extraFeatures: Set[Short] = Set.empty,
     assets: Map[IssuedAsset, RunnerAssetInfo] = Map.empty,
     blocks: Map[Int, RunnerBlockInfo] = Map.empty,
@@ -58,11 +58,6 @@ case class RideRunnerInput(
     (addr, state) <- accounts
     lease         <- state.leasing
   } yield addr -> LeaseBalance(lease.in, lease.out)
-
-  lazy val resolveAlias: Map[Alias, Address] = for {
-    (addr, state) <- accounts
-    alias         <- state.aliases
-  } yield Alias.createWithChainId(alias, 'W'.toByte).explicitGet() -> addr // TODO #14: chain id from input
 
   private def accountStateLens[T](f: RunnerAccountState => T): Map[Address, T] = for {
     (addr, state) <- accounts
@@ -249,22 +244,7 @@ object RideRunnerInput {
   implicit val txPositiveAmountFormat: Format[TxPositiveAmount] = implicitly[Format[Long]]
     .bimap(TxPositiveAmount.from(_).explicitGet(), _.value)
 
-  implicit val proofsReads: Reads[Proofs]                       = requests.proofsReads
-  implicit val runnerExprRead: Reads[RunnerExpr]                = Json.reads
-  implicit val runnerCallPaymentReads: Reads[RunnerCallPayment] = Json.reads
-  implicit val runnerCallReads: Reads[RunnerCall]               = Json.reads
-  implicit val runnerCallRequestFormat: Reads[Either[RunnerExpr, RunnerCall]] = Reads { json =>
-    val asExpr     = runnerExprRead.reads(json).map(_.asLeft[RunnerCall])
-    val asFuncCall = runnerCallReads.reads(json).map(_.asRight[RunnerExpr])
-    (asExpr, asFuncCall) match {
-      case (r @ JsSuccess(_, _), _) => r
-      case (_, r @ JsSuccess(_, _)) => r
-      case (JsError(e1), JsError(e2)) =>
-        JsError(e1 ++ e2)
-    }
-  }
-  implicit val runnerRequestFormat: Reads[RunnerRequest] = Json.reads
-
+  implicit val proofsReads: Reads[Proofs]                    = requests.proofsReads
   implicit val rideRunnerInputFormat: Reads[RideRunnerInput] = Json.reads
 
   def mapFormat[K, V: Format](stringifyKey: K => String, parseKey: String => JsResult[K])(implicit vFormat: Format[V]): Format[Map[K, V]] = {

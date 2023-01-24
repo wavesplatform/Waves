@@ -1,16 +1,10 @@
 package com.wavesplatform.storage
 
-import com.wavesplatform.BaseTestSuite
 import com.wavesplatform.storage.HasLevelDb.TestDb
-import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
 import play.api.libs.json.Json
 
-import java.nio.charset.StandardCharsets
-
-class LevelDbRequestStorageTestSuite extends BaseTestSuite with HasLevelDb {
-  private val alice = Wallet.generateNewAccount("alice".getBytes(StandardCharsets.UTF_8), 0)
-  private val bob   = Wallet.generateNewAccount("bob".getBytes(StandardCharsets.UTF_8), 0)
-
+class LevelDbRequestStorageTestSuite extends BaseTestSuite with HasLevelDb with HasTestAccounts {
   "LevelDbRequestStorageTestSuite" - {
     "added entries are preserved during restarts" in {
       val entry1 = (alice.toAddress, Json.obj("foo" -> 1))

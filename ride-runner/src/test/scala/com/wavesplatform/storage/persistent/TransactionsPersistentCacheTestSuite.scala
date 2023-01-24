@@ -1,13 +1,11 @@
 package com.wavesplatform.storage.persistent
 
-import com.wavesplatform.BaseTestSuite
 import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.DigestLength
 import com.wavesplatform.state.{Height, TransactionId}
-import com.wavesplatform.storage.HasLevelDb
 
-class TransactionsPersistentCacheTestSuite extends BaseTestSuite with HasLevelDb {
+class TransactionsPersistentCacheTestSuite extends PersistentTestSuite {
   private val defaultTxId        = TransactionId @@ ByteStr(Array.fill[Byte](DigestLength)(0))
   private val defaultHeight      = Height @@ 10
   private val defaultCachedValue = RemoteData.Cached(defaultHeight)

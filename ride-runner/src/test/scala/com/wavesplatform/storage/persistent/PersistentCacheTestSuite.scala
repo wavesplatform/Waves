@@ -1,11 +1,9 @@
 package com.wavesplatform.storage.persistent
 
-import com.wavesplatform.BaseTestSuite
 import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.meta.getSimpleName
-import com.wavesplatform.storage.HasLevelDb
 
-abstract class PersistentCacheTestSuite[KeyT, ValueT] extends BaseTestSuite with HasLevelDb {
+abstract class PersistentCacheTestSuite[KeyT, ValueT] extends PersistentTestSuite {
   private val name                    = getSimpleName(this).replace("TestSuite", "")
   private lazy val defaultCachedValue = RemoteData.Cached(defaultValue)
 

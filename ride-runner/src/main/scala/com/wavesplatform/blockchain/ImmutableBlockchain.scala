@@ -17,7 +17,18 @@ import com.wavesplatform.ride.*
 import com.wavesplatform.ride.input.{RideRunnerInput, decodeStringLikeBytes}
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, Blockchain, DataEntry, Height, LeaseBalance, TxMeta, VolumeAndFee}
+import com.wavesplatform.state.{
+  AccountScriptInfo,
+  AssetDescription,
+  AssetScriptInfo,
+  BalanceSnapshot,
+  Blockchain,
+  DataEntry,
+  Height,
+  LeaseBalance,
+  TxMeta,
+  VolumeAndFee
+}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
@@ -28,9 +39,8 @@ import scala.util.chaining.scalaUtilChainingOps
 class ImmutableBlockchain(override val settings: BlockchainSettings, input: RideRunnerInput) extends Blockchain {
   private val chainId: Byte = settings.addressSchemeCharacter.toByte
 
-  // TODO #16 We don't support it for now, use GET /utils/script/evaluate
   // Ride: isDataStorageUntouched
-  override def hasData(address: Address): Boolean = kill(s"hasData($address)")
+  override def hasData(address: Address): Boolean = input.hasData.getOrElse(address, false)
 
   // Ride: get*Value (data), get* (data)
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
@@ -105,9 +115,14 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
   // Ride (indirectly): asset script validation
   override def assetScript(id: Asset.IssuedAsset): Option[AssetScriptInfo] = assets.get(id).flatMap(_.script)
 
+  private lazy val resolveAlias: Map[Alias, Address] = for {
+    (addr, state) <- input.accounts
+    alias         <- state.aliases
+  } yield Alias.createWithChainId(alias, chainId).explicitGet() -> addr
+
   // Ride: get*Value (data), get* (data), isDataStorageUntouched, balance, scriptHash, wavesBalance
   override def resolveAlias(a: Alias): Either[ValidationError, Address] =
-    input.resolveAlias.get(a).toRight(AliasDoesNotExist(a): ValidationError)
+    resolveAlias.get(a).toRight(AliasDoesNotExist(a): ValidationError)
 
   // Ride: wavesBalance
   override def leaseBalance(address: Address): LeaseBalance = input.leaseBalance.getOrElse(address, LeaseBalance(0, 0))

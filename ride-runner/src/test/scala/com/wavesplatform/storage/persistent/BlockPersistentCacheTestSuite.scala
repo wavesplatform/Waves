@@ -1,12 +1,10 @@
 package com.wavesplatform.storage.persistent
 
-import com.wavesplatform.BaseTestSuite
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.ride.input.EmptyPublicKey
-import com.wavesplatform.storage.HasLevelDb
 
-class BlockPersistentCacheTestSuite extends BaseTestSuite with HasLevelDb {
+class BlockPersistentCacheTestSuite extends PersistentTestSuite {
   "BlockPersistentCache" - {
     "get on empty return None" in test { cache =>
       cache.get(1) shouldBe empty

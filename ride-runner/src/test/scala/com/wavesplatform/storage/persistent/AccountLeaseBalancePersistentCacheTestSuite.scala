@@ -1,17 +1,10 @@
 package com.wavesplatform.storage.persistent
 
-import com.wavesplatform.BaseTestSuite
 import com.wavesplatform.account.Address
 import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.state.LeaseBalance
-import com.wavesplatform.storage.HasLevelDb
-import com.wavesplatform.wallet.Wallet
 
-import java.nio.charset.StandardCharsets
-
-class AccountLeaseBalancePersistentCacheTestSuite extends BaseTestSuite with HasLevelDb {
-  private val alice = Wallet.generateNewAccount("test".getBytes(StandardCharsets.UTF_8), 0)
-
+class AccountLeaseBalancePersistentCacheTestSuite extends PersistentTestSuite {
   private val cacheKey                                    = alice.publicKey.toAddress
   private val cacheValue: RemoteData[LeaseBalance]        = RemoteData.Cached(LeaseBalance(12L, 14L))
   private val defaultCacheValue: RemoteData[LeaseBalance] = RemoteData.Cached(LeaseBalance.empty) // Equal to RemoteData.Absence for this case

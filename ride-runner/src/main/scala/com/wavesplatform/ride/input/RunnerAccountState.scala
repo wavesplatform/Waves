@@ -7,6 +7,9 @@ import com.wavesplatform.state.*
 import com.wavesplatform.state.InvokeScriptResult.DataEntry
 import com.wavesplatform.transaction.Asset
 
+/**
+  * @param data Some(Map.empty) means the data was here
+  */
 case class RunnerAccountState(
     scriptInfo: Option[RunnerScriptInfo] = None,
     data: Option[Map[String, RunnerDataEntry]] = None,
