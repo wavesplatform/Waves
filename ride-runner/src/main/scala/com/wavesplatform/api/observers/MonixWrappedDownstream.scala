@@ -7,13 +7,13 @@ class MonixWrappedDownstream[RequestT, EventT](s: Observer[WrappedEvent[EventT]]
   override def onNext(value: EventT): Unit = send(WrappedEvent.Next(value))
 
   override def onError(t: Throwable): Unit = {
-    super.onError(t)
     send(WrappedEvent.Failed(t))
+    super.onError(t)
   }
 
   override def onCompleted(): Unit = {
-    super.onCompleted()
     send(WrappedEvent.Closed)
+    super.onCompleted()
   }
 
   private def send(event: WrappedEvent[EventT]): Unit = ifWorking(s.onNext(event))

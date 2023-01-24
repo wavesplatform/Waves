@@ -1,10 +1,10 @@
 package com.wavesplatform.api
 
 import com.wavesplatform.BaseTestSuite
+import com.wavesplatform.api.DefaultBlockchainApiTestSuite.EmptyChannel
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.*
 import com.wavesplatform.events.protobuf.BlockchainUpdated
-import com.wavesplatform.api.DefaultBlockchainApiTestSuite.EmptyChannel
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.StreamObserver
 import io.grpc.{CallOptions, Channel, ClientCall, MethodDescriptor}
