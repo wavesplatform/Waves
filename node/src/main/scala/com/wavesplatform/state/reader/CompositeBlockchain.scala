@@ -120,7 +120,7 @@ final class CompositeBlockchain private (
     }
 
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] =
-    if (maybeDiff.isEmpty || to != blockMeta.map(_._1.id())) {
+    if (maybeDiff.isEmpty) {
       inner.balanceSnapshots(address, from, to)
     } else {
       val balance    = this.balance(address)

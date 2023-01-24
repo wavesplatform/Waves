@@ -4,11 +4,10 @@ import com.google.common.base.Charsets
 import com.google.common.collect.AbstractIterator
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.AddressPortfolio.{assetBalanceIterator, nftIterator}
-import com.wavesplatform.api.common.CommonAccountsApi.AddressDataIterator.BatchSize
 import com.wavesplatform.api.common.TransactionMeta.Ethereum
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{AddressId, CurrentData, DBExt, DBResource, Key, KeyTags, Keys}
+import com.wavesplatform.database.{DBExt, DBResource, KeyTags, Keys}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBRecipients
@@ -24,10 +23,8 @@ import com.wavesplatform.transaction.{EthereumTransaction, TransactionType}
 import monix.eval.Task
 import monix.reactive.Observable
 import org.rocksdb.RocksDB
-import java.nio.ByteBuffer
 import java.util.regex.Pattern
 
-import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 
 trait CommonAccountsApi {
@@ -120,14 +117,10 @@ object CommonAccountsApi {
         .fold(Array.empty[DataEntry[?]])(_.filter { case (k, _) => pattern.forall(_.matcher(k).matches()) }.values.toArray.sortBy(_.key))
 
       db.resourceObservable.flatMap { dbResource =>
-        dbResource
-          .get(Keys.addressId(address))
-          .map { addressId =>
-            Observable.fromIterator(
-              Task(new AddressDataIterator(dbResource, address, addressId, entriesFromDiff, pattern).asScala)
-            )
-          }
-          .getOrElse(Observable.fromIterable(entriesFromDiff))
+        Observable
+          .fromIterator(
+            Task(new AddressDataIterator(dbResource, address, entriesFromDiff, pattern).asScala)
+          )
           .filterNot(_.isEmpty)
       }
     }
@@ -213,23 +206,22 @@ object CommonAccountsApi {
   class AddressDataIterator(
       db: DBResource,
       address: Address,
-      addressId: AddressId,
       entriesFromDiff: Array[DataEntry[?]],
       pattern: Option[Pattern]
   ) extends AbstractIterator[DataEntry[?]] {
-    val prefix: Array[Byte] = KeyTags.DataHistory.prefixBytes ++ PBRecipients.publicKeyHash(address)
+    val prefix: Array[Byte] = KeyTags.Data.prefixBytes ++ PBRecipients.publicKeyHash(address)
 
     val length: Int = entriesFromDiff.length
 
     db.withSafePrefixIterator(_.seek(prefix))()
 
-    var nextIndex                        = 0
-    var nextDbEntries: Seq[DataEntry[?]] = Seq.empty
+    var nextIndex                         = 0
+    var nextDbEntry: Option[DataEntry[?]] = None
 
     def matches(key: String): Boolean = pattern.forall(_.matcher(key).matches())
 
     final override def computeNext(): DataEntry[?] = db.withSafePrefixIterator { dbIterator =>
-      nextDbEntries.headOption match {
+      nextDbEntry match {
         case Some(dbEntry) =>
           if (nextIndex < length) {
             val entryFromDiff = entriesFromDiff(nextIndex)
@@ -238,32 +230,25 @@ object CommonAccountsApi {
               entryFromDiff
             } else if (entryFromDiff.key == dbEntry.key) {
               nextIndex += 1
-              nextDbEntries = nextDbEntries.tail
+              nextDbEntry = None
               entryFromDiff
             } else {
-              nextDbEntries = nextDbEntries.tail
+              nextDbEntry = None
               dbEntry
             }
           } else {
-            nextDbEntries = nextDbEntries.tail
+            nextDbEntry = None
             dbEntry
           }
         case None =>
-          val keysBuffer  = new ArrayBuffer[Key[Option[CurrentData]]]()
-          val sizesBuffer = new ArrayBuffer[Int]()
-          while (dbIterator.isValid && keysBuffer.length < BatchSize) {
+          if (dbIterator.isValid) {
             val key = new String(dbIterator.key().drop(2 + Address.HashLength), Charsets.UTF_8)
             if (matches(key)) {
-              Option(dbIterator.value()).foreach { arr =>
-                val buf = ByteBuffer.wrap(arr)
-//                keysBuffer.addOne(Keys.dataAt(addressId, key)(buf.getInt))
-                sizesBuffer.addOne(buf.getInt)
+              nextDbEntry = Option(dbIterator.value()).map { arr =>
+                Keys.data(address, key).parse(arr).entry
               }
             }
             dbIterator.next()
-          }
-          if (keysBuffer.nonEmpty) {
-            nextDbEntries = db.multiGetFlat(keysBuffer, sizesBuffer).map(_.entry)
             computeNext()
           } else if (nextIndex < length) {
             nextIndex += 1
@@ -273,9 +258,5 @@ object CommonAccountsApi {
           }
       }
     }(endOfData())
-  }
-
-  object AddressDataIterator {
-    val BatchSize = 1000
   }
 }

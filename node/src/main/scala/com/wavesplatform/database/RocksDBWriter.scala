@@ -161,8 +161,6 @@ abstract class RocksDBWriter private[database] (
 
   private[this] val log = LoggerFacade(LoggerFactory.getLogger(classOf[RocksDBWriter]))
 
-//  val txdb = new TXDB(new File(dbSettings.directory).getCanonicalPath + "/../transactions")
-
   def dataKeyFilter: BloomFilter
   def addressFilter: BloomFilter
 
@@ -174,15 +172,14 @@ abstract class RocksDBWriter private[database] (
 
   private[this] def readWrite[A](f: RW => A): A = writableDB.readWrite(f)
 
-  private def loadWithFilter[A, R](filter: BloomFilter, key: Key[A])(f: (ReadOnlyDB, A) => Option[R]): Option[R] =
-    if (filter.mightContain(key.suffix)) readOnly { ro =>
-      f(ro, ro.get(key))
-    }
-    else None
+  private def loadWithFilter[A, R](filter: BloomFilter, key: Key[A])(f: A => Option[R]): Option[R] =
+    if (filter.mightContain(key.suffix)) {
+      f(writableDB.get(key))
+    } else None
 
   override protected def loadMaxAddressId(): Long = writableDB.get(Keys.lastAddressId).getOrElse(0L)
 
-  override protected def loadAddressId(address: Address): Option[AddressId] = loadWithFilter(addressFilter, Keys.addressId(address)) { (_, id) => id }
+  override protected def loadAddressId(address: Address): Option[AddressId] = loadWithFilter(addressFilter, Keys.addressId(address))(identity)
 
   override protected def loadAddressIds(addresses: Seq[Address]): Map[Address, Option[AddressId]] = readOnly { ro =>
     addresses.view.zip(ro.multiGetOpt(addresses.map(Keys.addressId), 8)).toMap
@@ -222,9 +219,7 @@ abstract class RocksDBWriter private[database] (
   override def carryFee: Long = writableDB.get(Keys.carryFee(height))
 
   override protected def loadAccountData(address: Address, key: String): CurrentData =
-    loadWithFilter(dataKeyFilter, Keys.data(address, key)) { (_, cdn) =>
-      Some(cdn)
-    }.getOrElse(CurrentData.empty(key))
+    loadWithFilter(dataKeyFilter, Keys.data(address, key))(Some(_)).getOrElse(CurrentData.empty(key))
 
   override def hasData(address: Address): Boolean = {
     writableDB.readOnly { ro =>
@@ -882,15 +877,6 @@ abstract class RocksDBWriter private[database] (
             val asset    = PBAmounts.toVanillaAssetId(tAmount.assetId)
             e.toTransferLike(TxPositiveAmount.unsafeFrom(tAmount.amount), Address(transfer.publicKeyHash.toByteArray), asset)
         }
-      //      tx = txdb.load(id) match {
-//        case t: TransferTransaction if !tm.failed => t
-//        case e @ EthereumTransaction(_: Transfer, _, _, _) if !tm.failed =>
-//          val meta     = db.get(Keys.ethereumTransactionMeta(Height(tm.height), TxNum(tm.num.toShort))).get
-//          val transfer = meta.payload.transfer.get
-//          val tAmount  = transfer.amount.get
-//          val asset    = PBAmounts.toVanillaAssetId(tAmount.assetId)
-//          e.toTransferLike(TxPositiveAmount.unsafeFrom(tAmount.amount), Address(transfer.publicKeyHash.toByteArray), asset)
-//      }
     } yield (height, tx)
   }
 
@@ -911,7 +897,6 @@ abstract class RocksDBWriter private[database] (
       tm        <- db.get(Keys.transactionMetaById(TransactionId(id)))
       (txm, tx) <- db.get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort)))
     } yield (txm, tx)
-//    transactionMeta(id).map(tm => tm -> txdb.load(id))
 
   override def transactionMeta(id: ByteStr): Option[TxMeta] = readOnly { db =>
     db.get(Keys.transactionMetaById(TransactionId(id))).map { tm =>

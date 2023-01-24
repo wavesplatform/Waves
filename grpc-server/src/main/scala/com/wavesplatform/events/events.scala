@@ -366,7 +366,7 @@ object StateUpdate {
       LeasingBalanceUpdate(address, before, leaseBalance)
     }.toVector
 
-    val dataEntries = diff.accountData.toSeq.flatMap { case (address, AccountDataInfo(data)) =>
+    val dataEntries = diff.accountData.toSeq.flatMap { case (address, data) =>
       data.toSeq.map { case (_, entry) =>
         val prev = blockchain.accountData(address, entry.key).getOrElse(EmptyDataEntry(entry.key))
         DataEntryUpdate(address, prev, entry)
@@ -476,7 +476,7 @@ object StateUpdate {
             TransactionMetadata.Metadata.Empty
         }
       )
-    }.toVector
+    }
   }
 
   def referencedAssets(blockchain: Blockchain, txsStateUpdates: Seq[StateUpdate]): Seq[AssetInfo] =

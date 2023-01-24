@@ -2,7 +2,6 @@ package com.wavesplatform.database
 
 import java.{lang, util}
 import cats.data.Ior
-import cats.syntax.option.*
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.google.common.collect.ArrayListMultimap
 import com.google.common.hash.{Funnels, BloomFilter as GBloomFilter}
@@ -183,7 +182,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
   override def accountData(acc: Address, key: String): Option[DataEntry[?]] =
     accountDataCache.get((acc, key)).entry match {
       case _: EmptyDataEntry => None
-      case other => Some(other)
+      case other             => Some(other)
     }
 
   protected def discardAccountData(addressWithKey: (Address, String)): Unit = accountDataCache.invalidate(addressWithKey)
@@ -307,7 +306,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
         case Waves              => stateHash.addWavesBalance(address, balance)
         case asset: IssuedAsset => stateHash.addAssetBalance(address, asset, balance)
       }
-      val key = (address, asset)
+      val key                = (address, asset)
       val prevCurrentBalance = balancesCache.get(key)
       key ->
         (CurrentBalance(balance, Height(newHeight), prevCurrentBalance.height), BalanceNode(balance, prevCurrentBalance.height))
@@ -322,7 +321,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFil
       entry           <- data.values
     } yield {
       stateHash.addDataEntry(address, entry)
-      val entryKey = (address, entry.key)
+      val entryKey   = (address, entry.key)
       val prevHeight = accountDataCache.get(entryKey).height
       entryKey -> (CurrentData(entry, Height(newHeight), prevHeight) -> DataNode(entry, prevHeight))
     }

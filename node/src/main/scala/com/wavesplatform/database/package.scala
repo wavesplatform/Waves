@@ -526,7 +526,8 @@ package object database {
       case _: EmptyDataEntry          => pb.DataEntry.Value.Empty
     }).toByteArray
 
-  def readCurrentData(key: String)(bs: Array[Byte]): CurrentData = if (bs == null) CurrentData.empty(key) else
+  def readCurrentData(key: String)(bs: Array[Byte]): CurrentData = if (bs == null) CurrentData.empty(key)
+  else
     CurrentData(
       readDataEntry(key)(bs.drop(8)),
       Height(Ints.fromByteArray(bs.take(4))),
@@ -536,7 +537,8 @@ package object database {
   def writeCurrentData(cdn: CurrentData): Array[Byte] =
     Ints.toByteArray(cdn.height) ++ Ints.toByteArray(cdn.prevHeight) ++ writeDataEntry(cdn.entry)
 
-  def readDataNode(key: String)(bs: Array[Byte]): DataNode = if (bs == null) DataNode.empty(key) else
+  def readDataNode(key: String)(bs: Array[Byte]): DataNode = if (bs == null) DataNode.empty(key)
+  else
     DataNode(readDataEntry(key)(bs.drop(4)), Height(Ints.fromByteArray(bs.take(4))))
 
   def writeDataNode(dn: DataNode): Array[Byte] =

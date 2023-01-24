@@ -192,7 +192,7 @@ case class Diff private (
           leaseState = leaseState ++ newer.leaseState,
           scripts = scripts ++ newer.scripts,
           assetScripts = assetScripts ++ newer.assetScripts,
-          accountData = accountData ++ newer.accountData,
+          accountData = Diff.combine(accountData, newer.accountData),
           sponsorship = sponsorship.combine(newer.sponsorship),
           scriptsRun = scriptsRun + newer.scriptsRun,
           scriptResults = scriptResults.combine(newer.scriptResults),
@@ -293,6 +293,16 @@ object Diff {
           }
         case (r, _) => r
       }
+
+  def combine[K, IK, IV](first: Map[K, Map[IK, IV]], second: Map[K, Map[IK, IV]]): Map[K, Map[IK, IV]] = {
+    if (first.isEmpty) {
+      second
+    } else {
+      first ++ second.map { case (k, innerMap) =>
+        k -> first.get(k).fold(innerMap)(_ ++ innerMap)
+      }
+    }
+  }
 
   private def mkFilter() =
     BloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), 10000, 0.01f)

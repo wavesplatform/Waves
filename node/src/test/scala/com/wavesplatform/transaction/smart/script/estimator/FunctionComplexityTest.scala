@@ -15,7 +15,7 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import com.wavesplatform.lang.{Global, utils}
-import com.wavesplatform.state.diffs.smart.predef.scriptWithAllV1Functions
+import com.wavesplatform.state.diffs.smart.predef.{chainId, scriptWithAllV1Functions}
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.Waves
