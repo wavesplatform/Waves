@@ -535,10 +535,13 @@ abstract class LevelDBWriter private[database] (
         rw.put(Keys.wavesAmount(height), wavesAmount(height - 1) + lastReward)
       }
 
-      for (case (asset, sp: SponsorshipValue) <- sponsorship) {
-        rw.put(Keys.sponsorship(asset)(height), sp)
-        expiredKeys ++= updateHistory(rw, Keys.sponsorshipHistory(asset), threshold, Keys.sponsorship(asset))
-      }
+      for (case sp <- sponsorship)
+        sp match {
+          case (asset, value: SponsorshipValue) =>
+            rw.put(Keys.sponsorship(asset)(height), value)
+            expiredKeys ++= updateHistory(rw, Keys.sponsorshipHistory(asset), threshold, Keys.sponsorship(asset))
+          case _ =>
+        }
 
       rw.put(Keys.issuedAssets(height), issuedAssets.keySet.toSeq)
       rw.put(Keys.updatedAssets(height), updatedAssets.keySet.toSeq)
