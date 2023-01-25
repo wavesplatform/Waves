@@ -50,4 +50,4 @@ WORKDIR $WVDATA
 HEALTHCHECK CMD curl -f http://localhost:6869/node/status || exit 1
 
 STOPSIGNAL SIGINT
-CMD ["/usr/share/waves/bin/entrypoint.sh"]
+ENTRYPOINT ["/usr/share/waves/bin/entrypoint.sh"]

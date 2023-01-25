@@ -42,7 +42,7 @@ docker run -v /docker/waves/waves-data:/var/lib/waves -v /docker/waves/waves-con
 
 4. You can override the default executable by using the following syntax:
 ```
-docker run -it --entrypoint [command] wavesplatform/wavesnode [command args]
+docker run -it wavesplatform/wavesnode [command] [args]
 ```
 
 ### Environment variables
