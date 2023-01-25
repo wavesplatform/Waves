@@ -209,7 +209,7 @@ object InvokeScriptTransactionDiff {
               availableData,
               availableDataSize
             )
-            diff <- doProcessActions(actions, storingComplexity.toInt)
+            diff <- doProcessActions(StructuredCallableActions(actions, blockchain), storingComplexity.toInt)
           } yield diff
         }
 
@@ -218,7 +218,8 @@ object InvokeScriptTransactionDiff {
             process(dataItems ::: transfers, unusedComplexity)
           case ScriptResultV4(actions, unusedComplexity, _) =>
             process(actions, unusedComplexity)
-          case _: IncompleteResult if limitedExecution => doProcessActions(Nil, 0)
+          case _: IncompleteResult if limitedExecution =>
+            doProcessActions(StructuredCallableActions(Nil, blockchain), 0)
           case i: IncompleteResult =>
             TracedResult(Left(GenericError(s"Evaluation was uncompleted with unused complexity = ${i.unusedComplexity}")))
         }
