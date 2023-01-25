@@ -318,7 +318,7 @@ object Importer extends ScorexLogging {
     val time      = new NTP(settings.ntpServer)
 
     val db = openDB(settings.dbSettings)
-    val (blockchainUpdater, levelDb) =
+    val (blockchainUpdater, rocksDb) =
       StorageFactory(settings, db, time, Observer.empty, BlockchainUpdateTriggers.combined(triggers))
     val pos         = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
     val extAppender = BlockAppender(blockchainUpdater, time, (_: Seq[Diff]) => {}, pos, scheduler, importOptions.verify, txSignParCheck = false) _
@@ -361,7 +361,7 @@ object Importer extends ScorexLogging {
       quit = true
       lock.synchronized {
         if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG) && blockchainUpdater.liquidBlockMeta.nonEmpty) {
-          // Force store liquid block in leveldb
+          // Force store liquid block in rocksdb
           val lastHeader = blockchainUpdater.lastBlockHeader.get.header
           val pseudoBlock = Block(
             BlockHeader(
@@ -389,7 +389,7 @@ object Importer extends ScorexLogging {
         Await.ready(Future.sequence(extensions.map(_.shutdown())), settings.extensionsShutdownTimeout)
 
         blockchainUpdater.shutdown()
-        levelDb.close()
+        rocksDb.close()
         db.close()
       }
       inputStream.close()

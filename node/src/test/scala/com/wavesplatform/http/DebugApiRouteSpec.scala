@@ -108,6 +108,47 @@ class DebugApiRouteSpec
     }
   }
 
+  routePath("/balances/history/{address}") - {
+    val acc1 = TxHelpers.defaultSigner
+    val acc2 = TxHelpers.secondSigner
+
+    val initBalance = 5.waves
+
+    "works" in withDomain(balances = Seq(AddrWithBalance(acc2.toAddress, initBalance), AddrWithBalance(acc1.toAddress))) { d =>
+      val tx1 = TxHelpers.transfer(acc2, acc1.toAddress, 1.waves)
+      val tx2 = TxHelpers.transfer(acc1, acc2.toAddress, 3.waves)
+      val tx3 = TxHelpers.transfer(acc2, acc1.toAddress, 4.waves)
+      val tx4 = TxHelpers.transfer(acc1, acc2.toAddress, 5.waves)
+
+      d.appendBlock(tx1)
+      d.appendBlock(tx2)
+      d.appendBlock()
+      d.appendBlock(tx3)
+      d.appendBlock(tx4)
+      d.appendBlock()
+
+      val expectedBalance2 = initBalance - tx1.fee.value - tx1.amount.value
+      val expectedBalance3 = expectedBalance2 + tx2.amount.value
+      val expectedBalance5 = expectedBalance3 - tx3.fee.value - tx3.amount.value
+      val expectedBalance6 = expectedBalance5 + tx4.amount.value
+
+      Get(routePath(s"/balances/history/${acc2.toAddress}")) ~> routeWithBlockchain(d) ~> check {
+        status shouldBe StatusCodes.OK
+        responseAs[JsArray] shouldBe Json.toJson(
+          Seq(
+            6 -> expectedBalance6,
+            5 -> expectedBalance5,
+            3 -> expectedBalance3,
+            2 -> expectedBalance2,
+            1 -> initBalance
+          ).map { case (height, balance) =>
+            Json.obj("height" -> height, "balance" -> balance)
+          }
+        )
+      }
+    }
+  }
+
   routePath("/stateHash") - {
     "works" - {
       val settingsWithStateHashes = DomainPresets.SettingsFromDefaultConfig.copy(
@@ -2799,6 +2840,7 @@ class DebugApiRouteSpec
       .copy(
         blockchain = d.blockchain,
         priorityPoolBlockchain = () => d.blockchain,
+        loadBalanceHistory = d.rocksDBWriter.loadBalanceHistory,
         loadStateHash = d.rocksDBWriter.loadStateHash
       )
       .route

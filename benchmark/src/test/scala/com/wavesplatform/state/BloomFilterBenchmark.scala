@@ -21,12 +21,12 @@ class BloomFilterBenchmark {
 
   @Benchmark
   def volumeAndFeeWithBloom(bh: Blackhole, st: St): Unit = {
-    bh.consume(st.levelDBWriterWithBloomFilter.filledVolumeAndFee(ByteStr(Random.nextBytes(32))))
+    bh.consume(st.rocksDBWriterWithBloomFilter.filledVolumeAndFee(ByteStr(Random.nextBytes(32))))
   }
 
   @Benchmark
   def volumeAndFeeWithoutBloom(bh: Blackhole, st: St): Unit = {
-    bh.consume(st.levelDBWriterWithoutBloomFilter.filledVolumeAndFee(ByteStr(Random.nextBytes(32))))
+    bh.consume(st.rocksDBWriterWithoutBloomFilter.filledVolumeAndFee(ByteStr(Random.nextBytes(32))))
   }
 
   @Benchmark
@@ -42,7 +42,7 @@ object BloomFilterBenchmark {
       val txCountAtHeight =
         Map.empty[Int, Int].withDefault(h => db.get(Keys.blockMetaAt(Height(h))).fold(0)(_.transactionCount))
 
-      val txs = LazyList.from(levelDBWriter.height, -1).flatMap { h =>
+      val txs = LazyList.from(rocksDBWriter.height, -1).flatMap { h =>
         val txCount = txCountAtHeight(h)
         if (txCount == 0)
           Seq.empty[ExchangeTransaction]
@@ -56,13 +56,13 @@ object BloomFilterBenchmark {
       txs.take(1000).toList
     }
 
-    lazy val levelDBWriterWithBloomFilter: RocksDBWriter =
+    lazy val rocksDBWriterWithBloomFilter: RocksDBWriter =
       RocksDBWriter.readOnly(
         db,
         settings.copy(dbSettings = settings.dbSettings.copy(maxCacheSize = 1, useBloomFilter = true))
       )
 
-    lazy val levelDBWriterWithoutBloomFilter: RocksDBWriter =
+    lazy val rocksDBWriterWithoutBloomFilter: RocksDBWriter =
       RocksDBWriter.readOnly(
         db,
         settings.copy(dbSettings = settings.dbSettings.copy(maxCacheSize = 1, useBloomFilter = false))

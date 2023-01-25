@@ -301,12 +301,12 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
     }
 
     "spendableBalanceChanged" in {
-      withRocksDBWriter(RideV6) { levelDb =>
+      withRocksDBWriter(RideV6) { rocksDb =>
         val ps    = PublishToOneSubject[(Address, Asset)]()
         val items = ps.toListL.runToFuture
 
         val blockchain = new BlockchainUpdaterImpl(
-          levelDb,
+          rocksDb,
           ps,
           RideV6,
           ntpTime,
@@ -314,7 +314,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
           loadActiveLeases(db, _, _)
         )
 
-        val d = Domain(db, blockchain, levelDb, RideV6)
+        val d = Domain(db, blockchain, rocksDb, RideV6)
         blockchain.processBlock(d.createBlock(PlainBlockVersion, Seq(genesis(defaultAddress)), generator = TestBlock.defaultSigner))
         blockchain.processBlock(d.createBlock(PlainBlockVersion, Seq(transfer()), generator = TestBlock.defaultSigner))
 

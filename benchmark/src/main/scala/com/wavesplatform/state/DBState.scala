@@ -22,7 +22,7 @@ abstract class DBState extends ScorexLogging {
 
   lazy val db: RocksDB = openDB(settings.dbSettings)
 
-  lazy val levelDBWriter: RocksDBWriter =
+  lazy val rocksDBWriter: RocksDBWriter =
     RocksDBWriter.readOnly(
       db,
       settings.copy(dbSettings = settings.dbSettings.copy(maxCacheSize = 1))
@@ -33,8 +33,8 @@ abstract class DBState extends ScorexLogging {
   lazy val environment = new WavesEnvironment(
     AddressScheme.current.chainId,
     Coeval.raiseError(new NotImplementedError("`tx` is not implemented")),
-    Coeval(levelDBWriter.height),
-    levelDBWriter,
+    Coeval(rocksDBWriter.height),
+    rocksDBWriter,
     null,
     DirectiveSet.contractDirectiveSet,
     ByteStr.empty

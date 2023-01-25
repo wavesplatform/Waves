@@ -19,7 +19,7 @@ import com.wavesplatform.api.http.leasing.LeaseApiRoute
 import com.wavesplatform.api.http.utils.UtilsApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.database.{AddressId, DBExt, Keys, openDB}
+import com.wavesplatform.database.{DBExt, Keys, openDB}
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.EstimatorProvider.*
@@ -58,7 +58,6 @@ import java.io.File
 import java.security.Security
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.{TimeUnit, *}
-import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
@@ -103,7 +102,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private var triggers = Seq.empty[BlockchainUpdateTriggers]
 
   private[this] var miner: Miner & MinerDebugInfo = Miner.Disabled
-  private[this] val (blockchainUpdater, levelDB) =
+  private[this] val (blockchainUpdater, rocksDB) =
     StorageFactory(settings, db, time, spendableBalanceChanged, BlockchainUpdateTriggers.combined(triggers), bc => miner.scheduleMining(bc))
 
   @volatile
@@ -319,24 +318,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     // API start
     if (settings.restAPISettings.enable) {
-      // TODO: maybe add length constraint
-      def loadBalanceHistory(address: Address): Seq[(Int, Long)] = db.readOnly { rdb =>
-        @tailrec
-        def getPrevBalances(addressId: AddressId, height: Height, acc: Seq[(Int, Long)]): Seq[(Int, Long)] = {
-          if (height > 0) {
-            val balance = rdb.get(Keys.wavesBalanceAt(addressId, height))
-            getPrevBalances(addressId, balance.prevHeight, (height, balance.balance) +: acc)
-          } else acc
-        }
-
-        rdb
-          .get(Keys.addressId(address))
-          .map { aid =>
-            val currentBalance = rdb.get(Keys.wavesBalance(aid))
-            (currentBalance.height, currentBalance.balance) +: getPrevBalances(aid, currentBalance.prevHeight, Seq.empty).reverse
-          }
-          .getOrElse(Seq.empty)
-      }
 
       val limitedScheduler =
         Schedulers.timeBoundedFixedPool(
@@ -425,8 +406,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           mbSyncCacheSizes,
           scoreStatsReporter,
           configRoot,
-          loadBalanceHistory,
-          levelDB.loadStateHash,
+          rocksDB.loadBalanceHistory,
+          rocksDB.loadStateHash,
           () => utxStorage.priorityPool.compositeBlockchain,
           routeTimeout,
           heavyRequestScheduler
@@ -512,7 +493,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       shutdownAndWait(appenderScheduler, "Appender", 5.minutes.some)
 
       log.info("Closing storage")
-      levelDB.close()
+      rocksDB.close()
       db.close()
 
       // extensions should be shut down last, after all node functionality, to guarantee no data loss

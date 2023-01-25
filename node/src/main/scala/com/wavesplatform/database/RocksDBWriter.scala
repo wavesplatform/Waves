@@ -1,7 +1,6 @@
 package com.wavesplatform.database
 
 import java.util
-
 import cats.data.Ior
 import cats.syntax.option.*
 import cats.syntax.semigroup.*
@@ -9,6 +8,7 @@ import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
 import com.google.common.primitives.Ints
 import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.api.common.WavesBalanceIterator
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
@@ -601,7 +601,7 @@ abstract class RocksDBWriter private[database] (
         rw.put(Keys.ethereumTransactionMeta(Height(height), transactions(TransactionId(id))._3), Some(meta))
       }
 
-      expiredKeys.foreach(rw.delete(_, "expired-keys"))
+      expiredKeys.foreach(rw.delete)
 
       if (DisableHijackedAliases.height == height) {
         disabledAliases = DisableHijackedAliases(rw)
@@ -1048,6 +1048,13 @@ abstract class RocksDBWriter private[database] (
 
   def loadStateHash(height: Int): Option[StateHash] = readOnly { db =>
     db.get(Keys.stateHash(height))
+  }
+
+  // TODO: maybe add length constraint
+  def loadBalanceHistory(address: Address): Seq[(Int, Long)] = writableDB.withResource { dbResource =>
+    dbResource.get(Keys.addressId(address)).fold(Seq.empty[(Int, Long)]) { aid =>
+      new WavesBalanceIterator(aid, dbResource).asScala.toSeq
+    }
   }
 
   override def resolveERC20Address(address: ERC20Address): Option[IssuedAsset] =

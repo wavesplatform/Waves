@@ -9,7 +9,7 @@ class AddressTransactionsSpec extends FreeSpec {
     "with pagination" - {
       "after txs is in the middle of ngState" in pending
       "after txs is the last of ngState" in pending
-      "after txs is in levelDb" in pending
+      "after txs is in rocksDb" in pending
     }
 
     "return txs in correct ordering without fromId" in pending

@@ -96,7 +96,7 @@ object Dependencies {
 
   private def leveldbJava(module: String = "") = "org.iq80.leveldb" % s"leveldb${if (module.nonEmpty) "-" else ""}$module" % "0.12"
 
-  private[this] val levelDBJNA = {
+  private[this] val dbDeps = {
     val levelDbVersion = "1.23.1"
     Seq(
 //      "org.rocksdb"                   % "rocksdbjni"         % "7.7.3",
@@ -142,7 +142,7 @@ object Dependencies {
       akkaModule("testkit")                              % Test,
       akkaHttpModule("akka-http-testkit")                % Test,
       leveldbJava().exclude("com.google.guava", "guava") % Test
-    ) ++ test ++ console ++ logDeps ++ levelDBJNA ++ protobuf.value
+    ) ++ test ++ console ++ logDeps ++ dbDeps ++ protobuf.value
   )
 
   lazy val scalapbRuntime = Def.setting {

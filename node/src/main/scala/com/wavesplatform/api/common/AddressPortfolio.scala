@@ -2,6 +2,7 @@ package com.wavesplatform.api.common
 
 import cats.syntax.semigroup.*
 import com.google.common.collect.AbstractIterator
+import com.google.common.primitives.Ints
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.NFTIterator.BatchSize
 import com.wavesplatform.common.state.ByteStr
@@ -11,6 +12,7 @@ import com.wavesplatform.state.{AssetDescription, Diff, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utils.ScorexLogging
 
+import java.nio.ByteBuffer
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 
@@ -71,6 +73,23 @@ class AssetBalanceIterator(addressId: AddressId, resource: DBResource) extends A
         val curBalance = readCurrentBalance(dbIterator.value())
         dbIterator.next()
         Seq(assetId -> curBalance.balance)
+      } else endOfData()
+    }(endOfData())
+}
+
+class WavesBalanceIterator(addressId: AddressId, resource: DBResource) extends AbstractIterator[(Int, Long)] {
+  private val prefixBytes: Array[Byte] = KeyTags.WavesBalanceHistory.prefixBytes ++ addressId.toByteArray
+  private val lastHeight: Int          = resource.get(Keys.wavesBalance(addressId)).height.toInt
+
+  resource.withSafePrefixIterator(_.seekForPrev(prefixBytes ++ Ints.toByteArray(lastHeight)))(())
+
+  override def computeNext(): (Int, Long) =
+    resource.withSafePrefixIterator { dbIterator =>
+      if (dbIterator.isValid) {
+        val h       = ByteBuffer.wrap(dbIterator.key().drop(prefixBytes.length)).getInt
+        val balance = ByteBuffer.wrap(dbIterator.value()).getLong
+        dbIterator.prev()
+        h -> balance
       } else endOfData()
     }(endOfData())
 }

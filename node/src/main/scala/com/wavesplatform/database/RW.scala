@@ -16,15 +16,6 @@ class RW(db: RocksDB, readOptions: ReadOptions, batch: WriteBatch) extends ReadO
 
   def update[V](key: Key[V])(f: V => V): Unit = put(key, f(get(key)))
 
-  /** Because of how leveldb batches work, you can increment a specific value only once! */
-  def inc(key: Key[Int]): Int = {
-    val newValue = get(key) + 1
-    put(key, newValue)
-    newValue
-  }
-
-  def delete(key: Array[Byte], statsKey: String): Unit = batch.delete(key)
-
   def delete(key: Array[Byte]): Unit = batch.delete(key)
 
   def delete[V](key: Key[V]): Unit = batch.delete(key.keyBytes)

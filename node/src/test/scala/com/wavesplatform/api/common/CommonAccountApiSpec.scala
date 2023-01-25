@@ -114,7 +114,7 @@ class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransacti
     "includes NFT balances when ReducedNFTFee feature is inactive" in pending
     "excludes NFT balances when ReducedNFTFee feature is active" - {
       "from diff" in pending
-      "from leveldb" in pending
+      "from rocksdb" in pending
     }
   }
 
