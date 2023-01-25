@@ -1,5 +1,5 @@
-package com.wavesplatform.utils
-import com.wavesplatform.lang.API
+package com.wavesplatform.lang
+
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 
 import java.nio.file.{Files, Paths}
