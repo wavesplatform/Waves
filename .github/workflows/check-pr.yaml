@@ -28,7 +28,7 @@ jobs:
       - name: Check PR
         run: |
           sbt --mem 6144 --batch checkPR
-          sbt lang-tests/assembly
+          sbt lang/assembly
           git clone https://github.com/waves-exchange/neutrino-contract
           git clone https://github.com/waves-exchange/contracts
           git clone https://oauth2:${{ secrets.DUCKS_GITHUB_TOKEN }}@github.com/akharazyan/wavesducks-public
