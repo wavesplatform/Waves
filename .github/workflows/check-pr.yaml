@@ -35,11 +35,8 @@ jobs:
               - 'lang/**'
               - 'build.sbt'
               - 'project/*'
-            lang-sources:
-              - 'lang/shared/src/main/**'
-              - 'lang/jvm/src/main/**'
       - name: Compile external sources
-        if: steps.filter.outputs.lang-sources == 'true'
+        if: steps.filter.outputs.lang == 'true'
         run: |
           sbt lang/assembly
           git clone https://github.com/waves-exchange/neutrino-contract
