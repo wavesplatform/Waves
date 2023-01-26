@@ -59,6 +59,6 @@ class SharedBlockchainData[TagT](val settings: BlockchainSettings, persistentCac
       updateCache: (KeyT, RemoteData[ValueT]) => Unit
   )(key: KeyT): Option[ValueT] =
     fromCache(key)
-      .or(RemoteData.loaded(fromBlockchain(key)).tap(updateCache(key, _)))
+      .orElse(RemoteData.loaded(fromBlockchain(key)).tap(updateCache(key, _)))
       .mayBeValue
 }

@@ -15,12 +15,15 @@ import scala.util.chaining.*
   */
 trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging {
   storage =>
+
+  // We can look up tags to determine if a key has been known, because tags are always in RAM
+  protected val tags = Caffeine.newBuilder().build[KeyT, Set[TagT]]()
+
   protected val values = Caffeine
     .newBuilder()
     .recordStats(() => new KamonStatsCounter(name))
     .build[KeyT, RemoteData[ValueT]]()
 
-  protected val tags                       = Caffeine.newBuilder().build[KeyT, Set[TagT]]()
   private def tagsOf(key: KeyT): Set[TagT] = Option(tags.getIfPresent(key)).getOrElse(Set.empty)
 
   lazy val name = getSimpleName(this)
@@ -29,10 +32,13 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
 
   def persistentCache: PersistentCache[KeyT, ValueT]
 
+  // For REST API
   def getUntagged(height: Int, key: KeyT): Option[ValueT] = getInternal(height, key, None)
 
+  // For running scripts
   def get(height: Int, key: KeyT, tag: TagT): Option[ValueT] = getInternal(height, key, Some(tag))
 
+  // Only for REST API or running scripts
   private def getInternal(height: Int, key: KeyT, tag: Option[TagT]): Option[ValueT] = {
     tag.foreach { tag =>
       val origTags = tagsOf(key)
@@ -57,21 +63,27 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
   def append(height: Int, key: KeyT, update: ValueT): AffectedTags[TagT] = append(height, key, update.some)
 
   def append(height: Int, key: KeyT, update: Option[ValueT]): AffectedTags[TagT] = {
-    Option(values.getIfPresent(key)) match {
-      case None => AffectedTags.empty
-      case Some(orig) =>
-        val updated = RemoteData.loaded(update)
-        log.debug(s"$key appended: $updated")
+    lazy val tags = tagsOf(key)
+    val orig = Option(values.getIfPresent(key))
+      .getOrElse(RemoteData.Unknown)
+      .orElse {
+        if (tags.isEmpty) persistentCache.get(height, key)
+        else RemoteData.Unknown
+      }
 
-        // TODO #36 This could be updated in a different thread
-        persistentCache.set(height, key, updated) // Write here (not in "else"), because we want to preserve the height
+    if (orig.loaded) {
+      val updated = RemoteData.loaded(update)
+      log.debug(s"$key appended: $updated")
 
-        if (updated == orig) AffectedTags.empty
-        else {
-          values.put(key, updated)
-          AffectedTags(tagsOf(key))
-        }
-    }
+      // TODO #36 This could be updated in a different thread
+      persistentCache.set(height, key, updated) // Write here (not in "else"), because we want to preserve the height
+
+      if (updated == orig) AffectedTags.empty
+      else {
+        values.put(key, updated)
+        AffectedTags(tags)
+      }
+    } else AffectedTags.empty // Not present in cache, also we haven't received this key
   }
 
   def undoAppend(rollbackHeight: Int, key: KeyT): AffectedTags[TagT] = rollback(rollbackHeight, key, None)
@@ -79,30 +91,25 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
   def rollback(rollbackHeight: Int, key: KeyT, after: ValueT): AffectedTags[TagT] = rollback(rollbackHeight, key, after.some)
 
   // Micro blocks don't affect, because we know new values
-  def rollback(rollbackHeight: Int, key: KeyT, after: Option[ValueT]): AffectedTags[TagT] =
-    Option(values.getIfPresent(key)) match {
-      case None => AffectedTags.empty
-      case Some(_) =>
-        val tags   = tagsOf(key)
-        val latest = persistentCache.remove(rollbackHeight + 1, key)
-        after match {
-          case None =>
-            if (latest.loaded) {
-              values.put(key, latest)
-              log.debug(s"$key reloaded: ${latest.mayBeValue}")
-            } else {
-              values.put(key, RemoteData.Unknown) // Will be updated later during the run
-              log.debug(s"$key: unknown")
-            }
-            AffectedTags(tags)
+  def rollback(rollbackHeight: Int, key: KeyT, afterRollback: Option[ValueT]): AffectedTags[TagT] = {
+    val tags = tagsOf(key)
+    if (tags.isEmpty) AffectedTags.empty
+    else {
+      val beforeRollback = persistentCache.remove(rollbackHeight + 1, key)
+      afterRollback match {
+        case None =>
+          log.debug(if (beforeRollback.loaded) s"$key reloaded: ${beforeRollback.mayBeValue}" else s"$key: unknown")
+          values.put(key, beforeRollback) // RemoteData.Unknown will be updated later during the run
+          AffectedTags(tags)
 
-          case Some(after) =>
-            val restored = RemoteData.Cached(after)
-            // This could be a rollback to a micro block
-            if (latest != restored) persistentCache.set(rollbackHeight, key, restored) // TODO #36 This could be updated in a different thread
-            values.put(key, restored)
-            log.trace(s"$key restored: $restored")
-            AffectedTags(tags)
-        }
+        case Some(after) =>
+          val restored = RemoteData.Cached(after)
+          // This could be a rollback to a micro block
+          if (beforeRollback != restored) persistentCache.set(rollbackHeight, key, restored) // TODO #36 This could be updated in a different thread
+          values.put(key, restored)
+          log.trace(s"$key restored: $restored")
+          AffectedTags(tags)
+      }
     }
+  }
 }

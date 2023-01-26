@@ -58,19 +58,21 @@ class TransactionStorage[TagT](
     setHeight(txId, Height(height))
   }
 
-  def setHeight(txId: TransactionId, height: Height): AffectedTags[TagT] =
-    Option(values.getIfPresent(txId)) match {
-      case None => AffectedTags.empty
-      case Some(orig) =>
-        val updated = RemoteData.Cached(height)
-        if (updated == orig) AffectedTags.empty
-        else {
-          log.debug(s"Update Transactions($txId)")
-          persistentCache.setHeight(txId, updated)
-          values.put(txId, updated)
-          AffectedTags(tagsOf(txId))
-        }
+  def setHeight(txId: TransactionId, height: Height): AffectedTags[TagT] = {
+    val tags = tagsOf(txId)
+    if (tags.isEmpty) AffectedTags.empty
+    else {
+      val orig    = Option(values.getIfPresent(txId)).getOrElse(RemoteData.Unknown).orElse(persistentCache.getHeight(txId))
+      val updated = RemoteData.Cached(height)
+      if (updated == orig) AffectedTags.empty
+      else {
+        log.debug(s"Update Transactions($txId)")
+        persistentCache.setHeight(txId, updated)
+        values.put(txId, updated)
+        AffectedTags(tagsOf(txId))
+      }
     }
+  }
 
   def remove(pbTxId: ByteString): AffectedTags[TagT] = remove(TransactionId(pbTxId.toByteStr))
   def remove(txId: TransactionId): AffectedTags[TagT] =
