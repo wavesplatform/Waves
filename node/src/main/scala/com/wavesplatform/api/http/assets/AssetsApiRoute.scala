@@ -6,21 +6,21 @@ import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshal
 import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.Source
-import akka.util.ByteString
 import cats.data.Validated
 import cats.instances.either.*
 import cats.instances.list.*
 import cats.syntax.alternative.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import com.github.plokhotnyuk.jsoniter_scala.core.{JsonValueCodec, writeToArray}
-import com.github.plokhotnyuk.jsoniter_scala.macros.{CodecMakerConfig, JsonCodecMaker}
+import com.github.plokhotnyuk.jsoniter_scala.core.{JsonValueCodec, JsonWriter}
+import com.github.plokhotnyuk.jsoniter_scala.macros.JsonCodecMaker
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.api.http.*
-import com.wavesplatform.api.http.assets.AssetsApiRoute.{DistributionParams, FullAssetInfo, IssueTransactionInfo}
+import com.wavesplatform.api.http.assets.AssetsApiRoute.{AssetDetails, AssetInfo, DistributionParams, assetDetailsCodec}
 import com.wavesplatform.api.http.requests.*
+import com.wavesplatform.api.http.StreamSerializerUtils.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.TransactionPublisher
@@ -151,51 +151,25 @@ case class AssetsApiRoute(
       case (errors, _) => InvalidIds(errors)
     }
 
-  def fullAssetInfoJsonBytes(balances: Seq[(IssuedAsset, Long)]): Seq[ByteString] =
+  def getFullAssetInfo(balances: Seq[(IssuedAsset, Long)]): Seq[AssetInfo] =
     balances.view
       .zip(commonAssetsApi.fullInfos(balances.map(_._1)))
       .map { case ((asset, balance), infoOpt) =>
         infoOpt match {
           case Some(CommonAssetsApi.AssetInfo(assetInfo, issueTransaction, sponsorBalance)) =>
-            ByteString.fromArrayUnsafe(
-              writeToArray(
-                FullAssetInfo(
-                  assetId = asset.id.toString,
-                  reissuable = assetInfo.reissuable,
-                  minSponsoredAssetFee = assetInfo.sponsorship match {
-                    case 0           => None
-                    case sponsorship => Some(sponsorship)
-                  },
-                  sponsorBalance = sponsorBalance,
-                  quantity = BigDecimal(assetInfo.totalVolume),
-                  issueTransaction = issueTransaction.map { tx =>
-                    IssueTransactionInfo(
-                      tx.tpe.id,
-                      tx.id().toString,
-                      tx.assetFee._2,
-                      tx.assetFee._1.maybeBase58Repr,
-                      tx.timestamp,
-                      tx.version,
-                      if (tx.version >= TxVersion.V2) Some(tx.chainId) else None,
-                      tx.sender.toAddress(tx.chainId).toString,
-                      tx.sender.toString,
-                      tx.proofs.proofs.map(_.toString),
-                      tx.assetId.toString,
-                      tx.name.toStringUtf8,
-                      tx.quantity.value,
-                      tx.reissuable,
-                      tx.decimals.value,
-                      tx.description.toStringUtf8,
-                      if (tx.version >= TxVersion.V2) tx.script.map(_.bytes().base64) else None,
-                      if (tx.usesLegacySignature) Some(tx.signature.toString) else None
-                    )
-                  },
-                  balance = balance
-                )
-              )
+            AssetInfo.FullAssetInfo(
+              assetId = asset.id.toString,
+              reissuable = assetInfo.reissuable,
+              minSponsoredAssetFee = assetInfo.sponsorship match {
+                case 0           => None
+                case sponsorship => Some(sponsorship)
+              },
+              sponsorBalance = sponsorBalance,
+              quantity = BigDecimal(assetInfo.totalVolume),
+              issueTransaction = issueTransaction,
+              balance = balance
             )
-          case None =>
-            ByteString.fromArrayUnsafe(writeToArray(AssetsApiRoute.AssetId(asset.id.toString)))
+          case None => AssetInfo.AssetId(asset.id.toString)
         }
       }
       .toSeq
@@ -204,8 +178,8 @@ case class AssetsApiRoute(
     *   Some(assets) for specific asset balances, None for a full portfolio
     */
   def balances(address: Address, assets: Option[Seq[IssuedAsset]] = None): Route = {
-    implicit val jsonStreamingSupport: ToResponseMarshaller[Source[ByteString, NotUsed]] =
-      jsonBytesStreamMarshaller(s"""{"address":"$address","balances":[""", ",", "]}")
+    implicit val jsonStreamingSupport: ToResponseMarshaller[Source[AssetInfo, NotUsed]] =
+      jsonBytesStreamMarshaller(s"""{"address":"$address","balances":[""", ",", "]}")(AssetsApiRoute.assetInfoCodec)
 
     routeTimeout.executeFromObservable(
       (assets match {
@@ -214,7 +188,7 @@ case class AssetsApiRoute(
         case None =>
           commonAccountApi
             .portfolio(address)
-      }).concatMapIterable(fullAssetInfoJsonBytes)
+      }).concatMapIterable(getFullAssetInfo)
     )
   }
 
@@ -272,7 +246,7 @@ case class AssetsApiRoute(
     if (limit > settings.transactionsByAddressLimit) complete(TooBigArrayAllocation)
     else {
       import cats.syntax.either.*
-      implicit val jsonStreamingSupport: ToResponseMarshaller[Source[ByteString, NotUsed]] = jsonBytesStreamMarshaller()
+      implicit val jsonStreamingSupport: ToResponseMarshaller[Source[AssetDetails, NotUsed]] = jsonBytesStreamMarshaller()(assetDetailsCodec)
 
       val compBlockchain = compositeBlockchain()
       routeTimeout.executeStreamed {
@@ -280,7 +254,7 @@ case class AssetsApiRoute(
           .nftList(address, after)
           .concatMapIterable { a =>
             AssetsApiRoute
-              .jsonBytesDetails(compBlockchain)(a, full = true)
+              .getAssetDetails(compBlockchain)(a, full = true)
               .valueOr(err => throw new IllegalArgumentException(err))
           }
           .take(limit)
@@ -355,7 +329,7 @@ object AssetsApiRoute {
     } yield limit
   }
 
-  def jsonBytesDetails(blockchain: Blockchain)(assets: Seq[(IssuedAsset, AssetDescription)], full: Boolean): Either[String, Seq[ByteString]] = {
+  def getAssetDetails(blockchain: Blockchain)(assets: Seq[(IssuedAsset, AssetDescription)], full: Boolean): Either[String, Seq[AssetDetails]] = {
     def additionalInfo(ids: Seq[ByteStr]): Either[String, Seq[(TxTimestamp, Height)]] = {
       blockchain.transactionInfos(ids).traverse { infoOpt =>
         for {
@@ -376,34 +350,30 @@ object AssetsApiRoute {
 
     additionalInfo(assets.map { case (_, description) => description.originTransactionId }).map { infos =>
       assets.zip(infos).map { case ((id, description), (timestamp, height)) =>
-        ByteString.fromArrayUnsafe(
-          writeToArray(
-            AssetDetails(
-              assetId = id.id.toString,
-              issueHeight = height,
-              issueTimestamp = timestamp,
-              issuer = description.issuer.toAddress.toString,
-              issuerPublicKey = description.issuer.toString,
-              name = description.name.toStringUtf8,
-              description = description.description.toStringUtf8,
-              decimals = description.decimals,
-              reissuable = description.reissuable,
-              quantity = BigDecimal(description.totalVolume),
-              scripted = description.script.nonEmpty,
-              minSponsoredAssetFee = description.sponsorship match {
-                case 0           => None
-                case sponsorship => Some(sponsorship)
-              },
-              originTransactionId = description.originTransactionId.toString,
-              scriptDetails = description.script.filter(_ => full).map { case AssetScriptInfo(script, complexity) =>
-                AssetScriptDetails(
-                  scriptComplexity = BigDecimal(complexity),
-                  script = script.bytes().base64,
-                  scriptText = script.expr.toString // [WAIT] Script.decompile(script)
-                )
-              }
+        AssetDetails(
+          assetId = id.id.toString,
+          issueHeight = height,
+          issueTimestamp = timestamp,
+          issuer = description.issuer.toAddress.toString,
+          issuerPublicKey = description.issuer.toString,
+          name = description.name.toStringUtf8,
+          description = description.description.toStringUtf8,
+          decimals = description.decimals,
+          reissuable = description.reissuable,
+          quantity = BigDecimal(description.totalVolume),
+          scripted = description.script.nonEmpty,
+          minSponsoredAssetFee = description.sponsorship match {
+            case 0           => None
+            case sponsorship => Some(sponsorship)
+          },
+          originTransactionId = description.originTransactionId.toString,
+          scriptDetails = description.script.filter(_ => full).map { case AssetScriptInfo(script, complexity) =>
+            AssetScriptDetails(
+              scriptComplexity = BigDecimal(complexity),
+              script = script.bytes().base64,
+              scriptText = script.expr.toString // [WAIT] Script.decompile(script)
             )
-          )
+          }
         )
       }
     }
@@ -484,41 +454,94 @@ object AssetsApiRoute {
       scriptDetails: Option[AssetScriptDetails]
   )
 
-  case class IssueTransactionInfo(
-      `type`: Int,
-      id: String,
-      fee: Long,
-      feeAssetId: Option[String],
-      timestamp: Long,
-      version: Byte,
-      chainId: Option[Byte],
-      sender: String,
-      senderPublicKey: String,
-      proofs: Seq[String],
-      assetId: String,
-      name: String,
-      quantity: Long,
-      reissuable: Boolean,
-      decimals: Byte,
-      description: String,
-      script: Option[String],
-      signature: Option[String] = None
-  )
+  sealed trait AssetInfo
+  object AssetInfo {
+    case class FullAssetInfo(
+        assetId: String,
+        reissuable: Boolean,
+        minSponsoredAssetFee: Option[Long],
+        sponsorBalance: Option[Long],
+        quantity: BigDecimal,
+        issueTransaction: Option[IssueTransaction],
+        balance: Long
+    ) extends AssetInfo
 
-  case class FullAssetInfo(
-      assetId: String,
-      reissuable: Boolean,
-      minSponsoredAssetFee: Option[Long],
-      sponsorBalance: Option[Long],
-      quantity: BigDecimal,
-      issueTransaction: Option[IssueTransactionInfo],
-      balance: Long
-  )
+    case class AssetId(assetId: String) extends AssetInfo
+  }
 
-  case class AssetId(assetId: String)
+  implicit val assetIdCodec: JsonValueCodec[AssetInfo.AssetId] = JsonCodecMaker.make
 
-  implicit val issueTxInfoCodec: JsonValueCodec[IssueTransactionInfo] = JsonCodecMaker.make(CodecMakerConfig.withTransientNone(false))
-  implicit val assetDetailCodec: JsonValueCodec[AssetDetails]         = JsonCodecMaker.make
-  implicit val fullAssetInfoCodec: JsonValueCodec[FullAssetInfo]      = JsonCodecMaker.make
-  implicit val assetIdCodec: JsonValueCodec[AssetId]                  = JsonCodecMaker.make
+  def assetScriptDetailsCodec(numbersAsString: Boolean): JsonValueCodec[AssetScriptDetails] = new OnlyEncodeJsonValueCodec[AssetScriptDetails] {
+    override def encodeValue(details: AssetScriptDetails, out: JsonWriter): Unit = {
+      out.writeObjectStart()
+      out.writeKeyValue("scriptComplexity", details.scriptComplexity, numbersAsString)
+      out.writeKeyValue("script", details.script)
+      out.writeKeyValue("scriptText", details.scriptText)
+      out.writeObjectEnd()
+    }
+  }
+
+  def assetDetailsCodec(numbersAsString: Boolean): JsonValueCodec[AssetDetails] = new OnlyEncodeJsonValueCodec[AssetDetails] {
+    override def encodeValue(details: AssetDetails, out: JsonWriter): Unit = {
+      out.writeObjectStart()
+      out.writeKeyValue("assetId", details.assetId)
+      out.writeKeyValue("issueHeight", details.issueHeight, numbersAsString)
+      out.writeKeyValue("issueTimestamp", details.issueTimestamp, numbersAsString)
+      out.writeKeyValue("issuer", details.issuer)
+      out.writeKeyValue("issuerPublicKey", details.issuerPublicKey)
+      out.writeKeyValue("name", details.name)
+      out.writeKeyValue("description", details.description)
+      out.writeKeyValue("decimals", details.decimals, numbersAsString)
+      out.writeKeyValue("reissuable", details.reissuable)
+      out.writeKeyValue("quantity", details.quantity, numbersAsString)
+      out.writeKeyValue("scripted", details.scripted)
+      details.minSponsoredAssetFee.foreach(fee => out.writeKeyValue("minSponsoredAssetFee", fee, numbersAsString))
+      out.writeKeyValue("originTransactionId", details.originTransactionId)
+      details.scriptDetails.foreach(sd => out.writeKeyValue("scriptDetails", assetScriptDetailsCodec(numbersAsString).encodeValue(sd, _)))
+      out.writeObjectEnd()
+    }
+  }
+
+  def issueTxCodec(numbersAsString: Boolean): JsonValueCodec[IssueTransaction] = new OnlyEncodeJsonValueCodec[IssueTransaction] {
+    override def encodeValue(tx: IssueTransaction, out: JsonWriter): Unit = {
+      out.writeObjectStart()
+      out.writeKeyValue("type", tx.tpe.id, numbersAsString)
+      out.writeKeyValue("id", tx.id().toString)
+      out.writeKeyValue("fee", tx.assetFee._2, numbersAsString)
+      tx.assetFee._1.maybeBase58Repr.fold(out.writeKeyNull("feeAssetId"))(out.writeKeyValue("feeAssetId", _))
+      out.writeKeyValue("timestamp", tx.timestamp, numbersAsString)
+      out.writeKeyValue("version", tx.version, numbersAsString)
+      if (tx.version >= TxVersion.V2) out.writeKeyValue("chainId", tx.chainId, numbersAsString) else out.writeKeyNull("chainId")
+      out.writeKeyValue("sender", tx.sender.toAddress(tx.chainId).toString)
+      out.writeKeyValue("senderPublicKey", tx.sender.toString)
+      out.writeKeyValueArray("proofs", out => tx.proofs.proofs.foreach(p => out.writeVal(p.toString)))
+      out.writeKeyValue("assetId", tx.assetId.toString)
+      out.writeKeyValue("name", tx.name.toStringUtf8)
+      out.writeKeyValue("quantity", tx.quantity.value, numbersAsString)
+      out.writeKeyValue("reissuable", tx.reissuable)
+      out.writeKeyValue("decimals", tx.decimals.value, numbersAsString)
+      out.writeKeyValue("description", tx.description.toStringUtf8)
+      if (tx.version >= TxVersion.V2) {
+        tx.script.map(_.bytes().base64).fold(out.writeKeyNull("script"))(out.writeKeyValue("script", _))
+      }
+      if (tx.usesLegacySignature) out.writeKeyValue("signature", tx.signature.toString)
+      out.writeObjectEnd()
+    }
+  }
+
+  def assetInfoCodec(numbersAsString: Boolean): JsonValueCodec[AssetInfo] = new OnlyEncodeJsonValueCodec[AssetInfo] {
+    override def encodeValue(x: AssetInfo, out: JsonWriter): Unit = x match {
+      case info: AssetInfo.FullAssetInfo =>
+        out.writeObjectStart()
+        out.writeKeyValue("assetId", info.assetId)
+        out.writeKeyValue("reissuable", info.reissuable)
+        info.minSponsoredAssetFee.foreach(out.writeKeyValue("minSponsoredAssetFee", _, numbersAsString))
+        info.sponsorBalance.foreach(out.writeKeyValue("sponsorBalance", _, numbersAsString))
+        out.writeKeyValue("quantity", info.quantity, numbersAsString)
+        info.issueTransaction.foreach(tx => out.writeKeyValue("issueTransaction", issueTxCodec(numbersAsString).encodeValue(tx, _)))
+        out.writeKeyValue("balance", info.balance, numbersAsString)
+        out.writeObjectEnd()
+      case assetId: AssetInfo.AssetId => assetIdCodec.encodeValue(assetId, out)
+    }
+  }
 }

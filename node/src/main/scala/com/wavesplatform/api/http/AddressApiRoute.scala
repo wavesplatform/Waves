@@ -5,10 +5,8 @@ import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshal
 import akka.http.scaladsl.model.HttpMethods
 import akka.http.scaladsl.server.{Directive0, Route}
 import akka.stream.scaladsl.Source
-import akka.util.ByteString
 import cats.instances.option.*
 import cats.syntax.traverse.*
-import com.github.plokhotnyuk.jsoniter_scala.core.*
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.ApiError.*
@@ -199,7 +197,7 @@ case class AddressApiRoute(
 
   def getData: Route =
     pathPrefix("data" / AddrSegment) { address =>
-      implicit val jsonStreamingSupport: ToResponseMarshaller[Source[ByteString, NotUsed]] = jsonBytesStreamMarshaller()
+      implicit val jsonStreamingSupport: ToResponseMarshaller[Source[DataEntry[?], NotUsed]] = jsonBytesStreamMarshaller()(DataEntry.dataEntryCodec)
 
       (path(Segment) & get) { key =>
         complete(accountDataEntry(address, key))
@@ -288,25 +286,22 @@ case class AddressApiRoute(
       pass
   }
 
-  private def accountData(address: Address)(implicit m: ToResponseMarshaller[Source[ByteString, NotUsed]]) = {
+  private def accountData(address: Address)(implicit m: ToResponseMarshaller[Source[DataEntry[?], NotUsed]]) = {
     routeTimeout.executeFromObservable(
       commonAccountsApi
         .dataStream(address, None)
-        .map(entry => ByteString.fromArrayUnsafe(writeToArray[DataEntry[?]](entry)(DataEntry.dataEntryCodec)))
     )
   }
 
-  private def accountData(addr: Address, regex: String)(implicit m: ToResponseMarshaller[Source[ByteString, NotUsed]]) =
+  private def accountData(addr: Address, regex: String)(implicit m: ToResponseMarshaller[Source[DataEntry[?], NotUsed]]) =
     routeTimeout.executeFromObservable(
       commonAccountsApi
         .dataStream(addr, Some(regex))
-        .map(entry => ByteString.fromArrayUnsafe(writeToArray[DataEntry[?]](entry)(DataEntry.dataEntryCodec)))
     )
 
   private def accountDataEntry(address: Address, key: String): ToResponseMarshallable =
     commonAccountsApi
       .data(address, key)
-      .map(entry => ByteString.fromArrayUnsafe(writeToArray[DataEntry[?]](entry)(DataEntry.dataEntryCodec)))
       .toRight(DataKeyDoesNotExist)
 
   private def accountDataList(address: Address, keys: String*) =
@@ -314,7 +309,6 @@ case class AddressApiRoute(
       keys
         .flatMap(commonAccountsApi.data(address, _))
         .iterator
-        .map(entry => ByteString.fromArrayUnsafe(writeToArray[DataEntry[?]](entry)(DataEntry.dataEntryCodec)))
     )
 
   private def signPath(address: Address, encode: Boolean): Route = (post & entity(as[String])) { message =>
