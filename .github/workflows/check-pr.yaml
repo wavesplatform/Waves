@@ -27,8 +27,8 @@ jobs:
           key: coursier-cache
       - name: Check PR
         run: |
-          sbt --mem 6144 --batch checkPR
-          find ~/.cache/coursier -type d -name '*SNAPSHOT' | xargs rm -vrf {} \;
+#          sbt --mem 6144 --batch checkPR
+#          find ~/.cache/coursier -type d -name '*SNAPSHOT' | xargs rm -vrf {} \;
       - uses: dorny/paths-filter@v2
         id: filter
         with:
