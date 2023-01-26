@@ -1,7 +1,7 @@
 package com.wavesplatform.api.http.utils
 
 import cats.Id
-import cats.implicits.{catsSyntaxApply, catsSyntaxSemigroup}
+import cats.implicits.catsSyntaxSemigroup
 import cats.syntax.either.*
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
@@ -19,11 +19,12 @@ import com.wavesplatform.lang.v1.traits.Environment.Tthis
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.{ValidationError, utils}
-import com.wavesplatform.state.diffs.invoke.InvokeDiffsCommon.{actionsToScriptResult, checkActions}
+import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, ScriptExtraFee}
+import com.wavesplatform.state.diffs.invoke.InvokeDiffsCommon.processActions
 import com.wavesplatform.state.diffs.invoke.{InvokeScriptTransactionLike, StructuredCallableActions}
 import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TransactionType.TransactionType
+import com.wavesplatform.transaction.TransactionType.{InvokeScript, TransactionType}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvokeRejectError}
 import com.wavesplatform.transaction.smart.*
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -42,13 +43,13 @@ object UtilsEvaluator {
       .buildExprFromInvocation(script.expr.asInstanceOf[DApp], invocation, script.stdLibVersion)
       .bimap(e => GenericError(e.message), _.expr)
 
-  def executeExpression(blockchain: Blockchain, script: Script, address: Address, pk: PublicKey, limit: Int)(
+  def executeExpression(blockchain: Blockchain, script: Script, dAppAddress: Address, dAppPk: PublicKey, limit: Int)(
       expr: EXPR
   ): Either[ValidationError, (EVALUATED, Int, Log[Id], InvokeScriptResult)] =
     for {
       ds <- DirectiveSet(script.stdLibVersion, Account, DAppType).leftMap(GenericError(_))
       invoke = new InvokeScriptTransactionLike {
-        override def dApp: AddressOrAlias          = address
+        override def dApp: AddressOrAlias          = dAppAddress
         override def funcCall: Terms.FUNCTION_CALL = Terms.FUNCTION_CALL(FunctionHeader.User(""), Nil)
         // Payments, that are mapped to RIDE structure, is taken from Invocation,
         // while this field used for validation inside InvokeScriptTransactionDiff,
@@ -56,7 +57,7 @@ object UtilsEvaluator {
         override def payments: Seq[Payment]            = Seq.empty
         override def root: InvokeScriptTransactionLike = this
         override val sender: PublicKey                 = PublicKey(ByteStr(new Array[Byte](32)))
-        override def assetFee: (Asset, Long)           = Asset.Waves -> 0L
+        override def assetFee: (Asset, Long)           = Asset.Waves -> FeeConstants(InvokeScript) * ScriptExtraFee
         override def timestamp: Long                   = System.currentTimeMillis()
         override def chainId: Byte                     = AddressScheme.current.chainId
         override def id: Coeval[ByteStr]               = Coeval.evalOnce(ByteStr.empty)
@@ -68,11 +69,11 @@ object UtilsEvaluator {
         Coeval.raiseError(new IllegalStateException("No input entity available")),
         Coeval.evalOnce(blockchain.height),
         blockchain,
-        Coproduct[Tthis](Recipient.Address(ByteStr(address.bytes))),
+        Coproduct[Tthis](Recipient.Address(ByteStr(dAppAddress.bytes))),
         ds,
         invoke,
-        address,
-        pk,
+        dAppAddress,
+        dAppPk,
         Set.empty[Address],
         limitedExecution = false,
         limit,
@@ -84,7 +85,7 @@ object UtilsEvaluator {
         availableData = ContractLimits.MaxWriteSetSize,
         availableDataSize = ContractLimits.MaxTotalWriteSetSizeInBytes,
         currentDiff = Diff.empty,
-        invocationRoot = DAppEnvironment.InvocationTreeTracker(DAppEnvironment.DAppInvocation(address, null, Nil))
+        invocationRoot = DAppEnvironment.InvocationTreeTracker(DAppEnvironment.DAppInvocation(dAppAddress, null, Nil))
       )
       ctx  = BlockchainContext.build(ds, environment, fixUnicodeFunctions = true, useNewPowPrecision = true, fixBigScriptField = true)
       call = ContractEvaluator.buildSyntheticCall(ContractScriptCompactor.decompact(script.expr.asInstanceOf[DApp]), expr)
@@ -109,11 +110,22 @@ object UtilsEvaluator {
         .fromObj(ctx, ByteStr.empty, evaluated, ds.stdLibVersion, 0)
         .bimap(
           _ => Right(InvokeScriptResult.empty),
-          { r =>
-            val actions = StructuredCallableActions(r.actions, blockchain)
-            val check   = checkActions(actions, ds.stdLibVersion, address, usedComplexity, invoke, limitedExecution = false, limit, log)
-            (check *> actionsToScriptResult(actions, usedComplexity, invoke, log)).resultE
-          }
+          r =>
+            processActions(
+              StructuredCallableActions(r.actions, blockchain),
+              ds.stdLibVersion,
+              dAppAddress,
+              dAppPk,
+              usedComplexity,
+              invoke,
+              blockchain,
+              System.currentTimeMillis(),
+              isSyncCall = false,
+              limitedExecution = false,
+              limit,
+              Nil,
+              log
+            ).map(_.scriptResults.head._2).resultE
         )
         .merge
       scriptResult = environment.currentDiff.scriptResults.values.fold(InvokeScriptResult.empty)(_ |+| _) |+| rootScriptResult

@@ -4,6 +4,7 @@ import com.wavesplatform.api.http.ApiError.ScriptExecutionError
 import com.wavesplatform.api.http.utils.{UtilsApiRoute, UtilsInvocationRequest}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.lang.directives.values.V6
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -14,6 +15,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.state.{Blockchain, IntegerDataEntry, LeaseBalance}
 import com.wavesplatform.test.DomainPresets.{RideV5, RideV6}
+import com.wavesplatform.test.NumericExt
 import com.wavesplatform.transaction.TxHelpers
 import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.utils.{Schedulers, Time}
@@ -329,7 +331,7 @@ class UtilsRouteEvaluateSpec
         evalScript(""" testSyncCallComplexityExcess() """) ~> customApi.route ~> check {
           val response = responseAs[JsValue]
           val message =
-            "InvokeRejectError(error = FailedTransactionError(code = 1, error = Invoke complexity limit = 200 is exceeded), log = \n\ttestSyncCallComplexityExcess.@args = []\n\tinvoke.@args = [\n\t\tAddress(\n\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t),\n\t\t\"testSyncCallComplexityExcess\",\n\t\t[],\n\t\t[]\n\t]\n\tinvoke.@complexity = 75\n\t@complexityLimit = 122\n\tr = FailedTransactionError(code = 1, error = Invoke complexity limit = 200 is exceeded, log = \n\t\t@invokedDApp = Address(\n\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t)\n\t\t@invokedFuncName = \"testSyncCallComplexityExcess\"\n\t\ti = Invocation(\n\t\t\toriginCaller = Address(\n\t\t\t\tbytes = base58'3MuPKL2kQz1Gp9t7QwrDZN5F8m3u5Uzzo3e'\n\t\t\t)\n\t\t\tpayments = []\n\t\t\tcallerPublicKey = base58'9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ'\n\t\t\tfeeAssetId = Unit\n\t\t\toriginCallerPublicKey = base58'11111111111111111111111111111111'\n\t\t\ttransactionId = base58''\n\t\t\tcaller = Address(\n\t\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t\t)\n\t\t\tfee = 0\n\t\t)\n\t\ttestSyncCallComplexityExcess.@args = []\n\t\tinvoke.@args = [\n\t\t\tAddress(\n\t\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t\t),\n\t\t\t\"testSyncCallComplexityExcess\",\n\t\t\t[],\n\t\t\t[]\n\t\t]\n\t\tinvoke.@complexity = 75\n\t\t@complexityLimit = 44\n\t\tr = FailedTransactionError(code = 1, error = Invoke complexity limit = 200 is exceeded, log = \n\t\t\t@invokedDApp = Address(\n\t\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t\t)\n\t\t\t@invokedFuncName = \"testSyncCallComplexityExcess\"\n\t\t\ti = Invocation(\n\t\t\t\toriginCaller = Address(\n\t\t\t\t\tbytes = base58'3MuPKL2kQz1Gp9t7QwrDZN5F8m3u5Uzzo3e'\n\t\t\t\t)\n\t\t\t\tpayments = []\n\t\t\t\tcallerPublicKey = base58'9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ'\n\t\t\t\tfeeAssetId = Unit\n\t\t\t\toriginCallerPublicKey = base58'11111111111111111111111111111111'\n\t\t\t\ttransactionId = base58''\n\t\t\t\tcaller = Address(\n\t\t\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t\t\t)\n\t\t\t\tfee = 0\n\t\t\t)\n\t\t\ttestSyncCallComplexityExcess.@args = []\n\t\t)\n\t)\n)"
+            "InvokeRejectError(error = FailedTransactionError(code = 1, error = Invoke complexity limit = 200 is exceeded), log = \n\ttestSyncCallComplexityExcess.@args = []\n\tinvoke.@args = [\n\t\tAddress(\n\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t),\n\t\t\"testSyncCallComplexityExcess\",\n\t\t[],\n\t\t[]\n\t]\n\tinvoke.@complexity = 75\n\t@complexityLimit = 122\n\tr = FailedTransactionError(code = 1, error = Invoke complexity limit = 200 is exceeded, log = \n\t\t@invokedDApp = Address(\n\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t)\n\t\t@invokedFuncName = \"testSyncCallComplexityExcess\"\n\t\ti = Invocation(\n\t\t\toriginCaller = Address(\n\t\t\t\tbytes = base58'3MuPKL2kQz1Gp9t7QwrDZN5F8m3u5Uzzo3e'\n\t\t\t)\n\t\t\tpayments = []\n\t\t\tcallerPublicKey = base58'9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ'\n\t\t\tfeeAssetId = Unit\n\t\t\toriginCallerPublicKey = base58'11111111111111111111111111111111'\n\t\t\ttransactionId = base58''\n\t\t\tcaller = Address(\n\t\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t\t)\n\t\t\tfee = 2000000\n\t\t)\n\t\ttestSyncCallComplexityExcess.@args = []\n\t\tinvoke.@args = [\n\t\t\tAddress(\n\t\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t\t),\n\t\t\t\"testSyncCallComplexityExcess\",\n\t\t\t[],\n\t\t\t[]\n\t\t]\n\t\tinvoke.@complexity = 75\n\t\t@complexityLimit = 44\n\t\tr = FailedTransactionError(code = 1, error = Invoke complexity limit = 200 is exceeded, log = \n\t\t\t@invokedDApp = Address(\n\t\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t\t)\n\t\t\t@invokedFuncName = \"testSyncCallComplexityExcess\"\n\t\t\ti = Invocation(\n\t\t\t\toriginCaller = Address(\n\t\t\t\t\tbytes = base58'3MuPKL2kQz1Gp9t7QwrDZN5F8m3u5Uzzo3e'\n\t\t\t\t)\n\t\t\t\tpayments = []\n\t\t\t\tcallerPublicKey = base58'9BUoYQYq7K38mkk61q8aMH9kD9fKSVL1Fib7FbH6nUkQ'\n\t\t\t\tfeeAssetId = Unit\n\t\t\t\toriginCallerPublicKey = base58'11111111111111111111111111111111'\n\t\t\t\ttransactionId = base58''\n\t\t\t\tcaller = Address(\n\t\t\t\t\tbytes = base58'3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9'\n\t\t\t\t)\n\t\t\t\tfee = 2000000\n\t\t\t)\n\t\t\ttestSyncCallComplexityExcess.@args = []\n\t\t)\n\t)\n)"
           (response \ "message").as[String] shouldBe message
           (response \ "error").as[Int] shouldBe ScriptExecutionError.Id
         }
@@ -413,7 +415,7 @@ class UtilsRouteEvaluateSpec
       }
     }
 
-    "invocation" - {
+    "invocation" in {
       withDomain(RideV6) { d =>
         def dApp(caller: Address) = TestCompiler(V6).compileContract(
           s"""
@@ -1024,52 +1026,48 @@ class UtilsRouteEvaluateSpec
              """.stripMargin
           )
 
-        "successful result" in {
-          Post(routePath(s"/script/evaluate/$defaultAddress"), invocation()) ~> route ~> check {
-            val json = responseAs[JsValue]
-            (json \ "complexity").as[Int] shouldBe 16
-            (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
-            (json \ "vars").isEmpty shouldBe true
-            json.as[UtilsInvocationRequest] shouldBe invocation().as[UtilsInvocationRequest]
-          }
+        // successful result
+        Post(routePath(s"/script/evaluate/$defaultAddress"), invocation()) ~> route ~> check {
+          val json = responseAs[JsValue]
+          (json \ "complexity").as[Int] shouldBe 16
+          (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
+          (json \ "vars").isEmpty shouldBe true
+          json.as[UtilsInvocationRequest] shouldBe invocation().as[UtilsInvocationRequest]
         }
 
-        "trace" in {
-          Post(routePath(s"/script/evaluate/$defaultAddress?trace=true"), invocation()) ~> route ~> check {
-            val json = responseAs[JsValue]
-            (json \ "complexity").as[Int] shouldBe 16
-            (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
-            (json \ "vars").as[JsArray] shouldBe expectedTrace
-          }
+        // trace
+        Post(routePath(s"/script/evaluate/$defaultAddress?trace=true"), invocation()) ~> route ~> check {
+          val json = responseAs[JsValue]
+          (json \ "complexity").as[Int] shouldBe 16
+          (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
+          (json \ "vars").as[JsArray] shouldBe expectedTrace
         }
 
-        "all fields are empty (empty request body)" in {
-          Post(routePath(s"/script/evaluate/$defaultAddress"), Json.obj()) ~> route ~> check {
-            val json = responseAs[JsValue]
-            (json \ "complexity").as[Int] shouldBe 12
-            (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
-          }
+        // all fields are empty (empty request body)
+        Post(routePath(s"/script/evaluate/$defaultAddress"), Json.obj()) ~> route ~> check {
+          val json = responseAs[JsValue]
+          (json \ "complexity").as[Int] shouldBe 12
+          (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
         }
 
-        "conflicting request structure" in {
-          Post(routePath(s"/script/evaluate/$defaultAddress"), Json.obj("expr" -> "true") ++ invocation()) ~> route ~> check {
-            val json = responseAs[JsValue]
-            (json \ "message").as[String] shouldBe "Conflicting request structure. Both expression and invocation structure were sent"
-            (json \ "error").as[Int] shouldBe 198
-          }
+        // conflicting request structure
+        Post(routePath(s"/script/evaluate/$defaultAddress"), Json.obj("expr" -> "true") ++ invocation()) ~> route ~> check {
+          val json = responseAs[JsValue]
+          (json \ "message").as[String] shouldBe "Conflicting request structure. Both expression and invocation structure were sent"
+          (json \ "error").as[Int] shouldBe 198
         }
 
-        "sender address can be calculated from PK" in {
-          Post(routePath(s"/script/evaluate/$defaultAddress"), invocation(None)) ~> route ~> check {
-            val json = responseAs[JsValue]
-            (json \ "complexity").as[Int] shouldBe 16
-            (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
-            (json \ "vars").isEmpty shouldBe true
-            json.as[UtilsInvocationRequest] shouldBe invocation(None).as[UtilsInvocationRequest]
-          }
+        // sender address can be calculated from PK
+        Post(routePath(s"/script/evaluate/$defaultAddress"), invocation(None)) ~> route ~> check {
+          val json = responseAs[JsValue]
+          (json \ "complexity").as[Int] shouldBe 16
+          (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
+          (json \ "vars").isEmpty shouldBe true
+          json.as[UtilsInvocationRequest] shouldBe invocation(None).as[UtilsInvocationRequest]
         }
 
-        "sender address can differ from PK address" in withDomain(RideV6) { d =>
+        // sender address can differ from PK address
+        withDomain(RideV6) { d =>
           val customSender = signer(2).toAddress
           val route        = utilsApi.copy(blockchain = d.blockchain).route
           d.appendBlock(setScript(defaultSigner, dApp(caller = customSender)))
@@ -1081,6 +1079,24 @@ class UtilsRouteEvaluateSpec
             (json \ "vars").isEmpty shouldBe true
             json.as[UtilsInvocationRequest] shouldBe invocation(Some(customSender)).as[UtilsInvocationRequest]
           }
+        }
+      }
+    }
+
+    "validation of root call" in {
+      withDomain(RideV6, Seq(AddrWithBalance(secondAddress, 0.01 waves))) { d =>
+        val route = seal(utilsApi.copy(blockchain = d.blockchain).route)
+        val dApp = TestCompiler(V6).compileContract(
+          s"""
+             | @Callable(i)
+             | func default() = [ ScriptTransfer(Address(base58'$defaultAddress'), 1, unit) ]
+             """.stripMargin
+        )
+        d.appendBlock(setScript(secondSigner, dApp))
+
+        // negative balance after applying action
+        Post(routePath(s"/script/evaluate/$secondAddress"), Json.obj("expr" -> "default()")) ~> route ~> check {
+          responseAs[String] should include("AccountBalanceError")
         }
       }
     }
