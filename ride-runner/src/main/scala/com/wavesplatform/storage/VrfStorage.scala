@@ -1,18 +1,19 @@
 package com.wavesplatform.storage
 
 import com.github.benmanes.caffeine.cache.{CacheLoader, Caffeine}
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.api.BlockchainApi
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.storage.persistent.VrfPersistentCache
 import com.wavesplatform.utils.ScorexLogging
 import kamon.instrumentation.caffeine.KamonStatsCounter
 
 import scala.util.chaining.scalaUtilChainingOps
 
-class VrfStorage(blockchainApi: BlockchainApi, persistentCache: VrfPersistentCache, currHeight: => Int) extends ScorexLogging {
+class VrfStorage(settings: ExactWithHeightStorage.Settings, blockchainApi: BlockchainApi, persistentCache: VrfPersistentCache, currHeight: => Int)
+    extends ScorexLogging {
   protected val values = Caffeine
     .newBuilder()
-    .maximumSize(1000)
+    .maximumSize(settings.maxEntries)
     .recordStats(() => new KamonStatsCounter("VrfStorage"))
     .build[Int, Option[ByteStr]] {
       new CacheLoader[Int, Option[ByteStr]] {

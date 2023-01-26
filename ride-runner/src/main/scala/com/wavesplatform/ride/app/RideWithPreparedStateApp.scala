@@ -20,7 +20,7 @@ object RideWithPreparedStateApp {
 
     val input = RideRunnerInput.parse(Using(Source.fromFile(new File(inputJsonPath)))(_.getLines().mkString("\n")).get)
 
-    val blockchain = new ImmutableBlockchain(globalSettings.blockchain, input)
+    val blockchain = new ImmutableBlockchain(globalSettings.rideRunner.immutableBlockchain, input)
 
     val apiResult = UtilsApiRoute.evaluate(
       evaluateScriptComplexityLimit = globalSettings.rideRunner.processor.evaluateScriptComplexityLimit,

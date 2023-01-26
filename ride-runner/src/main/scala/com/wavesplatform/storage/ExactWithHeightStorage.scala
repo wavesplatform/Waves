@@ -15,13 +15,18 @@ import scala.util.chaining.*
   */
 trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging {
   storage =>
+  def settings: ExactWithHeightStorage.Settings
 
   // We can look up tags to determine if a key has been known, because tags are always in RAM
-  protected val tags = Caffeine.newBuilder().build[KeyT, Set[TagT]]()
+  protected val tags = Caffeine
+    .newBuilder()
+    .recordStats(() => new KamonStatsCounter(s"$name.tags"))
+    .build[KeyT, Set[TagT]]()
 
   protected val values = Caffeine
     .newBuilder()
-    .recordStats(() => new KamonStatsCounter(name))
+    .maximumSize(settings.maxEntries)
+    .recordStats(() => new KamonStatsCounter(s"$name.values"))
     .build[KeyT, RemoteData[ValueT]]()
 
   private def tagsOf(key: KeyT): Set[TagT] = Option(tags.getIfPresent(key)).getOrElse(Set.empty)
@@ -112,4 +117,8 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
       }
     }
   }
+}
+
+object ExactWithHeightStorage {
+  case class Settings(maxEntries: Int)
 }

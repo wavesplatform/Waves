@@ -3,7 +3,7 @@ package com.wavesplatform.ride.app
 import com.typesafe.config.{Config, ConfigRenderOptions}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector, RideApi}
-import com.wavesplatform.blockchain.BlockchainProcessor
+import com.wavesplatform.blockchain.{BlockchainProcessor, SharedBlockchainData}
 import com.wavesplatform.ride.app.RideRunnerSettings.DbSettings
 import com.wavesplatform.settings.*
 import net.ceedubs.ficus.Ficus.*
@@ -15,7 +15,6 @@ import scala.concurrent.duration.FiniteDuration
 
 case class RideRunnerGlobalSettings(
     rideRunner: RideRunnerSettings,
-    blockchain: BlockchainSettings,
     restApi: RestAPISettings,
     compare: CompareSettings
 )
@@ -44,6 +43,8 @@ object RideRunnerGlobalSettings {
 case class RideRunnerSettings(
     db: DbSettings,
     unhealthyIdleTimeout: FiniteDuration,
+    immutableBlockchain: BlockchainSettings,
+    sharedBlockchain: SharedBlockchainData.Settings,
     processor: BlockchainProcessor.Settings,
     blockchainApi: DefaultBlockchainApi.Settings,
     grpcConnector: GrpcConnector.Settings,

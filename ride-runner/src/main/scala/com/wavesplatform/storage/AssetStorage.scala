@@ -1,8 +1,8 @@
 package com.wavesplatform.storage
 
 import com.google.protobuf.UnsafeByteOperations
-import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.api.BlockchainApi
+import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Height}
@@ -13,6 +13,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import java.nio.charset.StandardCharsets
 
 class AssetStorage[TagT](
+    override val settings: ExactWithHeightStorage.Settings,
     blockchainApi: BlockchainApi,
     override val persistentCache: PersistentCache[IssuedAsset, AssetDescription]
 ) extends ExactWithHeightStorage[IssuedAsset, AssetDescription, TagT] {

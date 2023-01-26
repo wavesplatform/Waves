@@ -2,12 +2,12 @@ package com.wavesplatform.storage
 
 import cats.data.NonEmptyList
 import cats.syntax.option.*
+import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
-import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.storage.BlockHeadersStorage.BlockInfo

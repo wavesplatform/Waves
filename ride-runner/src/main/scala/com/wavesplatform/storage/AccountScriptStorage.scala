@@ -12,6 +12,7 @@ import com.wavesplatform.storage.actions.AffectedTags
 import com.wavesplatform.storage.persistent.PersistentCache
 
 class AccountScriptStorage[TagT](
+    override val settings: ExactWithHeightStorage.Settings,
     chainId: Byte,
     estimate: Script => Map[Int, ComplexityInfo],
     blockchainApi: BlockchainApi,

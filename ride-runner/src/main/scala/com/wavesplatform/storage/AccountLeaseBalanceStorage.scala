@@ -9,6 +9,7 @@ import com.wavesplatform.storage.actions.AffectedTags
 import com.wavesplatform.storage.persistent.PersistentCache
 
 class AccountLeaseBalanceStorage[TagT](
+    override val settings: ExactWithHeightStorage.Settings,
     chainId: Byte,
     blockchainApi: BlockchainApi,
     override val persistentCache: PersistentCache[Address, LeaseBalance]

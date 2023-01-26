@@ -14,20 +14,22 @@ import kamon.instrumentation.caffeine.KamonStatsCounter
 import scala.util.chaining.scalaUtilChainingOps
 
 class TransactionStorage[TagT](
+    settings: ExactWithHeightStorage.Settings,
     blockchainApi: BlockchainApi,
     persistentCache: TransactionPersistentCache
 ) extends ScorexLogging {
   storage =>
 
-  protected val values = Caffeine
-    .newBuilder()
-    .recordStats(() => new KamonStatsCounter("TransactionStorage.values"))
-    .build[TransactionId, RemoteData[Height]]()
-
   protected val tags = Caffeine
     .newBuilder()
     .recordStats(() => new KamonStatsCounter("TransactionStorage.tags"))
     .build[TransactionId, Set[TagT]]()
+
+  protected val values = Caffeine
+    .newBuilder()
+    .maximumSize(settings.maxEntries)
+    .recordStats(() => new KamonStatsCounter("TransactionStorage.values"))
+    .build[TransactionId, RemoteData[Height]]()
 
   private def tagsOf(key: TransactionId): Set[TagT] = Option(tags.getIfPresent(key)).getOrElse(Set.empty)
 

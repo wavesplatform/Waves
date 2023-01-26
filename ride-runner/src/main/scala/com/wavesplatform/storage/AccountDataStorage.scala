@@ -1,7 +1,7 @@
 package com.wavesplatform.storage
 
-import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.api.BlockchainApi
+import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaDataEntry
 import com.wavesplatform.state.DataEntry
 import com.wavesplatform.storage.actions.AffectedTags
@@ -9,6 +9,7 @@ import com.wavesplatform.storage.persistent.PersistentCache
 
 // TODO #32 Not all addresses are interesting. Probably, having a wrapped Map[Address, Map[Asset, Long]] is better, because we can filter out values slightly before.
 class AccountDataStorage[TagT](
+    override val settings: ExactWithHeightStorage.Settings,
     chainId: Byte,
     blockchainApi: BlockchainApi,
     override val persistentCache: PersistentCache[AccountDataKey, DataEntry[?]]

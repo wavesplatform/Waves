@@ -65,7 +65,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     val testDb   = use(TestDb.mk())
     val dbCaches = new LevelDbPersistentCaches(testDb.db)
     val blockchainStorage = new SharedBlockchainData[RequestKey](
-      blockchainSettings,
+      settings.rideRunner.sharedBlockchain,
       dbCaches,
       blockchainApi
     )

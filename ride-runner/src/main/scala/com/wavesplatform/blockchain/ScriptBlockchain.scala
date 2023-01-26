@@ -26,7 +26,7 @@ import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 
 class ScriptBlockchain[TagT](storage: SharedBlockchainData[TagT], tag: TagT) extends Blockchain with ScorexLogging {
-  override def settings: BlockchainSettings = storage.settings
+  override def settings: BlockchainSettings = storage.blockchainSettings
 
   // TODO #16 We don't support it for now, use GET /utils/script/evaluate
   // Ride: isDataStorageUntouched

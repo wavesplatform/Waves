@@ -122,7 +122,7 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
       db.close()
     }
     val dbCaches          = new LevelDbPersistentCaches(db)
-    val blockchainStorage = new SharedBlockchainData[RequestKey](settings.blockchain, dbCaches, blockchainApi)
+    val blockchainStorage = new SharedBlockchainData[RequestKey](settings.rideRunner.sharedBlockchain, dbCaches, blockchainApi)
 
     val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
     log.info(s"Current height: known=${blockchainStorage.height}, blockchain=$lastHeightAtStart")
