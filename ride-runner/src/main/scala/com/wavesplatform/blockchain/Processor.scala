@@ -320,10 +320,12 @@ class BlockchainProcessor(
       log.info(f"[$key] complexity: $complexity, apiResult: $result")
 
       prev.value.get("result").map(_.as[JsObject].value("value")).foreach { prevResult =>
-        if (result == prevResult) rideScriptUnnecessaryUpdateNumber.increment()
+        if (result == prevResult) rideScriptUnnecessaryCalls.increment()
+        else rideScriptOkCalls.increment()
       }
     } else {
       log.info(f"[$key] failed: $lastResult")
+      rideScriptFailedCalls.increment()
     }
     lastResult
   }
