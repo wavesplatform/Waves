@@ -28,15 +28,6 @@ jobs:
       - name: Check PR
         run: |
           sbt --mem 6144 --batch checkPR
-          sbt lang/assembly
-          git clone https://github.com/waves-exchange/neutrino-contract
-          git clone https://github.com/waves-exchange/contracts
-          git clone https://oauth2:${{ secrets.DUCKS_GITHUB_TOKEN }}@github.com/akharazyan/wavesducks-public
-          git clone https://oauth2:${{ secrets.SWOPFI_GITLAB_TOKEN }}@gitlabwp.wvservices.com/swopfi/swopfi-smart-contracts
-          find neutrino-contract/script     -name "*.ride" -type f -exec java -jar lang/jvm/target/file-compiler.jar {} +;     
-          find contracts/ride               -name "*.ride" -type f -exec java -jar lang/jvm/target/file-compiler.jar {} +;     
-          find wavesducks-public/ride       -name "*.ride" -type f -exec java -jar lang/jvm/target/file-compiler.jar {} +;     
-          find swopfi-smart-contracts/dApps -name "*.ride" -type f -exec java -jar lang/jvm/target/file-compiler.jar {} +;     
           find ~/.cache/coursier -type d -name '*SNAPSHOT' | xargs rm -vrf {} \;
       - uses: dorny/paths-filter@v2
         id: filter
@@ -46,6 +37,21 @@ jobs:
               - 'lang/**'
               - 'build.sbt'
               - 'project/*'
+            lang-sources:
+              - 'lang/shared/src/main/**'
+              - 'lang/jvm/src/main/**'
+      - name: Compile external sources
+        if: steps.filter.outputs.lang-sources == 'true'
+        run: |
+          sbt lang/assembly
+          git clone https://github.com/waves-exchange/neutrino-contract
+          git clone https://github.com/waves-exchange/contracts
+          git clone https://oauth2:${{ secrets.DUCKS_GITHUB_TOKEN }}@github.com/akharazyan/wavesducks-public
+          git clone https://oauth2:${{ secrets.SWOPFI_GITLAB_TOKEN }}@gitlabwp.wvservices.com/swopfi/swopfi-smart-contracts
+          find neutrino-contract/script     -name "*.ride" -type f -exec java -jar lang/jvm/target/file-compiler.jar {} +;     
+          find contracts/ride               -name "*.ride" -type f -exec java -jar lang/jvm/target/file-compiler.jar {} +;     
+          find wavesducks-public/ride       -name "*.ride" -type f -exec java -jar lang/jvm/target/file-compiler.jar {} +;     
+          find swopfi-smart-contracts/dApps -name "*.ride" -type f -exec java -jar lang/jvm/target/file-compiler.jar {} +;
       - name: Prepare version
         if: false # steps.filter.outputs.lang == 'true'
         id: sbt-version
