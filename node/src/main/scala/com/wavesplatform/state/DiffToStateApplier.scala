@@ -5,6 +5,8 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 
+import scala.collection.immutable.VectorMap
+
 /**
   * A set of functions that apply diff
   * to the blockchain and return new
@@ -22,7 +24,7 @@ object DiffToStateApplier {
 
     for ((address, portfolioDiff) <- diff.portfolios) {
       // balances for address
-      val bs = Map.newBuilder[Asset, Long]
+      val bs = VectorMap.newBuilder[Asset, Long]
 
       if (portfolioDiff.balance != 0) {
         bs += Waves -> (blockchain.balance(address, Waves) + portfolioDiff.balance)

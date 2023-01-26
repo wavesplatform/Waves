@@ -44,11 +44,12 @@ object TransactionDiffer {
   ): TracedResult[ValidationError, Diff] =
     validate(prevBlockTs, currentBlockTs, verify = true, limitedExecution = false)(blockchain, tx)
 
-  def limitedExecution(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, verify: Boolean = true)(
+  def limitedExecution(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, unlimited: Boolean, verify: Boolean = true)(
       blockchain: Blockchain,
       tx: Transaction
   ): TracedResult[ValidationError, Diff] = {
-    validate(prevBlockTimestamp, currentBlockTimestamp, verify = verify, limitedExecution = transactionMayFail(tx) && acceptFailed(blockchain))(
+    val limitedExecution = if (unlimited) false else transactionMayFail(tx) && acceptFailed(blockchain)
+    validate(prevBlockTimestamp, currentBlockTimestamp, verify = verify, limitedExecution)(
       blockchain,
       tx
     )

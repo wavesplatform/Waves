@@ -4,7 +4,7 @@ import cats.Id
 import cats.syntax.either.*
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.BlockchainFeatures.*
 import com.wavesplatform.features.EstimatorProvider.*
 import com.wavesplatform.features.EvaluatorFixProvider.*
 import com.wavesplatform.lang.*
@@ -45,13 +45,14 @@ object ScriptRunner {
       scriptContainerAddress,
       complexityLimit,
       default,
-      blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls),
-      blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls),
-      blockchain.isFeatureActivated(BlockchainFeatures.SynchronousCalls) &&
+      blockchain.isFeatureActivated(SynchronousCalls),
+      blockchain.isFeatureActivated(SynchronousCalls),
+      blockchain.isFeatureActivated(SynchronousCalls) &&
         blockchain.height > blockchain.settings.functionalitySettings.enforceTransferValidationAfter,
       blockchain.checkEstimatorSumOverflow,
       blockchain.newEvaluatorMode,
-      blockchain.isFeatureActivated(BlockchainFeatures.RideV6)
+      blockchain.isFeatureActivated(RideV6),
+      blockchain.isFeatureActivated(ConsensusImprovements)
     )
 
   def applyGeneric(
@@ -67,7 +68,8 @@ object ScriptRunner {
       useNewPowPrecision: Boolean,
       checkEstimatorSumOverflow: Boolean,
       newEvaluatorMode: Boolean,
-      checkWeakPk: Boolean
+      checkWeakPk: Boolean,
+      fixBigScriptField: Boolean
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
 
     def evalVerifier(
@@ -91,7 +93,8 @@ object ScriptRunner {
               scriptContainerAddress,
               txId,
               fixUnicodeFunctions,
-              useNewPowPrecision
+              useNewPowPrecision,
+              fixBigScriptField
             )
         } yield (ds, ctx)
 
@@ -141,16 +144,15 @@ object ScriptRunner {
       case ContractScript.ContractScriptImpl(v, DApp(_, decls, _, Some(vf))) =>
         val partialEvaluate: (DirectiveSet, EvaluationContext[Environment, Id]) => (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
           (directives, ctx) =>
-            val verify = ContractEvaluator.verify(decls, vf, evaluate(ctx, _, _, v), _)
-            val bindingsVersion =
-              if (useCorrectScriptVersion)
-                directives.stdLibVersion
-              else
-                V3
+            val verify          = ContractEvaluator.verify(decls, vf, evaluate(ctx, _, _, v), _)
+            val bindingsVersion = if (useCorrectScriptVersion) directives.stdLibVersion else V3
             in.eliminate(
               t =>
                 RealTransactionWrapper(t, blockchain, directives.stdLibVersion, DAppTarget)
-                  .fold(e => (Nil, 0, Left(e)), tx => verify(Bindings.transactionObject(tx, proofsEnabled = true, bindingsVersion))),
+                  .fold(
+                    e => (Nil, 0, Left(e)),
+                    tx => verify(Bindings.transactionObject(tx, proofsEnabled = true, bindingsVersion, fixBigScriptField))
+                  ),
               _.eliminate(
                 t => verify(Bindings.orderObject(RealTransactionWrapper.ord(t), proofsEnabled = true)),
                 _ => ???

@@ -31,18 +31,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
-import com.wavesplatform.transaction.{
-  Asset,
-  CreateAliasTransaction,
-  DataTransaction,
-  Proofs,
-  TxDecimals,
-  TxExchangeAmount,
-  TxExchangePrice,
-  TxNonNegativeAmount,
-  TxPositiveAmount,
-  TxVersion
-}
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, Proofs, TxDecimals, TxExchangeAmount, TxExchangePrice, TxNonNegativeAmount, TxPositiveAmount, TxVersion}
 import org.asynchttpclient.*
 import org.asynchttpclient.Dsl.{delete as _delete, get as _get, post as _post, put as _put}
 import org.asynchttpclient.util.HttpConstants.ResponseStatusCodes.OK_200
@@ -51,6 +40,7 @@ import org.scalatest.{Assertions, matchers}
 import play.api.libs.json.*
 import play.api.libs.json.Json.{stringify, toJson}
 
+import scala.collection.immutable.VectorMap
 import scala.compat.java8.FutureConverters.*
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -939,9 +929,9 @@ object AsyncHttpApi extends Assertions {
         .as[Seq[BalanceHistory]](amountsAsStrings)
     }
 
-    implicit val assetMapReads: Reads[Map[IssuedAsset, Long]] = implicitly[Reads[Map[String, Long]]].map(_.map { case (k, v) =>
+    implicit val assetMapReads: Reads[VectorMap[IssuedAsset, Long]] = implicitly[Reads[Map[String, Long]]].map(_.map { case (k, v) =>
       IssuedAsset(ByteStr.decodeBase58(k).get) -> v
-    })
+    }.to(VectorMap))
     implicit val leaseBalanceFormat: Reads[LeaseBalance] = Json.reads[LeaseBalance]
     implicit val portfolioFormat: Reads[Portfolio]       = Json.reads[Portfolio]
 

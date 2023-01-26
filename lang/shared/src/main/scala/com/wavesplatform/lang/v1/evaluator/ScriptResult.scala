@@ -19,14 +19,22 @@ sealed trait ScriptResult {
   def returnedValue: EVALUATED                                                    = unit
   def invokes: Seq[(Address, String, Seq[EVALUATED], Seq[CaseObj], ScriptResult)] = Nil
   def unusedComplexity: Int
+  def actions: List[CallableAction]
 }
-case class ScriptResultV3(ds: List[DataItem[_]], ts: List[AssetTransfer], unusedComplexity: Int) extends ScriptResult
+
+case class ScriptResultV3(ds: List[DataItem[_]], ts: List[AssetTransfer], unusedComplexity: Int) extends ScriptResult {
+  override lazy val actions: List[CallableAction] = ds ++ ts
+}
+
 case class ScriptResultV4(
     actions: List[CallableAction],
     unusedComplexity: Int,
     override val returnedValue: EVALUATED = unit
 ) extends ScriptResult
-case class IncompleteResult(expr: EXPR, unusedComplexity: Int) extends ScriptResult
+
+case class IncompleteResult(expr: EXPR, unusedComplexity: Int) extends ScriptResult {
+  override val actions: List[CallableAction] = Nil
+}
 
 object ScriptResult {
   type ActionInput    = (EvaluationContext[Environment, Id], ByteStr, Map[String, EVALUATED])

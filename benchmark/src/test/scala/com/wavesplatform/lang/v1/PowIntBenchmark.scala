@@ -52,7 +52,7 @@ class PowIntBenchmark {
 @State(Scope.Benchmark)
 class PowIntSt {
   val ds  = DirectiveSet(V5, Account, Expression).fold(null, identity)
-  val ctx = lazyContexts((ds, true)).value().evaluationContext(Common.emptyBlockchainEnvironment())
+  val ctx = lazyContexts((ds, true, true)).value().evaluationContext(Common.emptyBlockchainEnvironment())
 
   val max = Long.MaxValue
 

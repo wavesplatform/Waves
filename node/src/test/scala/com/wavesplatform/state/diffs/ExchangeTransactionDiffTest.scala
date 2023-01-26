@@ -5,9 +5,11 @@ import com.wavesplatform.account.{Address, AddressScheme, KeyPair, PrivateKey}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.crypto.EthereumKeyLength
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
-import com.wavesplatform.history.Domain
+import com.wavesplatform.history.{Domain, defaultSigner}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader.Native
@@ -24,19 +26,22 @@ import com.wavesplatform.test.*
 import com.wavesplatform.test.DomainPresets.*
 import com.wavesplatform.transaction.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError.AccountBalanceError
+import com.wavesplatform.transaction.TxValidationError.{AccountBalanceError, GenericError}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.*
 import com.wavesplatform.transaction.assets.exchange.OrderPriceMode.{AssetDecimals, FixedDecimals, Default as DefaultPriceMode}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.transaction.utils.EthConverters.*
+import com.wavesplatform.utils.{EthEncoding, EthHelpers}
 import com.wavesplatform.{TestValues, TestWallet, crypto}
 import org.scalatest.{EitherValues, Inside}
+import org.web3j.crypto.Bip32ECKeyPair
 
 import scala.util.{Random, Try}
 
-class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain with EitherValues with TestWallet {
+class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain with EitherValues with TestWallet with EthHelpers {
 
   private def wavesPortfolio(amt: Long) = Portfolio.waves(amt)
 
@@ -1881,6 +1886,115 @@ class ExchangeTransactionDiffTest extends PropSpec with Inside with WithDomain w
 
       d.balance(sender.toAddress) shouldBe exchangeFee
       d.appendBlockE(mkExchangeTx) should produce("Matcher fee can not be negative")
+    }
+  }
+
+  property(
+    s"orders' ETH public keys with leading zeros and shortened byte representation are allowed only after ${BlockchainFeatures.ConsensusImprovements} activation"
+  ) {
+    val signer = Bip32ECKeyPair.generateKeyPair("i1".getBytes)
+    signer.getPublicKey.toByteArray.length shouldBe <(EthereumKeyLength)
+
+    withDomain(
+      DomainPresets.RideV6.setFeaturesHeight(BlockchainFeatures.ConsensusImprovements -> 4),
+      Seq(AddrWithBalance(signer.toWavesAddress))
+    ) { d =>
+      val issue = TxHelpers.issue(TxHelpers.defaultSigner)
+      val buyOrder = Order(
+        4.toByte,
+        OrderAuthentication.Eip712Signature(ByteStr(new Array[Byte](64))),
+        defaultSigner.publicKey,
+        AssetPair(issue.asset, Waves),
+        OrderType.BUY,
+        TxExchangeAmount.unsafeFrom(1),
+        TxOrderPrice.unsafeFrom(1),
+        System.currentTimeMillis(),
+        System.currentTimeMillis() + 10000,
+        TxMatcherFee.unsafeFrom(0.003.waves)
+      )
+      val signedBuyOrder = buyOrder.copy(
+        orderAuthentication = OrderAuthentication.Eip712Signature(ByteStr(EthOrders.signOrder(buyOrder, signer)))
+      )
+      val sellOrder = TxHelpers.order(OrderType.SELL, issue.asset, Waves, version = Order.V4)
+
+      val tx = TxHelpers.exchange(signedBuyOrder, sellOrder, version = TxVersion.V3)
+
+      d.appendBlock(issue)
+
+      d.appendAndCatchError(tx) shouldBe TransactionDiffer.TransactionValidationError(
+        GenericError("Invalid public key for Ethereum orders"),
+        tx
+      )
+      d.appendBlock()
+      d.appendAndAssertSucceed(tx)
+    }
+  }
+
+  property(s"orders' native public keys with leading zeros are allowed before and after ${BlockchainFeatures.ConsensusImprovements} activation") {
+    val signer = KeyPair("h0".getBytes)
+    signer.publicKey.arr.head shouldBe 0.toByte
+
+    withDomain(
+      DomainPresets.RideV6.setFeaturesHeight(BlockchainFeatures.ConsensusImprovements -> 4),
+      AddrWithBalance.enoughBalances(signer)
+    ) { d =>
+      val issue     = TxHelpers.issue(TxHelpers.defaultSigner)
+      val buyOrder  = () => TxHelpers.order(OrderType.BUY, issue.asset, Waves, sender = signer)
+      val sellOrder = () => TxHelpers.order(OrderType.SELL, issue.asset, Waves)
+
+      val tx = () => TxHelpers.exchange(buyOrder(), sellOrder())
+
+      d.appendBlock(issue)
+      d.appendAndAssertSucceed(tx())
+
+      d.blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements) shouldBe false
+      d.appendBlock()
+      d.blockchain.isFeatureActivated(BlockchainFeatures.ConsensusImprovements) shouldBe true
+
+      d.appendAndAssertSucceed(tx())
+    }
+  }
+
+  property(
+    s"correctly recover signer public key when v < 27 in orders' signature data only after ${BlockchainFeatures.ConsensusImprovements} activation"
+  ) {
+    val signer =
+      Bip32ECKeyPair.create(EthEncoding.toBytes("0x01db4a036ea48572bf27630c72a1513f48f0b4a6316606fd01c23318befdf984"), Array.emptyByteArray)
+
+    withDomain(
+      DomainPresets.RideV6.setFeaturesHeight(BlockchainFeatures.ConsensusImprovements -> 4),
+      Seq(AddrWithBalance(signer.toWavesAddress))
+    ) { d =>
+      val issue = TxHelpers.issue(TxHelpers.defaultSigner)
+      val buyOrder = Order(
+        4.toByte,
+        OrderAuthentication.Eip712Signature(ByteStr(new Array[Byte](64))),
+        defaultSigner.publicKey,
+        AssetPair(issue.asset, Waves),
+        OrderType.BUY,
+        TxExchangeAmount.unsafeFrom(1),
+        TxOrderPrice.unsafeFrom(1),
+        System.currentTimeMillis(),
+        System.currentTimeMillis() + 10000,
+        TxMatcherFee.unsafeFrom(0.003.waves)
+      )
+      val signature = EthOrders.signOrder(buyOrder, signer)
+      val v         = signature.last
+      val signedBuyOrder = buyOrder.copy(
+        orderAuthentication = OrderAuthentication.Eip712Signature(ByteStr(signature.init :+ (v - 27).toByte))
+      )
+      val sellOrder = TxHelpers.order(OrderType.SELL, issue.asset, Waves, version = Order.V4)
+
+      val tx = TxHelpers.exchange(signedBuyOrder, sellOrder, version = TxVersion.V3)
+
+      d.appendBlock(issue)
+
+      d.appendAndCatchError(tx) shouldBe TransactionDiffer.TransactionValidationError(
+        GenericError("Invalid order signature format"),
+        tx
+      )
+      d.appendBlock()
+      d.appendAndAssertSucceed(tx)
     }
   }
 
