@@ -11,7 +11,6 @@ import com.wavesplatform.api.http.*
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidIds}
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
