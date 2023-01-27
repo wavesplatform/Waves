@@ -1,12 +1,11 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model.*
-import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.http.ApiError.*
-import com.wavesplatform.api.http.{CustomJson, RouteTimeout, TransactionsApiRoute}
+import com.wavesplatform.api.http.{RouteTimeout, TransactionsApiRoute}
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
@@ -25,9 +24,7 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
 import com.wavesplatform.state.{Blockchain, Height, InvokeScriptResult, TxMeta}
 import com.wavesplatform.test.*
-import com.wavesplatform.test.DomainPresets.RideV6
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxHelpers.defaultAddress
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
