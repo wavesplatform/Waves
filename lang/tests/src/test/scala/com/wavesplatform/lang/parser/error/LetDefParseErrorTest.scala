@@ -91,9 +91,9 @@ class LetDefParseErrorTest extends ParseErrorTest {
         | }
       """.stripMargin,
       """Parse error: expected expression""",
-      30,
       31,
-      "}"
+      34,
+      "\n }"
     )
   }
 

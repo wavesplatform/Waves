@@ -180,9 +180,9 @@ class FuncDefParseErrorTest extends ParseErrorTest {
         | }
       """.stripMargin,
       """Parse error: expected expression""",
-      26,
       27,
-      "1"
+      30,
+      "\n }"
     )
   }
 
