@@ -26,6 +26,11 @@
     <!-- Process and host metrics -->
     <logger name="oshi" level="WARN"/>
 
+    <!-- App -->
+    <logger name="com.wavesplatform.storage" level="WARN"/>
+    <logger name="com.wavesplatform.blockchain" level="INFO"/>
+    <logger name="com.wavesplatform.api" level="INFO"/>
+
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <target>System.out</target>
         <encoder>

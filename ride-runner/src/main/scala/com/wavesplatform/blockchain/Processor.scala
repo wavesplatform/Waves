@@ -85,6 +85,7 @@ class BlockchainProcessor(
 
     // Update this in the end, because a service could be suddenly turned off and we won't know, that we should re-read this block
     blockchainStorage.blockHeaders.update(event)
+    log.info(s"Processed $height")
   }
 
   private def process(h: Height, append: BlockchainUpdated.Append): ProcessResult[RequestKey] = {

@@ -1,11 +1,11 @@
 package com.wavesplatform.blockchain
 
+import com.wavesplatform.api.BlockchainApi.BlockchainUpdatesStream
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
-import com.wavesplatform.api.BlockchainApi.BlockchainUpdatesStream
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
@@ -124,7 +124,6 @@ object BlockchainState extends ScorexLogging {
   // 1. We have to know about blocks at height, so we need at least 1 dependency
   // 2. Side effects is the only reason for being of BlockchainState
   def apply(processor: Processor, orig: BlockchainState, event: SubscribeEvent): Task[BlockchainState] = {
-    val start  = System.nanoTime()
     val update = event.getUpdate.update
     val h      = Height(event.getUpdate.height)
 
@@ -132,7 +131,7 @@ object BlockchainState extends ScorexLogging {
     log.info(s"$orig + ${getUpdateType(update)}(id=$currBlockId, h=$h)")
 
     val ignore = Task.now(orig)
-    val r = orig match {
+    orig match {
       case orig: Starting =>
         update match {
           case _: Update.Append =>
@@ -191,9 +190,6 @@ object BlockchainState extends ScorexLogging {
           case Update.Empty => Task.now(orig.withProcessedHeight(h))
         }
     }
-
-    log.debug(f"Processed in ${(System.nanoTime() - start) / 1e9d}%5f s")
-    r
   }
 
   private def getUpdateType(update: BlockchainUpdated.Update): String = update match {
