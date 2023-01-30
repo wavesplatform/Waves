@@ -37,9 +37,9 @@ class RoundBraceParseErrorTest extends ParseErrorTest {
         | func g() = a
       """.stripMargin,
       """Parse error: expected ")"""",
-      25,
-      28,
-      "(\n ",
+      24,
+      26,
+      "f(",
       endExpr = false
     )
   }
