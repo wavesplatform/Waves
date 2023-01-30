@@ -53,4 +53,21 @@ class CommonParseErrorTest extends ParseErrorTest {
       "煊镕不"
     )
   }
+
+  property("error inside block passed to function") {
+    assert(
+      """
+        | func g(x: Int) = 1
+        | func f() = g({
+        |   let a = 1
+        |   let b = 2
+        |   let c = 3
+        | })
+      """.stripMargin,
+      """Parse error: expected expression""",
+      75,
+      78,
+      "\n }"
+    )
+  }
 }

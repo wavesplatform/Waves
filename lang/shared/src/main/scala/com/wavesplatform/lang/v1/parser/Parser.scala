@@ -24,20 +24,21 @@ class Parser(implicit offset: Int) {
   private val Global                                        = com.wavesplatform.lang.hacks.Global // Hack for IDEA
   implicit def hack(p: fastparse.P[Any]): fastparse.P[Unit] = p.map(_ => ())
 
-  val keywords = Set("let", "strict", "base58", "base64", "true", "false", "if", "then", "else", "match", "case", "func")
-  val exclude  = Set('(', ')', ':', ']', '[', '=', ',', ';')
-
-  def lowerChar[A: P]          = CharIn("a-z")
-  def upperChar[A: P]          = CharIn("A-Z")
-  def nonLatinChar[A: P]       = (CharPred(_.isLetter) ~~/ Fail).opaque("only latin charset for definitions")
-  def char[A: P]               = lowerChar | upperChar | nonLatinChar
-  def digit[A: P]              = CharIn("0-9")
-  def spaces[A: P]             = CharIn(" \t\n\r")
-  def unicodeSymbolP[A: P]     = P("\\u" ~/ Pass ~~ (char | digit).repX(0, "", 4))
-  def notEndOfString[A: P]     = CharPred(_ != '\"')
-  def specialSymbols[A: P]     = P("\\" ~~ AnyChar)
-  def comment[A: P]: P[Unit]   = P("#" ~~ CharPred(_ != '\n').repX).rep
-  def directive[A: P]: P[Unit] = P("{-#" ~ CharPred(el => el != '\n' && el != '#').rep ~ "#-}").rep(0, comment).map(_ => ())
+  val keywords                   = Set("let", "strict", "base58", "base64", "true", "false", "if", "then", "else", "match", "case", "func")
+  val exclude                    = Set('(', ')', ':', ']', '[', '=', ',', ';')
+  def lowerChar[A: P]            = CharIn("a-z")
+  def upperChar[A: P]            = CharIn("A-Z")
+  def nonLatinChar[A: P]         = (CharPred(_.isLetter) ~~/ Fail).opaque("only latin charset for definitions")
+  def char[A: P]                 = lowerChar | upperChar | nonLatinChar
+  def digit[A: P]                = CharIn("0-9")
+  def spacesAndNewLinesOpt[A: P] = CharIn(" \t\n\r")
+  def spacesOpt[A: P]            = CharIn(" \t").repX()
+  def newLines[A: P]             = CharIn("\n\r").repX(1)
+  def unicodeSymbolP[A: P]       = P("\\u" ~/ Pass ~~ (char | digit).repX(0, "", 4))
+  def notEndOfString[A: P]       = CharPred(_ != '\"')
+  def specialSymbols[A: P]       = P("\\" ~~ AnyChar)
+  def comment[A: P]: P[Unit]     = P("#" ~~ CharPred(_ != '\n').repX).rep
+  def directive[A: P]: P[Unit]   = P("{-#" ~ CharPred(el => el != '\n' && el != '#').rep ~ "#-}").rep(0, comment).map(_ => ())
 
   def unusedText[A: P] = comment ~ directive ~ comment
 
@@ -185,9 +186,12 @@ class Parser(implicit offset: Int) {
 
   def functionCallArgs[A: P]: P[Seq[EXPR]] = comment ~ baseExpr.rep(0, comment ~ "," ~ comment) ~ comment
 
-  def functionCallOrRef[A: P]: P[EXPR] = (Index ~~ lfunP ~~ P("(" ~ functionCallArgs.opaque("""")"""") ~/ ")").? ~~ Index).map {
-    case (start, REF(_, functionName, _, _), Some(args), accessEnd) => FUNCTION_CALL(Pos(start, accessEnd), functionName, args.toList)
-    case (_, id, None, _)                                           => id
+  def functionCallOrRef[A: P]: P[EXPR] = {
+    def argsAfterNewLine = (spacesAndNewLinesOpt ~~/ NoCut(functionCallArgs)).opaque("""")"""")
+    (Index ~~ lfunP ~~ P("(" ~~ spacesOpt ~~ (argsAfterNewLine | functionCallArgs) ~/ ")").? ~~ Index).map {
+      case (start, REF(_, functionName, _, _), Some(args), accessEnd) => FUNCTION_CALL(Pos(start, accessEnd), functionName, args.toList)
+      case (_, id, None, _)                                           => id
+    }
   }
 
   def foldMacroP[A: P]: P[EXPR] =
@@ -252,7 +256,7 @@ class Parser(implicit offset: Int) {
 
   def funcP(implicit c: fastparse.P[Any]): P[FUNC] = {
     def funcName       = anyVarName(check = true)
-    def funcKWAndName  = "func" ~~ ((&(spaces) ~ funcName) | (&(spaces | "(") ~~/ Fail).opaque("function name"))
+    def funcKWAndName  = "func" ~~ ((&(spacesAndNewLinesOpt) ~ funcName) | (&(spacesAndNewLinesOpt | "(") ~~/ Fail).opaque("function name"))
     def argWithType    = anyVarName(check = true) ~/ ":" ~/ unionTypeP ~ comment
     def args(min: Int) = "(" ~ comment ~ argWithType.rep(min, "," ~ comment) ~ ")" ~ comment
     def funcBody       = singleBaseExpr
@@ -432,7 +436,7 @@ class Parser(implicit offset: Int) {
 
   def variableDefP[A: P](key: String): P[Seq[LET]] = {
     def letNames      = destructuredTupleValuesP | letNameP
-    def letKWAndNames = key ~~ ((&(spaces) ~ comment ~ letNames ~ comment) | (&(spaces) ~~/ Fail).opaque("variable name"))
+    def letKWAndNames = key ~~ ((&(spacesAndNewLinesOpt) ~ comment ~ letNames ~ comment) | (&(spacesAndNewLinesOpt) ~~/ Fail).opaque("variable name"))
     def noKeyword     = NoCut(letNames).filter(_.exists(_._2.isInstanceOf[VALID[_]])) ~ "=" ~~ !"=" ~/ baseExpr ~~ Fail
     def noKeywordP    = noKeyword.opaque(""""let" or "strict" keyword""").asInstanceOf[P[Nothing]]
     def correctLets   = P(Index ~~ letKWAndNames ~/ ("=" ~ baseExpr | "=" ~/ Fail.opaque("let body")) ~~ Index)
@@ -542,8 +546,6 @@ class Parser(implicit offset: Int) {
           })
         def operator(implicit c: fastparse.P[Any]) = kindc(c)
         def error(implicit c: fastparse.P[Any])    = Index.map(i => INVALID(Pos(i, i), "expected a second operator"))
-        def spacesOpt[A: P]                        = CharIn(" \t").repX()
-        def newLines[A: P]                         = CharIn("\n\r").repX(1)
         val parser = P(Index ~~ operand ~~ P(!(newLines ~~ spacesOpt ~~ numberP) ~ operator ~ (NoCut(operand) | error)).rep)
         parser.map { case (start, left: EXPR, r: Seq[(BinaryOperation, EXPR)]) =>
           r.foldLeft(left) { case (acc, (currKind, currOperand)) => currKind.expr(start, currOperand.position.end + offset, acc, currOperand) }
@@ -681,13 +683,17 @@ class Parser(implicit offset: Int) {
       0
 
   private val moveRightKeywords =
-    Seq(""""func"""", """"let"""", " expression", "1 underscore", "end-of-input", "latin charset", "definition")
+    Seq(""""func"""", """"let"""", "expression", "1 underscore", "end-of-input", "latin charset", "definition")
 
   private def errorPosition(input: String, f: Failure): (Int, Int) =
     if (moveRightKeywords.exists(f.label.contains)) {
-      val lastSpace = input.indexWhere(_.isWhitespace, f.index)
-      val end       = if (lastSpace == -1) f.index else lastSpace
-      (f.index - offset, end - offset)
+      val end =
+        if (f.label.contains("expression"))
+          input.indexWhere(_ == '}', f.index) + 1
+        else
+          input.indexWhere(_.isWhitespace, f.index)
+      val correctedEnd = if (end <= 0) f.index else end
+      (f.index - offset, correctedEnd - offset)
     } else {
       val start =
         if (input(f.index - 1).isWhitespace)
