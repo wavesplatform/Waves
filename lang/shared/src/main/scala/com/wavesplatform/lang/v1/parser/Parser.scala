@@ -27,11 +27,11 @@ class Parser(implicit offset: Int) {
   val keywords       = Set("let", "strict", "base58", "base64", "true", "false", "if", "then", "else", "match", "case", "func")
   val excludeInError = Set('(', ')', ':', ']', '[', '=', ',', ';')
 
-  def lowerChar[A: P]          = CharIn("a-z")
-  def upperChar[A: P]          = CharIn("A-Z")
-  def nonLatinChar[A: P]       = (CharPred(_.isLetter) ~~/ Fail).opaque("only latin charset for definitions")
-  def char[A: P]               = lowerChar | upperChar | nonLatinChar
-  def digit[A: P]              = CharIn("0-9")
+  def lowerChar[A: P]            = CharIn("a-z")
+  def upperChar[A: P]            = CharIn("A-Z")
+  def nonLatinChar[A: P]         = (CharPred(_.isLetter) ~~/ Fail).opaque("only latin charset for definitions")
+  def char[A: P]                 = lowerChar | upperChar | nonLatinChar
+  def digit[A: P]                = CharIn("0-9")
   def spacesAndNewLinesOpt[A: P] = CharIn(" \t\n\r")
   def spacesOpt[A: P]            = CharIn(" \t").repX()
   def newLines[A: P]             = CharIn("\n\r").repX(1)
