@@ -277,7 +277,8 @@ object InvokeScriptDiff {
                     limitedExecution,
                     totalComplexityLimit,
                     Seq(),
-                    log
+                    log,
+                    forcePaymentsDiff = false
                   )
                 )
               )

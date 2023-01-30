@@ -1,5 +1,5 @@
 package com.wavesplatform.http
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.ApiError.ScriptExecutionError
 import com.wavesplatform.api.http.utils.{UtilsApiRoute, UtilsInvocationRequest}
 import com.wavesplatform.common.state.ByteStr
@@ -16,8 +16,9 @@ import com.wavesplatform.lang.v1.serialization.SerdeV1
 import com.wavesplatform.state.{Blockchain, IntegerDataEntry, LeaseBalance}
 import com.wavesplatform.test.DomainPresets.{RideV5, RideV6}
 import com.wavesplatform.test.NumericExt
-import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxHelpers.*
+import com.wavesplatform.transaction.{Asset, TxHelpers}
 import com.wavesplatform.utils.{Schedulers, Time}
 import io.netty.util.HashedWheelTimer
 import org.scalamock.scalatest.PathMockFactory
@@ -117,7 +118,7 @@ class UtilsRouteEvaluateSpec
     }
 
     "simple expression" in {
-      withDomain(RideV5) { d =>
+      withDomain(RideV5, AddrWithBalance.enoughBalances(defaultSigner)) { d =>
         val blockchain = d.blockchain
         val api        = utilsApi.copy(blockchain = blockchain, settings = utilsApi.settings.copy(evaluateScriptComplexityLimit = 26000))
         val route      = seal(api.route)
@@ -126,7 +127,6 @@ class UtilsRouteEvaluateSpec
           responseAs[JsObject] shouldBe Json.obj("error" -> 199, "message" -> s"Address $dAppAddress is not dApp")
         }
 
-        d.helpers.creditWavesToDefaultSigner()
         d.helpers.setScript(dAppAccount, testScript)
 
         evalScript("testListArg([\"test\", 111, base64'dGVzdA==', false], \"test\", base58'aaa')") ~> route ~> check {
@@ -148,7 +148,7 @@ class UtilsRouteEvaluateSpec
               |        },
               |        "value" : {
               |          "type" : "ByteVector",
-              |          "value" : "11111111111111111111111111"
+              |          "value" : "3MuPKL2kQz1Gp9t7QwrDZN5F8m3u5Uzzo3e"
               |        }
               |      }
               |    } ]
@@ -161,7 +161,7 @@ class UtilsRouteEvaluateSpec
           (result \ "stateChanges").as[JsObject] shouldBe Json.parse(
             """
               |{
-              |    "data" : [ {"key":"test","type":"binary","value":"base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="} ],
+              |    "data" : [ {"key":"test","type":"binary","value":"base64:AVQ7/yyDy88aPjf+qhzZz/b3yDC2lXyJwWk="} ],
               |    "transfers" : [ ],
               |    "issues" : [ ],
               |    "reissues" : [ ],
@@ -272,7 +272,7 @@ class UtilsRouteEvaluateSpec
               |        },
               |        "value" : {
               |          "type" : "ByteVector",
-              |          "value" : "11111111111111111111111111"
+              |          "value" : "3MuPKL2kQz1Gp9t7QwrDZN5F8m3u5Uzzo3e"
               |        }
               |      }
               |    } ]
@@ -289,7 +289,7 @@ class UtilsRouteEvaluateSpec
               |  "data" : [ {
               |    "key" : "testSyncInvoke",
               |    "type" : "binary",
-              |    "value" : "base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+              |    "value" : "base64:AVQ7/yyDy88aPjf+qhzZz/b3yDC2lXyJwWk="
               |  } ],
               |  "transfers" : [ ],
               |  "issues" : [ ],
@@ -368,7 +368,7 @@ class UtilsRouteEvaluateSpec
 
         evalScript(""" callable() """, dAppAddress2) ~> route ~> check {
           (responseAs[JsObject] - "stateChanges") should matchJson(
-            """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"testSyncInvoke"},"value":{"type":"ByteVector","value":"11111111111111111111111111"}}}]},"complexity":297,"expr":" callable() ","address":"3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"}"""
+            """{"result":{"type":"Array","value":[{"type":"BinaryEntry","value":{"key":{"type":"String","value":"testSyncInvoke"},"value":{"type":"ByteVector","value":"3MuPKL2kQz1Gp9t7QwrDZN5F8m3u5Uzzo3e"}}}]},"complexity":297,"expr":" callable() ","address":"3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"}"""
           )
         }
 
@@ -416,631 +416,28 @@ class UtilsRouteEvaluateSpec
     }
 
     "invocation" in {
-      withDomain(RideV6) { d =>
-        def dApp(caller: Address) = TestCompiler(V6).compileContract(
-          s"""
-             | @Callable(i)
-             | func f(arg1: Int, arg2: String) = {
-             |   let check =
-             |     this                    == Address(base58'$defaultAddress')            &&
-             |     i.caller                == Address(base58'$caller')                    &&
-             |     i.originCaller          == Address(base58'$caller')                    &&
-             |     i.callerPublicKey       == base58'${secondSigner.publicKey}'           &&
-             |     i.originCallerPublicKey == base58'${secondSigner.publicKey}'           &&
-             |     i.fee                   == 123456                                      &&
-             |     i.payments              == [AttachedPayment(unit, 1)]                  &&
-             |     i.transactionId         == base58'3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8' &&
-             |     i.feeAssetId            == base58'abcd'                                &&
-             |     arg1 == 123 && arg2 == "abc"
-             |   if (check) then [] else throw("wrong")
-             | }
-             |
-             | @Callable(i)
-             | func default() = {
-             |   let check =
-             |     this                    == Address(base58'$defaultAddress')            &&
-             |     i.caller                == Address(base58'${"1" * 26}')                &&
-             |     i.originCaller          == Address(base58'${"1" * 26}')                &&
-             |     i.callerPublicKey       == base58'${"1" * 32}'                         &&
-             |     i.originCallerPublicKey == base58'${"1" * 32}'                         &&
-             |     i.fee                   == 500000                                      &&
-             |     i.payments              == []                                          &&
-             |     i.transactionId         == base58'${"1" * 32}'                         &&
-             |     i.feeAssetId            == unit
-             |   if (check) then [] else throw("wrong")
-             | }
-           """.stripMargin
-        )
-        d.appendBlock(setScript(defaultSigner, dApp(caller = secondAddress)))
-
-        val route = utilsApi.copy(blockchain = d.blockchain).route
-        def invocation(senderAddress: Option[Address] = Some(secondAddress)) =
-          Json
-            .parse(
-              s"""
-                 | {
-                 |  "call": {
-                 |    "function": "f",
-                 |    "args": [
-                 |      {
-                 |        "type": "integer",
-                 |        "value": 123
-                 |      },
-                 |      {
-                 |        "type": "string",
-                 |        "value": "abc"
-                 |      }
-                 |    ]
-                 |  },
-                 |  "id": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8",
-                 |  "fee": 123456,
-                 |  "feeAssetId": "abcd",
-                 |  ${senderAddress.fold("")(a => s""""sender": "$a",""")}
-                 |  "senderPublicKey": "${secondSigner.publicKey}",
-                 |  "payment": [
-                 |    {
-                 |      "amount": 1,
-                 |      "assetId": null
-                 |    }
-                 |  ]
-                 | }
-               """.stripMargin
-            )
-            .as[JsObject]
-
-        val expectedTrace =
-          Json.parse(
-            s"""
-               | [
-               |  {
-               |    "name": "f.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "Int",
-               |        "value": 123
-               |      },
-               |      {
-               |        "type": "String",
-               |        "value": "abc"
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "Address.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "ByteVector",
-               |        "value": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "Address.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51999
-               |  },
-               |  {
-               |    "name": "==.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "Address",
-               |        "value": {
-               |          "bytes": {
-               |            "type": "ByteVector",
-               |            "value": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
-               |          }
-               |        }
-               |      },
-               |      {
-               |        "type": "Address",
-               |        "value": {
-               |          "bytes": {
-               |            "type": "ByteVector",
-               |            "value": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
-               |          }
-               |        }
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "==.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51998
-               |  },
-               |  {
-               |    "name": "i",
-               |    "type": "Invocation",
-               |    "value": {
-               |      "originCaller": {
-               |        "type": "Address",
-               |        "value": {
-               |          "bytes": {
-               |            "type": "ByteVector",
-               |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
-               |          }
-               |        }
-               |      },
-               |      "payments": {
-               |        "type": "Array",
-               |        "value": [
-               |          {
-               |            "type": "AttachedPayment",
-               |            "value": {
-               |              "amount": {
-               |                "type": "Int",
-               |                "value": 1
-               |              },
-               |              "assetId": {
-               |                "type": "Unit",
-               |                "value": {}
-               |              }
-               |            }
-               |          }
-               |        ]
-               |      },
-               |      "callerPublicKey": {
-               |        "type": "ByteVector",
-               |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
-               |      },
-               |      "feeAssetId": {
-               |        "type": "ByteVector",
-               |        "value": "abcd"
-               |      },
-               |      "originCallerPublicKey": {
-               |        "type": "ByteVector",
-               |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
-               |      },
-               |      "transactionId": {
-               |        "type": "ByteVector",
-               |        "value": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8"
-               |      },
-               |      "caller": {
-               |        "type": "Address",
-               |        "value": {
-               |          "bytes": {
-               |            "type": "ByteVector",
-               |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
-               |          }
-               |        }
-               |      },
-               |      "fee": {
-               |        "type": "Int",
-               |        "value": 123456
-               |      }
-               |    }
-               |  },
-               |  {
-               |    "name": "Address.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "ByteVector",
-               |        "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "Address.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51997
-               |  },
-               |  {
-               |    "name": "==.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "Address",
-               |        "value": {
-               |          "bytes": {
-               |            "type": "ByteVector",
-               |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
-               |          }
-               |        }
-               |      },
-               |      {
-               |        "type": "Address",
-               |        "value": {
-               |          "bytes": {
-               |            "type": "ByteVector",
-               |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
-               |          }
-               |        }
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "==.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51996
-               |  },
-               |  {
-               |    "name": "Address.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "ByteVector",
-               |        "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "Address.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51995
-               |  },
-               |  {
-               |    "name": "==.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "Address",
-               |        "value": {
-               |          "bytes": {
-               |            "type": "ByteVector",
-               |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
-               |          }
-               |        }
-               |      },
-               |      {
-               |        "type": "Address",
-               |        "value": {
-               |          "bytes": {
-               |            "type": "ByteVector",
-               |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
-               |          }
-               |        }
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "==.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51994
-               |  },
-               |  {
-               |    "name": "==.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "ByteVector",
-               |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
-               |      },
-               |      {
-               |        "type": "ByteVector",
-               |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "==.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51993
-               |  },
-               |  {
-               |    "name": "==.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "ByteVector",
-               |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
-               |      },
-               |      {
-               |        "type": "ByteVector",
-               |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "==.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51992
-               |  },
-               |  {
-               |    "name": "==.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "Int",
-               |        "value": 123456
-               |      },
-               |      {
-               |        "type": "Int",
-               |        "value": 123456
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "==.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51991
-               |  },
-               |  {
-               |    "name": "AttachedPayment.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "Unit",
-               |        "value": {}
-               |      },
-               |      {
-               |        "type": "Int",
-               |        "value": 1
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "AttachedPayment.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51990
-               |  },
-               |  {
-               |    "name": "cons.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "AttachedPayment",
-               |        "value": {
-               |          "assetId": {
-               |            "type": "Unit",
-               |            "value": {}
-               |          },
-               |          "amount": {
-               |            "type": "Int",
-               |            "value": 1
-               |          }
-               |        }
-               |      },
-               |      {
-               |        "type": "Array",
-               |        "value": []
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "cons.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51989
-               |  },
-               |  {
-               |    "name": "==.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "Array",
-               |        "value": [
-               |          {
-               |            "type": "AttachedPayment",
-               |            "value": {
-               |              "amount": {
-               |                "type": "Int",
-               |                "value": 1
-               |              },
-               |              "assetId": {
-               |                "type": "Unit",
-               |                "value": {}
-               |              }
-               |            }
-               |          }
-               |        ]
-               |      },
-               |      {
-               |        "type": "Array",
-               |        "value": [
-               |          {
-               |            "type": "AttachedPayment",
-               |            "value": {
-               |              "assetId": {
-               |                "type": "Unit",
-               |                "value": {}
-               |              },
-               |              "amount": {
-               |                "type": "Int",
-               |                "value": 1
-               |              }
-               |            }
-               |          }
-               |        ]
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "==.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51988
-               |  },
-               |  {
-               |    "name": "==.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "ByteVector",
-               |        "value": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8"
-               |      },
-               |      {
-               |        "type": "ByteVector",
-               |        "value": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8"
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "==.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51987
-               |  },
-               |  {
-               |    "name": "==.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "ByteVector",
-               |        "value": "abcd"
-               |      },
-               |      {
-               |        "type": "ByteVector",
-               |        "value": "abcd"
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "==.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51986
-               |  },
-               |  {
-               |    "name": "arg1",
-               |    "type": "Int",
-               |    "value": 123
-               |  },
-               |  {
-               |    "name": "==.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "Int",
-               |        "value": 123
-               |      },
-               |      {
-               |        "type": "Int",
-               |        "value": 123
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "==.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51985
-               |  },
-               |  {
-               |    "name": "arg2",
-               |    "type": "String",
-               |    "value": "abc"
-               |  },
-               |  {
-               |    "name": "==.@args",
-               |    "type": "Array",
-               |    "value": [
-               |      {
-               |        "type": "String",
-               |        "value": "abc"
-               |      },
-               |      {
-               |        "type": "String",
-               |        "value": "abc"
-               |      }
-               |    ]
-               |  },
-               |  {
-               |    "name": "==.@complexity",
-               |    "type": "Int",
-               |    "value": 1
-               |  },
-               |  {
-               |    "name": "@complexityLimit",
-               |    "type": "Int",
-               |    "value": 51984
-               |  },
-               |  {
-               |    "name": "check",
-               |    "type": "Boolean",
-               |    "value": true
-               |  }
-               |]
-             """.stripMargin
-          )
+      withDomain(RideV6, AddrWithBalance.enoughBalances(defaultSigner, secondSigner, signer(2))) { d =>
+        val route   = utilsApi.copy(blockchain = d.blockchain).route
+        val issueTx = issue()
+        val asset   = IssuedAsset(issueTx.id())
+        d.appendBlock(issueTx, sponsor(asset, Some(1)), transfer(asset = asset, amount = 12345678))
+        d.appendBlock(setScript(defaultSigner, dApp(caller = secondAddress, secondSigner.publicKey, asset)))
 
         // successful result
-        Post(routePath(s"/script/evaluate/$defaultAddress"), invocation()) ~> route ~> check {
+        Post(routePath(s"/script/evaluate/$defaultAddress"), invocation(asset)) ~> route ~> check {
           val json = responseAs[JsValue]
           (json \ "complexity").as[Int] shouldBe 16
           (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
           (json \ "vars").isEmpty shouldBe true
-          json.as[UtilsInvocationRequest] shouldBe invocation().as[UtilsInvocationRequest]
+          json.as[UtilsInvocationRequest] shouldBe invocation(asset).as[UtilsInvocationRequest]
         }
 
         // trace
-        Post(routePath(s"/script/evaluate/$defaultAddress?trace=true"), invocation()) ~> route ~> check {
+        Post(routePath(s"/script/evaluate/$defaultAddress?trace=true"), invocation(asset)) ~> route ~> check {
           val json = responseAs[JsValue]
           (json \ "complexity").as[Int] shouldBe 16
           (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
-          (json \ "vars").as[JsArray] shouldBe expectedTrace
+          (json \ "vars").as[JsArray] shouldBe expectedTrace(asset)
         }
 
         // all fields are empty (empty request body)
@@ -1051,34 +448,31 @@ class UtilsRouteEvaluateSpec
         }
 
         // conflicting request structure
-        Post(routePath(s"/script/evaluate/$defaultAddress"), Json.obj("expr" -> "true") ++ invocation()) ~> route ~> check {
+        Post(routePath(s"/script/evaluate/$defaultAddress"), Json.obj("expr" -> "true") ++ invocation(asset)) ~> route ~> check {
           val json = responseAs[JsValue]
           (json \ "message").as[String] shouldBe "Conflicting request structure. Both expression and invocation structure were sent"
           (json \ "error").as[Int] shouldBe 198
         }
 
         // sender address can be calculated from PK
-        Post(routePath(s"/script/evaluate/$defaultAddress"), invocation(None)) ~> route ~> check {
+        Post(routePath(s"/script/evaluate/$defaultAddress"), invocation(asset, None)) ~> route ~> check {
           val json = responseAs[JsValue]
           (json \ "complexity").as[Int] shouldBe 16
           (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
           (json \ "vars").isEmpty shouldBe true
-          json.as[UtilsInvocationRequest] shouldBe invocation(None).as[UtilsInvocationRequest]
+          json.as[UtilsInvocationRequest] shouldBe invocation(asset, None).as[UtilsInvocationRequest]
         }
 
-        // sender address can differ from PK address
-        withDomain(RideV6) { d =>
-          val customSender = signer(2).toAddress
-          val route        = utilsApi.copy(blockchain = d.blockchain).route
-          d.appendBlock(setScript(defaultSigner, dApp(caller = customSender)))
-
-          Post(routePath(s"/script/evaluate/$defaultAddress"), invocation(Some(customSender))) ~> route ~> check {
-            val json = responseAs[JsValue]
-            (json \ "complexity").as[Int] shouldBe 16
-            (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
-            (json \ "vars").isEmpty shouldBe true
-            json.as[UtilsInvocationRequest] shouldBe invocation(Some(customSender)).as[UtilsInvocationRequest]
-          }
+        // invocation sender address can differ from PK address
+        d.appendBlock(setScript(defaultSigner, dApp(caller = signer(2).toAddress, signer(2).publicKey, asset)))
+        d.appendBlock(transfer(defaultSigner, signer(2).toAddress, 1234567, asset))
+        val request = invocation(asset, Some(signer(2).toAddress), signer(2).publicKey)
+        Post(routePath(s"/script/evaluate/$defaultAddress"), request) ~> route ~> check {
+          val json = responseAs[JsValue]
+          (json \ "complexity").as[Int] shouldBe 16
+          (json \ "result").as[JsObject] shouldBe Json.obj("type" -> "Array", "value" -> JsArray())
+          (json \ "vars").isEmpty shouldBe true
+          json.as[UtilsInvocationRequest] shouldBe request.as[UtilsInvocationRequest]
         }
       }
     }
@@ -1089,16 +483,647 @@ class UtilsRouteEvaluateSpec
         val dApp = TestCompiler(V6).compileContract(
           s"""
              | @Callable(i)
-             | func default() = [ ScriptTransfer(Address(base58'$defaultAddress'), 1, unit) ]
-             """.stripMargin
+             | func action() = [ ScriptTransfer(Address(base58'$defaultAddress'), 1, unit) ]
+             |
+             | @Callable(i)
+             | func default() = []
+           """.stripMargin
         )
         d.appendBlock(setScript(secondSigner, dApp))
 
         // negative balance after applying action
-        Post(routePath(s"/script/evaluate/$secondAddress"), Json.obj("expr" -> "default()")) ~> route ~> check {
+        Post(routePath(s"/script/evaluate/$secondAddress"), Json.obj("expr" -> "action()")) ~> route ~> check {
           responseAs[String] should include("AccountBalanceError")
+        }
+
+        // negative fee
+        Post(routePath(s"/script/evaluate/$secondAddress"), Json.obj("fee" -> -1)) ~> route ~> check {
+          responseAs[String] should include("error = Fee in WAVES for InvokeScriptTransaction (-1 in WAVES)")
+        }
+
+        // illegal fee asset id
+        Post(routePath(s"/script/evaluate/$secondAddress"), Json.obj("feeAssetId" -> "xxxxx")) ~> route ~> check {
+          responseAs[String] should include("Asset xxxxx does not exist, cannot be used to pay fees")
+        }
+
+        // negative payment
+        Post(routePath(s"/script/evaluate/$secondAddress"), Json.parse("""{"payment":[{"amount":-1,"assetId":null}]}""")) ~> route ~> check {
+          responseAs[String] should include("non-positive amount: -1 of Waves")
+        }
+
+        // illegal payment asset id
+        Post(routePath(s"/script/evaluate/$secondAddress"), Json.parse("""{"payment":[{"amount":1,"assetId":"xxxxx"}]}""")) ~> route ~> check {
+          responseAs[String] should include("Accounts balance errors")
         }
       }
     }
   }
+
+  private def dApp(caller: Address, callerPk: PublicKey, asset: IssuedAsset) =
+    TestCompiler(V6).compileContract(
+      s"""
+         | @Callable(i)
+         | func f(arg1: Int, arg2: String) = {
+         |   let check =
+         |     this                    == Address(base58'$defaultAddress')            &&
+         |     i.caller                == Address(base58'$caller')                    &&
+         |     i.originCaller          == Address(base58'$caller')                    &&
+         |     i.callerPublicKey       == base58'$callerPk'                           &&
+         |     i.originCallerPublicKey == base58'$callerPk'                           &&
+         |     i.fee                   == 1234567                                     &&
+         |     i.payments              == [AttachedPayment(unit, 1)]                  &&
+         |     i.transactionId         == base58'3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8' &&
+         |     i.feeAssetId            == base58'$asset'                              &&
+         |     arg1 == 123 && arg2 == "abc"
+         |   if (check) then [] else throw("wrong " + i.caller.toString() + " " + Address(base58'$caller').toString())
+         | }
+         |
+         | @Callable(i)
+         | func default() = {
+         |   let check =
+         |     this                    == Address(base58'$defaultAddress')            &&
+         |     i.caller                == Address(base58'${"1" * 26}')                &&
+         |     i.originCaller          == Address(base58'${"1" * 26}')                &&
+         |     i.callerPublicKey       == base58'${"1" * 32}'                         &&
+         |     i.originCallerPublicKey == base58'${"1" * 32}'                         &&
+         |     i.fee                   == 500000                                      &&
+         |     i.payments              == []                                          &&
+         |     i.transactionId         == base58'${"1" * 32}'                         &&
+         |     i.feeAssetId            == unit
+         |   if (check) then [] else throw("wrong")
+         | }
+       """.stripMargin
+    )
+
+  private def invocation(feeAsset: Asset, senderAddress: Option[Address] = Some(secondAddress), senderPk: PublicKey = secondSigner.publicKey) =
+    Json
+      .parse(
+        s"""
+           | {
+           |  "call": {
+           |    "function": "f",
+           |    "args": [
+           |      {
+           |        "type": "integer",
+           |        "value": 123
+           |      },
+           |      {
+           |        "type": "string",
+           |        "value": "abc"
+           |      }
+           |    ]
+           |  },
+           |  "id": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8",
+           |  "fee": 1234567,
+           |  "feeAssetId": "$feeAsset",
+           |  ${senderAddress.fold("")(a => s""""sender": "$a",""")}
+           |  "senderPublicKey": "$senderPk",
+           |  "payment": [
+           |    {
+           |      "amount": 1,
+           |      "assetId": null
+           |    }
+           |  ]
+           | }
+         """.stripMargin
+      )
+      .as[JsObject]
+
+  private def expectedTrace(feeAsset: Asset) =
+    Json.parse(
+      s"""
+         | [
+         |  {
+         |    "name": "f.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "Int",
+         |        "value": 123
+         |      },
+         |      {
+         |        "type": "String",
+         |        "value": "abc"
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "Address.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "ByteVector",
+         |        "value": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "Address.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51999
+         |  },
+         |  {
+         |    "name": "==.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "Address",
+         |        "value": {
+         |          "bytes": {
+         |            "type": "ByteVector",
+         |            "value": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+         |          }
+         |        }
+         |      },
+         |      {
+         |        "type": "Address",
+         |        "value": {
+         |          "bytes": {
+         |            "type": "ByteVector",
+         |            "value": "3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"
+         |          }
+         |        }
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "==.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51998
+         |  },
+         |  {
+         |    "name": "i",
+         |    "type": "Invocation",
+         |    "value": {
+         |      "originCaller": {
+         |        "type": "Address",
+         |        "value": {
+         |          "bytes": {
+         |            "type": "ByteVector",
+         |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+         |          }
+         |        }
+         |      },
+         |      "payments": {
+         |        "type": "Array",
+         |        "value": [
+         |          {
+         |            "type": "AttachedPayment",
+         |            "value": {
+         |              "amount": {
+         |                "type": "Int",
+         |                "value": 1
+         |              },
+         |              "assetId": {
+         |                "type": "Unit",
+         |                "value": {}
+         |              }
+         |            }
+         |          }
+         |        ]
+         |      },
+         |      "callerPublicKey": {
+         |        "type": "ByteVector",
+         |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
+         |      },
+         |      "feeAssetId": {
+         |        "type": "ByteVector",
+         |        "value": "$feeAsset"
+         |      },
+         |      "originCallerPublicKey": {
+         |        "type": "ByteVector",
+         |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
+         |      },
+         |      "transactionId": {
+         |        "type": "ByteVector",
+         |        "value": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8"
+         |      },
+         |      "caller": {
+         |        "type": "Address",
+         |        "value": {
+         |          "bytes": {
+         |            "type": "ByteVector",
+         |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+         |          }
+         |        }
+         |      },
+         |      "fee": {
+         |        "type": "Int",
+         |        "value": 1234567
+         |      }
+         |    }
+         |  },
+         |  {
+         |    "name": "Address.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "ByteVector",
+         |        "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "Address.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51997
+         |  },
+         |  {
+         |    "name": "==.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "Address",
+         |        "value": {
+         |          "bytes": {
+         |            "type": "ByteVector",
+         |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+         |          }
+         |        }
+         |      },
+         |      {
+         |        "type": "Address",
+         |        "value": {
+         |          "bytes": {
+         |            "type": "ByteVector",
+         |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+         |          }
+         |        }
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "==.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51996
+         |  },
+         |  {
+         |    "name": "Address.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "ByteVector",
+         |        "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "Address.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51995
+         |  },
+         |  {
+         |    "name": "==.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "Address",
+         |        "value": {
+         |          "bytes": {
+         |            "type": "ByteVector",
+         |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+         |          }
+         |        }
+         |      },
+         |      {
+         |        "type": "Address",
+         |        "value": {
+         |          "bytes": {
+         |            "type": "ByteVector",
+         |            "value": "3MuVqVJGmFsHeuFni5RbjRmALuGCkEwzZtC"
+         |          }
+         |        }
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "==.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51994
+         |  },
+         |  {
+         |    "name": "==.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "ByteVector",
+         |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
+         |      },
+         |      {
+         |        "type": "ByteVector",
+         |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "==.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51993
+         |  },
+         |  {
+         |    "name": "==.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "ByteVector",
+         |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
+         |      },
+         |      {
+         |        "type": "ByteVector",
+         |        "value": "8h47fXqSctZ6sb3q6Sst9qH1UNzR5fjez2eEP6BvEfcr"
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "==.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51992
+         |  },
+         |  {
+         |    "name": "==.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "Int",
+         |        "value": 1234567
+         |      },
+         |      {
+         |        "type": "Int",
+         |        "value": 1234567
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "==.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51991
+         |  },
+         |  {
+         |    "name": "AttachedPayment.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "Unit",
+         |        "value": {}
+         |      },
+         |      {
+         |        "type": "Int",
+         |        "value": 1
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "AttachedPayment.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51990
+         |  },
+         |  {
+         |    "name": "cons.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "AttachedPayment",
+         |        "value": {
+         |          "assetId": {
+         |            "type": "Unit",
+         |            "value": {}
+         |          },
+         |          "amount": {
+         |            "type": "Int",
+         |            "value": 1
+         |          }
+         |        }
+         |      },
+         |      {
+         |        "type": "Array",
+         |        "value": []
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "cons.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51989
+         |  },
+         |  {
+         |    "name": "==.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "Array",
+         |        "value": [
+         |          {
+         |            "type": "AttachedPayment",
+         |            "value": {
+         |              "amount": {
+         |                "type": "Int",
+         |                "value": 1
+         |              },
+         |              "assetId": {
+         |                "type": "Unit",
+         |                "value": {}
+         |              }
+         |            }
+         |          }
+         |        ]
+         |      },
+         |      {
+         |        "type": "Array",
+         |        "value": [
+         |          {
+         |            "type": "AttachedPayment",
+         |            "value": {
+         |              "assetId": {
+         |                "type": "Unit",
+         |                "value": {}
+         |              },
+         |              "amount": {
+         |                "type": "Int",
+         |                "value": 1
+         |              }
+         |            }
+         |          }
+         |        ]
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "==.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51988
+         |  },
+         |  {
+         |    "name": "==.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "ByteVector",
+         |        "value": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8"
+         |      },
+         |      {
+         |        "type": "ByteVector",
+         |        "value": "3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8"
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "==.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51987
+         |  },
+         |  {
+         |    "name": "==.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "ByteVector",
+         |        "value": "$feeAsset"
+         |      },
+         |      {
+         |        "type": "ByteVector",
+         |        "value": "$feeAsset"
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "==.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51986
+         |  },
+         |  {
+         |    "name": "arg1",
+         |    "type": "Int",
+         |    "value": 123
+         |  },
+         |  {
+         |    "name": "==.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "Int",
+         |        "value": 123
+         |      },
+         |      {
+         |        "type": "Int",
+         |        "value": 123
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "==.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51985
+         |  },
+         |  {
+         |    "name": "arg2",
+         |    "type": "String",
+         |    "value": "abc"
+         |  },
+         |  {
+         |    "name": "==.@args",
+         |    "type": "Array",
+         |    "value": [
+         |      {
+         |        "type": "String",
+         |        "value": "abc"
+         |      },
+         |      {
+         |        "type": "String",
+         |        "value": "abc"
+         |      }
+         |    ]
+         |  },
+         |  {
+         |    "name": "==.@complexity",
+         |    "type": "Int",
+         |    "value": 1
+         |  },
+         |  {
+         |    "name": "@complexityLimit",
+         |    "type": "Int",
+         |    "value": 51984
+         |  },
+         |  {
+         |    "name": "check",
+         |    "type": "Boolean",
+         |    "value": true
+         |  }
+         |]
+       """.stripMargin
+    )
 }
