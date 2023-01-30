@@ -268,7 +268,7 @@ case class UtilsApiRoute(
           parseCall(exprRequest, script.stdLibVersion).flatMap(expr =>
             UtilsEvaluator.executeExpression(blockchain, script, address, pk, limit)(
               UtilsEvaluator.emptyInvokeScriptLike(address),
-              dApp => Right(ContractEvaluator.buildSyntheticCall(dApp, expr, ByteStr(DefaultPublicKey.toAddress.bytes), DefaultPublicKey))
+              dApp => Right(ContractEvaluator.buildSyntheticCall(dApp, expr, ByteStr(DefaultAddress.bytes), DefaultPublicKey))
             )
           )
         case (None, Some(invocationRequest)) =>
@@ -325,6 +325,7 @@ object UtilsApiRoute {
   val MaxSeedSize      = 1024
   val DefaultSeedSize  = 32
   val DefaultPublicKey = PublicKey(ByteStr(new Array[Byte](32)))
+  val DefaultAddress   = DefaultPublicKey.toAddress
 
   object WrongJson                   extends ValidationError
   object ConflictingRequestStructure extends ValidationError

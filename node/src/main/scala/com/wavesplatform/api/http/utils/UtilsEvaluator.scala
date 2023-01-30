@@ -146,9 +146,13 @@ object UtilsEvaluator {
         .merge
       _ <- TransactionDiffer.validateBalance(blockchain, InvokeScript, addWavesToDefaultInvoker(diff))
       _ <- TransactionDiffer.assetsVerifierDiff(blockchain, invoke, verify = true, diff, Int.MaxValue).resultE
-      scriptResult = environment.currentDiff.scriptResults.values.fold(InvokeScriptResult.empty)(_ |+| _) |+| diff.scriptResults.headOption.map(_._2).getOrElse(InvokeScriptResult.empty)
-    } yield (evaluated, usedComplexity, log, scriptResult)
+      rootScriptResult  = diff.scriptResults.headOption.map(_._2).getOrElse(InvokeScriptResult.empty)
+      innerScriptResult = environment.currentDiff.scriptResults.values.fold(InvokeScriptResult.empty)(_ |+| _)
+    } yield (evaluated, usedComplexity, log, innerScriptResult |+| rootScriptResult)
 
   private def addWavesToDefaultInvoker(diff: Diff) =
-    diff.combineE(Diff(Map(UtilsApiRoute.DefaultPublicKey.toAddress -> Portfolio.waves(Long.MaxValue / 3)))).explicitGet()
+    if (diff.portfolios.get(UtilsApiRoute.DefaultAddress).exists(_.balance >= Long.MaxValue / 10))
+      diff
+    else
+      diff.combineE(Diff(Map(UtilsApiRoute.DefaultAddress -> Portfolio.waves(Long.MaxValue / 10)))).explicitGet()
 }
