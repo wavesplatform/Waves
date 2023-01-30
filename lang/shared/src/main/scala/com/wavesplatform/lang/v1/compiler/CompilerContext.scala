@@ -42,16 +42,12 @@ case class CompilerContext(
     } else {
       varDefs.get(name)
     }
-
-  def getSimpleContext(): Map[String, Pos] = {
-    (varDefs.map(el => el._1 -> el._2.pos) ++ functionDefs.map(el => el._1 -> el._2.pos))
-      .filter(_._2.start != -1)
-  }
 }
 
 object CompilerContext {
-  case class VariableInfo(pos: Pos, vType: FINAL)
-  case class FunctionInfo(pos: Pos, fSigList: List[FunctionTypeSignature])
+  sealed trait PositionedInfo { val pos: Pos }
+  case class VariableInfo(pos: Pos, vType: FINAL)                          extends PositionedInfo
+  case class FunctionInfo(pos: Pos, fSigList: List[FunctionTypeSignature]) extends PositionedInfo
 
   type VariableTypes = Map[String, VariableInfo]
   type FunctionTypes = Map[String, FunctionInfo]
@@ -67,4 +63,6 @@ object CompilerContext {
   val types: Lens[CompilerContext, Map[String, FINAL]] = lens[CompilerContext] >> Symbol("predefTypes")
   val vars: Lens[CompilerContext, VariableTypes]       = lens[CompilerContext] >> Symbol("varDefs")
   val functions: Lens[CompilerContext, FunctionTypes]  = lens[CompilerContext] >> Symbol("functionDefs")
+
+  val empty = CompilerContext(Map(), Map(), Map(), true)
 }

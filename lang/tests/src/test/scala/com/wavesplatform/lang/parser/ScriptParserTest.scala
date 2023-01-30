@@ -384,33 +384,11 @@ class ScriptParserTest extends PropSpec with ScriptGenParser {
   }
 
   property("reserved keywords are invalid variable names in expr: then") {
-    val script = "then + 1"
-    parse(script) shouldBe BINARY_OP(
-      AnyPos,
-      IF(
-        AnyPos,
-        INVALID(AnyPos, "expected a condition"),
-        INVALID(AnyPos, "expected a true branch's expression"),
-        INVALID(AnyPos, "expected a false branch")
-      ),
-      BinaryOperation.SUM_OP,
-      CONST_LONG(AnyPos, 1)
-    )
+    parse("then + 1") shouldBe INVALID(AnyPos, "can't parse the expression", None, None)
   }
 
   property("reserved keywords are invalid variable names in expr: else") {
-    val script = "else + 1"
-    parse(script) shouldBe BINARY_OP(
-      AnyPos,
-      IF(
-        AnyPos,
-        INVALID(AnyPos, "expected a condition"),
-        INVALID(AnyPos, "expected a true branch"),
-        INVALID(AnyPos, "expected a false branch's expression")
-      ),
-      BinaryOperation.SUM_OP,
-      CONST_LONG(AnyPos, 1)
-    )
+    parse("else + 1") shouldBe INVALID(AnyPos, "can't parse the expression", None, None)
   }
 
   property("multisig sample") {
