@@ -3,6 +3,7 @@ package com.wavesplatform.lang.v1.estimator.v3
 import cats.implicits.*
 import cats.{Id, Monad}
 import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.estimator.v3.EstimatorContext.EvalM
 import com.wavesplatform.lang.v1.estimator.v3.EstimatorContext.Lenses.*
@@ -21,26 +22,41 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean) extends Sc
       vars: Set[String],
       funcs: Map[FunctionHeader, Coeval[Long]],
       expr: EXPR
-  ): Either[String, Long] = {
-    val ctxFuncs = funcs.view.mapValues((_, Set[String]())).toMap
-    evalExpr(expr).run(EstimatorContext(ctxFuncs)).value._2
+  ): Either[String, Long] =
+    estimate(funcs, expr, globalDeclarationsMode = false)._2
+
+  def globalDeclarationsCosts(
+      funcs: Map[FunctionHeader, Coeval[Long]],
+      expr: EXPR
+  ): Either[EstimationError, GlobalDeclarationsCosts] = {
+    val result = estimate(funcs, expr, globalDeclarationsMode = true)
+    result._2.map(_ => GlobalDeclarationsCosts(result._1.globalLetsCosts, result._1.globalFunctionsCosts))
   }
 
-  private def evalExpr(t: EXPR): EvalM[Long] =
+  private def estimate(
+      funcs: Map[FunctionHeader, Coeval[Long]],
+      expr: EXPR,
+      globalDeclarationsMode: Boolean
+  ): (EstimatorContext, Either[EstimationError, Long]) = {
+    val ctxFuncs = funcs.view.mapValues((_, Set[String]())).toMap
+    evalExpr(expr, globalDeclarationsMode).run(EstimatorContext(ctxFuncs)).value
+  }
+
+  private def evalExpr(t: EXPR, globalDeclarationsMode: Boolean = false): EvalM[Long] =
     if (Thread.currentThread().isInterrupted)
       raiseError("Script estimation was interrupted")
     else
       t match {
-        case LET_BLOCK(let, inner)       => evalLetBlock(let, inner)
-        case BLOCK(let: LET, inner)      => evalLetBlock(let, inner)
-        case BLOCK(f: FUNC, inner)       => evalFuncBlock(f, inner)
-        case BLOCK(_: FAILED_DEC, _)     => const(0)
+        case LET_BLOCK(let, inner)       => evalLetBlock(let, inner, globalDeclarationsMode)
+        case BLOCK(let: LET, inner)      => evalLetBlock(let, inner, globalDeclarationsMode)
+        case BLOCK(f: FUNC, inner)       => evalFuncBlock(f, inner, globalDeclarationsMode)
+        case BLOCK(_: FAILED_DEC, _)     => zero
         case REF(str)                    => markRef(str)
         case _: EVALUATED                => const(overheadCost)
         case IF(cond, t1, t2)            => evalIF(cond, t1, t2)
         case GETTER(expr, _)             => evalGetter(expr)
         case FUNCTION_CALL(header, args) => evalFuncCall(header, args)
-        case _: FAILED_EXPR              => const(0)
+        case _: FAILED_EXPR              => zero
       }
 
   private def evalHoldingFuncs(expr: EXPR): EvalM[Long] =
@@ -50,39 +66,74 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean) extends Sc
       _        <- update(funcs.set(_)(startCtx.funcs))
     } yield cost
 
-  private def evalLetBlock(let: LET, inner: EXPR): EvalM[Long] =
+  private def evalLetBlock(let: LET, inner: EXPR, globalDeclarationsMode: Boolean): EvalM[Long] =
     for {
       startCtx <- get[Id, EstimatorContext, EstimationError]
       overlap = startCtx.usedRefs.contains(let.name)
       _ <- update(usedRefs.modify(_)(_ - let.name))
       letEval = evalHoldingFuncs(let.value)
-      nextCost <- evalExpr(inner)
+      _        <- if (globalDeclarationsMode) saveGlobalLetCost(let) else doNothing
+      nextCost <- evalExpr(inner, globalDeclarationsMode)
       ctx      <- get[Id, EstimatorContext, EstimationError]
-      letCost  <- if (ctx.usedRefs.contains(let.name)) letEval else const(0L)
+      letCost  <- if (ctx.usedRefs.contains(let.name)) letEval else zero
       _        <- update(usedRefs.modify(_)(r => if (overlap) r + let.name else r - let.name))
       result   <- sum(nextCost, letCost)
     } yield result
 
-  private def evalFuncBlock(func: FUNC, inner: EXPR): EvalM[Long] =
+  private def saveGlobalLetCost(let: LET): EvalM[Unit] = {
+    val costEvaluation =
+      for {
+        startCtx    <- get[Id, EstimatorContext, EstimationError]
+        bodyCost    <- evalExpr(let.value)
+        bodyEvalCtx <- get[Id, EstimatorContext, EstimationError]
+        usedRefs = bodyEvalCtx.usedRefs diff startCtx.usedRefs
+        letCosts <- usedRefs.toSeq.traverse(bodyEvalCtx.globalLetEvals.getOrElse(_, zero))
+      } yield bodyCost + letCosts.sum
     for {
-      startCtx <- get[Id, EstimatorContext, EstimationError]
-      _ <- if (fixOverflow && startCtx.funcs.contains(FunctionHeader.User(func.name)))
-        raiseError(s"Function '${func.name}${func.args.mkString("(", ", ", ")")}' shadows preceding declaration"): EvalM[Long]
-      else const(0L)
+      cost <- local(costEvaluation)
+      _ <- update(ctx =>
+        ctx.copy(
+          globalLetEvals = ctx.globalLetEvals + (let.name   -> costEvaluation),
+          globalLetsCosts = ctx.globalLetsCosts + (let.name -> cost)
+        )
+      )
+    } yield ()
+  }
+
+  private def evalFuncBlock(func: FUNC, inner: EXPR, globalDeclarationsMode: Boolean): EvalM[Long] =
+    for {
+      startCtx    <- get[Id, EstimatorContext, EstimationError]
+      _           <- checkShadowing(func, startCtx)
       funcCost    <- evalHoldingFuncs(func.body)
       bodyEvalCtx <- get[Id, EstimatorContext, EstimationError]
-      usedRefsInBody = bodyEvalCtx.usedRefs diff startCtx.usedRefs
-      _ <- update(
-        (funcs ~ usedRefs).modify(_) {
-          case (funcs, _) =>
-            (
-              funcs + ((FunctionHeader.User(func.name), (Coeval.now(funcCost), usedRefsInBody))),
-              startCtx.usedRefs
-            )
-        }
-      )
-      nextCost <- evalExpr(inner)
+      refsUsedInBody = bodyEvalCtx.usedRefs diff startCtx.usedRefs
+      _        <- if (globalDeclarationsMode) saveGlobalFuncCost(func.name, funcCost, bodyEvalCtx, refsUsedInBody) else doNothing
+      _        <- handleUsedRefs(func.name, funcCost, startCtx, refsUsedInBody)
+      nextCost <- evalExpr(inner, globalDeclarationsMode)
     } yield nextCost
+
+  private def checkShadowing(func: FUNC, startCtx: EstimatorContext): EvalM[Any] =
+    if (fixOverflow && startCtx.funcs.contains(FunctionHeader.User(func.name)))
+      raiseError(s"Function '${func.name}${func.args.mkString("(", ", ", ")")}' shadows preceding declaration")
+    else
+      doNothing
+
+  private def saveGlobalFuncCost(name: String, funcCost: Long, ctx: EstimatorContext, refsUsedInBody: Set[String]): EvalM[Unit] =
+    for {
+      letCosts <- local(refsUsedInBody.toSeq.traverse(ctx.globalLetEvals.getOrElse(_, zero)))
+      totalCost = math.max(1, funcCost + letCosts.sum)
+      _ <- set[Id, EstimatorContext, EstimationError](ctx.copy(globalFunctionsCosts = ctx.globalFunctionsCosts + (name -> totalCost)))
+    } yield ()
+
+  private def handleUsedRefs(name: String, cost: Long, ctx: EstimatorContext, refsUsedInBody: Set[String]): EvalM[Unit] =
+    update(
+      (funcs ~ usedRefs).modify(_) { case (funcs, _) =>
+        (
+          funcs + (User(name) -> (Coeval.now(cost), refsUsedInBody)),
+          ctx.usedRefs
+        )
+      }
+    )
 
   private def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR): EvalM[Long] =
     for {
@@ -110,12 +161,11 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean) extends Sc
           raiseError[Id, EstimatorContext, EstimationError, (Coeval[Long], Set[String])](s"function '$header' not found")
         )
       _ <- update(
-        (funcs ~ usedRefs).modify(_) {
-          case (funcs, usedRefs) =>
-            (
-              funcs + ((header, (bodyCost, Set[String]()))),
-              usedRefs ++ bodyUsedRefs
-            )
+        (funcs ~ usedRefs).modify(_) { case (funcs, usedRefs) =>
+          (
+            funcs + ((header, (bodyCost, Set[String]()))),
+            usedRefs ++ bodyUsedRefs
+          )
         }
       )
       argsCosts    <- args.traverse(evalHoldingFuncs)
@@ -130,6 +180,12 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean) extends Sc
 
   private def const[A](a: A): EvalM[A] =
     Monad[EvalM].pure(a)
+
+  private val doNothing: EvalM[Any] =
+    const(())
+
+  private val zero: EvalM[Long] =
+    const(0L)
 
   private def sum(a: Long, b: Long): EvalM[Long] = {
     def r = if (fixOverflow) Math.addExact(a, b) else a + b

@@ -24,8 +24,9 @@ class Parser(implicit offset: Int) {
   private val Global                                        = com.wavesplatform.lang.hacks.Global // Hack for IDEA
   implicit def hack(p: fastparse.P[Any]): fastparse.P[Unit] = p.map(_ => ())
 
-  val keywords                   = Set("let", "strict", "base58", "base64", "true", "false", "if", "then", "else", "match", "case", "func")
-  val exclude                    = Set('(', ')', ':', ']', '[', '=', ',', ';')
+  val keywords       = Set("let", "strict", "base58", "base64", "true", "false", "if", "then", "else", "match", "case", "func")
+  val excludeInError = Set('(', ')', ':', ']', '[', '=', ',', ';')
+
   def lowerChar[A: P]            = CharIn("a-z")
   def upperChar[A: P]            = CharIn("A-Z")
   def nonLatinChar[A: P]         = (CharPred(_.isLetter) ~~/ Fail).opaque("only latin charset for definitions")
@@ -105,7 +106,7 @@ class Parser(implicit offset: Int) {
       .map { case (start, x, end) => PART.VALID(Pos(start, end), x) }
 
   def declNameP[A: P](check: Boolean = false): P[Unit] = {
-    def symbolsForError   = CharPred(c => !c.isWhitespace && !exclude.contains(c))
+    def symbolsForError   = CharPred(c => !c.isWhitespace && !excludeInError.contains(c))
     def checkedUnderscore = ("_" ~~/ !"_".repX(1)).opaque("not more than 1 underscore in a row")
 
     def onlyChar = {
@@ -161,26 +162,20 @@ class Parser(implicit offset: Int) {
   }
 
   def ifP[A: P]: P[IF] = {
-    def optionalPart(keyword: String, branch: String): P[EXPR] = (Index ~ (keyword ~/ Index ~ baseExpr.?).?).map { case (ifTruePos, ifTrueRaw) =>
-      ifTrueRaw
-        .map { case (pos, expr) => expr.getOrElse(INVALID(Pos(pos, pos), s"expected a $branch branch's expression")) }
-        .getOrElse(INVALID(Pos(ifTruePos, ifTruePos), s"expected a $branch branch"))
-    }
+    def optionalPart(keyword: String, branch: String): P[EXPR] = (Index ~ (keyword ~/ Index ~ baseExpr.?).?)
+      .map { case (ifTruePos, ifTrueRaw) =>
+        ifTrueRaw
+          .map { case (pos, expr) => expr.getOrElse(INVALID(Pos(pos, pos), s"expected a $branch branch's expression")) }
+          .getOrElse(INVALID(Pos(ifTruePos, ifTruePos), s"expected a $branch branch"))
+      }
 
     def thenPart[AA: P] = optionalPart("then", "true")
     def elsePart[AA: P] = optionalPart("else", "false")
 
-    P(Index ~~ "if" ~~ &(border) ~/ Index ~ baseExpr.? ~ thenPart ~ elsePart ~~ Index).map { case (start, condPos, condRaw, ifTrue, ifFalse, end) =>
-      val cond = condRaw.getOrElse(INVALID(Pos(condPos, condPos), "expected a condition"))
-      IF(Pos(start, end), cond, ifTrue, ifFalse)
-    } |
-      P(Index ~~ "then" ~~ &(border) ~/ Index ~ baseExpr.? ~ elsePart ~~ Index).map { case (start, ifTrueExprPos, ifTrueRaw, ifFalse, end) =>
-        val ifTrue = ifTrueRaw.getOrElse(INVALID(Pos(ifTrueExprPos, ifTrueExprPos), "expected a true branch's expression"))
-        IF(Pos(start, end), INVALID(Pos(start, start), "expected a condition"), ifTrue, ifFalse)
-      } |
-      P(Index ~~ "else" ~~ &(border) ~/ Index ~ baseExpr.? ~~ Index).map { case (start, ifFalseExprPos, ifFalseRaw, end) =>
-        val ifFalse = ifFalseRaw.getOrElse(INVALID(Pos(ifFalseExprPos, ifFalseExprPos), "expected a false branch's expression"))
-        IF(Pos(start, end), INVALID(Pos(start, start), "expected a condition"), INVALID(Pos(start, start), "expected a true branch"), ifFalse)
+    P(Index ~~ "if" ~~ &(border) ~/ Index ~ baseExpr.? ~ thenPart ~ elsePart ~~ Index)
+      .map { case (start, condPos, condRaw, ifTrue, ifFalse, end) =>
+        val cond = condRaw.getOrElse(INVALID(Pos(condPos, condPos), "expected a condition"))
+        IF(Pos(start, end), cond, ifTrue, ifFalse)
       }
   }
 

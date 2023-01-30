@@ -2,11 +2,11 @@ package com.wavesplatform
 
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
-import com.wavesplatform.lang.v1.compiler.CompilationError
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL, LIST, NOTHING, TYPE, UNION}
+import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext}
 import com.wavesplatform.lang.v1.parser.Expressions
-import com.wavesplatform.lang.v1.parser.Expressions.{PART, Pos, Type}
+import com.wavesplatform.lang.v1.parser.Expressions.{PART, Type}
 
 import scala.scalajs.js
 import scala.scalajs.js.Any
@@ -43,7 +43,7 @@ object JsApiUtils {
           "posStart" -> annFunc.position.start,
           "posEnd"   -> annFunc.position.end,
           "name"     -> serPartStr(ann.name),
-          "argList"  -> ann.args.map(serPartStr).toJSArray
+          "argList"  -> ann.args.toJSArray.map(serPartStr)
         )
       }
 
@@ -51,7 +51,7 @@ object JsApiUtils {
         "type"     -> "ANNOTATEDFUNC",
         "posStart" -> annFunc.position.start,
         "posEnd"   -> annFunc.position.end,
-        "annList"  -> annFunc.anns.map(serAnnotation).toJSArray,
+        "annList"  -> annFunc.anns.toJSArray.map(serAnnotation),
         "func"     -> serDec(annFunc.f)
       )
     }
@@ -60,19 +60,18 @@ object JsApiUtils {
       "type"        -> "DAPP",
       "posStart"    -> ast.position.start,
       "posEnd"      -> ast.position.end,
-      "decList"     -> ast.decs.map(serDec).toJSArray,
-      "annFuncList" -> ast.fs.map(serAnnFunc).toJSArray
+      "decList"     -> ast.decs.toJSArray.map(serDec),
+      "annFuncList" -> ast.fs.toJSArray.map(serAnnFunc)
     )
   }
 
-  def expressionScriptToJs(ast: Expressions.SCRIPT): js.Object = {
+  def expressionScriptToJs(ast: Expressions.SCRIPT): js.Object =
     jObj(
       "type"     -> "SCRIPT",
       "posStart" -> ast.position.start,
       "posEnd"   -> ast.position.end,
       "expr"     -> serExpr(ast.expr)
     )
-  }
 
   def serExpr(expr: Expressions.EXPR): js.Object = {
 
@@ -80,7 +79,7 @@ object JsApiUtils {
       t match {
         case ut: UNION =>
           jObj(
-            "unionTypes" -> ut.typeList.map(serType(_)).toJSArray
+            "unionTypes" -> ut.typeList.toJSArray.map(serType(_))
           )
         case lt: LIST =>
           jObj(
@@ -98,7 +97,7 @@ object JsApiUtils {
       "posStart"   -> expr.position.start,
       "posEnd"     -> expr.position.end,
       "resultType" -> serType(expr.resultType.getOrElse(NOTHING)),
-      "ctx"        -> serCtx(expr.ctxOpt.getOrElse(Map.empty))
+      "ctx"        -> serCtx(expr.ctxOpt.getOrElse(CompilerContext.empty))
     )
 
     expr match {
@@ -110,21 +109,21 @@ object JsApiUtils {
 
       case x: Expressions.REF =>
         val additionalDataObj = jObj("name" -> Expressions.PART.toOption[String](x.key).getOrElse("").toString)
-        mergeJSObjects(commonDataObj, additionalDataObj)
+        js.Object.assign(additionalDataObj, commonDataObj)
 
       case Expressions.GETTER(_, ref, field, _, _, _) =>
         val additionalDataObj = jObj(
           "ref"   -> serExpr(ref),
           "field" -> serPartStr(field)
         )
-        mergeJSObjects(commonDataObj, additionalDataObj)
+        js.Object.assign(additionalDataObj, commonDataObj)
 
       case Expressions.BLOCK(_, dec, body, _, _) =>
         val additionalDataObj = jObj(
           "dec"  -> serDec(dec),
           "body" -> serExpr(body)
         )
-        mergeJSObjects(commonDataObj, additionalDataObj)
+        js.Object.assign(additionalDataObj, commonDataObj)
 
       case Expressions.IF(_, cond, ifTrue, ifFalse, _, _) =>
         val additionalDataObj = jObj(
@@ -132,43 +131,34 @@ object JsApiUtils {
           "ifTrue"  -> serExpr(ifTrue),
           "ifFalse" -> serExpr(ifFalse)
         )
-        mergeJSObjects(commonDataObj, additionalDataObj)
+        js.Object.assign(additionalDataObj, commonDataObj)
 
       case Expressions.FUNCTION_CALL(_, name, args, _, _) =>
         val additionalDataObj = jObj(
           "name" -> serPartStr(name),
-          "args" -> args.map(serExpr).toJSArray
+          "args" -> args.toJSArray.map(serExpr)
         )
-        mergeJSObjects(commonDataObj, additionalDataObj)
+        js.Object.assign(additionalDataObj, commonDataObj)
 
       case Expressions.FOLD(_, limit, value, acc, func, _, _) =>
         val additionalDataObj = jObj(
           "name" -> s"FOLD<$limit>",
           "args" -> js.Array(serExpr(value), serExpr(acc), func.key.toString: js.Any)
         )
-        mergeJSObjects(commonDataObj, additionalDataObj)
+        js.Object.assign(additionalDataObj, commonDataObj)
 
       case Expressions.MATCH(_, expr, cases, _, ctxOpt) =>
         val additionalDataObj = jObj(
           "expr"  -> serExpr(expr),
-          "cases" -> cases.map(serMatchCase(_, ctxOpt.getOrElse(Map.empty))).toJSArray
+          "cases" -> cases.toJSArray.map(serMatchCase(_, ctxOpt.getOrElse(CompilerContext.empty)))
         )
-        mergeJSObjects(commonDataObj, additionalDataObj)
+        js.Object.assign(additionalDataObj, commonDataObj)
 
       case t => jObj("[not_supported]stringRepr" -> t.toString)
     }
   }
 
-  def mergeJSObjects(objs: js.Dynamic*): js.Object = {
-    val result = js.Dictionary.empty[Any]
-    for (source <- objs) {
-      for ((key, value) <- source.asInstanceOf[js.Dictionary[Any]])
-        result(key) = value
-    }
-    result.asInstanceOf[js.Object]
-  }
-
-  def serMatchCase(c: Expressions.MATCH_CASE, simpleCtx: Map[String, Pos]): js.Object = {
+  def serMatchCase(c: Expressions.MATCH_CASE, simpleCtx: CompilerContext): js.Object = {
     val vars = c.pattern.subpatterns.collect { case (Expressions.TypedVar(Some(newVarName), caseType), _) =>
       (serPartStr(newVarName), serType(caseType))
     }
@@ -184,14 +174,18 @@ object JsApiUtils {
     )
   }
 
-  def serCtx(simpleCtx: Map[String, Pos]): js.Object = {
-    simpleCtx.map { ctxEl =>
-      jObj(
-        "name"     -> ctxEl._1,
-        "posStart" -> ctxEl._2.start,
-        "posEnd"   -> ctxEl._2.end
-      )
-    }.toJSArray
+  def serCtx(ctx: CompilerContext): js.Object = {
+    val r = js.Array[js.Dynamic]()
+    def addInfo(decl: (String, CompilerContext.PositionedInfo)): Unit =
+      if (decl._2.pos.start != -1)
+        r += jObj(
+          "name"     -> decl._1,
+          "posStart" -> decl._2.pos.start,
+          "posEnd"   -> decl._2.pos.end
+        )
+    ctx.varDefs.foreach(addInfo)
+    ctx.functionDefs.foreach(addInfo)
+    r
   }
 
   def serType(t: Type): js.Object =
@@ -208,12 +202,12 @@ object JsApiUtils {
       case Expressions.Union(types) =>
         jObj(
           "isUnion"  -> "true",
-          "typeList" -> types.map(serType).toJSArray
+          "typeList" -> types.toJSArray.map(serType)
         )
       case Expressions.Tuple(types) =>
         jObj(
           "isTuple"  -> "true",
-          "typeList" -> types.map(serType).toJSArray
+          "typeList" -> types.toJSArray.map(serType)
         )
     }
 
@@ -239,7 +233,7 @@ object JsApiUtils {
           "posStart" -> p.start,
           "posEnd"   -> p.end,
           "name"     -> serPartStr(name),
-          "argList"  -> args.map(arg => serFuncArg(arg._1, arg._2)).toJSArray,
+          "argList"  -> args.toJSArray.map(arg => serFuncArg(arg._1, arg._2)),
           "expr"     -> serExpr(expr)
         )
       case t => jObj("[not_supported]stringRepr" -> t.toString)
@@ -278,7 +272,7 @@ object JsApiUtils {
               case Native(name)          => name.toString()
               case User(internalName, _) => internalName
             }),
-            "args" -> args.map(r).toJSArray
+            "args" -> args.toJSArray.map(r)
           )
         case t => jObj("[not_supported]stringRepr" -> t.toString)
       }
@@ -292,10 +286,10 @@ object JsApiUtils {
   }
 
   def typeRepr(t: TYPE): js.Any = t match {
-    case UNION(l, _) => l.map(typeRepr).toJSArray
+    case UNION(l, _) => l.toJSArray.map(typeRepr)
     case CASETYPEREF(name, fields, false) =>
-      js.Dynamic.literal("typeName" -> name, "fields" -> fields.map(f => js.Dynamic.literal("name" -> f._1, "type" -> typeRepr(f._2))).toJSArray)
-    case LIST(t) => js.Dynamic.literal("listOf" -> typeRepr(t))
+      jObj("typeName" -> name, "fields" -> fields.toJSArray.map(f => jObj("name" -> f._1, "type" -> typeRepr(f._2))))
+    case LIST(t) => jObj("listOf" -> typeRepr(t))
     case t       => t.toString
   }
 }
