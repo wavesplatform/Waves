@@ -11,17 +11,18 @@ jobs:
   check-pr:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-java@v1
+      - uses: actions/checkout@v3
+      - uses: actions/setup-java@v3
         with:
-          java-version: 1.8
+          distribution: 'zulu'
+          java-version: '8'
       - name: Cache SBT
-        uses: actions/cache@v1
+        uses: actions/cache@v3
         with:
           path: ~/.sbt
           key: sbt-cache-${{ hashFiles('project/build.properties') }}
       - name: Cache Coursier
-        uses: actions/cache@v1
+        uses: actions/cache@v3
         with:
           path: ~/.cache/coursier
           key: coursier-cache
