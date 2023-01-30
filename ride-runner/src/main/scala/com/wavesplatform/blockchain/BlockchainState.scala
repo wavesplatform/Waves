@@ -72,6 +72,11 @@ object BlockchainState extends ScorexLogging {
       )
   }
 
+  private val grpcStatusesToRestart = Set(
+    Status.Code.INTERNAL, // RST_STREAM closed stream. HTTP/2 error code: INTERNAL_ERROR
+    Status.Code.UNKNOWN // Probably it is an issue with a balancer
+  )
+
   def apply(
       processor: Processor,
       blockchainUpdatesStream: BlockchainUpdatesStream,
@@ -103,9 +108,8 @@ object BlockchainState extends ScorexLogging {
       case WrappedEvent.Failed(e) =>
         Task {
           e match {
-            // RST_STREAM closed stream. HTTP/2 error code: INTERNAL_ERROR
-            case e: StatusRuntimeException if e.getStatus.getCode == Status.Code.INTERNAL => forceRestart()
-            case _: UpstreamTimeoutException                                              => forceRestart()
+            case e: StatusRuntimeException if grpcStatusesToRestart.contains(e.getStatus.getCode) => forceRestart()
+            case _: UpstreamTimeoutException                                                      => forceRestart()
 
             case _ =>
               val message = e match {

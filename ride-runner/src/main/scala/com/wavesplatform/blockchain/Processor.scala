@@ -24,7 +24,7 @@ import monix.eval.Task
 import monix.execution.Scheduler
 import play.api.libs.json.{JsNumber, JsObject}
 
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.{ConcurrentHashMap, TimeUnit}
 import scala.collection.concurrent.TrieMap
 import scala.util.chaining.scalaUtilChainingOps
 
@@ -305,52 +305,64 @@ class BlockchainProcessor(
 
   override def removeBlocksFrom(height: Height): Unit = blockchainStorage.blockHeaders.removeFrom(height)
 
-  private def runScript(script: RestApiScript, hasCaches: Boolean): Task[JsObject] = Task {
-    val prev = script.lastResult
-
-    val refreshed = rideScriptRunTime.withTag("has-caches", hasCaches).measure {
-      script.refreshed(settings.enableTraces, settings.evaluateScriptComplexityLimit, settings.maxTxErrorLogSize, runScriptsScheduler)
-    }
+  private def runScript(script: RestApiScript, hasCaches: Boolean): Task[JsObject] = {
     val key = script.key
-    storage.put(key, refreshed)
+    Task {
+      val prev = script.lastResult
 
-    val lastResult = refreshed.lastResult
-    if ((lastResult \ "error").isEmpty) {
-      val complexity = lastResult.value("complexity").as[Int]
-      val result     = lastResult.value("result").as[JsObject].value("value")
-      log.info(f"[$key] complexity: $complexity, apiResult: $result")
-
-      prev.value.get("result").map(_.as[JsObject].value("value")).foreach { prevResult =>
-        if (result == prevResult) rideScriptUnnecessaryCalls.increment()
-        else rideScriptOkCalls.increment()
+      val refreshed = rideScriptRunTime.withTag("has-caches", hasCaches).measure {
+        script.refreshed(settings.enableTraces, settings.evaluateScriptComplexityLimit, settings.maxTxErrorLogSize, runScriptsScheduler)
       }
-    } else {
-      log.info(f"[$key] failed: $lastResult")
-      rideScriptFailedCalls.increment()
-    }
-    lastResult
-  }
-    .tapError { e => Task(log.error(s"An error during running ${script.key}", e)) }
-    .executeOn(runScriptsScheduler)
+      storage.put(key, refreshed)
 
+      val lastResult = refreshed.lastResult
+      if ((lastResult \ "error").isEmpty) {
+        val complexity = lastResult.value("complexity").as[Int]
+        val result     = lastResult.value("result").as[JsObject].value("value")
+        log.info(f"result=ok; addr=${key._1}; request=${key._2}; complexity=$complexity")
+
+        prev.value.get("result").map(_.as[JsObject].value("value")).foreach { prevResult =>
+          if (result == prevResult) rideScriptUnnecessaryCalls.increment()
+          else rideScriptOkCalls.increment()
+        }
+      } else {
+        log.info(f"result=failed; addr=${key._1}; request=${key._2}; errorCode=${(lastResult \ "error").as[Int]}")
+        rideScriptFailedCalls.increment()
+      }
+      lastResult
+    }
+      .tapError { e => Task(log.error(s"An error during running $key", e)) }
+      .executeOn(runScriptsScheduler)
+  }
+
+  // To limit duplicated requests
+  private val inProcess = new ConcurrentHashMap[RequestKey, Task[JsObject]]()
   override def getCachedResultOrRun(address: Address, request: JsObject): Task[JsObject] = {
     val key = (address, request)
     storage.get(key) match {
       case Some(r) =>
         rideScriptCacheHits.increment()
         Task.now(r.lastResult)
-      case None =>
-        Task {
-          rideScriptCacheMisses.increment()
-          requestsStorage.append(key)
-          blockchainStorage.accountScripts.getUntagged(blockchainStorage.height, address)
-        }.flatMap {
-          case None =>
-            // TODO #19 Change/move an error to an appropriate layer
-            Task.raiseError(ApiException(CustomValidationError(s"Address $address is not dApp")))
 
-          case _ => runScript(RestApiScript(address, blockchainStorage, request), hasCaches = false)
-        }
+      case None =>
+        inProcess.computeIfAbsent(
+          key,
+          { key =>
+            Task {
+              rideScriptCacheMisses.increment()
+              requestsStorage.append(key)
+              blockchainStorage.accountScripts.getUntagged(blockchainStorage.height, address)
+            }
+              .flatMap {
+                case None =>
+                  // TODO #19 Change/move an error to an appropriate layer
+                  Task.raiseError(ApiException(CustomValidationError(s"Address $address is not dApp")))
+
+                case _ => runScript(RestApiScript(address, blockchainStorage, request), hasCaches = false)
+              }
+              .doOnFinish { _ => Task(inProcess.remove(key)) }
+          }
+        )
     }
   }
 }
