@@ -2795,8 +2795,8 @@ paths:
                   format: int64
                 description: map of address <-> balance
                 example:
-                  addr1: 0
-                  addr2: 100
+                  addr1: "0"
+                  addr2: "100"
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
