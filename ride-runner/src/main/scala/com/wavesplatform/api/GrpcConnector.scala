@@ -14,7 +14,7 @@ class GrpcConnector(settings: Settings) extends AutoCloseable with ScorexLogging
   )
 
   def mkChannel(grpcClientSettings: GrpcChannelSettings): ManagedChannel = {
-    log.info(s"Creating a channel to ${grpcClientSettings.target}")
+    log.info(s"Creating a channel to ${grpcClientSettings.target} with settings: $grpcClientSettings")
     grpcClientSettings.toNettyChannelBuilder
       .executor(executor)
       .usePlaintext()

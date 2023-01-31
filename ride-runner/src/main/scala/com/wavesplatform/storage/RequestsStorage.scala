@@ -11,6 +11,7 @@ import play.api.libs.json.JsObject
 import java.util.concurrent.atomic.AtomicInteger
 
 trait RequestsStorage {
+  def size: Int
   def all(): List[RequestKey]
   def append(x: RequestKey): Unit
 }
@@ -23,6 +24,8 @@ class LevelDbRequestsStorage(db: DB) extends RequestsStorage {
   private val lastIndexKey = CacheKeys.RequestsLastIndex.mkKey(())
   private val lastIndex    = new AtomicInteger(db.readOnly(_.getOpt(lastIndexKey).getOrElse(-1)))
   refreshCounter()
+
+  override def size: Int = lastIndex.get() + 1
 
   override def all(): List[RequestKey] = db.readOnly { ro =>
     var r = List.empty[RequestKey]
@@ -40,5 +43,5 @@ class LevelDbRequestsStorage(db: DB) extends RequestsStorage {
     refreshCounter()
   }
 
-  private def refreshCounter(): Unit = rideScriptTotalNumber.update(lastIndex.get() + 1)
+  private def refreshCounter(): Unit = rideScriptTotalNumber.update(size)
 }

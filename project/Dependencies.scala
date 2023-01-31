@@ -1,5 +1,4 @@
 import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
-import sbt.Keys._
 import sbt.{Def, _}
 
 //noinspection TypeAnnotation

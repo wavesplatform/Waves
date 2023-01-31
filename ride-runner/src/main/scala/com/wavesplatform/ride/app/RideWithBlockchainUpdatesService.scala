@@ -117,6 +117,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     log.info(s"Current height: known=${blockchainStorage.height}, blockchain=$lastHeightAtStart")
 
     val requestsStorage = new LevelDbRequestsStorage(db)
+    log.info(s"There are ${requestsStorage.all().size} scripts")
     val processor = new BlockchainProcessor(
       settings.rideRunner.processor,
       blockchainStorage,

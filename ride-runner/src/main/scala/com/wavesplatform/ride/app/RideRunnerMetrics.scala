@@ -30,7 +30,7 @@ object RideRunnerMetrics {
   val rideScriptCacheMisses = Kamon.counter("ride.script.cache.miss", "Cache misses for whole script").withoutTags()
   val rideScriptRunTime     = Kamon.timer("ride.script.run", "Script running time")
 
-  val rideScriptCalls            = Kamon.counter("ride.script.calls", "Ride calls")
+  private val rideScriptCalls    = Kamon.counter("ride.script.calls", "Ride calls")
   val rideScriptOkCalls          = rideScriptCalls.withTag("type", "ok")
   val rideScriptUnnecessaryCalls = rideScriptCalls.withTag("type", "unnecessary")
   val rideScriptFailedCalls      = rideScriptCalls.withTag("type", "failed")
@@ -39,6 +39,9 @@ object RideRunnerMetrics {
   val blockProcessingTime            = anyEventProcessingTime.withTag("tpe", "b")
   val microBlockProcessingTime       = anyEventProcessingTime.withTag("tpe", "mb")
   val rollbackProcessingTime         = anyEventProcessingTime.withTag("tpe", "r")
+
+  private val grpcCallTimer                              = Kamon.timer("grpc.call", "gRPC calls time")
+  def grpcCallTimerFor(methodName: String, raw: Boolean) = grpcCallTimer.withTag("method", methodName).withTag("raw", raw)
 
   implicit def timeExt(timer: Timer): TimerExt = new TimerExt(timer)
 }

@@ -6,6 +6,7 @@ import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
+import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
@@ -74,7 +75,7 @@ object BlockchainState extends ScorexLogging {
 
   private val grpcStatusesToRestart = Set(
     Status.Code.INTERNAL, // RST_STREAM closed stream. HTTP/2 error code: INTERNAL_ERROR
-    Status.Code.UNKNOWN // Probably it is an issue with a balancer
+    Status.Code.UNKNOWN   // Probably it is an issue with a balancer
   )
 
   def apply(
@@ -133,6 +134,8 @@ object BlockchainState extends ScorexLogging {
 
     val currBlockId = event.getUpdate.id.toByteStr
     log.info(s"$orig + ${getUpdateType(update)}(id=$currBlockId, h=$h)")
+    def logStatusChanged(updated: BlockchainState): Unit =
+      log.info(s"Status changed: ${getSimpleName(orig)} -> ${getSimpleName(updated)}")
 
     val ignore = Task.now(orig)
     orig match {
@@ -152,7 +155,11 @@ object BlockchainState extends ScorexLogging {
             processor.process(event.getUpdate)
             if (h >= comparedBlocks.workingHeight) {
               log.debug(s"[$h] Reached the current height, run all scripts")
-              processor.runScripts().as(Working(h))
+              val r = Working(h)
+              processor.runScripts().as {
+                logStatusChanged(r)
+                r
+              }
             } else Task.now(comparedBlocks.copy(processedHeight = h))
 
           case _: Update.Rollback =>
@@ -173,7 +180,9 @@ object BlockchainState extends ScorexLogging {
           case _: Update.Rollback =>
             processor.removeBlocksFrom(Height(h + 1))
             processor.process(event.getUpdate)
-            Task.now(ResolvingFork.from(Height(event.getUpdate.height), orig.processedHeight))
+            val r = ResolvingFork.from(Height(event.getUpdate.height), orig.processedHeight)
+            logStatusChanged(r)
+            Task.now(r)
 
           case Update.Empty => Task.now(orig.withHeight(h))
         }
@@ -183,8 +192,13 @@ object BlockchainState extends ScorexLogging {
           case _: Update.Append =>
             processor.process(event.getUpdate)
             val updated = orig.apply(event)
-            if (updated.isRollbackResolved) processor.runScripts().as(Working(updated.processedHeight))
-            else Task.now(updated)
+            if (updated.isRollbackResolved) {
+              val r = Working(updated.processedHeight)
+              processor.runScripts().as {
+                logStatusChanged(r)
+                r
+              }
+            } else Task.now(updated)
 
           case _: Update.Rollback =>
             processor.removeBlocksFrom(Height(h + 1))
