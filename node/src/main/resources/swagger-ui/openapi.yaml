@@ -173,6 +173,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Balance'
+            application/json;large-significand-format=string:
+              schema:
+                $ref: '#/components/schemas/Balance'
   /addresses/balance:
     get:
       tags:
@@ -326,6 +329,11 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/DataEntry'
+            application/json;large-significand-format=string:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DataEntry'
     post:
       tags:
         - addresses
@@ -364,6 +372,11 @@ paths:
           description: successful operation
           content:
             application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DataEntry'
+            application/json;large-significand-format=string:
               schema:
                 type: array
                 items:
@@ -544,17 +557,13 @@ paths:
                   address:
                     type: string
                   regular:
-                    type: integer
-                    format: int64
+                    type: string
                   generating:
-                    type: integer
-                    format: int64
+                    type: string
                   available:
-                    type: integer
-                    format: int64
+                    type: string
                   effective:
-                    type: integer
-                    format: int64
+                    type: string
                 example:
                   address: '2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY'
                   available: '50000'
@@ -649,6 +658,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DataEntry'
+            application/json;large-significand-format=string:
+              schema:
+                $ref: '#/components/schemas/DataEntry'
   '/blocks/{id}':
     get:
       tags:
@@ -663,6 +675,9 @@ paths:
           description: successful operation
           content:
             application/json:
+              schema:
+                $ref: '#/components/schemas/Block'
+            application/json;large-significand-format=string:
               schema:
                 $ref: '#/components/schemas/Block'
   '/blocks/heightByTimestamp/{timestamp}':
@@ -1338,7 +1353,9 @@ paths:
                   $ref: '#/components/schemas/Transaction'
             application/json;large-significand-format=string:
               schema:
-                $ref: '#/components/schemas/Transaction'
+                type: array
+                items:
+                  $ref: '#/components/schemas/Transaction'
               examples:
                 largeSignificandTransaction:
                   $ref: '#/components/examples/largeSignificandTransaction'
@@ -1444,7 +1461,9 @@ paths:
                   $ref: '#/components/schemas/Transaction'
             application/json;large-significand-format=string:
               schema:
-                $ref: '#/components/schemas/Transaction'
+                type: array
+                items:
+                  $ref: '#/components/schemas/Transaction'
               examples:
                 largeSignificandTransaction:
                   $ref: '#/components/examples/largeSignificandTransaction'
@@ -1485,7 +1504,11 @@ paths:
                     $ref: '#/components/schemas/Transaction'
             application/json;large-significand-format=string:
               schema:
-                $ref: '#/components/schemas/Transaction'
+                type: array
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Transaction'
               examples:
                 largeSignificandTransaction:
                   $ref: '#/components/examples/largeSignificandTransaction'
@@ -2252,6 +2275,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AssetBalancesResponse'
+            application/json;large-significand-format=string:
+              schema:
+                $ref: '#/components/schemas/AssetBalancesResponse'
     post:
       tags:
         - assets
@@ -2313,6 +2339,9 @@ paths:
           description: successful operation
           content:
             application/json:
+              schema:
+                $ref: '#/components/schemas/AssetDetails'
+            application/json;large-significand-format=string:
               schema:
                 $ref: '#/components/schemas/AssetDetails'
   /assets/details:
@@ -2445,6 +2474,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AssetDistribution'
+            application/json;large-significand-format=string:
+              schema:
+                $ref: '#/components/schemas/AssetDistribution'
       deprecated: true
   '/assets/{assetId}/distribution/{height}/limit/{limit}':
     get:
@@ -2484,6 +2516,9 @@ paths:
           description: successful operation
           content:
             application/json:
+              schema:
+                $ref: '#/components/schemas/AssetDistribution'
+            application/json;large-significand-format=string:
               schema:
                 $ref: '#/components/schemas/AssetDistribution'
   '/assets/nft/{address}/limit/{limit}':
@@ -3059,6 +3094,19 @@ paths:
                     balance:
                       type: integer
                       format: int64
+            application/json;large-significand-format=string:
+              schema:
+                type: array
+                items:
+                  required:
+                    - balance
+                    - height
+                  type: object
+                  properties:
+                    height:
+                      $ref: '#/components/schemas/Height'
+                    balance:
+                      type: string
   '/debug/stateWaves/{height}':
     get:
       tags:
@@ -3086,6 +3134,15 @@ paths:
                 additionalProperties:
                   type: integer
                   format: int64
+                description: map of address <-> balance
+                example:
+                  addr1: 0
+                  addr2: 100
+            application/json;large-significand-format=string:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
                 description: map of address <-> balance
                 example:
                   addr1: 0
