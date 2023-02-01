@@ -20,6 +20,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.InvokeTransaction
 import com.wavesplatform.transaction.{Asset, EthereumTransaction, Transaction}
 
+import scala.collection.immutable.VectorMap
 import scala.util.chaining.*
 
 case class LeaseBalance(in: Long, out: Long) {
@@ -80,7 +81,8 @@ case class AssetDescription(
     lastUpdatedAt: Height,
     script: Option[AssetScriptInfo],
     sponsorship: Long,
-    nft: Boolean
+    nft: Boolean,
+    sequenceInBlock: Int
 )
 
 case class AccountDataInfo(data: Map[String, DataEntry[?]])
@@ -90,11 +92,6 @@ object AccountDataInfo {
     override def empty: AccountDataInfo = AccountDataInfo(Map.empty)
 
     override def combine(x: AccountDataInfo, y: AccountDataInfo): AccountDataInfo = AccountDataInfo(x.data ++ y.data)
-  }
-
-  implicit class AccountDataInfoExt(private val ad: AccountDataInfo) extends AnyVal {
-    def filterEmpty: AccountDataInfo =
-      ad.copy(ad.data.filterNot(_._2.isEmpty))
   }
 }
 
@@ -149,7 +146,7 @@ case class NewAssetInfo(static: AssetStaticInfo, dynamic: AssetInfo, volume: Ass
 case class Diff private (
     transactions: Vector[NewTransactionInfo],
     portfolios: Map[Address, Portfolio],
-    issuedAssets: Map[IssuedAsset, NewAssetInfo],
+    issuedAssets: VectorMap[IssuedAsset, NewAssetInfo],
     updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
     aliases: Map[Alias, Address],
     orderFills: Map[ByteStr, VolumeAndFee],
@@ -216,7 +213,7 @@ case class Diff private (
 object Diff {
   def apply(
       portfolios: Map[Address, Portfolio] = Map.empty,
-      issuedAssets: Map[IssuedAsset, NewAssetInfo] = Map.empty,
+      issuedAssets: VectorMap[IssuedAsset, NewAssetInfo] = VectorMap.empty,
       updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map.empty,
       aliases: Map[Alias, Address] = Map.empty,
       orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
@@ -252,7 +249,7 @@ object Diff {
   def withTransactions(
       nti: Vector[NewTransactionInfo],
       portfolios: Map[Address, Portfolio] = Map.empty,
-      issuedAssets: Map[IssuedAsset, NewAssetInfo] = Map.empty,
+      issuedAssets: VectorMap[IssuedAsset, NewAssetInfo] = VectorMap.empty,
       updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map.empty,
       aliases: Map[Alias, Address] = Map.empty,
       orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,

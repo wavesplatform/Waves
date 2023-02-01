@@ -114,7 +114,8 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
     lastUpdatedAt = Height(1),
     script = None,
     sponsorship = 0,
-    nft = false
+    nft = false,
+    0
   )
 
   "/balance/{address}" - {
@@ -404,7 +405,8 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
             Height(d.blockchain.height),
             script.map(s => AssetScriptInfo(s, 1L)),
             0L,
-            nft = false
+            nft = false,
+            0
           ),
           issueTransaction.id().toString,
           responseAs[Seq[JsObject]].head
@@ -442,7 +444,8 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
                                  |  "quantity" : ${issueTx.quantity.value},
                                  |  "scripted" : false,
                                  |  "minSponsoredAssetFee" : null,
-                                 |  "originTransactionId" : "${issueTx.id()}"
+                                 |  "originTransactionId" : "${issueTx.id()}",
+                                 |  "sequenceInBlock" : 0
                                  |}
                                  |""".stripMargin)
       }
@@ -583,20 +586,24 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
   }
 
   private def checkDetails(domain: Domain, route: Route, tx: Transaction, assetId: String, assetDesc: AssetDescription): Unit = {
-    domain.liquidAndSolidAssert { () =>
-      Get(routePath(s"/details/$assetId")) ~> route ~> check {
+    def check(assetDesc: AssetDescription) = {
+      Get(routePath(s"/details/$assetId")) ~> route ~> super.check {
         val response = responseAs[JsObject]
         checkResponse(tx, assetDesc, assetId, response)
       }
-      Get(routePath(s"/details?id=$assetId")) ~> route ~> check {
+      Get(routePath(s"/details?id=$assetId")) ~> route ~> super.check {
         val responses = responseAs[List[JsObject]]
         responses.foreach(response => checkResponse(tx, assetDesc, assetId, response))
       }
-      Post(routePath("/details"), Json.obj("ids" -> List(s"$assetId"))) ~> route ~> check {
+      Post(routePath("/details"), Json.obj("ids" -> List(s"$assetId"))) ~> route ~> super.check {
         val responses = responseAs[List[JsObject]]
         responses.foreach(response => checkResponse(tx, assetDesc, assetId, response))
       }
     }
+    assetDesc.sequenceInBlock shouldBe 0
+    check(assetDesc)
+    domain.makeStateSolid()
+    check(assetDesc.copy(sequenceInBlock = 1))
   }
 
   private def checkResponse(tx: Transaction, desc: AssetDescription, assetId: String, response: JsObject): Unit = {
@@ -610,5 +617,6 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
     (response \ "quantity").as[BigDecimal] shouldBe desc.totalVolume
     (response \ "minSponsoredAssetFee").asOpt[Long] shouldBe empty
     (response \ "originTransactionId").as[String] shouldBe tx.id().toString
+    (response \ "sequenceInBlock").as[Int] shouldBe desc.sequenceInBlock
   }
 }

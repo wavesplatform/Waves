@@ -157,7 +157,8 @@ case class AssetsApiRoute(
         }),
         "sponsorBalance"   -> sponsorBalance,
         "quantity"         -> JsNumber(BigDecimal(assetInfo.totalVolume)),
-        "issueTransaction" -> issueTransaction.map(_.json())
+        "issueTransaction" -> issueTransaction.map(_.json()),
+        "sequenceInBlock"  -> assetInfo.sequenceInBlock
       )
 
     case None =>
@@ -363,7 +364,8 @@ object AssetsApiRoute {
           case 0           => JsNull
           case sponsorship => JsNumber(sponsorship)
         }),
-        "originTransactionId" -> JsString(description.originTransactionId.toString)
+        "originTransactionId" -> JsString(description.originTransactionId.toString),
+        "sequenceInBlock"     -> JsNumber(description.sequenceInBlock),
       ) ++ script.toSeq.map { case AssetScriptInfo(script, complexity) =>
         "scriptDetails" -> Json.obj(
           "scriptComplexity" -> JsNumber(BigDecimal(complexity)),

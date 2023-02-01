@@ -211,7 +211,8 @@ object CompositeBlockchain {
           info.lastUpdatedAt,
           None,
           0L,
-          static.nft
+          static.nft,
+          0
         )
       }
       .orElse(innerAssetDescription)

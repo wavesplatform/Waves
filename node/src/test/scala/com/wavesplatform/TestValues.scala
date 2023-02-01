@@ -70,6 +70,7 @@ object TestValues {
     Height(1),
     None,
     0,
-    nft = false
+    nft = false,
+    0
   )
 }

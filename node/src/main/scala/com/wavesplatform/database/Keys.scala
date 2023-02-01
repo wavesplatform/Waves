@@ -165,7 +165,7 @@ object Keys {
     as => writeStrings(as.map(_.name).toSeq)
   )
 
-  def assetStaticInfo(asset: IssuedAsset): Key[Option[AssetStaticInfo]] =
+  def assetStaticInfo(asset: IssuedAsset): Key[Option[(AssetNum, AssetStaticInfo)]] =
     Key.opt(AssetStaticInfo, asset.id.arr, readAssetStaticInfo, writeAssetStaticInfo)
 
   def nftCount(addressId: AddressId): Key[Int] =

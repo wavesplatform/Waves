@@ -1,7 +1,6 @@
 package com.wavesplatform.database
 
 import java.util
-
 import cats.data.Ior
 import cats.syntax.option.*
 import cats.syntax.semigroup.*
@@ -38,6 +37,7 @@ import org.iq80.leveldb.DB
 import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
+import scala.collection.immutable.VectorMap
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
@@ -368,7 +368,7 @@ abstract class LevelDBWriter private[database] (
       leaseBalances: Map[AddressId, LeaseBalance],
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       leaseStates: Map[ByteStr, LeaseDetails],
-      issuedAssets: Map[IssuedAsset, NewAssetInfo],
+      issuedAssets: VectorMap[IssuedAsset, NewAssetInfo],
       updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
       filledQuantity: Map[ByteStr, VolumeAndFee],
       scripts: Map[AddressId, Option[AccountScriptInfo]],
@@ -439,8 +439,8 @@ abstract class LevelDBWriter private[database] (
         expiredKeys ++= updateHistory(rw, Keys.filledVolumeAndFeeHistory(orderId), threshold, Keys.filledVolumeAndFee(orderId))
       }
 
-      for ((asset, NewAssetInfo(staticInfo, info, volumeInfo)) <- issuedAssets) {
-        rw.put(Keys.assetStaticInfo(asset), staticInfo.some)
+      for (((asset, NewAssetInfo(staticInfo, info, volumeInfo)), assetNum) <- issuedAssets.zipWithIndex) {
+        rw.put(Keys.assetStaticInfo(asset), Some((AssetNum(assetNum + 1), staticInfo)))
         rw.put(Keys.assetDetails(asset)(height), (info, volumeInfo))
       }
 

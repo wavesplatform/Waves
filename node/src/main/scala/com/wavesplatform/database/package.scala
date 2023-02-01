@@ -1,9 +1,5 @@
 package com.wavesplatform
 
-import java.io.File
-import java.nio.ByteBuffer
-import java.util.Map as JMap
-
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
@@ -29,7 +25,15 @@ import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.{EthereumTransaction, GenesisTransaction, PBSince, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
+import com.wavesplatform.transaction.{
+  EthereumTransaction,
+  GenesisTransaction,
+  PBSince,
+  PaymentTransaction,
+  Transaction,
+  TransactionParsers,
+  TxValidationError
+}
 import com.wavesplatform.utils.*
 import monix.eval.Task
 import monix.reactive.Observable
@@ -37,6 +41,9 @@ import org.iq80.leveldb.*
 import org.slf4j.LoggerFactory
 import supertagged.TaggedType
 
+import java.io.File
+import java.nio.ByteBuffer
+import java.util.Map as JMap
 import scala.collection.mutable
 
 //noinspection UnstableApiUsage
@@ -148,13 +155,11 @@ package object database {
 
   def writeTxIds(ids: Seq[ByteStr]): Array[Byte] =
     ids
-      .foldLeft(ByteBuffer.allocate(ids.map(_.arr.length + 1).sum)) {
-        case (b, id) =>
-          b.put((id.arr.length: @unchecked) match {
-              case crypto.DigestLength    => crypto.DigestLength.toByte
-              case crypto.SignatureLength => crypto.SignatureLength.toByte
-            })
-            .put(id.arr)
+      .foldLeft(ByteBuffer.allocate(ids.map(_.arr.length + 1).sum)) { case (b, id) =>
+        b.put((id.arr.length: @unchecked) match {
+          case crypto.DigestLength    => crypto.DigestLength.toByte
+          case crypto.SignatureLength => crypto.SignatureLength.toByte
+        }).put(id.arr)
       }
       .array()
 
@@ -163,7 +168,7 @@ package object database {
     val s = Seq.newBuilder[String]
 
     while (i < data.length) {
-      val len = ((data(i) << 8) | (data(i + 1) & 0xFF)).toShort // Optimization
+      val len = ((data(i) << 8) | (data(i + 1) & 0xff)).toShort // Optimization
       s += new String(data, i + 2, len, UTF_8)
       i += (2 + len)
     }
@@ -173,9 +178,8 @@ package object database {
   def writeStrings(strings: Seq[String]): Array[Byte] = {
     val utfBytes = strings.toVector.map(_.utf8Bytes)
     utfBytes
-      .foldLeft(ByteBuffer.allocate(utfBytes.map(_.length + 2).sum)) {
-        case (buf, bytes) =>
-          buf.putShort(bytes.length.toShort).put(bytes)
+      .foldLeft(ByteBuffer.allocate(utfBytes.map(_.length + 2).sum)) { case (buf, bytes) =>
+        buf.putShort(bytes.length.toShort).put(bytes)
       }
       .array()
   }
@@ -197,20 +201,19 @@ package object database {
       _ => throw new IllegalArgumentException("Can not write boolean flag instead of LeaseDetails"),
       ld =>
         pb.LeaseDetails(
-            ByteString.copyFrom(ld.sender.arr),
-            Some(PBRecipients.create(ld.recipient)),
-            ld.amount,
-            ByteString.copyFrom(ld.sourceId.arr),
-            ld.height,
-            ld.status match {
-              case LeaseDetails.Status.Active => pb.LeaseDetails.Status.Active(com.google.protobuf.empty.Empty())
-              case LeaseDetails.Status.Cancelled(height, cancelTxId) =>
-                pb.LeaseDetails.Status
-                  .Cancelled(pb.LeaseDetails.Cancelled(height, cancelTxId.fold(ByteString.EMPTY)(id => ByteString.copyFrom(id.arr))))
-              case LeaseDetails.Status.Expired(height) => pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height))
-            }
-          )
-          .toByteArray
+          ByteString.copyFrom(ld.sender.arr),
+          Some(PBRecipients.create(ld.recipient)),
+          ld.amount,
+          ByteString.copyFrom(ld.sourceId.arr),
+          ld.height,
+          ld.status match {
+            case LeaseDetails.Status.Active => pb.LeaseDetails.Status.Active(com.google.protobuf.empty.Empty())
+            case LeaseDetails.Status.Cancelled(height, cancelTxId) =>
+              pb.LeaseDetails.Status
+                .Cancelled(pb.LeaseDetails.Cancelled(height, cancelTxId.fold(ByteString.EMPTY)(id => ByteString.copyFrom(id.arr))))
+            case LeaseDetails.Status.Expired(height) => pb.LeaseDetails.Status.Expired(pb.LeaseDetails.Expired(height))
+          }
+        ).toByteArray
     )
 
   def readLeaseDetails(data: Array[Byte]): Either[Boolean, LeaseDetails] =
@@ -317,47 +320,48 @@ package object database {
     val (info, volumeInfo) = ai
 
     pb.AssetDetails(
-        info.name,
-        info.description,
-        info.lastUpdatedAt,
-        volumeInfo.isReissuable,
-        ByteString.copyFrom(volumeInfo.volume.toByteArray)
-      )
-      .toByteArray
+      info.name,
+      info.description,
+      info.lastUpdatedAt,
+      volumeInfo.isReissuable,
+      ByteString.copyFrom(volumeInfo.volume.toByteArray)
+    ).toByteArray
   }
 
-  def writeAssetStaticInfo(sai: AssetStaticInfo): Array[Byte] =
+  def writeAssetStaticInfo(sai: (AssetNum, AssetStaticInfo)): Array[Byte] =
     pb.StaticAssetInfo(
-        ByteString.copyFrom(sai.source.arr),
-        ByteString.copyFrom(sai.issuer.arr),
-        sai.decimals,
-        sai.nft
-      )
-      .toByteArray
+      ByteString.copyFrom(sai._2.source.arr),
+      ByteString.copyFrom(sai._2.issuer.arr),
+      sai._2.decimals,
+      sai._2.nft,
+      sai._1
+    ).toByteArray
 
-  def readAssetStaticInfo(bb: Array[Byte]): AssetStaticInfo = {
+  def readAssetStaticInfo(bb: Array[Byte]): (AssetNum, AssetStaticInfo) = {
     val sai = pb.StaticAssetInfo.parseFrom(bb)
-    AssetStaticInfo(
-      TransactionId(sai.sourceId.toByteStr),
-      PublicKey(sai.issuerPublicKey.toByteArray),
-      sai.decimals,
-      sai.isNft
+    (
+      AssetNum(sai.sequenceInBlock),
+      AssetStaticInfo(
+        TransactionId(sai.sourceId.toByteStr),
+        PublicKey(sai.issuerPublicKey.toByteArray),
+        sai.decimals,
+        sai.isNft
+      )
     )
   }
 
   def writeBlockMeta(data: BlockMeta): Array[Byte] =
     pb.BlockMeta(
-        Some(PBBlocks.protobuf(data.header)),
-        ByteString.copyFrom(data.signature.arr),
-        data.headerHash.fold(ByteString.EMPTY)(hh => ByteString.copyFrom(hh.arr)),
-        data.height,
-        data.size,
-        data.transactionCount,
-        data.totalFeeInWaves,
-        data.reward.getOrElse(-1L),
-        data.vrf.fold(ByteString.EMPTY)(vrf => ByteString.copyFrom(vrf.arr))
-      )
-      .toByteArray
+      Some(PBBlocks.protobuf(data.header)),
+      ByteString.copyFrom(data.signature.arr),
+      data.headerHash.fold(ByteString.EMPTY)(hh => ByteString.copyFrom(hh.arr)),
+      data.height,
+      data.size,
+      data.transactionCount,
+      data.totalFeeInWaves,
+      data.reward.getOrElse(-1L),
+      data.vrf.fold(ByteString.EMPTY)(vrf => ByteString.copyFrom(vrf.arr))
+    ).toByteArray
 
   def readBlockMeta(bs: Array[Byte]): BlockMeta = {
     val pbbm = pb.BlockMeta.parseFrom(bs)
@@ -379,11 +383,14 @@ package object database {
     val height       = Height(ndi.readInt())
     val numSeqLength = ndi.readInt()
 
-    (height, List.fill(numSeqLength) {
-      val tp  = ndi.readByte()
-      val num = TxNum(ndi.readShort())
-      (tp, num)
-    })
+    (
+      height,
+      List.fill(numSeqLength) {
+        val tp  = ndi.readByte()
+        val num = TxNum(ndi.readShort())
+        (tp, num)
+      }
+    )
   }
 
   def writeTransactionHNSeqAndType(v: (Height, Seq[(Byte, TxNum)])): Array[Byte] = {
@@ -395,10 +402,9 @@ package object database {
 
     ndo.writeInt(height)
     ndo.writeInt(numSeqLength)
-    numSeq.foreach {
-      case (tp, num) =>
-        ndo.writeByte(tp)
-        ndo.writeShort(num)
+    numSeq.foreach { case (tp, num) =>
+      ndo.writeByte(tp)
+      ndo.writeShort(num)
     }
 
     ndo.toByteArray
@@ -420,10 +426,9 @@ package object database {
     val sorted = sh.sectionHashes.toSeq.sortBy(_._1)
     val ndo    = newDataOutput(crypto.DigestLength + 1 + sorted.length * (1 + crypto.DigestLength))
     ndo.writeByte(sorted.length)
-    sorted.foreach {
-      case (sectionId, value) =>
-        ndo.writeByte(sectionId.id.toByte)
-        ndo.writeByteStr(value.ensuring(_.arr.length == DigestLength))
+    sorted.foreach { case (sectionId, value) =>
+      ndo.writeByte(sectionId.id.toByte)
+      ndo.writeByteStr(value.ensuring(_.arr.length == DigestLength))
     }
     ndo.writeByteStr(sh.totalHash.ensuring(_.arr.length == DigestLength))
     ndo.toByteArray
@@ -440,13 +445,12 @@ package object database {
 
   def writeDataEntry(e: DataEntry[?]): Array[Byte] =
     pb.DataEntry(e match {
-        case IntegerDataEntry(_, value) => pb.DataEntry.Value.IntValue(value)
-        case BooleanDataEntry(_, value) => pb.DataEntry.Value.BoolValue(value)
-        case BinaryDataEntry(_, value)  => pb.DataEntry.Value.BinaryValue(ByteString.copyFrom(value.arr))
-        case StringDataEntry(_, value)  => pb.DataEntry.Value.StringValue(value)
-        case _: EmptyDataEntry          => pb.DataEntry.Value.Empty
-      })
-      .toByteArray
+      case IntegerDataEntry(_, value) => pb.DataEntry.Value.IntValue(value)
+      case BooleanDataEntry(_, value) => pb.DataEntry.Value.BoolValue(value)
+      case BinaryDataEntry(_, value)  => pb.DataEntry.Value.BinaryValue(ByteString.copyFrom(value.arr))
+      case StringDataEntry(_, value)  => pb.DataEntry.Value.StringValue(value)
+      case _: EmptyDataEntry          => pb.DataEntry.Value.Empty
+    }).toByteArray
 
   implicit class EntryExt(val e: JMap.Entry[Array[Byte], Array[Byte]]) extends AnyVal {
     import com.wavesplatform.crypto.DigestLength
@@ -464,8 +468,8 @@ package object database {
       finally snapshot.close()
     }
 
-    /**
-      * @note Runs operations in batch, so keep in mind, that previous changes don't appear lately in f
+    /** @note
+      *   Runs operations in batch, so keep in mind, that previous changes don't appear lately in f
       */
     def readWrite[A](f: RW => A): A = {
       val snapshot    = db.getSnapshot
@@ -523,9 +527,8 @@ package object database {
         ByteString.copyFrom(scriptInfo.publicKey.arr),
         ByteString.copyFrom(scriptInfo.script.bytes().arr),
         scriptInfo.verifierComplexity,
-        scriptInfo.complexitiesByEstimator.map {
-          case (version, complexities) =>
-            pb.AccountScriptInfo.ComplexityByVersion(version, complexities)
+        scriptInfo.complexitiesByEstimator.map { case (version, complexities) =>
+          pb.AccountScriptInfo.ComplexityByVersion(version, complexities)
         }.toSeq
       )
     )
@@ -556,10 +559,10 @@ package object database {
     val (m, tx) = v
     val ptx = tx match {
       case lps: PBSince if !lps.isProtobufVersion => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
-      case _: GenesisTransaction                         => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
-      case _: PaymentTransaction                         => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
-      case et: EthereumTransaction                       => TD.EthereumTransaction(ByteString.copyFrom(et.bytes()))
-      case _                                             => TD.WavesTransaction(PBTransactions.protobuf(tx))
+      case _: GenesisTransaction                  => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
+      case _: PaymentTransaction                  => TD.LegacyBytes(ByteString.copyFrom(tx.bytes()))
+      case et: EthereumTransaction                => TD.EthereumTransaction(ByteString.copyFrom(et.bytes()))
+      case _                                      => TD.WavesTransaction(PBTransactions.protobuf(tx))
     }
     pb.TransactionData(ptx, !m.succeeded, m.spentComplexity).toByteArray
   }
@@ -585,7 +588,7 @@ package object database {
 
   def loadAssetDescription(resource: DBResource, asset: IssuedAsset): Option[AssetDescription] =
     for {
-      staticInfo         <- resource.get(Keys.assetStaticInfo(asset))
+      (num, staticInfo)  <- resource.get(Keys.assetStaticInfo(asset))
       (info, volumeInfo) <- fromHistory(resource, Keys.assetDetailsHistory(asset), Keys.assetDetails(asset))
       sponsorship = fromHistory(resource, Keys.sponsorshipHistory(asset), Keys.sponsorship(asset)).fold(0L)(_.minFee)
       script      = fromHistory(resource, Keys.assetScriptHistory(asset), Keys.assetScript(asset)).flatten
@@ -600,7 +603,8 @@ package object database {
       info.lastUpdatedAt,
       script,
       sponsorship,
-      staticInfo.nft
+      staticInfo.nft,
+      num
     )
 
   def loadActiveLeases(db: DB, fromHeight: Int, toHeight: Int): Seq[LeaseTransaction] = db.withResource { r =>

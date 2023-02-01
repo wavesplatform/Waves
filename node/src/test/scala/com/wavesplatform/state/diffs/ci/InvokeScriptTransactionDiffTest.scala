@@ -1145,7 +1145,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with WithDomain with DBCa
             Height(1),
             None,
             0L,
-            nft = false
+            nft = false,
+            0
           )
         )
       )
