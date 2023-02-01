@@ -297,10 +297,11 @@ object UtilsApiRoute {
     val apiResult = exprE.flatMap { exprE =>
       val evaluated = for {
         expr                      <- exprE
-        (result, complexity, log) <- UtilsEvaluator.executeExpression(blockchain, script, address, pk, evaluateScriptComplexityLimit)(expr)
+        (result, complexity, log, scriptResult) <- UtilsEvaluator.executeExpression(blockchain, script, address, pk, evaluateScriptComplexityLimit)(expr)
       } yield Json.obj(
-        "result"     -> ScriptValuesJson.serializeValue(result),
-        "complexity" -> complexity
+        "result"       -> ScriptValuesJson.serializeValue(result),
+        "complexity"   -> complexity,
+          "stateChanges" -> scriptResult
       ) ++ (if (trace) Json.obj(TraceStep.logJson(log)) else Json.obj())
       evaluated.leftMap {
         case e: InvokeRejectError => Json.obj("error" -> ApiError.ScriptExecutionError.Id, "message" -> e.toStringWithLog(maxTxErrorLogSize))

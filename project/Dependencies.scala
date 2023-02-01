@@ -134,7 +134,7 @@ object Dependencies {
       akkaModule("testkit")                              % Test,
       akkaHttpModule("akka-http-testkit")                % Test,
       leveldbJava().exclude("com.google.guava", "guava") % Test
-    ) ++ test ++ console ++ logDeps ++ levelDBJNA ++ protobuf.value
+    ) ++ test ++ console ++ logDeps ++ levelDBJNA ++ protobuf.value ++ langCompilerPlugins.value
   )
 
   lazy val scalapbRuntime = Def.setting {

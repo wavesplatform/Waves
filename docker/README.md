@@ -40,6 +40,11 @@ docker run -v /docker/waves/waves-data:/var/lib/waves -v /docker/waves/waves-con
 
 3. By default, `/etc/waves/waves.conf` config includes `/etc/waves/local.conf`. Custom `/etc/waves/local.conf` can be used to override default config entries. Custom `/etc/waves/waves.conf` can be used to override or the whole configuration. For additional information about Docker volumes mapping please refer to `Managing data` item.
 
+4. You can override the default executable by using the following syntax:
+```
+docker run -it wavesplatform/wavesnode [command] [args]
+```
+
 ### Environment variables
 
 **You can run container with predefined environment variables:**

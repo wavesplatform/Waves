@@ -1,6 +1,7 @@
 package com.wavesplatform.api.http.utils
 
 import cats.Id
+import cats.implicits.{catsSyntaxApply, catsSyntaxSemigroup}
 import cats.syntax.either.*
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
@@ -13,13 +14,14 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.compiler.{ContractScriptCompactor, ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.{Invocation, LogExtraInfo}
-import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2, Log}
+import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, EvaluatorV2, Log, ScriptResult}
 import com.wavesplatform.lang.v1.traits.Environment.Tthis
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.{ValidationError, utils}
-import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionLike
-import com.wavesplatform.state.{Blockchain, Diff}
+import com.wavesplatform.state.diffs.invoke.InvokeDiffsCommon.{actionsToScriptResult, checkActions}
+import com.wavesplatform.state.diffs.invoke.{InvokeScriptTransactionLike, StructuredCallableActions}
+import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TransactionType.TransactionType
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvokeRejectError}
@@ -42,7 +44,7 @@ object UtilsEvaluator {
 
   def executeExpression(blockchain: Blockchain, script: Script, address: Address, pk: PublicKey, limit: Int)(
       expr: EXPR
-  ): Either[ValidationError, (EVALUATED, Int, Log[Id])] =
+  ): Either[ValidationError, (EVALUATED, Int, Log[Id], InvokeScriptResult)] =
     for {
       ds <- DirectiveSet(script.stdLibVersion, Account, DAppType).leftMap(GenericError(_))
       invoke = new InvokeScriptTransactionLike {
@@ -99,9 +101,21 @@ object UtilsEvaluator {
         )
         .value()
         .leftMap { case (err, _, log) => InvokeRejectError(err.message, log) }
-      result <- limitedResult match {
+      (evaluated, usedComplexity, log) <- limitedResult match {
         case (eval: EVALUATED, unusedComplexity, log) => Right((eval, limit - unusedComplexity, log))
         case (_: EXPR, _, log)                        => Left(InvokeRejectError(s"Calculation complexity limit exceeded", log))
       }
-    } yield result
+      rootScriptResult <- ScriptResult
+        .fromObj(ctx, ByteStr.empty, evaluated, ds.stdLibVersion, 0)
+        .bimap(
+          _ => Right(InvokeScriptResult.empty),
+          { r =>
+            val actions = StructuredCallableActions(r.actions, blockchain)
+            val check   = checkActions(actions, ds.stdLibVersion, address, usedComplexity, invoke, limitedExecution = false, limit, log)
+            (check *> actionsToScriptResult(actions, usedComplexity, invoke, log)).resultE
+          }
+        )
+        .merge
+      scriptResult = environment.currentDiff.scriptResults.values.fold(InvokeScriptResult.empty)(_ |+| _) |+| rootScriptResult
+    } yield (evaluated, usedComplexity, log, scriptResult)
 }
