@@ -3,352 +3,95 @@ package com.wavesplatform.test.builtInFunctions.accountDataStorage
 import com.wavesplatform.JsTestBase
 import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomInt, randomStringArrayElement}
 import testHelpers.GeneratorContractsForBuiltInFunctions
-import testHelpers.TestDataConstantsAndMethods.thisVariable
+import testHelpers.TestDataConstantsAndMethods.{GreaterV3ResultBinaryEntry, rideV3Result, thisVariable}
 import utest.{Tests, test}
 
 object GetBinary extends JsTestBase {
   // getBinary
-  private val getBinary = s"getBinary(callerTestData, $randomStringArrayElement)"
-  private val getBinaryArgBeforeFunc = s"callerTestData.getBinary($randomStringArrayElement)"
-  private val ownDataGetBinary = s"getBinary($randomStringArrayElement)"
+  private val getBinary                     = s"getBinary(callerTestData, $randomStringArrayElement)"
+  private val getBinaryArgBeforeFunc        = s"callerTestData.getBinary($randomStringArrayElement)"
+  private val ownDataGetBinary              = s"getBinary($randomStringArrayElement)"
   private val ownDataGetBinaryArgBeforeFunc = s"$randomStringArrayElement.getBinary()"
 
   // getBinaryValue
-  private val getBinaryValue = s"getBinaryValue(callerTestData, $randomStringArrayElement)"
-  private val getBinaryValueArgBeforeFunc = s"callerTestData.getBinaryValue($randomStringArrayElement)"
-  private val ownDataGetBinaryValue = s"getBinaryValue($randomStringArrayElement)"
+  private val getBinaryValue                     = s"getBinaryValue(callerTestData, $randomStringArrayElement)"
+  private val getBinaryValueArgBeforeFunc        = s"callerTestData.getBinaryValue($randomStringArrayElement)"
+  private val ownDataGetBinaryValue              = s"getBinaryValue($randomStringArrayElement)"
   private val ownDataGetBinaryValueArgBeforeFunc = s"$randomStringArrayElement.getBinaryValue()"
 
-  private val invalidGetBinary = s"getBinary(callerTestData)"
+  private val invalidGetBinary      = s"getBinary(callerTestData)"
   private val invalidGetBinaryValue = s"getBinaryValue(callerTestData)"
 
-
   val tests: Tests = Tests {
-    test("check: function getBinary accountDataStorage compiles for address") {
+    test("functions getBinary accountDataStorage compiles for address, alias and 'this'") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomAddressDataArrayElement,
-          getBinary,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-
-        assertCompileSuccessDApp(script, version)
+        for (
+          (addressOrAlias, binary) <- Seq(
+            (randomAddressDataArrayElement, getBinary),
+            (randomAddressDataArrayElement, getBinaryArgBeforeFunc),
+            (randomAliasDataArrayElement, getBinary),
+            (randomAliasDataArrayElement, getBinaryArgBeforeFunc),
+            (randomAddressDataArrayElement, getBinaryValue),
+            (randomAddressDataArrayElement, getBinaryValueArgBeforeFunc),
+            (randomAliasDataArrayElement, getBinaryValue),
+            (randomAliasDataArrayElement, getBinaryValueArgBeforeFunc),
+            (thisVariable, getBinary),
+            (thisVariable, getBinaryArgBeforeFunc),
+            (thisVariable, getBinaryValue),
+            (thisVariable, getBinaryValueArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.codeFromMatchingAndCase(addressOrAlias, binary, rideV3Result, GreaterV3ResultBinaryEntry)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
-    test("check: function getBinary accountDataStorage compiles (argument before function) for address") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomAddressDataArrayElement,
-          getBinaryArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinary accountDataStorage compiles for 'this'") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          thisVariable,
-          getBinary,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinary accountDataStorage compiles (argument before function) for 'this'") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          thisVariable,
-          getBinaryArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinary accountDataStorage compiles for alias") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomAliasDataArrayElement,
-          getBinary,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinary accountDataStorage compiles (argument before function) for alias") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomAliasDataArrayElement,
-          getBinaryArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function own data getBinary accountDataStorage compiles") {
+    test("functions own data getBinary accountDataStorage compiles for address, alias and 'this'") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeOwnData(
-          ownDataGetBinary,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-
-        assertCompileSuccessDApp(script, version)
+        for (ownData <- Seq(ownDataGetBinary, ownDataGetBinaryArgBeforeFunc, ownDataGetBinaryValueArgBeforeFunc, ownDataGetBinaryValue)) {
+          val script = precondition.codeOwnData(ownData, rideV3Result, GreaterV3ResultBinaryEntry)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
-    test("check: function own data getBinary accountDataStorage (argument before function) compiles") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeOwnData(
-          ownDataGetBinaryArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinaryValue accountDataStorage compiles for address") {
+    test("negative tests for getBinary functions") {
+      val invalidFunction = s"getBinaryValue($randomInt)"
+      val invalidArgBeforeFunction = s"$randomInt.getBinaryValue()"
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomAddressDataArrayElement,
-          getBinaryValue,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-
-        assertCompileSuccessDApp(script, version)
+        for (
+          (addressOrAlias, binary) <- Seq(
+            (randomAddressDataArrayElement, invalidGetBinary),
+            (randomAliasDataArrayElement, invalidGetBinaryValue),
+            (randomInt.toString, getBinary),
+            (randomInt.toString, getBinaryValue),
+            (randomInt.toString, invalidFunction),
+            (randomInt.toString, invalidArgBeforeFunction),
+          )
+        ) {
+          val script = precondition.codeFromMatchingAndCase(addressOrAlias, binary, rideV3Result, GreaterV3ResultBinaryEntry)
+          assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+        }
       }
     }
 
-    test("check: function getBinaryValue accountDataStorage compiles (argument before function) for address") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomAddressDataArrayElement,
-          getBinaryValueArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
 
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinaryValue accountDataStorage compiles for 'this'") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          thisVariable,
-          getBinaryValue,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinaryValue accountDataStorage compiles (argument before function) for 'this'") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          thisVariable,
-          getBinaryValueArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinaryValue accountDataStorage compiles for alias") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomAliasDataArrayElement,
-          getBinaryValue,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinaryValue accountDataStorage compiles (argument before function) for alias") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomAliasDataArrayElement,
-          getBinaryValueArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function own data getBinaryValue accountDataStorage (argument before function) compiles") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeOwnData(
-          ownDataGetBinaryValueArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function own data getBinaryValue accountDataStorage compiles") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeOwnData(
-          ownDataGetBinaryValue,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("compilation error: Can't find a function overload getBinary accountDataStorage") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomAddressDataArrayElement,
-          invalidGetBinary,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: Can't find a function overload getBinaryValue accountDataStorage") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomAliasDataArrayElement,
-          invalidGetBinaryValue,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: Can't find a own data function overload getBinary accountDataStorage") {
+    test("Can't find a own data functions overload Binary accountDataStorage for old Versions") {
       for (version <- testData.oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomAddressDataArrayElement,
-          ownDataGetBinaryValue,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: Can't find a own data function overload getBinaryValue accountDataStorage") {
-      for (version <- testData.oldVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomAliasDataArrayElement,
-          ownDataGetBinaryValueArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: Can't find a function overload getBinary - invalid data") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomInt.toString,
-          getBinary,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: Can't find a function overload getBinaryValue - invalid data") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomInt.toString,
-          getBinaryValue,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: Can't find a own data function overload getBinary - invalid data") {
-      for (version <- testData.actualVersions) {
-        val invalidFunction = s"getBinaryValue($randomInt)"
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomInt.toString,
-          invalidFunction,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: Can't find a own data function overload getBinaryValue - invalid data") {
-      for (version <- testData.actualVersions) {
-        val invalidFunction = s"$randomInt.getBinaryValue()"
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomInt.toString,
-          invalidFunction,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+        for (
+          (addressOrAlias, binary) <- Seq(
+            (randomAddressDataArrayElement, ownDataGetBinaryValue),
+            (randomAliasDataArrayElement, ownDataGetBinaryValueArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.codeFromMatchingAndCase(addressOrAlias, binary, rideV3Result, GreaterV3ResultBinaryEntry)
+          assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+        }
       }
     }
   }

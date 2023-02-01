@@ -3,196 +3,87 @@ package com.wavesplatform.test.builtInFunctions.accountDataStorage
 import com.wavesplatform.JsTestBase
 import _root_.testHelpers.GeneratorContractsForBuiltInFunctions
 import _root_.testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomInt}
-import testHelpers.TestDataConstantsAndMethods.thisVariable
+import testHelpers.TestDataConstantsAndMethods.{
+  GreaterV3ResultBooleanEntry,
+  invalidFunctionError,
+  nonMatchingTypes,
+  oldVersions,
+  rideV3Result,
+  thisVariable,
+  versionsSupportingTheNewFeatures
+}
 import utest.{Tests, test}
 
 object IsDataStorageUntouched extends JsTestBase {
-  private val isDataStorageUntouched = "isDataStorageUntouched(callerTestData)"
+  private val isDataStorageUntouched              = "isDataStorageUntouched(callerTestData)"
   private val isDataStorageUntouchedArgBeforeFunc = "callerTestData.isDataStorageUntouched()"
-  private val invalidFunction = "isDataStorageUntouched()"
-
-  private val invalidFunctionErrorResult: String = testData.invalidFunctionError("isDataStorageUntouched", 1)
+  private val invalidFunction                     = "isDataStorageUntouched()"
+  private val invalidFunctionErrorResult: String  = invalidFunctionError("isDataStorageUntouched", 1)
 
   val tests: Tests = Tests {
-    test("check: function isDataStorageUntouched compiles for address") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.codeWithoutMatcher(
-          randomAddressDataArrayElement,
-          isDataStorageUntouched,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
+    test("functions IsDataStorageUntouched accountDataStorage compiles for address, alias and 'this'") {
+      for (version <- versionsSupportingTheNewFeatures) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        for (
+          (addressOrAlias, dataStorage) <- Seq(
+            (randomAddressDataArrayElement, isDataStorageUntouched),
+            (randomAddressDataArrayElement, isDataStorageUntouchedArgBeforeFunc),
+            (randomAliasDataArrayElement, isDataStorageUntouched),
+            (randomAliasDataArrayElement, isDataStorageUntouchedArgBeforeFunc),
+            (thisVariable, isDataStorageUntouched),
+            (thisVariable, isDataStorageUntouchedArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.codeFromMatchingAndCase(addressOrAlias, dataStorage, rideV3Result, GreaterV3ResultBooleanEntry)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
-    test("check: function isDataStorageUntouched compiles (argument before function) for address") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.codeWithoutMatcher(
-          randomAddressDataArrayElement,
-          isDataStorageUntouchedArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
+    test("Non-matching types for function is DataStorageUntouched") {
+      for (version <- versionsSupportingTheNewFeatures) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        for (
+          (addressOrAlias, dataStorage) <- Seq(
+            (randomInt.toString, isDataStorageUntouched),
+            (randomInt.toString, isDataStorageUntouchedArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.codeFromMatchingAndCase(addressOrAlias, dataStorage, rideV3Result, GreaterV3ResultBooleanEntry)
+          assertCompileErrorDApp(script, version, nonMatchingTypes("Address|Alias"))
+        }
       }
     }
 
-    test("check: function isDataStorageUntouched compiles for 'this'") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.codeWithoutMatcher(
-          thisVariable,
-          isDataStorageUntouched,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
+    test("Invalid data for functions isDataStorageUntouched") {
+      for (version <- versionsSupportingTheNewFeatures) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        for (
+          (addressOrAlias, dataStorage) <- Seq(
+            (randomAddressDataArrayElement, invalidFunction),
+            (randomAliasDataArrayElement, invalidFunction),
+            (thisVariable, invalidFunction)
+          )
+        ) {
+          val script = precondition.codeFromMatchingAndCase(addressOrAlias, dataStorage, rideV3Result, GreaterV3ResultBooleanEntry)
+          assertCompileErrorDApp(script, version, invalidFunctionErrorResult)
+        }
       }
     }
 
-    test("check: function isDataStorageUntouched compiles (argument before function) for 'this'") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.codeWithoutMatcher(
-          thisVariable,
-          isDataStorageUntouchedArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function isDataStorageUntouched compiles for alias") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.codeWithoutMatcher(
-          randomAliasDataArrayElement,
-          isDataStorageUntouched,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function isDataStorageUntouched compiles (argument before function) for alias") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.codeWithoutMatcher(
-          randomAliasDataArrayElement,
-          isDataStorageUntouchedArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("compilation error: Can't find function isDataStorageUntouched (argument before function) for address") {
-      for (version <- testData.oldVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.codeWithoutMatcher(
-          randomAddressDataArrayElement,
-          isDataStorageUntouchedArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_FUNCTION)
-      }
-    }
-
-    test("compilation error: Can't find function isDataStorageUntouched (argument before function) for 'this'") {
-      for (version <- testData.oldVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.codeWithoutMatcher(
-          thisVariable,
-          isDataStorageUntouchedArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_FUNCTION)
-      }
-    }
-
-    test("compilation error: Can't find function isDataStorageUntouched for alias") {
-      for (version <- testData.oldVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.codeWithoutMatcher(
-          randomAliasDataArrayElement,
-          isDataStorageUntouched,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_FUNCTION)
-      }
-    }
-
-    test("compilation error: invalid function isDataStorageUntouched for address") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.codeWithoutMatcher(
-          randomAddressDataArrayElement,
-          invalidFunction,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileErrorDApp(script, version, invalidFunctionErrorResult)
-      }
-    }
-
-    test("compilation error: invalid function isDataStorageUntouched for 'this'") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.codeWithoutMatcher(
-          thisVariable,
-          invalidFunction,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileErrorDApp(script, version, invalidFunctionErrorResult)
-      }
-    }
-
-    test("compilation error: invalid function isDataStorageUntouched for alias") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.codeWithoutMatcher(
-          randomAliasDataArrayElement,
-          invalidFunction,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileErrorDApp(script, version, invalidFunctionErrorResult)
-      }
-    }
-
-    test("compilation error: invalid data for function isDataStorageUntouched") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.codeWithoutMatcher(
-          randomInt.toString,
-          isDataStorageUntouched,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("Address|Alias"))
-      }
-    }
-
-    test("compilation error: invalid data for function isDataStorageUntouched (argument before function)") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.codeWithoutMatcher(
-          randomInt.toString,
-          isDataStorageUntouchedArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("Address|Alias"))
+    test("Can't find functions isDataStorageUntouched dataStorage accountDataStorage for old Versions") {
+      for (version <- oldVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        for (
+          (addressOrAlias, dataStorage) <- Seq(
+            (randomAddressDataArrayElement, isDataStorageUntouchedArgBeforeFunc),
+            (thisVariable, isDataStorageUntouchedArgBeforeFunc),
+            (randomAliasDataArrayElement, isDataStorageUntouched)
+          )
+        ) {
+          val script = precondition.codeFromMatchingAndCase(addressOrAlias, dataStorage, rideV3Result, GreaterV3ResultBooleanEntry)
+          assertCompileErrorDApp(script, version, testData.CANT_FIND_FUNCTION)
+        }
       }
     }
   }
