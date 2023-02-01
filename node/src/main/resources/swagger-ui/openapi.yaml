@@ -1466,7 +1466,7 @@ paths:
                   $ref: '#/components/schemas/TransactionLSF'
               examples:
                 largeSignificandTransaction:
-                  $ref: '#/components/examples/largeSignificandTransaction'
+                  $ref: '#/components/examples/largeSignificandTransactionInList'
   '/transactions/address/{address}/limit/{limit}':
     get:
       tags:
@@ -1511,7 +1511,7 @@ paths:
                     $ref: '#/components/schemas/TransactionLSF'
               examples:
                 largeSignificandTransaction:
-                  $ref: '#/components/examples/largeSignificandTransaction'
+                  $ref: '#/components/examples/largeSignificandTransactionInListInList'
 
   /transactions/unconfirmed/size:
     get:
@@ -5430,6 +5430,124 @@ components:
           increase: 0
           decrease: 0
     largeSignificandTransaction:
+      value:
+        type: 7
+        id: AapJSJ9pEt47ukwkxZbGMic7EbxQHYKGgAwk5ZiMe51A
+        fee: '300000'
+        feeAssetId: null
+        timestamp: 1666095438770
+        version: 3
+        chainId: 87
+        sender: 3PEjHv3JGjcWNpYEEkif2w8NXV4kbhnoGgu
+        senderPublicKey: 9cpfKN9suPNvfeUNphzxXMjcnn974eme8ZhWUjaktzU5
+        proofs:
+          - 2ichUyTM9mE6bb2ashHuXYsWKSkmT5NhrdCXGjsb5oGqinNdhLRpnACT6cMgfcJ2YHpF83DxR75B2obtGpcqPCo6
+        order1:
+          version: 3
+          id: 8uESHKHj4fW172WxBRA7dc539QnCJaMxCMGmSqGQW6yY
+          sender: 3PHgpEFhejacrSyBnppXUpcxGDrsyMDPDnh
+          senderPublicKey: 9D2R1PJBqfKjJifgeCxWp4wJNqBpudXfWmvH7tnKmdzq
+          matcherPublicKey: 9cpfKN9suPNvfeUNphzxXMjcnn974eme8ZhWUjaktzU5
+          assetPair:
+            amountAsset: 34N9YcEETLWn93qYQ64EsP1x89tSruJU44RrEMSXXEPJ
+            priceAsset: DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p
+          orderType: buy
+          amount: '943757509'
+          price: '101770000'
+          timestamp: 1666095437000
+          expiration: 1666095737000
+          matcherFee: '90343223'
+          signature: 2GxNHyECiPH33GMgdbrv6qostUCfUS4x7Pz4zMbGY4iyyT1k6r93MuQXoX5BMCugxCoQqGKFjGzmacRykqg5jyx3
+          proofs:
+            - 2GxNHyECiPH33GMgdbrv6qostUCfUS4x7Pz4zMbGY4iyyT1k6r93MuQXoX5BMCugxCoQqGKFjGzmacRykqg5jyx3
+          matcherFeeAssetId: Atqv59EYzjFGuitKVnMRk6H8FukjoV3ktPorbEys25on
+        order2:
+          version: 3
+          id: BBZhCLSYv9PUURhcRM3LGEe8RqHKSrRdzqhDYBinsfdz
+          sender: 3PESY4gY6hTeSx5ZetVQn5WjaREmE4PC3Gn
+          senderPublicKey: A65kmHQ2kN5hENWF4KwNdsGKVpNXNAVhxV3hdw9Dp282
+          matcherPublicKey: 9cpfKN9suPNvfeUNphzxXMjcnn974eme8ZhWUjaktzU5
+          assetPair:
+            amountAsset: 34N9YcEETLWn93qYQ64EsP1x89tSruJU44RrEMSXXEPJ
+            priceAsset: DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p
+          orderType: sell
+          amount: '5703128855'
+          price: '101765000'
+          timestamp: 1666095438000
+          expiration: 1666311438000
+          matcherFee: '2754928000'
+          signature: 5NqXiSKHamcjLuxUBqRGNwdCgMH6LH8aSqpdnkGEioQHG57yoDPZgo8tU6Uqeeohwajxc3zSJfKPyipi2ZgWRh5F
+          proofs:
+            - 5NqXiSKHamcjLuxUBqRGNwdCgMH6LH8aSqpdnkGEioQHG57yoDPZgo8tU6Uqeeohwajxc3zSJfKPyipi2ZgWRh5F
+          matcherFeeAssetId: Atqv59EYzjFGuitKVnMRk6H8FukjoV3ktPorbEys25on
+        amount: '943757509'
+        price: '101770000'
+        buyMatcherFee: '90343223'
+        sellMatcherFee: '90422304'
+        height: 3343233
+        applicationStatus: succeeded
+        spentComplexity: 0
+
+    largeSignificandTransactionInList:
+      value:
+        - type: 7
+          id: AapJSJ9pEt47ukwkxZbGMic7EbxQHYKGgAwk5ZiMe51A
+          fee: '300000'
+          feeAssetId: null
+          timestamp: 1666095438770
+          version: 3
+          chainId: 87
+          sender: 3PEjHv3JGjcWNpYEEkif2w8NXV4kbhnoGgu
+          senderPublicKey: 9cpfKN9suPNvfeUNphzxXMjcnn974eme8ZhWUjaktzU5
+          proofs:
+            - 2ichUyTM9mE6bb2ashHuXYsWKSkmT5NhrdCXGjsb5oGqinNdhLRpnACT6cMgfcJ2YHpF83DxR75B2obtGpcqPCo6
+          order1:
+            version: 3
+            id: 8uESHKHj4fW172WxBRA7dc539QnCJaMxCMGmSqGQW6yY
+            sender: 3PHgpEFhejacrSyBnppXUpcxGDrsyMDPDnh
+            senderPublicKey: 9D2R1PJBqfKjJifgeCxWp4wJNqBpudXfWmvH7tnKmdzq
+            matcherPublicKey: 9cpfKN9suPNvfeUNphzxXMjcnn974eme8ZhWUjaktzU5
+            assetPair:
+              amountAsset: 34N9YcEETLWn93qYQ64EsP1x89tSruJU44RrEMSXXEPJ
+              priceAsset: DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p
+            orderType: buy
+            amount: '943757509'
+            price: '101770000'
+            timestamp: 1666095437000
+            expiration: 1666095737000
+            matcherFee: '90343223'
+            signature: 2GxNHyECiPH33GMgdbrv6qostUCfUS4x7Pz4zMbGY4iyyT1k6r93MuQXoX5BMCugxCoQqGKFjGzmacRykqg5jyx3
+            proofs:
+              - 2GxNHyECiPH33GMgdbrv6qostUCfUS4x7Pz4zMbGY4iyyT1k6r93MuQXoX5BMCugxCoQqGKFjGzmacRykqg5jyx3
+            matcherFeeAssetId: Atqv59EYzjFGuitKVnMRk6H8FukjoV3ktPorbEys25on
+          order2:
+            version: 3
+            id: BBZhCLSYv9PUURhcRM3LGEe8RqHKSrRdzqhDYBinsfdz
+            sender: 3PESY4gY6hTeSx5ZetVQn5WjaREmE4PC3Gn
+            senderPublicKey: A65kmHQ2kN5hENWF4KwNdsGKVpNXNAVhxV3hdw9Dp282
+            matcherPublicKey: 9cpfKN9suPNvfeUNphzxXMjcnn974eme8ZhWUjaktzU5
+            assetPair:
+              amountAsset: 34N9YcEETLWn93qYQ64EsP1x89tSruJU44RrEMSXXEPJ
+              priceAsset: DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p
+            orderType: sell
+            amount: '5703128855'
+            price: '101765000'
+            timestamp: 1666095438000
+            expiration: 1666311438000
+            matcherFee: '2754928000'
+            signature: 5NqXiSKHamcjLuxUBqRGNwdCgMH6LH8aSqpdnkGEioQHG57yoDPZgo8tU6Uqeeohwajxc3zSJfKPyipi2ZgWRh5F
+            proofs:
+              - 5NqXiSKHamcjLuxUBqRGNwdCgMH6LH8aSqpdnkGEioQHG57yoDPZgo8tU6Uqeeohwajxc3zSJfKPyipi2ZgWRh5F
+            matcherFeeAssetId: Atqv59EYzjFGuitKVnMRk6H8FukjoV3ktPorbEys25on
+          amount: '943757509'
+          price: '101770000'
+          buyMatcherFee: '90343223'
+          sellMatcherFee: '90422304'
+          height: 3343233
+          applicationStatus: succeeded
+          spentComplexity: 0
+
+    largeSignificandTransactionInListInList:
       value:
         - - type: 7
             id: AapJSJ9pEt47ukwkxZbGMic7EbxQHYKGgAwk5ZiMe51A
