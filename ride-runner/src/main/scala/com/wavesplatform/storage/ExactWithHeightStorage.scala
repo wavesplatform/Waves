@@ -69,12 +69,12 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
 
   def append(height: Int, key: KeyT, update: Option[ValueT]): AffectedTags[TagT] = {
     lazy val tags = tagsOf(key)
-    val orig = Option(values.getIfPresent(key))
-      .getOrElse(RemoteData.Unknown)
-      .orElse {
-        if (tags.isEmpty) persistentCache.get(height, key)
-        else RemoteData.Unknown
-      }
+    val orig =
+      if (tags.isEmpty) RemoteData.Unknown // We haven't known this key
+      else
+        Option(values.getIfPresent(key))
+          .getOrElse(RemoteData.Unknown) // The data was evicted from the memory cache
+          .orElse(persistentCache.get(height, key))
 
     if (orig.loaded) {
       val updated = RemoteData.loaded(update)

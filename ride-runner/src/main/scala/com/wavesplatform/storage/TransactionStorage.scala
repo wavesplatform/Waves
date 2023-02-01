@@ -77,13 +77,14 @@ class TransactionStorage[TagT](
   }
 
   def remove(pbTxId: ByteString): AffectedTags[TagT] = remove(TransactionId(pbTxId.toByteStr))
-  def remove(txId: TransactionId): AffectedTags[TagT] =
-    Option(values.getIfPresent(txId)) match {
-      case None => AffectedTags.empty
-      case _ =>
-        log.info(s"Rollback Transactions($txId)")
-        persistentCache.remove(txId)
-        values.put(txId, RemoteData.Absence)
-        AffectedTags(tagsOf(txId))
+  def remove(txId: TransactionId): AffectedTags[TagT] = {
+    val tags = tagsOf(txId)
+    if (tags.isEmpty) AffectedTags.empty
+    else {
+      log.debug(s"Rollback $txId")
+      persistentCache.remove(txId)
+      values.put(txId, RemoteData.Absence)
+      AffectedTags(tags)
     }
+  }
 }

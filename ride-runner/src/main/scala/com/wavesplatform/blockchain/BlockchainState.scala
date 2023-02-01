@@ -154,7 +154,7 @@ object BlockchainState extends ScorexLogging {
 
             processor.process(event.getUpdate)
             if (h >= comparedBlocks.workingHeight) {
-              log.debug(s"[$h] Reached the current height, run all scripts")
+              log.info(s"[$h] Reached the current height, run all scripts")
               val r = Working(h)
               processor.runScripts().as {
                 logStatusChanged(r)
