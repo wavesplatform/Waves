@@ -14,6 +14,7 @@ import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
+import com.wavesplatform.ride.app.RideRunnerMetrics
 import com.wavesplatform.ride.app.RideRunnerMetrics.*
 import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.storage.RequestsStorage
@@ -212,10 +213,15 @@ class BlockchainProcessor(
     // See getCachedResultOrRun: it takes some time to run a script and later add it to the storage.
     accumulatedChanges = ProcessResult(affectedScripts = accumulatedChanges.affectedScripts -- affectedScripts.map(_.key))
 
-    Task
+    val r = Task
       .parTraverseUnordered(affectedScripts)(runScript(_, hasCaches = true))
       .as(())
       .executeOn(runScriptsScheduler)
+
+    if (forceAll) {
+      val startedTimer = RideRunnerMetrics.rideScriptForceRunTime.start()
+      r.tapEval(_ => Task.now(startedTimer.stop()))
+    } else r
   }
 
   override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] = blockchainStorage.blockHeaders.getLocal(height).map(_.id() == id)

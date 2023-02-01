@@ -25,6 +25,10 @@ class RideRunnerMetrics(globalConfig: Config) extends AutoCloseable with ScorexL
 }
 
 object RideRunnerMetrics {
+  val lastKnownHeight = Kamon.gauge("ride.height", "The last known blockchain height").withoutTags()
+
+  val rideScriptForceRunTime = Kamon.timer("ride.script.force-run", "Force run (all) script running time").withoutTags()
+
   val rideScriptTotalNumber = Kamon.gauge("ride.script.number", "Total registered RIDE scripts").withoutTags()
   val rideScriptCacheHits   = Kamon.counter("ride.script.cache.hit", "Cache hits for whole script").withoutTags()
   val rideScriptCacheMisses = Kamon.counter("ride.script.cache.miss", "Cache misses for whole script").withoutTags()
