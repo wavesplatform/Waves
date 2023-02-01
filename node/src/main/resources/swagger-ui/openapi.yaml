@@ -175,7 +175,7 @@ paths:
                 $ref: '#/components/schemas/Balance'
             application/json;large-significand-format=string:
               schema:
-                $ref: '#/components/schemas/Balance'
+                $ref: '#/components/schemas/BalanceLSF'
   /addresses/balance:
     get:
       tags:
@@ -287,7 +287,7 @@ paths:
             application/json;large-significand-format=string:
               schema:
                 allOf:
-                  -  $ref: '#/components/schemas/Balance'
+                  -  $ref: '#/components/schemas/BalanceLSF'
                 example:
                   address: 2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY
                   confirmations: 3
@@ -333,7 +333,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/DataEntry'
+                  $ref: '#/components/schemas/DataEntryLSF'
     post:
       tags:
         - addresses
@@ -380,7 +380,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/DataEntry'
+                  $ref: '#/components/schemas/DataEntryLSF'
       x-codegen-request-body-name: keys
   '/addresses/validate/{address}':
     get:
@@ -598,7 +598,7 @@ paths:
             application/json;large-significand-format=string:
               schema:
                 allOf:
-                  -  $ref: '#/components/schemas/Balance'
+                  -  $ref: '#/components/schemas/BalanceLSF'
                 example:
                   address: 2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY
                   confirmations: 3
@@ -631,7 +631,7 @@ paths:
             application/json;large-significand-format=string:
               schema:
                 allOf:
-                  -  $ref: '#/components/schemas/Balance'
+                  -  $ref: '#/components/schemas/BalanceLSF'
                 example:
                   address: 2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY
                   confirmations: 3
@@ -660,7 +660,7 @@ paths:
                 $ref: '#/components/schemas/DataEntry'
             application/json;large-significand-format=string:
               schema:
-                $ref: '#/components/schemas/DataEntry'
+                $ref: '#/components/schemas/DataEntryLSF'
   '/blocks/{id}':
     get:
       tags:
@@ -679,7 +679,7 @@ paths:
                 $ref: '#/components/schemas/Block'
             application/json;large-significand-format=string:
               schema:
-                $ref: '#/components/schemas/Block'
+                $ref: '#/components/schemas/BlockLSF'
   '/blocks/heightByTimestamp/{timestamp}':
     get:
       tags: [ blocks ]
@@ -731,7 +731,7 @@ paths:
                   $ref: '#/components/schemas/Block'
             application/json;large-significand-format=string:
               schema:
-                $ref: '#/components/schemas/Block'
+                $ref: '#/components/schemas/BlockLSF'
               examples:
                 largeSignificandBlock:
                   $ref: '#/components/examples/largeSignificandBlock'
@@ -768,7 +768,7 @@ paths:
                   $ref: '#/components/schemas/Block'
             application/json;large-significand-format=string:
               schema:
-                $ref: '#/components/schemas/Block'
+                $ref: '#/components/schemas/BlockLSF'
               examples:
                 largeSignificandBlock:
                   $ref: '#/components/examples/largeSignificandBlock'
@@ -835,7 +835,7 @@ paths:
                 $ref: '#/components/schemas/Block'
             application/json;large-significand-format=string:
               schema:
-                $ref: '#/components/schemas/Block'
+                $ref: '#/components/schemas/BlockLSF'
               examples:
                 largeSignificandBlock:
                   $ref: '#/components/examples/largeSignificandBlock'
@@ -855,7 +855,7 @@ paths:
                 $ref: '#/components/schemas/Block'
             application/json;large-significand-format=string:
               schema:
-                $ref: '#/components/schemas/Block'
+                $ref: '#/components/schemas/BlockLSF'
               examples:
                 largeSignificandBlock:
                   $ref: '#/components/examples/largeSignificandBlock'
@@ -894,7 +894,7 @@ paths:
                 $ref: '#/components/schemas/BlockHeader'
             application/json;large-significand-format=string:
               schema:
-                $ref: '#/components/schemas/BlockHeader'
+                $ref: '#/components/schemas/BlockHeaderLSF'
               examples:
                 largeSignificandBlock:
                   $ref: '#/components/examples/largeSignificandBlock'
@@ -947,7 +947,7 @@ paths:
                   $ref: '#/components/schemas/BlockHeader'
             application/json;large-significand-format=string:
               schema:
-                $ref: '#/components/schemas/BlockHeader'
+                $ref: '#/components/schemas/BlockHeaderLSF'
               examples:
                 largeSignificandBlock:
                   $ref: '#/components/examples/largeSignificandBlock'
@@ -967,7 +967,7 @@ paths:
                 $ref: '#/components/schemas/BlockHeader'
             application/json;large-significand-format=string:
               schema:
-                $ref: '#/components/schemas/BlockHeader'
+                $ref: '#/components/schemas/BlockHeaderLSF'
               examples:
                 largeSignificandBlock:
                   $ref: '#/components/examples/largeSignificandBlock'
@@ -1180,7 +1180,7 @@ paths:
                 $ref: '#/components/schemas/RewardStatus'
             application/json;large-significand-format=string:
               schema:
-                $ref: '#/components/schemas/RewardStatus'
+                $ref: '#/components/schemas/RewardStatusLSF'
               examples:
                 largeSignificandblockchainRewards:
                   $ref: '#/components/examples/largeSignificandblockchainRewards'
@@ -1207,7 +1207,7 @@ paths:
                 $ref: '#/components/schemas/RewardStatus'
             application/json;large-significand-format=string:
               schema:
-                $ref: '#/components/schemas/RewardStatus'
+                $ref: '#/components/schemas/RewardStatusLSF'
               examples:
                 largeSignificandblockchainRewards:
                   $ref: '#/components/examples/largeSignificandblockchainRewards'
@@ -1319,7 +1319,7 @@ paths:
                 $ref: '#/components/schemas/Transaction'
             application/json;large-significand-format=string:
               schema:
-                $ref: '#/components/schemas/Transaction'
+                $ref: '#/components/schemas/TransactionLSF'
               examples:
                 largeSignificandTransaction:
                   $ref: '#/components/examples/largeSignificandTransaction'
@@ -1355,7 +1355,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Transaction'
+                  $ref: '#/components/schemas/TransactionLSF'
               examples:
                 largeSignificandTransaction:
                   $ref: '#/components/examples/largeSignificandTransaction'
@@ -1403,7 +1403,7 @@ paths:
                   $ref: '#/components/schemas/Transaction'
             application/json;large-significand-format=string:
               schema:
-                $ref: '#/components/schemas/Transaction'
+                $ref: '#/components/schemas/TransactionLSF'
               examples:
                 largeSignificandTransaction:
                   $ref: '#/components/examples/largeSignificandTransaction'
@@ -1463,7 +1463,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Transaction'
+                  $ref: '#/components/schemas/TransactionLSF'
               examples:
                 largeSignificandTransaction:
                   $ref: '#/components/examples/largeSignificandTransaction'
@@ -1508,7 +1508,7 @@ paths:
                 items:
                   type: array
                   items:
-                    $ref: '#/components/schemas/Transaction'
+                    $ref: '#/components/schemas/TransactionLSF'
               examples:
                 largeSignificandTransaction:
                   $ref: '#/components/examples/largeSignificandTransaction'
@@ -1551,7 +1551,7 @@ paths:
                 $ref: '#/components/schemas/Transaction'
             application/json;large-significand-format=string:
               schema:
-                $ref: '#/components/schemas/Transaction'
+                $ref: '#/components/schemas/TransactionLSF'
               examples:
                 largeSignificandTransaction:
                   $ref: '#/components/examples/largeSignificandTransaction'
@@ -1683,7 +1683,7 @@ paths:
                 $ref: '#/components/schemas/Transaction'
             application/json;large-significand-format=string:
               schema:
-                $ref: '#/components/schemas/Transaction'
+                $ref: '#/components/schemas/TransactionLSF'
               examples:
                 largeSignificandTransaction:
                   $ref: '#/components/examples/largeSignificandTransaction'
@@ -2277,7 +2277,7 @@ paths:
                 $ref: '#/components/schemas/AssetBalancesResponse'
             application/json;large-significand-format=string:
               schema:
-                $ref: '#/components/schemas/AssetBalancesResponse'
+                $ref: '#/components/schemas/AssetBalancesResponseLSF'
     post:
       tags:
         - assets
@@ -2343,7 +2343,7 @@ paths:
                 $ref: '#/components/schemas/AssetDetails'
             application/json;large-significand-format=string:
               schema:
-                $ref: '#/components/schemas/AssetDetails'
+                $ref: '#/components/schemas/AssetDetailsLSF'
   /assets/details:
     get:
       tags:
@@ -2476,7 +2476,7 @@ paths:
                 $ref: '#/components/schemas/AssetDistribution'
             application/json;large-significand-format=string:
               schema:
-                $ref: '#/components/schemas/AssetDistribution'
+                $ref: '#/components/schemas/AssetDistributionLSF'
       deprecated: true
   '/assets/{assetId}/distribution/{height}/limit/{limit}':
     get:
@@ -2520,7 +2520,7 @@ paths:
                 $ref: '#/components/schemas/AssetDistribution'
             application/json;large-significand-format=string:
               schema:
-                $ref: '#/components/schemas/AssetDistribution'
+                $ref: '#/components/schemas/AssetDistributionLSF'
   '/assets/nft/{address}/limit/{limit}':
     get:
       tags:
@@ -3419,6 +3419,44 @@ components:
           allOf:
             - $ref: '#/components/schemas/AssetId'
           nullable: true
+    TransactionBaseLSF:
+      type: object
+      required: [ id, timestamp, type, fee ]
+      properties:
+        timestamp:
+          $ref: '#/components/schemas/Timestamp'
+        sender:
+          allOf:
+            - $ref: '#/components/schemas/Address'
+          readOnly: true
+        senderPublicKey:
+          $ref: '#/components/schemas/PublicKey'
+        id:
+          allOf:
+            - $ref: '#/components/schemas/TransactionId'
+          readOnly: true
+        applicationStatus:
+          allOf:
+            - $ref: '#/components/schemas/ApplicationStatus'
+          readOnly: true
+        version:
+          type: integer
+          minimum: 1
+        type:
+          type: integer
+          minimum: 1
+        proofs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Proof'
+        signature:
+          $ref: '#/components/schemas/Signature'
+        fee:
+          type: string
+        feeAssetId:
+          allOf:
+            - $ref: '#/components/schemas/AssetId'
+          nullable: true
     TransactionInfo:
       allOf:
         - $ref: '#/components/schemas/TransactionBase'
@@ -3454,6 +3492,24 @@ components:
           example:
             2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY: 15
             3PPqZ623dAfbmxmnpTjwV6yD5GA5s3PJiUG: 25
+    AssetDistributionLSF:
+      required:
+        - hasNext
+        - last
+        - values
+      type: object
+      properties:
+        hasNext:
+          type: boolean
+        last:
+          $ref: '#/components/schemas/Address'
+        values:
+          additionalProperties:
+            type: string
+          description: map of assetId <-> balance
+          example:
+            2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY: "15"
+            3PPqZ623dAfbmxmnpTjwV6yD5GA5s3PJiUG: "25"
     AssetDetailsBase:
       type: object
       required:
@@ -3471,6 +3527,23 @@ components:
           $ref: '#/components/schemas/AssetDescription'
         decimals:
           $ref: '#/components/schemas/AssetDecimals'
+    AssetDetailsBaseLSF:
+      type: object
+      required:
+        - assetId
+        - name
+        - description
+        - quantity
+        - decimals
+      properties:
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        name:
+          $ref: '#/components/schemas/AssetName'
+        description:
+          $ref: '#/components/schemas/AssetDescription'
+        decimals:
+          type: string
     AssetDetails:
       allOf:
         - $ref: '#/components/schemas/AssetDetailsBase'
@@ -3500,6 +3573,51 @@ components:
             minSponsoredAssetFee:
               type: integer
               format: int64
+            originTransactionId:
+              type: string
+            scriptDetails:
+              type: object
+              required:
+                - script
+                - scriptComplexity
+                - scriptText
+              properties:
+                scriptComplexity:
+                  type: integer
+                  format: int32
+                script:
+                  type: string
+                  format: byte
+                scriptText:
+                  type: string
+    AssetDetailsLSF:
+      allOf:
+        - $ref: '#/components/schemas/AssetDetailsBaseLSF'
+        - type: object
+          required:
+            - issueHeight
+            - issueTimestamp
+            - issuer
+            - minSponsoredAssetFee
+            - reissuable
+            - scriptDetails
+            - scripted
+            - originTransactionId
+          properties:
+            issueHeight:
+              $ref: '#/components/schemas/Height'
+            issueTimestamp:
+              $ref: '#/components/schemas/Timestamp'
+            issuer:
+              $ref: '#/components/schemas/Address'
+            issuerPublicKey:
+              $ref: '#/components/schemas/PublicKey'
+            reissuable:
+              type: boolean
+            scripted:
+              type: boolean
+            minSponsoredAssetFee:
+              type: string
             originTransactionId:
               type: string
             scriptDetails:
@@ -3560,6 +3678,45 @@ components:
           description: Total supply of the asset
         issueTransaction:
           $ref: '#/components/schemas/IssueTransaction'
+    AssetBalanceAndDetailsLSF:
+      required:
+        - assetId
+        - balance
+        - issueTransaction
+        - minSponsoredAssetFee
+        - quantity
+        - reissuable
+        - sponsorBalance
+      type: object
+      properties:
+        assetId:
+          type: string
+          description: Asset ID base58 encoded
+        balance:
+          type: string
+          description: Account balance in the asset
+        reissuable:
+          type: boolean
+          description: Indicates if the asset is reissuable
+        minSponsoredAssetFee:
+          type: string
+          nullable: true
+          description: >-
+            For [sponsored
+            asset](https://docs.waves.tech/en/blockchain/waves-protocol/sponsored-fee)
+            only: the equivalent of 0.001 WAVES
+        sponsorBalance:
+          type: string
+          nullable: true
+          description: >-
+            For [sponsored
+            asset](https://docs.waves.tech/en/blockchain/waves-protocol/sponsored-fee)
+            only: the sponsor balance in WAVES
+        quantity:
+          type: string
+          description: Total supply of the asset
+        issueTransaction:
+          $ref: '#/components/schemas/IssueTransactionLSF'
     AssetBalancesResponse:
       required:
         - address
@@ -3572,6 +3729,18 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AssetBalanceAndDetails'
+    AssetBalancesResponseLSF:
+      required:
+        - address
+        - balances
+      type: object
+      properties:
+        address:
+          type: string
+        balances:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssetBalanceAndDetailsLSF'
     Balance:
       required:
         - address
@@ -3587,6 +3756,20 @@ components:
         balance:
           type: integer
           format: int64
+    BalanceLSF:
+      required:
+        - address
+        - balance
+        - confirmations
+      type: object
+      properties:
+        address:
+          type: string
+        confirmations:
+          type: integer
+          format: int32
+        balance:
+          type: string
     BlockHeader:
       required:
         - blocksize
@@ -3657,9 +3840,87 @@ components:
           type: string
         transactionsRoot:
           type: string
+    BlockHeaderLSF:
+      required:
+        - blocksize
+        - generator
+        - generatorPublicKey
+        - height
+        - nxt-consensus
+        - reference
+        - signature
+        - timestamp
+        - totalFee
+        - transactionCount
+        - version
+        - VRF
+        - transactionsRoot
+      type: object
+      properties:
+        timestamp:
+          type: integer
+          format: int64
+        version:
+          type: integer
+          format: int32
+        height:
+          $ref: '#/components/schemas/Height'
+        totalFee:
+          type: string
+        reference:
+          type: string
+        generator:
+          $ref: '#/components/schemas/Address'
+        generatorPublicKey:
+          $ref: '#/components/schemas/PublicKey'
+        signature:
+          type: string
+        id:
+          type: string
+        nxt-consensus:
+          required:
+            - base-target
+            - generation-signature
+          type: object
+          properties:
+            base-target:
+              type: integer
+              format: int64
+            generation-signature:
+              type: string
+        blocksize:
+          type: integer
+          format: int32
+        transactionCount:
+          type: integer
+          format: int32
+        features:
+          type: array
+          items:
+            type: integer
+            format: int32
+        reward:
+          type: string
+        desiredReward:
+          type: string
+        VRF:
+          type: string
+        transactionsRoot:
+          type: string
     Block:
       allOf:
         - $ref: '#/components/schemas/BlockHeader'
+        - type: object
+          required:
+            - transactions
+          properties:
+            transactions:
+              type: array
+              items:
+                $ref: '#/components/schemas/Transaction'
+    BlockLSF:
+      allOf:
+        - $ref: '#/components/schemas/BlockHeaderLSF'
         - type: object
           required:
             - transactions
@@ -3775,6 +4036,21 @@ components:
         value:
           type: integer
           format: int64
+    IntegerEntryLSF:
+      required:
+        - key
+        - type
+        - value
+      type: object
+      properties:
+        key:
+          type: string
+        type:
+          type: string
+          enum:
+            - integer
+        value:
+          type: string
     StringEntry:
       required:
         - key
@@ -3802,6 +4078,19 @@ components:
           binary: '#/components/schemas/BinaryEntry'
           boolean: '#/components/schemas/BooleanEntry'
           integer: '#/components/schemas/IntegerEntry'
+          string: '#/components/schemas/StringEntry'
+    DataEntryLSF:
+      oneOf:
+        - $ref: '#/components/schemas/BinaryEntry'
+        - $ref: '#/components/schemas/BooleanEntry'
+        - $ref: '#/components/schemas/IntegerEntryLSF'
+        - $ref: '#/components/schemas/StringEntry'
+      discriminator:
+        propertyName: type
+        mapping:
+          binary: '#/components/schemas/BinaryEntry'
+          boolean: '#/components/schemas/BooleanEntry'
+          integer: '#/components/schemas/IntegerEntryLSF'
           string: '#/components/schemas/StringEntry'
     DeleteEntry:
       required:
@@ -3872,6 +4161,54 @@ components:
             $ref: '#/components/schemas/Signature'
         matcherFeeAssetId:
           $ref: '#/components/schemas/AssetId'
+    OrderLSF:
+      type: object
+      properties:
+        version:
+          type: integer
+          format: int32
+        id:
+          type: string
+        sender:
+          allOf:
+            - $ref: '#/components/schemas/Address'
+          readOnly: true
+        senderPublicKey:
+          $ref: '#/components/schemas/PublicKey'
+        matcherPublicKey:
+          $ref: '#/components/schemas/PublicKey'
+        assetPair:
+          type: object
+          properties:
+            amountAsset:
+              type: string
+              nullable: true
+            priceAsset:
+              type: string
+              nullable: true
+        orderType:
+          type: string
+          enum:
+            - buy
+            - sell
+        amount:
+          type: string
+        price:
+          type: string
+        timestamp:
+          $ref: '#/components/schemas/Timestamp'
+        expiration:
+          $ref: '#/components/schemas/Timestamp'
+        matcherFee:
+          type: string
+        signature:
+          $ref: '#/components/schemas/Signature'
+        proofs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Signature'
+        matcherFeeAssetId:
+          $ref: '#/components/schemas/AssetId'
     RewardStatus:
       required:
         - currentReward
@@ -3894,6 +4231,51 @@ components:
           $ref: '#/components/schemas/Amount'
         minIncrement:
           $ref: '#/components/schemas/Amount'
+        term:
+          type: integer
+          format: int32
+        nextCheck:
+          $ref: '#/components/schemas/Height'
+        votingIntervalStart:
+          $ref: '#/components/schemas/Height'
+        votingInterval:
+          type: integer
+          format: int32
+        votingThreshold:
+          type: integer
+          format: int32
+        votes:
+          type: object
+          required: [ decrease, increase ]
+          properties:
+            increase:
+              type: integer
+              format: int32
+            decrease:
+              type: integer
+              format: int32
+    RewardStatusLSF:
+      required:
+        - currentReward
+        - height
+        - minIncrement
+        - nextCheck
+        - term
+        - totalWavesAmount
+        - votes
+        - votingInterval
+        - votingIntervalStart
+        - votingThreshold
+      type: object
+      properties:
+        height:
+          $ref: '#/components/schemas/Height'
+        totalWavesAmount:
+          type: string
+        currentReward:
+          type: string
+        minIncrement:
+          type: string
         term:
           type: integer
           format: int32
@@ -3948,10 +4330,35 @@ components:
         - $ref: '#/components/schemas/SponsorFeeTransaction'
         - $ref: '#/components/schemas/TransferTransaction'
         - $ref: '#/components/schemas/UpdateAssetInfoTransaction'
+    NonGenesisTransactionLSF:
+      required: [ sender, senderPublicKey, applicationStatus, version, proofs, signature, feeAssetId ]
+      allOf:
+        - $ref: '#/components/schemas/TransactionBaseLSF'
+      oneOf:
+        - $ref: '#/components/schemas/BurnTransactionLSF'
+        - $ref: '#/components/schemas/CreateAliasTransaction'
+        - $ref: '#/components/schemas/DataTransactionLSF'
+        - $ref: '#/components/schemas/ExchangeTransactionLSF'
+        - $ref: '#/components/schemas/GenesisTransactionLSF'
+        - $ref: '#/components/schemas/InvokeScriptTransactionLSF'
+        - $ref: '#/components/schemas/IssueTransactionLSF'
+        - $ref: '#/components/schemas/LeaseCancelTransactionLSF'
+        - $ref: '#/components/schemas/LeaseTransactionLSF'
+        - $ref: '#/components/schemas/MassTransferTransactionLSF'
+        - $ref: '#/components/schemas/ReissueTransactionLSF'
+        - $ref: '#/components/schemas/SetAssetScriptTransaction'
+        - $ref: '#/components/schemas/SetScriptTransaction'
+        - $ref: '#/components/schemas/SponsorFeeTransactionLSF'
+        - $ref: '#/components/schemas/TransferTransactionLSF'
+        - $ref: '#/components/schemas/UpdateAssetInfoTransaction'
     Transaction:
       oneOf:
         - $ref: '#/components/schemas/GenesisTransaction'
         - $ref: '#/components/schemas/NonGenesisTransaction'
+    TransactionLSF:
+      oneOf:
+        - $ref: '#/components/schemas/GenesisTransactionLSF'
+        - $ref: '#/components/schemas/NonGenesisTransactionLSF'
     ApplicationStatus:
       type: string
       enum:
@@ -4001,6 +4408,49 @@ components:
           description: Leased WAVES amount
           allOf:
             - $ref: '#/components/schemas/Amount'
+        height:
+          allOf:
+            - $ref: '#/components/schemas/Height'
+          description: >-
+            The sequential number of the block that contains the origin transaction
+        status:
+          $ref: '#/components/schemas/LeaseStatus'
+        cancelHeight:
+          allOf:
+            - $ref: '#/components/schemas/Height'
+          description: "The sequential number of the block that contains the cancel transaction"
+        cancelTransactionId:
+          allOf:
+            - $ref: '#/components/schemas/TransactionId'
+          description: ID of Lease Cancel or Invoke Script transaction that canceled the lease
+    LeaseInfoLSF:
+      required:
+        - id
+        - originTransactionId
+        - sender
+        - recipient
+        - amount
+        - height
+        - status
+      type: object
+      properties:
+        id:
+          allOf:
+            - $ref: '#/components/schemas/LeaseId'
+          description: Lease ID
+        originTransactionId:
+          allOf:
+            - $ref: '#/components/schemas/TransactionId'
+          description: ID of Lease or Invoke Script transaction that created the lease
+        sender:
+          $ref: '#/components/schemas/Address'
+        recipient:
+          allOf:
+            - $ref: '#/components/schemas/Address'
+          description: Lease recipient address
+        amount:
+          type: string
+          description: Leased WAVES amount
         height:
           allOf:
             - $ref: '#/components/schemas/Height'
@@ -4069,6 +4519,14 @@ components:
           $ref: '#/components/schemas/AssetId'
         amount:
           $ref: '#/components/schemas/Amount'
+    BurnTransactionLSF:
+      type: object
+      required: [ assetId, amount ]
+      properties:
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        amount:
+          type: string
     CreateAliasTransaction:
       type: object
       required: [ alias ]
@@ -4085,6 +4543,16 @@ components:
           items:
             oneOf:
               - $ref: '#/components/schemas/DataEntry'
+              - $ref: '#/components/schemas/DeleteEntry'
+    DataTransactionLSF:
+      type: object
+      required: [ data ]
+      properties:
+        data:
+          type: array
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/DataEntryLSF'
               - $ref: '#/components/schemas/DeleteEntry'
     ExchangeTransaction:
       type: object
@@ -4108,6 +4576,28 @@ components:
           $ref: '#/components/schemas/Amount'
         sellMatcherFee:
           $ref: '#/components/schemas/Amount'
+    ExchangeTransactionLSF:
+      type: object
+      required:
+        - order1
+        - order2
+        - amount
+        - price
+        - buyMatcherFee
+        - sellMatcherFee
+      properties:
+        order1:
+          $ref: '#/components/schemas/OrderLSF'
+        order2:
+          $ref: '#/components/schemas/OrderLSF'
+        amount:
+          type: string
+        price:
+          type: string
+        buyMatcherFee:
+          type: string
+        sellMatcherFee:
+          type: string
     GenesisTransaction:
       type: object
       required:
@@ -4133,6 +4623,28 @@ components:
           $ref: '#/components/schemas/Address'
         amount:
           $ref: '#/components/schemas/Amount'
+    GenesisTransactionLSF:
+      type: object
+      required:
+        - id
+        - fee
+        - timestamp
+        - signature
+        - recipient
+        - amount
+      properties:
+        id:
+          $ref: '#/components/schemas/Signature'
+        signature:
+          $ref: '#/components/schemas/Signature'
+        fee:
+          type: string
+        timestamp:
+          $ref: '#/components/schemas/Timestamp'
+        recipient:
+          $ref: '#/components/schemas/Address'
+        amount:
+          type: string
     InvokeScriptTransaction:
       type: object
       required:
@@ -4183,6 +4695,56 @@ components:
                       value } objects
         stateChanges:
           $ref: '#/components/schemas/StateChanges'
+    InvokeScriptTransactionLSF:
+      type: object
+      required:
+        - dApp
+        - payment
+        - call
+        - stateChanges
+      properties:
+        dApp:
+          $ref: '#/components/schemas/AddressOrAlias'
+        payment:
+          type: array
+          items:
+            type: object
+            properties:
+              amount:
+                type: string
+              assetId:
+                allOf:
+                  - $ref: '#/components/schemas/AssetId'
+                nullable: true
+        call:
+          type: object
+          properties:
+            function:
+              type: string
+            args:
+              type: array
+              items:
+                required:
+                  - type
+                  - value
+                type: object
+                properties:
+                  type:
+                    type: string
+                    enum:
+                      - binary
+                      - boolean
+                      - integer
+                      - list
+                      - string
+                  value:
+                    type: object
+                    properties: { }
+                    description: >-
+                      binary/boolean/integer/string value or list of { type,
+                      value } objects
+        stateChanges:
+          $ref: '#/components/schemas/StateChangesLSF'
     IssueTransaction:
       type: object
       required:
@@ -4212,6 +4774,34 @@ components:
         script:
           type: string
           format: byte
+    IssueTransactionLSF:
+      type: object
+      required:
+        - assetId
+        - name
+        - quantity
+        - reissuable
+        - decimals
+        - description
+        - script
+      properties:
+        assetId:
+          allOf:
+            - $ref: '#/components/schemas/AssetId'
+          readOnly: true
+        name:
+          $ref: '#/components/schemas/AssetName'
+        quantity:
+          type: string
+        reissuable:
+          type: boolean
+        decimals:
+          $ref: '#/components/schemas/AssetDecimals'
+        description:
+          $ref: '#/components/schemas/AssetDescription'
+        script:
+          type: string
+          format: byte
     LeaseCancelTransaction:
       type: object
       required:
@@ -4222,6 +4812,16 @@ components:
           $ref: '#/components/schemas/LeaseId'
         lease:
           $ref: '#/components/schemas/LeaseInfo'
+    LeaseCancelTransactionLSF:
+      type: object
+      required:
+        - leaseId
+        - lease
+      properties:
+        leaseId:
+          $ref: '#/components/schemas/LeaseId'
+        lease:
+          $ref: '#/components/schemas/LeaseInfoLSF'
     LeaseTransaction:
       type: object
       required:
@@ -4230,6 +4830,16 @@ components:
       properties:
         amount:
           $ref: '#/components/schemas/Amount'
+        recipient:
+          $ref: '#/components/schemas/AddressOrAlias'
+    LeaseTransactionLSF:
+      type: object
+      required:
+        - amount
+        - recipient
+      properties:
+        amount:
+          type: string
         recipient:
           $ref: '#/components/schemas/AddressOrAlias'
     MassTransferTransaction:
@@ -4263,6 +4873,35 @@ components:
                 $ref: '#/components/schemas/AddressOrAlias'
               amount:
                 $ref: '#/components/schemas/Amount'
+    MassTransferTransactionLSF:
+      type: object
+      required:
+        - assetId
+        - attachment
+        - transfersCount
+        - totalAmount
+        - transfers
+      properties:
+        assetId:
+          type: string
+          nullable: true
+        attachment:
+          type: string
+        transferCount:
+          type: integer
+          format: int32
+          readOnly: true
+        totalAmount:
+          type: string
+        transfers:
+          type: array
+          items:
+            type: object
+            properties:
+              recipient:
+                $ref: '#/components/schemas/AddressOrAlias'
+              amount:
+                type: string
     ReissueTransaction:
       type: object
       required:
@@ -4274,6 +4913,19 @@ components:
           $ref: '#/components/schemas/AssetId'
         quantity:
           $ref: '#/components/schemas/Amount'
+        reissuable:
+          type: boolean
+    ReissueTransactionLSF:
+      type: object
+      required:
+        - assetId
+        - quantity
+        - reissuable
+      properties:
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        quantity:
+          type: string
         reissuable:
           type: boolean
     SetAssetScriptTransaction:
@@ -4307,6 +4959,16 @@ components:
           type: integer
           format: int64
           minimum: 1
+    SponsorFeeTransactionLSF:
+      type: object
+      required:
+        - assetId
+        - minSponsoredAssetFee
+      properties:
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        minSponsoredAssetFee:
+          type: string
     TransferTransaction:
       type: object
       required:
@@ -4330,6 +4992,29 @@ components:
           $ref: '#/components/schemas/Amount'
         attachment:
           type: string
+    TransferTransactionLSF:
+      type: object
+      required:
+        - recipient
+        - assetId
+        - amount
+        - attachment
+        - feeAsset
+      properties:
+        recipient:
+          $ref: '#/components/schemas/AddressOrAlias'
+        assetId:
+          allOf:
+            - $ref: '#/components/schemas/AssetId'
+          nullable: true
+        feeAsset:
+          allOf:
+            - $ref: '#/components/schemas/AssetId'
+          nullable: true
+        amount:
+          type: string
+        attachment:
+          type: string
     UpdateAssetInfoTransaction:
       type: object
       required:
@@ -4347,6 +5032,10 @@ components:
       oneOf:
         - $ref: '#/components/schemas/DataEntry'
         - $ref: '#/components/schemas/DeleteEntry'
+    DataActionLSF:
+      oneOf:
+        - $ref: '#/components/schemas/DataEntryLSF'
+        - $ref: '#/components/schemas/DeleteEntry'
     TransferAction:
       type: object
       required:
@@ -4362,9 +5051,36 @@ components:
           nullable: true
         amount:
           $ref: '#/components/schemas/Amount'
+    TransferActionLSF:
+      type: object
+      required:
+        - address
+        - asset
+        - amount
+      properties:
+        address:
+          $ref: '#/components/schemas/Address'
+        asset:
+          allOf:
+            - $ref: '#/components/schemas/AssetId'
+          nullable: true
+        amount:
+          type: string
     IssueAction:
       allOf:
         - $ref: '#/components/schemas/AssetDetailsBase'
+        - type: object
+          required:
+            - isReissuable
+            - compiledScript
+          properties:
+            isReissuable:
+              type: boolean
+            compiledScript:
+              type: string
+    IssueActionLSF:
+      allOf:
+        - $ref: '#/components/schemas/AssetDetailsBaseLSF'
         - type: object
           required:
             - isReissuable
@@ -4388,21 +5104,66 @@ components:
         quantity:
           type: integer
           format: int64
+    ReissueActionLSF:
+      type: object
+      required:
+        - assetId
+        - isReissuable
+        - quantity
+      properties:
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        isReissuable:
+          type: boolean
+        quantity:
+          type: string
     BurnAction:
       type: object
       required:
         - assetId
         - quantity
-      properties: { }
+      properties:
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        quantity:
+          type: integer
+          format: int64
+    BurnActionLSF:
+      type: object
+      required:
+        - assetId
+        - quantity
+      properties:
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        quantity:
+          type: string
     SponsorFeeAction:
       type: object
       required:
         - assetId
         - minSponsoredAssetFee
-      properties: { }
+      properties:
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        minSponsoredAssetFee:
+          type: integer
+    SponsorFeeActionLSF:
+      type: object
+      required:
+        - assetId
+        - minSponsoredAssetFee
+      properties:
+        assetId:
+          $ref: '#/components/schemas/AssetId'
+        minSponsoredAssetFee:
+          type: string
     LeaseAction:
       allOf:
         - $ref: '#/components/schemas/LeaseInfo'
+    LeaseActionLSF:
+      allOf:
+        - $ref: '#/components/schemas/LeaseInfoLSF'
     LeaseCancelAction:
       type: object
       required:
@@ -4420,6 +5181,18 @@ components:
           type: object
         stateChanges:
           $ref: '#/components/schemas/StateChanges'
+    InvokeActionLSF:
+      type: object
+      required:
+        - dApp
+        - payment
+        - call
+        - stateCahnges
+      properties:
+        error:
+          type: object
+        stateChanges:
+          $ref: '#/components/schemas/StateChangesLSF'
     StateChanges:
       type: object
       required:
@@ -4469,6 +5242,55 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/InvokeAction'
+    StateChangesLSF:
+      type: object
+      required:
+        - data
+        - transfers
+        - issues
+        - reissues
+        - burns
+        - sponsorFees
+        - leases
+        - leaseCancel
+        - invokes
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataActionLSF'
+        transfers:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransferActionLSF'
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/IssueActionLSF'
+        reissues:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReissueActionLSF'
+        burns:
+          type: array
+          items:
+            $ref: '#/components/schemas/BurnActionLSF'
+        sponsorFees:
+          type: array
+          items:
+            $ref: '#/components/schemas/SponsorFeeActionLSF'
+        leases:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeaseActionLSF'
+        leaseCancel:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeaseCancelAction'
+        invokes:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvokeActionLSF'
   responses:
     Height:
       description: Block height
