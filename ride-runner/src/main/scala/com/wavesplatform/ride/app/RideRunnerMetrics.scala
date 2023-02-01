@@ -4,7 +4,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.utils.ScorexLogging
 import kamon.Kamon
-import kamon.metric.Timer
+import kamon.metric.{MeasurementUnit, Timer}
 
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
@@ -27,7 +27,8 @@ class RideRunnerMetrics(globalConfig: Config) extends AutoCloseable with ScorexL
 object RideRunnerMetrics {
   val lastKnownHeight = Kamon.gauge("ride.height", "The last known blockchain height").withoutTags()
 
-  val rideScriptForceRunTime = Kamon.timer("ride.script.force-run", "Force run (all) script running time").withoutTags()
+  private val rideScriptRunOnHeightTime_ = Kamon.gauge("ride.script.run-on-height", "Run script running time", MeasurementUnit.time.nanoseconds)
+  def rideScriptRunOnHeightTime(force: Boolean) = rideScriptRunOnHeightTime_.withTag("force", force)
 
   val rideScriptTotalNumber = Kamon.gauge("ride.script.number", "Total registered RIDE scripts").withoutTags()
   val rideScriptCacheHits   = Kamon.counter("ride.script.cache.hit", "Cache hits for whole script").withoutTags()

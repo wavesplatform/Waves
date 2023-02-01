@@ -218,10 +218,8 @@ class BlockchainProcessor(
       .as(())
       .executeOn(runScriptsScheduler)
 
-    if (forceAll) {
-      val startedTimer = RideRunnerMetrics.rideScriptForceRunTime.start()
-      r.tapEval(_ => Task.now(startedTimer.stop()))
-    } else r
+    val start = System.nanoTime()
+    r.tapEval(_ => Task.now(RideRunnerMetrics.rideScriptRunOnHeightTime(forceAll).update(System.nanoTime() - start)))
   }
 
   override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] = blockchainStorage.blockHeaders.getLocal(height).map(_.id() == id)
