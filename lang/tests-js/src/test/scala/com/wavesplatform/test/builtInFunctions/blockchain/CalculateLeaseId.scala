@@ -3,6 +3,7 @@ package com.wavesplatform.test.builtInFunctions.blockchain
 import com.wavesplatform.JsTestBase
 import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomDigestAlgorithmTypeArrayElement, randomIssuesArrayElement, randomStringArrayElement}
 import testHelpers.GeneratorContractsForBuiltInFunctions
+import testHelpers.TestDataConstantsAndMethods.{CANT_FIND_A_FUNCTION_OVERLOAD, CANT_FIND_FUNCTION, invalidFunctionError, oldVersions, versionsSupportingTheNewFeatures}
 import utest.{Tests, test}
 
 object CalculateLeaseId extends JsTestBase {
@@ -11,113 +12,52 @@ object CalculateLeaseId extends JsTestBase {
   private val invalidCalculateLeaseId       = "calculateLeaseId()"
 
   val tests: Tests = Tests {
-    test("check: function calculateLeaseId for V5 and more compiles for address") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
+    test("Functions calculateLeaseId for V5 and more compiles for address") {
+      for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeForCalculateLeaseId(
-          randomAddressDataArrayElement,
-          calculateLeaseId
-        )
-        assertCompileSuccessDApp(script, version)
+        for (
+          (data, function) <- Seq(
+            (randomAddressDataArrayElement, calculateLeaseId),
+            (randomAddressDataArrayElement, calculateLeaseIdArgBeforeFunc),
+            (randomAliasDataArrayElement, calculateLeaseId),
+            (randomAliasDataArrayElement, calculateLeaseIdArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.codeForCalculateLeaseId(data, function)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
-    test("check: function calculateLeaseId for V5 and more (argument before function) compiles for address") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
+    test("negative cases CalculateAssetId for version V5 and more") {
+      for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeForCalculateLeaseId(
-          randomAddressDataArrayElement,
-          calculateLeaseIdArgBeforeFunc
-        )
-        assertCompileSuccessDApp(script, version)
+        for (
+          (data, function, error) <- Seq(
+            (randomStringArrayElement, calculateLeaseId, CANT_FIND_A_FUNCTION_OVERLOAD),
+            (randomDigestAlgorithmTypeArrayElement, calculateLeaseIdArgBeforeFunc, CANT_FIND_A_FUNCTION_OVERLOAD),
+            (randomAddressDataArrayElement, invalidCalculateLeaseId, invalidFunctionError("calculateLeaseId", 1)),
+            (randomAliasDataArrayElement, invalidCalculateLeaseId, invalidFunctionError("calculateLeaseId", 1)),
+          )
+        ) {
+          val script = precondition.codeForCalculateLeaseId(data, function)
+          assertCompileErrorDApp(script, version, error)
+        }
       }
     }
 
-    test("check: function calculateLeaseId for V5 and more compiles for alias") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
+    test("negative cases CalculateAssetId for version V3, V4") {
+      for (version <- oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeForCalculateLeaseId(
-          randomAliasDataArrayElement,
-          calculateLeaseId
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function calculateLeaseId for V5 and more (argument before function) compiles for alias") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeForCalculateLeaseId(
-          randomAliasDataArrayElement,
-          calculateLeaseIdArgBeforeFunc
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("compilation error: calculateLeaseId Can't find a function overload") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeForCalculateLeaseId(
-          randomStringArrayElement,
-          calculateLeaseId
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: calculateLeaseId Can't find a function overload (argument before function)") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeForCalculateLeaseId(
-          randomDigestAlgorithmTypeArrayElement,
-          calculateLeaseIdArgBeforeFunc
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: calculateLeaseId Can't find a function overload") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeForCalculateLeaseId(
-          randomStringArrayElement,
-          invalidCalculateLeaseId
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: function calculateLeaseId for V5 and more requires 1 argument") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeForCalculateLeaseId(
-          randomDigestAlgorithmTypeArrayElement,
-          invalidCalculateLeaseId
-        )
-        assertCompileErrorDApp(script, version, testData.invalidFunctionError("calculateLeaseId", 1))
-      }
-    }
-
-    test("compilation error: calculateLeaseId function is missing") {
-      for (version <- testData.oldVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.codeForCalculateLeaseId(
-          randomIssuesArrayElement,
-          calculateLeaseId
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_FUNCTION)
-      }
-    }
-
-    test("compilation error: calculateLeaseId (argument before function) function is missing") {
-      for (version <- testData.oldVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.codeForCalculateLeaseId(
-          randomIssuesArrayElement,
-          calculateLeaseIdArgBeforeFunc
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_FUNCTION)
+        for (
+          (data, function) <- Seq(
+            (randomIssuesArrayElement, calculateLeaseId),
+            (randomIssuesArrayElement, calculateLeaseIdArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.codeForCalculateLeaseId(data, function)
+          assertCompileErrorDApp(script, version, CANT_FIND_FUNCTION)
+        }
       }
     }
   }

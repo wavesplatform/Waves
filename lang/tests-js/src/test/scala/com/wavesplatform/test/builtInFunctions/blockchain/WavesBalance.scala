@@ -2,196 +2,84 @@ package com.wavesplatform.test.builtInFunctions.blockchain
 
 import com.wavesplatform.JsTestBase
 import com.wavesplatform.lang.directives.values.V3
-import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomDigestAlgorithmTypeArrayElement, randomInt}
+import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomDigestAlgorithmTypeArrayElement, randomInt, randomStringArrayElement}
 import testHelpers.GeneratorContractsForBuiltInFunctions
-import testHelpers.TestDataConstantsAndMethods.thisVariable
+import testHelpers.TestDataConstantsAndMethods.{actualVersionsWithoutV3, invalidFunctionError, nonMatchingTypes, thisVariable}
 import utest.{Tests, test}
 
 object WavesBalance extends JsTestBase {
   private val wavesBalance              = "wavesBalance(callerTestData)"
   private val wavesBalanceArgBeforeFunc = "callerTestData.wavesBalance()"
   private val invalidWavesBalance       = "wavesBalance()"
-  private val invalidWavesBalanceArg    = s"$randomInt.wavesBalance()"
+  private val invalidWavesBalanceArg    = s"callerTestData.wavesBalance(callerTestData)"
 
   val tests: Tests = Tests {
-    test("check: function wavesBalance for version V4 and more compiles for address") {
-      for (version <- testData.actualVersionsWithoutV3) {
+    test(" Functions wavesBalance for version V4 and more compiles for address, alias and 'this'") {
+      for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BalanceDetails", version)
-        val script = precondition.onlyMatcherContract(
-          randomAddressDataArrayElement,
-          wavesBalance
-        )
-        assertCompileSuccessDApp(script, version)
+        for (
+          (data, function) <- Seq(
+            (randomAddressDataArrayElement, wavesBalance),
+            (randomAliasDataArrayElement, wavesBalance),
+            (thisVariable, wavesBalance),
+            (randomAddressDataArrayElement, wavesBalanceArgBeforeFunc),
+            (randomAliasDataArrayElement, wavesBalanceArgBeforeFunc),
+            (thisVariable, wavesBalanceArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.onlyMatcherContract(data, function)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
-    test("check: function wavesBalance for version V4 and more (argument before function) compiles for address") {
-      for (version <- testData.actualVersionsWithoutV3) {
+    test(" Functions wavesBalance for version V4 and more - negative cases") {
+      for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BalanceDetails", version)
-        val script = precondition.onlyMatcherContract(
-          randomAddressDataArrayElement,
-          wavesBalanceArgBeforeFunc
-        )
-        assertCompileSuccessDApp(script, version)
+        for (
+          (data, function, error) <- Seq(
+            (randomDigestAlgorithmTypeArrayElement, wavesBalance, nonMatchingTypes("Address|Alias")),
+            (randomStringArrayElement, wavesBalanceArgBeforeFunc, nonMatchingTypes("Address|Alias")),
+            (randomAddressDataArrayElement, invalidWavesBalanceArg, invalidFunctionError("wavesBalance", 1)),
+            (randomAliasDataArrayElement, invalidWavesBalance, invalidFunctionError("wavesBalance", 1))
+          )
+        ) {
+          val script = precondition.onlyMatcherContract(data, function)
+          assertCompileErrorDApp(script, version, error)
+        }
       }
     }
 
-    test("check: function wavesBalance for version V4 and more compiles for 'this'") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BalanceDetails", version)
-        val script = precondition.onlyMatcherContract(
-          thisVariable,
-          wavesBalance
-        )
-        assertCompileSuccessDApp(script, version)
+    test(" Functions wavesBalance for V3 compiles for address, alias and 'this'") {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
+        for (
+          (data, function) <- Seq(
+            (randomAddressDataArrayElement, wavesBalance),
+            (randomAliasDataArrayElement, wavesBalance),
+            (thisVariable, wavesBalance),
+            (randomAddressDataArrayElement, wavesBalanceArgBeforeFunc),
+            (randomAliasDataArrayElement, wavesBalanceArgBeforeFunc),
+            (thisVariable, wavesBalanceArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.onlyMatcherContract(data, function)
+          assertCompileSuccessDApp(script, V3)
       }
-    }
-
-    test("check: function wavesBalance for version V4 and more (argument before function) compiles for 'this'") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BalanceDetails", version)
-        val script = precondition.onlyMatcherContract(
-          thisVariable,
-          wavesBalanceArgBeforeFunc
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function wavesBalance for version V4 and more compiles for alias") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BalanceDetails", version)
-        val script = precondition.onlyMatcherContract(
-          randomAliasDataArrayElement,
-          wavesBalance
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function wavesBalance for version V4 and more (argument before function) compiles for alias") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BalanceDetails", version)
-        val script = precondition.onlyMatcherContract(
-          randomAliasDataArrayElement,
-          wavesBalanceArgBeforeFunc
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("compilation error: wavesBalance for version V4 and more Non-matching type") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BalanceDetails", version)
-        val script = precondition.onlyMatcherContract(
-          randomDigestAlgorithmTypeArrayElement,
-          wavesBalance
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("Address|Alias"))
-      }
-    }
-
-    test("compilation error: wavesBalance for version V4 and more Non-matching type (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BalanceDetails", version)
-        val script = precondition.onlyMatcherContract(
-          randomDigestAlgorithmTypeArrayElement,
-          invalidWavesBalanceArg
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("Address|Alias"))
-      }
-    }
-
-    test("compilation error: Function 'wavesBalance for version V4 and more' requires 1 arguments") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BalanceDetails", version)
-        val script = precondition.onlyMatcherContract(
-          randomAddressDataArrayElement,
-          invalidWavesBalance
-        )
-        assertCompileErrorDApp(script, version, testData.invalidFunctionError("wavesBalance", 1))
-      }
-    }
-
-    test("check: function wavesBalance for V3 compiles for address") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
-      val script = precondition.onlyMatcherContract(
-        randomAddressDataArrayElement,
-        wavesBalance
-      )
-      assertCompileSuccessDApp(script, V3)
-    }
-
-    test("check: function wavesBalance for V3 (argument before function) compiles for address") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
-      val script = precondition.onlyMatcherContract(
-        randomAddressDataArrayElement,
-        wavesBalanceArgBeforeFunc
-      )
-      assertCompileSuccessDApp(script, V3)
-    }
-
-    test("check: function wavesBalance for V3 compiles for 'this'") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
-      val script = precondition.onlyMatcherContract(
-        thisVariable,
-        wavesBalance
-      )
-      assertCompileSuccessDApp(script, V3)
-    }
-
-    test("check: function wavesBalance for V3 (argument before function) compiles for 'this'") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
-      val script = precondition.onlyMatcherContract(
-        thisVariable,
-        wavesBalanceArgBeforeFunc
-      )
-      assertCompileSuccessDApp(script, V3)
-    }
-
-    test("check: function wavesBalance for V3 compiles for alias") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
-      val script = precondition.onlyMatcherContract(
-        randomAliasDataArrayElement,
-        wavesBalance
-      )
-      assertCompileSuccessDApp(script, V3)
-    }
-
-    test("check: function wavesBalance for V3 (argument before function) compiles for alias") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
-      val script = precondition.onlyMatcherContract(
-        randomAliasDataArrayElement,
-        wavesBalanceArgBeforeFunc
-      )
-      assertCompileSuccessDApp(script, V3)
     }
 
     test("compilation error: wavesBalance for V3 Non-matching type") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
-      val script = precondition.onlyMatcherContract(
-        randomDigestAlgorithmTypeArrayElement,
-        wavesBalance
-      )
-      assertCompileErrorDApp(script, V3, testData.nonMatchingTypes("Address|Alias"))
-    }
-
-    test("compilation error: wavesBalance for V3 Non-matching type (argument before function)") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
-      val script = precondition.onlyMatcherContract(
-        randomDigestAlgorithmTypeArrayElement,
-        invalidWavesBalanceArg
-      )
-      assertCompileErrorDApp(script, V3, testData.nonMatchingTypes("Address|Alias"))
-    }
-
-    test("compilation error: Function 'wavesBalance for V3' requires 1 arguments") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
-      val script = precondition.onlyMatcherContract(
-        randomAddressDataArrayElement,
-        invalidWavesBalance
-      )
-      assertCompileErrorDApp(script, V3, testData.invalidFunctionError("wavesBalance", 1))
+      for (
+        (data, function, error) <- Seq(
+          (randomDigestAlgorithmTypeArrayElement, wavesBalance, nonMatchingTypes("Address|Alias")),
+          (randomStringArrayElement, wavesBalanceArgBeforeFunc, nonMatchingTypes("Address|Alias")),
+          (randomAddressDataArrayElement, invalidWavesBalanceArg, invalidFunctionError("wavesBalance", 1)),
+          (randomAliasDataArrayElement, invalidWavesBalance, invalidFunctionError("wavesBalance", 1))
+        )
+      ) {
+        val script = precondition.onlyMatcherContract(data, function)
+        assertCompileErrorDApp(script, V3, error)
+      }
     }
   }
 }

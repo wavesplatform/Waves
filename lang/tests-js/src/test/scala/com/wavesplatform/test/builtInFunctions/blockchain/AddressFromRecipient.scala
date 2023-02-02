@@ -7,108 +7,46 @@ import testHelpers.TestDataConstantsAndMethods.thisVariable
 import utest.{Tests, test}
 
 object AddressFromRecipient extends JsTestBase {
-  private val addressFromRecipient = "addressFromRecipient(addressOrAlias)"
+  private val addressFromRecipient              = "addressFromRecipient(addressOrAlias)"
   private val addressFromRecipientArgBeforeFunc = "addressOrAlias.addressFromRecipient()"
-  private val invalidFunc = "addressFromRecipient()"
+  private val invalidFunc                       = "addressFromRecipient()"
 
   val tests: Tests = Tests {
-    test("check: function addressFromRecipient compiles for address") {
+    test("functions addressFromRecipient compiles for address, alias and 'this'") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeForAddressFromRecipient(
-          randomAddressDataArrayElement,
-          addressFromRecipient,
-          randomAddressDataArrayElement
-        )
-        assertCompileSuccessExpression(script, version)
+        for (
+          (addressOrAlias, function, address) <- Seq(
+            (randomAddressDataArrayElement, addressFromRecipient, randomAddressDataArrayElement),
+            (randomAliasDataArrayElement, addressFromRecipient, randomAddressDataArrayElement),
+            (thisVariable, addressFromRecipient, randomAddressDataArrayElement),
+            (randomAddressDataArrayElement, addressFromRecipientArgBeforeFunc, randomAddressDataArrayElement),
+            (randomAliasDataArrayElement, addressFromRecipientArgBeforeFunc, randomAddressDataArrayElement),
+            (thisVariable, addressFromRecipientArgBeforeFunc, randomAddressDataArrayElement)
+          )
+        ) {
+          val script = precondition.codeForAddressFromRecipient(addressOrAlias, function, address)
+          assertCompileSuccessExpression(script, version)
+        }
       }
     }
 
-    test("check: function addressFromRecipient compiles for 'this'") {
+    test("addressFromRecipient Non-matching types: expected: Address|Alias") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeForAddressFromRecipient(
-          thisVariable,
-          addressFromRecipient,
-          randomAddressDataArrayElement
-        )
-        assertCompileSuccessExpression(script, version)
+        for (
+          (addressOrAlias, function, address) <- Seq(
+            (randomInt.toString, addressFromRecipient, randomAddressDataArrayElement),
+            (randomInt.toString, addressFromRecipientArgBeforeFunc, randomAddressDataArrayElement)
+          )
+        ) {
+          val script = precondition.codeForAddressFromRecipient(addressOrAlias, function, address)
+          assertCompileErrorExpression(script, version, testData.nonMatchingTypes("Address|Alias"))
+        }
       }
     }
 
-    test("check: function addressFromRecipient compiles for alias") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeForAddressFromRecipient(
-          randomAliasDataArrayElement,
-          addressFromRecipient,
-          randomAddressDataArrayElement
-        )
-        assertCompileSuccessExpression(script, version)
-      }
-    }
-
-    test("check: function addressFromRecipient (argument before function) compiles for address") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeForAddressFromRecipient(
-          randomAddressDataArrayElement,
-          addressFromRecipientArgBeforeFunc,
-          randomAddressDataArrayElement
-        )
-        assertCompileSuccessExpression(script, version)
-      }
-    }
-
-    test("check: function addressFromRecipient (argument before function) compiles for 'this'") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeForAddressFromRecipient(
-          thisVariable,
-          addressFromRecipientArgBeforeFunc,
-          randomAddressDataArrayElement
-        )
-        assertCompileSuccessExpression(script, version)
-      }
-    }
-
-    test("check: function addressFromRecipient (argument before function) compiles for alias") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeForAddressFromRecipient(
-          randomAliasDataArrayElement,
-          addressFromRecipientArgBeforeFunc,
-          randomAddressDataArrayElement
-        )
-        assertCompileSuccessExpression(script, version)
-      }
-    }
-
-    test("compilation error: addressFromRecipient Non-matching types: expected: Address|Alias") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeForAddressFromRecipient(
-          randomInt.toString,
-          addressFromRecipient,
-          randomAddressDataArrayElement
-        )
-        assertCompileErrorExpression(script, version, testData.nonMatchingTypes("Address|Alias"))
-      }
-    }
-
-    test("compilation error: addressFromRecipient (argument before func) Non-matching types: expected: Address|Alias") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeForAddressFromRecipient(
-          randomInt.toString,
-          addressFromRecipientArgBeforeFunc,
-          randomAddressDataArrayElement
-        )
-        assertCompileErrorExpression(script, version, testData.nonMatchingTypes("Address|Alias"))
-      }
-    }
-
-    test("compilation error: Function 'addressFromRecipient' requires 1 arguments") {
+    test("Function 'addressFromRecipient' requires 1 arguments") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script = precondition.codeForAddressFromRecipient(
@@ -119,7 +57,5 @@ object AddressFromRecipient extends JsTestBase {
         assertCompileErrorExpression(script, version, testData.invalidFunctionError("addressFromRecipient", 1))
       }
     }
-
-
   }
 }

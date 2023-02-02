@@ -3,7 +3,7 @@ package com.wavesplatform.test.builtInFunctions.blockchain
 import com.wavesplatform.JsTestBase
 import testHelpers.GeneratorContractsForBuiltInFunctions
 import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomByteVectorArrayElement, randomUnionArrayElement}
-import testHelpers.TestDataConstantsAndMethods.thisVariable
+import testHelpers.TestDataConstantsAndMethods.{GreaterV3ResultIntegerEntry, actualVersions, invalidFunctionError, nonMatchingTypes, rideV3Result, thisVariable}
 import utest.{Tests, test}
 
 object AssetBalance extends JsTestBase {
@@ -16,122 +16,41 @@ object AssetBalance extends JsTestBase {
   private val invalidAssetBalanceFunc = "assetBalance()"
 
   val tests: Tests = Tests {
-    test("check: function AssetBalance compiles for address") {
-      for (version <- testData.actualVersions) {
+    test("Functions assetBalance compiles for address, alias and 'this'") {
+      for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeWithoutMatcher(
-          address,
-          assetBalance,
-          testData.rideV3Result,
-          testData.GreaterV3ResultIntegerEntry
-        )
-        assertCompileSuccessDApp(script, version)
+        for (
+          (addressOrAlias, function) <- Seq(
+            (address, assetBalance),
+            (alias, assetBalance),
+            (thisVariable, assetBalance),
+            (address, assetBalanceArgBeforeFunc),
+            (alias, assetBalanceArgBeforeFunc),
+            (thisVariable, assetBalanceArgBeforeFunc),
+          )
+        ) {
+          val script = precondition.codeWithoutMatcher(addressOrAlias, function, rideV3Result, GreaterV3ResultIntegerEntry)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
-    test("check: function AssetBalance compiles for 'this'") {
-      for (version <- testData.actualVersions) {
+    test("negative cases") {
+      for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeWithoutMatcher(
-          thisVariable,
-          assetBalance,
-          testData.rideV3Result,
-          testData.GreaterV3ResultIntegerEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function AssetBalance compiles for alias") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeWithoutMatcher(
-          alias,
-          assetBalance,
-          testData.rideV3Result,
-          testData.GreaterV3ResultIntegerEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function AssetBalance (argument before function) compiles for address") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeWithoutMatcher(
-          address,
-          assetBalanceArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultIntegerEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function AssetBalance (argument before function) compiles for 'this'") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeWithoutMatcher(
-          thisVariable,
-          assetBalanceArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultIntegerEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function AssetBalance (argument before function) compiles for alias") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeWithoutMatcher(
-          alias,
-          assetBalanceArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultIntegerEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("compilation error: Function 'assetBalance' requires 1 arguments") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeWithoutMatcher(
-          address,
-          invalidAssetBalanceFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultIntegerEntry
-        )
-        assertCompileErrorDApp(script, version, testData.invalidFunctionError("assetBalance", 2))
-      }
-    }
-
-    test("compilation error: Function 'assetBalance' requires 2 arguments") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeWithoutMatcher(
-          address,
-          invalidAssetBalanceFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultIntegerEntry
-        )
-        assertCompileErrorDApp(script, version, testData.invalidFunctionError("assetBalance", 2))
-      }
-    }
-
-    test("compilation error: assetBalance Non-matching types: expected: Address|Alias") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeWithoutMatcher(
-          randomUnionArrayElement,
-          assetBalanceArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultIntegerEntry
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("Address|Alias"))
+        for (
+          (addressOrAlias, function, error) <- Seq(
+            (address, invalidAssetBalanceFunc, invalidFunctionError("assetBalance", 2)),
+            (alias, invalidAssetBalanceFunc, invalidFunctionError("assetBalance", 2)),
+            (thisVariable, invalidAssetBalanceFunc, invalidFunctionError("assetBalance", 2)),
+            (randomUnionArrayElement, assetBalance, nonMatchingTypes("Address|Alias")),
+            (randomByteVectorArrayElement, assetBalanceArgBeforeFunc, nonMatchingTypes("Address|Alias")),
+          )
+        ) {
+          val script = precondition.codeWithoutMatcher(addressOrAlias, function, rideV3Result, GreaterV3ResultIntegerEntry)
+          assertCompileErrorDApp(script, version, error)
+        }
       }
     }
   }
-
 }

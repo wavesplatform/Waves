@@ -2,7 +2,8 @@ package com.wavesplatform.test.builtInFunctions.blockchain
 
 import com.wavesplatform.JsTestBase
 import testHelpers.GeneratorContractsForBuiltInFunctions
-import testHelpers.RandomDataGenerator.{randomAliasDataArrayElement, randomByteVectorArrayElement, randomDigestAlgorithmTypeArrayElement}
+import testHelpers.RandomDataGenerator.{randomAliasDataArrayElement, randomByteVectorArrayElement, randomDigestAlgorithmTypeArrayElement, randomStringArrayElement}
+import testHelpers.TestDataConstantsAndMethods.{actualVersions, invalidFunctionError, nonMatchingTypes}
 import utest.{Tests, test}
 
 object TransactionHeightById extends JsTestBase {
@@ -10,62 +11,39 @@ object TransactionHeightById extends JsTestBase {
   private val transactionHeightByIdArgBeforeFunc = "callerTestData.transactionHeightById()"
 
   private val invalidTransactionHeightById = "transactionHeightById()"
-  private val invalidTransactionHeightByIdArg = s"$randomAliasDataArrayElement.transactionHeightById()"
+  private val invalidTransactionHeightByIdArg = s"callerTestData.transactionHeightById(callerTestData)"
 
 
   val tests: Tests = Tests {
-    test("check: function transactionHeightById compiles") {
-      for (version <- testData.actualVersions) {
+    test("Functions TransactionHeightById compiles") {
+      for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.onlyMatcherContract(
-          randomByteVectorArrayElement,
-          transactionHeightById
-        )
-        assertCompileSuccessDApp(script, version)
+        for (
+          (data, function) <- Seq(
+            (randomByteVectorArrayElement, transactionHeightById),
+            (randomByteVectorArrayElement, transactionHeightByIdArgBeforeFunc),
+          )
+        ) {
+          val script = precondition.onlyMatcherContract(data, function)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
-    test("check: function transactionHeightById (argument before function) compiles") {
-      for (version <- testData.actualVersions) {
+    test("negative cases TransactionHeightById") {
+      for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.onlyMatcherContract(
-          randomByteVectorArrayElement,
-          transactionHeightByIdArgBeforeFunc
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("compilation error: transactionHeightById Non-matching type") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.onlyMatcherContract(
-          randomDigestAlgorithmTypeArrayElement,
-          transactionHeightById
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("ByteVector"))
-      }
-    }
-
-    test("compilation error: transactionHeightById Non-matching type (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.onlyMatcherContract(
-          randomDigestAlgorithmTypeArrayElement,
-          invalidTransactionHeightByIdArg
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("ByteVector"))
-      }
-    }
-
-    test("compilation error: Function 'transactionHeightById' requires 1 arguments") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.onlyMatcherContract(
-          randomByteVectorArrayElement,
-          invalidTransactionHeightById
-        )
-        assertCompileErrorDApp(script, version, testData.invalidFunctionError("transactionHeightById", 1))
+        for (
+          (data, function, error) <- Seq(
+            (randomDigestAlgorithmTypeArrayElement, transactionHeightById, nonMatchingTypes("ByteVector")),
+            (randomStringArrayElement, transactionHeightByIdArgBeforeFunc, nonMatchingTypes("ByteVector")),
+            (randomByteVectorArrayElement, invalidTransactionHeightById, invalidFunctionError("transactionHeightById", 1)),
+            (randomByteVectorArrayElement, invalidTransactionHeightByIdArg, invalidFunctionError("transactionHeightById", 1))
+          )
+        ) {
+          val script = precondition.onlyMatcherContract(data, function)
+          assertCompileErrorDApp(script, version, error)
+        }
       }
     }
   }

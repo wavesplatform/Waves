@@ -1,8 +1,9 @@
 package com.wavesplatform.test.builtInFunctions.blockchain
 
 import _root_.testHelpers.GeneratorContractsForBuiltInFunctions
-import _root_.testHelpers.RandomDataGenerator.{randomAliasDataArrayElement, randomByteVectorArrayElement, randomInt}
+import _root_.testHelpers.RandomDataGenerator.{randomAliasDataArrayElement, randomBoolean, randomByteVectorArrayElement, randomInt}
 import com.wavesplatform.JsTestBase
+import testHelpers.TestDataConstantsAndMethods.{actualVersions, invalidFunctionError, nonMatchingTypes, rideV3Result}
 import utest.{Tests, test}
 
 object AssetInfo extends JsTestBase {
@@ -15,58 +16,35 @@ object AssetInfo extends JsTestBase {
 
 
   val tests: Tests = Tests {
-    test("check: function assetInfo compiles") {
-      for (version <- testData.actualVersions) {
+    test("Functions assetInfo compiles") {
+      for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Asset", version)
-        val script = precondition.onlyMatcherContract(
-          randomByteVectorArrayElement,
-          assetInfo
-        )
-        assertCompileSuccessDApp(script, version)
+        for (
+          (asset, function) <- Seq(
+            (randomByteVectorArrayElement, assetInfo),
+            (randomByteVectorArrayElement, assetInfoArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.onlyMatcherContract(asset, function)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
-    test("check: function assetInfo (argument before function) compiles") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Asset", version)
-        val script = precondition.onlyMatcherContract(
-          randomByteVectorArrayElement,
-          assetInfoArgBeforeFunc
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("compilation error: assetInfo Non-matching type") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Asset", version)
-        val script = precondition.onlyMatcherContract(
-          randomAliasDataArrayElement,
-          assetInfo
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("ByteVector"))
-      }
-    }
-
-    test("compilation error: assetInfo Non-matching type (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Asset", version)
-        val script = precondition.onlyMatcherContract(
-          randomByteVectorArrayElement,
-          invalidAssetInfoArg
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("ByteVector"))
-      }
-    }
-
-    test("compilation error: Function 'assetInfo' requires 1 arguments") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Asset", version)
-        val script = precondition.onlyMatcherContract(
-          randomByteVectorArrayElement,
-          invalidAssetInfo
-        )
-        assertCompileErrorDApp(script, version, testData.invalidFunctionError("assetInfo", 1))
+    test("negative cases") {
+      for (version <- actualVersions) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
+        for (
+          (asset, function, error) <- Seq(
+            (randomByteVectorArrayElement, invalidAssetInfo, invalidFunctionError("assetInfo", 1)),
+            (randomByteVectorArrayElement, invalidAssetInfoArg, invalidFunctionError("assetInfo", 1)),
+            (randomAliasDataArrayElement, assetInfo, nonMatchingTypes("ByteVector")),
+            (randomBoolean.toString, assetInfoArgBeforeFunc, nonMatchingTypes("ByteVector")),
+          )
+        ) {
+          val script = precondition.onlyMatcherContract(asset, function)
+          assertCompileErrorDApp(script, version, error)
+        }
       }
     }
   }
