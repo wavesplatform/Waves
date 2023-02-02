@@ -18,6 +18,8 @@ import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, Alias
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 
+import scala.collection.immutable.VectorMap
+
 final class CompositeBlockchain private (
     inner: Blockchain,
     maybeDiff: Option[Diff] = None,
@@ -32,6 +34,11 @@ final class CompositeBlockchain private (
 
   def diff: Diff = maybeDiff.getOrElse(Diff.empty)
 
+  private lazy val indexedIssuedAssets: VectorMap[IssuedAsset, (NewAssetInfo, Int)] =
+    VectorMap.empty ++
+      diff.issuedAssets.zipWithIndex
+        .map { case ((asset, info), i) => asset -> (info, i + 1) }
+
   override def balance(address: Address, assetId: Asset): Long =
     inner.balance(address, assetId) + diff.portfolios.get(address).fold(0L)(_.balanceOf(assetId))
 
@@ -44,7 +51,12 @@ final class CompositeBlockchain private (
       .getOrElse(inner.assetScript(asset))
 
   override def assetDescription(asset: IssuedAsset): Option[AssetDescription] =
-    CompositeBlockchain.assetDescription(asset, maybeDiff.getOrElse(Diff.empty), inner.assetDescription(asset))
+    CompositeBlockchain.assetDescription(
+      asset,
+      maybeDiff.getOrElse(Diff.empty),
+      indexedIssuedAssets,
+      inner.assetDescription(asset)
+    )
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] =
     inner
@@ -53,19 +65,22 @@ final class CompositeBlockchain private (
       .orElse(diff.leaseState.get(leaseId))
 
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =
-    diff.transaction(id)
+    diff
+      .transaction(id)
       .collect { case NewTransactionInfo(tx: TransferTransaction, _, true, _) =>
         (height, tx)
       }
       .orElse(inner.transferById(id))
 
   override def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)] =
-    diff.transaction(id)
+    diff
+      .transaction(id)
       .map(t => (TxMeta(Height(this.height), t.applied, t.spentComplexity), t.transaction))
       .orElse(inner.transactionInfo(id))
 
   override def transactionMeta(id: ByteStr): Option[TxMeta] =
-    diff.transaction(id)
+    diff
+      .transaction(id)
       .map(t => TxMeta(Height(this.height), t.applied, t.spentComplexity))
       .orElse(inner.transactionMeta(id))
 
@@ -195,11 +210,12 @@ object CompositeBlockchain {
   private def assetDescription(
       asset: IssuedAsset,
       diff: Diff,
+      indexedIssuedAssets: VectorMap[IssuedAsset, (NewAssetInfo, Int)],
       innerAssetDescription: => Option[AssetDescription]
   ): Option[AssetDescription] = {
-    diff.issuedAssets
+    indexedIssuedAssets
       .get(asset)
-      .map { case NewAssetInfo(static, info, volume) =>
+      .map { case (NewAssetInfo(static, info, volume), assetNum) =>
         AssetDescription(
           static.source,
           static.issuer,
@@ -212,7 +228,7 @@ object CompositeBlockchain {
           None,
           0L,
           static.nft,
-          0
+          assetNum
         )
       }
       .orElse(innerAssetDescription)
