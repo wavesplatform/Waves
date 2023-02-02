@@ -11,7 +11,7 @@ object Take extends JsTestBase {
   private val takeArgBeforeFunction    = s"callerTestData.take($randomInt)"
   private val invalidTake              = s"take(callerTestData)"
   private val invalidTakeArgBeforeFunc = s"callerTestData.take(callerTestData, $randomInt)"
-  private val invalidTakeNotInt   = s"drop(callerTestData, $randomByteVectorArrayElement)"
+  private val invalidTakeNotInt   = s"take(callerTestData, $randomByteVectorArrayElement)"
 
   val tests: Tests = Tests {
     test(" Functions Take compiles") {

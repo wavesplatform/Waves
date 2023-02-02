@@ -11,7 +11,7 @@ object TakeRight extends JsTestBase {
   private val takeRightArgBeforeFunction    = s"callerTestData.takeRight($randomInt)"
   private val invalidTakeRight              = s"takeRight(callerTestData)"
   private val invalidTakeRightArgBeforeFunc = s"callerTestData.takeRight(callerTestData, $randomInt)"
-  private val invalidTakeRightNotInt        = s"drop(callerTestData, $randomByteVectorArrayElement)"
+  private val invalidTakeRightNotInt        = s"takeRight(callerTestData, $randomByteVectorArrayElement)"
 
   val tests: Tests = Tests {
     test(" Functions TakeRight compiles") {

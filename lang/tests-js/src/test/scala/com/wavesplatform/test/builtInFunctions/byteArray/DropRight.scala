@@ -10,7 +10,7 @@ object DropRight extends JsTestBase {
   private val dropRight                     = s"dropRight(callerTestData, $randomInt)"
   private val dropRightArgBeforeFunction    = s"callerTestData.dropRight($randomInt)"
   private val invalidDropRight              = s"dropRight(callerTestData)"
-  private val invalidDropRightNotInt        = s"drop(callerTestData, $randomByteVectorArrayElement)"
+  private val invalidDropRightNotInt        = s"dropRight(callerTestData, $randomByteVectorArrayElement)"
   private val invalidDropRightArgBeforeFunc = s"callerTestData.dropRight(callerTestData, $randomInt)"
 
   val tests: Tests = Tests {
