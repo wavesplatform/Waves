@@ -54,6 +54,7 @@ final class CompositeBlockchain private (
     CompositeBlockchain.assetDescription(
       asset,
       maybeDiff.getOrElse(Diff.empty),
+      height,
       indexedIssuedAssets,
       inner.assetDescription(asset)
     )
@@ -210,6 +211,7 @@ object CompositeBlockchain {
   private def assetDescription(
       asset: IssuedAsset,
       diff: Diff,
+      height: Int,
       indexedIssuedAssets: VectorMap[IssuedAsset, (NewAssetInfo, Int)],
       innerAssetDescription: => Option[AssetDescription]
   ): Option[AssetDescription] = {
@@ -228,7 +230,8 @@ object CompositeBlockchain {
           None,
           0L,
           static.nft,
-          assetNum
+          assetNum,
+          Height @@ height
         )
       }
       .orElse(innerAssetDescription)

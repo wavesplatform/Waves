@@ -268,7 +268,7 @@ abstract class LevelDBWriter private[database] (
   )
 
   override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] =
-    writableDB.withResource(r => database.loadAssetDescription(r, asset))
+    writableDB.withResource(r => database.loadAssetDescription(r, this, asset))
 
   override protected def loadVolumeAndFee(orderId: ByteStr): VolumeAndFee =
     loadWithFilter(orderFilter, Keys.filledVolumeAndFeeHistory(orderId)) { (ro, history) =>

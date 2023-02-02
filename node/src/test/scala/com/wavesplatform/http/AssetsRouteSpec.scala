@@ -115,7 +115,8 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
     script = None,
     sponsorship = 0,
     nft = false,
-    1
+    1,
+    Height(1)
   )
 
   "/balance/{address}" - {
@@ -406,7 +407,8 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
             script.map(s => AssetScriptInfo(s, 1L)),
             0L,
             nft = false,
-            1
+            1,
+            Height(1)
           ),
           issueTransaction.id().toString,
           responseAs[Seq[JsObject]].head

@@ -92,7 +92,8 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
               script.map(script => AssetScriptInfo(script, 1L)),
               0L,
               nft = false,
-              0
+              0,
+              Height(1)
             )
           )
         )

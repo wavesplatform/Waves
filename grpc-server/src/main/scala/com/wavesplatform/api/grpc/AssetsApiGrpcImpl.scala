@@ -58,6 +58,8 @@ class AssetsApiGrpcImpl(assetsApi: CommonAssetsApi, accountsApi: CommonAccountsA
             complexity
           )
       },
-      d.sponsorship
+      d.sponsorship,
+      sequenceInBlock = d.sequenceInBlock,
+      issueHeight = d.issueHeight
     )
 }

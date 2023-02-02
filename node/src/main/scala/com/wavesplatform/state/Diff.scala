@@ -82,7 +82,8 @@ case class AssetDescription(
     script: Option[AssetScriptInfo],
     sponsorship: Long,
     nft: Boolean,
-    sequenceInBlock: Int
+    sequenceInBlock: Int,
+    issueHeight: Height
 )
 
 case class AccountDataInfo(data: Map[String, DataEntry[?]])

@@ -247,7 +247,8 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
           ),
           0L,
           issue.decimals.value == 0 && issue.quantity.value == 1 && !issue.reissuable,
-          1
+          1,
+          Height(1)
         )
       )
       blockDiff.transaction(issue.id()) shouldBe defined
