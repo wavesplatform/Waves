@@ -92,11 +92,14 @@ class BlockchainProcessor(
   private def process(h: Height, append: BlockchainUpdated.Append): ProcessResult[RequestKey] = {
     val withUpdatedHeight = {
       // Almost all scripts use the height, so we can run all of them
+      // ^ It's not true, I see that unnecessary calls more than regular 10x
       val r =
         if (accumulatedChanges.newHeight == h) accumulatedChanges
         else accumulatedChanges.withAffectedTags(AffectedTags(storage.keySet.toSet))
 
-      // TODO #31 Affect all scripts if height is increased
+      // TODO Affect scripts if height is increased
+//      val r = accumulatedChanges.withAffectedTags(blockchainStorage.taggedHeight.affectedTags)
+
       r.copy(newHeight = h)
     }
 
@@ -395,7 +398,8 @@ case class RestApiScript(address: Address, blockchain: Blockchain, request: JsOb
       trace,
       maxTxErrorLogSize
     )
-    copy(lastResult = result + (LastUpdatedKey -> JsNumber(scheduler.clockMonotonic(TimeUnit.MILLISECONDS))))
+    // TODO restore stateChanges?
+    copy(lastResult = result - "stateChanges" + (LastUpdatedKey -> JsNumber(scheduler.clockMonotonic(TimeUnit.MILLISECONDS))))
   }
 }
 

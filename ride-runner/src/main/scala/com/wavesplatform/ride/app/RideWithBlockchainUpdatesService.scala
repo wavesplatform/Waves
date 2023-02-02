@@ -74,6 +74,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     val blockchainEventsStreamScheduler = mkScheduler("blockchain-events", 2)
     val rideScheduler = mkScheduler(
       name = "ride",
+      // TODO
       threads = settings.restApi.heavyRequestProcessorPoolThreads.getOrElse((Runtime.getRuntime.availableProcessors() * 2).min(4))
     )
 

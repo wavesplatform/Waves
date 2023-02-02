@@ -71,8 +71,9 @@ object CompareApp extends ScorexLogging {
     }
 
     val scheduler = mkScheduler("probes", 3)
+    log.info(s"Found ${settings.compare.testRequests.size} scripts")
     val task: Task[Boolean] = Task
-      .traverse(settings.compare.testRequests.toList) { case (address, request) =>
+      .traverse(settings.compare.testRequests) { case (address, request) =>
         rideApi
           .ask(address, request)
           .map { x =>

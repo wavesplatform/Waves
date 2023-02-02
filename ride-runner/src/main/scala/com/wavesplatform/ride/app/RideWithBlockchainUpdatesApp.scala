@@ -131,7 +131,7 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
       settings.rideRunner.processor,
       blockchainStorage,
       new RequestsStorage {
-        override def size: Int = scripts.size
+        override def size: Int                            = scripts.size
         override def all(): List[(Address, JsObject)]     = scripts
         override def append(x: (Address, JsObject)): Unit = {} // Ignore, because no way to evaluate a new expr
       },
