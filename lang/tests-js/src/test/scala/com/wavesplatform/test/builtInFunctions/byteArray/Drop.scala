@@ -3,6 +3,7 @@ package com.wavesplatform.test.builtInFunctions.byteArray
 import com.wavesplatform.JsTestBase
 import _root_.testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomByteVectorArrayElement, randomInt, randomUnionArrayElement}
 import _root_.testHelpers.GeneratorContractsForBuiltInFunctions
+import testHelpers.TestDataConstantsAndMethods.{CANT_FIND_A_FUNCTION_OVERLOAD, GreaterV3ResultBinaryEntry, actualVersions, rideV3Result}
 import utest.{Tests, test}
 
 object Drop extends JsTestBase {
@@ -13,94 +14,36 @@ object Drop extends JsTestBase {
   private val invalidDropArgBeforeFunc = s"callerTestData.drop(callerTestData, $randomInt)"
 
   val tests: Tests = Tests {
-    test("check: function drop compiles") {
-      for (version <- testData.actualVersions) {
+    test(" Functions Drop compiles") {
+      for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeWithoutMatcher(
-          randomByteVectorArrayElement,
-          drop,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
+        for (
+          (data, function) <- Seq(
+            (randomByteVectorArrayElement, drop),
+            (randomByteVectorArrayElement, dropArgBeforeFunction)
+          )
+        ) {
+          val script = precondition.codeWithoutMatcher(data, function, rideV3Result, GreaterV3ResultBinaryEntry)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
-    test("check: function drop compiles (argument before function)") {
-      for (version <- testData.actualVersions) {
+    test(" Drop Can't find a function overload") {
+      for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeWithoutMatcher(
-          randomByteVectorArrayElement,
-          dropArgBeforeFunction,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("compilation error: Can't find a function overload, invalid first argument") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeWithoutMatcher(
-          randomAddressDataArrayElement,
-          drop,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: Can't find a function overload, invalid second argument") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeWithoutMatcher(
-          randomByteVectorArrayElement,
-          invalidDropNotInt,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: Can't find a function overload, invalid data (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeWithoutMatcher(
-          randomUnionArrayElement,
-          dropArgBeforeFunction,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: invalid function drop Can't find a function overload") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeWithoutMatcher(
-          randomByteVectorArrayElement,
-          invalidDrop,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: invalid function drop Can't find a function overload (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeWithoutMatcher(
-          randomByteVectorArrayElement,
-          invalidDropArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+        for (
+          (data, function) <- Seq(
+            (randomAddressDataArrayElement, drop),
+            (randomUnionArrayElement, dropArgBeforeFunction),
+            (randomByteVectorArrayElement, invalidDrop),
+            (randomByteVectorArrayElement, invalidDropNotInt),
+            (randomByteVectorArrayElement, invalidDropArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.codeWithoutMatcher(data, function, rideV3Result, GreaterV3ResultBinaryEntry)
+          assertCompileErrorDApp(script, version, CANT_FIND_A_FUNCTION_OVERLOAD)
+        }
       }
     }
   }
