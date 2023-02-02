@@ -52,6 +52,7 @@ object RideRunnerGlobalSettings {
 case class RideRunnerSettings(
     db: DbSettings,
     unhealthyIdleTimeout: FiniteDuration,
+    rideSchedulerThreads: Option[Int],
     immutableBlockchain: BlockchainSettings,
     sharedBlockchain: SharedBlockchainData.Settings,
     processor: BlockchainProcessor.Settings,
@@ -61,6 +62,7 @@ case class RideRunnerSettings(
     blockchainUpdatesApiChannel: GrpcChannelSettings
 ) {
   val unhealthyIdleTimeoutMs = unhealthyIdleTimeout.toMillis
+  val exactRideSchedulerThreads = rideSchedulerThreads.getOrElse(Runtime.getRuntime.availableProcessors() * 2).min(4)
 }
 
 object RideRunnerSettings {

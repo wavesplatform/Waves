@@ -2,10 +2,10 @@ package com.wavesplatform.ride.app
 
 import akka.actor.ActorSystem
 import com.wavesplatform.account.Address
+import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
 import com.wavesplatform.events.WrappedEvent
-import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.state.Height
 import com.wavesplatform.storage.RequestsStorage
 import com.wavesplatform.storage.RequestsStorage.RequestKey
@@ -77,10 +77,7 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
     }
 
     val blockchainEventsStreamScheduler = mkScheduler("blockchain-events", 2)
-    val rideScheduler = mkScheduler(
-      name = "ride",
-      threads = settings.restApi.heavyRequestProcessorPoolThreads.getOrElse((Runtime.getRuntime.availableProcessors() * 2).min(4))
-    )
+    val rideScheduler                   = mkScheduler(name = "ride", threads = settings.rideRunner.exactRideSchedulerThreads)
 
     val grpcConnector = new GrpcConnector(settings.rideRunner.grpcConnector)
     cs.cleanup(CustomShutdownPhase.GrpcConnector) {

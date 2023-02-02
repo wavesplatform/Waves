@@ -72,11 +72,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     }
 
     val blockchainEventsStreamScheduler = mkScheduler("blockchain-events", 2)
-    val rideScheduler = mkScheduler(
-      name = "ride",
-      // TODO
-      threads = settings.restApi.heavyRequestProcessorPoolThreads.getOrElse((Runtime.getRuntime.availableProcessors() * 2).min(4))
-    )
+    val rideScheduler                   = mkScheduler(name = "ride", threads = settings.rideRunner.exactRideSchedulerThreads)
 
     val grpcConnector = new GrpcConnector(settings.rideRunner.grpcConnector)
     cs.cleanup(CustomShutdownPhase.GrpcConnector) { grpcConnector.close() }
