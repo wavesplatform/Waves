@@ -1,6 +1,5 @@
 package com.wavesplatform.api.http.assets
 
-import java.util.concurrent.*
 import akka.NotUsed
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.model.headers.Accept
@@ -14,8 +13,8 @@ import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
-import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.api.http.*
+import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.api.http.assets.AssetsApiRoute.DistributionParams
 import com.wavesplatform.api.http.requests.*
 import com.wavesplatform.common.state.ByteStr
@@ -25,11 +24,11 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.EthereumTransaction.Invocation
-import com.wavesplatform.transaction.{EthereumTransaction, TransactionFactory}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction}
+import com.wavesplatform.transaction.{EthereumTransaction, TransactionFactory}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import io.netty.util.concurrent.DefaultThreadFactory
@@ -37,6 +36,7 @@ import monix.eval.Task
 import monix.execution.Scheduler
 import play.api.libs.json.*
 
+import java.util.concurrent.*
 import scala.concurrent.Future
 
 case class AssetsApiRoute(
@@ -325,32 +325,30 @@ object AssetsApiRoute {
 
   def jsonDetails(blockchain: Blockchain)(id: IssuedAsset, description: AssetDescription, full: Boolean): Either[String, JsObject] = {
     // (timestamp, height)
-    def additionalInfo(id: ByteStr): Either[String, (Long, Int)] =
+    def additionalInfo(id: ByteStr): Either[String, Long] =
       for {
-        tt <- blockchain
+        (_, tx) <- blockchain
           .transactionInfo(id)
           .filter { case (tm, _) => tm.succeeded }
           .toRight("Failed to find issue/invokeScript/invokeExpression transaction by ID")
-        (txm, tx) = tt
-        ts <- (tx match {
+        timestamp <- (tx match {
           case tx: IssueTransaction                             => Some(tx.timestamp)
           case tx: InvokeScriptTransaction                      => Some(tx.timestamp)
           case tx: InvokeExpressionTransaction                  => Some(tx.timestamp)
           case tx @ EthereumTransaction(_: Invocation, _, _, _) => Some(tx.timestamp)
           case _                                                => None
         }).toRight("No issue/invokeScript/invokeExpression transaction found with the given asset ID")
-      } yield (ts, txm.height)
+      } yield timestamp
 
     for {
-      tsh <- additionalInfo(description.originTransactionId)
-      (timestamp, height) = tsh
-      script              = description.script.filter(_ => full)
-      name                = description.name.toStringUtf8
-      desc                = description.description.toStringUtf8
+      timestamp <- additionalInfo(description.originTransactionId)
+      script = description.script.filter(_ => full)
+      name   = description.name.toStringUtf8
+      desc   = description.description.toStringUtf8
     } yield JsObject(
       Seq(
         "assetId"         -> JsString(id.id.toString),
-        "issueHeight"     -> JsNumber(height),
+        "issueHeight"     -> JsNumber(description.issueHeight),
         "issueTimestamp"  -> JsNumber(timestamp),
         "issuer"          -> JsString(description.issuer.toAddress.toString),
         "issuerPublicKey" -> JsString(description.issuer.toString),
@@ -365,7 +363,7 @@ object AssetsApiRoute {
           case sponsorship => JsNumber(sponsorship)
         }),
         "originTransactionId" -> JsString(description.originTransactionId.toString),
-        "sequenceInBlock"     -> JsNumber(description.sequenceInBlock),
+        "sequenceInBlock"     -> JsNumber(description.sequenceInBlock)
       ) ++ script.toSeq.map { case AssetScriptInfo(script, complexity) =>
         "scriptDetails" -> Json.obj(
           "scriptComplexity" -> JsNumber(BigDecimal(complexity)),
