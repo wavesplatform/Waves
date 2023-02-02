@@ -291,7 +291,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
           None,
           0,
           false,
-          0
+          1
         )
         actualDesc shouldBe Some(desc1)
 
@@ -316,7 +316,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
             None,
             0,
             false,
-            0
+            1
           )
         )
 
@@ -334,7 +334,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
             None,
             0,
             false,
-            0
+            1
           )
         )
 
