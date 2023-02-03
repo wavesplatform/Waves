@@ -4,7 +4,7 @@ import com.wavesplatform.JsTestBase
 import com.wavesplatform.lang.directives.values.V3
 import testHelpers.GeneratorContractsForBuiltInFunctions
 import testHelpers.RandomDataGenerator.{dataEntryForTests, randomBoolean, randomInt, randomStringArrayElement}
-import testHelpers.TestDataConstantsAndMethods.{binaryEntryForTests, booleanEntryForTests, integerEntryForTests, stringEntryForTests}
+import testHelpers.TestDataConstantsAndMethods.{CANT_FIND_A_FUNCTION_OVERLOAD, GreaterV3ResultBooleanEntry, actualVersionsWithoutV3, binaryEntryForTests, booleanEntryForTests, integerEntryForTests, rideV3Result, stringEntryForTests}
 import utest.{Tests, test}
 
 object GetBoolean extends JsTestBase {
@@ -29,805 +29,139 @@ object GetBoolean extends JsTestBase {
   private val invalidGetBooleanValueArgBeforeFunc = s"callerTestData.getBooleanValue()"
 
   val tests: Tests = Tests {
-    // getBoolean
-    test("check: function getBoolean dataTransaction compiles for V3 dataEntry") {
+    test(" Functions getBoolean dataTransaction compiles for versions V4 and more") {
+      for (version <- actualVersionsWithoutV3) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
+        for (
+          (data, binary) <- Seq(
+            (binaryEntryForTests, getBooleanKey),
+            (integerEntryForTests, getBooleanKey),
+            (stringEntryForTests, getBooleanKey),
+            (booleanEntryForTests, getBooleanKey),
+            (binaryEntryForTests, getBooleanKeyArgBeforeFunc),
+            (integerEntryForTests, getBooleanKeyArgBeforeFunc),
+            (stringEntryForTests, getBooleanKeyArgBeforeFunc),
+            (booleanEntryForTests, getBooleanKeyArgBeforeFunc),
+            (binaryEntryForTests, getBooleanIndex),
+            (integerEntryForTests, getBooleanIndex),
+            (stringEntryForTests, getBooleanIndex),
+            (booleanEntryForTests, getBooleanIndex),
+            (binaryEntryForTests, getBooleanIndexArgBeforeFunc),
+            (integerEntryForTests, getBooleanIndexArgBeforeFunc),
+            (stringEntryForTests, getBooleanIndexArgBeforeFunc),
+            (booleanEntryForTests, getBooleanIndexArgBeforeFunc),
+            (binaryEntryForTests, getBooleanValueKey),
+            (integerEntryForTests, getBooleanValueKey),
+            (stringEntryForTests, getBooleanValueKey),
+            (booleanEntryForTests, getBooleanValueKey),
+            (binaryEntryForTests, getBooleanValueKeyArgBeforeFunc),
+            (integerEntryForTests, getBooleanValueKeyArgBeforeFunc),
+            (stringEntryForTests, getBooleanValueKeyArgBeforeFunc),
+            (booleanEntryForTests, getBooleanValueKeyArgBeforeFunc),
+            (binaryEntryForTests, getBooleanValueIndex),
+            (integerEntryForTests, getBooleanValueIndex),
+            (stringEntryForTests, getBooleanValueIndex),
+            (booleanEntryForTests, getBooleanValueIndex),
+            (binaryEntryForTests, getBooleanValueIndexArgBeforeFunc),
+            (integerEntryForTests, getBooleanValueIndexArgBeforeFunc),
+            (stringEntryForTests, getBooleanValueIndexArgBeforeFunc),
+            (booleanEntryForTests, getBooleanValueIndexArgBeforeFunc),
+          )
+        ) {
+          val script = precondition.codeFromMatchingAndCase(data, binary, rideV3Result, GreaterV3ResultBooleanEntry)
+          assertCompileSuccessDApp(script, version)
+        }
+      }
+    }
+
+    test(" Functions getBoolean dataTransaction compiles for versions V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        dataEntryForTests(randomStringArrayElement),
-        getBooleanKey,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileSuccessDApp(script, V3)
-    }
-
-    test("check: function getBoolean dataTransaction compiles for binaryEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          binaryEntryForTests,
-          getBooleanKey,
-          "",
-          testData.GreaterV3ResultBooleanEntry
+      for (
+        (data, binary) <- Seq(
+          (dataEntryForTests(randomStringArrayElement), getBooleanKey),
+          (dataEntryForTests(randomStringArrayElement), getBooleanKeyArgBeforeFunc),
+          (dataEntryForTests(randomStringArrayElement), getBooleanIndex),
+          (dataEntryForTests(randomStringArrayElement), getBooleanIndexArgBeforeFunc),
+          (dataEntryForTests(randomStringArrayElement), getBooleanValueKey),
+          (dataEntryForTests(randomStringArrayElement), getBooleanValueKeyArgBeforeFunc),
+          (dataEntryForTests(randomStringArrayElement), getBooleanValueIndex),
+          (dataEntryForTests(randomStringArrayElement), getBooleanValueIndexArgBeforeFunc)
         )
-        assertCompileSuccessDApp(script, version)
+      ) {
+        val script = precondition.codeFromMatchingAndCase(data, binary, rideV3Result, GreaterV3ResultBooleanEntry)
+        assertCompileSuccessDApp(script, V3)
       }
     }
 
-    test("check: function getBoolean dataTransaction compiles for integerEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
+    test(" Can't find getBoolean functions overload for V4 and more") {
+      for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          integerEntryForTests,
-          getBooleanKey,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
+        for (
+          (data, binary) <- Seq(
+            (randomInt.toString, getBooleanKey),
+            (randomBoolean.toString, getBooleanKeyArgBeforeFunc),
+            (randomInt.toString, getBooleanIndex),
+            (randomBoolean.toString, getBooleanIndexArgBeforeFunc),
+            (randomInt.toString, getBooleanValueKey),
+            (randomBoolean.toString, getBooleanValueKeyArgBeforeFunc),
+            (randomInt.toString, getBooleanValueIndex),
+            (randomBoolean.toString, getBooleanValueIndexArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.codeFromMatchingAndCase(data, binary, rideV3Result, GreaterV3ResultBooleanEntry)
+          assertCompileErrorDApp(script, version, CANT_FIND_A_FUNCTION_OVERLOAD)
+        }
       }
     }
 
-    test("check: function getBoolean dataTransaction compiles for stringEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          stringEntryForTests,
-          getBooleanKey,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBoolean dataTransaction compiles for booleanEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          booleanEntryForTests,
-          getBooleanKey,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBoolean dataTransaction compiles for V3 dataEntry (argument before function)") {
+    test(" Can't find getBoolean functions overload for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        dataEntryForTests(randomStringArrayElement),
-        getBooleanKeyArgBeforeFunc,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileSuccessDApp(script, V3)
-    }
-
-    test("check: function getBoolean dataTransaction compiles for binaryEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          binaryEntryForTests,
-          getBooleanKeyArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBooleanEntry
+      for (
+        (data, binary) <- Seq(
+          (randomInt.toString, getBooleanKey),
+          (randomBoolean.toString, getBooleanKeyArgBeforeFunc),
+          (randomInt.toString, getBooleanIndex),
+          (randomBoolean.toString, getBooleanIndexArgBeforeFunc),
+          (randomInt.toString, getBooleanValueKey),
+          (randomBoolean.toString, getBooleanValueKeyArgBeforeFunc),
+          (randomInt.toString, getBooleanValueIndex),
+          (randomBoolean.toString, getBooleanValueIndexArgBeforeFunc)
         )
-        assertCompileSuccessDApp(script, version)
+      ) {
+        val script = precondition.codeFromMatchingAndCase(data, binary, rideV3Result, GreaterV3ResultBooleanEntry)
+        assertCompileErrorDApp(script, V3, CANT_FIND_A_FUNCTION_OVERLOAD)
       }
     }
 
-    test("check: function getBoolean dataTransaction compiles for integerEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
+    test(" Invalid getBoolean functions for V4 and more") {
+      for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          integerEntryForTests,
-          getBooleanKeyArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
+        for (
+          (data, binary) <- Seq(
+            (integerEntryForTests, invalidGetBooleanKey),
+            (binaryEntryForTests, invalidGetBooleanArgBeforeFunc),
+            (integerEntryForTests, invalidGetBooleanValue),
+            (binaryEntryForTests, invalidGetBooleanValueArgBeforeFunc),
+          )
+        ) {
+          val script = precondition.codeFromMatchingAndCase(data, binary, rideV3Result, GreaterV3ResultBooleanEntry)
+          assertCompileErrorDApp(script, version, CANT_FIND_A_FUNCTION_OVERLOAD)
+        }
       }
     }
 
-    test("check: function getBoolean dataTransaction compiles for stringEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          stringEntryForTests,
-          getBooleanKeyArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBoolean dataTransaction compiles for booleanEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          booleanEntryForTests,
-          getBooleanKeyArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    // getBooleanIndex
-    test("check: function getBooleanIndex dataTransaction compiles for V3 dataEntry") {
+    test(" Invalid getBoolean functions for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        dataEntryForTests(randomStringArrayElement),
-        getBooleanIndex,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileSuccessDApp(script, V3)
-    }
-
-    test("check: function getBooleanIndex dataTransaction compiles for binaryEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          binaryEntryForTests,
-          getBooleanIndex,
-          "",
-          testData.GreaterV3ResultBooleanEntry
+      for (
+        (data, binary) <- Seq(
+          (dataEntryForTests(randomStringArrayElement), invalidGetBooleanKey),
+          (dataEntryForTests(randomStringArrayElement), invalidGetBooleanArgBeforeFunc),
+          (dataEntryForTests(randomStringArrayElement), invalidGetBooleanValue),
+          (dataEntryForTests(randomStringArrayElement), invalidGetBooleanValueArgBeforeFunc),
         )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBooleanIndex dataTransaction compiles for integerEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          integerEntryForTests,
-          getBooleanIndex,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBooleanIndex dataTransaction compiles for stringEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          stringEntryForTests,
-          getBooleanIndex,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBooleanIndex dataTransaction compiles for booleanEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          booleanEntryForTests,
-          getBooleanIndex,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBooleanIndex dataTransaction compiles for V3 dataEntry (argument before function)") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        dataEntryForTests(randomStringArrayElement),
-        getBooleanIndexArgBeforeFunc,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileSuccessDApp(script, V3)
-    }
-
-    test("check: function getBooleanIndex dataTransaction compiles for binaryEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          binaryEntryForTests,
-          getBooleanIndexArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBooleanIndex dataTransaction compiles for integerEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          integerEntryForTests,
-          getBooleanIndexArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBooleanIndex dataTransaction compiles for stringEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          stringEntryForTests,
-          getBooleanIndexArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBooleanIndex dataTransaction compiles for booleanEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          booleanEntryForTests,
-          getBooleanIndexArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    // getBooleanValueKey
-    test("check: function getBooleanValueKey dataTransaction compiles for V3 dataEntry") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        dataEntryForTests(randomStringArrayElement),
-        getBooleanValueKey,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileSuccessDApp(script, V3)
-    }
-
-    test("check: function getBooleanValueKey dataTransaction compiles for binaryEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          binaryEntryForTests,
-          getBooleanValueKey,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBooleanValueKey dataTransaction compiles for integerEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          integerEntryForTests,
-          getBooleanValueKey,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBooleanValueKey dataTransaction compiles for stringEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          stringEntryForTests,
-          getBooleanValueKey,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBooleanValueKey dataTransaction compiles for booleanEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          booleanEntryForTests,
-          getBooleanValueKey,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBooleanValueKey dataTransaction compiles for V3 dataEntry (argument before function)") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        dataEntryForTests(randomStringArrayElement),
-        getBooleanValueKeyArgBeforeFunc,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileSuccessDApp(script, V3)
-    }
-
-    test("check: function getBooleanValueKey dataTransaction compiles for binaryEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          binaryEntryForTests,
-          getBooleanValueKeyArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBooleanValueKey dataTransaction compiles for integerEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          integerEntryForTests,
-          getBooleanValueKeyArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBooleanValueKey dataTransaction compiles for stringEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          stringEntryForTests,
-          getBooleanValueKeyArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBooleanValueKey dataTransaction compiles for booleanEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          booleanEntryForTests,
-          getBooleanValueKeyArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    // getBooleanValueIndex
-    test("check: function getBooleanValueIndex dataTransaction compiles for V3 dataEntry") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        dataEntryForTests(randomStringArrayElement),
-        getBooleanValueIndex,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileSuccessDApp(script, V3)
-    }
-
-    test("check: function getBooleanValueIndex dataTransaction compiles for binaryEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          binaryEntryForTests,
-          getBooleanValueIndex,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBooleanValueIndex dataTransaction compiles for integerEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          integerEntryForTests,
-          getBooleanValueIndex,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBooleanValueIndex dataTransaction compiles for stringEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          stringEntryForTests,
-          getBooleanValueIndex,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBooleanValueIndex dataTransaction compiles for booleanEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          booleanEntryForTests,
-          getBooleanValueIndex,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBooleanValueIndex dataTransaction compiles for V3 dataEntry (argument before function)") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        dataEntryForTests(randomStringArrayElement),
-        getBooleanValueIndexArgBeforeFunc,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileSuccessDApp(script, V3)
-    }
-
-    test("check: function getBooleanValueIndex dataTransaction compiles for binaryEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          binaryEntryForTests,
-          getBooleanValueIndexArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBooleanValueIndex dataTransaction compiles for integerEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          integerEntryForTests,
-          getBooleanValueIndexArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBooleanValueIndex dataTransaction compiles for stringEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          stringEntryForTests,
-          getBooleanValueIndexArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBooleanValueIndex dataTransaction compiles for booleanEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          booleanEntryForTests,
-          getBooleanValueIndexArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    // getBoolean - Can't find a function overload
-    test("compilation error: function getBoolean V3 - Can't find a function overload") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        randomInt.toString,
-        getBooleanKey,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-    }
-
-    test("compilation error: function getBoolean version V4 and more - Can't find a function overload") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomBoolean.toString,
-          getBooleanKey,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: function getBoolean V3 - Can't find a function overload (argument before function)") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        randomInt.toString,
-        getBooleanKeyArgBeforeFunc,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-    }
-
-    test("compilation error: function getBoolean version V4 and more - Can't find a function overload (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomBoolean.toString,
-          getBooleanKeyArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    // getBooleanIndex - Can't find a function overload
-    test("compilation error: function getBooleanIndex V3 - Can't find a function overload") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        randomInt.toString,
-        getBooleanIndex,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-    }
-
-    test("compilation error: function getBooleanIndex version V4 and more - Can't find a function overload") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomBoolean.toString,
-          getBooleanIndex,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: function getBooleanIndex V3 - Can't find a function overload (argument before function)") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        randomInt.toString,
-        getBooleanIndexArgBeforeFunc,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-    }
-
-    test("compilation error: function getBooleanIndex version V4 and more - Can't find a function overload (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomBoolean.toString,
-          getBooleanIndexArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    // getBooleanValueKey - Can't find a function overload
-    test("compilation error: function getBooleanValueKey V3 - Can't find a function overload") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        randomInt.toString,
-        getBooleanValueKey,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-    }
-
-    test("compilation error: function getBooleanValueKey version V4 and more - Can't find a function overload") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomBoolean.toString,
-          getBooleanValueKey,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: function getBooleanValueKey V3 - Can't find a function overload (argument before function)") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        randomInt.toString,
-        getBooleanValueKeyArgBeforeFunc,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-    }
-
-    test("compilation error: function getBooleanValueKey version V4 and more - Can't find a function overload (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomBoolean.toString,
-          getBooleanValueKeyArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    // getBooleanValueIndex - Can't find a function overload
-    test("compilation error: function getBooleanValueIndex V3 - Can't find a function overload") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        randomInt.toString,
-        getBooleanValueIndex,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-    }
-
-    test("compilation error: function getBooleanValueIndex version V4 and more - Can't find a function overload") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomBoolean.toString,
-          getBooleanValueIndex,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: function getBooleanValueIndex V3 - Can't find a function overload (argument before function)") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        randomInt.toString,
-        getBooleanValueIndexArgBeforeFunc,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-    }
-
-    test("compilation error: function getBooleanValueIndex version V4 and more - Can't find a function overload (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomBoolean.toString,
-          getBooleanValueIndexArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    // invalid getBoolean
-    test("compilation error: invalid getBoolean - Can't find a function overload") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        integerEntryForTests,
-        invalidGetBooleanKey,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-    }
-
-    test("compilation error: invalid getBoolean - Can't find a function overload") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          booleanEntryForTests,
-          invalidGetBooleanKey,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: invalid getBoolean - Can't find a function overload (argument before function)") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        binaryEntryForTests,
-        invalidGetBooleanArgBeforeFunc,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-    }
-
-    test("compilation error: invalid getBoolean - Can't find a function overload (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          stringEntryForTests,
-          invalidGetBooleanArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    // invalid getBooleanValue
-    test("compilation error: invalid getBooleanValue - Can't find a function overload") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        integerEntryForTests,
-        invalidGetBooleanValue,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-    }
-
-    test("compilation error: invalid getBooleanValue - Can't find a function overload") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          booleanEntryForTests,
-          invalidGetBooleanValue,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: invalid getBooleanValue - Can't find a function overload (argument before function)") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        binaryEntryForTests,
-        invalidGetBooleanValueArgBeforeFunc,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-    }
-
-    test("compilation error: invalid getBooleanValue - Can't find a function overload (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.codeFromMatchingAndCase(
-          stringEntryForTests,
-          invalidGetBooleanValueArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBooleanEntry
-        )
-        assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+      ) {
+        val script = precondition.codeFromMatchingAndCase(data, binary, rideV3Result, GreaterV3ResultBooleanEntry)
+        assertCompileErrorDApp(script, V3, CANT_FIND_A_FUNCTION_OVERLOAD)
       }
     }
   }

@@ -4,831 +4,175 @@ import com.wavesplatform.JsTestBase
 import com.wavesplatform.lang.directives.values.V3
 import testHelpers.GeneratorContractsForBuiltInFunctions
 import testHelpers.RandomDataGenerator.{dataEntryForTests, randomBoolean, randomInt, randomStringArrayElement}
-import testHelpers.TestDataConstantsAndMethods.{binaryEntryForTests, booleanEntryForTests, integerEntryForTests, stringEntryForTests}
+import testHelpers.TestDataConstantsAndMethods.{
+  CANT_FIND_A_FUNCTION_OVERLOAD,
+  GreaterV3ResultBinaryEntry,
+  actualVersions,
+  actualVersionsWithoutV3,
+  binaryEntryForTests,
+  booleanEntryForTests,
+  integerEntryForTests,
+  rideV3Result,
+  stringEntryForTests
+}
 import utest.{Tests, test}
 
 object GetBinary extends JsTestBase {
   // getBinaryKey
-  private val getBinaryKey = s"getBinary(callerTestData, \"key\")"
+  private val getBinaryKey              = s"getBinary(callerTestData, \"key\")"
   private val getBinaryKeyArgBeforeFunc = s"callerTestData.getBinary(\"key\")"
   // getBinaryIndex
-  private val getBinaryIndex = s"getBinary(callerTestData, $randomInt)"
+  private val getBinaryIndex              = s"getBinary(callerTestData, $randomInt)"
   private val getBinaryIndexArgBeforeFunc = s"callerTestData.getBinary($randomInt)"
   // getBinaryValueKey
-  private val getBinaryValueKey = s"getBinaryValue(callerTestData, \"key\")"
+  private val getBinaryValueKey              = s"getBinaryValue(callerTestData, \"key\")"
   private val getBinaryValueKeyArgBeforeFunc = s"callerTestData.getBinaryValue(\"key\")"
   // getBinaryValueIndex
-  private val getBinaryValueIndex = s"getBinaryValue(callerTestData, $randomInt)"
+  private val getBinaryValueIndex              = s"getBinaryValue(callerTestData, $randomInt)"
   private val getBinaryValueIndexArgBeforeFunc = s"callerTestData.getBinaryValue($randomInt)"
 
   // invalid getBinary
-  private val invalidGetBinaryKey = s"getBinary()"
+  private val invalidGetBinaryKey           = s"getBinary()"
   private val invalidGetBinaryArgBeforeFunc = s"callerTestData.getBinary()"
   // invalid getBinaryValue
-  private val invalidGetBinaryValue = s"getBinaryValue()"
+  private val invalidGetBinaryValue              = s"getBinaryValue()"
   private val invalidGetBinaryValueArgBeforeFunc = s"callerTestData.getBinaryValue()"
 
   val tests: Tests = Tests {
-    // getBinary
-    test("check: function getBinary dataTransaction compiles for V3 dataEntry") {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-        val script = precondition.codeFromMatchingAndCase(
-          dataEntryForTests(randomStringArrayElement),
-          getBinaryKey,
-          testData.rideV3Result,
-          ""
+    test(" Functions getBinary dataTransaction compiles for versions V4 and more") {
+      for (version <- actualVersionsWithoutV3) {
+        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
+        for (
+          (data, binary) <- Seq(
+            (binaryEntryForTests, getBinaryKey),
+            (integerEntryForTests, getBinaryKey),
+            (stringEntryForTests, getBinaryKey),
+            (booleanEntryForTests, getBinaryKey),
+            (binaryEntryForTests, getBinaryKeyArgBeforeFunc),
+            (integerEntryForTests, getBinaryKeyArgBeforeFunc),
+            (stringEntryForTests, getBinaryKeyArgBeforeFunc),
+            (booleanEntryForTests, getBinaryKeyArgBeforeFunc),
+            (binaryEntryForTests, getBinaryIndex),
+            (integerEntryForTests, getBinaryIndex),
+            (stringEntryForTests, getBinaryIndex),
+            (booleanEntryForTests, getBinaryIndex),
+            (binaryEntryForTests, getBinaryIndexArgBeforeFunc),
+            (integerEntryForTests, getBinaryIndexArgBeforeFunc),
+            (stringEntryForTests, getBinaryIndexArgBeforeFunc),
+            (booleanEntryForTests, getBinaryIndexArgBeforeFunc),
+            (binaryEntryForTests, getBinaryValueKey),
+            (integerEntryForTests, getBinaryValueKey),
+            (stringEntryForTests, getBinaryValueKey),
+            (booleanEntryForTests, getBinaryValueKey),
+            (binaryEntryForTests, getBinaryValueKeyArgBeforeFunc),
+            (integerEntryForTests, getBinaryValueKeyArgBeforeFunc),
+            (stringEntryForTests, getBinaryValueKeyArgBeforeFunc),
+            (booleanEntryForTests, getBinaryValueKeyArgBeforeFunc),
+            (binaryEntryForTests, getBinaryValueIndex),
+            (integerEntryForTests, getBinaryValueIndex),
+            (stringEntryForTests, getBinaryValueIndex),
+            (booleanEntryForTests, getBinaryValueIndex),
+            (binaryEntryForTests, getBinaryValueIndexArgBeforeFunc),
+            (integerEntryForTests, getBinaryValueIndexArgBeforeFunc),
+            (stringEntryForTests, getBinaryValueIndexArgBeforeFunc),
+            (booleanEntryForTests, getBinaryValueIndexArgBeforeFunc),
+          )
+        ) {
+          val script = precondition.codeFromMatchingAndCase(data, binary, rideV3Result, GreaterV3ResultBinaryEntry)
+          assertCompileSuccessDApp(script, version)
+        }
+      }
+    }
+
+    test(" Functions getBinary dataTransaction compiles for versions V3") {
+      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
+      for (
+        (data, binary) <- Seq(
+          (dataEntryForTests(randomStringArrayElement), getBinaryKey),
+          (dataEntryForTests(randomStringArrayElement), getBinaryKeyArgBeforeFunc),
+          (dataEntryForTests(randomStringArrayElement), getBinaryIndex),
+          (dataEntryForTests(randomStringArrayElement), getBinaryIndexArgBeforeFunc),
+          (dataEntryForTests(randomStringArrayElement), getBinaryValueKey),
+          (dataEntryForTests(randomStringArrayElement), getBinaryValueKeyArgBeforeFunc),
+          (dataEntryForTests(randomStringArrayElement), getBinaryValueIndex),
+          (dataEntryForTests(randomStringArrayElement), getBinaryValueIndexArgBeforeFunc)
         )
+      ) {
+        val script = precondition.codeFromMatchingAndCase(data, binary, rideV3Result, GreaterV3ResultBinaryEntry)
         assertCompileSuccessDApp(script, V3)
-    }
-
-    test("check: function getBinary dataTransaction compiles for binaryEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          binaryEntryForTests,
-          getBinaryKey,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
       }
     }
 
-    test("check: function getBinary dataTransaction compiles for integerEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
+    test(" Can't find getBinary functions overload for V4 and more") {
+      for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          integerEntryForTests,
-          getBinaryKey,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
+        for (
+          (data, binary) <- Seq(
+            (randomInt.toString, getBinaryKey),
+            (randomBoolean.toString, getBinaryKeyArgBeforeFunc),
+            (randomInt.toString, getBinaryIndex),
+            (randomBoolean.toString, getBinaryIndexArgBeforeFunc),
+            (randomInt.toString, getBinaryValueKey),
+            (randomBoolean.toString, getBinaryValueKeyArgBeforeFunc),
+            (randomInt.toString, getBinaryValueIndex),
+            (randomBoolean.toString, getBinaryValueIndexArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.codeFromMatchingAndCase(data, binary, rideV3Result, GreaterV3ResultBinaryEntry)
+          assertCompileErrorDApp(script, version, CANT_FIND_A_FUNCTION_OVERLOAD)
+        }
       }
     }
 
-    test("check: function getBinary dataTransaction compiles for stringEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
+    test(" Can't find getBinary functions overload for V3") {
+        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
+        for (
+          (data, binary) <- Seq(
+            (randomInt.toString, getBinaryKey),
+            (randomBoolean.toString, getBinaryKeyArgBeforeFunc),
+            (randomInt.toString, getBinaryIndex),
+            (randomBoolean.toString, getBinaryIndexArgBeforeFunc),
+            (randomInt.toString, getBinaryValueKey),
+            (randomBoolean.toString, getBinaryValueKeyArgBeforeFunc),
+            (randomInt.toString, getBinaryValueIndex),
+            (randomBoolean.toString, getBinaryValueIndexArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.codeFromMatchingAndCase(data, binary, rideV3Result, GreaterV3ResultBinaryEntry)
+          assertCompileErrorDApp(script, V3, CANT_FIND_A_FUNCTION_OVERLOAD)
+        }
+    }
+
+    test(" Invalid getBinary functions for V4 and more") {
+      for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          stringEntryForTests,
-          getBinaryKey,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
+        for (
+          (data, binary) <- Seq(
+            (integerEntryForTests, invalidGetBinaryKey),
+            (binaryEntryForTests, invalidGetBinaryArgBeforeFunc),
+            (integerEntryForTests, invalidGetBinaryValue),
+            (binaryEntryForTests, invalidGetBinaryValueArgBeforeFunc),
+          )
+        ) {
+          val script = precondition.codeFromMatchingAndCase(data, binary, rideV3Result, GreaterV3ResultBinaryEntry)
+          assertCompileErrorDApp(script, version, CANT_FIND_A_FUNCTION_OVERLOAD)
+        }
       }
     }
 
-    test("check: function getBinary dataTransaction compiles for booleanEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          booleanEntryForTests,
-          getBinaryKey,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinary dataTransaction compiles for V3 dataEntry (argument before function)") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        dataEntryForTests(randomStringArrayElement),
-        getBinaryKeyArgBeforeFunc,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileSuccessDApp(script, V3)
-    }
-
-    test("check: function getBinary dataTransaction compiles for binaryEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          binaryEntryForTests,
-          getBinaryKeyArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinary dataTransaction compiles for integerEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          integerEntryForTests,
-          getBinaryKeyArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinary dataTransaction compiles for stringEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          stringEntryForTests,
-          getBinaryKeyArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinary dataTransaction compiles for booleanEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          booleanEntryForTests,
-          getBinaryKeyArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    // getBinaryIndex
-    test("check: function getBinaryIndex dataTransaction compiles for V3 dataEntry") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        dataEntryForTests(randomStringArrayElement),
-        getBinaryIndex,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileSuccessDApp(script, V3)
-    }
-
-    test("check: function getBinaryIndex dataTransaction compiles for binaryEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          binaryEntryForTests,
-          getBinaryIndex,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinaryIndex dataTransaction compiles for integerEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          integerEntryForTests,
-          getBinaryIndex,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinaryIndex dataTransaction compiles for stringEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          stringEntryForTests,
-          getBinaryIndex,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinaryIndex dataTransaction compiles for booleanEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          booleanEntryForTests,
-          getBinaryIndex,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinaryIndex dataTransaction compiles for V3 dataEntry (argument before function)") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        dataEntryForTests(randomStringArrayElement),
-        getBinaryIndexArgBeforeFunc,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileSuccessDApp(script, V3)
-    }
-
-    test("check: function getBinaryIndex dataTransaction compiles for binaryEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          binaryEntryForTests,
-          getBinaryIndexArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinaryIndex dataTransaction compiles for integerEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          integerEntryForTests,
-          getBinaryIndexArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinaryIndex dataTransaction compiles for stringEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          stringEntryForTests,
-          getBinaryIndexArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinaryIndex dataTransaction compiles for booleanEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          booleanEntryForTests,
-          getBinaryIndexArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    // getBinaryValueKey
-    test("check: function getBinaryValueKey dataTransaction compiles for V3 dataEntry") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        dataEntryForTests(randomStringArrayElement),
-        getBinaryValueKey,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileSuccessDApp(script, V3)
-    }
-
-    test("check: function getBinaryValueKey dataTransaction compiles for binaryEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          binaryEntryForTests,
-          getBinaryValueKey,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinaryValueKey dataTransaction compiles for integerEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          integerEntryForTests,
-          getBinaryValueKey,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinaryValueKey dataTransaction compiles for stringEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          stringEntryForTests,
-          getBinaryValueKey,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinaryValueKey dataTransaction compiles for booleanEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          booleanEntryForTests,
-          getBinaryValueKey,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinaryValueKey dataTransaction compiles for V3 dataEntry (argument before function)") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        dataEntryForTests(randomStringArrayElement),
-        getBinaryValueKeyArgBeforeFunc,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileSuccessDApp(script, V3)
-    }
-
-    test("check: function getBinaryValueKey dataTransaction compiles for binaryEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          binaryEntryForTests,
-          getBinaryValueKeyArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinaryValueKey dataTransaction compiles for integerEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          integerEntryForTests,
-          getBinaryValueKeyArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinaryValueKey dataTransaction compiles for stringEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          stringEntryForTests,
-          getBinaryValueKeyArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinaryValueKey dataTransaction compiles for booleanEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          booleanEntryForTests,
-          getBinaryValueKeyArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    // getBinaryValueIndex
-    test("check: function getBinaryValueIndex dataTransaction compiles for V3 dataEntry") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        dataEntryForTests(randomStringArrayElement),
-        getBinaryValueIndex,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileSuccessDApp(script, V3)
-    }
-
-    test("check: function getBinaryValueIndex dataTransaction compiles for binaryEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          binaryEntryForTests,
-          getBinaryValueIndex,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinaryValueIndex dataTransaction compiles for integerEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          integerEntryForTests,
-          getBinaryValueIndex,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinaryValueIndex dataTransaction compiles for stringEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          stringEntryForTests,
-          getBinaryValueIndex,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinaryValueIndex dataTransaction compiles for booleanEntry - version V4 and more") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          booleanEntryForTests,
-          getBinaryValueIndex,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinaryValueIndex dataTransaction compiles for V3 dataEntry (argument before function)") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        dataEntryForTests(randomStringArrayElement),
-        getBinaryValueIndexArgBeforeFunc,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileSuccessDApp(script, V3)
-    }
-
-    test("check: function getBinaryValueIndex dataTransaction compiles for binaryEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          binaryEntryForTests,
-          getBinaryValueIndexArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinaryValueIndex dataTransaction compiles for integerEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          integerEntryForTests,
-          getBinaryValueIndexArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinaryValueIndex dataTransaction compiles for stringEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          stringEntryForTests,
-          getBinaryValueIndexArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function getBinaryValueIndex dataTransaction compiles for booleanEntry - version V4 and more (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          booleanEntryForTests,
-          getBinaryValueIndexArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    // getBinary - Can't find a function overload
-    test("compilation error: function getBinary V3 - Can't find a function overload") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        randomInt.toString,
-        getBinaryKey,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-    }
-
-    test("compilation error: function getBinary version V4 and more - Can't find a function overload") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomBoolean.toString,
-          getBinaryKey,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: function getBinary V3 - Can't find a function overload (argument before function)") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        randomInt.toString,
-        getBinaryKeyArgBeforeFunc,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-    }
-
-    test("compilation error: function getBinary version V4 and more - Can't find a function overload (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomBoolean.toString,
-          getBinaryKeyArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    // getBinaryIndex - Can't find a function overload
-    test("compilation error: function getBinaryIndex V3 - Can't find a function overload") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        randomInt.toString,
-        getBinaryIndex,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-    }
-
-    test("compilation error: function getBinaryIndex version V4 and more - Can't find a function overload") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomBoolean.toString,
-          getBinaryIndex,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: function getBinaryIndex V3 - Can't find a function overload (argument before function)") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        randomInt.toString,
-        getBinaryIndexArgBeforeFunc,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-    }
-
-    test("compilation error: function getBinaryIndex version V4 and more - Can't find a function overload (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomBoolean.toString,
-          getBinaryIndexArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    // getBinaryValueKey - Can't find a function overload
-    test("compilation error: function getBinaryValueKey V3 - Can't find a function overload") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        randomInt.toString,
-        getBinaryValueKey,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-    }
-
-    test("compilation error: function getBinaryValueKey version V4 and more - Can't find a function overload") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomBoolean.toString,
-          getBinaryValueKey,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: function getBinaryValueKey V3 - Can't find a function overload (argument before function)") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        randomInt.toString,
-        getBinaryValueKeyArgBeforeFunc,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-    }
-
-    test("compilation error: function getBinaryValueKey version V4 and more - Can't find a function overload (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomBoolean.toString,
-          getBinaryValueKeyArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    // getBinaryValueIndex - Can't find a function overload
-    test("compilation error: function getBinaryValueIndex V3 - Can't find a function overload") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        randomInt.toString,
-        getBinaryValueIndex,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-    }
-
-    test("compilation error: function getBinaryValueIndex version V4 and more - Can't find a function overload") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomBoolean.toString,
-          getBinaryValueIndex,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: function getBinaryValueIndex V3 - Can't find a function overload (argument before function)") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        randomInt.toString,
-        getBinaryValueIndexArgBeforeFunc,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-    }
-
-    test("compilation error: function getBinaryValueIndex version V4 and more - Can't find a function overload (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomBoolean.toString,
-          getBinaryValueIndexArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    // invalid getBinary
-    test("compilation error: invalid getBinary - Can't find a function overload") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        integerEntryForTests,
-        invalidGetBinaryKey,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-    }
-
-    test("compilation error: invalid getBinary - Can't find a function overload") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          booleanEntryForTests,
-          invalidGetBinaryKey,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: invalid getBinary - Can't find a function overload (argument before function)") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        binaryEntryForTests,
-        invalidGetBinaryArgBeforeFunc,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-    }
-
-    test("compilation error: invalid getBinary - Can't find a function overload (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          stringEntryForTests,
-          invalidGetBinaryArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    // invalid getBinaryValue
-    test("compilation error: invalid getBinaryValue - Can't find a function overload") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        integerEntryForTests,
-        invalidGetBinaryValue,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-    }
-
-    test("compilation error: invalid getBinaryValue - Can't find a function overload") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          booleanEntryForTests,
-          invalidGetBinaryValue,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: invalid getBinaryValue - Can't find a function overload (argument before function)") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        binaryEntryForTests,
-        invalidGetBinaryValueArgBeforeFunc,
-        testData.rideV3Result,
-        ""
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-    }
-
-    test("compilation error: invalid getBinaryValue - Can't find a function overload (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          stringEntryForTests,
-          invalidGetBinaryValueArgBeforeFunc,
-          "",
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, V3, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
+    test(" Invalid getBinary functions for V3") {
+        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
+        for (
+          (data, binary) <- Seq(
+            (dataEntryForTests(randomStringArrayElement), invalidGetBinaryKey),
+            (dataEntryForTests(randomStringArrayElement), invalidGetBinaryArgBeforeFunc),
+            (dataEntryForTests(randomStringArrayElement), invalidGetBinaryValue),
+            (dataEntryForTests(randomStringArrayElement), invalidGetBinaryValueArgBeforeFunc),
+          )
+        ) {
+          val script = precondition.codeFromMatchingAndCase(data, binary, rideV3Result, GreaterV3ResultBinaryEntry)
+          assertCompileErrorDApp(script, V3, CANT_FIND_A_FUNCTION_OVERLOAD)
+        }
     }
   }
 }
