@@ -40,7 +40,7 @@ class AssetsApiGrpcSuite extends BaseFreeSpec with ActivationStatusRequest with 
     nftList
       .groupMap(_.assetInfo.get.issueHeight)(_.assetInfo.get.sequenceInBlock)
       .values
-      .foreach(_ shouldBe sorted)
+      .foreach(nums => nums shouldBe (1 to nums.size))
   }
 
   override def nodeConfigs: Seq[Config] =
