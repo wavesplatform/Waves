@@ -72,7 +72,7 @@ class DefaultRequestsService(
       .executeOn(runScriptsScheduler)
 
     val start = System.nanoTime()
-    r.tapEval(_ => Task.now(RideRunnerMetrics.rideScriptRunOnHeightTime(force).update(System.nanoTime() - start)))
+    r.tapEval(_ => Task.now(RideRunnerMetrics.rideScriptRunOnHeightTime(force).update((System.nanoTime() - start).toDouble)))
   }
 
   private def runOne(script: RideScriptRunEnvironment, hasCaches: Boolean): Task[JsObject] = Task {

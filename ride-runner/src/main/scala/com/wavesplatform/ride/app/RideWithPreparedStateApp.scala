@@ -23,12 +23,12 @@ object RideWithPreparedStateApp {
     val blockchain = new ImmutableBlockchain(globalSettings.rideRunner.immutableBlockchain, input)
 
     val apiResult = UtilsApiRoute.evaluate(
-      evaluateScriptComplexityLimit = globalSettings.rideRunner.processor.evaluateScriptComplexityLimit,
+      evaluateScriptComplexityLimit = globalSettings.rideRunner.requestsService.evaluateScriptComplexityLimit,
       blockchain = blockchain,
       address = input.address,
       request = input.request,
       trace = input.trace,
-      maxTxErrorLogSize = globalSettings.rideRunner.processor.maxTxErrorLogSize
+      maxTxErrorLogSize = globalSettings.rideRunner.requestsService.maxTxErrorLogSize
     )
 
     println(Json.prettyPrint(apiResult))

@@ -1,11 +1,12 @@
 package com.wavesplatform.storage
 
+import cats.syntax.contravariantSemigroupal.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.database.DBExt
 import com.wavesplatform.ride.app.RideRunnerMetrics.rideScriptTotalNumber
 import com.wavesplatform.storage.persistent.CacheKeys
 import org.iq80.leveldb.DB
-import play.api.libs.json.{JsObject, Json, Reads}
+import play.api.libs.json.*
 
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -21,7 +22,25 @@ trait RequestsStorage {
 // TODO rename
 final case class RequestKey(address: Address, requestBody: JsObject)
 object RequestKey {
-  implicit val requestsKeyReads: Reads[RequestKey] = Json.reads[(Address, JsObject)].map(Function.tupled(RequestKey))
+  implicit val requestsKeyReads: Reads[RequestKey] = Reads {
+    case JsArray(rawAddress +: rawRequestBody +: xs) if xs.isEmpty =>
+      val address = rawAddress match {
+        case JsString(rawAddress) => Address.fromString(rawAddress).left.map(e => s"Expected '$rawAddress' to be an address: $e")
+        case x                    => Left(s"Expected a string, got: $x")
+      }
+
+      val requestBody = rawRequestBody match {
+        case r: JsObject => Right(r)
+        case x           => Left(s"Expected a JsObject, got: $x")
+      }
+
+      (address, requestBody).mapN(RequestKey.apply) match {
+        case Left(e)  => JsError(s"Can't parse RequestKey: $e")
+        case Right(r) => JsSuccess(r)
+      }
+
+    case x => JsError(s"Expected an array with two elements, got: $x")
+  }
 }
 
 class LevelDbRequestsStorage(db: DB) extends RequestsStorage {

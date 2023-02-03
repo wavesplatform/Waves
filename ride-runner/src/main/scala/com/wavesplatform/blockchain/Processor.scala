@@ -17,7 +17,6 @@ import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 
 import java.util.concurrent.atomic.AtomicReference
-import scala.util.chaining.scalaUtilChainingOps
 
 trait Processor {
 
@@ -47,8 +46,8 @@ class BlockchainProcessor(blockchainStorage: SharedBlockchainData[RequestKey], r
 
   override def process(event: BlockchainUpdated): Unit = {
     val height = Height(event.height)
-    accumulatedChanges.set(event.update match {
-      case Update.Empty => accumulatedChanges // Ignore
+    val affected = event.update match {
+      case Update.Empty => AffectedTags.empty[RequestKey] // Ignore
       case Update.Append(append) =>
         append.body match {
           case Body.Empty         =>
@@ -62,26 +61,31 @@ class BlockchainProcessor(blockchainStorage: SharedBlockchainData[RequestKey], r
         // It wasn't a micro fork, so we have a useful information about changed keys
         if (lastEvents.isEmpty) lastEvents = List(event)
         process(height, rollback)
-    })
+    }
+
+    // TODO
+    accumulatedChanges.accumulateAndGet(ProcessResult(height, affected), (orig, update) => update.withAffectedTags(orig.affectedScripts))
 
     // Update this in the end, because a service could be suddenly turned off and we won't know, that we should re-read this block
     blockchainStorage.blockHeaders.update(event)
     log.info(s"Processed $height")
   }
 
-  private def process(h: Height, append: BlockchainUpdated.Append): ProcessResult[RequestKey] = {
-    val withUpdatedHeight = {
-      // Almost all scripts use the height, so we can run all of them
-      // ^ It's not true, I see that unnecessary calls more than regular 10x
-      val r =
-        if (accumulatedChanges.newHeight == h) accumulatedChanges
-        else accumulatedChanges.withAffectedTags(AffectedTags(storage.keySet.toSet))
+  private val empty = AffectedTags[RequestKey](Set.empty)
 
-      // TODO Affect scripts if height is increased
-//      val r = accumulatedChanges.withAffectedTags(blockchainStorage.taggedHeight.affectedTags)
-
-      r.copy(newHeight = h)
-    }
+  private def process(h: Height, append: BlockchainUpdated.Append): AffectedTags[RequestKey] = {
+//    val withUpdatedHeight = {
+//      // Almost all scripts use the height, so we can run all of them
+//      // ^ It's not true, I see that unnecessary calls more than regular 10x
+////      val r =
+////        if (accumulatedChanges.newHeight == h) accumulatedChanges
+////        else accumulatedChanges.withAffectedTags(AffectedTags(storage.keySet.toSet))
+//
+//      // TODO Affect scripts if height is increased
+////      val r = accumulatedChanges.withAffectedTags(blockchainStorage.taggedHeight.affectedTags)
+//
+//      AffectedTags(Set.empty[RequestKey])
+//    }
 
     val (txs, timer) = append.body match {
       // PBBlocks.vanilla(block.getBlock.getHeader)
@@ -90,89 +94,83 @@ class BlockchainProcessor(blockchainStorage: SharedBlockchainData[RequestKey], r
       case Body.Empty                  => (Seq.empty, none)
     }
 
-    timer match {
-      case None => withUpdatedHeight
-      case Some(timer) =>
-        timer.measure {
-          val stateUpdate = (append.getStateUpdate +: append.transactionStateUpdates).view
-          val txsView     = txs.view.map(_.transaction)
-          // TODO parallelize?
-          withUpdatedHeight
-            .pipe(stateUpdate.flatMap(_.assets).foldLeft(_) { case (r, x) =>
-              r.withAffectedTags(blockchainStorage.assets.append(h, x))
-            })
-            .pipe(stateUpdate.flatMap(_.balances).foldLeft(_) { case (r, x) =>
-              r.withAffectedTags(blockchainStorage.accountBalances.append(h, x))
-            })
-            .pipe(stateUpdate.flatMap(_.leasingForAddress).foldLeft(_) { case (r, x) =>
-              r.withAffectedTags(blockchainStorage.accountLeaseBalances.append(h, x))
-            })
-            .pipe(stateUpdate.flatMap(_.dataEntries).foldLeft(_) { case (r, x) =>
-              r.withAffectedTags(blockchainStorage.data.append(h, x))
-            })
-            .pipe(
-              txsView
-                .flatMap {
-                  case Transaction.WavesTransaction(tx) =>
-                    tx.data match {
-                      case Data.SetScript(txData) => (tx.senderPublicKey.toPublicKey, txData.script).some
-                      case _                      => none
-                    }
-                  case _ => none
+    timer.fold(empty) { timer =>
+      timer.measure {
+        val stateUpdate = (append.getStateUpdate +: append.transactionStateUpdates).view
+        val txsView     = txs.view.map(_.transaction)
+        // TODO parallelize?
+        stateUpdate.flatMap(_.assets).foldLeft(empty) { case (r, x) =>
+          r ++ blockchainStorage.assets.append(h, x)
+        } ++
+          stateUpdate.flatMap(_.balances).foldLeft(empty) { case (r, x) =>
+            r ++ blockchainStorage.accountBalances.append(h, x)
+          } ++
+          stateUpdate.flatMap(_.leasingForAddress).foldLeft(empty) { case (r, x) =>
+            r ++ blockchainStorage.accountLeaseBalances.append(h, x)
+          } ++
+          stateUpdate.flatMap(_.dataEntries).foldLeft(empty) { case (r, x) =>
+            r ++ blockchainStorage.data.append(h, x)
+          } ++
+          (
+            txsView
+              .flatMap {
+                case Transaction.WavesTransaction(tx) =>
+                  tx.data match {
+                    case Data.SetScript(txData) => (tx.senderPublicKey.toPublicKey, txData.script).some
+                    case _                      => none
+                  }
+                case _ => none
+              }
+              .foldLeft(empty) { case (r, (pk, script)) =>
+                r ++ blockchainStorage.accountScripts.append(h, pk, script)
+              }
+          ) ++
+          txsView
+            .flatMap {
+              case Transaction.WavesTransaction(tx) =>
+                tx.data match {
+                  case Data.CreateAlias(txData) => (txData.alias, tx.senderPublicKey.toPublicKey).some
+                  case _                        => none
                 }
-                .foldLeft(_) { case (r, (pk, script)) =>
-                  r.withAffectedTags(blockchainStorage.accountScripts.append(h, pk, script))
-                }
-            )
-            .pipe(
-              txsView
-                .flatMap {
-                  case Transaction.WavesTransaction(tx) =>
-                    tx.data match {
-                      case Data.CreateAlias(txData) => (txData.alias, tx.senderPublicKey.toPublicKey).some
-                      case _                        => none
-                    }
-                  case _ => none
-                }
-                .foldLeft(_) { case (r, (alias, pk)) =>
-                  r.withAffectedTags(blockchainStorage.aliases.append(h, alias, pk))
-                }
-            )
-            // We have to do this, otherwise:
-            // 1. A transaction could be moved to a new block during NG process
-            // 2. We couldn't observe it, e.g. comes in a next micro block or even a block
-            // 3. So a script returns a wrong result until the next height, when we re-evaluate all scripts forcefully
-            .pipe(append.transactionIds.foldLeft(_) { case (r, txId) =>
-              r.withAffectedTags(blockchainStorage.transactions.setHeight(txId, h))
-            })
-        }
+              case _ => none
+            }
+            .foldLeft(empty) { case (r, (alias, pk)) =>
+              r ++ blockchainStorage.aliases.append(h, alias, pk)
+            } ++
+          // We have to do this, otherwise:
+          // 1. A transaction could be moved to a new block during NG process
+          // 2. We couldn't observe it, e.g. comes in a next micro block or even a block
+          // 3. So a script returns a wrong result until the next height, when we re-evaluate all scripts forcefully
+          append.transactionIds.foldLeft(empty) { case (r, txId) =>
+            r ++ blockchainStorage.transactions.setHeight(txId, h)
+          }
+      }
     }
   }
 
-  private def process(h: Height, rollback: BlockchainUpdated.Rollback): ProcessResult[RequestKey] = rollbackProcessingTime.measure {
+  private def process(h: Height, rollback: BlockchainUpdated.Rollback): AffectedTags[RequestKey] = rollbackProcessingTime.measure {
     // TODO #20 The height will be eventually > if this is a rollback, so we need to run all scripts
     // Almost all scripts use the height
-    val withUpdatedHeight = accumulatedChanges.copy(newHeight = h)
+//    val withUpdatedHeight = accumulatedChanges.copy(newHeight = h)
 
     blockchainStorage.vrf.removeFrom(h + 1)
 
     val stateUpdate = rollback.getRollbackStateUpdate
-    withUpdatedHeight
-      .pipe(stateUpdate.assets.foldLeft(_) { case (r, x) =>
-        r.withAffectedTags(blockchainStorage.assets.rollback(h, x))
-      })
-      .pipe(stateUpdate.balances.foldLeft(_) { case (r, x) =>
-        r.withAffectedTags(blockchainStorage.accountBalances.rollback(h, x))
-      })
-      .pipe(stateUpdate.leasingForAddress.foldLeft(_) { case (r, x) =>
-        r.withAffectedTags(blockchainStorage.accountLeaseBalances.rollback(h, x))
-      })
-      .pipe(stateUpdate.dataEntries.foldLeft(_) { case (r, x) =>
-        r.withAffectedTags(blockchainStorage.data.rollback(h, x))
-      })
-      .pipe(rollback.removedTransactionIds.foldLeft(_) { case (r, txId) =>
-        r.withAffectedTags(blockchainStorage.transactions.remove(txId))
-      })
+    stateUpdate.assets.foldLeft(empty) { case (r, x) =>
+      r ++ blockchainStorage.assets.rollback(h, x)
+    } ++
+      stateUpdate.balances.foldLeft(empty) { case (r, x) =>
+        r ++ blockchainStorage.accountBalances.rollback(h, x)
+      } ++
+      stateUpdate.leasingForAddress.foldLeft(empty) { case (r, x) =>
+        r ++ blockchainStorage.accountLeaseBalances.rollback(h, x)
+      } ++
+      stateUpdate.dataEntries.foldLeft(empty) { case (r, x) =>
+        r ++ blockchainStorage.data.rollback(h, x)
+      } ++
+      rollback.removedTransactionIds.foldLeft(empty) { case (r, txId) =>
+        r ++ blockchainStorage.transactions.remove(txId)
+      }
     /* TODO #29: Will be fixed (or not) soon with a new BlockchainUpdates API
        NOTE: Ignoring, because 1) almost impossible 2) transactions return to blockchain eventually
       .pipe(stateUpdate.aliases.foldLeft(_) { case (r, x) =>
@@ -184,17 +182,13 @@ class BlockchainProcessor(blockchainStorage: SharedBlockchainData[RequestKey], r
   }
 
   override def runAffectedScripts(): Task[Unit] = {
-    val height = accumulatedChanges.newHeight
-
-    if (accumulatedChanges.affectedScripts.isEmpty) Task.now(log.debug(s"[$height] Not updated"))
-    else {
-      val affected = accumulatedChanges.affectedScripts
-      accumulatedChanges = ProcessResult(affectedScripts = accumulatedChanges.affectedScripts -- affected)
-      requestsService.runAffected(height, affected)
-    }
+    val last = accumulatedChanges.getAndUpdate(orig => orig.withoutAffectedTags)
+    if (last.affectedScripts.isEmpty) Task(log.debug(s"[${last.newHeight}] Not updated"))
+    else requestsService.runAffected(last.newHeight, last.affectedScripts.xs)
   }
 
-  override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] = blockchainStorage.blockHeaders.getLocal(height).map(_.id() == id)
+  override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] =
+    blockchainStorage.blockHeaders.getLocal(height).map(_.id() == id)
 
   /** Includes removeBlocksFrom
     */
@@ -204,20 +198,26 @@ class BlockchainProcessor(blockchainStorage: SharedBlockchainData[RequestKey], r
       case last :: _ => // a liquid block with same height
         val rollbackToHeight = Height(last.height - 1) // -1 because we undo the lastEvent
         lastEvents.foreach { lastEvent =>
-          accumulatedChanges = lastEvent.update match {
+          val updates = lastEvent.update match {
             case Update.Append(append) => undo(rollbackToHeight, ByteStr(lastEvent.id.toByteArray), append)
-            case _                     => accumulatedChanges
+            case _                     => empty
           }
+
+          if (!updates.isEmpty)
+            accumulatedChanges.getAndAccumulate(
+              ProcessResult(rollbackToHeight, updates),
+              (orig, update) => update.withAffectedTags(orig.affectedScripts)
+            )
         }
 
         removeBlocksFrom(Height(last.height))
     }
 
-  private def undo(h: Height, id: ByteStr, append: BlockchainUpdated.Append): ProcessResult[RequestKey] = {
+  private def undo(h: Height, id: ByteStr, append: BlockchainUpdated.Append): AffectedTags[RequestKey] = {
     log.info(s"Undo id=$id to $h")
 
     // Almost all scripts use the height, so we can run all of them
-    val withUpdatedHeight = accumulatedChanges.copy(newHeight = h) // TODO #31 Affect all scripts if height is increased
+//    val withUpdatedHeight = accumulatedChanges.copy(newHeight = h) // TODO #31 Affect all scripts if height is increased
 
     val (txs, timer) = append.body match {
       case Body.Block(block)           => (block.getBlock.transactions, blockProcessingTime.some)
@@ -225,57 +225,50 @@ class BlockchainProcessor(blockchainStorage: SharedBlockchainData[RequestKey], r
       case Body.Empty                  => (Seq.empty, none)
     }
 
-    timer match {
-      case None => withUpdatedHeight
-      case Some(timer) =>
-        timer.measure {
-          val stateUpdate = (append.getStateUpdate +: append.transactionStateUpdates).view
-          val txsView     = txs.view.map(_.transaction)
-          withUpdatedHeight
-            .pipe(stateUpdate.flatMap(_.assets).foldLeft(_) { case (r, x) =>
-              r.withAffectedTags(blockchainStorage.assets.undoAppend(h, x))
-            })
-            .pipe(stateUpdate.flatMap(_.balances).foldLeft(_) { case (r, x) =>
-              r.withAffectedTags(blockchainStorage.accountBalances.undoAppend(h, x))
-            })
-            .pipe(stateUpdate.flatMap(_.leasingForAddress).foldLeft(_) { case (r, x) =>
-              r.withAffectedTags(blockchainStorage.accountLeaseBalances.undoAppend(h, x))
-            })
-            .pipe(stateUpdate.flatMap(_.dataEntries).foldLeft(_) { case (r, x) =>
-              r.withAffectedTags(blockchainStorage.data.undoAppend(h, x))
-            })
-            .pipe(
-              txsView
-                .flatMap {
-                  case Transaction.WavesTransaction(tx) =>
-                    tx.data match {
-                      case Data.SetScript(txData) => (tx.senderPublicKey.toPublicKey, txData.script).some
-                      case _                      => none
-                    }
-                  case _ => none
+    timer.fold(empty) { timer =>
+      timer.measure {
+        val stateUpdate = (append.getStateUpdate +: append.transactionStateUpdates).view
+        val txsView     = txs.view.map(_.transaction)
+        stateUpdate.flatMap(_.assets).foldLeft(empty) { case (r, x) =>
+          r ++ blockchainStorage.assets.undoAppend(h, x)
+        } ++
+          stateUpdate.flatMap(_.balances).foldLeft(empty) { case (r, x) =>
+            r ++ blockchainStorage.accountBalances.undoAppend(h, x)
+          } ++
+          stateUpdate.flatMap(_.leasingForAddress).foldLeft(empty) { case (r, x) =>
+            r ++ blockchainStorage.accountLeaseBalances.undoAppend(h, x)
+          } ++
+          stateUpdate.flatMap(_.dataEntries).foldLeft(empty) { case (r, x) =>
+            r ++ blockchainStorage.data.undoAppend(h, x)
+          } ++
+          txsView
+            .flatMap {
+              case Transaction.WavesTransaction(tx) =>
+                tx.data match {
+                  case Data.SetScript(txData) => (tx.senderPublicKey.toPublicKey, txData.script).some
+                  case _                      => none
                 }
-                .foldLeft(_) { case (r, (pk, _)) =>
-                  r.withAffectedTags(blockchainStorage.accountScripts.undoAppend(h, pk))
+              case _ => none
+            }
+            .foldLeft(empty) { case (r, (pk, _)) =>
+              r ++ blockchainStorage.accountScripts.undoAppend(h, pk)
+            } ++
+          txsView
+            .flatMap {
+              case Transaction.WavesTransaction(tx) =>
+                tx.data match {
+                  case Data.CreateAlias(txData) => (txData.alias, tx.senderPublicKey.toPublicKey).some
+                  case _                        => none
                 }
-            )
-            .pipe(
-              txsView
-                .flatMap {
-                  case Transaction.WavesTransaction(tx) =>
-                    tx.data match {
-                      case Data.CreateAlias(txData) => (txData.alias, tx.senderPublicKey.toPublicKey).some
-                      case _                        => none
-                    }
-                  case _ => none
-                }
-                .foldLeft(_) { case (r, (alias, _)) =>
-                  r.withAffectedTags(blockchainStorage.aliases.undoAppend(h, alias))
-                }
-            )
-            .pipe(append.transactionIds.foldLeft(_) { case (r, txId) =>
-              r.withAffectedTags(blockchainStorage.transactions.remove(txId))
-            })
-        }
+              case _ => none
+            }
+            .foldLeft(empty) { case (r, (alias, _)) =>
+              r ++ blockchainStorage.aliases.undoAppend(h, alias)
+            } ++
+          append.transactionIds.foldLeft(empty) { case (r, txId) =>
+            r ++ blockchainStorage.transactions.remove(txId)
+          }
+      }
     }
   }
 
@@ -284,10 +277,12 @@ class BlockchainProcessor(blockchainStorage: SharedBlockchainData[RequestKey], r
 
 object BlockchainProcessor {}
 // TODO #18: don't calculate affectedScripts if all scripts are affected
+// Use totalScripts: Int = 0, but not all scripts are affected! Probably cancel?
 case class ProcessResult[TagT](
     /*allScripts: Set[Int], */
     newHeight: Int = 0,
-    affectedScripts: Set[TagT] = Set.empty[TagT]
+    affectedScripts: AffectedTags[TagT] = AffectedTags(Set.empty[TagT])
 ) {
-  def withAffectedTags(x: AffectedTags[TagT]): ProcessResult[TagT] = copy(affectedScripts = affectedScripts ++ x.xs)
+  def withAffectedTags(xs: AffectedTags[TagT]): ProcessResult[TagT] = copy(affectedScripts = affectedScripts ++ xs)
+  def withoutAffectedTags: ProcessResult[TagT]                      = copy(affectedScripts = AffectedTags.empty[TagT])
 }

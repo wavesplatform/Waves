@@ -306,11 +306,6 @@ object CacheKeys {
   object RequestsLastIndex extends CacheKey[Unit, Int](19)
   object Requests          extends CacheKey[Int, RequestKey](20)
 
-  implicit val requestKeyAsBytes: AsBytes[RequestKey] = AsBytes[(Address, JsObject)].transform(
-    Function.tupled(RequestKey.apply),
-    x => (x.address, x.requestBody)
-  )
-
   implicit val jsObjectAsBytes: AsBytes[JsObject] = AsBytes[String].transform(
     s =>
       Json.parse(s) match {
@@ -489,4 +484,9 @@ object CacheKeys {
       (tx, 1 + len)
     }
   }
+
+  implicit val requestKeyAsBytes: AsBytes[RequestKey] = AsBytes[(Address, JsObject)].transform(
+    Function.tupled(RequestKey.apply),
+    x => (x.address, x.requestBody)
+  )
 }

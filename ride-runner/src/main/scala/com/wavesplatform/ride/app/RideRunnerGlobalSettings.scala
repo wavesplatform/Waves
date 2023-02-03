@@ -3,7 +3,7 @@ package com.wavesplatform.ride.app
 import com.typesafe.config.{Config, ConfigList, ConfigRenderOptions, ConfigValue}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector, RideApi}
-import com.wavesplatform.blockchain.{BlockchainProcessor, SharedBlockchainData}
+import com.wavesplatform.blockchain.SharedBlockchainData
 import com.wavesplatform.ride.DefaultRequestsService
 import com.wavesplatform.ride.app.RideRunnerSettings.DbSettings
 import com.wavesplatform.settings.*
