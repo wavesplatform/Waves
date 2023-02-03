@@ -204,7 +204,9 @@ object StateUpdate {
           Height @@ v.lastUpdated,
           v.scriptInfo.map(fromPBScriptInfo),
           v.sponsorship,
-          v.nft
+          v.nft,
+          0,
+          Height @@ 0
         )
       }
 
