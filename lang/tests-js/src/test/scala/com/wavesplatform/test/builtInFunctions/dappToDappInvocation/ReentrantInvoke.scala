@@ -2,7 +2,8 @@ package com.wavesplatform.test.builtInFunctions.dappToDappInvocation
 
 import com.wavesplatform.JsTestBase
 import testHelpers.GeneratorContractsForBuiltInFunctions
-import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomByteVectorArrayElement, randomInt, randomStringArrayElement}
+import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomByteVectorArrayElement, randomDigestAlgorithmTypeArrayElement, randomInt, randomStringArrayElement}
+import testHelpers.TestDataConstantsAndMethods.{nonMatchingTypes, versionsSupportingTheNewFeatures}
 import utest.{Tests, test}
 
 object ReentrantInvoke extends JsTestBase {
@@ -13,51 +14,37 @@ object ReentrantInvoke extends JsTestBase {
   private val invalidFunctionErrorResult: String  = testData.invalidFunctionError("reentrantInvoke", 4)
 
   val tests: Tests = Tests {
-    test("check: function reentrantInvoke compiles") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
+    test(" functions invoke compiles for Issue V4 and more") {
+      for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script       = precondition.codeForDAppInvocation(randomByteVectorArrayElement, randomInt.toString, reentrantInvoke)
-        assertCompileSuccessDApp(script, version)
+        for (
+          (byteVector, data, function) <- Seq(
+            (randomByteVectorArrayElement, randomInt.toString, reentrantInvoke),
+            (randomByteVectorArrayElement, randomInt.toString, reentrantInvokeArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.codeForDAppInvocation(byteVector, data, function)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
-    test("check: function reentrantInvoke compiles (argument before function)") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
+    test(" Functions invoke negative tests for V4 and more") {
+      for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script       = precondition.codeForDAppInvocation(randomByteVectorArrayElement, randomInt.toString, reentrantInvokeArgBeforeFunc)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("compilation error: invalid data reentrantInvoke") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script       = precondition.codeForDAppInvocation(randomByteVectorArrayElement, randomAddressDataArrayElement, reentrantInvoke)
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("Int"))
-      }
-    }
-
-    test("compilation error: invalid data reentrantInvoke (argument before function)") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeForDAppInvocation(randomByteVectorArrayElement, randomAddressDataArrayElement, reentrantInvokeArgBeforeFunc)
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("Int"))
-      }
-    }
-
-    test("compilation error: invalid function reentrantInvoke") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script       = precondition.codeForDAppInvocation(randomByteVectorArrayElement, randomStringArrayElement, invalidReentrantInvokeFunction)
-        assertCompileErrorDApp(script, version, invalidFunctionErrorResult)
-      }
-    }
-
-    test("compilation error: invalid function reentrantInvoke (argument before function)") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeForDAppInvocation(randomByteVectorArrayElement, randomStringArrayElement, invalidReentrantInvokeArgBeforeFunc)
-        assertCompileErrorDApp(script, version, invalidFunctionErrorResult)
+        for (
+          (byteVector, data, function, error) <- Seq(
+            (randomByteVectorArrayElement, randomAddressDataArrayElement, reentrantInvoke, nonMatchingTypes("Int")),
+            (randomByteVectorArrayElement, randomDigestAlgorithmTypeArrayElement, reentrantInvokeArgBeforeFunc, nonMatchingTypes("Int")),
+            (randomStringArrayElement, randomInt.toString, reentrantInvoke, nonMatchingTypes("ByteVector|Unit")),
+            (randomStringArrayElement, randomInt.toString, reentrantInvokeArgBeforeFunc, nonMatchingTypes("ByteVector|Unit")),
+            (randomByteVectorArrayElement, randomInt.toString, invalidReentrantInvokeFunction, invalidFunctionErrorResult),
+            (randomByteVectorArrayElement, randomInt.toString, invalidReentrantInvokeArgBeforeFunc, invalidFunctionErrorResult)
+          )
+        ) {
+          val script = precondition.codeForDAppInvocation(byteVector, data, function)
+          assertCompileErrorDApp(script, version, error)
+        }
       }
     }
   }
