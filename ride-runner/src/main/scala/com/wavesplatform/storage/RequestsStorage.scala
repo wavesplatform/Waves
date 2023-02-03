@@ -3,21 +3,25 @@ package com.wavesplatform.storage
 import com.wavesplatform.account.Address
 import com.wavesplatform.database.DBExt
 import com.wavesplatform.ride.app.RideRunnerMetrics.rideScriptTotalNumber
-import com.wavesplatform.storage.RequestsStorage.RequestKey
 import com.wavesplatform.storage.persistent.CacheKeys
 import org.iq80.leveldb.DB
-import play.api.libs.json.JsObject
+import play.api.libs.json.{JsObject, Json, Reads}
 
 import java.util.concurrent.atomic.AtomicInteger
 
 trait RequestsStorage {
   def size: Int
   def all(): List[RequestKey]
+
+  /** Doesn't check presence
+    */
   def append(x: RequestKey): Unit
 }
 
-object RequestsStorage {
-  type RequestKey = (Address, JsObject)
+// TODO rename
+final case class RequestKey(address: Address, requestBody: JsObject)
+object RequestKey {
+  implicit val requestsKeyReads: Reads[RequestKey] = Json.reads[(Address, JsObject)].map(Function.tupled(RequestKey))
 }
 
 class LevelDbRequestsStorage(db: DB) extends RequestsStorage {

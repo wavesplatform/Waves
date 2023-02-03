@@ -158,7 +158,7 @@ object BlockchainState extends ScorexLogging {
             if (h >= comparedBlocks.workingHeight) {
               log.info(s"[$h] Reached the current height, run all scripts")
               val r = Working(h)
-              processor.runScripts().as {
+              processor.runAffectedScripts().as {
                 logStatusChanged(r)
                 r
               }
@@ -177,7 +177,7 @@ object BlockchainState extends ScorexLogging {
         update match {
           case _: Update.Append =>
             processor.process(event.getUpdate)
-            processor.runScripts().as(orig.withHeight(h))
+            processor.runAffectedScripts().as(orig.withHeight(h))
 
           case _: Update.Rollback =>
             processor.removeBlocksFrom(Height(h + 1))
@@ -196,7 +196,7 @@ object BlockchainState extends ScorexLogging {
             val updated = orig.apply(event)
             if (updated.isRollbackResolved) {
               val r = Working(updated.processedHeight)
-              processor.runScripts().as {
+              processor.runAffectedScripts().as {
                 logStatusChanged(r)
                 r
               }

@@ -1,12 +1,6 @@
 package com.wavesplatform.blockchain
 
 import cats.syntax.option.*
-import com.wavesplatform.account.Address
-import com.wavesplatform.api.http.ApiError.CustomValidationError
-import com.wavesplatform.api.http.ApiException
-import com.wavesplatform.api.http.utils.UtilsApiRoute
-import com.wavesplatform.blockchain.BlockchainProcessor.{ProcessResult, Settings}
-import com.wavesplatform.blockchain.RestApiScript.LastUpdatedKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
@@ -14,19 +8,15 @@ import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
-import com.wavesplatform.ride.app.RideRunnerMetrics
+import com.wavesplatform.ride.RequestsService
 import com.wavesplatform.ride.app.RideRunnerMetrics.*
-import com.wavesplatform.state.{Blockchain, Height}
-import com.wavesplatform.storage.RequestsStorage
-import com.wavesplatform.storage.RequestsStorage.RequestKey
+import com.wavesplatform.state.Height
+import com.wavesplatform.storage.RequestKey
 import com.wavesplatform.storage.actions.AffectedTags
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
-import monix.execution.Scheduler
-import play.api.libs.json.{JsNumber, JsObject}
 
-import java.util.concurrent.{ConcurrentHashMap, TimeUnit}
-import scala.collection.concurrent.TrieMap
+import java.util.concurrent.atomic.AtomicReference
 import scala.util.chaining.scalaUtilChainingOps
 
 trait Processor {
@@ -45,29 +35,19 @@ trait Processor {
 
   def process(event: BlockchainUpdated): Unit
 
-  def runScripts(forceAll: Boolean = false): Task[Unit]
-
-  def getCachedResultOrRun(address: Address, request: JsObject): Task[JsObject]
+  def runAffectedScripts(): Task[Unit]
 }
 
-class BlockchainProcessor(
-    settings: Settings,
-    blockchainStorage: SharedBlockchainData[RequestKey],
-    requestsStorage: RequestsStorage,
-    runScriptsScheduler: Scheduler
-) extends Processor
+class BlockchainProcessor(blockchainStorage: SharedBlockchainData[RequestKey], requestsService: RequestsService)
+    extends Processor
     with ScorexLogging {
-  private val storage: TrieMap[RequestKey, RestApiScript] = {
-    TrieMap.from(requestsStorage.all().map(k => (k, RestApiScript(k._1, blockchainStorage, k._2))))
-  }
 
-  // No need for locks, because only runScript can be executed from a different workflow. Other methods are called in sequence
-  @volatile private var accumulatedChanges = new ProcessResult[RequestKey]()
-  @volatile private var lastEvents         = List.empty[BlockchainUpdated]
+  private val accumulatedChanges   = new AtomicReference(new ProcessResult[RequestKey]())
+  @volatile private var lastEvents = List.empty[BlockchainUpdated]
 
   override def process(event: BlockchainUpdated): Unit = {
     val height = Height(event.height)
-    accumulatedChanges = event.update match {
+    accumulatedChanges.set(event.update match {
       case Update.Empty => accumulatedChanges // Ignore
       case Update.Append(append) =>
         append.body match {
@@ -82,7 +62,7 @@ class BlockchainProcessor(
         // It wasn't a micro fork, so we have a useful information about changed keys
         if (lastEvents.isEmpty) lastEvents = List(event)
         process(height, rollback)
-    }
+    })
 
     // Update this in the end, because a service could be suddenly turned off and we won't know, that we should re-read this block
     blockchainStorage.blockHeaders.update(event)
@@ -116,6 +96,7 @@ class BlockchainProcessor(
         timer.measure {
           val stateUpdate = (append.getStateUpdate +: append.transactionStateUpdates).view
           val txsView     = txs.view.map(_.transaction)
+          // TODO parallelize?
           withUpdatedHeight
             .pipe(stateUpdate.flatMap(_.assets).foldLeft(_) { case (r, x) =>
               r.withAffectedTags(blockchainStorage.assets.append(h, x))
@@ -202,27 +183,15 @@ class BlockchainProcessor(
       }) */
   }
 
-  override def runScripts(forceAll: Boolean = false): Task[Unit] = {
+  override def runAffectedScripts(): Task[Unit] = {
     val height = accumulatedChanges.newHeight
 
-    val affectedScripts =
-      if (forceAll) storage.values
-      else if (accumulatedChanges.affectedScripts.isEmpty) {
-        log.debug(s"[$height] Not updated")
-        Nil
-      } else accumulatedChanges.affectedScripts.flatMap(storage.get)
-
-    // Don't clean all affected scripts, because not all scripts could be added to the storage on the moment of runScripts.
-    // See getCachedResultOrRun: it takes some time to run a script and later add it to the storage.
-    accumulatedChanges = ProcessResult(affectedScripts = accumulatedChanges.affectedScripts -- affectedScripts.map(_.key))
-
-    val r = Task
-      .parTraverseUnordered(affectedScripts)(runScript(_, hasCaches = true))
-      .as(())
-      .executeOn(runScriptsScheduler)
-
-    val start = System.nanoTime()
-    r.tapEval(_ => Task.now(RideRunnerMetrics.rideScriptRunOnHeightTime(forceAll).update(System.nanoTime() - start)))
+    if (accumulatedChanges.affectedScripts.isEmpty) Task.now(log.debug(s"[$height] Not updated"))
+    else {
+      val affected = accumulatedChanges.affectedScripts
+      accumulatedChanges = ProcessResult(affectedScripts = accumulatedChanges.affectedScripts -- affected)
+      requestsService.runAffected(height, affected)
+    }
   }
 
   override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] = blockchainStorage.blockHeaders.getLocal(height).map(_.id() == id)
@@ -311,102 +280,14 @@ class BlockchainProcessor(
   }
 
   override def removeBlocksFrom(height: Height): Unit = blockchainStorage.blockHeaders.removeFrom(height)
-
-  private def runScript(script: RestApiScript, hasCaches: Boolean): Task[JsObject] = {
-    val key = script.key
-    Task {
-      val prev = script.lastResult
-
-      val refreshed = rideScriptRunTime.withTag("has-caches", hasCaches).measure {
-        script.refreshed(settings.enableTraces, settings.evaluateScriptComplexityLimit, settings.maxTxErrorLogSize, runScriptsScheduler)
-      }
-      storage.put(key, refreshed)
-
-      val lastResult = refreshed.lastResult
-      if ((lastResult \ "error").isEmpty) {
-        val complexity = lastResult.value("complexity").as[Int]
-        val result     = lastResult.value("result").as[JsObject].value("value")
-        log.info(f"result=ok; addr=${key._1}; request=${key._2}; complexity=$complexity")
-
-        prev.value.get("result").map(_.as[JsObject].value("value")).foreach { prevResult =>
-          if (result == prevResult) rideScriptUnnecessaryCalls.increment()
-          else rideScriptOkCalls.increment()
-        }
-      } else {
-        log.info(f"result=failed; addr=${key._1}; request=${key._2}; errorCode=${(lastResult \ "error").as[Int]}")
-        rideScriptFailedCalls.increment()
-      }
-      lastResult
-    }
-      .tapError { e => Task(log.error(s"An error during running $key", e)) }
-      .executeOn(runScriptsScheduler)
-  }
-
-  // To limit duplicated requests
-  private val inProcess = new ConcurrentHashMap[RequestKey, Task[JsObject]]()
-  override def getCachedResultOrRun(address: Address, request: JsObject): Task[JsObject] = {
-    val key = (address, request)
-    storage.get(key) match {
-      case Some(r) =>
-        rideScriptCacheHits.increment()
-        Task.now(r.lastResult)
-
-      case None =>
-        inProcess.computeIfAbsent(
-          key,
-          { key =>
-            Task {
-              rideScriptCacheMisses.increment()
-              requestsStorage.append(key)
-              blockchainStorage.accountScripts.getUntagged(blockchainStorage.height, address)
-            }
-              .flatMap {
-                case None =>
-                  // TODO #19 Change/move an error to an appropriate layer
-                  Task.raiseError(ApiException(CustomValidationError(s"Address $address is not dApp")))
-
-                case _ => runScript(RestApiScript(address, blockchainStorage, request), hasCaches = false)
-              }
-              .doOnFinish { _ => Task(inProcess.remove(key)) }
-          }
-        )
-    }
-  }
 }
 
-object BlockchainProcessor {
-  case class Settings(enableTraces: Boolean, evaluateScriptComplexityLimit: Int, maxTxErrorLogSize: Int)
-
-  // TODO #18: don't calculate affectedScripts if all scripts are affected
-  private case class ProcessResult[TagT](
-      /*allScripts: Set[Int], */ newHeight: Int = 0,
-      affectedScripts: Set[TagT] = Set.empty[TagT]
-  ) {
-    def withAffectedTags(x: AffectedTags[TagT]): ProcessResult[TagT] = copy(affectedScripts = affectedScripts ++ x.xs)
-  }
-}
-
-case class RestApiScript(address: Address, blockchain: Blockchain, request: JsObject, lastResult: JsObject) {
-  def key: RequestKey = (address, request)
-
-  def refreshed(trace: Boolean, evaluateScriptComplexityLimit: Int, maxTxErrorLogSize: Int, scheduler: Scheduler): RestApiScript = {
-    val result = UtilsApiRoute.evaluate(
-      evaluateScriptComplexityLimit,
-      blockchain,
-      address,
-      request,
-      trace,
-      maxTxErrorLogSize
-    )
-    // TODO restore stateChanges?
-    copy(lastResult = result - "stateChanges" + (LastUpdatedKey -> JsNumber(scheduler.clockMonotonic(TimeUnit.MILLISECONDS))))
-  }
-}
-
-object RestApiScript {
-  val LastUpdatedKey = "__lastUpdated"
-
-  def apply(address: Address, blockchainStorage: SharedBlockchainData[RequestKey], request: JsObject): RestApiScript = {
-    new RestApiScript(address, new ScriptBlockchain[RequestKey](blockchainStorage, (address, request)), request, JsObject.empty)
-  }
+object BlockchainProcessor {}
+// TODO #18: don't calculate affectedScripts if all scripts are affected
+case class ProcessResult[TagT](
+    /*allScripts: Set[Int], */
+    newHeight: Int = 0,
+    affectedScripts: Set[TagT] = Set.empty[TagT]
+) {
+  def withAffectedTags(x: AffectedTags[TagT]): ProcessResult[TagT] = copy(affectedScripts = affectedScripts ++ x.xs)
 }

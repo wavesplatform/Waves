@@ -35,6 +35,7 @@ import com.wavesplatform.state.{
   TransactionId,
   TxMeta
 }
+import com.wavesplatform.storage.RequestKey
 import com.wavesplatform.storage.persistent.AsBytes.{ByteArrayOutputStreamOps, optional}
 import com.wavesplatform.storage.persistent.CacheKey.prefixOffset
 import com.wavesplatform.transaction.serialization.impl.DataTxSerializer
@@ -303,7 +304,12 @@ object CacheKeys {
   object Transactions extends CacheKey[TransactionId, Option[Int]](18)
 
   object RequestsLastIndex extends CacheKey[Unit, Int](19)
-  object Requests          extends CacheKey[Int, (Address, JsObject)](20)
+  object Requests          extends CacheKey[Int, RequestKey](20)
+
+  implicit val requestKeyAsBytes: AsBytes[RequestKey] = AsBytes[(Address, JsObject)].transform(
+    Function.tupled(RequestKey.apply),
+    x => (x.address, x.requestBody)
+  )
 
   implicit val jsObjectAsBytes: AsBytes[JsObject] = AsBytes[String].transform(
     s =>

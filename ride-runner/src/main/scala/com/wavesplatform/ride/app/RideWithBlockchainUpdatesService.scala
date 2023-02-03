@@ -7,10 +7,10 @@ import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcCon
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
 import com.wavesplatform.http.{EvaluateApiRoute, HttpServiceStatus, ServiceStatusRoute}
+import com.wavesplatform.ride.DefaultRequestsService
 import com.wavesplatform.state.Height
-import com.wavesplatform.storage.LevelDbRequestsStorage
-import com.wavesplatform.storage.RequestsStorage.RequestKey
 import com.wavesplatform.storage.persistent.LevelDbPersistentCaches
+import com.wavesplatform.storage.{LevelDbRequestsStorage, RequestKey}
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.ManagedChannel
 import io.netty.util.concurrent.DefaultThreadFactory
@@ -115,15 +115,16 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
 
     val requestsStorage = new LevelDbRequestsStorage(db)
     log.info(s"There are ${requestsStorage.all().size} scripts")
-    val processor = new BlockchainProcessor(
-      settings.rideRunner.processor,
+
+    val requestsService = new DefaultRequestsService(
+      settings.rideRunner.requestsService,
       blockchainStorage,
       requestsStorage,
       rideScheduler
     )
 
     log.info("Warming up caches...") // Helps to figure out, which data is used by a script
-    Await.result(processor.runScripts(forceAll = true).runToFuture(rideScheduler), Duration.Inf)
+    Await.result(requestsService.runAll().runToFuture(rideScheduler), Duration.Inf)
 
     val lastSafeKnownHeight = Height(math.max(0, blockchainStorage.height - 100 - 1)) // A rollback is not possible
     val workingHeight       = Height(math.max(blockchainStorage.height, lastHeightAtStart))
@@ -131,6 +132,8 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     log.info(s"Watching blockchain updates...")
     val blockchainUpdatesStream = blockchainApi.mkBlockchainUpdatesStream(blockchainEventsStreamScheduler)
     cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream) { blockchainUpdatesStream.close() }
+
+    val processor = new BlockchainProcessor(blockchainStorage, requestsService)
 
     @volatile var lastServiceStatus = ServiceStatus()
     val events = blockchainUpdatesStream.downstream
@@ -164,7 +167,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
 
     log.info(s"Initializing REST API on ${settings.restApi.bindAddress}:${settings.restApi.port}...")
     val apiRoutes = Seq(
-      EvaluateApiRoute(Function.tupled(processor.getCachedResultOrRun(_, _).runToFuture(rideScheduler))),
+      EvaluateApiRoute(requestsService.trackAndRun(_).runToFuture(rideScheduler)),
       ServiceStatusRoute({ () =>
         val nowMs      = blockchainEventsStreamScheduler.clockMonotonic(TimeUnit.MILLISECONDS)
         val idleTimeMs = nowMs - lastServiceStatus.lastProcessedTimeMs

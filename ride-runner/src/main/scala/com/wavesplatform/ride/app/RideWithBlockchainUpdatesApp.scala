@@ -1,22 +1,21 @@
 package com.wavesplatform.ride.app
 
 import akka.actor.ActorSystem
-import com.wavesplatform.account.Address
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
 import com.wavesplatform.events.WrappedEvent
+import com.wavesplatform.ride.DefaultRequestsService
 import com.wavesplatform.state.Height
-import com.wavesplatform.storage.RequestsStorage
-import com.wavesplatform.storage.RequestsStorage.RequestKey
 import com.wavesplatform.storage.persistent.LevelDbPersistentCaches
+import com.wavesplatform.storage.{RequestKey, RequestsStorage}
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.ManagedChannel
 import io.netty.util.concurrent.DefaultThreadFactory
 import kamon.instrumentation.executor.ExecutorInstrumentation
 import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.Json
 import sttp.client3.HttpURLConnectionBackend
 
 import java.io.File
@@ -124,19 +123,19 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
     val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
     log.info(s"Current height: known=${blockchainStorage.height}, blockchain=$lastHeightAtStart")
 
-    val processor = new BlockchainProcessor(
-      settings.rideRunner.processor,
+    val requestsService = new DefaultRequestsService(
+      settings.rideRunner.requestsService,
       blockchainStorage,
       new RequestsStorage {
-        override def size: Int                            = scripts.size
-        override def all(): List[(Address, JsObject)]     = scripts
-        override def append(x: (Address, JsObject)): Unit = {} // Ignore, because no way to evaluate a new expr
+        override def size: Int                   = scripts.size
+        override def all(): List[RequestKey]     = scripts
+        override def append(x: RequestKey): Unit = {} // Ignore, because no way to evaluate a new expr
       },
       rideScheduler
     )
 
     log.info("Warming up caches...") // Helps to figure out, which data is used by a script
-    Await.result(processor.runScripts(forceAll = true).runToFuture(rideScheduler), Duration.Inf)
+    Await.result(requestsService.runAll().runToFuture(rideScheduler), Duration.Inf)
 
     // mainnet
     val lastSafeKnownHeight = Height(3393500)                 // math.max(0, blockchainStorage.height - 100 - 1)) // A rollback is not possible
@@ -153,6 +152,7 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
       blockchainUpdates.close()
     }
 
+    val processor = new BlockchainProcessor(blockchainStorage, requestsService)
     val events = blockchainUpdates.downstream
       .doOnError(e =>
         Task {
