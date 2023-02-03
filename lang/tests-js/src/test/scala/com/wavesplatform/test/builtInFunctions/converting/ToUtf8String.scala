@@ -3,6 +3,7 @@ package com.wavesplatform.test.builtInFunctions.converting
 import com.wavesplatform.JsTestBase
 import testHelpers.GeneratorContractsForBuiltInFunctions
 import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomByteVectorArrayElement, randomUnionArrayElement}
+import testHelpers.TestDataConstantsAndMethods.{GreaterV3ResultStringEntry, actualVersions, invalidFunctionError, nonMatchingTypes, rideV3Result}
 import utest.{Tests, test}
 
 object ToUtf8String extends JsTestBase {
@@ -13,81 +14,33 @@ object ToUtf8String extends JsTestBase {
   private val invalidToUtf8StringArgBeforeFunc = "callerTestData.toUtf8String(callerTestData)"
 
   val tests: Tests = Tests {
-    test("check: toUtf8String function compiles with a ByteVector data type") {
-      for (version <- testData.actualVersions) {
+    test(" Functions toUtf8String compiles") {
+      for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomByteVectorArrayElement,
-          toUtf8String,
-          testData.rideV3Result,
-          testData.GreaterV3ResultStringEntry
-        )
-        assertCompileSuccessDApp(script, version)
+        for ((data, function) <- Seq(
+            (randomByteVectorArrayElement, toUtf8String),
+            (randomByteVectorArrayElement, toUtf8StringArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.codeFromMatchingAndCase(data, function, rideV3Result, GreaterV3ResultStringEntry)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
-    test("check: toUtf8String function compiles with a string data type (argument before function)") {
-      for (version <- testData.actualVersions) {
+    test(" toUtf8String negative tests") {
+      for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomByteVectorArrayElement,
-          toUtf8StringArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultStringEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("compilation error: Can't find a function overload toUtf8String") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomUnionArrayElement,
-          toUtf8String,
-          testData.rideV3Result,
-          testData.GreaterV3ResultStringEntry
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("ByteVector"))
-      }
-    }
-
-    test("compilation error: Can't find a function overload toUtf8String (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomAddressDataArrayElement,
-          toUtf8StringArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultStringEntry
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("ByteVector"))
-      }
-    }
-
-    test("compilation error: Function 'toUtf8String' requires 1 arguments toUtf8String") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomUnionArrayElement,
-          invalidToUtf8String,
-          testData.rideV3Result,
-          testData.GreaterV3ResultStringEntry
-        )
-        assertCompileErrorDApp(script, version, testData.invalidFunctionError("toUtf8String", 1))
-      }
-    }
-
-    test("compilation error: Function 'toUtf8String' requires 1 arguments (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomUnionArrayElement,
-          invalidToUtf8StringArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultStringEntry
-        )
-        assertCompileErrorDApp(script, version, testData.invalidFunctionError("toUtf8String", 1))
+        for ((data, function, error) <- Seq(
+            (randomUnionArrayElement, toUtf8String, nonMatchingTypes("ByteVector")),
+            (randomAddressDataArrayElement, toUtf8StringArgBeforeFunc, nonMatchingTypes("ByteVector")),
+            (randomByteVectorArrayElement, invalidToUtf8String, invalidFunctionError("toUtf8String", 1)),
+            (randomByteVectorArrayElement, invalidToUtf8StringArgBeforeFunc, invalidFunctionError("toUtf8String", 1))
+          )
+        ) {
+          val script = precondition.codeFromMatchingAndCase(data, function, rideV3Result, GreaterV3ResultStringEntry)
+          assertCompileErrorDApp(script, version, error)
+        }
       }
     }
   }

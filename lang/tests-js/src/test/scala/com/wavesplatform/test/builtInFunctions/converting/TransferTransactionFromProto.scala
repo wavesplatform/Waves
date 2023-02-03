@@ -3,7 +3,8 @@ package com.wavesplatform.test.builtInFunctions.converting
 import com.wavesplatform.JsTestBase
 import com.wavesplatform.lang.directives.values.V3
 import testHelpers.GeneratorContractsForBuiltInFunctions
-import testHelpers.RandomDataGenerator.{randomDigestAlgorithmTypeArrayElement, randomByteVectorArrayElement}
+import testHelpers.RandomDataGenerator.{randomByteVectorArrayElement, randomDigestAlgorithmTypeArrayElement}
+import testHelpers.TestDataConstantsAndMethods.{CANT_FIND_FUNCTION, actualVersionsWithoutV3, invalidFunctionError, nonMatchingTypes}
 import utest.{Tests, test}
 
 object TransferTransactionFromProto extends JsTestBase {
@@ -13,88 +14,53 @@ object TransferTransactionFromProto extends JsTestBase {
   private val invalidTransferTransactionFromProtoArgBeforeFunction = "transferTransactionFromProto()"
 
   val tests: Tests = Tests {
-    test("check: function transferTransactionFromProto for version V4 and more compiles for Issue") {
-      for (version <- testData.actualVersionsWithoutV3) {
+    test(" Functions transferTransactionFromProto compiles for Issue V4 and more") {
+      for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("TransferTransaction", version)
-        val script = precondition.onlyMatcherContract(
-          randomByteVectorArrayElement,
-          transferTransactionFromProto
-        )
-        assertCompileSuccessDApp(script, version)
+        for (
+          (data, function) <- Seq(
+            (randomByteVectorArrayElement, transferTransactionFromProto),
+            (randomByteVectorArrayElement, transferTransactionFromProtoArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.onlyMatcherContract(data, function)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
-    test("check: function transferTransactionFromProto for version V4 and more (argument before function) compiles for Issue") {
-      for (version <- testData.actualVersionsWithoutV3) {
+    test(" transferTransactionFromProto negative tests for V4 and more") {
+      for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("TransferTransaction", version)
-        val script = precondition.onlyMatcherContract(
-          randomByteVectorArrayElement,
-          transferTransactionFromProtoArgBeforeFunc
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("compilation error: function transferTransactionFromProto for V4 and more Non-matching types") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("TransferTransaction", version)
-        val script = precondition.onlyMatcherContract(
-          randomDigestAlgorithmTypeArrayElement,
-          transferTransactionFromProto
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("ByteVector"))
-      }
-    }
-
-    test("compilation error: function transferTransactionFromProto for V4 and more Non-matching types (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("TransferTransaction", version)
-        val script = precondition.onlyMatcherContract(
-          randomDigestAlgorithmTypeArrayElement,
-          transferTransactionFromProtoArgBeforeFunc
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("ByteVector"))
-      }
-    }
-
-    test("compilation error: function transferTransactionFromProto for V4 and more Non-matching types") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("TransferTransaction", version)
-        val script = precondition.onlyMatcherContract(
-          randomDigestAlgorithmTypeArrayElement,
-          invalidTransferTransactionFromProto
-        )
-        assertCompileErrorDApp(script, version, testData.invalidFunctionError("transferTransactionFromProto", 1))
-      }
-    }
-
-    test("compilation error: function transferTransactionFromProto for V4 and more Non-matching types (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("TransferTransaction", version)
-        val script = precondition.onlyMatcherContract(
-          randomDigestAlgorithmTypeArrayElement,
-          invalidTransferTransactionFromProtoArgBeforeFunction
-        )
-        assertCompileErrorDApp(script, version, testData.invalidFunctionError("transferTransactionFromProto", 1))
+        for (
+          (data, function, error) <- Seq(
+            (randomDigestAlgorithmTypeArrayElement, transferTransactionFromProto, nonMatchingTypes("ByteVector")),
+            (randomDigestAlgorithmTypeArrayElement, transferTransactionFromProtoArgBeforeFunc, nonMatchingTypes("ByteVector")),
+            (randomByteVectorArrayElement, invalidTransferTransactionFromProto, invalidFunctionError("transferTransactionFromProto", 1)),
+            (
+              randomByteVectorArrayElement,
+              invalidTransferTransactionFromProtoArgBeforeFunction,
+              invalidFunctionError("transferTransactionFromProto", 1)
+            )
+          )
+        ) {
+          val script = precondition.onlyMatcherContract(data, function)
+          assertCompileErrorDApp(script, version, error)
+        }
       }
     }
 
     test("compilation error: transferTransactionFromProto for V3 function is missing") {
       val precondition = new GeneratorContractsForBuiltInFunctions("TransferTransaction", V3)
-      val script = precondition.onlyMatcherContract(
-        randomByteVectorArrayElement,
-        transferTransactionFromProto
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
-    }
-
-    test("compilation error: transferTransactionFromProto for V3 (argument before function) function is missing") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("TransferTransaction", V3)
-      val script = precondition.onlyMatcherContract(
-        randomByteVectorArrayElement,
-        transferTransactionFromProtoArgBeforeFunc
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
+      for (
+        (data, function) <- Seq(
+          (randomByteVectorArrayElement, transferTransactionFromProto),
+          (randomByteVectorArrayElement, transferTransactionFromProtoArgBeforeFunc)
+        )
+      ) {
+        val script = precondition.onlyMatcherContract(data, function)
+        assertCompileErrorDApp(script, V3, CANT_FIND_FUNCTION)
+      }
     }
   }
 }
