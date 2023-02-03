@@ -3,6 +3,7 @@ package com.wavesplatform.test.builtInFunctions.converting
 import com.wavesplatform.JsTestBase
 import testHelpers.GeneratorContractsForBuiltInFunctions
 import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomByteVectorArrayElement, randomUnionArrayElement}
+import testHelpers.TestDataConstantsAndMethods.{actualVersions, invalidFunctionError, nonMatchingTypes}
 import utest.{Tests, test}
 
 object AddressFromPublicKey extends JsTestBase {
@@ -10,71 +11,39 @@ object AddressFromPublicKey extends JsTestBase {
   private val addressFromPublicKeyArgBeforeFunction    = s"callerTestData.addressFromPublicKey()"
   private val invalidAddressFromPublicKey              = s"addressFromPublicKey()"
   private val invalidAddressFromPublicKeyArgBeforeFunc = s"callerTestData.addressFromPublicKey(callerTestData, callerTestData)"
+  private val invalidAddressFromPublicKeyData          = s"addressFromPublicKey(callerTestData, $randomUnionArrayElement)"
 
   val tests: Tests = Tests {
-    test("check: function addressFromPublicKey compiles") {
-      for (version <- testData.actualVersions) {
+    test(" Functions AddressFromPublicKey compiles") {
+      for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Address", version)
-        val script = precondition.onlyMatcherContract(
-          randomByteVectorArrayElement,
-          addressFromPublicKey
-        )
-        assertCompileSuccessDApp(script, version)
+        for (
+          (data, function) <- Seq(
+            (randomByteVectorArrayElement, addressFromPublicKey),
+            (randomByteVectorArrayElement, addressFromPublicKeyArgBeforeFunction)
+          )
+        ) {
+          val script = precondition.onlyMatcherContract(data, function)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
-    test("check: function addressFromPublicKey compiles (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Address", version)
-        val script = precondition.onlyMatcherContract(
-          randomByteVectorArrayElement,
-          addressFromPublicKeyArgBeforeFunction
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("compilation error: Can't find a function overload, invalid data") {
-      for (version <- testData.actualVersions) {
+    test(" AddressFromPublicKey Can't find a function overload") {
+      for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.onlyMatcherContract(
-          randomAddressDataArrayElement,
-          addressFromPublicKey
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("ByteVector"))
-      }
-    }
-
-    test("compilation error: Can't find a function overload, invalid data (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.onlyMatcherContract(
-          randomUnionArrayElement,
-          addressFromPublicKeyArgBeforeFunction
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("ByteVector"))
-      }
-    }
-
-    test("compilation error: invalid function addressFromPublicKey Can't find a function overload") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.onlyMatcherContract(
-          randomByteVectorArrayElement,
-          invalidAddressFromPublicKey
-        )
-        assertCompileErrorDApp(script, version, testData.invalidFunctionError("addressFromPublicKey", 1))
-      }
-    }
-
-    test("compilation error: invalid function addressFromPublicKey Can't find a function overload (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.onlyMatcherContract(
-          randomByteVectorArrayElement,
-          invalidAddressFromPublicKeyArgBeforeFunc
-        )
-        assertCompileErrorDApp(script, version, testData.invalidFunctionError("addressFromPublicKey", 1))
+        for (
+          (data, function, error) <- Seq(
+            (randomAddressDataArrayElement, addressFromPublicKey, nonMatchingTypes("ByteVector")),
+            (randomAddressDataArrayElement, addressFromPublicKeyArgBeforeFunction, nonMatchingTypes("ByteVector")),
+            (randomByteVectorArrayElement, invalidAddressFromPublicKey, invalidFunctionError("addressFromPublicKey", 1)),
+            (randomAddressDataArrayElement, invalidAddressFromPublicKeyArgBeforeFunc, invalidFunctionError("addressFromPublicKey", 1)),
+            (randomAddressDataArrayElement, invalidAddressFromPublicKeyData, invalidFunctionError("addressFromPublicKey", 1))
+          )
+        ) {
+          val script = precondition.onlyMatcherContract(data, function)
+          assertCompileErrorDApp(script, version, error)
+        }
       }
     }
   }

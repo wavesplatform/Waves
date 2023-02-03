@@ -3,6 +3,7 @@ package com.wavesplatform.test.builtInFunctions.converting
 import com.wavesplatform.JsTestBase
 import testHelpers.GeneratorContractsForBuiltInFunctions
 import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomBoolean, randomInt, randomStringArrayElement, randomUnionArrayElement}
+import testHelpers.TestDataConstantsAndMethods.{CANT_FIND_A_FUNCTION_OVERLOAD, GreaterV3ResultBinaryEntry, actualVersions, rideV3Result, versionsSupportingTheNewFeatures}
 import utest.{Tests, test}
 
 object ToBytes extends JsTestBase {
@@ -13,159 +14,54 @@ object ToBytes extends JsTestBase {
   private val invalidToBytesArgBeforeFunc = "callerTestData.toBytes(callerTestData)"
 
   val tests: Tests = Tests {
-    test("check: toBytes function compiles with a string data type") {
-      for (version <- testData.actualVersions) {
+    test(" Functions toBytes compiles with int, string, boolean") {
+      for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomStringArrayElement,
-          toBytes,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
+        for (
+          (data, function) <- Seq(
+            (randomStringArrayElement, toBytes),
+            (randomInt.toString, toBytes),
+            (randomBoolean.toString, toBytes),
+            (randomStringArrayElement, toBytesArgBeforeFunc),
+            (randomInt.toString, toBytesArgBeforeFunc),
+            (randomBoolean.toString, toBytesArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.codeFromMatchingAndCase(data, function, rideV3Result, GreaterV3ResultBinaryEntry)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
-    test("check: toBytes function compiles with a Integer data type") {
-      for (version <- testData.actualVersions) {
+    test(" Functions toBytes compiles with bigInt for V5, V6 versions") {
+      for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomInt.toString,
-          toBytes,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
+        for (
+          (data, function) <- Seq(
+            (s"toBigInt($randomInt)", toBytes),
+            (s"toBigInt($randomInt)", toBytesArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.codeFromMatchingAndCase(data, function, rideV3Result, GreaterV3ResultBinaryEntry)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
-    test("check: toBytes function compiles with a Boolean data type") {
-      for (version <- testData.actualVersions) {
+    test(" toBytes negative tests") {
+      for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomBoolean.toString,
-          toBytes,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: toBytes function compiles with a BigInt data type") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          s"toBigInt($randomInt)",
-          toBytes,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: toBytes function compiles with a string data type (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomStringArrayElement,
-          toBytesArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: toBytes function compiles with a Integer data type (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomInt.toString,
-          toBytesArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: toBytes function compiles with a Boolean data type (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomBoolean.toString,
-          toBytesArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: toBytes function compiles with a BigInt data type (argument before function)") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          s"toBigInt($randomInt)",
-          toBytesArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("compilation error: Can't find a function overload toBytes") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomUnionArrayElement,
-          toBytes,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: Can't find a function overload toBytes (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomAddressDataArrayElement,
-          toBytesArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: Can't find a function overload toBytes") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomUnionArrayElement,
-          invalidToBytes,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: Can't find a function overload toBytes (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomUnionArrayElement,
-          invalidToBytesArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+        for (
+          (data, function, error) <- Seq(
+            (randomAddressDataArrayElement, toBytes, CANT_FIND_A_FUNCTION_OVERLOAD),
+            (randomUnionArrayElement, toBytesArgBeforeFunc, CANT_FIND_A_FUNCTION_OVERLOAD),
+            (randomInt.toString, invalidToBytes, CANT_FIND_A_FUNCTION_OVERLOAD),
+            (randomStringArrayElement, invalidToBytesArgBeforeFunc, CANT_FIND_A_FUNCTION_OVERLOAD),
+          )
+        ) {
+          val script = precondition.codeFromMatchingAndCase(data, function, rideV3Result, GreaterV3ResultBinaryEntry)
+          assertCompileErrorDApp(script, version, error)
+        }
       }
     }
   }

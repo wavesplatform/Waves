@@ -2,12 +2,8 @@ package com.wavesplatform.test.builtInFunctions.converting
 
 import com.wavesplatform.JsTestBase
 import testHelpers.GeneratorContractsForBuiltInFunctions
-import testHelpers.RandomDataGenerator.{
-  randomByteVectorArrayElement,
-  randomDigestAlgorithmTypeArrayElement,
-  randomInt,
-  randomUnionArrayElement
-}
+import testHelpers.RandomDataGenerator.{randomBoolean, randomByteVectorArrayElement, randomDigestAlgorithmTypeArrayElement, randomInt, randomUnionArrayElement}
+import testHelpers.TestDataConstantsAndMethods.{CANT_FIND_A_FUNCTION_OVERLOAD, versionsSupportingTheNewFeatures}
 import utest.{Tests, test}
 
 object ToBigInt extends JsTestBase {
@@ -19,131 +15,43 @@ object ToBigInt extends JsTestBase {
   private val invalidParseBigIntArgBeforeFunc = s"callerTestData.toBigInt(callerTestData, 123, $randomInt)"
 
   val tests: Tests = Tests {
-    test("check: The toBigInt function is compiled with ByteVector") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
+    test(" Functions toBigInt compiles") {
+      for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, toBigInt)
-        assertCompileSuccessDApp(script, version)
+        for (
+          (data, function) <- Seq(
+            (randomInt.toString, toBigInt),
+            (randomByteVectorArrayElement, toBigInt),
+            (randomInt.toString, toBigIntArgBeforeFunc),
+            (randomByteVectorArrayElement, toBigIntArgBeforeFunc),
+            (randomByteVectorArrayElement, toBigIntOnIndex),
+            (randomByteVectorArrayElement, toBigIntOnIndexArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.onlyMatcherContract(data, function)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
-    test("check: The toBigInt function is compiled with Integer") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
+    test(" Functions toBigInt negative tests") {
+      for (version <- versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script       = precondition.onlyMatcherContract(randomInt.toString, toBigInt)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: The toBigInt function is compiled with ByteVector (argument before function)") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, toBigIntArgBeforeFunc)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: The toBigInt function is compiled with Integer (argument before function)") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script       = precondition.onlyMatcherContract(randomInt.toString, toBigIntArgBeforeFunc)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("compilation error: invalid data for function toBigInt") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script       = precondition.onlyMatcherContract(randomUnionArrayElement, toBigInt)
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: invalid data for function toBigInt (argument before function)") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script       = precondition.onlyMatcherContract(randomDigestAlgorithmTypeArrayElement, toBigIntArgBeforeFunc)
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: invalid function toBigInt") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script       = precondition.onlyMatcherContract(randomUnionArrayElement, invalidFunctionParseBigInt)
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: invalid function toBigIntAtIndex (argument before function)") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script       = precondition.onlyMatcherContract(randomDigestAlgorithmTypeArrayElement, invalidParseBigIntArgBeforeFunc)
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("check: The toBigIntOnIndex function is compiled with ByteVector") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, toBigIntOnIndex)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: The toBigIntAtIndex function is compiled with Integer") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, toBigIntOnIndex)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: The toBigIntOnIndex function is compiled with ByteVector (argument before function)") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, toBigIntOnIndexArgBeforeFunc)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: The toBigIntOnIndex function is compiled with Integer (argument before function)") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, toBigIntOnIndexArgBeforeFunc)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("compilation error: invalid data for function toBigIntOnIndex") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script       = precondition.onlyMatcherContract(randomUnionArrayElement, toBigIntOnIndex)
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: invalid data for function toBigIntOnIndex (argument before function)") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script       = precondition.onlyMatcherContract(randomDigestAlgorithmTypeArrayElement, toBigIntOnIndexArgBeforeFunc)
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: invalid function toBigIntOnIndex") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script       = precondition.onlyMatcherContract(randomUnionArrayElement, invalidFunctionParseBigInt)
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: invalid function toBigIntOnIndex (argument before function)") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script       = precondition.onlyMatcherContract(randomDigestAlgorithmTypeArrayElement, invalidParseBigIntArgBeforeFunc)
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+        for (
+          (data, function, error) <- Seq(
+            (randomBoolean.toString, toBigIntArgBeforeFunc, CANT_FIND_A_FUNCTION_OVERLOAD),
+            (randomUnionArrayElement, toBigIntArgBeforeFunc, CANT_FIND_A_FUNCTION_OVERLOAD),
+            (randomInt.toString, invalidFunctionParseBigInt, CANT_FIND_A_FUNCTION_OVERLOAD),
+            (randomDigestAlgorithmTypeArrayElement, toBigIntOnIndex, CANT_FIND_A_FUNCTION_OVERLOAD),
+            (randomBoolean.toString, toBigIntOnIndexArgBeforeFunc, CANT_FIND_A_FUNCTION_OVERLOAD),
+            (randomInt.toString, toBigIntOnIndexArgBeforeFunc, CANT_FIND_A_FUNCTION_OVERLOAD),
+            (randomByteVectorArrayElement, invalidFunctionParseBigInt, CANT_FIND_A_FUNCTION_OVERLOAD),
+            (randomByteVectorArrayElement, invalidParseBigIntArgBeforeFunc, CANT_FIND_A_FUNCTION_OVERLOAD)
+          )
+        ) {
+          val script = precondition.onlyMatcherContract(data, function)
+          assertCompileErrorDApp(script, version, error)
+        }
       }
     }
   }
