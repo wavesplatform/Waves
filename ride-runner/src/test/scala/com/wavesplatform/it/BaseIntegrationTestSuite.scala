@@ -4,29 +4,29 @@ import cats.syntax.option.*
 import com.google.common.primitives.Ints
 import com.google.protobuf.{ByteString, UnsafeByteOperations}
 import com.wavesplatform.account.{Address, PublicKey}
+import com.wavesplatform.api.DefaultBlockchainApi.*
+import com.wavesplatform.api.{DefaultBlockchainApi, HasGrpc}
 import com.wavesplatform.block.SignedBlockHeader
-import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, RestApiScript, SharedBlockchainData}
+import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.events.protobuf.{BlockchainUpdated, StateUpdate}
-import com.wavesplatform.api.DefaultBlockchainApi.*
-import com.wavesplatform.api.{DefaultBlockchainApi, HasGrpc}
 import com.wavesplatform.lang.API
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.protobuf.block.Block
 import com.wavesplatform.protobuf.transaction.DataTransactionData
+import com.wavesplatform.ride.DefaultRequestsService
 import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
 import com.wavesplatform.storage.HasLevelDb.TestDb
-import com.wavesplatform.storage.RequestsStorage.RequestKey
 import com.wavesplatform.storage.persistent.LevelDbPersistentCaches
-import com.wavesplatform.storage.{HasLevelDb, RequestsStorage}
+import com.wavesplatform.storage.{HasLevelDb, RequestKey, RequestsStorage}
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{BaseTestSuite, HasMonixHelpers}
 import monix.eval.Task
 import monix.execution.schedulers.TestScheduler
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.Json
 
 import java.nio.charset.StandardCharsets
 import scala.concurrent.Await
@@ -40,10 +40,10 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
 
   protected val initX = 0
 
-  /** @param xGt0
+  /** @param xPlusHeight
     *   An expected script result, x > 0? The initial value is 0
     */
-  protected def test(events: List[WrappedEvent[SubscribeEvent]], xGt0: Boolean): Unit = Using.Manager { use =>
+  protected def test(events: List[WrappedEvent[SubscribeEvent]], xPlusHeight: Int): Unit = Using.Manager { use =>
     implicit val testScheduler = TestScheduler()
 
     val blockchainApi = new TestBlockchainApi() {
@@ -70,28 +70,23 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
       blockchainApi
     )
 
-    val request = aliceAddr -> Json.obj("expr" -> "foo()")
-    val processor = new BlockchainProcessor(
-      BlockchainProcessor.Settings(
-        enableTraces = false,
-        evaluateScriptComplexityLimit = 52000,
-        maxTxErrorLogSize = 0
-      ),
-      blockchainStorage,
-      new RequestsStorage {
-        override def all(): List[(Address, JsObject)] = List(request)
-
-        override def append(x: (Address, JsObject)): Unit = {} // Ignore, because no way to evaluate a new expr
+    val request = RequestKey(aliceAddr, Json.obj("expr" -> "foo()"))
+    val requestsService = new DefaultRequestsService(
+      settings = DefaultRequestsService.Settings(enableTraces = false, Int.MaxValue, 0),
+      sharedBlockchainData = blockchainStorage,
+      storage = new RequestsStorage {
+        override def size: Int                   = 1
+        override def append(x: RequestKey): Unit = {} // Ignore, because no way to evaluate a new expr
+        override def all(): List[RequestKey]     = List(request)
       },
-      testScheduler
+      runScriptsScheduler = testScheduler
     )
+    val processor = new BlockchainProcessor(blockchainStorage, requestsService)
 
-    processor.runScripts(forceAll = true).runToFuture
+    requestsService.runAll().runToFuture
     testScheduler.tick(1.milli) // 1 millisecond to detect that script will be ran in the end
 
-    def getScriptResult = Await.result(processor.getCachedResultOrRun(request._1, request._2).runToFuture, 5.seconds)
-
-    val before = getScriptResult
+    def getScriptResult = Await.result(requestsService.trackAndRun(request).runToFuture, 5.seconds)
 
     val blockchainUpdatesStream = use(blockchainApi.mkBlockchainUpdatesStream(testScheduler))
 
@@ -126,14 +121,8 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     log.info(s"The last result: ${Await.result(eventsStream, 5.seconds)}")
 
     val after = getScriptResult
-    withClue("was refreshed:") {
-      val runTimeBefore = (before \ RestApiScript.LastUpdatedKey).as[Long]
-      val runTimeAfter  = (after \ RestApiScript.LastUpdatedKey).as[Long]
-      runTimeAfter should be > runTimeBefore
-    }
-
     withClue(Json.prettyPrint(after)) {
-      (after \ "result" \ "value" \ "_2" \ "value").as[Boolean] shouldBe xGt0
+      (after \ "result" \ "value" \ "_2" \ "value").as[Int] shouldBe xPlusHeight
     }
   }.get
 
@@ -148,7 +137,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
 func foo() = {
 let alice = Address(base58'$aliceAddr')
 let x = getIntegerValue(alice, "x")
-([], x > 0)
+([], x + height)
 }
 """
     val estimator      = ScriptEstimatorV3(fixOverflow = true, overhead = false)
@@ -208,11 +197,11 @@ let x = getIntegerValue(alice, "x")
         )
     )
 
-  protected def mkDataEntryUpdate(address: Address, key: String, before: Long, after: Long): StateUpdate.DataEntryUpdate =
+  protected def mkDataEntryUpdate(address: Address, key: String, valueBefore: Long, valueAfter: Long): StateUpdate.DataEntryUpdate =
     StateUpdate.DataEntryUpdate(
       address = DefaultBlockchainApi.toPb(address),
-      dataEntry = DataTransactionData.DataEntry(key, DataTransactionData.DataEntry.Value.IntValue(after)).some,
-      dataEntryBefore = DataTransactionData.DataEntry(key, DataTransactionData.DataEntry.Value.IntValue(before)).some
+      dataEntry = DataTransactionData.DataEntry(key, DataTransactionData.DataEntry.Value.IntValue(valueAfter)).some,
+      dataEntryBefore = DataTransactionData.DataEntry(key, DataTransactionData.DataEntry.Value.IntValue(valueBefore)).some
     )
 
   private def mkPbBlock(height: Int) =

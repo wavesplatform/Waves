@@ -20,10 +20,7 @@ class BlockchainStateTestSuite extends BaseTestSuite {
 
           val updatedState = nextState(processor, BlockchainState.Starting(Height(9), Height(10)), event)
           updatedState shouldBe a[BlockchainState.Working]
-          processor.actions shouldBe Vector(
-            Process(event),
-            RunScripts(forceAll = false)
-          )
+          processor.actions shouldBe Vector(Process(event), RunAffectedScripts)
         }
 
         "not reaching the blockchain height - still Starting" in {
@@ -85,10 +82,7 @@ class BlockchainStateTestSuite extends BaseTestSuite {
 
           val updatedState = nextState(processor, BlockchainState.Working(Height(10)), event)
           updatedState shouldBe a[BlockchainState.Working]
-          processor.actions shouldBe Vector(
-            Process(event),
-            RunScripts(forceAll = false)
-          )
+          processor.actions shouldBe Vector(Process(event), RunAffectedScripts)
         }
 
         "micro block - process the event and run scripts" in {
@@ -97,10 +91,7 @@ class BlockchainStateTestSuite extends BaseTestSuite {
 
           val updatedState = nextState(processor, BlockchainState.Working(Height(10)), event)
           updatedState shouldBe a[BlockchainState.Working]
-          processor.actions shouldBe Vector(
-            Process(event),
-            RunScripts(forceAll = false)
-          )
+          processor.actions shouldBe Vector(Process(event), RunAffectedScripts)
         }
       }
 
@@ -152,10 +143,7 @@ class BlockchainStateTestSuite extends BaseTestSuite {
 
             val updatedState = nextState(processor, BlockchainState.ResolvingFork(Height(11), 0, Height(10)), event)
             updatedState shouldBe a[BlockchainState.Working]
-            processor.actions shouldBe Vector(
-              Process(event),
-              RunScripts(forceAll = false)
-            )
+            processor.actions shouldBe Vector(Process(event), RunAffectedScripts)
           }
 
           "reaching an origin fork height + 1 and getting a micro block" in {
@@ -164,10 +152,7 @@ class BlockchainStateTestSuite extends BaseTestSuite {
 
             val updatedState = nextState(processor, BlockchainState.ResolvingFork(Height(11), 0, Height(10)), event)
             updatedState shouldBe a[BlockchainState.Working]
-            processor.actions shouldBe Vector(
-              Process(event),
-              RunScripts(forceAll = false)
-            )
+            processor.actions shouldBe Vector(Process(event), RunAffectedScripts)
           }
         }
       }

@@ -1,17 +1,15 @@
 package com.wavesplatform.blockchain
 
-import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.state.Height
 import monix.eval.Task
-import play.api.libs.json.JsObject
 
 class TestProcessor extends Processor {
-  override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] = None
+  var actions: Vector[ProcessorAction] = Vector.empty
 
-  override def getCachedResultOrRun(address: Address, request: JsObject): Task[JsObject] = Task.raiseError(new RuntimeException("Test"))
+  override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] = None
 
   /** Includes removeBlocksFrom
     */
@@ -25,12 +23,10 @@ class TestProcessor extends Processor {
     actions = actions.appended(Process(event))
   }
 
-  override def runScripts(forceAll: Boolean): Task[Unit] = {
-    actions = actions.appended(RunScripts(forceAll))
+  override def runAffectedScripts(): Task[Unit] = {
+    actions = actions.appended(RunAffectedScripts)
     Task.now(())
   }
-
-  var actions: Vector[ProcessorAction] = Vector.empty
 
   override def toString: String = s"TestProcessor(${actions.mkString(", ")})"
 }
@@ -49,4 +45,4 @@ object Process {
   def apply(event: SubscribeEvent): Process = Process(event.getUpdate)
 }
 
-case class RunScripts(forceAll: Boolean) extends ProcessorAction
+case object RunAffectedScripts extends ProcessorAction

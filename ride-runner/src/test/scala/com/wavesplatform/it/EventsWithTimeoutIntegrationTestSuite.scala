@@ -26,7 +26,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
           )
         )
       ),
-      xGt0 = true
+      xPlusHeight = 3
     )
 
     "a micro block append" in test(
@@ -52,7 +52,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
           )
         )
       ),
-      xGt0 = true
+      xPlusHeight = 3
     )
 
     "a rollback" in test(
@@ -84,9 +84,10 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
             microBlockNumber = 1,
             dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
           )
-        )
+        ),
+        WrappedEvent.Next(mkMicroBlockAppendEvent(3, 2, 1))
       ),
-      xGt0 = true
+      xPlusHeight = 4
     )
   }
 
@@ -105,7 +106,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
         WrappedEvent.Next(mkBlockAppendEvent(2, 2)),
         WrappedEvent.Next(mkMicroBlockAppendEvent(2, 2, 1)) // Resolves a synthetic fork
       ),
-      xGt0 = false
+      xPlusHeight = 2
     )
 
     "a micro block" in test(
@@ -127,7 +128,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
         // It's okay, that we don't wait for a next micro block (as on a previous fork), because by default a timeout happens after 90s,
         // so there is a new block probably.
       ),
-      xGt0 = false
+      xPlusHeight = 2
     )
 
     "a rollback" - {
@@ -158,7 +159,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
           WrappedEvent.Next(mkBlockAppendEvent(4, 2)),
           WrappedEvent.Next(mkMicroBlockAppendEvent(4, 2, 1)) // Resolves a synthetic fork
         ),
-        xGt0 = false
+        xPlusHeight = 4
       )
 
       "to a micro block" - {
@@ -181,7 +182,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
             WrappedEvent.Next(mkBlockAppendEvent(3, 2)),
             WrappedEvent.Next(mkMicroBlockAppendEvent(3, 2, 1)) // Resolves a synthetic fork
           ),
-          xGt0 = false
+          xPlusHeight = 3
         )
 
         "tx in a removed micro block" in test(
@@ -210,7 +211,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
             WrappedEvent.Next(mkBlockAppendEvent(3, 2)),
             WrappedEvent.Next(mkMicroBlockAppendEvent(3, 2, 1)) // Resolves a synthetic fork
           ),
-          xGt0 = false
+          xPlusHeight = 3
         )
       }
     }
@@ -232,7 +233,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
         WrappedEvent.Next(mkBlockAppendEvent(3, 2)),
         WrappedEvent.Next(mkMicroBlockAppendEvent(3, 2, 1)) // Resolves a synthetic fork
       ),
-      xGt0 = true
+      xPlusHeight = 4
     )
 
     "a rollback" - {
@@ -251,9 +252,10 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
           WrappedEvent.Next(mkRollbackEvent(3, 1)),
           WrappedEvent.Failed(UpstreamTimeoutException(90.seconds)),
           WrappedEvent.Next(mkBlockAppendEvent(3, 2)),
-          WrappedEvent.Next(mkBlockAppendEvent(4, 2)) // Resolves a synthetic fork
+          WrappedEvent.Next(mkBlockAppendEvent(4, 2)),
+          WrappedEvent.Next(mkMicroBlockAppendEvent(4, 2, 1)) // Resolves a synthetic fork
         ),
-        xGt0 = true
+        xPlusHeight = 5
       )
 
       "to a micro block" in test(
@@ -272,9 +274,10 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
           WrappedEvent.Next(mkRollbackEvent(3, 1, 1)),
           WrappedEvent.Failed(UpstreamTimeoutException(90.seconds)),
           WrappedEvent.Next(mkBlockAppendEvent(3, 2)),
-          WrappedEvent.Next(mkBlockAppendEvent(4, 2)) // Resolves a synthetic fork
+          WrappedEvent.Next(mkBlockAppendEvent(4, 2)),
+          WrappedEvent.Next(mkMicroBlockAppendEvent(4, 2, 1)) // Resolves a synthetic fork
         ),
-        xGt0 = true
+        xPlusHeight = 5
       )
     }
   }

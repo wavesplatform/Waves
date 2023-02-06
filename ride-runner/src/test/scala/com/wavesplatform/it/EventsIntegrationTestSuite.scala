@@ -15,7 +15,7 @@ class EventsIntegrationTestSuite extends BaseIntegrationTestSuite {
           )
         )
       ),
-      xGt0 = true
+      xPlusHeight = 3
     )
 
     "a micro block append" in test(
@@ -31,7 +31,7 @@ class EventsIntegrationTestSuite extends BaseIntegrationTestSuite {
           )
         )
       ),
-      xGt0 = true
+      xPlusHeight = 3
     )
   }
 
@@ -63,9 +63,10 @@ class EventsIntegrationTestSuite extends BaseIntegrationTestSuite {
             forkNumber = 2,
             dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
           )
-        )
+        ),
+        WrappedEvent.Next(mkMicroBlockAppendEvent(4, 2, 1))
       ),
-      xGt0 = true
+      xPlusHeight = 5
     )
 
     "a micro fork" in test(
@@ -99,7 +100,7 @@ class EventsIntegrationTestSuite extends BaseIntegrationTestSuite {
           )
         )
       ),
-      xGt0 = true
+      xPlusHeight = 5
     )
   }
 }

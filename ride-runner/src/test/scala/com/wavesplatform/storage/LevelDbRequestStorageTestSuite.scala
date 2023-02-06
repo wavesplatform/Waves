@@ -7,8 +7,8 @@ import play.api.libs.json.Json
 class LevelDbRequestStorageTestSuite extends BaseTestSuite with HasLevelDb with HasTestAccounts {
   "LevelDbRequestStorageTestSuite" - {
     "added entries are preserved during restarts" in {
-      val entry1 = (alice.toAddress, Json.obj("foo" -> 1))
-      val entry2 = (bob.toAddress, Json.obj("bar" -> 2))
+      val entry1 = RequestKey(alice.toAddress, Json.obj("foo" -> 1))
+      val entry2 = RequestKey(bob.toAddress, Json.obj("bar" -> 2))
 
       val testPath = TestDb.mkTempPath
       TestDb.mk(testPath).withoutCleaning.withDb { db =>
