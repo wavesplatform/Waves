@@ -19,7 +19,8 @@ import scala.collection.concurrent.TrieMap
 
 trait RequestsService {
   def runAll(): Task[Unit]
-  def runAffected(atHeight: Int, affected: Set[RequestKey]): Task[Unit]
+  // Either temporarly
+  def runAffected(atHeight: Int, affected: Either[Unit, Set[RequestKey]]): Task[Unit]
   def trackAndRun(request: RequestKey): Task[JsObject]
 }
 
@@ -38,8 +39,10 @@ class DefaultRequestsService(
 
   override def runAll(): Task[Unit] = runMany(scripts.values, force = true)
 
-  override def runAffected(atHeight: Int, affected: Set[RequestKey]): Task[Unit] =
-    runMany(affected.flatMap(scripts.get).to(List), force = false)
+  override def runAffected(atHeight: Int, affected: Either[Unit, Set[RequestKey]]): Task[Unit] = affected match {
+    case Right(affected) => runMany(affected.flatMap(scripts.get).toList, force = false)
+    case _               => runAll()
+  }
 
   override def trackAndRun(request: RequestKey): Task[JsObject] = scripts.get(request) match {
     case Some(r) =>
@@ -76,8 +79,6 @@ class DefaultRequestsService(
   }
 
   private def runOne(script: RideScriptRunEnvironment, hasCaches: Boolean): Task[JsObject] = Task {
-    val origResult = script.lastResult
-
     val updatedResult = rideScriptRunTime.withTag("has-caches", hasCaches).measure {
       val result = UtilsApiRoute.evaluate(
         settings.evaluateScriptComplexityLimit,
@@ -92,20 +93,21 @@ class DefaultRequestsService(
       result - "stateChanges"
     }
 
+    val origResult = script.lastResult
     scripts.put(
       script.key,
       script.copy(lastResult = updatedResult, lastUpdatedTs = runScriptsScheduler.clockMonotonic(TimeUnit.MILLISECONDS))
     )
 
     if ((updatedResult \ "error").isEmpty) {
-      val complexity = updatedResult.value("complexity").as[Int]
-      val result     = updatedResult.value("result").as[JsObject].value("value")
+      val complexity = (updatedResult \ "complexity").as[Int]
       log.info(f"result=ok; addr=${script.key.address}; req=${script.key.requestBody}; complexity=$complexity")
 
-      origResult.value.get("result").map(_.as[JsObject].value("value")).foreach { prevResult =>
-        if (result == prevResult) rideScriptUnnecessaryCalls.increment()
-        else rideScriptOkCalls.increment()
-      }
+      if (
+        origResult == JsObject.empty ||
+        updatedResult \ "result" \ "value" != origResult \ "result" \ "value"
+      ) rideScriptOkCalls.increment()
+      else rideScriptUnnecessaryCalls.increment()
     } else {
       log.info(f"result=failed; addr=${script.key.address}; req=${script.key.requestBody}; errorCode=${(updatedResult \ "error").as[Int]}")
       rideScriptFailedCalls.increment()

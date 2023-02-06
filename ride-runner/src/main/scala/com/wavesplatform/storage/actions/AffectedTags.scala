@@ -1,7 +1,12 @@
 package com.wavesplatform.storage.actions
 
 case class AffectedTags[TagT](xs: Set[TagT]) {
-  def ++(ys: AffectedTags[TagT]): AffectedTags[TagT] = AffectedTags(xs ++ ys.xs)
+  def ++(that: AffectedTags[TagT]): AffectedTags[TagT] =
+    if (that.isEmpty) this
+    else if (isEmpty) that
+    else if (xs.size <= that.xs.size) AffectedTags(that.xs ++ xs)
+    else AffectedTags(xs ++ that.xs)
+
   def isEmpty = xs.isEmpty
 }
 
