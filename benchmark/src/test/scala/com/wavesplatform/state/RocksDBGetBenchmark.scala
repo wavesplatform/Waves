@@ -31,6 +31,7 @@ class RocksDBGetBenchmark {
     bh.consume {
       st.kvs.foreach { case (key, value) =>
         val keyBuffer = Util.getTemporaryDirectBuffer(key.length)
+        keyBuffer.put(key).flip()
         val valBuffer = Util.getTemporaryDirectBuffer(value.length)
 
         st.db.get(st.readOptions, keyBuffer, valBuffer)
