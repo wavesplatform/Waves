@@ -19,7 +19,7 @@ import scala.collection.concurrent.TrieMap
 
 trait RequestsService {
   def runAll(): Task[Unit]
-  // Either temporarly
+  // Either temporarily
   def runAffected(atHeight: Int, affected: Either[Unit, Set[RequestKey]]): Task[Unit]
   def trackAndRun(request: RequestKey): Task[JsObject]
 }
@@ -40,48 +40,46 @@ class DefaultRequestsService(
   private val probablyNotDependentOnHeight = ConcurrentHashMap.newKeySet[RequestKey]()
 
   override def runAll(): Task[Unit] =
-    runManyAll(scripts.values.toList.filter { v => !probablyNotDependentOnHeight.contains(v.key) })
+    runManyAll(sharedBlockchainData.height, scripts.values.toList.filter { v => !probablyNotDependentOnHeight.contains(v.key) })
 
   override def runAffected(atHeight: Int, affected: Either[Unit, Set[RequestKey]]): Task[Unit] = affected match {
-    case Right(affected) => runMany(affected.flatMap(scripts.get).toList)
+    case Right(affected) => runMany(atHeight, affected.flatMap(scripts.get).toList)
     case _               => runAll()
   }
 
   override def trackAndRun(request: RequestKey): Task[JsObject] = {
-    val isStale = probablyNotDependentOnHeight.contains(request)
+    val height        = sharedBlockchainData.height
+    val probablyStale = probablyNotDependentOnHeight.contains(request)
     scripts.get(request) match {
-      case Some(r) if !isStale =>
+      case Some(r) if !probablyStale && height <= r.updateHeight =>
         rideScriptCacheHits.increment()
         Task.now(r.lastResult)
 
       case _ =>
-        inProgress.computeIfAbsent(
-          request,
-          { request =>
-            val task =
-              if (isStale) runOne(RideScriptRunEnvironment(request, sharedBlockchainData), hasCaches = false)
-              else
-                Task {
-                  rideScriptCacheMisses.increment()
-                  storage.append(request)
-                  sharedBlockchainData.accountScripts.getUntagged(sharedBlockchainData.height, request.address)
-                }.flatMap {
-                  // TODO #19 Change/move an error to an appropriate layer
-                  case None => Task.raiseError(ApiException(CustomValidationError(s"Address ${request.address} is not dApp")))
-                  case _    => runOne(RideScriptRunEnvironment(request, sharedBlockchainData), hasCaches = false)
-                }
+        val runOneTask = runOne(height, RideScriptRunEnvironment(request, sharedBlockchainData), hasCaches = false)
+        val task =
+          if (probablyStale) runOneTask
+          else
+            Task {
+              rideScriptCacheMisses.increment()
+              storage.append(request)
+              sharedBlockchainData.accountScripts.getUntagged(height, request.address)
+            }.flatMap {
+              // TODO #19 Change/move an error to an appropriate layer
+              case None => Task.raiseError(ApiException(CustomValidationError(s"Address ${request.address} is not dApp")))
+              case _    => runOneTask
+            }
 
-            task.doOnFinish { _ => Task(inProgress.remove(request)) }
-          }
-        )
+        val completeTask = task.doOnFinish(_ => Task(inProgress.remove(request)))
+        inProgress.computeIfAbsent(request, _ => completeTask)
     }
   }
 
-  private def runManyAll(scripts: Iterable[RideScriptRunEnvironment]): Task[Unit] = {
+  private def runManyAll(height: Int, scripts: Iterable[RideScriptRunEnvironment]): Task[Unit] = {
     val r = Task
       .parTraverseUnordered(scripts) { script =>
         val origResult = script.lastResult
-        runOne(script, hasCaches = true).tapEval { updatedResult =>
+        runOne(height, script, hasCaches = true).tapEval { updatedResult =>
           Task {
             if (!(origResult == JsObject.empty || updatedResult \ "result" \ "value" != origResult \ "result" \ "value"))
               probablyNotDependentOnHeight.add(script.key)
@@ -95,9 +93,9 @@ class DefaultRequestsService(
     r.tapEval(_ => Task.now(RideRunnerMetrics.rideScriptRunOnHeightTime(true).update((System.nanoTime() - start).toDouble)))
   }
 
-  private def runMany(scripts: Iterable[RideScriptRunEnvironment]): Task[Unit] = {
+  private def runMany(height: Int, scripts: Iterable[RideScriptRunEnvironment]): Task[Unit] = {
     val r = Task
-      .parTraverseUnordered(scripts)(runOne(_, hasCaches = true))
+      .parTraverseUnordered(scripts)((script: RideScriptRunEnvironment) => runOne(height, script, hasCaches = true))
       .as(())
       .executeOn(runScriptsScheduler)
 
@@ -105,7 +103,7 @@ class DefaultRequestsService(
     r.tapEval(_ => Task.now(RideRunnerMetrics.rideScriptRunOnHeightTime(false).update((System.nanoTime() - start).toDouble)))
   }
 
-  private def runOne(script: RideScriptRunEnvironment, hasCaches: Boolean): Task[JsObject] = Task {
+  private def runOne(height: Int, script: RideScriptRunEnvironment, hasCaches: Boolean): Task[JsObject] = Task {
     val updatedResult = rideScriptRunTime.withTag("has-caches", hasCaches).measure {
       val result = evaluate(script)
       // Removed, because I'm not sure it is required. TODO restore stateChanges?
@@ -115,7 +113,7 @@ class DefaultRequestsService(
     val origResult = script.lastResult
     scripts.put(
       script.key,
-      script.copy(lastResult = updatedResult, updateHeight = sharedBlockchainData.height)
+      script.copy(lastResult = updatedResult, updateHeight = height)
     )
 
     if ((updatedResult \ "error").isEmpty) {
