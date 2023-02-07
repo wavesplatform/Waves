@@ -47,28 +47,34 @@ class DefaultRequestsService(
     case _               => runAll()
   }
 
-  override def trackAndRun(request: RequestKey): Task[JsObject] = scripts.get(request) match {
-    case Some(r) =>
-      rideScriptCacheHits.increment()
-      Task.now(r.lastResult)
+  override def trackAndRun(request: RequestKey): Task[JsObject] = {
+    val isStale = probablyNotDependentOnHeight.contains(request)
+    scripts.get(request) match {
+      case Some(r) if !isStale =>
+        rideScriptCacheHits.increment()
+        Task.now(r.lastResult)
 
-    case None =>
-      inProgress.computeIfAbsent(
-        request,
-        { request =>
-          Task {
-            rideScriptCacheMisses.increment()
-            storage.append(request)
-            sharedBlockchainData.accountScripts.getUntagged(sharedBlockchainData.height, request.address)
+      case _ =>
+        inProgress.computeIfAbsent(
+          request,
+          { request =>
+            val task =
+              if (isStale) runOne(RideScriptRunEnvironment(request, sharedBlockchainData), hasCaches = false)
+              else
+                Task {
+                  rideScriptCacheMisses.increment()
+                  storage.append(request)
+                  sharedBlockchainData.accountScripts.getUntagged(sharedBlockchainData.height, request.address)
+                }.flatMap {
+                  // TODO #19 Change/move an error to an appropriate layer
+                  case None => Task.raiseError(ApiException(CustomValidationError(s"Address ${request.address} is not dApp")))
+                  case _    => runOne(RideScriptRunEnvironment(request, sharedBlockchainData), hasCaches = false)
+                }
+
+            task.doOnFinish { _ => Task(inProgress.remove(request)) }
           }
-            .flatMap {
-              // TODO #19 Change/move an error to an appropriate layer
-              case None => Task.raiseError(ApiException(CustomValidationError(s"Address ${request.address} is not dApp")))
-              case _    => runOne(RideScriptRunEnvironment(request, sharedBlockchainData), hasCaches = false)
-            }
-            .doOnFinish { _ => Task(inProgress.remove(request)) }
-        }
-      )
+        )
+    }
   }
 
   private def runManyAll(scripts: Iterable[RideScriptRunEnvironment]): Task[Unit] = {
@@ -77,8 +83,8 @@ class DefaultRequestsService(
         val origResult = script.lastResult
         runOne(script, hasCaches = true).tapEval { updatedResult =>
           Task {
-//            if (!(origResult == JsObject.empty || updatedResult \ "result" \ "value" != origResult \ "result" \ "value"))
-//              probablyNotDependentOnHeight.add(script.key)
+            if (!(origResult == JsObject.empty || updatedResult \ "result" \ "value" != origResult \ "result" \ "value"))
+              probablyNotDependentOnHeight.add(script.key)
           }
         }
       }
