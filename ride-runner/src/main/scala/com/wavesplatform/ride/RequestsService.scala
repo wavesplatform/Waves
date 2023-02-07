@@ -14,7 +14,7 @@ import monix.eval.Task
 import monix.execution.Scheduler
 import play.api.libs.json.JsObject
 
-import java.util.concurrent.{ConcurrentHashMap, TimeUnit}
+import java.util.concurrent.ConcurrentHashMap
 import scala.collection.concurrent.TrieMap
 
 trait RequestsService {
@@ -37,10 +37,13 @@ class DefaultRequestsService(
   // To get rid of duplicated requests
   private val inProgress = new ConcurrentHashMap[RequestKey, Task[JsObject]]()
 
-  override def runAll(): Task[Unit] = runMany(scripts.values, force = true)
+  private val probablyNotDependentOnHeight = ConcurrentHashMap.newKeySet[RequestKey]()
+
+  override def runAll(): Task[Unit] =
+    runManyAll(scripts.values.toList.filter { v => !probablyNotDependentOnHeight.contains(v.key) })
 
   override def runAffected(atHeight: Int, affected: Either[Unit, Set[RequestKey]]): Task[Unit] = affected match {
-    case Right(affected) => runMany(affected.flatMap(scripts.get).toList, force = false)
+    case Right(affected) => runMany(affected.flatMap(scripts.get).toList)
     case _               => runAll()
   }
 
@@ -68,27 +71,37 @@ class DefaultRequestsService(
       )
   }
 
-  private def runMany(scripts: Iterable[RideScriptRunEnvironment], force: Boolean): Task[Unit] = {
+  private def runManyAll(scripts: Iterable[RideScriptRunEnvironment]): Task[Unit] = {
+    val r = Task
+      .parTraverseUnordered(scripts) { script =>
+        val origResult = script.lastResult
+        runOne(script, hasCaches = true).tapEval { updatedResult =>
+          Task {
+//            if (!(origResult == JsObject.empty || updatedResult \ "result" \ "value" != origResult \ "result" \ "value"))
+//              probablyNotDependentOnHeight.add(script.key)
+          }
+        }
+      }
+      .as(())
+      .executeOn(runScriptsScheduler)
+
+    val start = System.nanoTime()
+    r.tapEval(_ => Task.now(RideRunnerMetrics.rideScriptRunOnHeightTime(true).update((System.nanoTime() - start).toDouble)))
+  }
+
+  private def runMany(scripts: Iterable[RideScriptRunEnvironment]): Task[Unit] = {
     val r = Task
       .parTraverseUnordered(scripts)(runOne(_, hasCaches = true))
       .as(())
       .executeOn(runScriptsScheduler)
 
     val start = System.nanoTime()
-    r.tapEval(_ => Task.now(RideRunnerMetrics.rideScriptRunOnHeightTime(force).update((System.nanoTime() - start).toDouble)))
+    r.tapEval(_ => Task.now(RideRunnerMetrics.rideScriptRunOnHeightTime(false).update((System.nanoTime() - start).toDouble)))
   }
 
   private def runOne(script: RideScriptRunEnvironment, hasCaches: Boolean): Task[JsObject] = Task {
     val updatedResult = rideScriptRunTime.withTag("has-caches", hasCaches).measure {
-      val result = UtilsApiRoute.evaluate(
-        settings.evaluateScriptComplexityLimit,
-        script.blockchain,
-        script.key.address,
-        script.key.requestBody,
-        settings.enableTraces,
-        settings.maxTxErrorLogSize
-      )
-
+      val result = evaluate(script)
       // Removed, because I'm not sure it is required. TODO restore stateChanges?
       result - "stateChanges"
     }
@@ -96,7 +109,7 @@ class DefaultRequestsService(
     val origResult = script.lastResult
     scripts.put(
       script.key,
-      script.copy(lastResult = updatedResult, lastUpdatedTs = runScriptsScheduler.clockMonotonic(TimeUnit.MILLISECONDS))
+      script.copy(lastResult = updatedResult, updateHeight = sharedBlockchainData.height)
     )
 
     if ((updatedResult \ "error").isEmpty) {
@@ -117,12 +130,27 @@ class DefaultRequestsService(
   }
     .tapError { e => Task(log.error(s"An error during running ${script.key}", e)) }
     .executeOn(runScriptsScheduler)
+
+  private def evaluate(script: RideScriptRunEnvironment): JsObject = UtilsApiRoute.evaluate(
+    settings.evaluateScriptComplexityLimit,
+    script.blockchain,
+    script.key.address,
+    script.key.requestBody,
+    settings.enableTraces,
+    settings.maxTxErrorLogSize
+  )
 }
 
 object DefaultRequestsService {
   case class Settings(enableTraces: Boolean, evaluateScriptComplexityLimit: Int, maxTxErrorLogSize: Int)
 
-  private final case class RideScriptRunEnvironment(blockchain: Blockchain, key: RequestKey, lastResult: JsObject, lastUpdatedTs: Long)
+  private final case class RideScriptRunEnvironment(
+      blockchain: Blockchain,
+      key: RequestKey,
+      lastResult: JsObject,
+      updateHeight: Int
+  )
+
   private object RideScriptRunEnvironment {
     def apply(key: RequestKey, blockchainStorage: SharedBlockchainData[RequestKey]): RideScriptRunEnvironment =
       new RideScriptRunEnvironment(new ScriptBlockchain[RequestKey](blockchainStorage, key), key, JsObject.empty, 0)

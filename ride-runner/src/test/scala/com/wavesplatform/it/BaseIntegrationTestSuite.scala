@@ -1,43 +1,29 @@
 package com.wavesplatform.it
 
 import cats.syntax.option.*
-import com.google.common.primitives.Ints
-import com.google.protobuf.{ByteString, UnsafeByteOperations}
-import com.wavesplatform.account.{Address, PublicKey}
+import com.wavesplatform.account.Address
 import com.wavesplatform.api.DefaultBlockchainApi.*
-import com.wavesplatform.api.{DefaultBlockchainApi, HasGrpc}
+import com.wavesplatform.api.HasGrpc
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
-import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
-import com.wavesplatform.events.protobuf.{BlockchainUpdated, StateUpdate}
-import com.wavesplatform.lang.API
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.protobuf.block.Block
-import com.wavesplatform.protobuf.transaction.DataTransactionData
 import com.wavesplatform.ride.DefaultRequestsService
 import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
 import com.wavesplatform.storage.HasLevelDb.TestDb
 import com.wavesplatform.storage.persistent.LevelDbPersistentCaches
 import com.wavesplatform.storage.{HasLevelDb, RequestKey, RequestsStorage}
-import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{BaseTestSuite, HasMonixHelpers}
 import monix.eval.Task
 import monix.execution.schedulers.TestScheduler
 import play.api.libs.json.Json
 
-import java.nio.charset.StandardCharsets
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 import scala.util.Using
 
 abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with HasLevelDb with HasMonixHelpers {
-  protected val miner     = Wallet.generateNewAccount("miner".getBytes(StandardCharsets.UTF_8), 0)
-  protected val alice     = Wallet.generateNewAccount("alice".getBytes(StandardCharsets.UTF_8), 0)
-  protected val aliceAddr = alice.toAddress(chainId)
-
   protected val initX = 0
 
   /** @param xPlusHeight
@@ -54,7 +40,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
       override def getActivatedFeatures(height: Int): Map[Short, Int] = blockchainSettings.functionalitySettings.preActivatedFeatures
 
       override def getAccountScript(address: Address): Option[Script] =
-        if (address == aliceAddr) mkScript().some
+        if (address == aliceAddr) aliceScript.some
         else super.getAccountScript(address)
 
       override def getAccountDataEntry(address: Address, key: String): Option[DataEntry[?]] =
@@ -126,9 +112,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     }
   }.get
 
-  private def mkScript(): Script = {
-    val scriptSrc =
-      s"""
+  private lazy val aliceScript: Script = mkScript(s"""
 {-#STDLIB_VERSION 6 #-}
 {-#SCRIPT_TYPE ACCOUNT #-}
 {-#CONTENT_TYPE DAPP #-}
@@ -139,78 +123,5 @@ let alice = Address(base58'$aliceAddr')
 let x = getIntegerValue(alice, "x")
 ([], x + height)
 }
-"""
-    val estimator      = ScriptEstimatorV3(fixOverflow = true, overhead = false)
-    val compiledScript = API.compile(input = scriptSrc, estimator).explicitGet()
-    Script.fromBase64String(Base64.encode(compiledScript.bytes)).explicitGet()
-  }
-
-  protected def mkRollbackEvent(
-      height: Int,
-      forkNumber: Int,
-      microBlockNumber: Int = 0,
-      dataEntryUpdates: List[StateUpdate.DataEntryUpdate] = Nil
-  ): SubscribeEvent = SubscribeEvent().withUpdate(
-    BlockchainUpdated()
-      .withId(toByteString32(forkNumber, height, microBlockNumber))
-      .withHeight(height)
-      .withUpdate(
-        BlockchainUpdated.Update.Rollback(
-          BlockchainUpdated
-            .Rollback()
-            .withRollbackStateUpdate(StateUpdate.defaultInstance.withDataEntries(dataEntryUpdates))
-        )
-      )
-  )
-
-  protected def mkMicroBlockAppendEvent(
-      height: Int,
-      forkNumber: Int,
-      microBlockNumber: Int,
-      dataEntryUpdates: List[StateUpdate.DataEntryUpdate] = Nil
-  ): SubscribeEvent = SubscribeEvent().withUpdate(
-    BlockchainUpdated()
-      .withId(toByteString32(forkNumber, height, microBlockNumber))
-      .withHeight(height)
-      .withUpdate(
-        BlockchainUpdated.Update.Append(
-          BlockchainUpdated
-            .Append()
-            .withMicroBlock(BlockchainUpdated.Append.MicroBlockAppend())
-            .withStateUpdate(StateUpdate.defaultInstance.withDataEntries(dataEntryUpdates))
-        )
-      )
-  )
-
-  protected def mkBlockAppendEvent(height: Int, forkNumber: Int, dataEntryUpdates: List[StateUpdate.DataEntryUpdate] = Nil): SubscribeEvent =
-    SubscribeEvent().withUpdate(
-      BlockchainUpdated()
-        .withHeight(height)
-        .withId(toByteString32(forkNumber, height))
-        .withUpdate(
-          BlockchainUpdated.Update.Append(
-            BlockchainUpdated
-              .Append()
-              .withBlock(BlockchainUpdated.Append.BlockAppend().withBlock(mkPbBlock(height)))
-              .withStateUpdate(StateUpdate.defaultInstance.withDataEntries(dataEntryUpdates))
-          )
-        )
-    )
-
-  protected def mkDataEntryUpdate(address: Address, key: String, valueBefore: Long, valueAfter: Long): StateUpdate.DataEntryUpdate =
-    StateUpdate.DataEntryUpdate(
-      address = DefaultBlockchainApi.toPb(address),
-      dataEntry = DataTransactionData.DataEntry(key, DataTransactionData.DataEntry.Value.IntValue(valueAfter)).some,
-      dataEntryBefore = DataTransactionData.DataEntry(key, DataTransactionData.DataEntry.Value.IntValue(valueBefore)).some
-    )
-
-  private def mkPbBlock(height: Int) =
-    Block.defaultInstance.withHeader(Block.Header.defaultInstance.withGenerator(toPb(miner.publicKey)).withTimestamp(height))
-
-  private def toPb(pk: PublicKey): ByteString = UnsafeByteOperations.unsafeWrap(pk.arr)
-
-  private def toByteString32(xs: Int*): ByteString = {
-    require(xs.size < 4)
-    UnsafeByteOperations.unsafeWrap(Array.concat(xs.map(Ints.toByteArray)*).padTo(32, 0.toByte))
-  }
+""")
 }

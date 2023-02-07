@@ -1,12 +1,12 @@
 package com.wavesplatform.it
 
 import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.api.grpc.BalanceResponse
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
-import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.{AssetDescription, DataEntry, Height}
 import com.wavesplatform.transaction.Asset
