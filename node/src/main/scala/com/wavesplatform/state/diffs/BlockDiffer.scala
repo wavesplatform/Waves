@@ -2,7 +2,6 @@ package com.wavesplatform.state.diffs
 
 import cats.implicits.{toBifunctorOps, toFoldableOps}
 import cats.syntax.either.catsSyntaxEitherId
-import cats.syntax.parallel.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
@@ -20,14 +19,9 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.{Asset, Authorized, GenesisTransaction, PaymentTransaction, ProvenTransaction, Transaction}
-import com.wavesplatform.utils.Schedulers
-import monix.eval.Task
-import monix.execution.schedulers.SchedulerService
+import com.wavesplatform.transaction.{Asset, Authorized, GenesisTransaction, PaymentTransaction, Transaction}
 
 object BlockDiffer {
-  implicit val sigverify: SchedulerService = Schedulers.fixedPool(4, "sigverify")
-
   final case class DetailedDiff(parentDiff: Diff, transactionDiffs: List[Diff])
   final case class Result(diff: Diff, carry: Long, totalFee: Long, constraint: MiningConstraint, detailedDiff: DetailedDiff)
 
@@ -197,22 +191,8 @@ object BlockDiffer {
     val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, verify, enableExecutionLog = enableExecutionLog) _
     val hasSponsorship = currentBlockHeight >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
 
-    if (verify && txSignParCheck) {
-      txs
-        .parUnorderedTraverse {
-          case tx: ProvenTransaction =>
-            Task {
-              if (rideV6Activated) {
-                tx.firstProofIsValidSignatureAfterV6
-              } else {
-                tx.firstProofIsValidSignatureBeforeV6
-              }
-            }.void
-          case _ => Task.unit
-        }
-        .executeOn(sigverify)
-        .runAsyncAndForget
-    }
+    if (verify && txSignParCheck)
+      ParSignatureChecker.checkTxSignatures(txs, rideV6Activated)
 
     prepareCaches(blockGenerator, txs, loadCacheData)
 

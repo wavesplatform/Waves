@@ -3,7 +3,6 @@ package com.wavesplatform
 import java.io.*
 import java.net.{MalformedURLException, URL}
 import akka.actor.ActorSystem
-import cats.implicits.catsSyntaxParallelTraverse1
 import com.google.common.io.ByteStreams
 import com.google.common.primitives.Ints
 import com.wavesplatform.Exporter.Formats
@@ -22,11 +21,11 @@ import com.wavesplatform.mining.Miner
 import com.wavesplatform.protobuf.block.{PBBlocks, VanillaBlock}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.BlockAppender
-import com.wavesplatform.state.diffs.BlockDiffer.sigverify
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height}
+import com.wavesplatform.state.ParSignatureChecker.sigverify
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height, ParSignatureChecker}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Asset, DiscardedBlocks, ProvenTransaction, Transaction}
+import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.*
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -234,22 +233,7 @@ object Importer extends ScorexLogging {
 
               val block = (if (!blockV5) Block.parseBytes(blockBytes) else parsedProtoBlock).orElse(parsedProtoBlock).get
 
-              val verifiedObjects: Seq[Any] = (block +: block.transactionData)
-              verifiedObjects
-                .parTraverse {
-                  case tx: ProvenTransaction =>
-                    Task {
-                      if (rideV6) {
-                        tx.firstProofIsValidSignatureAfterV6
-                      } else {
-                        tx.firstProofIsValidSignatureBeforeV6
-                      }
-                    }.void
-                  case b: Block => Task(b.signatureValid()).void
-                  case _        => Task.unit
-                }
-                .executeOn(sigverify)
-                .runAsyncAndForget
+              ParSignatureChecker.checkBlockAndTxSignatures(block, rideV6)
 
               queue.enqueue(block)
             }

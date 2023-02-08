@@ -2,6 +2,7 @@ package com.wavesplatform.state.appender
 
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.PoSSelector
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.{BlockStats, Metrics}
 import com.wavesplatform.network.{ExtensionBlocks, InvalidBlockStorage, PeerDatabase, formatBlocks, id}
@@ -32,7 +33,7 @@ object ExtensionAppender extends ScorexLogging {
       if (extension.remoteScore <= blockchainUpdater.score) {
         log.trace(s"Ignoring extension $extension because declared remote was not greater than local score ${blockchainUpdater.score}")
         Right(None)
-      } else
+      } else {
         extension.blocks
           .collectFirst { case b if !b.signatureValid() => GenericError(s"Block $b has invalid signature") }
           .toLeft(extension)
@@ -53,10 +54,15 @@ object ExtensionAppender extends ScorexLogging {
                 } yield (commonBlockHeight, droppedBlocks)
 
                 droppedBlocksEi.flatMap { case (commonBlockHeight, droppedBlocks) =>
+                  newBlocks.zipWithIndex.foreach { case (block, idx) =>
+                    val rideV6Activated = blockchainUpdater.isFeatureActivated(BlockchainFeatures.RideV6, commonBlockHeight + idx + 1)
+                    ParSignatureChecker.checkTxSignatures(block.transactionData, rideV6Activated)
+                  }
+
                   val forkApplicationResultEi = {
                     newBlocks.view
                       .map { b =>
-                        b -> appendExtensionBlock(blockchainUpdater, pos, time, verify = true)(b)
+                        b -> appendExtensionBlock(blockchainUpdater, pos, time, verify = true, txSignParCheck = false)(b)
                           .map {
                             _.foreach(bh => BlockStats.applied(b, BlockStats.Source.Ext, bh))
                           }
@@ -112,6 +118,7 @@ object ExtensionAppender extends ScorexLogging {
                 Right(None)
             }
           }
+      }
 
     log.debug(s"${id(ch)} Attempting to append extension ${formatBlocks(extensionBlocks.blocks)}")
     Task(appendExtension(extensionBlocks)).executeOn(scheduler).map {

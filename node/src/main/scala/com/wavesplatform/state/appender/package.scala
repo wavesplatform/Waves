@@ -48,11 +48,12 @@ package object appender {
       blockchainUpdater: BlockchainUpdater & Blockchain,
       pos: PoSSelector,
       time: Time,
-      verify: Boolean
+      verify: Boolean,
+      txSignParCheck: Boolean
   )(block: Block): Either[ValidationError, Option[Int]] =
     for {
       hitSource <- if (verify) validateBlock(blockchainUpdater, pos, time)(block) else pos.validateGenerationSignature(block)
-      _         <- metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify))
+      _         <- metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify, txSignParCheck))
     } yield Some(blockchainUpdater.height)
 
   private def validateBlock(blockchainUpdater: Blockchain, pos: PoSSelector, time: Time)(block: Block) =
