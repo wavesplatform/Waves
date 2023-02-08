@@ -27,6 +27,7 @@ class TransactionStorage[TagT](
 
   protected val values = Caffeine
     .newBuilder()
+    .softValues()
     .maximumSize(settings.maxEntries)
     .recordStats(() => new KamonStatsCounter("TransactionStorage.values"))
     .build[TransactionId, RemoteData[Height]]()

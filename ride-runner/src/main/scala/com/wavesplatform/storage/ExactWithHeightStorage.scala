@@ -25,6 +25,7 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
 
   protected val values = Caffeine
     .newBuilder()
+    .softValues()
     .maximumSize(settings.maxEntries)
     .recordStats(() => new KamonStatsCounter(s"$name.values"))
     .build[KeyT, RemoteData[ValueT]]()

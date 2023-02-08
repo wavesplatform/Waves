@@ -13,6 +13,7 @@ class VrfStorage(settings: ExactWithHeightStorage.Settings, blockchainApi: Block
     extends ScorexLogging {
   protected val values = Caffeine
     .newBuilder()
+    .softValues()
     .maximumSize(settings.maxEntries)
     .recordStats(() => new KamonStatsCounter("VrfStorage"))
     .build[Int, Option[ByteStr]] {
