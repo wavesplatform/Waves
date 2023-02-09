@@ -18,7 +18,6 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.settings.*
 import com.wavesplatform.state.appender.BlockAppender
-import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.{Schedulers, ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPoolImpl
@@ -115,11 +114,10 @@ object BlockchainGeneratorApp extends ScorexLogging {
       override def getTimestamp(): Long  = time
     }
 
-    val spendableBalance = ConcurrentSubject.publish[(Address, Asset)]
     val blockchain = {
       val db = openDB(wavesSettings.dbSettings)
       val (blockchainUpdater, rocksdb) =
-        StorageFactory(wavesSettings, db, fakeTime, spendableBalance, BlockchainUpdateTriggers.noop)
+        StorageFactory(wavesSettings, db, fakeTime, BlockchainUpdateTriggers.noop)
       com.wavesplatform.checkGenesis(wavesSettings, blockchainUpdater, Miner.Disabled)
       sys.addShutdownHook(synchronized {
         blockchainUpdater.shutdown()

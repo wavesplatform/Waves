@@ -21,17 +21,14 @@ import com.wavesplatform.state.utils.TestRocksDB
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Portfolio}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers}
+import com.wavesplatform.transaction.{Transaction, TxHelpers}
 import com.wavesplatform.{NTPTime, TestHelpers, database}
-import monix.reactive.Observer
-import monix.reactive.subjects.{PublishSubject, Subject}
 import org.rocksdb.RocksDB
 import org.scalatest.Suite
 import org.scalatest.matchers.should.Matchers
 
 trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
-  protected val ignoreSpendableBalanceChanged: Subject[(Address, Asset), (Address, Asset)] = PublishSubject()
-  protected val ignoreBlockchainUpdateTriggers: BlockchainUpdateTriggers                   = BlockchainUpdateTriggers.noop
+  protected val ignoreBlockchainUpdateTriggers: BlockchainUpdateTriggers = BlockchainUpdateTriggers.noop
 
   private[this] val currentDbInstance = new ThreadLocal[RocksDB]
   protected def db: RocksDB           = currentDbInstance.get()
@@ -54,7 +51,6 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
       ws,
       db,
       ntpTime,
-      ignoreSpendableBalanceChanged,
       ignoreBlockchainUpdateTriggers
     )
     test(rdb)
@@ -183,7 +179,6 @@ trait WithDomain extends WithState { _: Suite =>
       var domain: Domain = null
       val bcu = new BlockchainUpdaterImpl(
         blockchain,
-        Observer.stopped,
         settings,
         ntpTime,
         BlockchainUpdateTriggers.combined(domain.triggers),

@@ -24,8 +24,7 @@ import monix.reactive.Observer
 import scala.jdk.CollectionConverters.*
 import scala.reflect.ClassTag
 
-// TODO: remove spendableBalanceChanged?
-abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)], txFilterSize: Int) extends Blockchain with Storage {
+abstract class Caches(txFilterSize: Int) extends Blockchain with Storage {
   import Caches.*
 
   val dbSettings: DBSettings

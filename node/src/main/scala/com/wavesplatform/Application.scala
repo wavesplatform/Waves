@@ -7,7 +7,7 @@ import cats.instances.bigInt.*
 import cats.instances.int.*
 import cats.syntax.option.*
 import com.typesafe.config.*
-import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.*
@@ -34,7 +34,7 @@ import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, Micro
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height, TxMeta}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
+import com.wavesplatform.transaction.{DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.*
 import com.wavesplatform.utils.Schedulers.*
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
@@ -71,8 +71,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private[this] val db = openDB(settings.dbSettings)
 
-  private[this] val spendableBalanceChanged = ConcurrentSubject.publish[(Address, Asset)]
-
   private[this] lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
 
   private[this] val wallet: Wallet = Wallet(settings.walletSettings)
@@ -103,7 +101,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private[this] var miner: Miner & MinerDebugInfo = Miner.Disabled
   private[this] val (blockchainUpdater, rocksDB) =
-    StorageFactory(settings, db, time, spendableBalanceChanged, BlockchainUpdateTriggers.combined(triggers), bc => miner.scheduleMining(bc))
+    StorageFactory(settings, db, time, BlockchainUpdateTriggers.combined(triggers), bc => miner.scheduleMining(bc))
 
   @volatile
   private[this] var maybeUtx: Option[UtxPool] = None
@@ -218,9 +216,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override def utx: UtxPool                                                                 = utxStorage
       override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] =
         Await.result(transactionPublisher.validateAndBroadcast(tx, None), Duration.Inf) // TODO: Replace with async if possible
-      override def spendableBalanceChanged: Observable[(Address, Asset)] = app.spendableBalanceChanged
-      override def actorSystem: ActorSystem                              = app.actorSystem
-      override def utxEvents: Observable[UtxEvent]                       = app.utxEvents
+      override def actorSystem: ActorSystem        = app.actorSystem
+      override def utxEvents: Observable[UtxEvent] = app.utxEvents
 
       override val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(
         blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
@@ -469,7 +466,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   def shutdown(): Unit =
     if (shutdownInProgress.compareAndSet(false, true)) {
-      spendableBalanceChanged.onComplete()
       maybeUtx.foreach(_.close())
 
       log.info("Closing REST API")

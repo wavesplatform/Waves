@@ -227,7 +227,6 @@ class FPPoSSelectorTest extends FreeSpec with WithDB with DBCacheSettings {
     val db   = database.openDB(dbSettings.copy(directory = path.toAbsolutePath.toString))
     val defaultWriter = TestRocksDB.withFunctionalitySettings(
       db,
-      ignoreSpendableBalanceChanged,
       TestFunctionalitySettings.Stub.copy(preActivatedFeatures =
         Map(BlockchainFeatures.FairPoS.id -> 0) ++ (if (VRFActivated) Map(BlockchainFeatures.BlockV5.id -> 0) else Map())
       )
@@ -235,7 +234,7 @@ class FPPoSSelectorTest extends FreeSpec with WithDB with DBCacheSettings {
     val settings0 = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings  = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val bcu =
-      new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
+      new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
     val pos = PoSSelector(bcu, settings.synchronizationSettings.maxBaseTarget)
     try {
       val (accounts, blocks) = gen(ntpTime).sample.get

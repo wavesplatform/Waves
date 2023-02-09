@@ -5,34 +5,27 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.TestHelpers.enableNG
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
-import com.wavesplatform.block.Block.PlainBlockVersion
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.loadActiveLeases
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.db.{DBCacheSettings, WithDomain}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
-import com.wavesplatform.history.{Domain, chainBaseAndMicro, randomSig}
+import com.wavesplatform.history.{chainBaseAndMicro, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.TxHelpers.*
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers, TxVersion}
+import com.wavesplatform.transaction.{Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.{EitherMatchers, NTPTime}
-import monix.execution.Scheduler.Implicits.global
-import monix.reactive.subjects.PublishToOneSubject
 import org.scalamock.scalatest.MockFactory
 
-import scala.concurrent.Await
-import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
 class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDomain with NTPTime with DBCacheSettings with MockFactory {
@@ -297,35 +290,6 @@ class BlockchainUpdaterImplSpec extends FreeSpec with EitherMatchers with WithDo
           Signed.invokeScript(3.toByte, sender, dapp.toAddress, None, Seq.empty, 50_0000L, Waves, ntpTime.getTimestamp())
 
         d.appendBlock(d.createBlock(5.toByte, Seq(invoke)))
-      }
-    }
-
-    "spendableBalanceChanged" in {
-      withRocksDBWriter(RideV6) { rocksDb =>
-        val ps    = PublishToOneSubject[(Address, Asset)]()
-        val items = ps.toListL.runToFuture
-
-        val blockchain = new BlockchainUpdaterImpl(
-          rocksDb,
-          ps,
-          RideV6,
-          ntpTime,
-          BlockchainUpdateTriggers.noop,
-          loadActiveLeases(db, _, _)
-        )
-
-        val d = Domain(db, blockchain, rocksDb, RideV6)
-        blockchain.processBlock(d.createBlock(PlainBlockVersion, Seq(genesis(defaultAddress)), generator = TestBlock.defaultSigner))
-        blockchain.processBlock(d.createBlock(PlainBlockVersion, Seq(transfer()), generator = TestBlock.defaultSigner))
-
-        ps.onComplete()
-        Await.result(items, 2.seconds) shouldBe Seq(
-          (TestBlock.defaultSigner.toAddress, Waves),
-          (defaultAddress, Waves),
-          (TestBlock.defaultSigner.toAddress, Waves),
-          (defaultAddress, Waves),
-          (secondAddress, Waves)
-        )
       }
     }
   }

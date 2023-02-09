@@ -25,13 +25,12 @@ import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
 import monix.reactive.subjects.ReplaySubject
-import monix.reactive.{Observable, Observer}
+import monix.reactive.Observable
 
 import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
 class BlockchainUpdaterImpl(
     rocksdb: RocksDBWriter,
-    spendableBalanceChanged: Observer[(Address, Asset)],
     wavesSettings: WavesSettings,
     time: Time,
     blockchainUpdateTriggers: BlockchainUpdateTriggers,
@@ -374,8 +373,7 @@ class BlockchainUpdaterImpl(
                 }
           }).map {
             _ map { case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint, _), discDiffs, reward, hitSource) =>
-              val newHeight   = rocksdb.height + 1
-              val prevNgState = ngState
+              val newHeight = rocksdb.height + 1
 
               restTotalConstraint = updatedTotalConstraint
               ngState = Some(
@@ -390,7 +388,6 @@ class BlockchainUpdaterImpl(
                   cancelLeases(collectLeasesToCancel(newHeight), newHeight)
                 )
               )
-              notifyChangedSpendable(prevNgState, ngState)
               publishLastBlockInfo()
 
               if (
@@ -466,7 +463,6 @@ class BlockchainUpdaterImpl(
     result match {
       case Right(_) =>
         log.info(s"Blockchain rollback to $blockId succeeded")
-        notifyChangedSpendable(prevNgState, ngState)
         publishLastBlockInfo()
         miner.scheduleMining()
 
@@ -474,22 +470,6 @@ class BlockchainUpdaterImpl(
         log.error(s"Blockchain rollback to $blockId failed: ${error.err}")
     }
     result
-  }
-
-  private def notifyChangedSpendable(prevNgState: Option[NgState], newNgState: Option[NgState]): Unit = {
-    val changedPortfolios = (prevNgState, newNgState) match {
-      case (Some(p), Some(n)) =>
-        Diff.combine(p.bestLiquidDiff.portfolios, n.bestLiquidDiff.portfolios.view.mapValues(_.negate).toMap).getOrElse(Map.empty)
-      case (Some(x), _) => x.bestLiquidDiff.portfolios
-      case (_, Some(x)) => x.bestLiquidDiff.portfolios
-      case _            => Map.empty
-    }
-
-    changedPortfolios.foreach { case (addr, p) =>
-      p.assetIds.view
-        .filter(x => p.spendableBalanceOf(x) != 0)
-        .foreach(assetId => spendableBalanceChanged.onNext(addr -> assetId))
-    }
   }
 
   override def processMicroBlock(microBlock: MicroBlock, verify: Boolean = true): Either[ValidationError, BlockId] = writeLock {
@@ -539,10 +519,6 @@ class BlockchainUpdaterImpl(
               log.info(s"${microBlock.stringRepr(blockId)} appended, diff=${diff.hashString}")
               internalLastBlockInfo.onNext(LastBlockInfo(blockId, height, score, ready = true))
 
-              for {
-                (addr, p) <- diff.portfolios
-                assetId   <- p.assetIds
-              } spendableBalanceChanged.onNext(addr -> assetId)
               blockId
             }
         }

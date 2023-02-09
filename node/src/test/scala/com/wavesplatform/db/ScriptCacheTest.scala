@@ -133,11 +133,10 @@ class ScriptCacheTest extends FreeSpec with WithDB {
     val settings  = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val defaultWriter = TestRocksDB.withFunctionalitySettings(
       db,
-      ignoreSpendableBalanceChanged,
       TestFunctionalitySettings.Stub
     )
     val bcu =
-      new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
+      new BlockchainUpdaterImpl(defaultWriter, settings, ntpTime, ignoreBlockchainUpdateTriggers, (_, _) => Seq.empty)
     try {
       val (accounts, blocks) = gen(ntpTime).sample.get
 

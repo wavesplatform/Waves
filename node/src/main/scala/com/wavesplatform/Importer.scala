@@ -6,7 +6,6 @@ import akka.actor.ActorSystem
 import com.google.common.io.ByteStreams
 import com.google.common.primitives.Ints
 import com.wavesplatform.Exporter.Formats
-import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonBlocksApi, CommonTransactionsApi}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -25,14 +24,14 @@ import com.wavesplatform.state.ParSignatureChecker.sigverify
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height, ParSignatureChecker}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
+import com.wavesplatform.transaction.{DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.*
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import kamon.Kamon
 import monix.eval.Task
 import monix.execution.Scheduler
-import monix.reactive.{Observable, Observer}
+import monix.reactive.Observable
 import org.rocksdb.RocksDB
 import scopt.OParser
 
@@ -133,9 +132,8 @@ object Importer extends ScorexLogging {
 
           override def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean] =
             TracedResult.wrapE(Left(GenericError("Not implemented during import")))
-          override def spendableBalanceChanged: Observable[(Address, Asset)] = Observable.empty
-          override def actorSystem: ActorSystem                              = extensionActorSystem
-          override def utxEvents: Observable[UtxEvent]                       = Observable.empty
+          override def actorSystem: ActorSystem        = extensionActorSystem
+          override def utxEvents: Observable[UtxEvent] = Observable.empty
           override def transactionsApi: CommonTransactionsApi =
             CommonTransactionsApi(
               blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
@@ -303,7 +301,7 @@ object Importer extends ScorexLogging {
 
     val db = openDB(settings.dbSettings)
     val (blockchainUpdater, rocksDb) =
-      StorageFactory(settings, db, time, Observer.empty, BlockchainUpdateTriggers.combined(triggers))
+      StorageFactory(settings, db, time, BlockchainUpdateTriggers.combined(triggers))
     val pos         = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
     val extAppender = BlockAppender(blockchainUpdater, time, (_: Seq[Diff]) => {}, pos, scheduler, importOptions.verify, txSignParCheck = false) _
 

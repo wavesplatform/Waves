@@ -14,7 +14,6 @@ import com.wavesplatform.transaction.{GenesisTransaction, Proofs, TxDecimals, Tx
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.utils.{NTP, ScorexLogging}
-import monix.reactive.Observer
 
 import scala.collection.immutable.VectorMap
 
@@ -23,7 +22,7 @@ object RollbackBenchmark extends ScorexLogging {
     val settings      = Application.loadApplicationConfig(Some(new File(args(0))))
     val db            = openDB(settings.dbSettings)
     val time          = new NTP(settings.ntpServer)
-    val rocksDBWriter = RocksDBWriter(db, Observer.stopped, settings)
+    val rocksDBWriter = RocksDBWriter(db, settings)
 
     val issuer = KeyPair(new Array[Byte](32))
 

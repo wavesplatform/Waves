@@ -14,8 +14,6 @@ import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings, loadCon
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.utils.TestRocksDB
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
-import monix.execution.UncaughtExceptionReporter
-import monix.reactive.Observer
 import org.openjdk.jmh.annotations.{Setup, TearDown}
 import org.rocksdb.RocksDB
 import org.scalacheck.{Arbitrary, Gen}
@@ -34,8 +32,7 @@ trait BaseState {
     openDB(wavesSettings.dbSettings.copy(directory = dir))
   }
 
-  private val portfolioChanges = Observer.empty(UncaughtExceptionReporter.default)
-  val state: RocksDBWriter     = TestRocksDB.withFunctionalitySettings(db, portfolioChanges, fsSettings)
+  val state: RocksDBWriter = TestRocksDB.withFunctionalitySettings(db, fsSettings)
 
   private var _richAccount: KeyPair = _
   def richAccount: KeyPair          = _richAccount

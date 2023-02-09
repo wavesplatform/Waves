@@ -36,10 +36,9 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{Asset, Transaction, *}
+import com.wavesplatform.transaction.{Transaction, *}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool.PackStrategy
-import monix.reactive.subjects.PublishSubject
 import org.rocksdb.RocksDB
 import org.scalacheck.Gen.*
 import org.scalacheck.{Arbitrary, Gen}
@@ -53,12 +52,10 @@ import scala.concurrent.duration.*
 import scala.util.Random
 
 private object UtxPoolSpecification {
-  private val ignoreSpendableBalanceChanged = PublishSubject[(Address, Asset)]()
-
   final case class TempDB(fs: FunctionalitySettings, dbSettings: DBSettings) {
     val path: Path            = Files.createTempDirectory("rocksdb-test")
     val db: RocksDB           = openDB(dbSettings.copy(directory = path.toAbsolutePath.toString))
-    val writer: RocksDBWriter = TestRocksDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, fs)
+    val writer: RocksDBWriter = TestRocksDB.withFunctionalitySettings(db, fs)
 
     sys.addShutdownHook {
       db.close()
@@ -95,7 +92,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
     )
 
     val dbContext = TempDB(settings.blockchainSettings.functionalitySettings, settings.dbSettings)
-    val (bcu, _)  = TestStorageFactory(settings, dbContext.db, new TestTime, ignoreSpendableBalanceChanged, ignoreBlockchainUpdateTriggers)
+    val (bcu, _)  = TestStorageFactory(settings, dbContext.db, new TestTime, ignoreBlockchainUpdateTriggers)
     bcu.processBlock(Block.genesis(genesisSettings, bcu.isFeatureActivated(BlockchainFeatures.RideV6)).explicitGet()) should beRight
     bcu
   }

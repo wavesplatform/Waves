@@ -1,14 +1,11 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.account.Address
 import com.wavesplatform.database.{DBExt, Keys, RocksDBWriter, loadActiveLeases}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.BlockchainUpdaterImpl
-import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceStopApplication}
-import monix.reactive.Observer
 import org.rocksdb.RocksDB
 
 object StorageFactory extends ScorexLogging {
@@ -18,15 +15,13 @@ object StorageFactory extends ScorexLogging {
       settings: WavesSettings,
       db: RocksDB,
       time: Time,
-      spendableBalanceChanged: Observer[(Address, Asset)],
       blockchainUpdateTriggers: BlockchainUpdateTriggers,
       miner: Miner = _ => ()
   ): (BlockchainUpdaterImpl, RocksDBWriter & AutoCloseable) = {
     checkVersion(db)
-    val rocksDBWriter = RocksDBWriter(db, spendableBalanceChanged, settings)
+    val rocksDBWriter = RocksDBWriter(db, settings)
     val bui = new BlockchainUpdaterImpl(
       rocksDBWriter,
-      spendableBalanceChanged,
       settings,
       time,
       blockchainUpdateTriggers,

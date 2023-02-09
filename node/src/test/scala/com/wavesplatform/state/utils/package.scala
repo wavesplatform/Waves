@@ -7,10 +7,9 @@ import com.wavesplatform.database.{RocksDBWriter, TestStorageFactory}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.settings.TestSettings.*
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings, RewardsSettings, TestSettings}
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.SystemTime
 import monix.execution.Scheduler
-import monix.reactive.Observer
 import org.rocksdb.RocksDB
 
 package object utils {
@@ -31,14 +30,12 @@ package object utils {
   object TestRocksDB {
     def withFunctionalitySettings(
         writableDB: RocksDB,
-        spendableBalanceChanged: Observer[(Address, Asset)],
         fs: FunctionalitySettings
     ): RocksDBWriter =
       TestStorageFactory(
         TestSettings.Default.withFunctionalitySettings(fs),
         writableDB,
         SystemTime,
-        spendableBalanceChanged,
         BlockchainUpdateTriggers.noop
       )._2
 

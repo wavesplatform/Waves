@@ -9,14 +9,13 @@ import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.history.Domain
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.transaction.TxHelpers
-import monix.reactive.Observer
 import org.rocksdb.RocksDB
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
 trait SharedDomain extends BeforeAndAfterAll with NTPTime with DBCacheSettings { _: Suite =>
   private val path        = Files.createTempDirectory("rocks-temp").toAbsolutePath
   private val db: RocksDB = database.openDB(dbSettings.copy(directory = path.toAbsolutePath.toString))
-  private val (bui, ldb)  = TestStorageFactory(settings, db, ntpTime, Observer.stopped, BlockchainUpdateTriggers.noop)
+  private val (bui, ldb)  = TestStorageFactory(settings, db, ntpTime, BlockchainUpdateTriggers.noop)
 
   def settings: WavesSettings               = DomainPresets.ScriptsAndSponsorship
   def genesisBalances: Seq[AddrWithBalance] = Seq.empty
