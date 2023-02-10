@@ -9,7 +9,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.consensus.{PoSCalculator, PoSSelector}
-import com.wavesplatform.database.{DBExt, Keys, RocksDBWriter}
+import com.wavesplatform.database.{DBExt, Keys, RDB, RocksDBWriter}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures.{BlockV5, RideV6}
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -36,7 +36,7 @@ import scala.concurrent.duration.*
 import scala.util.Try
 import scala.util.control.NonFatal
 
-case class Domain(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWriter: RocksDBWriter, settings: WavesSettings) {
+case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWriter: RocksDBWriter, settings: WavesSettings) {
   import Domain.*
 
   val blockchain: BlockchainUpdaterImpl = blockchainUpdater
@@ -90,11 +90,11 @@ case class Domain(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDB
 
     lazy val transactions: CommonTransactionsApi = CommonTransactionsApi(
       blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
-      db,
+      rdb,
       blockchain,
       utxPool,
       tx => Future.successful(utxPool.putIfNew(tx)),
-      Application.loadBlockAt(db, blockchain)
+      Application.loadBlockAt(rdb, blockchain)
     )
   }
 
@@ -120,12 +120,12 @@ case class Domain(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDB
   }
 
   def solidStateHeight: Int = {
-    db.get(Keys.height)
+    rdb.db.get(Keys.height)
   }
 
   def solidStateSnapshot(): SortedMap[String, String] = {
     val builder = SortedMap.newBuilder[String, String]
-    db.iterateOver(Array.emptyByteArray)(e =>
+    rdb.db.iterateOver(Array.emptyByteArray)(e =>
       builder.addOne(EthEncoding.toHexString(e.getKey).drop(2) -> EthEncoding.toHexString(e.getValue).drop(2))
     )
     builder.result()
@@ -160,7 +160,7 @@ case class Domain(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDB
   def balance(address: Address): Long               = blockchainUpdater.balance(address)
   def balance(address: Address, asset: Asset): Long = blockchainUpdater.balance(address, asset)
 
-  def nftList(address: Address): Seq[(IssuedAsset, AssetDescription)] = db.withResource { resource =>
+  def nftList(address: Address): Seq[(IssuedAsset, AssetDescription)] = rdb.db.withResource { resource =>
     AddressPortfolio
       .nftIterator(resource, address, blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), None, blockchainUpdater.assetDescription)
       .toSeq
@@ -170,7 +170,7 @@ case class Domain(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDB
   def addressTransactions(address: Address, from: Option[ByteStr] = None): Seq[(Height, Transaction)] =
     AddressTransactions
       .allAddressTransactions(
-        db,
+        rdb,
         blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
         address,
         None,
@@ -181,7 +181,7 @@ case class Domain(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDB
       .toListL
       .runSyncUnsafe()
 
-  def portfolio(address: Address): Seq[(IssuedAsset, Long)] = Domain.portfolio(address, db, blockchainUpdater)
+  def portfolio(address: Address): Seq[(IssuedAsset, Long)] = Domain.portfolio(address, rdb.db, blockchainUpdater)
 
   def appendAndAssertSucceed(txs: Transaction*): Block = {
     val block = createBlock(Block.PlainBlockVersion, txs)
@@ -233,7 +233,7 @@ case class Domain(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDB
   }
 
   def appendBlock(txs: Transaction*): Block =
-    appendBlock(Block.PlainBlockVersion, txs: _*)
+    appendBlock(Block.PlainBlockVersion, txs *)
 
   def appendKeyBlock(ref: Option[ByteStr] = None): Block = {
     val block          = createBlock(Block.NgBlockVersion, Nil, ref.orElse(Some(lastBlockId)))
@@ -265,7 +265,7 @@ case class Domain(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDB
   }
 
   def appendMicroBlock(txs: Transaction*): BlockId = {
-    val mb = createMicroBlock(txs: _*)
+    val mb = createMicroBlock(txs *)
     blockchainUpdater.processMicroBlock(mb).explicitGet()
   }
 
@@ -354,10 +354,10 @@ case class Domain(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDB
       loadBlockMetaAt(db, blockchainUpdater)(height).map { meta =>
         meta -> blockchainUpdater
           .liquidTransactions(meta.id)
-          .getOrElse(db.readOnly(ro => database.loadTransactions(Height(height), ro)))
+          .getOrElse(database.loadTransactions(Height(height), rdb))
       }
 
-    CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockInfoAt(db, blockchainUpdater))
+    CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(rdb.db, blockchainUpdater), loadBlockInfoAt(rdb.db, blockchainUpdater))
   }
 
   // noinspection ScalaStyle
@@ -400,7 +400,7 @@ case class Domain(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDB
 
   val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(
     blockchainUpdater.bestLiquidDiff.map(Height(blockchainUpdater.height) -> _),
-    db,
+    rdb,
     blockchain,
     utxPool,
     _ => Future.successful(TracedResult(Right(true))),
@@ -409,19 +409,19 @@ case class Domain(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDB
 
   val accountsApi: CommonAccountsApi = CommonAccountsApi(
     () => blockchainUpdater.getCompositeBlockchain,
-    db,
+    rdb,
     blockchain
   )
 
   val assetsApi: CommonAssetsApi = CommonAssetsApi(
     () => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty),
-    db,
+    rdb.db,
     blockchain
   )
 }
 
 object Domain {
-  implicit class BlockchainUpdaterExt[A <: BlockchainUpdater with Blockchain](bcu: A) {
+  implicit class BlockchainUpdaterExt[A <: BlockchainUpdater & Blockchain](bcu: A) {
     def processBlock(block: Block): Either[ValidationError, Seq[Diff]] = {
       val hitSource =
         if (bcu.height == 0 || !bcu.activatedFeaturesAt(bcu.height + 1).contains(BlockV5.id))

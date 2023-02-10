@@ -6,6 +6,7 @@ import com.wavesplatform.block
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.database.RDB
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.diffs.FeeValidation.FeeDetails
@@ -15,7 +16,6 @@ import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Transaction}
 import com.wavesplatform.utx.UtxPool
 import monix.reactive.Observable
-import org.rocksdb.RocksDB
 
 import scala.concurrent.Future
 
@@ -46,13 +46,14 @@ trait CommonTransactionsApi {
 object CommonTransactionsApi {
   def apply(
       maybeDiff: => Option[(Height, Diff)],
-      db: RocksDB,
+      rdb: RDB,
       blockchain: Blockchain,
       utx: UtxPool,
       publishTransaction: Transaction => Future[TracedResult[ValidationError, Boolean]],
       blockAt: Int => Option[(BlockMeta, Seq[(TxMeta, Transaction)])]
   ): CommonTransactionsApi = new CommonTransactionsApi {
-    override def aliasesOfAddress(address: Address): Observable[(Height, CreateAliasTransaction)] = common.aliasesOfAddress(db, maybeDiff, address)
+    override def aliasesOfAddress(address: Address): Observable[(Height, CreateAliasTransaction)] =
+      common.aliasesOfAddress(rdb, maybeDiff, address)
 
     override def transactionsByAddress(
         subject: Address,
@@ -60,10 +61,10 @@ object CommonTransactionsApi {
         transactionTypes: Set[TransactionType],
         fromId: Option[ByteStr] = None
     ): Observable[TransactionMeta] =
-      common.addressTransactions(db, maybeDiff, subject, sender, transactionTypes, fromId)
+      common.addressTransactions(rdb, maybeDiff, subject, sender, transactionTypes, fromId)
 
     override def transactionById(transactionId: ByteStr): Option[TransactionMeta] =
-      blockchain.transactionInfo(transactionId).map(common.loadTransactionMeta(db, maybeDiff))
+      blockchain.transactionInfo(transactionId).map(common.loadTransactionMeta(rdb, maybeDiff))
 
     override def unconfirmedTransactions: Seq[Transaction] = utx.all
 

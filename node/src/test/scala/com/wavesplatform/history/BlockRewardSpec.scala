@@ -269,7 +269,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
 
         d.rocksDBWriter.height shouldBe BlockRewardActivationHeight - 1
         d.rocksDBWriter.balance(miner1.toAddress) shouldBe InitialMinerBalance + OneFee
-        d.db.get(Keys.blockMetaAt(Height(BlockRewardActivationHeight - 1))).map(_.totalFeeInWaves) shouldBe OneTotalFee.some
+        d.rdb.db.get(Keys.blockMetaAt(Height(BlockRewardActivationHeight - 1))).map(_.totalFeeInWaves) shouldBe OneTotalFee.some
         d.rocksDBWriter.carryFee shouldBe OneCarryFee
 
         d.blockchainUpdater.processBlock(b3) should beRight

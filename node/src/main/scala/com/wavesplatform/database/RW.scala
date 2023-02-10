@@ -8,7 +8,7 @@ class RW(db: RocksDB, readOptions: ReadOptions, batch: WriteBatch) extends ReadO
   def put[V](key: Key[V], value: V): Int = {
     val bytes = key.encode(value)
     RocksDBStats.write.recordTagged(key, bytes)
-    batch.put(key.keyBytes, bytes)
+    batch.put(key.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily), key.keyBytes, bytes)
     bytes.length
   }
 
@@ -18,16 +18,11 @@ class RW(db: RocksDB, readOptions: ReadOptions, batch: WriteBatch) extends ReadO
 
   def delete(key: Array[Byte]): Unit = batch.delete(key)
 
-  def delete[V](key: Key[V]): Unit = batch.delete(key.keyBytes)
+  def delete[V](key: Key[V]): Unit =
+    batch.delete(key.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily), key.keyBytes)
 
   def filterHistory(key: Key[Seq[Int]], heightToRemove: Int): Unit = {
     val newValue = get(key).filterNot(_ == heightToRemove)
-    if (newValue.nonEmpty) put(key, newValue)
-    else delete(key)
-  }
-
-  def filterMetaHistory(key: Key[Seq[(Int, Int)]], heightToRemove: Int): Unit = {
-    val newValue = get(key).filterNot(_._1 == heightToRemove)
     if (newValue.nonEmpty) put(key, newValue)
     else delete(key)
   }

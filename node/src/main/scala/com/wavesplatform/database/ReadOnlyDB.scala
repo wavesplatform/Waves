@@ -3,14 +3,14 @@ package com.wavesplatform.database
 import com.google.common.collect.Maps
 import com.wavesplatform.metrics.RocksDBStats
 import com.wavesplatform.metrics.RocksDBStats.DbHistogramExt
-import org.rocksdb.{ReadOptions, RocksDB, RocksIterator}
+import org.rocksdb.{ColumnFamilyHandle, ReadOptions, RocksDB, RocksIterator}
 
 import scala.annotation.tailrec
 import scala.util.Using
 
 class ReadOnlyDB(db: RocksDB, readOptions: ReadOptions) {
   def get[V](key: Key[V]): V = {
-    val bytes = db.get(readOptions, key.keyBytes)
+    val bytes = db.get(key.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily), readOptions, key.keyBytes)
     RocksDBStats.read.recordTagged(key, bytes)
     key.parse(bytes)
   }
@@ -56,8 +56,8 @@ class ReadOnlyDB(db: RocksDB, readOptions: ReadOptions) {
     }
   }
 
-  def iterateOver(prefix: Array[Byte])(f: DBEntry => Unit): Unit =
-    Using.resource(db.newIterator(readOptions.setTotalOrderSeek(true))) { iter =>
+  def iterateOver(prefix: Array[Byte], cfh: Option[ColumnFamilyHandle] = None)(f: DBEntry => Unit): Unit =
+    Using.resource(db.newIterator(cfh.getOrElse(db.getDefaultColumnFamily), readOptions.setTotalOrderSeek(true))) { iter =>
       iter.seek(prefix)
       while (iter.isValid && iter.key().startsWith(prefix)) {
         f(Maps.immutableEntry(iter.key(), iter.value()))

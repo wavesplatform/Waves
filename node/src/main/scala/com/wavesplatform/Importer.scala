@@ -2,6 +2,7 @@ package com.wavesplatform
 
 import java.io.*
 import java.net.{MalformedURLException, URL}
+
 import akka.actor.ActorSystem
 import com.google.common.io.ByteStreams
 import com.google.common.primitives.Ints
@@ -10,7 +11,7 @@ import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonB
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.database.{DBExt, KeyTags, openDB}
+import com.wavesplatform.database.{DBExt, KeyTags, RDB}
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.BlockchainFeatures
@@ -19,8 +20,8 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.protobuf.block.{PBBlocks, VanillaBlock}
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.ParSignatureChecker.sigverify
+import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Height, ParSignatureChecker}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
@@ -32,7 +33,6 @@ import kamon.Kamon
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.Observable
-import org.rocksdb.RocksDB
 import scopt.OParser
 
 import scala.annotation.tailrec
@@ -115,7 +115,7 @@ object Importer extends ScorexLogging {
       appenderScheduler: Scheduler,
       extensionTime: Time,
       utxPool: UtxPool,
-      db: RocksDB,
+      rdb: RDB,
       extensionActorSystem: ActorSystem
   ): Seq[Extension] =
     if (wavesSettings.extensions.isEmpty) Seq.empty
@@ -137,18 +137,22 @@ object Importer extends ScorexLogging {
           override def transactionsApi: CommonTransactionsApi =
             CommonTransactionsApi(
               blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
-              db,
+              rdb,
               blockchainUpdater,
               utxPool,
               _ => Future.successful(TracedResult.wrapE(Left(GenericError("Not implemented during import")))),
-              Application.loadBlockAt(db, blockchainUpdater)
+              Application.loadBlockAt(rdb, blockchainUpdater)
             )
           override def blocksApi: CommonBlocksApi =
-            CommonBlocksApi(blockchainUpdater, Application.loadBlockMetaAt(db, blockchainUpdater), Application.loadBlockInfoAt(db, blockchainUpdater))
+            CommonBlocksApi(
+              blockchainUpdater,
+              Application.loadBlockMetaAt(rdb.db, blockchainUpdater),
+              Application.loadBlockInfoAt(rdb, blockchainUpdater)
+            )
           override def accountsApi: CommonAccountsApi =
-            CommonAccountsApi(() => blockchainUpdater.getCompositeBlockchain, db, blockchainUpdater)
+            CommonAccountsApi(() => blockchainUpdater.getCompositeBlockchain, rdb, blockchainUpdater)
           override def assetsApi: CommonAssetsApi =
-            CommonAssetsApi(() => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
+            CommonAssetsApi(() => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), rdb.db, blockchainUpdater)
         }
       }
 
@@ -299,9 +303,9 @@ object Importer extends ScorexLogging {
     val scheduler = Schedulers.singleThread("appender")
     val time      = new NTP(settings.ntpServer)
 
-    val db = openDB(settings.dbSettings)
+    val rdb = RDB.open(settings.dbSettings)
     val (blockchainUpdater, rocksDb) =
-      StorageFactory(settings, db, time, BlockchainUpdateTriggers.combined(triggers))
+      StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.combined(triggers))
     val pos         = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
     val extAppender = BlockAppender(blockchainUpdater, time, (_: Seq[Diff]) => {}, pos, scheduler, importOptions.verify, txSignParCheck = false) _
 
@@ -314,7 +318,7 @@ object Importer extends ScorexLogging {
         importOptions.format match {
           case Formats.Binary =>
             var result = 0L
-            db.iterateOver(KeyTags.BlockInfoAtHeight) { e =>
+            rdb.db.iterateOver(KeyTags.BlockInfoAtHeight) { e =>
               e.getKey match {
                 case Array(_, _, 0, 0, 0, 1) => // Skip genesis
                 case _ =>
@@ -371,8 +375,7 @@ object Importer extends ScorexLogging {
         Await.ready(Future.sequence(extensions.map(_.shutdown())), settings.extensionsShutdownTimeout)
 
         blockchainUpdater.shutdown()
-        rocksDb.close()
-        db.close()
+        rdb.close()
       }
       inputStream.close()
     }

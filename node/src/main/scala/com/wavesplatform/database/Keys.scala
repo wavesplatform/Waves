@@ -4,7 +4,7 @@ import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, OldTransactionMeta, TransactionMeta, BlockMeta as PBBlockMeta}
+import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, TransactionMeta, BlockMeta as PBBlockMeta}
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state
 import com.wavesplatform.state.*
@@ -55,13 +55,7 @@ object DataNode {
 
 object Keys {
   import KeyHelpers.*
-  import KeyTags.{
-    AddressId as AddressIdTag,
-    EthereumTransactionMeta as EthereumTransactionMetaTag,
-    InvokeScriptResult as InvokeScriptResultTag,
-    LeaseDetails as LeaseDetailsTag,
-    *
-  }
+  import KeyTags.{AddressId as AddressIdTag, EthereumTransactionMeta as EthereumTransactionMetaTag, InvokeScriptResult as InvokeScriptResultTag, LeaseDetails as LeaseDetailsTag, *}
 
   val version: Key[Int] = intKey(Version, default = 1)
   val height: Key[Height] =
@@ -161,12 +155,13 @@ object Keys {
       unsupported("Can not explicitly write block bytes")
     )
 
-  def transactionAt(height: Height, n: TxNum): Key[Option[(TxMeta, Transaction)]] =
+  def transactionAt(height: Height, n: TxNum, cfHandle: RDB.TxHandle): Key[Option[(TxMeta, Transaction)]] =
     Key.opt[(TxMeta, Transaction)](
       NthTransactionInfoAtHeight,
       hNum(height, n),
       readTransaction(height),
-      writeTransaction
+      writeTransaction,
+      Some(cfHandle.handle)
     )
 
   def addressTransactionSeqNr(addressId: AddressId): Key[Int] =
@@ -188,20 +183,13 @@ object Keys {
       oldWriteTransactionHNSeqAndType
     )
 
-  def transactionMetaById(txId: TransactionId): Key[Option[TransactionMeta]] =
+  def transactionMetaById(txId: TransactionId, cfh: RDB.TxMetaHandle): Key[Option[TransactionMeta]] =
     Key.opt(
       TransactionMetaById,
       txId.arr,
       TransactionMeta.parseFrom,
-      _.toByteArray
-    )
-
-  def oldTransactionMetaById(txId: TransactionId): Key[Option[OldTransactionMeta]] =
-    Key.opt(
-      TransactionMetaById,
-      txId.arr,
-      OldTransactionMeta.parseFrom,
-      _.toByteArray
+      _.toByteArray,
+      Some(cfh.handle)
     )
 
   def blockTransactionsFee(height: Int): Key[Long] =

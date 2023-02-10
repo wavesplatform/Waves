@@ -50,7 +50,7 @@ class InvokeAssetChecksTest extends PropSpec with Inside with WithState with DBC
       activated <- Seq(true, false)
       func      <- Seq("invalidLength", "unexisting")
     } {
-      tempDb { _ =>
+      {
         val miner       = TxHelpers.signer(0).toAddress
         val invoker     = TxHelpers.signer(1)
         val master      = TxHelpers.signer(2)

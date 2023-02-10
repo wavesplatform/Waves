@@ -8,7 +8,7 @@ import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.TransactionsOrdering
-import com.wavesplatform.database.{RocksDBWriter, TestStorageFactory, openDB}
+import com.wavesplatform.database.{RDB, RocksDBWriter, TestStorageFactory}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.UtxEvent
@@ -39,14 +39,13 @@ import com.wavesplatform.transaction.utils.Signed
 import com.wavesplatform.transaction.{Transaction, *}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool.PackStrategy
-import org.rocksdb.RocksDB
 import org.scalacheck.Gen.*
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
 import org.scalatest.concurrent.Eventually
-
 import java.nio.file.{Files, Path}
+
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration.*
 import scala.util.Random
@@ -54,11 +53,11 @@ import scala.util.Random
 private object UtxPoolSpecification {
   final case class TempDB(fs: FunctionalitySettings, dbSettings: DBSettings) {
     val path: Path            = Files.createTempDirectory("rocksdb-test")
-    val db: RocksDB           = openDB(dbSettings.copy(directory = path.toAbsolutePath.toString))
-    val writer: RocksDBWriter = TestRocksDB.withFunctionalitySettings(db, fs)
+    val rdb           = RDB.open(dbSettings.copy(directory = path.toAbsolutePath.toString))
+    val writer: RocksDBWriter = TestRocksDB.withFunctionalitySettings(rdb, fs)
 
     sys.addShutdownHook {
-      db.close()
+      rdb.close()
       TestHelpers.deleteRecursively(path)
     }
   }
@@ -92,7 +91,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
     )
 
     val dbContext = TempDB(settings.blockchainSettings.functionalitySettings, settings.dbSettings)
-    val (bcu, _)  = TestStorageFactory(settings, dbContext.db, new TestTime, ignoreBlockchainUpdateTriggers)
+    val (bcu, _)  = TestStorageFactory(settings, dbContext.rdb, new TestTime, ignoreBlockchainUpdateTriggers)
     bcu.processBlock(Block.genesis(genesisSettings, bcu.isFeatureActivated(BlockchainFeatures.RideV6)).explicitGet()) should beRight
     bcu
   }

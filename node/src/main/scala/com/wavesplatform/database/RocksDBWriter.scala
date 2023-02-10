@@ -1,11 +1,13 @@
 package com.wavesplatform.database
 
 import java.util
+
 import cats.data.Ior
 import cats.syntax.option.*
 import cats.syntax.semigroup.*
 import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
+import com.google.common.hash.{BloomFilter, Funnels}
 import com.google.common.primitives.Ints
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.WavesBalanceIterator
@@ -20,7 +22,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.PBAmounts
-import com.wavesplatform.settings.{BlockchainSettings, DBSettings, WavesSettings}
+import com.wavesplatform.settings.{BlockchainSettings, DBSettings}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.*
@@ -51,10 +53,6 @@ object RocksDBWriter extends ScorexLogging {
   private[database] def slice(v: Seq[Int], from: Int, to: Int): Seq[Int] = {
     val (c1, c2) = v.dropWhile(_ > to).partition(_ > from)
     c1 :+ c2.headOption.getOrElse(1)
-  }
-
-  private[database] def closest(v: Seq[Int], h: Int): Option[Int] = {
-    v.dropWhile(_ > h).headOption // Should we use binary search?
   }
 
   implicit class ReadOnlyDBExt(val db: ReadOnlyDB) extends AnyVal {
@@ -104,63 +102,17 @@ object RocksDBWriter extends ScorexLogging {
 
     recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty).toSeq
   }
-
-  def apply(db: RocksDB, settings: WavesSettings): RocksDBWriter & AutoCloseable = {
-    val expectedHeight = loadHeight(db)
-    def load(name: String, key: KeyTags.KeyTag): Option[BloomFilterImpl] = {
-      if (settings.dbSettings.useBloomFilter)
-        Some(BloomFilter.loadOrPopulate(db, settings.dbSettings.directory, name, expectedHeight, key, 100000000))
-      else
-        None
-    }
-
-    val _orderFilter        = load("orders", KeyTags.FilledVolumeAndFeeHistory)
-    val _dataKeyFilter      = load("account-data", KeyTags.DataHistory)
-    val _addressesKeyFilter = load("addresses", KeyTags.AddressId)
-    new RocksDBWriter(db, 200_000_000, settings.blockchainSettings, settings.dbSettings) with AutoCloseable {
-
-      override val dataKeyFilter: BloomFilter = _dataKeyFilter.getOrElse(BloomFilter.AlwaysEmpty)
-      override val addressFilter: BloomFilter = _addressesKeyFilter.getOrElse(BloomFilter.AlwaysEmpty)
-
-      override def close(): Unit = {
-        log.debug("Shutting down LevelDBWriter")
-        val lastHeight = RocksDBWriter.loadHeight(db)
-        _orderFilter.foreach(_.save(lastHeight))
-        _dataKeyFilter.foreach(_.save(lastHeight))
-        _addressesKeyFilter.foreach(_.save(lastHeight))
-      }
-    }
-  }
-
-  def readOnly(db: RocksDB, settings: WavesSettings): RocksDBWriter = {
-    val expectedHeight = loadHeight(db)
-    def loadFilter(filterName: String) =
-      if (settings.dbSettings.useBloomFilter)
-        BloomFilter
-          .tryLoad(db, filterName, settings.dbSettings.directory, expectedHeight)
-          .fold(_ => BloomFilter.AlwaysEmpty, gf => new Wrapper(gf))
-      else
-        BloomFilter.AlwaysEmpty
-
-    new RocksDBWriter(db, 200_000_000, settings.blockchainSettings, settings.dbSettings) {
-      override val dataKeyFilter: BloomFilter = loadFilter("account-data")
-      override val addressFilter: BloomFilter = loadFilter("addresses")
-    }
-  }
 }
 
 //noinspection UnstableApiUsage
-abstract class RocksDBWriter private[database] (
-    writableDB: RocksDB,
-    txFilterSize: Int,
+class RocksDBWriter(
+    rdb: RDB,
     val settings: BlockchainSettings,
     val dbSettings: DBSettings
-) extends Caches(txFilterSize) {
+) extends Caches {
+  import rdb.db as writableDB
 
   private[this] val log = LoggerFacade(LoggerFactory.getLogger(classOf[RocksDBWriter]))
-
-  def dataKeyFilter: BloomFilter
-  def addressFilter: BloomFilter
 
   private[this] var disabledAliases = writableDB.get(Keys.disabledAliases)
 
@@ -170,14 +122,10 @@ abstract class RocksDBWriter private[database] (
 
   private[this] def readWrite[A](f: RW => A): A = writableDB.readWrite(f)
 
-  private def loadWithFilter[A, R](filter: BloomFilter, key: Key[A])(f: A => Option[R]): Option[R] =
-    if (filter.mightContain(key.suffix)) {
-      f(writableDB.get(key))
-    } else None
-
   override protected def loadMaxAddressId(): Long = writableDB.get(Keys.lastAddressId).getOrElse(0L)
 
-  override protected def loadAddressId(address: Address): Option[AddressId] = loadWithFilter(addressFilter, Keys.addressId(address))(identity)
+  override protected def loadAddressId(address: Address): Option[AddressId] =
+    writableDB.get(Keys.addressId(address))
 
   override protected def loadAddressIds(addresses: Seq[Address]): Map[Address, Option[AddressId]] = readOnly { ro =>
     addresses.view.zip(ro.multiGetOpt(addresses.map(Keys.addressId), 8)).toMap
@@ -190,9 +138,8 @@ abstract class RocksDBWriter private[database] (
   override protected def loadBlockMeta(height: Height): Option[PBBlockMeta] =
     writableDB.get(Keys.blockMetaAt(height))
 
-  override protected def loadTxs(height: Height): Seq[Transaction] = readOnly { db =>
-    loadTransactions(height, db).map(_._2)
-  }
+  override protected def loadTxs(height: Height): Seq[Transaction] =
+    loadTransactions(height, rdb).map(_._2)
 
   override protected def loadScript(address: Address): Option[AccountScriptInfo] = readOnly { db =>
     addressId(address).fold(Option.empty[AccountScriptInfo]) { addressId =>
@@ -217,7 +164,7 @@ abstract class RocksDBWriter private[database] (
   override def carryFee: Long = writableDB.get(Keys.carryFee(height))
 
   override protected def loadAccountData(address: Address, key: String): CurrentData =
-    loadWithFilter(dataKeyFilter, Keys.data(address, key))(Some(_)).getOrElse(CurrentData.empty(key))
+    writableDB.get(Keys.data(address, key))
 
   override def hasData(address: Address): Boolean = {
     writableDB.readOnly { ro =>
@@ -399,13 +346,24 @@ abstract class RocksDBWriter private[database] (
       val kdh = Keys.data(address, key)
       rw.put(kdh, currentData)
       rw.put(Keys.dataAt(addressId, key)(height), dataNode)
-      dataKeyFilter.put(kdh.suffix)
     }
 
     changedKeys.asMap().forEach { (addressId, keys) =>
       rw.put(Keys.changedDataKeys(height, addressId), keys.asScala.toSeq)
     }
   }
+
+  // todo: instead of fixed-size block batches, store fixed-time batches
+  private val BlockStep  = 200
+  private def mkFilter() = BloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), BlockStep * 10000, 0.01f)
+
+  private var bf0 = mkFilter()
+  private var bf1 = mkFilter()
+
+  override def containsTransaction(tx: Transaction): Boolean =
+    (bf0.mightContain(tx.id().arr) || bf1.mightContain(tx.id().arr)) && {
+      writableDB.get(Keys.transactionMetaById(TransactionId(tx.id()), rdb.txMetaHandle)).isDefined
+    }
 
   // noinspection ScalaStyle
   override protected def doAppend(
@@ -458,7 +416,6 @@ abstract class RocksDBWriter private[database] (
         val kaid = Keys.addressId(address)
         rw.put(kaid, Some(id))
         rw.put(Keys.idToAddress(id), address)
-        addressFilter.put(kaid.suffix)
       }
 
       val threshold = newSafeRollbackHeight
@@ -518,9 +475,22 @@ abstract class RocksDBWriter private[database] (
         if (script.isDefined) rw.put(Keys.assetScript(asset)(height), script)
       }
 
+      if (height % BlockStep == 1) {
+        if ((height / BlockStep) % 2 == 0) {
+          bf0 = mkFilter()
+        } else {
+          bf1 = mkFilter()
+        }
+      }
+
+      val targetBf = if ((height / BlockStep) % 2 == 0) bf0 else bf1
+
       val txSizes = transactions.map { case (id, (txm, tx, num)) =>
-        val size = rw.put(Keys.transactionAt(Height(height), num), Some((txm, tx)))
-        rw.put(Keys.transactionMetaById(id), Some(TransactionMeta(height, num, tx.tpe.id, !txm.succeeded, 0, size)))
+        val size = rw.put(Keys.transactionAt(Height(height), num, rdb.txHandle), Some((txm, tx)))
+
+        targetBf.put(tx.id().arr)
+
+        rw.put(Keys.transactionMetaById(id, rdb.txMetaHandle), Some(TransactionMeta(height, num, tx.tpe.id, !txm.succeeded, 0, size)))
         id -> size
       }
 
@@ -583,7 +553,7 @@ abstract class RocksDBWriter private[database] (
         val (txHeight, txNum) = transactions
           .get(TransactionId(txId))
           .map { case (_, _, txNum) => (height, txNum) }
-          .orElse(rw.get(Keys.transactionMetaById(TransactionId(txId))).map { tm =>
+          .orElse(rw.get(Keys.transactionMetaById(TransactionId(txId), rdb.txMetaHandle)).map { tm =>
             (tm.height, TxNum(tm.num.toShort))
           })
           .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction height and num: $txId"))
@@ -699,7 +669,7 @@ abstract class RocksDBWriter private[database] (
 
           rollbackAssetsInfo(rw, currentHeight)
 
-          val blockTxs = loadTransactions(currentHeight, rw)
+          val blockTxs = loadTransactions(currentHeight, rdb)
           blockTxs.view.zipWithIndex.foreach { case ((_, tx), idx) =>
             val num = TxNum(idx.toShort)
             (tx: @unchecked) match {
@@ -742,8 +712,8 @@ abstract class RocksDBWriter private[database] (
             }
 
             if (tx.tpe != TransactionType.Genesis) {
-              rw.delete(Keys.transactionAt(currentHeight, num))
-              rw.delete(Keys.transactionMetaById(TransactionId(tx.id())))
+              rw.delete(Keys.transactionAt(currentHeight, num, rdb.txHandle))
+              rw.delete(Keys.transactionMetaById(TransactionId(tx.id()), rdb.txMetaHandle))
             }
           }
 
@@ -862,10 +832,10 @@ abstract class RocksDBWriter private[database] (
 
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] = readOnly { db =>
     for {
-      tm <- db.get(Keys.transactionMetaById(TransactionId @@ id))
+      tm <- db.get(Keys.transactionMetaById(TransactionId @@ id, rdb.txMetaHandle))
       if tm.`type` == TransferTransaction.typeId || tm.`type` == TransactionType.Ethereum.id
       tx <- db
-        .get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort)))
+        .get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort), rdb.txHandle))
         .collect {
           case (tm, t: TransferTransaction) if tm.succeeded => t
           case (m, e @ EthereumTransaction(_: Transfer, _, _, _)) if m.succeeded =>
@@ -881,10 +851,10 @@ abstract class RocksDBWriter private[database] (
   override def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)] = readOnly(transactionInfo(id, _))
 
   override def transactionInfos(ids: Seq[ByteStr]): Seq[Option[(TxMeta, Transaction)]] = readOnly { db =>
-    val tms = db.multiGetOpt(ids.map(id => Keys.transactionMetaById(TransactionId(id))), 36)
+    val tms = db.multiGetOpt(ids.map(id => Keys.transactionMetaById(TransactionId(id), rdb.txMetaHandle)), 36)
     val (keys, sizes) = tms.map {
-      case Some(tm) => Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort)) -> tm.size
-      case None     => Keys.transactionAt(Height(0), TxNum(0.toShort))              -> 0
+      case Some(tm) => Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort), rdb.txHandle) -> tm.size
+      case None     => Keys.transactionAt(Height(0), TxNum(0.toShort), rdb.txHandle)              -> 0
     }.unzip
 
     db.multiGetOpt(keys, sizes)
@@ -892,12 +862,12 @@ abstract class RocksDBWriter private[database] (
 
   protected def transactionInfo(id: ByteStr, db: ReadOnlyDB): Option[(TxMeta, Transaction)] =
     for {
-      tm        <- db.get(Keys.transactionMetaById(TransactionId(id)))
-      (txm, tx) <- db.get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort)))
+      tm        <- db.get(Keys.transactionMetaById(TransactionId(id), rdb.txMetaHandle))
+      (txm, tx) <- db.get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort), rdb.txHandle))
     } yield (txm, tx)
 
-  override def transactionMeta(id: ByteStr): Option[TxMeta] = readOnly { db =>
-    db.get(Keys.transactionMetaById(TransactionId(id))).map { tm =>
+  override def transactionMeta(id: ByteStr): Option[TxMeta] = {
+    writableDB.get(Keys.transactionMetaById(TransactionId(id), rdb.txMetaHandle)).map { tm =>
       TxMeta(Height(tm.height), !tm.failed, tm.spentComplexity)
     }
   }

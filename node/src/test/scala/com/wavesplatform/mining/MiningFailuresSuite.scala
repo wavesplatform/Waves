@@ -1,7 +1,7 @@
 package com.wavesplatform.mining
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.WithDB
+import com.wavesplatform.WithNewDBForEachTest
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -23,7 +23,7 @@ import monix.execution.Scheduler.Implicits.global
 import monix.reactive.Observable
 import org.scalamock.scalatest.PathMockFactory
 
-class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithDB {
+class MiningFailuresSuite extends FlatSpec with PathMockFactory with WithNewDBForEachTest {
   trait BlockchainUpdaterNG extends Blockchain with BlockchainUpdater with NG
 
   behavior of "Miner"

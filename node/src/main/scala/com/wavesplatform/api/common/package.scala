@@ -3,7 +3,7 @@ package com.wavesplatform.api
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.{AddressId, DBExt, Keys}
+import com.wavesplatform.database.{AddressId, DBExt, Keys, RDB}
 import com.wavesplatform.state.{Diff, Height, Portfolio, TxMeta}
 import com.wavesplatform.transaction.{CreateAliasTransaction, Transaction, TransactionType}
 import monix.eval.Task
@@ -17,23 +17,23 @@ package object common {
   import BalanceDistribution.*
 
   def addressTransactions(
-      db: RocksDB,
+      rdb: RDB,
       maybeDiff: Option[(Height, Diff)],
       subject: Address,
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
   ): Observable[TransactionMeta] =
-    allAddressTransactions(db, maybeDiff, subject, sender, types, fromId).map { case (m, transaction, txNumOpt) =>
+    allAddressTransactions(rdb, maybeDiff, subject, sender, types, fromId).map { case (m, transaction, txNumOpt) =>
       def loadISR(t: Transaction) =
         maybeDiff
           .flatMap { case (_, diff) => diff.scriptResults.get(t.id()) }
-          .orElse(txNumOpt.flatMap(loadInvokeScriptResult(db, m.height, _)))
+          .orElse(txNumOpt.flatMap(loadInvokeScriptResult(rdb.db, m.height, _)))
 
       def loadETM(t: Transaction) =
         maybeDiff
           .flatMap { case (_, diff) => diff.ethereumTransactionMeta.get(t.id()) }
-          .orElse(txNumOpt.flatMap(loadEthereumMetadata(db, m.height, _)))
+          .orElse(txNumOpt.flatMap(loadEthereumMetadata(rdb.db, m.height, _)))
 
       TransactionMeta.create(
         m.height,
@@ -64,15 +64,21 @@ package object common {
         Observable.fromIterator(Task(new BalanceIterator(resource, globalPrefix, addressId, balanceOf, height, overrides).asScala.filter(_._2 > 0)))
       }
 
-  def aliasesOfAddress(db: RocksDB, maybeDiff: => Option[(Height, Diff)], address: Address): Observable[(Height, CreateAliasTransaction)] = {
-    val disabledAliases = db.get(Keys.disabledAliases)
-    addressTransactions(db, maybeDiff, address, Some(address), Set(TransactionType.CreateAlias), None)
+  def aliasesOfAddress(
+      rdb: RDB,
+      maybeDiff: => Option[(Height, Diff)],
+      address: Address
+  ): Observable[(Height, CreateAliasTransaction)] = {
+    val disabledAliases = rdb.db.get(Keys.disabledAliases)
+    addressTransactions(rdb, maybeDiff, address, Some(address), Set(TransactionType.CreateAlias), None)
       .collect {
         case TransactionMeta(height, cat: CreateAliasTransaction, true) if disabledAliases.isEmpty || !disabledAliases(cat.alias) => height -> cat
       }
   }
 
-  def loadTransactionMeta(db: RocksDB, maybeDiff: => Option[(Int, Diff)])(tuple: (TxMeta, Transaction)): TransactionMeta = {
+  def loadTransactionMeta(rdb: RDB, maybeDiff: => Option[(Int, Diff)])(
+      tuple: (TxMeta, Transaction)
+  ): TransactionMeta = {
     val (meta, transaction) = tuple
     TransactionMeta.create(
       meta.height,
@@ -82,11 +88,11 @@ package object common {
       ist =>
         maybeDiff
           .flatMap { case (_, diff) => diff.scriptResults.get(ist.id()) }
-          .orElse(loadInvokeScriptResult(db, ist.id())),
+          .orElse(loadInvokeScriptResult(rdb.db, rdb.txMetaHandle, ist.id())),
       et =>
         maybeDiff
           .flatMap { case (_, diff) => diff.ethereumTransactionMeta.get(et.id()) }
-          .orElse(loadEthereumMetadata(db, et.id()))
+          .orElse(loadEthereumMetadata(rdb.db, rdb.txMetaHandle, et.id()))
     )
   }
 }

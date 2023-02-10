@@ -1,17 +1,15 @@
 package com.wavesplatform
 
-import java.io.File
 import java.nio.ByteBuffer
 import java.util
-import java.util.{Collections, Map as JMap}
+import java.util.Map as JMap
 
 import com.google.common.base.Charsets.UTF_8
-import com.google.common.collect.Maps
+import com.google.common.collect.{Interners, Maps}
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.google.protobuf.ByteString
-import com.typesafe.scalalogging.Logger
 import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.block.validation.Validators
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -21,11 +19,10 @@ import com.wavesplatform.crypto.*
 import com.wavesplatform.database.protobuf as pb
 import com.wavesplatform.database.protobuf.DataEntry.Value
 import com.wavesplatform.database.protobuf.TransactionData.Transaction as TD
-import com.wavesplatform.lang.script.{Script, ScriptReader}
+import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
-import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.reader.LeaseDetails
@@ -43,8 +40,7 @@ import com.wavesplatform.transaction.{
 import com.wavesplatform.utils.*
 import monix.eval.Task
 import monix.reactive.Observable
-import org.rocksdb.{BloomFilter as RBloomFilter, *}
-import org.slf4j.LoggerFactory
+import org.rocksdb.*
 import sun.nio.ch.Util
 import supertagged.TaggedType
 
@@ -56,78 +52,15 @@ import scala.util.Using
 
 //noinspection UnstableApiUsage
 package object database {
-  private lazy val logger: Logger = Logger(LoggerFactory.getLogger(getClass.getName))
-
-  def openDB(settings: DBSettings): RocksDB = {
-    logger.debug(s"Open DB at ${settings.directory}")
-    val file = new File(settings.directory)
-    val options = new DBOptions()
-      .setStatistics(new Statistics())
-      .setStatsDumpPeriodSec(300)
-      .setCreateIfMissing(true)
-      .setParanoidChecks(true)
-      .setIncreaseParallelism(4)
-      .setBytesPerSync(2 << 20)
-      .setMaxBackgroundJobs(4)
-
-    val cfo = new ColumnFamilyOptions()
-      .setTableFormatConfig(
-        new BlockBasedTableConfig()
-          .setFilterPolicy(new RBloomFilter())
-          .setOptimizeFiltersForMemory(true)
-          .setCacheIndexAndFilterBlocks(true)
-          .setPinL0FilterAndIndexBlocksInCache(true)
-          .setFormatVersion(5)
-          .setBlockSize(16 << 10)
-          .setChecksumType(ChecksumType.kNoChecksum)
-          .setBlockCache(new LRUCache(512 << 20, -1, false, 0.6))
-          .setCacheIndexAndFilterBlocksWithHighPriority(true)
-          .setDataBlockIndexType(DataBlockIndexType.kDataBlockBinaryAndHash)
-          .setDataBlockHashTableUtilRatio(0.5)
-      )
-      .setWriteBufferSize(128 << 20)
-      .setLevelCompactionDynamicLevelBytes(true)
-      .useCappedPrefixExtractor(10)
-      .setMemtablePrefixBloomSizeRatio(0.25)
-      .setCompressionType(CompressionType.LZ4_COMPRESSION)
-
-    file.getAbsoluteFile.getParentFile.mkdirs()
-
-    RocksDB.open(
-      options,
-      settings.directory,
-      Collections.singletonList(new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfo)),
-      new util.ArrayList[ColumnFamilyHandle]()
-    )
-  }
-
   final type DBEntry = JMap.Entry[Array[Byte], Array[Byte]]
 
   implicit class ByteArrayDataOutputExt(val output: ByteArrayDataOutput) extends AnyVal {
     def writeByteStr(s: ByteStr): Unit = {
       output.write(s.arr)
     }
-
-    def writeScriptOption(v: Option[Script]): Unit = {
-      output.writeBoolean(v.isDefined)
-      v.foreach { s =>
-        val b = s.bytes().arr
-        output.writeShort(b.length)
-        output.write(b)
-      }
-    }
   }
 
   implicit class ByteArrayDataInputExt(val input: ByteArrayDataInput) extends AnyVal {
-    def readScriptOption(): Option[Script] = {
-      if (input.readBoolean()) {
-        val len = input.readShort()
-        val b   = new Array[Byte](len)
-        input.readFully(b)
-        Some(ScriptReader.fromBytes(b).explicitGet())
-      } else None
-    }
-
     def readBytes(len: Int): Array[Byte] = {
       val arr = new Array[Byte](len)
       input.readFully(arr)
@@ -137,9 +70,6 @@ package object database {
     def readByteStr(len: Int): ByteStr = {
       ByteStr(readBytes(len))
     }
-
-    def readSignature: ByteStr   = readByteStr(SignatureLength)
-    def readPublicKey: PublicKey = PublicKey(readBytes(KeyLength))
   }
 
   def writeIntSeq(values: Seq[Int]): Array[Byte] = {
@@ -149,19 +79,6 @@ package object database {
   def readIntSeq(data: Array[Byte]): Seq[Int] = Option(data).fold(Seq.empty[Int]) { d =>
     val in = ByteBuffer.wrap(data)
     Seq.fill(d.length / 4)(in.getInt)
-  }
-
-  def writeTupleIntSeq(values: Seq[(Int, Int)]): Array[Byte] = {
-    values
-      .foldLeft(ByteBuffer.allocate((4 + 4) * values.length)) { case (buf, (first, second)) =>
-        buf.putInt(first).putInt(second)
-      }
-      .array()
-  }
-
-  def readTupleIntSeq(data: Array[Byte]): Seq[(Int, Int)] = Option(data).fold(Seq.empty[(Int, Int)]) { d =>
-    val in = ByteBuffer.wrap(data)
-    Seq.fill(d.length / (4 + 4))(in.getInt -> in.getInt)
   }
 
   def readAddressIds(data: Array[Byte]): Seq[AddressId] = Option(data).fold(Seq.empty[AddressId]) { d =>
@@ -185,32 +102,6 @@ package object database {
 
   def writeAssetIds(values: Seq[ByteStr]): Array[Byte] =
     values.foldLeft(ByteBuffer.allocate(values.length * transaction.AssetIdLength)) { case (buf, ai) => buf.put(ai.arr) }.array()
-
-  def readTxIds(data: Array[Byte]): List[ByteStr] = Option(data).fold(List.empty[ByteStr]) { d =>
-    val b   = ByteBuffer.wrap(d)
-    val ids = List.newBuilder[ByteStr]
-
-    while (b.remaining() > 0) {
-      val buffer = (b.get(): @unchecked) match {
-        case crypto.DigestLength    => new Array[Byte](crypto.DigestLength)
-        case crypto.SignatureLength => new Array[Byte](crypto.SignatureLength)
-      }
-      b.get(buffer)
-      ids += ByteStr(buffer)
-    }
-
-    ids.result()
-  }
-
-  def writeTxIds(ids: Seq[ByteStr]): Array[Byte] =
-    ids
-      .foldLeft(ByteBuffer.allocate(ids.map(_.arr.length + 1).sum)) { case (b, id) =>
-        b.put((id.arr.length: @unchecked) match {
-          case crypto.DigestLength    => crypto.DigestLength.toByte
-          case crypto.SignatureLength => crypto.SignatureLength.toByte
-        }).put(id.arr)
-      }
-      .array()
 
   def readStrings(data: Array[Byte]): Seq[String] = Option(data).fold(Seq.empty[String]) { _ =>
     var i = 0
@@ -312,33 +203,6 @@ package object database {
 
   def writeVolumeAndFee(vf: CurrentVolumeAndFee): Array[Byte] =
     Longs.toByteArray(vf.volume) ++ Longs.toByteArray(vf.fee) ++ Ints.toByteArray(vf.height) ++ Ints.toByteArray(vf.prevHeight)
-
-  def readTransactionInfo(data: Array[Byte]): (Int, Transaction) =
-    (Ints.fromByteArray(data), TransactionParsers.parseBytes(data.drop(4)).get)
-
-  def readTransactionHeight(data: Array[Byte]): Int = Ints.fromByteArray(data)
-
-  def readTransactionIds(data: Array[Byte]): Seq[(Int, ByteStr)] = Option(data).fold(Seq.empty[(Int, ByteStr)]) { d =>
-    val b   = ByteBuffer.wrap(d)
-    val ids = Seq.newBuilder[(Int, ByteStr)]
-    while (b.hasRemaining) {
-      ids += b.get.toInt -> {
-        val buf = new Array[Byte](b.get)
-        b.get(buf)
-        ByteStr(buf)
-      }
-    }
-    ids.result()
-  }
-
-  def writeTransactionIds(ids: Seq[(Int, ByteStr)]): Array[Byte] = {
-    val size   = ids.foldLeft(0) { case (prev, (_, id)) => prev + 2 + id.arr.length }
-    val buffer = ByteBuffer.allocate(size)
-    for ((typeId, id) <- ids) {
-      buffer.put(typeId.toByte).put(id.arr.length.toByte).put(id.arr)
-    }
-    buffer.array()
-  }
 
   def readFeatureMap(data: Array[Byte]): Map[Short, Int] = Option(data).fold(Map.empty[Short, Int]) { _ =>
     val b        = ByteBuffer.wrap(data)
@@ -505,7 +369,7 @@ package object database {
     ndo.toByteArray
   }
 
-  def readDataEntry(key: String)(bs: Array[Byte]): DataEntry[?] =
+  private def readDataEntry(key: String)(bs: Array[Byte]): DataEntry[?] =
     pb.DataEntry.parseFrom(bs).value match {
       case Value.Empty              => EmptyDataEntry(key)
       case Value.IntValue(value)    => IntegerDataEntry(key, value)
@@ -514,7 +378,7 @@ package object database {
       case Value.StringValue(value) => StringDataEntry(key, value)
     }
 
-  def writeDataEntry(e: DataEntry[?]): Array[Byte] =
+  private def writeDataEntry(e: DataEntry[?]): Array[Byte] =
     pb.DataEntry(e match {
       case IntegerDataEntry(_, value) => pb.DataEntry.Value.IntValue(value)
       case BooleanDataEntry(_, value) => pb.DataEntry.Value.BoolValue(value)
@@ -555,17 +419,7 @@ package object database {
   def writeBalanceNode(balance: BalanceNode): Array[Byte] =
     Longs.toByteArray(balance.balance) ++ Ints.toByteArray(balance.prevHeight)
 
-  implicit class EntryExt(val e: JMap.Entry[Array[Byte], Array[Byte]]) extends AnyVal {
-    import com.wavesplatform.crypto.DigestLength
-    def extractId(offset: Int = 2, length: Int = DigestLength): ByteStr = {
-      val id = ByteStr(new Array[Byte](length))
-      Array.copy(e.getKey, offset, id.arr, 0, length)
-      id
-    }
-  }
-
   implicit class DBExt(val db: RocksDB) extends AnyVal {
-    import scala.jdk.FunctionConverters.*
 
     def readOnly[A](f: ReadOnlyDB => A): A = {
       Using.resource(db.getSnapshot) { s =>
@@ -585,7 +439,7 @@ package object database {
       val rw          = new RW(db, readOptions, batch)
       try {
         val r = f(rw)
-        db.write(new WriteOptions().setSync(false), batch)
+        db.write(new WriteOptions().setSync(false).setDisableWAL(true), batch)
         r
       } finally {
         batch.close()
@@ -665,13 +519,15 @@ package object database {
       result
     }
 
-    def get[A](key: Key[A]): A                           = key.parse(db.get(key.keyBytes))
+    def get[A](key: Key[A]): A = key.parse(db.get(key.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily), key.keyBytes))
     def get[A](key: Key[A], readOptions: ReadOptions): A = key.parse(db.get(readOptions, key.keyBytes))
     def has(key: Key[?]): Boolean                        = db.get(key.keyBytes) != null
 
     def iterateOver(tag: KeyTags.KeyTag)(f: DBEntry => Unit): Unit = iterateOver(tag.prefixBytes)(f)
 
-    def iterateOver(prefix: Array[Byte], seekPrefix: Array[Byte] = Array.emptyByteArray)(f: DBEntry => Unit): Unit = {
+    def iterateOver(prefix: Array[Byte], seekPrefix: Array[Byte] = Array.emptyByteArray, cfh: Option[ColumnFamilyHandle] = None)(
+        f: DBEntry => Unit
+    ): Unit = {
       @tailrec
       def loop(iter: RocksIterator): Unit = {
         if (iter.isValid && iter.key().startsWith(prefix)) {
@@ -681,7 +537,7 @@ package object database {
         } else ()
       }
 
-      val iterator = db.newIterator(new ReadOptions().setTotalOrderSeek(true))
+      val iterator = db.newIterator(cfh.getOrElse(db.getDefaultColumnFamily), new ReadOptions().setTotalOrderSeek(true))
       try {
         iterator.seek(Bytes.concat(prefix, seekPrefix))
         loop(iterator)
@@ -792,15 +648,19 @@ package object database {
       )
     )
 
+  private val scriptInterner = Interners.newWeakInterner[AccountScriptInfo]()
+
   def readAccountScriptInfo(b: Array[Byte]): AccountScriptInfo = {
     val asi = pb.AccountScriptInfo.parseFrom(b)
-    AccountScriptInfo(
-      PublicKey(asi.publicKey.toByteArray),
-      ScriptReader.fromBytes(asi.scriptBytes.toByteArray).explicitGet(),
-      asi.maxComplexity,
-      asi.callableComplexity.map { c =>
-        c.version -> c.callableComplexity
-      }.toMap
+    scriptInterner.intern(
+      AccountScriptInfo(
+        PublicKey(asi.publicKey.toByteArray),
+        ScriptReader.fromBytes(asi.scriptBytes.toByteArray).explicitGet(),
+        asi.maxComplexity,
+        asi.callableComplexity.map { c =>
+          c.version -> c.callableComplexity
+        }.toMap
+      )
     )
   }
 
@@ -826,18 +686,18 @@ package object database {
     pb.TransactionData(ptx, !m.succeeded, m.spentComplexity).toByteArray
   }
 
-  def loadTransactions(height: Height, db: ReadOnlyDB): Seq[(TxMeta, Transaction)] = {
+  def loadTransactions(height: Height, rdb: RDB): Seq[(TxMeta, Transaction)] = {
     val transactions = Seq.newBuilder[(TxMeta, Transaction)]
-    db.iterateOver(KeyTags.NthTransactionInfoAtHeight.prefixBytes ++ Ints.toByteArray(height)) { e =>
+    rdb.db.iterateOver(KeyTags.NthTransactionInfoAtHeight.prefixBytes ++ Ints.toByteArray(height), cfh = Some(rdb.txHandle.handle)) { e =>
       transactions += readTransaction(height)(e.getValue)
     }
     transactions.result()
   }
 
-  def loadBlock(height: Height, db: ReadOnlyDB): Option[Block] =
+  def loadBlock(height: Height, rdb: RDB): Option[Block] =
     for {
-      meta  <- db.get(Keys.blockMetaAt(height))
-      block <- createBlock(PBBlocks.vanilla(meta.getHeader), meta.signature.toByteStr, loadTransactions(height, db).map(_._2)).toOption
+      meta  <- rdb.db.get(Keys.blockMetaAt(height))
+      block <- createBlock(PBBlocks.vanilla(meta.getHeader), meta.signature.toByteStr, loadTransactions(height, rdb).map(_._2)).toOption
     } yield block
 
   def fromHistory[A](resource: DBResource, historyKey: Key[Seq[Int]], valueKey: Int => Key[A]): Option[A] =
@@ -865,13 +725,13 @@ package object database {
       staticInfo.nft
     )
 
-  def loadActiveLeases(db: RocksDB, fromHeight: Int, toHeight: Int): Seq[LeaseTransaction] = db.withResource { r =>
+  def loadActiveLeases(rdb: RDB, fromHeight: Int, toHeight: Int): Seq[LeaseTransaction] = rdb.db.withResource { r =>
     (for {
       id      <- loadLeaseIds(r, fromHeight, toHeight, includeCancelled = false)
       details <- fromHistory(r, Keys.leaseDetailsHistory(id), Keys.leaseDetails(id))
       if details.exists(_.fold(identity, _.isActive))
-      tm <- r.get(Keys.transactionMetaById(TransactionId(id)))
-      tx <- r.get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort)))
+      tm <- r.get(Keys.transactionMetaById(TransactionId(id), rdb.txMetaHandle))
+      tx <- r.get(Keys.transactionAt(Height(tm.height), TxNum(tm.num.toShort), rdb.txHandle))
     } yield tx).collect {
       case (ltm, lt: LeaseTransaction) if ltm.succeeded => lt
     }.toSeq

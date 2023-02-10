@@ -2,16 +2,13 @@ package com.wavesplatform.utils.generator
 
 import java.io.{File, FileOutputStream, PrintWriter}
 import java.util.concurrent.TimeUnit
-import scala.collection.mutable.ArrayBuffer
-import scala.concurrent.duration.*
-import scala.language.reflectiveCalls
+
 import cats.implicits.*
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions}
-import com.wavesplatform.{GenesisBlockGenerator, Version}
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.database.openDB
+import com.wavesplatform.database.RDB
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
@@ -22,12 +19,17 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.{Schedulers, ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.{GenesisBlockGenerator, Version}
 import io.netty.channel.group.DefaultChannelGroup
 import monix.reactive.subjects.ConcurrentSubject
 import net.ceedubs.ficus.Ficus.*
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import play.api.libs.json.Json
 import scopt.OParser
+
+import scala.collection.mutable.ArrayBuffer
+import scala.concurrent.duration.*
+import scala.language.reflectiveCalls
 
 object BlockchainGeneratorApp extends ScorexLogging {
   final case class BlockchainGeneratorAppSettings(
@@ -115,14 +117,13 @@ object BlockchainGeneratorApp extends ScorexLogging {
     }
 
     val blockchain = {
-      val db = openDB(wavesSettings.dbSettings)
+      val rdb = RDB.open(wavesSettings.dbSettings)
       val (blockchainUpdater, rocksdb) =
-        StorageFactory(wavesSettings, db, fakeTime, BlockchainUpdateTriggers.noop)
+        StorageFactory(wavesSettings, rdb, fakeTime, BlockchainUpdateTriggers.noop)
       com.wavesplatform.checkGenesis(wavesSettings, blockchainUpdater, Miner.Disabled)
       sys.addShutdownHook(synchronized {
         blockchainUpdater.shutdown()
-        rocksdb.close()
-        db.close()
+        rdb.close()
       })
       blockchainUpdater
     }

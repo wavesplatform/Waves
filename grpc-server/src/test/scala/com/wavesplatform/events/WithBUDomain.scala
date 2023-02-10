@@ -18,7 +18,7 @@ import org.scalatest.Suite
 trait WithBUDomain extends WithDomain { _: Suite =>
   def withDomainAndRepo(settings: WavesSettings)(f: (Domain, Repo) => Unit, wrapDB: RocksDB => RocksDB = identity): Unit = {
     withDomain(settings) { d =>
-      tempDb { db =>
+      tempDb { (db, _) =>
         val repo = new Repo(wrapDB(db), d.blocksApi)
         d.triggers = Seq(repo)
         try f(d, repo)
@@ -29,7 +29,7 @@ trait WithBUDomain extends WithDomain { _: Suite =>
 
   def withManualHandle(settings: WavesSettings, setSendUpdate: (() => Unit) => Unit)(f: (Domain, Repo) => Unit): Unit =
     withDomain(settings) { d =>
-      tempDb { db =>
+      tempDb { (db, _) =>
         val repo = new Repo(db, d.blocksApi) {
           override def newHandler(
               id: String,

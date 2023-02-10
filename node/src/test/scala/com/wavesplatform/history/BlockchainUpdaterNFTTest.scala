@@ -90,7 +90,7 @@ class BlockchainUpdaterNFTTest extends PropSpec with DomainScenarioDrivenPropert
           d.nftList(secondAccount) shouldBe Nil
 
           val persistedNfts = Seq.newBuilder[IssuedAsset]
-          d.db.readOnly { ro =>
+          d.rdb.db.readOnly { ro =>
             val addressId = ro.get(Keys.addressId(firstAccount)).get
             ro.iterateOver(KeyTags.NftPossession.prefixBytes ++ addressId.toByteArray) { e =>
               persistedNfts += IssuedAsset(ByteStr(e.getKey.takeRight(32)))

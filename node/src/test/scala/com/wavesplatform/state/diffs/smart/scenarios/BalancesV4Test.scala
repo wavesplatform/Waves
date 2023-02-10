@@ -96,7 +96,7 @@ class BalancesV4Test extends PropSpec with WithState {
       rideV4Activated
     ) { case (d, s) =>
       val apiBalance =
-        com.wavesplatform.api.common.CommonAccountsApi(() => CompositeBlockchain(s, d), db, s).balanceDetails(acc1.toAddress).explicitGet()
+        com.wavesplatform.api.common.CommonAccountsApi(() => CompositeBlockchain(s, d), rdb, s).balanceDetails(acc1.toAddress).explicitGet()
       val data = d.accountData(dapp.toAddress)
       data("available") shouldBe IntegerDataEntry("available", apiBalance.available)
       apiBalance.available shouldBe 16 * Constants.UnitsInWave

@@ -1,6 +1,6 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.database.{DBExt, Keys, RocksDBWriter, loadActiveLeases}
+import com.wavesplatform.database.{DBExt, Keys, RDB, RocksDBWriter, loadActiveLeases}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings.WavesSettings
@@ -13,19 +13,19 @@ object StorageFactory extends ScorexLogging {
 
   def apply(
       settings: WavesSettings,
-      db: RocksDB,
+      rdb: RDB,
       time: Time,
       blockchainUpdateTriggers: BlockchainUpdateTriggers,
       miner: Miner = _ => ()
-  ): (BlockchainUpdaterImpl, RocksDBWriter & AutoCloseable) = {
-    checkVersion(db)
-    val rocksDBWriter = RocksDBWriter(db, settings)
+  ): (BlockchainUpdaterImpl, RocksDBWriter) = {
+    checkVersion(rdb.db)
+    val rocksDBWriter = new RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings)
     val bui = new BlockchainUpdaterImpl(
       rocksDBWriter,
       settings,
       time,
       blockchainUpdateTriggers,
-      (minHeight, maxHeight) => loadActiveLeases(db, minHeight, maxHeight),
+      (minHeight, maxHeight) => loadActiveLeases(rdb, minHeight, maxHeight),
       miner
     )
     (bui, rocksDBWriter)

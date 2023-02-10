@@ -32,7 +32,8 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
   )
 
   private[this] val settings = context.settings.config.as[BlockchainUpdatesSettings]("waves.blockchain-updates")
-  private[this] val db       = openDB(context.settings.dbSettings.copy(directory = context.settings.directory + "/blockchain-updates"))
+  // todo: no need to open column families here
+  private[this] val (db, cfhs) = openDB(context.settings.dbSettings.copy(directory = context.settings.directory + "/blockchain-updates"))
   private[this] val repo     = new Repo(db, context.blocksApi)
 
   private[this] val grpcServer: Server = NettyServerBuilder
@@ -88,6 +89,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
 
       scheduler.shutdown()
       scheduler.awaitTermination(10 seconds)
+      cfhs.forEach(_.close())
       repo.shutdown()
     }(Scheduler.global)
 

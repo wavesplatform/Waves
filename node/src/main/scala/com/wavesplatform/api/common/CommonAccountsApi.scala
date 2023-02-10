@@ -1,5 +1,7 @@
 package com.wavesplatform.api.common
 
+import java.util.regex.Pattern
+
 import com.google.common.base.Charsets
 import com.google.common.collect.AbstractIterator
 import com.wavesplatform.account.{Address, Alias}
@@ -7,7 +9,7 @@ import com.wavesplatform.api.common.AddressPortfolio.{assetBalanceIterator, nftI
 import com.wavesplatform.api.common.TransactionMeta.Ethereum
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{DBExt, DBResource, KeyTags, Keys}
+import com.wavesplatform.database.{DBExt, DBResource, KeyTags, Keys, RDB}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBRecipients
@@ -22,8 +24,6 @@ import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.{EthereumTransaction, TransactionType}
 import monix.eval.Task
 import monix.reactive.Observable
-import org.rocksdb.RocksDB
-import java.util.regex.Pattern
 
 import scala.jdk.CollectionConverters.*
 
@@ -56,12 +56,13 @@ trait CommonAccountsApi {
 }
 
 object CommonAccountsApi {
-  def includeNft(blockchain: Blockchain)(assetId: IssuedAsset): Boolean =
-    !blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee) || !blockchain.assetDescription(assetId).exists(_.nft)
-
   final case class BalanceDetails(regular: Long, generating: Long, available: Long, effective: Long, leaseIn: Long, leaseOut: Long)
 
-  def apply(compositeBlockchain: () => CompositeBlockchain, db: RocksDB, blockchain: Blockchain): CommonAccountsApi = new CommonAccountsApi {
+  def apply(
+      compositeBlockchain: () => CompositeBlockchain,
+      rdb: RDB,
+      blockchain: Blockchain
+  ): CommonAccountsApi = new CommonAccountsApi {
 
     override def balance(address: Address, confirmations: Int = 0): Long =
       blockchain.balance(address, blockchain.height, confirmations)
@@ -92,14 +93,14 @@ object CommonAccountsApi {
       def includeNft(assetId: IssuedAsset): Boolean =
         featureNotActivated || !compBlockchain.assetDescription(assetId).exists(_.nft)
 
-      db.resourceObservable.flatMap { resource =>
+      rdb.db.resourceObservable.flatMap { resource =>
         Observable
           .fromIterator(Task(assetBalanceIterator(resource, address, compBlockchain.diff, includeNft)))
       }
     }
 
     override def nftList(address: Address, after: Option[IssuedAsset]): Observable[Seq[(IssuedAsset, AssetDescription)]] = {
-      db.resourceObservable.flatMap { resource =>
+      rdb.db.resourceObservable.flatMap { resource =>
         Observable
           .fromIterator(Task(nftIterator(resource, address, compositeBlockchain().diff, after, blockchain.assetDescription)))
       }
@@ -116,7 +117,7 @@ object CommonAccountsApi {
         .get(address)
         .fold(Array.empty[DataEntry[?]])(_.filter { case (k, _) => pattern.forall(_.matcher(k).matches()) }.values.toArray.sortBy(_.key))
 
-      db.resourceObservable.flatMap { dbResource =>
+      rdb.db.resourceObservable.flatMap { dbResource =>
         Observable
           .fromIterator(
             Task(new AddressDataIterator(dbResource, address, entriesFromDiff, pattern).asScala)
@@ -129,7 +130,7 @@ object CommonAccountsApi {
 
     override def activeLeases(address: Address): Observable[LeaseInfo] =
       addressTransactions(
-        db,
+        rdb,
         Some(Height(blockchain.height) -> compositeBlockchain().diff),
         address,
         None,

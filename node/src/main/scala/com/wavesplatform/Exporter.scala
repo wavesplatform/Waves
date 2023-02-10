@@ -4,7 +4,7 @@ import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
 
 import com.google.common.primitives.Ints
 import com.wavesplatform.block.Block
-import com.wavesplatform.database.{DBExt, openDB}
+import com.wavesplatform.database.RDB
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.metrics.Metrics
@@ -12,7 +12,6 @@ import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.*
 import kamon.Kamon
-import org.rocksdb.RocksDB
 import scopt.OParser
 
 import scala.concurrent.Await
@@ -39,8 +38,8 @@ object Exporter extends ScorexLogging {
       val settings = Application.loadApplicationConfig(configFile)
 
       val time             = new NTP(settings.ntpServer)
-      val db               = openDB(settings.dbSettings)
-      val (blockchain, _)  = StorageFactory(settings, db, time, BlockchainUpdateTriggers.noop)
+      val rdb              = RDB.open(settings.dbSettings)
+      val (blockchain, _)  = StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.noop)
       val blockchainHeight = blockchain.height
       val height           = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
       log.info(s"Blockchain height is $blockchainHeight exporting to $height")
@@ -54,8 +53,8 @@ object Exporter extends ScorexLogging {
           val start         = System.currentTimeMillis()
           exportedBytes += IO.writeHeader(bos, format)
           (2 to height).foreach { h =>
-            exportedBytes += (if (format == "JSON") IO.exportBlockToJson(bos, db, h)
-                              else IO.exportBlockToBinary(bos, db, h, format == Formats.Binary))
+            exportedBytes += (if (format == "JSON") IO.exportBlockToJson(bos, rdb, h)
+                              else IO.exportBlockToBinary(bos, rdb, h, format == Formats.Binary))
             if (h % (height / 10) == 0)
               log.info(s"$h blocks exported, ${humanReadableSize(exportedBytes)} written")
           }
@@ -77,8 +76,8 @@ object Exporter extends ScorexLogging {
     def createOutputStream(filename: String): Try[FileOutputStream] =
       Try(new FileOutputStream(filename))
 
-    def exportBlockToBinary(stream: OutputStream, db: RocksDB, height: Int, legacy: Boolean): Int = {
-      val maybeBlockBytes = db.readOnly(ro => database.loadBlock(Height(height), ro)).map(_.bytes())
+    def exportBlockToBinary(stream: OutputStream, rdb: RDB, height: Int, legacy: Boolean): Int = {
+      val maybeBlockBytes = database.loadBlock(Height(height), rdb).map(_.bytes())
       maybeBlockBytes
         .map { oldBytes =>
           val bytes       = if (legacy) oldBytes else PBBlocks.clearChainId(PBBlocks.protobuf(Block.parseBytes(oldBytes).get)).toByteArray
@@ -92,8 +91,8 @@ object Exporter extends ScorexLogging {
         .getOrElse(0)
     }
 
-    def exportBlockToJson(stream: OutputStream, db: RocksDB, height: Int): Int = {
-      val maybeBlock = db.readOnly(ro => database.loadBlock(Height(height), ro))
+    def exportBlockToJson(stream: OutputStream, rdb: RDB, height: Int): Int = {
+      val maybeBlock = database.loadBlock(Height(height), rdb)
       maybeBlock
         .map { block =>
           val len = if (height != 2) {

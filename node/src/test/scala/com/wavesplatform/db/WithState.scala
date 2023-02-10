@@ -1,10 +1,12 @@
 package com.wavesplatform.db
 
 import java.nio.file.Files
+
+import com.google.common.primitives.Shorts
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{RocksDBWriter, TestStorageFactory, loadActiveLeases}
+import com.wavesplatform.database.{KeyTags, RDB, RocksDBWriter, TestStorageFactory, loadActiveLeases}
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
@@ -22,38 +24,44 @@ import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Portfol
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Transaction, TxHelpers}
-import com.wavesplatform.{NTPTime, TestHelpers, database}
+import com.wavesplatform.{NTPTime, TestHelpers}
 import org.rocksdb.RocksDB
-import org.scalatest.Suite
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.{BeforeAndAfterAll, Suite}
 
-trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
+trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers with NTPTime { _: Suite =>
   protected val ignoreBlockchainUpdateTriggers: BlockchainUpdateTriggers = BlockchainUpdateTriggers.noop
 
-  private[this] val currentDbInstance = new ThreadLocal[RocksDB]
-  protected def db: RocksDB           = currentDbInstance.get()
+  private val path  = Files.createTempDirectory("rocks-temp").toAbsolutePath
+  protected val rdb = RDB.open(dbSettings.copy(directory = path.toAbsolutePath.toString))
 
-  protected def tempDb[A](f: RocksDB => A): A = {
-    val path = Files.createTempDirectory("rocks-temp").toAbsolutePath
-    val db   = database.openDB(dbSettings.copy(directory = path.toAbsolutePath.toString))
-    currentDbInstance.set(db)
+  private val MaxKey = Shorts.toByteArray(KeyTags.maxId.toShort)
+  private val MinKey = new Array[Byte](2)
+
+  protected def tempDb[A](f: RDB => A): A = {
     try {
-      f(db)
+      f(rdb)
     } finally {
-      db.close()
-      currentDbInstance.remove()
-      TestHelpers.deleteRecursively(path)
+      Seq(rdb.db.getDefaultColumnFamily, rdb.txHandle.handle, rdb.txMetaHandle.handle).foreach { cfh =>
+        rdb.db.deleteRange(cfh, MinKey, MaxKey)
+      }
     }
   }
 
-  protected def withRocksDBWriter[A](ws: WavesSettings)(test: RocksDBWriter => A): A = tempDb { db =>
-    val (_, rdb) = TestStorageFactory(
+  override protected def afterAll(): Unit = {
+    super.afterAll()
+    TestHelpers.deleteRecursively(path)
+    rdb.close()
+  }
+
+  protected def withRocksDBWriter[A](ws: WavesSettings)(test: RocksDBWriter => A): A = tempDb { rdb =>
+    val (_, rdw) = TestStorageFactory(
       ws,
-      db,
+      rdb,
       ntpTime,
       ignoreBlockchainUpdateTriggers
     )
-    test(rdb)
+    test(rdw)
   }
 
   protected def withRocksDBWriter[A](bs: BlockchainSettings)(test: RocksDBWriter => A): A =
@@ -182,9 +190,9 @@ trait WithDomain extends WithState { _: Suite =>
         settings,
         ntpTime,
         BlockchainUpdateTriggers.combined(domain.triggers),
-        loadActiveLeases(db, _, _)
+        loadActiveLeases(rdb, _, _)
       )
-      domain = Domain(wrapDB(db), bcu, blockchain, settings)
+      domain = Domain(new RDB(wrapDB(rdb.db), rdb.txMetaHandle, rdb.txHandle), bcu, blockchain, settings)
       val genesis = balances.map { case AddrWithBalance(address, amount) =>
         TxHelpers.genesis(address, amount)
       }

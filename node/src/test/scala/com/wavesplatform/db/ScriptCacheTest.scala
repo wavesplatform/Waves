@@ -1,6 +1,7 @@
 package com.wavesplatform.db
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.WithNewDBForEachTest
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
@@ -8,17 +9,16 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
+import com.wavesplatform.state.*
 import com.wavesplatform.state.utils.TestRocksDB
-import com.wavesplatform.state.{BlockchainUpdaterImpl, _}
+import com.wavesplatform.test.FreeSpec
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction}
 import com.wavesplatform.utils.Time
-import com.wavesplatform.WithDB
-import com.wavesplatform.test.FreeSpec
 import org.scalacheck.Gen
 
-class ScriptCacheTest extends FreeSpec with WithDB {
+class ScriptCacheTest extends FreeSpec with WithNewDBForEachTest {
 
   val CACHE_SIZE = 1
   val AMOUNT     = 10000000000L
@@ -128,7 +128,7 @@ class ScriptCacheTest extends FreeSpec with WithDB {
 
   }
 
-  def withBlockchain(gen: Time => Gen[(Seq[KeyPair], Seq[Block])])(f: (Seq[KeyPair], Blockchain with BlockchainUpdater) => Unit): Unit = {
+  def withBlockchain(gen: Time => Gen[(Seq[KeyPair], Seq[Block])])(f: (Seq[KeyPair], Blockchain & BlockchainUpdater) => Unit): Unit = {
     val settings0 = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings  = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val defaultWriter = TestRocksDB.withFunctionalitySettings(

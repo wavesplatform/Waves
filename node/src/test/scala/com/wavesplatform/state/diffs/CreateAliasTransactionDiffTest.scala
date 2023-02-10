@@ -68,7 +68,7 @@ class CreateAliasTransactionDiffTest extends PropSpec with WithState {
         val senderAcc = anotherAliasTx.sender.toAddress
         blockDiff.aliases shouldBe Map(anotherAliasTx.alias -> senderAcc)
 
-        addressTransactions(db, Some(Height(newState.height + 1) -> blockDiff), senderAcc, Set(TransactionType.CreateAlias), None).collect {
+        addressTransactions(rdb, Some(Height(newState.height + 1) -> blockDiff), senderAcc, Set(TransactionType.CreateAlias), None).collect {
           case (_, cat: CreateAliasTransaction) => cat.alias
         }.toSet shouldBe Set(
           anotherAliasTx.alias,

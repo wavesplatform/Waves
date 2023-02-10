@@ -1,5 +1,10 @@
 package com.wavesplatform
 
+import java.io.File
+import java.security.Security
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.{TimeUnit, *}
+
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
@@ -19,7 +24,7 @@ import com.wavesplatform.api.http.leasing.LeaseApiRoute
 import com.wavesplatform.api.http.utils.UtilsApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.database.{DBExt, Keys, openDB}
+import com.wavesplatform.database.{DBExt, Keys, RDB}
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.EstimatorProvider.*
@@ -46,18 +51,14 @@ import io.netty.util.concurrent.{DefaultThreadFactory, GlobalEventExecutor}
 import kamon.Kamon
 import kamon.instrumentation.executor.ExecutorInstrumentation
 import monix.eval.{Coeval, Task}
-import monix.execution.{Scheduler, UncaughtExceptionReporter}
 import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
+import monix.execution.{Scheduler, UncaughtExceptionReporter}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import org.influxdb.dto.Point
 import org.rocksdb.RocksDB
 import org.slf4j.LoggerFactory
 
-import java.io.File
-import java.security.Security
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.{TimeUnit, *}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
@@ -69,7 +70,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   import Application.*
   import monix.execution.Scheduler.Implicits.global as scheduler
 
-  private[this] val db = openDB(settings.dbSettings)
+  private[this] val rdb = RDB.open(settings.dbSettings)
 
   private[this] lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
 
@@ -101,7 +102,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private[this] var miner: Miner & MinerDebugInfo = Miner.Disabled
   private[this] val (blockchainUpdater, rocksDB) =
-    StorageFactory(settings, db, time, BlockchainUpdateTriggers.combined(triggers), bc => miner.scheduleMining(bc))
+    StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.combined(triggers), bc => miner.scheduleMining(bc))
 
   @volatile
   private[this] var maybeUtx: Option[UtxPool] = None
@@ -177,7 +178,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         allChannels.broadcast(LocalScoreChanged(x))
       }(scheduler)
 
-    val history = History(blockchainUpdater, blockchainUpdater.liquidBlock, blockchainUpdater.microBlock, db)
+    val history = History(blockchainUpdater, blockchainUpdater.liquidBlock, blockchainUpdater.microBlock, rdb)
 
     val historyReplier = new HistoryReplier(blockchainUpdater.score, history, settings.synchronizationSettings)(historyRepliesScheduler)
 
@@ -221,17 +222,18 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
       override val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(
         blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
-        db,
+        rdb,
         blockchainUpdater,
         utxStorage,
         tx => transactionPublisher.validateAndBroadcast(tx, None),
-        loadBlockAt(db, blockchainUpdater)
+        loadBlockAt(rdb, blockchainUpdater)
       )
       override val blocksApi: CommonBlocksApi =
-        CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(db, blockchainUpdater), loadBlockInfoAt(db, blockchainUpdater))
+        CommonBlocksApi(blockchainUpdater, loadBlockMetaAt(rdb.db, blockchainUpdater), loadBlockInfoAt(rdb, blockchainUpdater))
       override val accountsApi: CommonAccountsApi =
-        CommonAccountsApi(() => blockchainUpdater.getCompositeBlockchain, db, blockchainUpdater)
-      override val assetsApi: CommonAssetsApi = CommonAssetsApi(() => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
+        CommonAccountsApi(() => blockchainUpdater.getCompositeBlockchain, rdb, blockchainUpdater)
+      override val assetsApi: CommonAssetsApi =
+        CommonAssetsApi(() => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), rdb.db, blockchainUpdater)
     }
 
     extensions = settings.extensions.map { extensionClassName =>
@@ -489,8 +491,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       shutdownAndWait(appenderScheduler, "Appender", 5.minutes.some)
 
       log.info("Closing storage")
-      rocksDB.close()
-      db.close()
+      rdb.close()
 
       // extensions should be shut down last, after all node functionality, to guarantee no data loss
       if (extensions.nonEmpty) {
@@ -572,18 +573,18 @@ object Application extends ScorexLogging {
     settings
   }
 
-  private[wavesplatform] def loadBlockAt(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl)(
+  private[wavesplatform] def loadBlockAt(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl)(
       height: Int
   ): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
-    loadBlockInfoAt(db, blockchainUpdater)(height)
+    loadBlockInfoAt(rdb, blockchainUpdater)(height)
 
-  private[wavesplatform] def loadBlockInfoAt(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl)(
+  private[wavesplatform] def loadBlockInfoAt(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl)(
       height: Int
   ): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
-    loadBlockMetaAt(db, blockchainUpdater)(height).map { meta =>
+    loadBlockMetaAt(rdb.db, blockchainUpdater)(height).map { meta =>
       meta -> blockchainUpdater
         .liquidTransactions(meta.id)
-        .getOrElse(db.readOnly(ro => database.loadTransactions(Height(height), ro)))
+        .getOrElse(database.loadTransactions(Height(height), rdb))
     }
 
   private[wavesplatform] def loadBlockMetaAt(db: RocksDB, blockchainUpdater: BlockchainUpdaterImpl)(height: Int): Option[BlockMeta] =

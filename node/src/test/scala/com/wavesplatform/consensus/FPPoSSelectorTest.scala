@@ -1,28 +1,30 @@
 package com.wavesplatform.consensus
 
 import java.nio.file.Files
+
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.database.RDB
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.settings.{WavesSettings, *}
+import com.wavesplatform.settings.*
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.utils.TestRocksDB
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction}
 import com.wavesplatform.utils.Time
-import com.wavesplatform.{TestHelpers, WithDB, crypto, database}
+import com.wavesplatform.{TestHelpers, WithNewDBForEachTest, crypto}
 import org.scalacheck.{Arbitrary, Gen}
 
 import scala.concurrent.duration.*
 import scala.util.Random
 
-class FPPoSSelectorTest extends FreeSpec with WithDB with DBCacheSettings {
+class FPPoSSelectorTest extends FreeSpec with WithNewDBForEachTest with DBCacheSettings {
   import FPPoSSelectorTest.*
 
   private val generationSignatureMethods = Table(
@@ -224,9 +226,9 @@ class FPPoSSelectorTest extends FreeSpec with WithDB with DBCacheSettings {
   def withEnv(gen: Time => Gen[(Seq[KeyPair], Seq[Block])], VRFActivated: Boolean = false)(f: Env => Unit): Unit = {
     // we are not using the db instance from WithDB trait as it should be recreated between property checks
     val path = Files.createTempDirectory("lvl").toAbsolutePath
-    val db   = database.openDB(dbSettings.copy(directory = path.toAbsolutePath.toString))
+    val rdb  = RDB.open(dbSettings.copy(directory = path.toAbsolutePath.toString))
     val defaultWriter = TestRocksDB.withFunctionalitySettings(
-      db,
+      rdb,
       TestFunctionalitySettings.Stub.copy(preActivatedFeatures =
         Map(BlockchainFeatures.FairPoS.id -> 0) ++ (if (VRFActivated) Map(BlockchainFeatures.BlockV5.id -> 0) else Map())
       )

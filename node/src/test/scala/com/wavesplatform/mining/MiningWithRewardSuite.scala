@@ -4,13 +4,13 @@ import scala.concurrent.Future
 import scala.concurrent.duration.*
 import cats.effect.Resource
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.{TransactionGen, WithDB}
+import com.wavesplatform.{TransactionGen, WithNewDBForEachTest}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.database.TestStorageFactory
+import com.wavesplatform.database.{RDB, TestStorageFactory}
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -33,7 +33,7 @@ import org.scalatest.compatible.Assertion
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with TransactionGen with DBCacheSettings {
+class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithNewDBForEachTest with TransactionGen with DBCacheSettings {
   import MiningWithRewardSuite.*
 
   behavior of "Miner with activated reward feature"
@@ -140,7 +140,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
 
   private def forgeBlock(miner: MinerImpl)(account: KeyPair): Either[String, (Block, MiningConstraint)] = miner.forgeBlock(account)
 
-  private def resources(settings: WavesSettings): Resource[Task, (BlockchainUpdaterImpl, RocksDB)] =
+  private def resources(settings: WavesSettings): Resource[Task, (BlockchainUpdaterImpl, RDB)] =
     Resource.make {
       val (bcu, _) = TestStorageFactory(settings, db, ntpTime, ignoreBlockchainUpdateTriggers)
       Task.now((bcu, db))

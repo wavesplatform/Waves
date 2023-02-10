@@ -3,11 +3,8 @@ package com.wavesplatform.mining
 import java.security.Permission
 import java.util.concurrent.{Semaphore, TimeUnit}
 
-import scala.concurrent.Await
-import scala.concurrent.duration._
-
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.WithDB
+import com.wavesplatform.WithNewDBForEachTest
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
@@ -16,8 +13,8 @@ import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.BlockWithMaxBaseTargetTest.Env
-import com.wavesplatform.settings.{WavesSettings, _}
-import com.wavesplatform.state._
+import com.wavesplatform.settings.*
+import com.wavesplatform.state.*
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.utils.TestRocksDB
@@ -34,7 +31,10 @@ import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
 import org.scalacheck.{Arbitrary, Gen}
 
-class BlockWithMaxBaseTargetTest extends FreeSpec with WithDB with DBCacheSettings {
+import scala.concurrent.Await
+import scala.concurrent.duration.*
+
+class BlockWithMaxBaseTargetTest extends FreeSpec with WithNewDBForEachTest with DBCacheSettings {
 
   "base target limit" - {
     "node should stop if base target greater than maximum in block creation " in {

@@ -1,10 +1,10 @@
 package com.wavesplatform.database
 
 import java.{lang, util}
+
 import cats.data.Ior
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
 import com.google.common.collect.ArrayListMultimap
-import com.google.common.hash.{Funnels, BloomFilter as GBloomFilter}
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, SignedBlockHeader}
@@ -24,7 +24,7 @@ import monix.reactive.Observer
 import scala.jdk.CollectionConverters.*
 import scala.reflect.ClassTag
 
-abstract class Caches(txFilterSize: Int) extends Blockchain with Storage {
+abstract class Caches extends Blockchain with Storage {
   import Caches.*
 
   val dbSettings: DBSettings
@@ -57,10 +57,6 @@ abstract class Caches(txFilterSize: Int) extends Blockchain with Storage {
 
   override def heightOf(blockId: ByteStr): Option[Int] = if (current.id.contains(blockId)) Some(height) else loadHeightOf(blockId)
 
-  private val transactionsBloomFilter = GBloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), txFilterSize)
-
-  override def containsTransaction(tx: Transaction): Boolean = transactionsBloomFilter.mightContain(tx.id().arr) && transactionMeta(tx.id()).nonEmpty
-
   protected val leaseBalanceCache: LoadingCache[Address, CurrentLeaseBalance] =
     cache(dbSettings.maxCacheSize, loadLeaseBalance, keys => loadLeaseBalances(keys.asScala.toSeq).asJava)
   protected def loadLeaseBalance(address: Address): CurrentLeaseBalance
@@ -84,7 +80,6 @@ abstract class Caches(txFilterSize: Int) extends Blockchain with Storage {
 
   protected val balancesCache: LoadingCache[(Address, Asset), CurrentBalance] =
     cache(dbSettings.maxCacheSize * 16, loadBalance, keys => loadBalances(keys.asScala.toSeq).asJava)
-  protected def clearBalancesCache(): Unit                          = balancesCache.invalidateAll()
   protected def discardBalance(key: (Address, Asset)): Unit         = balancesCache.invalidate(key)
   override def balance(address: Address, mayBeAssetId: Asset): Long = balancesCache.get(address -> mayBeAssetId).balance
 
@@ -288,7 +283,6 @@ abstract class Caches(txFilterSize: Int) extends Blockchain with Storage {
     val transactionMeta     = Seq.newBuilder[(TxMeta, Transaction)]
     val addressTransactions = ArrayListMultimap.create[AddressId, TransactionId]()
     for (nti <- diff.transactions) {
-      transactionsBloomFilter.put(nti.transaction.id().arr)
       transactionMeta += (TxMeta(Height(newHeight), nti.applied, nti.spentComplexity) -> nti.transaction)
       for (addr <- nti.affected) {
         addressTransactions.put(addressIdWithFallback(addr, newAddressIds), TransactionId(nti.transaction.id()))
