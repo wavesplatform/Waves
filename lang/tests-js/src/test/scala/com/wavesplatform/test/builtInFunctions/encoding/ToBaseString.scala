@@ -2,7 +2,16 @@ package com.wavesplatform.test.builtInFunctions.encoding
 
 import com.wavesplatform.JsTestBase
 import testHelpers.GeneratorContractsForBuiltInFunctions
-import testHelpers.RandomDataGenerator.{randomAliasDataArrayElement, randomBoolean, randomByteVectorArrayElement, randomDigestAlgorithmTypeArrayElement, randomInt, randomUnionArrayElement}
+import testHelpers.RandomDataGenerator.{
+  randomAliasDataArrayElement,
+  randomBoolean,
+  randomByteVectorArrayElement,
+  randomDigestAlgorithmTypeArrayElement,
+  randomInt,
+  randomStringArrayElement,
+  randomUnionArrayElement
+}
+import testHelpers.TestDataConstantsAndMethods.{actualVersions, nonMatchingTypes}
 import utest.{Tests, test}
 
 object ToBaseString extends JsTestBase {
@@ -23,203 +32,48 @@ object ToBaseString extends JsTestBase {
   private val invalidErrorForToBase64String          = testData.invalidFunctionError("toBase64String", 1)
 
   val tests: Tests = Tests {
-    test("check: function toBase16String compiles") {
-      for (version <- testData.actualVersions) {
+    test("toBaseString functions compiles") {
+      for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script = precondition.onlyMatcherContract(
-          randomByteVectorArrayElement,
-          toBase16String
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function toBase16String compiles (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script = precondition.onlyMatcherContract(
-          randomByteVectorArrayElement,
-          toBase16StringArgBeforeFunc
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function toBase58String compiles") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script = precondition.onlyMatcherContract(
-          randomByteVectorArrayElement,
-          toBase58String
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function toBase58String compiles (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script = precondition.onlyMatcherContract(
-          randomByteVectorArrayElement,
-          toBase58StringArgBeforeFunc
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function toBase64String compiles") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script = precondition.onlyMatcherContract(
-          randomByteVectorArrayElement,
-          toBase64String
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function toBase64String compiles (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script = precondition.onlyMatcherContract(
-          randomByteVectorArrayElement,
-          toBase64StringArgBeforeFunc
-        )
-        assertCompileSuccessDApp(script, version)
+        for (
+          (data, function) <- Seq(
+            (randomByteVectorArrayElement, toBase16String),
+            (randomByteVectorArrayElement, toBase16StringArgBeforeFunc),
+            (randomByteVectorArrayElement, toBase58String),
+            (randomByteVectorArrayElement, toBase58StringArgBeforeFunc),
+            (randomByteVectorArrayElement, toBase64String),
+            (randomByteVectorArrayElement, toBase64StringArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.onlyMatcherContract(data, function)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
     // invalid data
-    test("compilation error: function toBase16String invalid data") {
-      for (version <- testData.actualVersions) {
+    test("toBaseString functions invalid data") {
+      for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script = precondition.onlyMatcherContract(
-          randomBoolean.toString,
-          toBase16String
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("ByteVector"))
-      }
-    }
-
-    test("compilation error: function toBase16String invalid data (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script = precondition.onlyMatcherContract(
-          randomAliasDataArrayElement,
-          toBase16StringArgBeforeFunc
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("ByteVector"))
-      }
-    }
-
-    test("compilation error: function toBase58String invalid data") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script = precondition.onlyMatcherContract(
-          randomInt.toString,
-          toBase58String
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("ByteVector"))
-      }
-    }
-
-    test("compilation error: function toBase58String invalid data (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script = precondition.onlyMatcherContract(
-          randomDigestAlgorithmTypeArrayElement,
-          toBase58StringArgBeforeFunc
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("ByteVector"))
-      }
-    }
-
-    test("compilation error: function toBase64String invalid data") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script = precondition.onlyMatcherContract(
-          randomBoolean.toString,
-          toBase64String
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("ByteVector"))
-      }
-    }
-
-    test("compilation error: function toBase64String invalid data (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script = precondition.onlyMatcherContract(
-          randomUnionArrayElement,
-          toBase64StringArgBeforeFunc
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("ByteVector"))
-      }
-    }
-
-    // invalid function
-    test("compilation error: invalid function toBase16String") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script = precondition.onlyMatcherContract(
-          randomByteVectorArrayElement,
-          invalidToBase16String
-        )
-        assertCompileErrorDApp(script, version, invalidErrorForToBase16String)
-      }
-    }
-
-    test("compilation error: invalid function toBase58String") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script = precondition.onlyMatcherContract(
-          randomByteVectorArrayElement,
-          invalidToBase58String
-        )
-        assertCompileErrorDApp(script, version, invalidErrorForToBase58String)
-      }
-    }
-
-    test("compilation error: invalid function toBase64String") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script = precondition.onlyMatcherContract(
-          randomByteVectorArrayElement,
-          invalidToBase64String
-        )
-        assertCompileErrorDApp(script, version, invalidErrorForToBase64String)
-      }
-    }
-
-    test("compilation error: invalid function toBase16String (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script = precondition.onlyMatcherContract(
-          randomByteVectorArrayElement,
-          invalidToBase16StringArgBeforeFunction
-        )
-        assertCompileErrorDApp(script, version, invalidErrorForToBase16String)
-      }
-    }
-
-    test("compilation error: invalid function toBase58String (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script = precondition.onlyMatcherContract(
-          randomByteVectorArrayElement,
-          invalidToBase58StringArgBeforeFunction
-        )
-        assertCompileErrorDApp(script, version, invalidErrorForToBase58String)
-      }
-    }
-
-    test("compilation error: invalid function toBase64String (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script = precondition.onlyMatcherContract(
-          randomByteVectorArrayElement,
-          invalidToBase64StringArgBeforeFunction
-        )
-        assertCompileErrorDApp(script, version, invalidErrorForToBase64String)
+        for (
+          (data, function, error) <- Seq(
+            (randomBoolean.toString, toBase16String, nonMatchingTypes("ByteVector")),
+            (randomAliasDataArrayElement, toBase16StringArgBeforeFunc, nonMatchingTypes("ByteVector")),
+            (randomStringArrayElement, toBase58String, nonMatchingTypes("ByteVector")),
+            (randomDigestAlgorithmTypeArrayElement, toBase58StringArgBeforeFunc, nonMatchingTypes("ByteVector")),
+            (randomInt.toString, toBase64String, nonMatchingTypes("ByteVector")),
+            (randomUnionArrayElement, toBase64StringArgBeforeFunc, nonMatchingTypes("ByteVector")),
+            (randomByteVectorArrayElement, invalidToBase16String, invalidErrorForToBase16String),
+            (randomByteVectorArrayElement, invalidToBase58String, invalidErrorForToBase58String),
+            (randomByteVectorArrayElement, invalidToBase64String, invalidErrorForToBase64String),
+            (randomByteVectorArrayElement, invalidToBase16StringArgBeforeFunction, invalidErrorForToBase16String),
+            (randomByteVectorArrayElement, invalidToBase58StringArgBeforeFunction, invalidErrorForToBase58String),
+            (randomByteVectorArrayElement, invalidToBase64StringArgBeforeFunction, invalidErrorForToBase64String)
+          )
+        ) {
+          val script = precondition.onlyMatcherContract(data, function)
+          assertCompileErrorDApp(script, version, error)
+        }
       }
     }
   }

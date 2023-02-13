@@ -3,6 +3,7 @@ package com.wavesplatform.test.builtInFunctions.decoding
 import com.wavesplatform.JsTestBase
 import testHelpers.GeneratorContractsForBuiltInFunctions
 import testHelpers.RandomDataGenerator.{randomAliasDataArrayElement, randomBoolean, randomStringArrayElement, randomUnionArrayElement}
+import testHelpers.TestDataConstantsAndMethods.{actualVersions, invalidFunctionError, nonMatchingTypes}
 import utest.{Tests, test}
 
 object AddressFromString extends JsTestBase {
@@ -12,117 +13,43 @@ object AddressFromString extends JsTestBase {
   private val addressFromStringValueArgBeforeFunc           = "callerTestData.addressFromStringValue()"
   private val invalidAddressFromString                      = "addressFromString()"
   private val invalidAddressFromStringValue                 = "addressFromStringValue()"
-  private val invalidFunctionErrorForAddressFromString      = testData.invalidFunctionError("addressFromString", 1)
-  private val invalidFunctionErrorForAddressFromStringValue = testData.invalidFunctionError("addressFromStringValue", 1)
+  private val invalidFunctionErrorForAddressFromString      = invalidFunctionError("addressFromString", 1)
+  private val invalidFunctionErrorForAddressFromStringValue = invalidFunctionError("addressFromStringValue", 1)
 
   val tests: Tests = Tests {
-    test("check: function addressFromString compiles") {
-      for (version <- testData.actualVersions) {
+    test("Functions addressFromString compiles") {
+      for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Address", version)
-        val script = precondition.onlyMatcherContract(
-          randomStringArrayElement,
-          addressFromString
-        )
-        assertCompileSuccessDApp(script, version)
+        for (
+          (data, function) <- Seq(
+            (randomStringArrayElement, addressFromString),
+            (randomStringArrayElement, addressFromStringArgBeforeFunc),
+            (randomStringArrayElement, addressFromStringValue),
+            (randomStringArrayElement, addressFromStringValueArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.onlyMatcherContract(data, function)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
-    test("check: function addressFromString compiles (argument before function)") {
-      for (version <- testData.actualVersions) {
+    test("Compilation error: addressFromString invalid data or function") {
+      for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Address", version)
-        val script = precondition.onlyMatcherContract(
-          randomStringArrayElement,
-          addressFromStringArgBeforeFunc
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function addressFromStringValue compiles") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Address", version)
-        val script = precondition.onlyMatcherContract(
-          randomStringArrayElement,
-          addressFromStringValue
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function addressFromStringValue compiles (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Address", version)
-        val script = precondition.onlyMatcherContract(
-          randomStringArrayElement,
-          addressFromStringValueArgBeforeFunc
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("compilation error: addressFromString invalid data") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Address", version)
-        val script = precondition.onlyMatcherContract(
-          randomAliasDataArrayElement,
-          addressFromString
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("String"))
-      }
-    }
-
-    test("compilation error: addressFromString invalid data (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Address", version)
-        val script = precondition.onlyMatcherContract(
-          randomAliasDataArrayElement,
-          addressFromStringArgBeforeFunc
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("String"))
-      }
-    }
-
-    test("compilation error: addressFromStringValue invalid data") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Address", version)
-        val script = precondition.onlyMatcherContract(
-          randomBoolean.toString,
-          addressFromStringValue
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("String"))
-      }
-    }
-
-    test("compilation error: addressFromStringValue invalid data (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Address", version)
-        val script = precondition.onlyMatcherContract(
-          randomUnionArrayElement,
-          addressFromStringValueArgBeforeFunc
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("String"))
-      }
-    }
-
-    test("compilation error: addressFromString invalid function") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Address", version)
-        val script = precondition.onlyMatcherContract(
-          randomStringArrayElement,
-          invalidAddressFromString
-        )
-        assertCompileErrorDApp(script, version, invalidFunctionErrorForAddressFromString)
-      }
-    }
-
-    test("compilation error: addressFromStringValue invalid function") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Address", version)
-        val script = precondition.onlyMatcherContract(
-          randomStringArrayElement,
-          invalidAddressFromStringValue
-        )
-        assertCompileErrorDApp(script, version, invalidFunctionErrorForAddressFromStringValue)
+        for (
+          (data, function, error) <- Seq(
+            (randomAliasDataArrayElement, addressFromString, nonMatchingTypes("String")),
+            (randomAliasDataArrayElement, addressFromStringArgBeforeFunc, nonMatchingTypes("String")),
+            (randomBoolean.toString, addressFromStringValue, nonMatchingTypes("String")),
+            (randomUnionArrayElement, addressFromStringValueArgBeforeFunc, nonMatchingTypes("String")),
+            (randomStringArrayElement, invalidAddressFromString, invalidFunctionErrorForAddressFromString),
+            (randomStringArrayElement, invalidAddressFromStringValue, invalidFunctionErrorForAddressFromStringValue)
+          )
+        ) {
+          val script = precondition.onlyMatcherContract(data, function)
+          assertCompileErrorDApp(script, version, error)
+        }
       }
     }
   }

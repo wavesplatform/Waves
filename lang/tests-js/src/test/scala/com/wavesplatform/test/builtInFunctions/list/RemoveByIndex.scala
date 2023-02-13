@@ -2,12 +2,11 @@ package com.wavesplatform.test.builtInFunctions.list
 
 import com.wavesplatform.JsTestBase
 import testHelpers.GeneratorContractsForBuiltInFunctions
-import testHelpers.RandomDataGenerator.{randomAliasDataArrayElement, randomInt, randomIssuesArrayElement}
-import testHelpers.TestDataConstantsAndMethods.stringList
+import testHelpers.RandomDataGenerator.{randomAliasDataArrayElement, randomInt, randomIssuesArrayElement, randomStringArrayElement}
+import testHelpers.TestDataConstantsAndMethods.{actualVersionsWithoutV3, intList, nonMatchingTypes, stringList}
 import utest.{Tests, test}
 
 object RemoveByIndex extends JsTestBase {
-  // removeByIndex
   private val removeByIndex                     = "removeByIndex(bar, foo)"
   private val removeByIndexArgBeforeFunc        = "bar.removeByIndex(foo)"
   private val invalidRemoveByIndex              = "removeByIndex(foo)"
@@ -15,55 +14,35 @@ object RemoveByIndex extends JsTestBase {
   private val invalidErrorRemoveByIndex         = testData.invalidFunctionError("removeByIndex", 2)
 
   val tests: Tests = Tests {
-    test("check: removeByIndex function compiles") {
-      for (version <- testData.actualVersionsWithoutV3) {
+    test("removeByIndex functions compiles with a list") {
+      for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script       = precondition.simpleRideCode(randomInt.toString, stringList, removeByIndex)
-        assertCompileSuccessDApp(script, version)
+        for (
+          (data, list, function) <- Seq(
+            (randomInt.toString, stringList, removeByIndex),
+            (randomInt.toString, stringList, removeByIndexArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.simpleRideCode(data, list, function)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
-    test("check: removeByIndex function compiles (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
+    test("Compilation errors RemoveByIndex functions") {
+      for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script       = precondition.simpleRideCode(randomInt.toString, stringList, removeByIndexArgBeforeFunc)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("compilation error: removeByIndex - Non-matching types") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script       = precondition.simpleRideCode(randomInt.toString, randomAliasDataArrayElement, removeByIndexArgBeforeFunc)
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("List[T]"))
-      }
-    }
-
-    test("compilation error: removeByIndex - Non-matching types (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script       = precondition.simpleRideCode(randomInt.toString, randomIssuesArrayElement, removeByIndexArgBeforeFunc)
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("List[T]"))
-      }
-    }
-
-    test("compilation error: Can't find a function overload removeByIndex") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script       = precondition.simpleRideCode(randomInt.toString, randomAliasDataArrayElement, invalidRemoveByIndex)
-        assertCompileErrorDApp(script, version, invalidErrorRemoveByIndex)
-      }
-    }
-
-    test("compilation error: Can't find a function overload removeByIndex (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.simpleRideCode(
-          randomInt.toString,
-          randomAliasDataArrayElement,
-          invalidRemoveByIndexArgBeforeFunc
-        )
-        assertCompileErrorDApp(script, version, invalidErrorRemoveByIndex)
+        for (
+          (data, list, function, error) <- Seq(
+            (randomInt.toString, randomAliasDataArrayElement, removeByIndex, nonMatchingTypes("List[T]")),
+            (randomInt.toString, randomIssuesArrayElement, removeByIndexArgBeforeFunc, nonMatchingTypes("List[T]")),
+            (randomInt.toString, stringList, invalidRemoveByIndex, invalidErrorRemoveByIndex),
+            (randomInt.toString, stringList, invalidRemoveByIndexArgBeforeFunc, invalidErrorRemoveByIndex)
+          )
+        ) {
+          val script = precondition.simpleRideCode(data, list, function)
+          assertCompileErrorDApp(script, version, error)
+        }
       }
     }
   }

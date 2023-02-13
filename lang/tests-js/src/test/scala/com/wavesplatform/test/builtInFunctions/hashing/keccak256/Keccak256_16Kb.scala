@@ -3,6 +3,7 @@ package com.wavesplatform.test.builtInFunctions.hashing.keccak256
 import com.wavesplatform.JsTestBase
 import testHelpers.GeneratorContractsForBuiltInFunctions
 import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomByteVectorArrayElement, randomUnionArrayElement}
+import testHelpers.TestDataConstantsAndMethods.{GreaterV3ResultBinaryEntry, actualVersionsWithoutV3, nonMatchingTypes, rideV3Result}
 import utest.{Tests, test}
 
 object Keccak256_16Kb extends JsTestBase {
@@ -14,51 +15,35 @@ object Keccak256_16Kb extends JsTestBase {
   private val invalidErrorKeccak256_16Kb         = testData.invalidFunctionError("keccak256_16Kb", 1)
 
   val tests: Tests = Tests {
-    test("check: keccak256_16Kb function compiles with a ByteVector") {
-      for (version <- testData.actualVersionsWithoutV3) {
+    test("keccak256_16Kb functions compiles with a ByteVector") {
+      for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, keccak256_16Kb)
-        assertCompileSuccessDApp(script, version)
+        for (
+          (data, function) <- Seq(
+            (randomByteVectorArrayElement, keccak256_16Kb),
+            (randomByteVectorArrayElement, keccak256_16KbArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.codeFromMatchingAndCase(data, function, rideV3Result, GreaterV3ResultBinaryEntry)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
-    test("check: keccak256_16Kb function compiles with a ByteVector(argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
+    test("compilation errors keccak256_16Kb") {
+      for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, keccak256_16KbArgBeforeFunc)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("compilation error: keccak256_16Kb - Non-matching types: expected: ByteVector") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script       = precondition.onlyMatcherContract(randomUnionArrayElement, keccak256_16Kb)
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("ByteVector"))
-      }
-    }
-
-    test("compilation error: keccak256_16Kb - Non-matching types: expected: ByteVector (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script       = precondition.onlyMatcherContract(randomAddressDataArrayElement, keccak256_16KbArgBeforeFunc)
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("ByteVector"))
-      }
-    }
-
-    test("compilation error: Can't find a function overload keccak256_16Kb") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script       = precondition.onlyMatcherContract(randomUnionArrayElement, invalidKeccak256_16Kb)
-        assertCompileErrorDApp(script, version, invalidErrorKeccak256_16Kb)
-      }
-    }
-
-    test("compilation error: Can't find a function overload keccak256_16Kb (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script       = precondition.onlyMatcherContract(randomUnionArrayElement, invalidKeccak256_16KbArgBeforeFunc)
-        assertCompileErrorDApp(script, version, invalidErrorKeccak256_16Kb)
+        for (
+          (data, function, error) <- Seq(
+            (randomUnionArrayElement, keccak256_16Kb, nonMatchingTypes("ByteVector")),
+            (randomAddressDataArrayElement, keccak256_16KbArgBeforeFunc, nonMatchingTypes("ByteVector")),
+            (randomByteVectorArrayElement, invalidKeccak256_16Kb, invalidErrorKeccak256_16Kb),
+            (randomByteVectorArrayElement, invalidKeccak256_16KbArgBeforeFunc, invalidErrorKeccak256_16Kb)
+          )
+        ) {
+          val script = precondition.codeFromMatchingAndCase(data, function, rideV3Result, GreaterV3ResultBinaryEntry)
+          assertCompileErrorDApp(script, version, error)
+        }
       }
     }
   }

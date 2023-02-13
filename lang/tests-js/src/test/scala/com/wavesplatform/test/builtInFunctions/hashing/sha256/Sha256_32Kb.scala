@@ -3,6 +3,7 @@ package com.wavesplatform.test.builtInFunctions.hashing.sha256
 import com.wavesplatform.JsTestBase
 import testHelpers.GeneratorContractsForBuiltInFunctions
 import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomByteVectorArrayElement, randomUnionArrayElement}
+import testHelpers.TestDataConstantsAndMethods.{GreaterV3ResultBinaryEntry, actualVersionsWithoutV3, nonMatchingTypes, rideV3Result}
 import utest.{Tests, test}
 
 object Sha256_32Kb extends JsTestBase {
@@ -11,84 +12,38 @@ object Sha256_32Kb extends JsTestBase {
   private val sha256_32KbArgBeforeFunc        = "callerTestData.sha256_32Kb()"
   private val invalidSha256_32Kb              = "sha256_32Kb()"
   private val invalidSha256_32KbArgBeforeFunc = "callerTestData.sha256_32Kb(callerTestData)"
-  private val invalidErrorSha256_32Kb  = testData.invalidFunctionError("sha256_32Kb", 1)
+  private val invalidErrorSha256_32Kb         = testData.invalidFunctionError("sha256_32Kb", 1)
 
   val tests: Tests = Tests {
-    test("check: sha256_32Kb function compiles with a ByteVector") {
-      for (version <- testData.actualVersionsWithoutV3) {
+    test("sha256_32Kb functions compiles with a ByteVector") {
+      for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomByteVectorArrayElement,
-          sha256_32Kb,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
+        for (
+          (data, function) <- Seq(
+            (randomByteVectorArrayElement, sha256_32Kb),
+            (randomByteVectorArrayElement, sha256_32KbArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.codeFromMatchingAndCase(data, function, rideV3Result, GreaterV3ResultBinaryEntry)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
-    test("check: sha256_32Kb function compiles with a ByteVector(argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
+    test("compilation errors sha256_32Kb") {
+      for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomByteVectorArrayElement,
-          sha256_32KbArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("compilation error: sha256_32Kb - Non-matching types: expected: ByteVector") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomUnionArrayElement,
-          sha256_32Kb,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("ByteVector"))
-      }
-    }
-
-    test("compilation error: sha256_32Kb - Non-matching types: expected: ByteVector (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomAddressDataArrayElement,
-          sha256_32KbArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("ByteVector"))
-      }
-    }
-
-    test("compilation error: Can't find a function overload sha256_32Kb") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomUnionArrayElement,
-          invalidSha256_32Kb,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, version, invalidErrorSha256_32Kb)
-      }
-    }
-
-    test("compilation error: Can't find a function overload sha256_32Kb (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script = precondition.codeFromMatchingAndCase(
-          randomUnionArrayElement,
-          invalidSha256_32KbArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultBinaryEntry
-        )
-        assertCompileErrorDApp(script, version, invalidErrorSha256_32Kb)
+        for (
+          (data, function, error) <- Seq(
+            (randomUnionArrayElement, sha256_32Kb, nonMatchingTypes("ByteVector")),
+            (randomAddressDataArrayElement, sha256_32KbArgBeforeFunc, nonMatchingTypes("ByteVector")),
+            (randomByteVectorArrayElement, invalidSha256_32Kb, invalidErrorSha256_32Kb),
+            (randomByteVectorArrayElement, invalidSha256_32KbArgBeforeFunc, invalidErrorSha256_32Kb)
+          )
+        ) {
+          val script = precondition.codeFromMatchingAndCase(data, function, rideV3Result, GreaterV3ResultBinaryEntry)
+          assertCompileErrorDApp(script, version, error)
+        }
       }
     }
   }

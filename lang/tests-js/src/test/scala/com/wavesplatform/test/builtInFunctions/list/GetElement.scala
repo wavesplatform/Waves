@@ -2,114 +2,50 @@ package com.wavesplatform.test.builtInFunctions.list
 
 import com.wavesplatform.JsTestBase
 import testHelpers.GeneratorContractsForBuiltInFunctions
-import testHelpers.RandomDataGenerator.{randomAliasDataArrayElement, randomInt, randomIssuesArrayElement}
-import testHelpers.TestDataConstantsAndMethods.{intList, stringList}
+import testHelpers.RandomDataGenerator.{randomAliasDataArrayElement, randomInt, randomIssuesArrayElement, randomStringArrayElement}
+import testHelpers.TestDataConstantsAndMethods.{actualVersions, intList, nonMatchingTypes, stringList}
 import utest.{Tests, test}
 
 object GetElement extends JsTestBase {
-  // getElement
   private val getElement                     = "getElement(bar, foo)"
   private val getElementArgBeforeFunc        = "bar.getElement(foo)"
   private val invalidGetElement              = "getElement(foo)"
   private val invalidGetElementArgBeforeFunc = "foo.getElement(bar, foo)"
-  private val invalidErrorGetElement  = testData.invalidFunctionError("getElement", 2)
+  private val invalidErrorGetElement         = testData.invalidFunctionError("getElement", 2)
 
   val tests: Tests = Tests {
-    test("check: getElement function compiles with a stringList") {
-      for (version <- testData.actualVersions) {
+    test("GetElement functions compiles with a list") {
+      for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.simpleRideCode(
-          randomInt.toString,
-          stringList,
-          getElement
-        )
-        assertCompileSuccessDApp(script, version)
+        for (
+          (data, list, function) <- Seq(
+            (randomInt.toString, stringList, getElement),
+            (randomInt.toString, intList, getElement),
+            (randomInt.toString, stringList, getElementArgBeforeFunc),
+            (randomInt.toString, intList, getElementArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.simpleRideCode(data, list, function)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
-    test("check: getElement function compiles with a intList") {
-      for (version <- testData.actualVersions) {
+    test("Compilation errors GetElement functions") {
+      for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.simpleRideCode(
-          randomInt.toString,
-          intList,
-          getElement
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: getElement function compiles with a stringList (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.simpleRideCode(
-          randomInt.toString,
-          stringList,
-          getElementArgBeforeFunc
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: getElement function compiles with a intList (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.simpleRideCode(
-          randomInt.toString,
-          intList,
-          getElementArgBeforeFunc
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("compilation error: getElement - Non-matching types") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.simpleRideCode(
-          randomInt.toString,
-          randomAliasDataArrayElement,
-          getElementArgBeforeFunc
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes(""))
-      }
-    }
-
-    test("compilation error: getElement - Non-matching types (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.simpleRideCode(
-          randomInt.toString,
-          randomIssuesArrayElement,
-          getElementArgBeforeFunc
-        )
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes(""))
-      }
-    }
-
-    test("compilation error: Can't find a function overload getElement") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.simpleRideCode(
-          randomInt.toString,
-          randomAliasDataArrayElement,
-          invalidGetElement
-        )
-        assertCompileErrorDApp(script, version, invalidErrorGetElement)
-      }
-    }
-
-    test("compilation error: Can't find a function overload getElement (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.simpleRideCode(
-          randomInt.toString,
-          randomAliasDataArrayElement,
-          invalidGetElementArgBeforeFunc
-        )
-        assertCompileErrorDApp(script, version, invalidErrorGetElement)
+        for (
+          (data, list, function, error) <- Seq(
+            (randomInt.toString, randomAliasDataArrayElement, getElement, nonMatchingTypes("")),
+            (randomStringArrayElement, randomIssuesArrayElement, getElementArgBeforeFunc, nonMatchingTypes("")),
+            (randomInt.toString, intList, invalidGetElement, invalidErrorGetElement),
+            (randomStringArrayElement, stringList, invalidGetElementArgBeforeFunc, invalidErrorGetElement)
+          )
+        ) {
+          val script = precondition.simpleRideCode(data, list, function)
+          assertCompileErrorDApp(script, version, error)
+        }
       }
     }
   }
-
 }
