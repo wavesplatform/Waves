@@ -71,7 +71,7 @@ object PBOrders {
         case AssetDecimals    => ASSET_DECIMALS
         case FixedDecimals    => FIXED_DECIMALS
       },
-      order.orderAuthentication match {
+      sender = order.orderAuthentication match {
         case OrderAuthentication.OrderProofs(key, _)        => Sender.SenderPublicKey(key.toByteString)
         case OrderAuthentication.Eip712Signature(signature) => Sender.Eip712Signature(signature.toByteString)
       }
