@@ -27,7 +27,7 @@
   "gnetId": 12317,
   "graphTooltip": 0,
   "id": 3,
-  "iteration": 1676361322409,
+  "iteration": 1676362940156,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -593,10 +593,11 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(host_network_packets_read_failed_total{job=\"$job\", instance=~\"$instance\"})\n/\nsum(host_network_packets_read_total_total{job=\"$job\", instance=~\"$instance\"})",
+          "expr": "sum(host_network_packets_read_failed_total{job=\"$job\", instance=~\"$instance\"})\n/\nsum(host_network_packets_read_total{job=\"$job\", instance=~\"$instance\"})",
           "format": "time_series",
           "intervalFactor": 2,
           "legendFormat": "read",
+          "range": true,
           "refId": "A"
         },
         {
@@ -604,10 +605,11 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(host_network_packets_write_failed_total{job=\"$job\", instance=~\"$instance\"})\n/\nsum(host_network_packets_write_total_total{job=\"$job\", instance=~\"$instance\"})",
+          "expr": "sum(host_network_packets_write_failed_total{job=\"$job\", instance=~\"$instance\"})\n/\nsum(host_network_packets_write_total{job=\"$job\", instance=~\"$instance\"})",
           "format": "time_series",
           "intervalFactor": 2,
           "legendFormat": "write",
+          "range": true,
           "refId": "B"
         }
       ],
@@ -1168,8 +1170,8 @@
     },
     {
       "datasource": {
-        "type": "mixed",
-        "uid": "-- Mixed --"
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
       "description": "Tracks the number of file descriptors in used by the process.",
       "fieldConfig": {
@@ -1217,6 +1219,9 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
+          "editorMode": "builder",
+          "expr": "process_ulimit_file_descriptors_used{job=\"$job\", instance=~\"$instance\"}",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -2574,8 +2579,8 @@
               },
               "expr": "histogram_quantile(0.50, sum(rate(span_processing_time_seconds_bucket{instance=~\"$instance\", span_kind=\"server\", http_status_code=~\"5.*\"}[$__interval])) by (le))",
               "format": "time_series",
-              "intervalFactor": 2,
               "interval": "1m",
+              "intervalFactor": 2,
               "legendFormat": "p50",
               "refId": "D"
             }
@@ -3838,9 +3843,9 @@
               "exemplar": false,
               "expr": "increase(grpc_call_seconds_sum{job=\"$job\", instance=~\"$instance\"}[$__rate_interval])",
               "format": "time_series",
-              "interval": "1m",
               "hide": false,
               "instant": false,
+              "interval": "1m",
               "legendFormat": "{{method}}, raw: {{raw}}",
               "range": true,
               "rawQuery": false,
@@ -4198,8 +4203,8 @@
               "editorMode": "builder",
               "expr": "sum by(span_kind) (increase(span_processing_time_seconds_count{instance=~\"$instance\", job=\"$job\", error=\"true\", operation=\"$client_operation\"}[$__interval]))",
               "format": "time_series",
-              "interval": "1m",
               "hide": false,
+              "interval": "1m",
               "intervalFactor": 2,
               "legendFormat": "{{operation}} with error",
               "range": true,
@@ -6982,6 +6987,6 @@
   "timezone": "browser",
   "title": "RIDE runner",
   "uid": "atdeRNc4k",
-  "version": 118,
+  "version": 120,
   "weekStart": ""
 }
