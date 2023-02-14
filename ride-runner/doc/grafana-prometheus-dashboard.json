@@ -704,7 +704,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 6,
+        "h": 3,
         "w": 3,
         "x": 21,
         "y": 1
@@ -1210,6 +1210,66 @@
         }
       ],
       "title": "# FDs",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 3,
+        "x": 21,
+        "y": 4
+      },
+      "id": 158,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "8.5.3",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "builder",
+          "expr": "ride_script_number{job=\"$job\", instance=~\"$instance\"}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Total scripts",
       "type": "stat"
     },
     {
@@ -6858,6 +6918,6 @@
   "timezone": "browser",
   "title": "RIDE runner",
   "uid": "atdeRNc4k",
-  "version": 115,
+  "version": 116,
   "weekStart": ""
 }
