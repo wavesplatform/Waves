@@ -1,10 +1,11 @@
 #!/bin/bash
 shopt -s nullglob
 
-[ -n "${YOURKIT_OPTS}" ] && JAVA_OPTS="$JAVA_OPTS -agentpath:/usr/local/YourKit-JavaProfiler-$YOURKIT_VERSION/bin/linux-x86-64/libyjpagent.so=$YOURKIT_OPTS"
 JAVA_OPTS="-javaagent:${RIDE_INSTALL_PATH}/kanela-agent/kanela-agent-1.0.16.jar
   -server
   -XX:+ExitOnOutOfMemoryError
+  -XX:+HeapDumpOnOutOfMemoryError
+  -XX:HeapDumpPath=${RDATA}/heap-dumps/on-exit
   -XX:+ParallelRefProcEnabled
   -XX:+UseStringDeduplication
   -Xmx${RIDE_HEAP_SIZE}
@@ -12,11 +13,20 @@ JAVA_OPTS="-javaagent:${RIDE_INSTALL_PATH}/kanela-agent/kanela-agent-1.0.16.jar
   -Dlogback.configurationFile=${RIDE_LOGBACK_CONFIG}
   -Dlogback.stdout.level=${RIDE_LOG_LEVEL}
   -Dconfig.override_with_env_vars=true
-  ${JAVA_OPTS}
   -Dwaves.defaults.blockchain.type=$RIDE_NETWORK
-  -Dwaves.defaults.directory=$RDATA"
+  -Dwaves.defaults.directory=$RDATA
+  -Dride.heapDumps.enabled=true"
+
+[ -n "${ASYNCPROF_OPTS}" ] && JAVA_OPTS="-agentpath:/usr/local/async-profiler/build/libasyncProfiler.so=$ASYNCPROF_OPTS $JAVA_OPTS"
 
 echo "Ride runner is starting..."
 echo "JAVA_OPTS='${JAVA_OPTS}'"
 
-java $JAVA_OPTS -cp "${RIDE_INSTALL_PATH}/lib/*" $RIDE_APP "$RIDE_CONFIG"
+if [ $# -eq 0 ]
+  then
+    ARGS="$RIDE_APP $RIDE_CONFIG"
+  else
+    ARGS=$@
+fi
+
+java $JAVA_OPTS -cp "${RIDE_INSTALL_PATH}/lib/*" $ARGS

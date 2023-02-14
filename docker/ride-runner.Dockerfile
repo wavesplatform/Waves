@@ -1,21 +1,24 @@
 # To build: docker build -t wavesplatform/ride-runner:latest -f docker/ride-runner.Dockerfile docker
-FROM eclipse-temurin:11-jre
+FROM eclipse-temurin:17-jre
 
-ENV RIDE_LOG_LEVEL=INFO
-ENV RIDE_HEAP_SIZE=2g
-ENV RIDE_NETWORK=mainnet
-ENV RIDE_APP=com.wavesplatform.ride.app.RideWithBlockchainUpdatesService
-
-ENV YOURKIT_VERSION=2022.9
+# /usr/local/async-profiler/build/libasyncProfiler.so
+ENV ASYNCPROF_VERSION=2.9
 
 SHELL ["/bin/bash", "-c"]
 
 # Additional dependencies
 RUN apt-get update && apt-get install -y wget unzip gosu || exit 1; \
-    export YOURKIT_ARCHIVE="YourKit-JavaProfiler-$YOURKIT_VERSION-docker.zip"; \
-    wget --quiet "https://www.yourkit.com/download/docker/$YOURKIT_ARCHIVE" -P /tmp/ && unzip /tmp/$YOURKIT_ARCHIVE -d /usr/local || exit 1; \
+    export ASYNCPROF_ARCHIVE="async-profiler-${ASYNCPROF_VERSION}-linux-x64.tar.gz"; \
+    wget --quiet "https://github.com/jvm-profiling-tools/async-profiler/releases/download/v${ASYNCPROF_VERSION}/${ASYNCPROF_ARCHIVE}" -P /tmp/ && \
+      mkdir /usr/local/async-profiler; tar -xvzf /tmp/$ASYNCPROF_ARCHIVE --strip-components=1 -C /usr/local/async-profiler || exit 1; \
     # Clean
     apt-get remove -y wget unzip && apt-get autoremove -y && apt-get autoclean && rm -rf /var/lib/apt/lists/*
+
+# Temporarly here to experiment on a test env
+ENV RIDE_LOG_LEVEL=INFO
+ENV RIDE_HEAP_SIZE=1g
+ENV RIDE_NETWORK=mainnet
+ENV RIDE_APP=com.wavesplatform.ride.app.RideWithBlockchainUpdatesService
 
 # RIDE runner files
 ENV RDATA=/var/lib/ride-runner
@@ -28,7 +31,7 @@ COPY ride-runner.conf.template $RIDE_CONFIG
 
 # Setup node
 COPY ride-runner.entrypoint.sh $RIDE_INSTALL_PATH/bin/entrypoint.sh
-RUN mkdir -p $RDATA; \
+RUN mkdir -p $RDATA/heap-dumps/on-exit; \
     # Create user
     groupadd -r ride --gid=999; \
     useradd -r -g ride --uid=999 --home-dir=$RDATA --shell=/bin/bash ride; \
@@ -46,4 +49,4 @@ WORKDIR $RDATA
 HEALTHCHECK CMD curl -f http://localhost:6890/ride/status || exit 1
 
 STOPSIGNAL SIGINT
-CMD ["/usr/share/ride-runner/bin/entrypoint.sh"]
+ENTRYPOINT ["/usr/share/ride-runner/bin/entrypoint.sh"]
