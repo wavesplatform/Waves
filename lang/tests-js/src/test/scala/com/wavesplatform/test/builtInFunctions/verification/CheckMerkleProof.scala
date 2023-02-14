@@ -4,68 +4,58 @@ import com.wavesplatform.JsTestBase
 import com.wavesplatform.lang.directives.values.V3
 import testHelpers.GeneratorContractsForBuiltInFunctions
 import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomByteVectorArrayElement, randomInt, randomUnionArrayElement}
+import testHelpers.TestDataConstantsAndMethods.{CANT_FIND_FUNCTION, MATCHING_NOT_EXHAUSTIVE}
 import utest.{Tests, test}
 
 object CheckMerkleProof extends JsTestBase {
-  // checkMerkleProof
   private val checkMerkleProof                     = "checkMerkleProof(callerTestData, callerTestData, callerTestData)"
   private val checkMerkleProofArgBeforeFunc        = "callerTestData.checkMerkleProof(callerTestData, callerTestData)"
   private val invalidCheckMerkleProof              = "checkMerkleProof()"
   private val invalidCheckMerkleProofArgBeforeFunc = "callerTestData.checkMerkleProof(callerTestData)"
 
-  private val invalidErrorCheckMerkleProof         = testData.invalidFunctionError("checkMerkleProof", 3)
+  private val invalidErrorCheckMerkleProof = testData.invalidFunctionError("checkMerkleProof", 3)
 
   val tests: Tests = Tests {
-    test("check: checkMerkleProof function compiles") {
+    test("checkMerkleProof functions compiles") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.onlyMatcherContract(randomByteVectorArrayElement, checkMerkleProof)
-      assertCompileSuccessDApp(script, V3)
-    }
-
-    test("check: checkMerkleProof function compiles (argument before function)") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.onlyMatcherContract(randomByteVectorArrayElement, checkMerkleProofArgBeforeFunc)
-      assertCompileSuccessDApp(script, V3)
-    }
-
-    test("compilation error: checkMerkleProof - Non-matching types: expected") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.onlyMatcherContract(randomUnionArrayElement, checkMerkleProof)
-      assertCompileErrorDApp(script, V3, testData.MATCHING_NOT_EXHAUSTIVE)
-
-    }
-
-    test("compilation error: checkMerkleProof - Non-matching types: expected: (argument before function)") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.onlyMatcherContract(randomAddressDataArrayElement, checkMerkleProofArgBeforeFunc)
-      assertCompileErrorDApp(script, V3, testData.MATCHING_NOT_EXHAUSTIVE)
-    }
-
-    test("compilation error: Can't find a function overload checkMerkleProof") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.onlyMatcherContract(randomUnionArrayElement, invalidCheckMerkleProof)
-      assertCompileErrorDApp(script, V3, invalidErrorCheckMerkleProof)
-    }
-
-    test("compilation error: Can't find a function overload checkMerkleProof (argument before function)") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
-      val script = precondition.onlyMatcherContract(randomUnionArrayElement, invalidCheckMerkleProofArgBeforeFunc)
-      assertCompileErrorDApp(script, V3, invalidErrorCheckMerkleProof)
-    }
-
-    test("check: checkMerkleProof function compiles") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.onlyMatcherContract(randomInt.toString, checkMerkleProof)
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_FUNCTION)
+      for (
+        (data, function) <- Seq(
+          (randomByteVectorArrayElement, checkMerkleProof),
+          (randomByteVectorArrayElement, checkMerkleProofArgBeforeFunc)
+        )
+      ) {
+        val script = precondition.onlyMatcherContract(data, function)
+        assertCompileSuccessDApp(script, V3)
       }
     }
 
-    test("check: checkMerkleProof function compiles (argument before function)") {
+    test("invalid functions checkMerkleProof") {
+      val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
+      for (
+        (data, function, error) <- Seq(
+          (randomUnionArrayElement, checkMerkleProof, MATCHING_NOT_EXHAUSTIVE),
+          (randomAddressDataArrayElement, checkMerkleProofArgBeforeFunc, MATCHING_NOT_EXHAUSTIVE),
+          (randomByteVectorArrayElement, invalidCheckMerkleProof, invalidErrorCheckMerkleProof),
+          (randomByteVectorArrayElement, invalidCheckMerkleProofArgBeforeFunc, invalidErrorCheckMerkleProof)
+        )
+      ) {
+        val script = precondition.onlyMatcherContract(data, function)
+        assertCompileErrorDApp(script, V3, error)
+      }
+    }
+
+    test("check: checkMerkleProof functions compiles") {
       for (version <- testData.actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script = precondition.onlyMatcherContract(randomInt.toString, checkMerkleProofArgBeforeFunc)
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_FUNCTION)
+        for (
+          (data, function) <- Seq(
+            (randomByteVectorArrayElement, checkMerkleProof),
+            (randomByteVectorArrayElement, checkMerkleProofArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.onlyMatcherContract(data, function)
+          assertCompileErrorDApp(script, version, CANT_FIND_FUNCTION)
+        }
       }
     }
   }

@@ -4,69 +4,53 @@ import com.wavesplatform.JsTestBase
 import com.wavesplatform.lang.directives.values.V3
 import testHelpers.GeneratorContractsForBuiltInFunctions
 import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomByteVectorArrayElement, randomUnionArrayElement}
+import testHelpers.TestDataConstantsAndMethods.{CANT_FIND_FUNCTION, actualVersionsWithoutV3, nonMatchingTypes}
 import utest.{Tests, test}
 
 object SigVerify_32Kb extends JsTestBase {
-  // sigVerify_32Kb
-  private val sigVerify_32Kb              = s"sigVerify_32Kb(callerTestData, callerTestData, callerTestData)"
-  private val sigVerify_32KbArgBeforeFunc = s"callerTestData.sigVerify_32Kb(callerTestData, callerTestData)"
-  private val invalidSigVerify_32Kb       = "sigVerify_32Kb()"
+  private val sigVerify_32Kb                     = s"sigVerify_32Kb(callerTestData, callerTestData, callerTestData)"
+  private val sigVerify_32KbArgBeforeFunc        = s"callerTestData.sigVerify_32Kb(callerTestData, callerTestData)"
+  private val invalidSigVerify_32Kb              = "sigVerify_32Kb()"
   private val invalidSigVerify_32KbArgBeforeFunc = "callerTestData.sigVerify_32Kb(callerTestData)"
   private val invalidErrorSigVerify_32Kb         = testData.invalidFunctionError("sigVerify_32Kb", 3)
 
   val tests: Tests = Tests {
-    test("check: sigVerify_32Kb function compiles with a ByteVector") {
-      for (version <- testData.actualVersionsWithoutV3) {
+    test("sigVerify_32Kb functions compiles") {
+      for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, sigVerify_32Kb)
-        assertCompileSuccessDApp(script, version)
+        for (
+          (data, function) <- Seq(
+            (randomByteVectorArrayElement, sigVerify_32Kb),
+            (randomByteVectorArrayElement, sigVerify_32KbArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.onlyMatcherContract(data, function)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
-    test("check: sigVerify_32Kb function compiles with a ByteVector(argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
+    test("invalid functions sigVerify_32Kb") {
+      for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, sigVerify_32KbArgBeforeFunc)
-        assertCompileSuccessDApp(script, version)
+        for (
+          (data, function, error) <- Seq(
+            (randomUnionArrayElement, sigVerify_32Kb, nonMatchingTypes("ByteVector")),
+            (randomAddressDataArrayElement, sigVerify_32KbArgBeforeFunc, nonMatchingTypes("ByteVector")),
+            (randomByteVectorArrayElement, invalidSigVerify_32Kb, invalidErrorSigVerify_32Kb),
+            (randomByteVectorArrayElement, invalidSigVerify_32KbArgBeforeFunc, invalidErrorSigVerify_32Kb)
+          )
+        ) {
+          val script = precondition.onlyMatcherContract(data, function)
+          assertCompileErrorDApp(script, version, error)
+        }
       }
     }
 
-    test("compilation error: sigVerify_32Kb - Non-matching types: expected: ByteVector") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script       = precondition.onlyMatcherContract(randomUnionArrayElement, sigVerify_32Kb)
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("ByteVector"))
-      }
-    }
-
-    test("compilation error: sigVerify_32Kb - Non-matching types: expected: ByteVector (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script       = precondition.onlyMatcherContract(randomAddressDataArrayElement, sigVerify_32KbArgBeforeFunc)
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("ByteVector"))
-      }
-    }
-
-    test("compilation error: Can't find a function overload sigVerify_32Kb") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script       = precondition.onlyMatcherContract(randomUnionArrayElement, invalidSigVerify_32Kb)
-        assertCompileErrorDApp(script, version, invalidErrorSigVerify_32Kb)
-      }
-    }
-
-    test("compilation error: Can't find a function overload sigVerify_32Kb (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script       = precondition.onlyMatcherContract(randomUnionArrayElement, invalidSigVerify_32KbArgBeforeFunc)
-        assertCompileErrorDApp(script, version, invalidErrorSigVerify_32Kb)
-      }
-    }
-
-    test("compilation error: Can't find a function sigVerify_32Kb") {
+    test("compilation error: Can't find a function sigVerify_32Kb for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", V3)
       val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, sigVerify_32Kb)
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
+      assertCompileErrorDApp(script, V3, CANT_FIND_FUNCTION)
     }
   }
 }

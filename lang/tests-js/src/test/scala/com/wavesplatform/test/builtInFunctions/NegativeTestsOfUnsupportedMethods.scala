@@ -4,7 +4,15 @@ import com.wavesplatform.JsTestBase
 import com.wavesplatform.lang.directives.values.V3
 import testHelpers.GeneratorContractsForBuiltInFunctions
 import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomByteVectorArrayElement, randomInt, randomStringArrayElement}
-import testHelpers.TestDataConstantsAndMethods.{intList, stringList}
+import testHelpers.TestDataConstantsAndMethods.{
+  CANT_FIND_FUNCTION,
+  GreaterV3ResultBinaryEntry,
+  UNDEFINED_TYPE,
+  intList,
+  oldVersions,
+  rideV3Result,
+  stringList
+}
 import utest.{Tests, test}
 
 object NegativeTestsOfUnsupportedMethods extends JsTestBase {
@@ -29,146 +37,73 @@ object NegativeTestsOfUnsupportedMethods extends JsTestBase {
   private val min = "min(callerTestData)"
 
   val tests: Tests = Tests {
-    test("compilation error: Undefined type: `BigInt` for ride v3, v4") {
-      for (version <- testData.oldVersions) {
+    test("toBigInt functions compilation error: Undefined type: `BigInt` for ride v3, v4") {
+      for (version <- oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script       = precondition.onlyMatcherContract(randomInt.toString, toBigInt)
-        assertCompileErrorDApp(script, version, testData.UNDEFINED_TYPE)
-      }
-    }
-
-    test("compilation error: Undefined type: `BigInt` for ride v3, v4 (argument before function)") {
-      for (version <- testData.oldVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script       = precondition.onlyMatcherContract(randomStringArrayElement, toBigIntArgBeforeFunc)
-        assertCompileErrorDApp(script, version, testData.UNDEFINED_TYPE)
+        for (
+          (data, function, error) <- Seq(
+            (randomInt.toString, toBigInt, UNDEFINED_TYPE),
+            (randomStringArrayElement, toBigIntArgBeforeFunc, UNDEFINED_TYPE)
+          )
+        ) {
+          val script = precondition.onlyMatcherContract(data, function)
+          assertCompileErrorDApp(script, version, error)
+        }
       }
     }
 
     test("compilation error: invalid data invoke for ride v3, v4 (argument before function)") {
-      for (version <- testData.oldVersions) {
+      for (version <- oldVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
         val script       = precondition.codeForDAppInvocation(randomByteVectorArrayElement, randomAddressDataArrayElement, invokeArgBeforeFunc)
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_FUNCTION)
+        assertCompileErrorDApp(script, version, CANT_FIND_FUNCTION)
       }
     }
 
-    test("compilation error: blake2b256_16Kb Can't find a function for V3") {
+    test("compilation error: blake2b256 functions Can't find a function for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        randomByteVectorArrayElement,
-        blake2b256_16Kb,
-        testData.rideV3Result,
-        testData.GreaterV3ResultBinaryEntry
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
+      for (
+        (data, function, error) <- Seq(
+          (randomByteVectorArrayElement, blake2b256_16Kb, CANT_FIND_FUNCTION),
+          (randomByteVectorArrayElement, blake2b256_32Kb, CANT_FIND_FUNCTION),
+          (randomByteVectorArrayElement, blake2b256_64Kb, CANT_FIND_FUNCTION),
+          (randomByteVectorArrayElement, blake2b256_128Kb, CANT_FIND_FUNCTION)
+        )
+      ) {
+        val script = precondition.codeFromMatchingAndCase(data, function, rideV3Result, GreaterV3ResultBinaryEntry)
+        assertCompileErrorDApp(script, V3, error)
+      }
     }
 
-    test("compilation error: blake2b256_32Kb Can't find a function for V3") {
+    test("compilation error: keccak256 Can't find a functions for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        randomByteVectorArrayElement,
-        blake2b256_32Kb,
-        testData.rideV3Result,
-        testData.GreaterV3ResultBinaryEntry
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
+      for (
+        (data, function, error) <- Seq(
+          (randomByteVectorArrayElement, keccak256_16Kb, CANT_FIND_FUNCTION),
+          (randomByteVectorArrayElement, keccak256_32Kb, CANT_FIND_FUNCTION),
+          (randomByteVectorArrayElement, keccak256_64Kb, CANT_FIND_FUNCTION),
+          (randomByteVectorArrayElement, keccak256_128Kb, CANT_FIND_FUNCTION)
+        )
+      ) {
+        val script = precondition.codeFromMatchingAndCase(data, function, rideV3Result, GreaterV3ResultBinaryEntry)
+        assertCompileErrorDApp(script, V3, error)
+      }
     }
 
-    test("compilation error: blake2b256_64Kb Can't find a function for V3") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        randomByteVectorArrayElement,
-        blake2b256_64Kb,
-        testData.rideV3Result,
-        testData.GreaterV3ResultBinaryEntry
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
-    }
-
-    test("compilation error: blake2b256_128Kb Can't find a function for V3") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        randomByteVectorArrayElement,
-        blake2b256_128Kb,
-        testData.rideV3Result,
-        testData.GreaterV3ResultBinaryEntry
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
-    }
-
-    test("compilation error: keccak256_16Kb Can't find a function for V3") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        randomByteVectorArrayElement,
-        keccak256_16Kb,
-        testData.rideV3Result,
-        testData.GreaterV3ResultBinaryEntry
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
-    }
-
-    test("compilation error: keccak256_32Kb Can't find a function for V3") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        randomByteVectorArrayElement,
-        keccak256_32Kb,
-        testData.rideV3Result,
-        testData.GreaterV3ResultBinaryEntry
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
-    }
-
-    test("compilation error: keccak256_64Kb Can't find a function for V3") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        randomByteVectorArrayElement,
-        keccak256_64Kb,
-        testData.rideV3Result,
-        testData.GreaterV3ResultBinaryEntry
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
-    }
-
-    test("compilation error: keccak256_128Kb Can't find a function for V3") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", V3)
-      val script = precondition.codeFromMatchingAndCase(
-        randomByteVectorArrayElement,
-        keccak256_128Kb,
-        testData.rideV3Result,
-        testData.GreaterV3ResultBinaryEntry
-      )
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
-    }
-
-    test("compilation error: containsElement Can't find a function for V3") {
+    test("Can't find a functions for V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("", V3)
-      val script       = precondition.simpleRideCode(randomStringArrayElement, stringList, containsElement)
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
-    }
-
-    test("compilation error: indexOf Can't find a function for V3") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("", V3)
-      val script       = precondition.simpleRideCode(randomInt.toString, intList, indexOf)
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
-    }
-
-    test("compilation error: max Can't find a function for V3") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("", V3)
-      val script       = precondition.simpleRideCode(randomInt.toString, intList, max)
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
-    }
-
-    test("compilation error: max Can't find a function for V3") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("", V3)
-      val script       = precondition.simpleRideCode(randomInt.toString, intList, min)
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
-    }
-
-    test("compilation error: removeByIndex Can't find a function for V3") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("", V3)
-      val script       = precondition.simpleRideCode(randomInt.toString, intList, removeByIndex)
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
+      for (
+        (data, list, function) <- Seq(
+          (randomStringArrayElement, stringList, containsElement),
+          (randomInt.toString, intList, indexOf),
+          (randomInt.toString, intList, max),
+          (randomInt.toString, intList, min),
+          (randomInt.toString, intList, removeByIndex)
+        )
+      ) {
+        val script = precondition.simpleRideCode(data, list, function)
+        assertCompileErrorDApp(script, V3, CANT_FIND_FUNCTION)
+      }
     }
   }
 }
