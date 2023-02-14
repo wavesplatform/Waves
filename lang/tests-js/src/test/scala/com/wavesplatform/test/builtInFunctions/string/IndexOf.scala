@@ -3,11 +3,10 @@ package com.wavesplatform.test.builtInFunctions.string
 import com.wavesplatform.JsTestBase
 import testHelpers.GeneratorContractsForBuiltInFunctions
 import testHelpers.RandomDataGenerator.{randomInt, randomStringArrayElement}
-import testHelpers.TestDataConstantsAndMethods.{intList, stringList}
+import testHelpers.TestDataConstantsAndMethods.{CANT_FIND_A_FUNCTION_OVERLOAD, actualVersions, intList, stringList}
 import utest.{Tests, test}
 
 object IndexOf extends JsTestBase {
-  // indexOf
   private val indexOf                        = "indexOf(bar, foo)"
   private val indexOfWithOffset              = s"indexOf(bar, foo, $randomInt)"
   private val indexOfArgBeforeFunc           = "bar.indexOf(foo)"
@@ -16,112 +15,38 @@ object IndexOf extends JsTestBase {
 
   val tests: Tests = Tests {
     test("check: indexOf function compiles") {
-      for (version <- testData.actualVersions) {
+      for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.simpleRideCode(
-          randomStringArrayElement,
-          randomStringArrayElement,
-          indexOf
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: indexOf function compiles with offset") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.simpleRideCode(
-          randomStringArrayElement,
-          randomStringArrayElement,
-          indexOfWithOffset
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: indexOf function compiles (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.simpleRideCode(
-          randomStringArrayElement,
-          randomStringArrayElement,
-          indexOfArgBeforeFunc
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: indexOf function compiles with offset (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.simpleRideCode(
-          randomStringArrayElement,
-          randomStringArrayElement,
-          indexOfWithOffsetArgBeforeFunc
-        )
-        assertCompileSuccessDApp(script, version)
+        for (
+          (firstData, secondData, function) <- Seq(
+            (randomStringArrayElement, randomStringArrayElement, indexOf),
+            (randomStringArrayElement, randomStringArrayElement, indexOfWithOffset),
+            (randomStringArrayElement, randomStringArrayElement, indexOfArgBeforeFunc),
+            (randomStringArrayElement, randomStringArrayElement, indexOfWithOffsetArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.simpleRideCode(firstData, secondData, function)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
     test("compilation error: indexOf - Non-matching types - Can't find a function overload") {
-      for (version <- testData.actualVersions) {
+      for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.simpleRideCode(
-          stringList,
-          randomStringArrayElement,
-          indexOf
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: indexOf - Non-matching types - Can't find a function overload") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.simpleRideCode(
-          randomInt.toString,
-          randomStringArrayElement,
-          indexOfArgBeforeFunc
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: indexOf with offset - Non-matching types - Can't find a function overload") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.simpleRideCode(
-          stringList,
-          randomStringArrayElement,
-          indexOfWithOffset
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: indexOf with overload - Non-matching types - Can't find a function overload") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.simpleRideCode(
-          randomInt.toString,
-          randomStringArrayElement,
-          indexOfWithOffsetArgBeforeFunc
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: Can't find a function overload indexOf") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.simpleRideCode(
-          randomInt.toString,
-          intList,
-          invalidIndexOf
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+        for (
+          (firstData, secondData, function) <- Seq(
+            (stringList, randomStringArrayElement, indexOf),
+            (randomInt.toString, randomStringArrayElement, indexOfArgBeforeFunc),
+            (stringList, randomStringArrayElement, indexOfWithOffset),
+            (randomInt.toString, randomStringArrayElement, indexOfWithOffsetArgBeforeFunc),
+            (randomInt.toString, intList, invalidIndexOf)
+          )
+        ) {
+          val script = precondition.simpleRideCode(firstData, secondData, function)
+          assertCompileErrorDApp(script, version, CANT_FIND_A_FUNCTION_OVERLOAD)
+        }
       }
     }
   }
-
 }

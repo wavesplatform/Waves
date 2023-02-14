@@ -4,68 +4,58 @@ import com.wavesplatform.JsTestBase
 import com.wavesplatform.lang.directives.values.V3
 import testHelpers.GeneratorContractsForBuiltInFunctions
 import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomInt, randomUnionArrayElement}
+import testHelpers.TestDataConstantsAndMethods.{CANT_FIND_FUNCTION, MATCHING_NOT_EXHAUSTIVE, actualVersionsWithoutV3, invalidFunctionError}
 import utest.{Tests, test}
 
 object Extract extends JsTestBase {
-  // extract
   private val extract                     = "extract(callerTestData)"
   private val extractArgBeforeFunc        = "callerTestData.extract()"
   private val invalidExtract              = "extract()"
   private val invalidExtractArgBeforeFunc = "callerTestData.extract(callerTestData)"
 
-  private val invalidErrorExtract         = testData.invalidFunctionError("extract", 1)
+  private val invalidErrorExtract = invalidFunctionError("extract", 1)
 
   val tests: Tests = Tests {
-    test("check: extract function compiles") {
+    test("Extract functions compiles") {
       val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
-      val script       = precondition.onlyMatcherContract(randomInt.toString, extract)
-      assertCompileSuccessDApp(script, V3)
-    }
-
-    test("check: extract function compiles (argument before function)") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
-      val script       = precondition.onlyMatcherContract(randomInt.toString, extractArgBeforeFunc)
-      assertCompileSuccessDApp(script, V3)
-    }
-
-    test("compilation error: extract - Non-matching types: expected") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
-      val script       = precondition.onlyMatcherContract(randomUnionArrayElement, extract)
-      assertCompileErrorDApp(script, V3, testData.MATCHING_NOT_EXHAUSTIVE)
-
-    }
-
-    test("compilation error: extract - Non-matching types: expected: (argument before function)") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
-      val script       = precondition.onlyMatcherContract(randomAddressDataArrayElement, extractArgBeforeFunc)
-      assertCompileErrorDApp(script, V3, testData.MATCHING_NOT_EXHAUSTIVE)
-    }
-
-    test("compilation error: Can't find a function overload extract") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
-      val script = precondition.onlyMatcherContract(randomUnionArrayElement, invalidExtract)
-      assertCompileErrorDApp(script, V3, invalidErrorExtract)
-    }
-
-    test("compilation error: Can't find a function overload extract (argument before function)") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
-      val script       = precondition.onlyMatcherContract(randomUnionArrayElement, invalidExtractArgBeforeFunc)
-      assertCompileErrorDApp(script, V3, invalidErrorExtract)
-    }
-
-    test("check: extract function compiles") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.onlyMatcherContract(randomInt.toString, extract)
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_FUNCTION)
+      for (
+        (data, function) <- Seq(
+          (randomInt.toString, extract),
+          (randomInt.toString, extractArgBeforeFunc)
+        )
+      ) {
+        val script = precondition.onlyMatcherContract(data, function)
+        assertCompileSuccessDApp(script, V3)
       }
     }
 
-    test("check: extract function compiles (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
+    test("invalid extract functions") {
+      val precondition = new GeneratorContractsForBuiltInFunctions("Int", V3)
+      for (
+        (data, function, error) <- Seq(
+          (randomUnionArrayElement, extract, MATCHING_NOT_EXHAUSTIVE),
+          (randomUnionArrayElement, extractArgBeforeFunc, MATCHING_NOT_EXHAUSTIVE),
+          (randomInt.toString, invalidExtract, invalidErrorExtract),
+          (randomInt.toString, invalidExtractArgBeforeFunc, invalidErrorExtract),
+        )
+      ) {
+        val script = precondition.onlyMatcherContract(data, function)
+        assertCompileErrorDApp(script, V3, error)
+      }
+    }
+
+    test("invalid extract functions for V4 - V6") {
+      for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.onlyMatcherContract(randomInt.toString, extractArgBeforeFunc)
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_FUNCTION)
+        for (
+          (data, function) <- Seq(
+            (randomInt.toString, extract),
+            (randomInt.toString, extractArgBeforeFunc),
+          )
+        ) {
+          val script = precondition.onlyMatcherContract(data, function)
+          assertCompileErrorDApp(script, version, CANT_FIND_FUNCTION)
+        }
       }
     }
   }

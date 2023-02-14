@@ -11,6 +11,7 @@ import testHelpers.RandomDataGenerator.{
   randomStringArrayElement,
   randomUnionArrayElement
 }
+import testHelpers.TestDataConstantsAndMethods.{MATCHING_NOT_EXHAUSTIVE, actualVersions}
 import utest.{Tests, test}
 
 object ValueOrErrorMessage extends JsTestBase {
@@ -21,83 +22,39 @@ object ValueOrErrorMessage extends JsTestBase {
   private val valueOrErrorInvalidFunctionMessage      = testData.invalidFunctionError("valueOrErrorMessage", 2)
 
   val tests: Tests = Tests {
-    test("check: function valueOrErrorMessage compiles with Int") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script       = precondition.onlyMatcherContract(randomInt.toString, valueOrErrorMessage)
-        assertCompileSuccessDApp(script, version)
+    test("valueOrElse functions are compiled with different data types") {
+      for (version <- actualVersions) {
+        for (
+          (dataType, firstData, function) <- Seq(
+            ("Int", randomInt.toString, valueOrErrorMessage),
+            ("Boolean", randomBoolean.toString, valueOrErrorMessage),
+            ("String", randomStringArrayElement, valueOrErrorMessage),
+            ("ByteVector", randomByteVectorArrayElement, valueOrErrorMessageArgBeforeFunction),
+            ("Address", randomAddressDataArrayElement, valueOrErrorMessageArgBeforeFunction),
+            ("Alias", randomAliasDataArrayElement, valueOrErrorMessageArgBeforeFunction)
+          )
+        ) {
+          val precondition = new GeneratorContractsForBuiltInFunctions(dataType, version)
+          val script       = precondition.onlyMatcherContract(firstData, function)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
-    test("check: function valueOrErrorMessage compiles with Boolean") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Boolean", version)
-        val script       = precondition.onlyMatcherContract(randomBoolean.toString, valueOrErrorMessage)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function valueOrErrorMessage compiles with Boolean") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script       = precondition.onlyMatcherContract(randomStringArrayElement, valueOrErrorMessage)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function valueOrErrorMessage compiles with ByteVector (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, valueOrErrorMessageArgBeforeFunction)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function valueOrErrorMessage compiles with Address (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Address", version)
-        val script       = precondition.onlyMatcherContract(randomAddressDataArrayElement, valueOrErrorMessageArgBeforeFunction)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: function valueOrErrorMessage compiles with Alias (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Alias", version)
-        val script       = precondition.onlyMatcherContract(randomAliasDataArrayElement, valueOrErrorMessageArgBeforeFunction)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("compilation error: Can't find a function overload, invalid data") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Alias", version)
-        val script       = precondition.onlyMatcherContract(randomAddressDataArrayElement, valueOrErrorMessage)
-        assertCompileErrorDApp(script, version, testData.MATCHING_NOT_EXHAUSTIVE)
-      }
-    }
-
-    test("compilation error: Can't find a function overload, invalid data (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script       = precondition.onlyMatcherContract(randomUnionArrayElement, valueOrErrorMessageArgBeforeFunction)
-        assertCompileErrorDApp(script, version, testData.MATCHING_NOT_EXHAUSTIVE)
-      }
-    }
-
-    test("compilation error: invalid function valueOrErrorMessage Can't find a function overload") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script       = precondition.onlyMatcherContract(randomStringArrayElement, invalidValueOrErrorMessage)
-        assertCompileErrorDApp(script, version, valueOrErrorInvalidFunctionMessage)
-      }
-    }
-
-    test("compilation error: invalid function valueOrErrorMessage Can't find a function overload (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("ByteVector", version)
-        val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, invalidValueOrErrorMessageArgBeforeFunc)
-        assertCompileErrorDApp(script, version, valueOrErrorInvalidFunctionMessage)
+    test("invalid functions valueOrError") {
+      for (version <- actualVersions) {
+        for (
+          (dataType, firstData, function, error) <- Seq(
+            ("Alias", randomAddressDataArrayElement, valueOrErrorMessage, MATCHING_NOT_EXHAUSTIVE),
+            ("String", randomUnionArrayElement, valueOrErrorMessageArgBeforeFunction, MATCHING_NOT_EXHAUSTIVE),
+            ("String", randomStringArrayElement, invalidValueOrErrorMessage, valueOrErrorInvalidFunctionMessage),
+            ("ByteVector", randomByteVectorArrayElement, invalidValueOrErrorMessageArgBeforeFunc, valueOrErrorInvalidFunctionMessage)
+          )
+        ) {
+          val precondition = new GeneratorContractsForBuiltInFunctions(dataType, version)
+          val script       = precondition.onlyMatcherContract(firstData, function)
+          assertCompileErrorDApp(script, version, error)
+        }
       }
     }
   }

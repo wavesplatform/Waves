@@ -9,111 +9,66 @@ import testHelpers.RandomDataGenerator.{
   randomBoolean,
   randomByteVectorArrayElement,
   randomInt,
-  randomIssuesArrayElement,
-  randomStringArrayElement,
+  randomStringArrayElement
 }
+import testHelpers.TestDataConstantsAndMethods.{CANT_FIND_FUNCTION, CANT_MATCH_INFERRED_TYPE, actualVersionsWithoutV3, invalidFunctionError}
 import utest.{Tests, test}
 
 object ValueOrElse extends JsTestBase {
-  // valueOrElse
   private val valueOrElse                     = "valueOrElse(bar, foo)"
   private val valueOrElseArgBeforeFunc        = "bar.valueOrElse(foo)"
   private val invalidValueOrElse              = "valueOrElse(foo)"
   private val invalidValueOrElseArgBeforeFunc = "foo.valueOrElse(foo, bar)"
-  private val invalidErrorValueOrElse         = testData.invalidFunctionError("valueOrElse", 2)
+  private val invalidErrorValueOrElse         = invalidFunctionError("valueOrElse", 2)
 
   val tests: Tests = Tests {
     test("check: valueOrElse function compiles with String") {
-      for (version <- testData.actualVersionsWithoutV3) {
+      for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script       = precondition.simpleRideCode(randomStringArrayElement, randomStringArrayElement, valueOrElse)
-        assertCompileSuccessDApp(script, version)
+        for (
+          (firstData, secondData, function) <- Seq(
+            (randomStringArrayElement, randomStringArrayElement, valueOrElse),
+            (randomInt.toString, randomInt.toString, valueOrElse),
+            (randomAliasDataArrayElement, randomAliasDataArrayElement, valueOrElse),
+            (randomAddressDataArrayElement, randomAddressDataArrayElement, valueOrElseArgBeforeFunc),
+            (randomByteVectorArrayElement, randomByteVectorArrayElement, valueOrElseArgBeforeFunc),
+            (randomBoolean.toString, randomBoolean.toString, valueOrElseArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.simpleRideCode(firstData, secondData, function)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
-    test("check: valueOrElse function compiles with Int") {
-      for (version <- testData.actualVersionsWithoutV3) {
+    test("invalid valueOrElse functions") {
+      for (version <- actualVersionsWithoutV3) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script       = precondition.simpleRideCode(randomInt.toString, randomInt.toString, valueOrElse)
-        assertCompileSuccessDApp(script, version)
+        for (
+          (firstData, secondData, function, error) <- Seq(
+            (randomInt.toString, randomByteVectorArrayElement, valueOrElse, CANT_MATCH_INFERRED_TYPE),
+            (randomInt.toString, randomStringArrayElement, valueOrElseArgBeforeFunc, CANT_MATCH_INFERRED_TYPE),
+            (randomStringArrayElement, randomStringArrayElement, invalidValueOrElse, invalidErrorValueOrElse),
+            (randomByteVectorArrayElement, randomByteVectorArrayElement, invalidValueOrElseArgBeforeFunc, invalidErrorValueOrElse)
+          )
+        ) {
+          val script = precondition.simpleRideCode(firstData, secondData, function)
+          assertCompileErrorDApp(script, version, error)
+        }
       }
     }
 
-    test("check: valueOrElse function compiles with Alias") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script       = precondition.simpleRideCode(randomAliasDataArrayElement, randomAliasDataArrayElement, valueOrElse)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: valueOrElse function compiles with Address (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script       = precondition.simpleRideCode(randomAddressDataArrayElement, randomAddressDataArrayElement, valueOrElseArgBeforeFunc)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: valueOrElse function compiles with byteVector (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script       = precondition.simpleRideCode(randomByteVectorArrayElement, randomByteVectorArrayElement, valueOrElseArgBeforeFunc)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: valueOrElse function compiles with boolean (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script       = precondition.simpleRideCode(randomBoolean.toString, randomBoolean.toString, valueOrElseArgBeforeFunc)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("compilation error: valueOrElse - Non-matching types") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script       = precondition.simpleRideCode(randomInt.toString, randomAliasDataArrayElement, valueOrElseArgBeforeFunc)
-        assertCompileErrorDApp(script, version, testData.CANT_MATCH_INFERRED_TYPE)
-      }
-    }
-
-    test("compilation error: valueOrElse - Non-matching types (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script       = precondition.simpleRideCode(randomInt.toString, randomIssuesArrayElement, valueOrElseArgBeforeFunc)
-        assertCompileErrorDApp(script, version, testData.CANT_MATCH_INFERRED_TYPE)
-      }
-    }
-
-    test("compilation error: Can't find a function overload valueOrElse") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script       = precondition.simpleRideCode(randomInt.toString, randomAliasDataArrayElement, invalidValueOrElse)
-        assertCompileErrorDApp(script, version, invalidErrorValueOrElse)
-      }
-    }
-
-    test("compilation error: Can't find a function overload valueOrElse (argument before function)") {
-      for (version <- testData.actualVersionsWithoutV3) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script       = precondition.simpleRideCode(randomInt.toString, randomAliasDataArrayElement, invalidValueOrElseArgBeforeFunc)
-        assertCompileErrorDApp(script, version, invalidErrorValueOrElse)
-      }
-    }
-
-    test("compilation error: Can't find a function V3") {
+    test("Can't find a function valueOrElse V3") {
       val precondition = new GeneratorContractsForBuiltInFunctions("", V3)
-      val script       = precondition.simpleRideCode(randomAliasDataArrayElement, randomAliasDataArrayElement, valueOrElse)
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
-
-    }
-
-    test("compilation error: Can't find a function V3 (argument before function)") {
-      val precondition = new GeneratorContractsForBuiltInFunctions("", V3)
-      val script       = precondition.simpleRideCode(randomAddressDataArrayElement, randomAddressDataArrayElement, valueOrElseArgBeforeFunc)
-      assertCompileErrorDApp(script, V3, testData.CANT_FIND_FUNCTION)
+      for (
+        (firstData, secondData, function) <- Seq(
+          (randomAliasDataArrayElement, randomAliasDataArrayElement, valueOrElse),
+          (randomAddressDataArrayElement, randomAddressDataArrayElement, valueOrElseArgBeforeFunc)
+        )
+      ) {
+        val script = precondition.simpleRideCode(firstData, secondData, function)
+        assertCompileErrorDApp(script, V3, CANT_FIND_FUNCTION)
+      }
     }
   }
 }

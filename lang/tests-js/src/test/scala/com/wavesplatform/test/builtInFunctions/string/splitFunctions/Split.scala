@@ -3,10 +3,10 @@ package com.wavesplatform.test.builtInFunctions.string.splitFunctions
 import com.wavesplatform.JsTestBase
 import testHelpers.GeneratorContractsForBuiltInFunctions
 import testHelpers.RandomDataGenerator.{randomAliasDataArrayElement, randomInt, randomIssuesArrayElement, randomStringArrayElement}
+import testHelpers.TestDataConstantsAndMethods.{actualVersions, nonMatchingTypes}
 import utest.{Tests, test}
 
 object Split extends JsTestBase {
-  // split
   private val split                     = "split(bar, foo)"
   private val splitArgBeforeFunc        = "bar.split(foo)"
   private val invalidSplit              = "split(foo)"
@@ -14,57 +14,36 @@ object Split extends JsTestBase {
   private val invalidErrorSplit         = testData.invalidFunctionError("split", 2)
 
   val tests: Tests = Tests {
-    test("check: split function compiles") {
-      for (version <- testData.actualVersions) {
+    test("split functions compiles") {
+      for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script       = precondition.simpleRideCode(randomStringArrayElement, randomStringArrayElement, split)
-        assertCompileSuccessDApp(script, version)
+        for (
+          (data, list, function) <- Seq(
+            (randomStringArrayElement, randomStringArrayElement, split),
+            (randomStringArrayElement, randomStringArrayElement, splitArgBeforeFunc),
+          )
+        ) {
+          val script = precondition.simpleRideCode(data, list, function)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
-    test("check: split function compiles (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("String", version)
-        val script       = precondition.simpleRideCode(randomStringArrayElement, randomStringArrayElement, splitArgBeforeFunc)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("compilation error: split - Non-matching types") {
-      for (version <- testData.actualVersions) {
+    test("Compilation error for split functions") {
+      for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script       = precondition.simpleRideCode(randomInt.toString, randomAliasDataArrayElement, splitArgBeforeFunc)
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("String"))
-      }
-    }
-
-    test("compilation error: split - Non-matching types (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script       = precondition.simpleRideCode(randomInt.toString, randomIssuesArrayElement, splitArgBeforeFunc)
-        assertCompileErrorDApp(script, version, testData.nonMatchingTypes("String"))
-      }
-    }
-
-    test("compilation error: Can't find a function overload split") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script       = precondition.simpleRideCode(randomInt.toString, randomAliasDataArrayElement, invalidSplit)
-        assertCompileErrorDApp(script, version, invalidErrorSplit)
-      }
-    }
-
-    test("compilation error: Can't find a function overload split (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.simpleRideCode(
-          randomInt.toString,
-          randomAliasDataArrayElement,
-          invalidSplitArgBeforeFunc
-        )
-        assertCompileErrorDApp(script, version, invalidErrorSplit)
+        for (
+          (data, list, function, error) <- Seq(
+            (randomInt.toString, randomAliasDataArrayElement, splitArgBeforeFunc, nonMatchingTypes("String")),
+            (randomInt.toString, randomIssuesArrayElement, splitArgBeforeFunc, nonMatchingTypes("String")),
+            (randomStringArrayElement, randomStringArrayElement, invalidSplit, invalidErrorSplit),
+            (randomStringArrayElement, randomStringArrayElement, invalidSplitArgBeforeFunc, invalidErrorSplit),
+          )
+        ) {
+          val script = precondition.simpleRideCode(data, list, function)
+          assertCompileErrorDApp(script, version, error)
+        }
       }
     }
   }
-
 }

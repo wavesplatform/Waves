@@ -2,7 +2,8 @@ package com.wavesplatform.test.builtInFunctions.string
 
 import com.wavesplatform.JsTestBase
 import testHelpers.GeneratorContractsForBuiltInFunctions
-import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomStringArrayElement, randomInt, randomUnionArrayElement}
+import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomInt, randomStringArrayElement, randomUnionArrayElement}
+import testHelpers.TestDataConstantsAndMethods.{CANT_FIND_A_FUNCTION_OVERLOAD, GreaterV3ResultStringEntry, actualVersions, rideV3Result}
 import utest.{Tests, test}
 
 object Take extends JsTestBase {
@@ -12,81 +13,35 @@ object Take extends JsTestBase {
   private val invalidTakeArgBeforeFunc = s"callerTestData.take(callerTestData, $randomInt)"
 
   val tests: Tests = Tests {
-    test("check: function take compiles") {
-      for (version <- testData.actualVersions) {
+    test("Take functions compiles") {
+      for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeWithoutMatcher(
-          randomStringArrayElement,
-          take,
-          testData.rideV3Result,
-          testData.GreaterV3ResultStringEntry
-        )
-        assertCompileSuccessDApp(script, version)
+        for (
+          (data, function) <- Seq(
+            (randomStringArrayElement, take),
+            (randomStringArrayElement, takeArgBeforeFunction)
+          )
+        ) {
+          val script = precondition.codeWithoutMatcher(data, function, rideV3Result, GreaterV3ResultStringEntry)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
-    test("check: function take compiles (argument before function)") {
-      for (version <- testData.actualVersions) {
+    test("invalid take functions") {
+      for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeWithoutMatcher(
-          randomStringArrayElement,
-          takeArgBeforeFunction,
-          testData.rideV3Result,
-          testData.GreaterV3ResultStringEntry
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("compilation error: Can't find a function overload, invalid data") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeWithoutMatcher(
-          randomAddressDataArrayElement,
-          take,
-          testData.rideV3Result,
-          testData.GreaterV3ResultStringEntry
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: Can't find a function overload, invalid data (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeWithoutMatcher(
-          randomUnionArrayElement,
-          takeArgBeforeFunction,
-          testData.rideV3Result,
-          testData.GreaterV3ResultStringEntry
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: invalid function take Can't find a function overload") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeWithoutMatcher(
-          randomStringArrayElement,
-          invalidTake,
-          testData.rideV3Result,
-          testData.GreaterV3ResultStringEntry
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: invalid function take Can't find a function overload (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
-        val script = precondition.codeWithoutMatcher(
-          randomStringArrayElement,
-          invalidTakeArgBeforeFunc,
-          testData.rideV3Result,
-          testData.GreaterV3ResultStringEntry
-        )
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+        for (
+          (data, function) <- Seq(
+            (randomAddressDataArrayElement, take),
+            (randomUnionArrayElement, takeArgBeforeFunction),
+            (randomStringArrayElement, invalidTake),
+            (randomStringArrayElement, invalidTakeArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.codeWithoutMatcher(data, function, rideV3Result, GreaterV3ResultStringEntry)
+          assertCompileErrorDApp(script, version, CANT_FIND_A_FUNCTION_OVERLOAD)
+        }
       }
     }
   }
