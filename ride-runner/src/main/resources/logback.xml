@@ -6,7 +6,7 @@
     <statusListener class="ch.qos.logback.core.status.NopStatusListener"/>
 
     <!-- To stop LoggerContext properly and flush the logging events from the AsyncAppender queue -->
-    <shutdownHook class="ch.qos.logback.core.hook.DelayingShutdownHook">
+    <shutdownHook class="ch.qos.logback.core.hook.DefaultShutdownHook">
         <delay>5000</delay> <!-- milliseconds -->
     </shutdownHook>
 
