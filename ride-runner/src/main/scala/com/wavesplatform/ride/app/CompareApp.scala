@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import com.wavesplatform.api.RideApi
 import com.wavesplatform.api.http.CompositeHttpService
-import com.wavesplatform.http.{HttpServiceStatus, ServiceStatusRoute}
+import com.wavesplatform.http.{HttpServiceStatus, ServiceRoute}
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.util.concurrent.DefaultThreadFactory
 import kamon.instrumentation.executor.ExecutorInstrumentation
@@ -122,7 +122,7 @@ object CompareApp extends ScorexLogging {
 
     log.info(s"Initializing REST API on ${settings.restApi.bindAddress}:${settings.restApi.port}...")
     val apiRoutes = Seq(
-      ServiceStatusRoute({ () =>
+      ServiceRoute({ () =>
         val nowMs      = scheduler.clockMonotonic(TimeUnit.MILLISECONDS)
         val idleTimeMs = nowMs - lastServiceStatus.lastProcessedTimeMs
         HttpServiceStatus(

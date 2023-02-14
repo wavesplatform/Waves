@@ -6,6 +6,7 @@ import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
+import com.wavesplatform.jvm.HeapDumps
 import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.ride.app.RideRunnerMetrics
@@ -160,6 +161,7 @@ object BlockchainState extends ScorexLogging {
               val r = Working(h)
               processor.runAffectedScripts().as {
                 logStatusChanged(r)
+                HeapDumps.mk("init", live = true, makeAlways = false)
                 r
               }
             } else Task.now(comparedBlocks.copy(processedHeight = h))
