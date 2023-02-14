@@ -85,7 +85,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
             dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
           )
         ),
-        WrappedEvent.Next(mkMicroBlockAppendEvent(3, 2, 1))
+        WrappedEvent.Next(mkBlockAppendEvent(3, 2))
       ),
       xPlusHeight = 4
     )

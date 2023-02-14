@@ -6,7 +6,8 @@ import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
-import com.wavesplatform.http.{EvaluateApiRoute, HttpServiceStatus, ServiceStatusRoute}
+import com.wavesplatform.http.{EvaluateApiRoute, HttpServiceStatus, ServiceRoute}
+import com.wavesplatform.jvm.HeapDumps
 import com.wavesplatform.ride.DefaultRequestsService
 import com.wavesplatform.state.Height
 import com.wavesplatform.storage.persistent.LevelDbPersistentCaches
@@ -38,6 +39,8 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
       val metrics = new RideRunnerMetrics(globalConfig)
       cs.cleanup(CustomShutdownPhase.Metrics) { metrics.close() }
     }
+
+    HeapDumps.cleanDirs(5)
 
     log.info("Initializing thread pools...")
     def mkScheduler(name: String, threads: Int): Scheduler = {
@@ -168,7 +171,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     log.info(s"Initializing REST API on ${settings.restApi.bindAddress}:${settings.restApi.port}...")
     val apiRoutes = Seq(
       EvaluateApiRoute(requestsService.trackAndRun(_).runToFuture(rideScheduler)),
-      ServiceStatusRoute({ () =>
+      ServiceRoute({ () =>
         val nowMs      = blockchainEventsStreamScheduler.clockMonotonic(TimeUnit.MILLISECONDS)
         val idleTimeMs = nowMs - lastServiceStatus.lastProcessedTimeMs
         HttpServiceStatus(
