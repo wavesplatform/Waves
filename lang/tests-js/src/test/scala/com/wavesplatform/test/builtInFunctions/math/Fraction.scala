@@ -5,17 +5,16 @@ import com.wavesplatform.lang.directives.values.V5
 import testHelpers.GeneratorContractsForBuiltInFunctions
 import testHelpers.RandomDataGenerator.{
   randomAddressDataArrayElement,
-  randomByteVectorArrayElement,
   randomAliasDataArrayElement,
-  randomStringArrayElement,
+  randomInt,
   randomIssuesArrayElement,
-  randomUnionArrayElement,
-  randomInt
+  randomStringArrayElement,
+  randomUnionArrayElement
 }
+import testHelpers.TestDataConstantsAndMethods.{CANT_FIND_A_FUNCTION_OVERLOAD, actualVersions, nonMatchingTypes, versionsSupportingTheNewFeatures}
 import utest.{Tests, test}
 
 object Fraction extends JsTestBase {
-
   private var union: String                    = randomUnionArrayElement
   private val fractionInt                      = s"fraction(callerTestData, $randomInt, $randomInt)"
   private val fractionIntArgBeforeFunc         = s"callerTestData.fraction($randomInt, $randomInt)"
@@ -33,166 +32,77 @@ object Fraction extends JsTestBase {
   private val fractionError: String                = testData.invalidFunctionError("fraction", 3)
 
   val tests: Tests = Tests {
-    test("check: fraction Int function compiles") {
-      for (version <- testData.actualVersions) {
+    test("Fraction functions compiles with Int") {
+      for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script       = precondition.onlyMatcherContract(randomInt.toString, fractionInt)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: fraction Int function compiles (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script       = precondition.onlyMatcherContract(randomInt.toString, fractionIntArgBeforeFunc)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: fraction Int and union function compiles ") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script       = precondition.onlyMatcherContract(randomInt.toString, fractionIntAndUnion)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: fraction Int and union function compiles (argument before function)") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script       = precondition.onlyMatcherContract(randomInt.toString, fractionIntAndUnionArgBeforeFunc)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: fraction BigInt function compiles") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script       = precondition.onlyMatcherContract(s"toBigInt(${randomInt.toString})", fractionBigInt)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: fraction BigInt function compiles (argument before function)") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script       = precondition.onlyMatcherContract(s"toBigInt(${randomInt.toString})", fractionBigIntArgBeforeFunc)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: fraction BigInt and union function compiles ") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script = precondition.onlyMatcherContract(
-          s"toBigInt(${randomInt.toString})",
-          fractionBigIntAndUnion
-        )
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: fraction BigInt and union function compiles (argument before function)") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script       = precondition.onlyMatcherContract(s"toBigInt(${randomInt.toString})", fractionBigIntAndUnionArgBeforeFunc)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("compilation error: invalid fraction function") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script       = precondition.onlyMatcherContract(randomInt.toString, invalidFractionFunction)
-        if (version < V5) {
-          assertCompileErrorDApp(script, version, fractionError)
-        } else {
-          assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+        for (
+          (data, function) <- Seq(
+            (randomInt.toString, fractionInt),
+            (randomInt.toString, fractionIntArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.onlyMatcherContract(data, function)
+          assertCompileSuccessDApp(script, version)
         }
       }
     }
 
-    test("compilation error: invalid fraction function (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script       = precondition.onlyMatcherContract(randomInt.toString, invalidFractionFunctionArgBeforeFunc)
-        if (version < V5) {
-          assertCompileErrorDApp(script, version, fractionError)
-        } else {
-          assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+    test("Fraction functions compiles with Int and union") {
+      for (version <- versionsSupportingTheNewFeatures) {
+        for (
+          (data, function, dataType) <- Seq(
+            (randomInt.toString, fractionIntAndUnion, "Int"),
+            (randomInt.toString, fractionIntAndUnionArgBeforeFunc, "Int"),
+            (s"toBigInt(${randomInt.toString})", fractionBigInt, "BigInt"),
+            (s"toBigInt(${randomInt.toString})", fractionBigIntArgBeforeFunc, "BigInt"),
+            (s"toBigInt(${randomInt.toString})", fractionBigIntAndUnion, "BigInt"),
+            (s"toBigInt(${randomInt.toString})", fractionBigIntAndUnionArgBeforeFunc, "BigInt")
+          )
+        ) {
+          val precondition = new GeneratorContractsForBuiltInFunctions(dataType, version)
+          val script       = precondition.onlyMatcherContract(data, function)
+          assertCompileSuccessDApp(script, version)
         }
       }
     }
 
-    test("compilation error: invalid fraction data") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script       = precondition.onlyMatcherContract(randomStringArrayElement, fractionInt)
-        if (version < V5) {
-          assertCompileErrorDApp(script, version, testData.nonMatchingTypes("Int"))
-        } else {
-          assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-        }
-      }
-    }
-
-    test("compilation error: invalid fraction data (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script       = precondition.onlyMatcherContract(randomAddressDataArrayElement, fractionIntArgBeforeFunc)
-        if (version < V5) {
-          assertCompileErrorDApp(script, version, testData.nonMatchingTypes("Int"))
-        } else {
-          assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+    test("Compilation error for Fraction with Int") {
+      for (version <- actualVersions) {
+        for (
+          (data, function, dataType, error) <- Seq(
+            (randomInt.toString, invalidFractionFunction, "Int", fractionError),
+            (randomInt.toString, invalidFractionFunctionArgBeforeFunc, "Int", fractionError),
+            (randomStringArrayElement, fractionInt, "Int", nonMatchingTypes("Int")),
+            (randomAddressDataArrayElement, fractionIntArgBeforeFunc, "Int", nonMatchingTypes("Int"))
+          )
+        ) {
+          val precondition = new GeneratorContractsForBuiltInFunctions(dataType, version)
+          val script       = precondition.onlyMatcherContract(data, function)
+          if (version < V5) {
+            assertCompileErrorDApp(script, version, error)
+          } else {
+            assertCompileErrorDApp(script, version, CANT_FIND_A_FUNCTION_OVERLOAD)
+          }
         }
       }
     }
 
     test("compilation error: invalid fraction data BigInt") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script       = precondition.onlyMatcherContract(randomStringArrayElement, fractionBigInt)
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: invalid fraction data BigInt (argument before function)") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script       = precondition.onlyMatcherContract(randomAliasDataArrayElement, fractionBigIntArgBeforeFunc)
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: invalid fraction data BigInt and unit") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script       = precondition.onlyMatcherContract(randomStringArrayElement, fractionBigIntAndUnion)
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: invalid fraction data BigInt and unit (argument before function)") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script       = precondition.onlyMatcherContract(randomAliasDataArrayElement, fractionBigIntAndUnionArgBeforeFunc)
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: fraction Int and Union invalid data") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script       = precondition.onlyMatcherContract(randomIssuesArrayElement, fractionIntAndUnion)
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: fraction Int and Union invalid data (argument before function)") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script       = precondition.onlyMatcherContract(randomByteVectorArrayElement, fractionIntAndUnionArgBeforeFunc)
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+      for (version <- versionsSupportingTheNewFeatures) {
+        for (
+          (data, function, dataType, error) <- Seq(
+            (randomStringArrayElement, fractionBigInt, "BigInt", CANT_FIND_A_FUNCTION_OVERLOAD),
+            (randomAliasDataArrayElement, fractionBigIntArgBeforeFunc, "BigInt", CANT_FIND_A_FUNCTION_OVERLOAD),
+            (randomStringArrayElement, fractionBigIntAndUnion, "BigInt", CANT_FIND_A_FUNCTION_OVERLOAD),
+            (randomAliasDataArrayElement, fractionBigIntAndUnionArgBeforeFunc, "BigInt", CANT_FIND_A_FUNCTION_OVERLOAD),
+            (randomIssuesArrayElement, fractionIntAndUnion, "Int", CANT_FIND_A_FUNCTION_OVERLOAD),
+            (randomIssuesArrayElement, fractionIntAndUnionArgBeforeFunc, "Int", CANT_FIND_A_FUNCTION_OVERLOAD)
+          )
+        ) {
+          val precondition = new GeneratorContractsForBuiltInFunctions(dataType, version)
+          val script       = precondition.onlyMatcherContract(data, function)
+          assertCompileErrorDApp(script, version, error)
+        }
       }
     }
 

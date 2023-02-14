@@ -6,10 +6,11 @@ import testHelpers.GeneratorContractsForBuiltInFunctions
 import testHelpers.RandomDataGenerator.{
   randomAddressDataArrayElement,
   randomAliasDataArrayElement,
+  randomInt,
   randomStringArrayElement,
-  randomUnionArrayElement,
-  randomInt
+  randomUnionArrayElement
 }
+import testHelpers.TestDataConstantsAndMethods.{CANT_FIND_A_FUNCTION_OVERLOAD, actualVersions, nonMatchingTypes}
 import utest.{Tests, test}
 
 object Log extends JsTestBase {
@@ -21,85 +22,56 @@ object Log extends JsTestBase {
 
   private val invalidLogInt              = s"log(callerTestData, 10, $union)"
   private val invalidLogIntArgBeforeFunc = s"callerTestData.log(10, $union)"
-  private val logError: String = testData.invalidFunctionError("log", 6)
+  private val logError: String           = testData.invalidFunctionError("log", 6)
 
   val tests: Tests = Tests {
-    test("check: log Int function compiles") {
-      for (version <- testData.actualVersions) {
+    test("Log function compiles with Int") {
+      for (version <- actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.onlyMatcherContract(randomInt.toString, logInt)
-        assertCompileSuccessDApp(script, version)
+        for (
+          (data, function) <- Seq(
+            (randomInt.toString, logInt),
+            (randomInt.toString, logIntArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.onlyMatcherContract(data, function)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
-    test("check: log Int function compiles (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.onlyMatcherContract(randomInt.toString, logIntArgBeforeFunc)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: log BigInt function compiles") {
+    test("Log function compiles with BigInt") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script = precondition.onlyMatcherContract(s"toBigInt(${randomInt.toString})", logBigInt)
-        assertCompileSuccessDApp(script, version)
-      }
-    }
-
-    test("check: log BigInt function compiles (argument before function)") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script = precondition.onlyMatcherContract(s"toBigInt(${randomInt.toString})", logBigIntArgBeforeFunc)
-        assertCompileSuccessDApp(script, version)
+        for (
+          (data, function) <- Seq(
+            (s"toBigInt(${randomInt.toString})", logBigInt),
+            (s"toBigInt(${randomInt.toString})", logBigIntArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.onlyMatcherContract(data, function)
+          assertCompileSuccessDApp(script, version)
+        }
       }
     }
 
     test("compilation error: invalid log function") {
       for (version <- testData.actualVersions) {
         val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.onlyMatcherContract(randomInt.toString, invalidLogInt)
-        if (version < V5) {
-          assertCompileErrorDApp(script, version, logError)
-        } else {
-          assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-        }
-      }
-    }
-
-    test("compilation error: invalid log function (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.onlyMatcherContract(randomInt.toString, invalidLogIntArgBeforeFunc)
-        if (version < V5) {
-          assertCompileErrorDApp(script, version, logError)
-        } else {
-          assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-        }
-      }
-    }
-
-    test("compilation error: invalid log data") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.onlyMatcherContract(randomStringArrayElement, logInt)
-        if (version < V5) {
-          assertCompileErrorDApp(script, version, testData.nonMatchingTypes("Int"))
-        } else {
-          assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-        }
-      }
-    }
-
-    test("compilation error: invalid log data (argument before function)") {
-      for (version <- testData.actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("Int", version)
-        val script = precondition.onlyMatcherContract(randomAddressDataArrayElement, logIntArgBeforeFunc)
-        if (version < V5) {
-          assertCompileErrorDApp(script, version, testData.nonMatchingTypes("Int"))
-        } else {
-          assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+        for (
+          (data, function, error) <- Seq(
+            (randomStringArrayElement, logInt, nonMatchingTypes("Int")),
+            (randomAddressDataArrayElement, logIntArgBeforeFunc, nonMatchingTypes("Int")),
+            (randomInt.toString, invalidLogInt, logError),
+            (randomInt.toString, invalidLogIntArgBeforeFunc, logError)
+          )
+        ) {
+          val script = precondition.onlyMatcherContract(data, function)
+          if (version < V5) {
+            assertCompileErrorDApp(script, version, error)
+          } else {
+            assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+          }
         }
       }
     }
@@ -107,16 +79,15 @@ object Log extends JsTestBase {
     test("compilation error: invalid log data BigInt") {
       for (version <- testData.versionsSupportingTheNewFeatures) {
         val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script = precondition.onlyMatcherContract(randomStringArrayElement, logBigInt)
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
-      }
-    }
-
-    test("compilation error: invalid log data BigInt (argument before function)") {
-      for (version <- testData.versionsSupportingTheNewFeatures) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("BigInt", version)
-        val script = precondition.onlyMatcherContract(randomAliasDataArrayElement, logBigIntArgBeforeFunc)
-        assertCompileErrorDApp(script, version, testData.CANT_FIND_A_FUNCTION_OVERLOAD)
+        for (
+          (data, function) <- Seq(
+            (randomStringArrayElement, logBigInt),
+            (randomAliasDataArrayElement, logBigIntArgBeforeFunc)
+          )
+        ) {
+          val script = precondition.onlyMatcherContract(data, function)
+          assertCompileErrorDApp(script, version, CANT_FIND_A_FUNCTION_OVERLOAD)
+        }
       }
     }
   }
