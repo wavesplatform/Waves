@@ -291,6 +291,6 @@ case class ProcessResult[TagT](
     all = true
   )
 
-  def isEmpty: Boolean                  = affectedScripts.isEmpty && !all
-  def affected: Either[Unit, Set[TagT]] = if (all) Left(()) else Right(affectedScripts.xs)
+  def isEmpty: Boolean    = affectedScripts.isEmpty && !all
+  def affected: Set[TagT] = affectedScripts.xs
 }
