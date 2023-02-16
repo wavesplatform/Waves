@@ -27,7 +27,7 @@
   "gnetId": 12317,
   "graphTooltip": 0,
   "id": 3,
-  "iteration": 1676558854154,
+  "iteration": 1676573386321,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -4741,7 +4741,7 @@
           },
           "gridPos": {
             "h": 12,
-            "w": 8,
+            "w": 9,
             "x": 0,
             "y": 15
           },
@@ -4861,8 +4861,8 @@
           },
           "gridPos": {
             "h": 12,
-            "w": 8,
-            "x": 8,
+            "w": 10,
+            "x": 9,
             "y": 15
           },
           "id": 139,
@@ -4949,7 +4949,7 @@
                 "displayMode": "auto",
                 "filterable": false,
                 "inspect": false,
-                "minWidth": 100
+                "minWidth": 75
               },
               "mappings": [],
               "thresholds": {
@@ -4979,117 +4979,28 @@
                     "value": 250
                   }
                 ]
-              }
-            ]
-          },
-          "gridPos": {
-            "h": 12,
-            "w": 4,
-            "x": 16,
-            "y": 15
-          },
-          "id": 182,
-          "links": [],
-          "options": {
-            "footer": {
-              "fields": "",
-              "reducer": [
-                "sum"
-              ],
-              "show": false
-            },
-            "showHeader": true,
-            "sortBy": [
-              {
-                "desc": true,
-                "displayName": "Max"
-              }
-            ]
-          },
-          "pluginVersion": "8.5.3",
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "${datasource}"
               },
-              "editorMode": "code",
-              "exemplar": false,
-              "expr": "jvm_memory_pool_max_bytes{job=\"$job\", instance=~\"$instance\"}",
-              "format": "table",
-              "hide": false,
-              "instant": true,
-              "legendFormat": "{{pool}}",
-              "range": false,
-              "refId": "B"
-            }
-          ],
-          "title": "Last Max by Mempools",
-          "transformations": [
-            {
-              "id": "organize",
-              "options": {
-                "excludeByName": {
-                  "Time": true,
-                  "__name__": true,
-                  "component": true,
-                  "instance": true,
-                  "job": true
-                },
-                "indexByName": {},
-                "renameByName": {
-                  "Value": "Max",
-                  "pool": "Pool"
-                }
-              }
-            }
-          ],
-          "type": "table"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "description": "",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "thresholds"
-              },
-              "custom": {
-                "align": "auto",
-                "displayMode": "auto",
-                "filterable": false,
-                "inspect": false,
-                "minWidth": 100
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "unit": "bytes"
-            },
-            "overrides": [
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "pool"
+                  "options": "Value #Used"
                 },
                 "properties": [
                   {
-                    "id": "custom.minWidth",
-                    "value": 250
+                    "id": "displayName",
+                    "value": "Used"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Value #Max"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Max"
                   }
                 ]
               }
@@ -5097,11 +5008,11 @@
           },
           "gridPos": {
             "h": 12,
-            "w": 4,
-            "x": 20,
+            "w": 5,
+            "x": 19,
             "y": 15
           },
-          "id": 183,
+          "id": 204,
           "links": [],
           "options": {
             "footer": {
@@ -5134,11 +5045,29 @@
               "instant": true,
               "legendFormat": "{{pool}}",
               "range": false,
-              "refId": "A"
+              "refId": "Used"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "jvm_memory_pool_max_bytes{job=\"$job\", instance=~\"$instance\"}",
+              "format": "table",
+              "hide": false,
+              "instant": true,
+              "range": false,
+              "refId": "Max"
             }
           ],
-          "title": "Last Used by Mempools",
+          "title": "Mempools",
           "transformations": [
+            {
+              "id": "merge",
+              "options": {}
+            },
             {
               "id": "organize",
               "options": {
@@ -5151,8 +5080,8 @@
                 },
                 "indexByName": {},
                 "renameByName": {
-                  "Value": "Used",
-                  "pool": "Pool"
+                  "Value #A": "Used",
+                  "Value #B": "Max"
                 }
               }
             }
@@ -7386,6 +7315,6 @@
   "timezone": "browser",
   "title": "RIDE runner",
   "uid": "atdeRNc4k",
-  "version": 135,
+  "version": 137,
   "weekStart": ""
 }
