@@ -14,7 +14,7 @@ import monix.eval.Task
 import monix.execution.Scheduler
 import play.api.libs.json.JsObject
 
-import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.{ConcurrentHashMap, TimeUnit}
 import scala.collection.concurrent.TrieMap
 
 trait RequestsService {
@@ -34,26 +34,32 @@ class DefaultRequestsService(
   private val scripts: TrieMap[RequestKey, RideScriptRunEnvironment] =
     TrieMap.from(storage.all().map(k => (k, RideScriptRunEnvironment(k, sharedBlockchainData))))
 
+//  private val jobScheduler: JobScheduler[RequestKey] = SynchronizedJobScheduler(settings.parallelization, scripts.keys)
+
   // To get rid of duplicated requests
-  private val inProgress   = new ConcurrentHashMap[RequestKey, Task[JsObject]]()
+  private val inProgress = new ConcurrentHashMap[RequestKey, Task[JsObject]]()
 
   override def runAll(): Task[Unit] = runManyAll(sharedBlockchainData.height, scripts.values.toList)
 
   override def runAffected(atHeight: Int, affected: Set[RequestKey]): Task[Unit] =
-    runMany(atHeight, affected.toList.flatMap(scripts.get))
+    // runMany(atHeight, affected.toList.flatMap(scripts.get))
+    // Task.now(jobScheduler.prioritize(affected))
+    Task.unit
 
   override def trackAndRun(request: RequestKey): Task[JsObject] = {
     val currentHeight = sharedBlockchainData.height
-    scripts.get(request) match {
+    val cache = scripts.get(request)
+    cache match {
       // TODO -1 ? Will eliminate calls to blockchain
-      case Some(cache) if currentHeight <= cache.updateHeight =>
+      case Some(cache) if runScriptsScheduler.clockMonotonic(TimeUnit.SECONDS) - cache.lastUpdateInS < 30 =>
+        // if currentHeight <= cache.updateHeight =>
         rideScriptCacheHits.increment()
         Task.now(cache.lastResult)
 
       case _ =>
         val task = Task {
           rideScriptCacheMisses.increment()
-          storage.append(request)
+          if (cache.isEmpty) storage.append(request)
           sharedBlockchainData.accountScripts.getUntagged(currentHeight, request.address)
         }.flatMap {
           // TODO #19 Change/move an error to an appropriate layer
@@ -98,13 +104,14 @@ class DefaultRequestsService(
     val origResult = script.lastResult
     scripts.put(
       script.key,
-      script.copy(lastResult = updatedResult, updateHeight = height)
+      script.copy(lastResult = updatedResult, updateHeight = height, lastUpdateInS = runScriptsScheduler.clockMonotonic(TimeUnit.SECONDS))
     )
 
     if ((updatedResult \ "error").isEmpty) {
       val complexity = (updatedResult \ "complexity").as[Int]
       log.info(f"result=ok; addr=${script.key.address}; req=${script.key.requestBody}; complexity=$complexity")
 
+      // TODO consumes CPU?
       if (
         origResult == JsObject.empty ||
         updatedResult \ "result" \ "value" != origResult \ "result" \ "value"
@@ -131,17 +138,23 @@ class DefaultRequestsService(
 }
 
 object DefaultRequestsService {
-  case class Settings(enableTraces: Boolean, evaluateScriptComplexityLimit: Int, maxTxErrorLogSize: Int)
+  case class Settings(
+      enableTraces: Boolean,
+      evaluateScriptComplexityLimit: Int,
+      maxTxErrorLogSize: Int,
+      parallelization: Int
+  )
 
   private final case class RideScriptRunEnvironment(
       blockchain: Blockchain,
       key: RequestKey,
       lastResult: JsObject,
-      updateHeight: Int
+      updateHeight: Int,
+      lastUpdateInS: Long
   )
 
   private object RideScriptRunEnvironment {
     def apply(key: RequestKey, blockchainStorage: SharedBlockchainData[RequestKey]): RideScriptRunEnvironment =
-      new RideScriptRunEnvironment(new ScriptBlockchain[RequestKey](blockchainStorage, key), key, JsObject.empty, 0)
+      new RideScriptRunEnvironment(new ScriptBlockchain[RequestKey](blockchainStorage, key), key, JsObject.empty, 0, 0L)
   }
 }

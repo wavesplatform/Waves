@@ -58,7 +58,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
 
     val request = RequestKey(aliceAddr, Json.obj("expr" -> "foo()"))
     val requestsService = new DefaultRequestsService(
-      settings = DefaultRequestsService.Settings(enableTraces = false, Int.MaxValue, 0),
+      settings = DefaultRequestsService.Settings(enableTraces = false, Int.MaxValue, 0, 3),
       sharedBlockchainData = blockchainStorage,
       storage = new RequestsStorage {
         override def size: Int                   = 1
