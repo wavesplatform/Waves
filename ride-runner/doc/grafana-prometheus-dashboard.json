@@ -27,7 +27,7 @@
   "gnetId": 12317,
   "graphTooltip": 0,
   "id": 3,
-  "iteration": 1676362940156,
+  "iteration": 1676558854154,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -1419,7 +1419,7 @@
             "h": 10,
             "w": 24,
             "x": 0,
-            "y": 10
+            "y": 8
           },
           "id": 3,
           "links": [],
@@ -1616,7 +1616,7 @@
             "h": 9,
             "w": 24,
             "x": 0,
-            "y": 20
+            "y": 18
           },
           "id": 4,
           "links": [],
@@ -1768,7 +1768,7 @@
             "h": 13,
             "w": 16,
             "x": 0,
-            "y": 29
+            "y": 27
           },
           "id": 5,
           "links": [],
@@ -1929,7 +1929,7 @@
             "h": 13,
             "w": 8,
             "x": 16,
-            "y": 29
+            "y": 27
           },
           "id": 6,
           "links": [],
@@ -2124,7 +2124,7 @@
             "h": 11,
             "w": 8,
             "x": 0,
-            "y": 42
+            "y": 40
           },
           "id": 7,
           "links": [],
@@ -2319,7 +2319,7 @@
             "h": 11,
             "w": 8,
             "x": 8,
-            "y": 42
+            "y": 40
           },
           "id": 8,
           "links": [],
@@ -2514,7 +2514,7 @@
             "h": 11,
             "w": 8,
             "x": 16,
-            "y": 42
+            "y": 40
           },
           "id": 9,
           "links": [],
@@ -2661,10 +2661,10 @@
             "overrides": []
           },
           "gridPos": {
-            "h": 14,
+            "h": 15,
             "w": 12,
             "x": 0,
-            "y": 15
+            "y": 9
           },
           "id": 20,
           "options": {
@@ -2770,7 +2770,7 @@
             "h": 8,
             "w": 6,
             "x": 12,
-            "y": 15
+            "y": 9
           },
           "id": 18,
           "options": {
@@ -2878,7 +2878,7 @@
             "h": 8,
             "w": 6,
             "x": 18,
-            "y": 15
+            "y": 9
           },
           "id": 68,
           "options": {
@@ -3000,20 +3000,24 @@
             ]
           },
           "gridPos": {
-            "h": 6,
+            "h": 7,
             "w": 12,
             "x": 12,
-            "y": 23
+            "y": 17
           },
           "id": 16,
           "options": {
             "legend": {
-              "calcs": [],
-              "displayMode": "hidden",
+              "calcs": [
+                "min",
+                "mean",
+                "max"
+              ],
+              "displayMode": "table",
               "placement": "bottom"
             },
             "tooltip": {
-              "mode": "single",
+              "mode": "multi",
               "sort": "none"
             }
           },
@@ -3103,7 +3107,7 @@
             "h": 11,
             "w": 8,
             "x": 0,
-            "y": 29
+            "y": 24
           },
           "id": 22,
           "options": {
@@ -3275,7 +3279,7 @@
             "h": 11,
             "w": 8,
             "x": 8,
-            "y": 29
+            "y": 24
           },
           "id": 64,
           "options": {
@@ -3447,7 +3451,7 @@
             "h": 11,
             "w": 8,
             "x": 16,
-            "y": 29
+            "y": 24
           },
           "id": 59,
           "options": {
@@ -3621,7 +3625,7 @@
             "h": 14,
             "w": 12,
             "x": 0,
-            "y": 40
+            "y": 35
           },
           "id": 2,
           "options": {
@@ -3724,7 +3728,7 @@
             "h": 14,
             "w": 12,
             "x": 12,
-            "y": 40
+            "y": 35
           },
           "id": 55,
           "options": {
@@ -3815,7 +3819,7 @@
             "h": 25,
             "w": 24,
             "x": 0,
-            "y": 54
+            "y": 49
           },
           "id": 60,
           "options": {
@@ -4159,7 +4163,7 @@
             "h": 6,
             "w": 24,
             "x": 0,
-            "y": 80
+            "y": 11
           },
           "id": 11,
           "links": [],
@@ -4365,7 +4369,7 @@
             "h": 13,
             "w": 24,
             "x": 0,
-            "y": 86
+            "y": 17
           },
           "id": 12,
           "links": [],
@@ -4480,7 +4484,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 11
+        "y": 13
       },
       "id": 77,
       "panels": [
@@ -4674,7 +4678,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 12
+        "y": 14
       },
       "id": 143,
       "panels": [
@@ -4722,7 +4726,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -4730,15 +4735,15 @@
                   }
                 ]
               },
-              "unit": "decbytes"
+              "unit": "bytes"
             },
             "overrides": []
           },
           "gridPos": {
-            "h": 10,
-            "w": 12,
+            "h": 12,
+            "w": 8,
             "x": 0,
-            "y": 13
+            "y": 15
           },
           "id": 141,
           "links": [],
@@ -4841,7 +4846,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -4849,15 +4855,15 @@
                   }
                 ]
               },
-              "unit": "decbytes"
+              "unit": "bytes"
             },
             "overrides": []
           },
           "gridPos": {
-            "h": 10,
-            "w": 12,
-            "x": 12,
-            "y": 13
+            "h": 12,
+            "w": 8,
+            "x": 8,
+            "y": 15
           },
           "id": 139,
           "links": [],
@@ -4932,6 +4938,232 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "custom": {
+                "align": "auto",
+                "displayMode": "auto",
+                "filterable": false,
+                "inspect": false,
+                "minWidth": 100
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "bytes"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "pool"
+                },
+                "properties": [
+                  {
+                    "id": "custom.minWidth",
+                    "value": 250
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 12,
+            "w": 4,
+            "x": 16,
+            "y": 15
+          },
+          "id": 182,
+          "links": [],
+          "options": {
+            "footer": {
+              "fields": "",
+              "reducer": [
+                "sum"
+              ],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": [
+              {
+                "desc": true,
+                "displayName": "Max"
+              }
+            ]
+          },
+          "pluginVersion": "8.5.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "jvm_memory_pool_max_bytes{job=\"$job\", instance=~\"$instance\"}",
+              "format": "table",
+              "hide": false,
+              "instant": true,
+              "legendFormat": "{{pool}}",
+              "range": false,
+              "refId": "B"
+            }
+          ],
+          "title": "Last Max by Mempools",
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "__name__": true,
+                  "component": true,
+                  "instance": true,
+                  "job": true
+                },
+                "indexByName": {},
+                "renameByName": {
+                  "Value": "Max",
+                  "pool": "Pool"
+                }
+              }
+            }
+          ],
+          "type": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "custom": {
+                "align": "auto",
+                "displayMode": "auto",
+                "filterable": false,
+                "inspect": false,
+                "minWidth": 100
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "bytes"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "pool"
+                },
+                "properties": [
+                  {
+                    "id": "custom.minWidth",
+                    "value": 250
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 12,
+            "w": 4,
+            "x": 20,
+            "y": 15
+          },
+          "id": 183,
+          "links": [],
+          "options": {
+            "footer": {
+              "fields": "",
+              "reducer": [
+                "sum"
+              ],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": [
+              {
+                "desc": true,
+                "displayName": "Used"
+              }
+            ]
+          },
+          "pluginVersion": "8.5.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "jvm_memory_pool_used_bytes_sum{job=\"$job\", instance=~\"$instance\"}\n/\njvm_memory_pool_used_bytes_count{job=\"$job\", instance=~\"$instance\"}",
+              "format": "table",
+              "hide": false,
+              "instant": true,
+              "legendFormat": "{{pool}}",
+              "range": false,
+              "refId": "A"
+            }
+          ],
+          "title": "Last Used by Mempools",
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "__name__": true,
+                  "component": true,
+                  "instance": true,
+                  "job": true
+                },
+                "indexByName": {},
+                "renameByName": {
+                  "Value": "Used",
+                  "pool": "Pool"
+                }
+              }
+            }
+          ],
+          "type": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "description": "Tracks the distribution of GC events duration",
           "fieldConfig": {
             "defaults": {
@@ -4971,7 +5203,8 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green"
+                    "color": "green",
+                    "value": null
                   },
                   {
                     "color": "red",
@@ -4987,7 +5220,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 23
+            "y": 27
           },
           "id": 137,
           "links": [],
@@ -5035,7 +5268,147 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 13
+        "y": 15
+      },
+      "id": 161,
+      "panels": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": true,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 46
+          },
+          "id": 159,
+          "links": [],
+          "options": {
+            "legend": {
+              "calcs": [
+                "min",
+                "mean",
+                "max",
+                "lastNotNull"
+              ],
+              "displayMode": "table",
+              "placement": "right"
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "8.5.3",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "jvm_memory_pool_max_bytes{job=\"$job\", instance=~\"$instance\", pool=\"$pool\"}",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "max",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "builder",
+              "expr": "jvm_memory_pool_committed_bytes{job=\"$job\", instance=~\"$instance\", pool=\"$pool\"}",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "committed",
+              "range": true,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "jvm_memory_pool_used_bytes_sum{job=\"$job\", instance=~\"$instance\", pool=\"$pool\"}\n/\njvm_memory_pool_used_bytes_count{job=\"$job\", instance=~\"$instance\", pool=\"$pool\"}",
+              "format": "time_series",
+              "intervalFactor": 2,
+              "legendFormat": "used",
+              "range": true,
+              "refId": "C"
+            }
+          ],
+          "title": "$pool",
+          "type": "timeseries"
+        }
+      ],
+      "repeat": "pool",
+      "title": "JVM Memory Pools | $pool",
+      "type": "row"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 23
       },
       "id": 157,
       "panels": [
@@ -5632,7 +6005,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 14
+        "y": 24
       },
       "id": 135,
       "panels": [
@@ -5696,7 +6069,7 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 1
+            "y": 58
           },
           "id": 133,
           "links": [],
@@ -5824,7 +6197,7 @@
             "h": 6,
             "w": 24,
             "x": 0,
-            "y": 8
+            "y": 65
           },
           "id": 131,
           "links": [],
@@ -5965,7 +6338,7 @@
             "h": 6,
             "w": 24,
             "x": 0,
-            "y": 14
+            "y": 71
           },
           "id": 129,
           "links": [],
@@ -6025,7 +6398,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 15
+        "y": 25
       },
       "id": 127,
       "panels": [
@@ -6321,7 +6694,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 16
+        "y": 26
       },
       "id": 111,
       "panels": [
@@ -6579,7 +6952,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 17
+        "y": 27
       },
       "id": 117,
       "panels": [
@@ -6635,7 +7008,7 @@
                   }
                 ]
               },
-              "unit": "decbytes"
+              "unit": "bytes"
             },
             "overrides": []
           },
@@ -6643,7 +7016,7 @@
             "h": 6,
             "w": 24,
             "x": 0,
-            "y": 36
+            "y": 61
           },
           "id": 119,
           "links": [],
@@ -6743,7 +7116,7 @@
                   }
                 ]
               },
-              "unit": "decbytes"
+              "unit": "bytes"
             },
             "overrides": []
           },
@@ -6751,7 +7124,7 @@
             "h": 6,
             "w": 24,
             "x": 0,
-            "y": 42
+            "y": 67
           },
           "id": 121,
           "links": [],
@@ -6856,7 +7229,7 @@
       },
       {
         "current": {
-          "selected": true,
+          "selected": false,
           "text": [
             "ride-runner"
           ],
@@ -6891,13 +7264,9 @@
       {
         "allValue": ".*",
         "current": {
-          "selected": true,
-          "text": [
-            "test-ride-runner:9095"
-          ],
-          "value": [
-            "test-ride-runner:9095"
-          ]
+          "selected": false,
+          "text": "test-ride-runner:9095",
+          "value": "test-ride-runner:9095"
         },
         "datasource": {
           "type": "prometheus",
@@ -6926,8 +7295,8 @@
       {
         "current": {
           "selected": false,
-          "text": "caffeine.computeIfAbsent",
-          "value": "caffeine.computeIfAbsent"
+          "text": "All",
+          "value": "$__all"
         },
         "datasource": {
           "type": "prometheus",
@@ -6935,7 +7304,7 @@
         },
         "definition": "label_values(span_processing_time_seconds_count{job=~\"$job\", span_kind=\"client\"},operation)  ",
         "hide": 2,
-        "includeAll": false,
+        "includeAll": true,
         "label": "",
         "multi": false,
         "name": "client_operation",
@@ -6952,12 +7321,42 @@
         "tagsQuery": "",
         "type": "query",
         "useTags": false
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(jvm_memory_pool_max_bytes{job=~\"$job\"},pool)  ",
+        "hide": 2,
+        "includeAll": true,
+        "label": "",
+        "multi": false,
+        "name": "pool",
+        "options": [],
+        "query": {
+          "query": "label_values(jvm_memory_pool_max_bytes{job=~\"$job\"},pool)  ",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "tagValuesQuery": "",
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
       }
     ]
   },
   "time": {
-    "from": "now-1h",
-    "to": "now"
+    "from": "2023-02-16T04:44:19.529Z",
+    "to": "2023-02-16T07:58:29.780Z"
   },
   "timepicker": {
     "refresh_intervals": [
@@ -6987,6 +7386,6 @@
   "timezone": "browser",
   "title": "RIDE runner",
   "uid": "atdeRNc4k",
-  "version": 120,
+  "version": 135,
   "weekStart": ""
 }
