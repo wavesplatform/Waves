@@ -1,12 +1,15 @@
 package com.wavesplatform.state
 
-import com.google.common.primitives.{Ints, UnsignedBytes}
-
+import java.nio.file.Files
+import java.util.Comparator
 import java.util.concurrent.TimeUnit
+import java.util.function.Consumer
+
+import com.google.common.primitives.{Ints, UnsignedBytes}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.common.ByteStrComparator
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.openDB
+import com.wavesplatform.database.RDB
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.RocksDBWriteBatchBenchmark.*
 import com.wavesplatform.state.RocksDBWriteBatchBenchmark.SortedBatch.ByteArrayHashingStrategy
@@ -16,11 +19,8 @@ import org.eclipse.collections.impl.factory.{HashingStrategyMaps, HashingStrateg
 import org.eclipse.collections.impl.utility.MapIterate
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
-import org.rocksdb.{RocksDB, WriteBatch, WriteOptions}
+import org.rocksdb.{WriteBatch, WriteOptions}
 
-import java.nio.file.Files
-import java.util.Comparator
-import java.util.function.Consumer
 import scala.util.Random
 
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
@@ -47,7 +47,7 @@ class RocksDBWriteBatchBenchmark {
         .forEach(new Consumer[Pair[Array[Byte], Array[Byte]]] {
           override def accept(t: Pair[Array[Byte], Array[Byte]]): Unit = nativeBatch.put(t.getOne, t.getTwo)
         })
-      st.db.write(st.writeOptions, nativeBatch)
+      st.rdb.db.write(st.writeOptions, nativeBatch)
     }
   }
 
@@ -58,7 +58,7 @@ class RocksDBWriteBatchBenchmark {
       st.kvsShuffled.foreach { case (k, v) =>
         nativeBatch.put(k, v)
       }
-      st.db.write(st.writeOptions, nativeBatch)
+      st.rdb.db.write(st.writeOptions, nativeBatch)
     }
   }
 }
@@ -70,9 +70,9 @@ object RocksDBWriteBatchBenchmark {
     private val wavesSettings: WavesSettings =
       WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
 
-    val db: RocksDB = {
+    val rdb: RDB = {
       val dir = Files.createTempDirectory("state-synthetic").toAbsolutePath.toString
-      openDB(wavesSettings.dbSettings.copy(directory = dir))
+      RDB.open(wavesSettings.dbSettings.copy(directory = dir))
     }
 
     private val minIdx      = 1
@@ -98,12 +98,12 @@ object RocksDBWriteBatchBenchmark {
 
     @Setup(Level.Invocation)
     def setup(): Unit =
-      db.deleteRange(firstKey, lastKey)
+      rdb.db.deleteRange(firstKey, lastKey)
 
     @TearDown
     def close(): Unit = {
       writeOptions.close()
-      db.close()
+      rdb.close()
     }
   }
 

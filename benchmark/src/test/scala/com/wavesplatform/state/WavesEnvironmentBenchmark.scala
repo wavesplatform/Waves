@@ -2,12 +2,13 @@ package com.wavesplatform.state
 
 import java.io.File
 import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
+
 import cats.Id
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.database.{RocksDBWriter, openDB}
+import com.wavesplatform.database.{RDB, RocksDBWriter}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Recipient
@@ -18,7 +19,6 @@ import com.wavesplatform.transaction.smart.WavesEnvironment
 import monix.eval.Coeval
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
-import org.rocksdb.RocksDB
 import scodec.bits.BitVector
 
 import scala.io.Codec
@@ -129,14 +129,14 @@ object WavesEnvironmentBenchmark {
       override val chainId: Byte = wavesSettings.blockchainSettings.addressSchemeCharacter.toByte
     }
 
-    private val db: RocksDB = {
+    private val rdb: RDB = {
       val dir = new File(wavesSettings.dbSettings.directory)
       if (!dir.isDirectory) throw new IllegalArgumentException(s"Can't find directory at '${wavesSettings.dbSettings.directory}'")
-      openDB(wavesSettings.dbSettings)
+      RDB.open(wavesSettings.dbSettings)
     }
 
     val environment: Environment[Id] = {
-      val state = RocksDBWriter.readOnly(db, wavesSettings)
+      val state = new RocksDBWriter(rdb, wavesSettings.blockchainSettings, wavesSettings.dbSettings)
       new WavesEnvironment(
         AddressScheme.current.chainId,
         Coeval.raiseError(new NotImplementedError("`tx` is not implemented")),
@@ -150,7 +150,7 @@ object WavesEnvironmentBenchmark {
 
     @TearDown
     def close(): Unit = {
-      db.close()
+      rdb.close()
     }
 
     protected def load[T](label: String, absolutePath: String)(f: String => T): Vector[T] = {

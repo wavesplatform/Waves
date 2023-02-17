@@ -1,6 +1,8 @@
 package com.wavesplatform.events
 
 import java.nio.{ByteBuffer, ByteOrder}
+import java.util.concurrent.ConcurrentHashMap
+
 import cats.syntax.semigroup.*
 import com.google.common.primitives.Ints
 import com.wavesplatform.api.common.CommonBlocksApi
@@ -9,10 +11,10 @@ import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.DBExt
 import com.wavesplatform.events.Repo.keyForHeight
-import com.wavesplatform.events.api.grpc.protobuf.BlockchainUpdatesApiGrpc.BlockchainUpdatesApi
 import com.wavesplatform.events.api.grpc.protobuf.*
-import com.wavesplatform.events.protobuf.serde.*
+import com.wavesplatform.events.api.grpc.protobuf.BlockchainUpdatesApiGrpc.BlockchainUpdatesApi
 import com.wavesplatform.events.protobuf.BlockchainUpdated as PBBlockchainUpdated
+import com.wavesplatform.events.protobuf.serde.*
 import com.wavesplatform.events.repo.LiquidState
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.BlockDiffer
@@ -24,7 +26,6 @@ import monix.reactive.Observable
 import monix.reactive.subjects.PublishToOneSubject
 import org.rocksdb.RocksDB
 
-import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.Future
 import scala.util.Using
 import scala.util.control.Exception
@@ -46,7 +47,6 @@ class Repo(db: RocksDB, blocksApi: CommonBlocksApi)(implicit s: Scheduler)
 
   def shutdown(): Unit = {
     shutdownHandlers()
-    db.close()
   }
 
   def height: Int =

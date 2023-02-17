@@ -1,17 +1,16 @@
 package com.wavesplatform.state
 
-import com.google.common.primitives.Ints
-
+import java.nio.file.Files
 import java.util.concurrent.TimeUnit
+
+import com.google.common.primitives.Ints
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.database.openDB
+import com.wavesplatform.database.RDB
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.RocksDBIteratorBenchmark.*
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
-import org.rocksdb.{ReadOptions, RocksDB, WriteBatch, WriteOptions}
-
-import java.nio.file.Files
+import org.rocksdb.{ReadOptions, WriteBatch, WriteOptions}
 
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -23,7 +22,7 @@ class RocksDBIteratorBenchmark {
   @Benchmark
   def directOrderIterator(st: BaseSt, bh: Blackhole): Unit = {
     bh.consume {
-      val iter = st.db.newIterator(st.readOptions)
+      val iter = st.rdb.db.newIterator(st.readOptions)
       iter.seek(st.firstKey)
       while (iter.isValid) {
         iter.key()
@@ -37,7 +36,7 @@ class RocksDBIteratorBenchmark {
   @Benchmark
   def reverseOrderIterator(st: BaseSt, bh: Blackhole): Unit = {
     bh.consume {
-      val iter = st.db.newIterator(st.readOptions)
+      val iter = st.rdb.db.newIterator(st.readOptions)
       iter.seekForPrev(st.lastKey)
       while (iter.isValid) {
         iter.key()
@@ -56,9 +55,9 @@ object RocksDBIteratorBenchmark {
     private val wavesSettings: WavesSettings =
       WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
 
-    val db: RocksDB = {
+    val rdb: RDB = {
       val dir = Files.createTempDirectory("state-synthetic").toAbsolutePath.toString
-      openDB(wavesSettings.dbSettings.copy(directory = dir))
+      RDB.open(wavesSettings.dbSettings.copy(directory = dir))
     }
 
     val keysPrefix            = "keysPrefix"
@@ -75,11 +74,11 @@ object RocksDBIteratorBenchmark {
     kvs.foreach { case (key, value) =>
       wb.put(key, value)
     }
-    db.write(new WriteOptions(), wb)
+    rdb.db.write(new WriteOptions(), wb)
 
     @TearDown
     def close(): Unit = {
-      db.close()
+      rdb.close()
     }
   }
 }

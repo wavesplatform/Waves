@@ -1,18 +1,19 @@
 package com.wavesplatform
 
 import java.io.File
+
 import com.google.common.primitives.Ints
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
-import com.wavesplatform.database.{openDB, RocksDBWriter}
+import com.wavesplatform.database.{RDB, RocksDBWriter}
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.{Diff, Portfolio}
-import com.wavesplatform.transaction.{GenesisTransaction, Proofs, TxDecimals, TxPositiveAmount}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.{GenesisTransaction, Proofs, TxDecimals, TxPositiveAmount}
 import com.wavesplatform.utils.{NTP, ScorexLogging}
 
 import scala.collection.immutable.VectorMap
@@ -20,9 +21,9 @@ import scala.collection.immutable.VectorMap
 object RollbackBenchmark extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     val settings      = Application.loadApplicationConfig(Some(new File(args(0))))
-    val db            = openDB(settings.dbSettings)
+    val rdb           = RDB.open(settings.dbSettings)
     val time          = new NTP(settings.ntpServer)
-    val rocksDBWriter = RocksDBWriter(db, settings)
+    val rocksDBWriter = new RocksDBWriter(rdb, settings.blockchainSettings, settings.dbSettings)
 
     val issuer = KeyPair(new Array[Byte](32))
 
@@ -95,6 +96,6 @@ object RollbackBenchmark extends ScorexLogging {
     rocksDBWriter.rollbackTo(1)
     val end = System.nanoTime()
     log.info(f"Rollback took ${(end - start) * 1e-6}%.3f ms")
-    rocksDBWriter.close()
+    rdb.close()
   }
 }

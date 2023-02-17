@@ -2,6 +2,7 @@ package com.wavesplatform.state
 
 import java.io.File
 import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
+
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.*
 import com.wavesplatform.api.BlockMeta
@@ -9,13 +10,12 @@ import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.database
-import com.wavesplatform.database.{DBExt, Keys, RocksDBWriter, openDB}
+import com.wavesplatform.database.{DBExt, Keys, RDB, RocksDBWriter}
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.RocksDBWriterBenchmark.*
 import com.wavesplatform.transaction.Transaction
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
-import org.rocksdb.RocksDB
 
 import scala.io.Codec
 
@@ -81,20 +81,20 @@ object RocksDBWriterBenchmark {
       override val chainId: Byte = wavesSettings.blockchainSettings.addressSchemeCharacter.toByte
     }
 
-    private val rawDB: RocksDB = {
+    private val rawDB: RDB = {
       val dir = new File(wavesSettings.dbSettings.directory)
       if (!dir.isDirectory) throw new IllegalArgumentException(s"Can't find directory at '${wavesSettings.dbSettings.directory}'")
-      openDB(wavesSettings.dbSettings)
+      RDB.open(wavesSettings.dbSettings)
     }
 
-    val db = RocksDBWriter.readOnly(rawDB, wavesSettings)
+    val db = new RocksDBWriter(rawDB, wavesSettings.blockchainSettings, wavesSettings.dbSettings)
 
     def loadBlockInfoAt(height: Int): Option[(BlockMeta, Seq[(TxMeta, Transaction)])] =
       loadBlockMetaAt(height).map { meta =>
-        meta -> rawDB.readOnly(ro => database.loadTransactions(Height(height), ro))
+        meta -> database.loadTransactions(Height(height), rawDB)
       }
 
-    def loadBlockMetaAt(height: Int): Option[BlockMeta] = rawDB.get(Keys.blockMetaAt(Height(height))).flatMap(BlockMeta.fromPb)
+    def loadBlockMetaAt(height: Int): Option[BlockMeta] = rawDB.db.get(Keys.blockMetaAt(Height(height))).flatMap(BlockMeta.fromPb)
 
     val cba = CommonBlocksApi(db, loadBlockMetaAt, loadBlockInfoAt)
 

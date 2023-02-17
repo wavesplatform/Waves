@@ -1,13 +1,13 @@
 package com.wavesplatform.state
 
-import com.typesafe.config.ConfigFactory
-
 import java.io.File
 import java.nio.file.Files
+
+import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{RocksDBWriter, openDB}
+import com.wavesplatform.database.{RDB, RocksDBWriter}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings, loadConfig}
@@ -15,7 +15,6 @@ import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.utils.TestRocksDB
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import org.openjdk.jmh.annotations.{Setup, TearDown}
-import org.rocksdb.RocksDB
 import org.scalacheck.{Arbitrary, Gen}
 
 trait BaseState {
@@ -27,12 +26,12 @@ trait BaseState {
     WavesSettings.fromRootConfig(config)
   }
   private val fsSettings: FunctionalitySettings = updateFunctionalitySettings(FunctionalitySettings.TESTNET)
-  private val db: RocksDB = {
+  private val rdb: RDB = {
     val dir = Files.createTempDirectory("state-synthetic").toAbsolutePath.toString
-    openDB(wavesSettings.dbSettings.copy(directory = dir))
+    RDB.open(wavesSettings.dbSettings.copy(directory = dir))
   }
 
-  val state: RocksDBWriter = TestRocksDB.withFunctionalitySettings(db, fsSettings)
+  val state: RocksDBWriter = TestRocksDB.withFunctionalitySettings(rdb, fsSettings)
 
   private var _richAccount: KeyPair = _
   def richAccount: KeyPair          = _richAccount
@@ -98,7 +97,7 @@ trait BaseState {
 
   @TearDown
   def close(): Unit = {
-    db.close()
+    rdb.close()
   }
 }
 

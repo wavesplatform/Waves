@@ -1,5 +1,8 @@
 package com.wavesplatform.state
 
+import java.nio.file.Files
+import java.util.concurrent.TimeUnit
+
 import com.google.common.primitives.{Bytes, Shorts}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.Address
@@ -9,7 +12,7 @@ import com.wavesplatform.database.{
   DataNode,
   KeyTags,
   Keys,
-  openDB,
+  RDB,
   readCurrentData,
   readDataNode,
   writeCurrentData,
@@ -19,10 +22,7 @@ import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.RocksDBSeekForPrevBenchmark.*
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
-import org.rocksdb.{ReadOptions, RocksDB, WriteBatch, WriteOptions}
-
-import java.nio.file.Files
-import java.util.concurrent.TimeUnit
+import org.rocksdb.{ReadOptions, WriteBatch, WriteOptions}
 
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -34,7 +34,7 @@ class RocksDBSeekForPrevBenchmark {
   @Benchmark
   def seekForPrev(st: BaseSt, bh: Blackhole): Unit = {
     bh.consume {
-      val iter = st.db.newIterator(st.readOptions)
+      val iter = st.rdb.db.newIterator(st.readOptions)
       iter.seekForPrev(st.dataNodeKey(Height(Int.MaxValue)))
       if (iter.isValid && iter.key().startsWith(st.dataNodeKeyPrefix)) {
         readDataNode(st.keyString)(iter.value()).prevHeight
@@ -46,7 +46,7 @@ class RocksDBSeekForPrevBenchmark {
   @Benchmark
   def get(st: BaseSt, bh: Blackhole): Unit = {
     bh.consume {
-      readCurrentData(st.keyString)(st.db.get(st.currentDataKey)).prevHeight
+      readCurrentData(st.keyString)(st.rdb.db.get(st.currentDataKey)).prevHeight
     }
   }
 }
@@ -58,9 +58,9 @@ object RocksDBSeekForPrevBenchmark {
     private val wavesSettings: WavesSettings =
       WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
 
-    val db: RocksDB = {
+    val rdb: RDB = {
       val dir = Files.createTempDirectory("state-synthetic").toAbsolutePath.toString
-      openDB(wavesSettings.dbSettings.copy(directory = dir))
+      RDB.open(wavesSettings.dbSettings.copy(directory = dir))
     }
 
     val address: Address     = Address(Array.fill(20)(1.toByte))
@@ -80,11 +80,11 @@ object RocksDBSeekForPrevBenchmark {
     (1 to 1000).foreach { h =>
       wb.put(dataNodeKey(Height(h)), writeDataNode(DataNode(dataEntry, Height(h - 1))))
     }
-    db.write(new WriteOptions(), wb)
+    rdb.db.write(new WriteOptions(), wb)
 
     @TearDown
     def close(): Unit = {
-      db.close()
+      rdb.close()
     }
   }
 }

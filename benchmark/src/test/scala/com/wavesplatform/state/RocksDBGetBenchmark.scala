@@ -1,16 +1,16 @@
 package com.wavesplatform.state
 
+import java.nio.file.Files
 import java.util.concurrent.TimeUnit
+
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.database.openDB
+import com.wavesplatform.database.RDB
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.RocksDBGetBenchmark.*
 import org.openjdk.jmh.annotations.*
 import org.openjdk.jmh.infra.Blackhole
-import org.rocksdb.{ReadOptions, RocksDB, WriteBatch, WriteOptions}
+import org.rocksdb.{ReadOptions, WriteBatch, WriteOptions}
 import sun.nio.ch.Util
-
-import java.nio.file.Files
 
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -22,7 +22,7 @@ class RocksDBGetBenchmark {
   @Benchmark
   def simpleGet(st: BaseSt, bh: Blackhole): Unit = {
     bh.consume(st.kvs.foreach { case (key, _) =>
-      st.db.get(st.readOptions, key)
+      st.rdb.db.get(st.readOptions, key)
     })
   }
 
@@ -34,7 +34,7 @@ class RocksDBGetBenchmark {
         keyBuffer.put(key).flip()
         val valBuffer = Util.getTemporaryDirectBuffer(value.length)
 
-        st.db.get(st.readOptions, keyBuffer, valBuffer)
+        st.rdb.db.get(st.readOptions, keyBuffer, valBuffer)
 
         Util.releaseTemporaryDirectBuffer(keyBuffer)
         Util.releaseTemporaryDirectBuffer(valBuffer)
@@ -50,9 +50,9 @@ object RocksDBGetBenchmark {
     private val wavesSettings: WavesSettings =
       WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
 
-    val db: RocksDB = {
+    val rdb: RDB = {
       val dir = Files.createTempDirectory("state-synthetic").toAbsolutePath.toString
-      openDB(wavesSettings.dbSettings.copy(directory = dir))
+      RDB.open(wavesSettings.dbSettings.copy(directory = dir))
     }
 
     val kvs: Map[Array[Byte], Array[Byte]] = (1 to 10000).map { idx =>
@@ -65,11 +65,11 @@ object RocksDBGetBenchmark {
     kvs.foreach { case (key, value) =>
       wb.put(key, value)
     }
-    db.write(new WriteOptions(), wb)
+    rdb.db.write(new WriteOptions(), wb)
 
     @TearDown
     def close(): Unit = {
-      db.close()
+      rdb.close()
     }
   }
 }
