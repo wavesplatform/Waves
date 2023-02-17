@@ -12,7 +12,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.RDB
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.RocksDBWriteBatchBenchmark.*
-import com.wavesplatform.state.RocksDBWriteBatchBenchmark.SortedBatch.ByteArrayHashingStrategy
 import org.eclipse.collections.api.block.HashingStrategy
 import org.eclipse.collections.api.tuple.Pair
 import org.eclipse.collections.impl.factory.{HashingStrategyMaps, HashingStrategySets}
@@ -125,11 +124,11 @@ object RocksDBWriteBatchBenchmark {
 
   object SortedBatch {
     val byteStrComparator: Comparator[ByteStr] = (o1: ByteStr, o2: ByteStr) => ByteStrComparator.compare(o1, o2)
+  }
 
-    object ByteArrayHashingStrategy extends HashingStrategy[Array[Byte]] {
-      override def computeHashCode(obj: Array[Byte]): Int = java.util.Arrays.hashCode(obj)
+  object ByteArrayHashingStrategy extends HashingStrategy[Array[Byte]] {
+    override def computeHashCode(obj: Array[Byte]): Int = java.util.Arrays.hashCode(obj)
 
-      override def equals(object1: Array[Byte], object2: Array[Byte]): Boolean = java.util.Arrays.equals(object1, object2)
-    }
+    override def equals(object1: Array[Byte], object2: Array[Byte]): Boolean = java.util.Arrays.equals(object1, object2)
   }
 }
