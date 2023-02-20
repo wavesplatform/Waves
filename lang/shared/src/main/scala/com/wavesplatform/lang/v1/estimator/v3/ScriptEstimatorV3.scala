@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.estimator.v3
 
-import cats.implicits.*
+import cats.implicits.{toBifunctorOps, toFoldableOps, toTraverseOps}
 import cats.{Id, Monad}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.User
@@ -59,20 +59,13 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
         case _: FAILED_EXPR              => zero
       }
 
-  private def evalHoldingFuncs(expr: EXPR, activeFuncArgs: Set[String]): EvalM[Long] =
+  private def evalLetBlock(let: LET, nextExpr: EXPR, activeFuncArgs: Set[String], globalDeclarationsMode: Boolean): EvalM[Long] =
     for {
-      startCtx <- get[Id, EstimatorContext, EstimationError]
-      cost     <- evalExpr(expr, activeFuncArgs)
-      _        <- update(funcs.set(_)(startCtx.funcs))
-    } yield cost
-
-  private def evalLetBlock(let: LET, inner: EXPR, activeFuncArgs: Set[String], globalDeclarationsMode: Boolean): EvalM[Long] =
-    for {
+      _        <- if (globalDeclarationsMode) saveGlobalLetCost(let, activeFuncArgs) else doNothing
       startCtx <- get[Id, EstimatorContext, EstimationError]
       letEval = evalHoldingFuncs(let.value, activeFuncArgs)
-      _            <- if (globalDeclarationsMode) saveGlobalLetCost(let, activeFuncArgs) else doNothing
       _            <- beforeNextExprEval(let, letEval)
-      nextExprCost <- evalExpr(inner, activeFuncArgs, globalDeclarationsMode)
+      nextExprCost <- evalExpr(nextExpr, activeFuncArgs, globalDeclarationsMode)
       nextExprCtx  <- get[Id, EstimatorContext, EstimationError]
       _            <- afterNextExprEval(let, startCtx)
       letCost      <- if (nextExprCtx.usedRefs.contains(let.name)) letEval else const(0L)
@@ -82,11 +75,9 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
   private def saveGlobalLetCost(let: LET, activeFuncArgs: Set[String]): EvalM[Unit] = {
     val costEvaluation =
       for {
-        startCtx    <- get[Id, EstimatorContext, EstimationError]
-        bodyCost    <- evalExpr(let.value, activeFuncArgs)
-        bodyEvalCtx <- get[Id, EstimatorContext, EstimationError]
-        usedRefs = bodyEvalCtx.usedRefs diff startCtx.usedRefs
-        letCosts <- usedRefs.toSeq.traverse(bodyEvalCtx.globalLetEvals.getOrElse(_, zero))
+        (bodyCost, usedRefs) <- withUsedRefs(evalExpr(let.value, activeFuncArgs))
+        ctx                  <- get[Id, EstimatorContext, EstimationError]
+        letCosts             <- usedRefs.toSeq.traverse(ctx.globalLetEvals.getOrElse(_, zero))
       } yield bodyCost + letCosts.sum
     for {
       cost <- local(costEvaluation)
@@ -121,16 +112,15 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
         )
     )
 
-  private def evalFuncBlock(func: FUNC, inner: EXPR, activeFuncArgs: Set[String], globalDeclarationsMode: Boolean): EvalM[Long] =
+  private def evalFuncBlock(func: FUNC, nextExpr: EXPR, activeFuncArgs: Set[String], globalDeclarationsMode: Boolean): EvalM[Long] =
     for {
       startCtx                   <- get[Id, EstimatorContext, EstimationError]
       _                          <- checkShadowing(func, startCtx)
       (funcCost, refsUsedInBody) <- withUsedRefs(evalHoldingFuncs(func.body, activeFuncArgs ++ func.args))
-      bodyEvalCtx                <- get[Id, EstimatorContext, EstimationError]
-      _                          <- if (globalDeclarationsMode) saveGlobalFuncCost(func.name, funcCost, bodyEvalCtx, refsUsedInBody) else doNothing
+      _                          <- if (globalDeclarationsMode) saveGlobalFuncCost(func.name, funcCost, refsUsedInBody) else doNothing
       _                          <- handleUsedRefs(func.name, funcCost, startCtx, refsUsedInBody)
-      nextCost                   <- evalExpr(inner, activeFuncArgs, globalDeclarationsMode)
-    } yield nextCost
+      nextExprCost               <- evalExpr(nextExpr, activeFuncArgs, globalDeclarationsMode)
+    } yield nextExprCost
 
   private def checkShadowing(func: FUNC, startCtx: EstimatorContext): EvalM[Any] =
     if (fixOverflow && startCtx.funcs.contains(FunctionHeader.User(func.name)))
@@ -138,8 +128,9 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
     else
       doNothing
 
-  private def saveGlobalFuncCost(name: String, funcCost: Long, ctx: EstimatorContext, refsUsedInBody: Set[String]): EvalM[Unit] =
+  private def saveGlobalFuncCost(name: String, funcCost: Long, refsUsedInBody: Set[String]): EvalM[Unit] =
     for {
+      ctx      <- get[Id, EstimatorContext, EstimationError]
       letCosts <- local(refsUsedInBody.toSeq.traverse(ctx.globalLetEvals.getOrElse(_, zero)))
       totalCost = math.max(1, funcCost + letCosts.sum)
       _ <- set[Id, EstimatorContext, EstimationError](ctx.copy(globalFunctionsCosts = ctx.globalFunctionsCosts + (name -> totalCost)))
@@ -175,22 +166,9 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
 
   private def evalFuncCall(header: FunctionHeader, args: List[EXPR], activeFuncArgs: Set[String]): EvalM[Long] =
     for {
-      ctx <- get[Id, EstimatorContext, EstimationError]
-      (bodyCost, bodyUsedRefs) <- funcs
-        .get(ctx)
-        .get(header)
-        .map(const)
-        .getOrElse(
-          raiseError[Id, EstimatorContext, EstimationError, (Coeval[Long], Set[String])](s"function '$header' not found")
-        )
-      _ <- update(
-        (funcs ~ usedRefs).modify(_) { case (funcs, usedRefs) =>
-          (
-            funcs + ((header, (bodyCost, Set[String]()))),
-            usedRefs ++ bodyUsedRefs
-          )
-        }
-      )
+      ctx                       <- get[Id, EstimatorContext, EstimationError]
+      (bodyCost, bodyUsedRefs)  <- getFuncCost(header, ctx)
+      _                         <- setFuncToCtx(header, bodyCost, bodyUsedRefs)
       (argsCosts, argsUsedRefs) <- withUsedRefs(args.traverse(evalHoldingFuncs(_, activeFuncArgs)))
       argsCostsSum              <- argsCosts.foldM(0L)(sum)
       bodyCostV = bodyCost.value()
@@ -201,8 +179,34 @@ case class ScriptEstimatorV3(fixOverflow: Boolean, overhead: Boolean, letFixes: 
       result <- sum(argsCostsSum, correctedBodyCost)
     } yield result
 
+  private def setFuncToCtx(header: FunctionHeader, bodyCost: Coeval[Long], bodyUsedRefs: Set[EstimationError]): EvalM[Unit] =
+    update(
+      (funcs ~ usedRefs).modify(_) { case (funcs, usedRefs) =>
+        (
+          funcs + (header -> (bodyCost, Set())),
+          usedRefs ++ bodyUsedRefs
+        )
+      }
+    )
+
+  private def getFuncCost(header: FunctionHeader, ctx: EstimatorContext): EvalM[(Coeval[Long], Set[EstimationError])] =
+    funcs
+      .get(ctx)
+      .get(header)
+      .map(const)
+      .getOrElse(
+        raiseError[Id, EstimatorContext, EstimationError, (Coeval[Long], Set[EstimationError])](s"function '$header' not found")
+      )
+
   private def isBlankFunc(usedRefs: Set[String], refsCosts: Map[String, Long]): Boolean =
     !usedRefs.exists(refsCosts.get(_).exists(_ > 0))
+
+  private def evalHoldingFuncs(expr: EXPR, activeFuncArgs: Set[String]): EvalM[Long] =
+    for {
+      startCtx <- get[Id, EstimatorContext, EstimationError]
+      cost     <- evalExpr(expr, activeFuncArgs)
+      _        <- update(funcs.set(_)(startCtx.funcs))
+    } yield cost
 
   private def withUsedRefs[A](eval: EvalM[A]): EvalM[(A, Set[String])] =
     for {
