@@ -16,6 +16,7 @@ import play.api.libs.json.JsObject
 
 import java.util.concurrent.{ConcurrentHashMap, TimeUnit}
 import scala.collection.concurrent.TrieMap
+import scala.concurrent.duration.FiniteDuration
 
 trait RequestsService {
   def runAll(): Task[Unit]
@@ -48,10 +49,10 @@ class DefaultRequestsService(
 
   override def trackAndRun(request: RequestKey): Task[JsObject] = {
     val currentHeight = sharedBlockchainData.height
-    val cache = scripts.get(request)
+    val cache         = scripts.get(request)
     cache match {
       // TODO -1 ? Will eliminate calls to blockchain
-      case Some(cache) if runScriptsScheduler.clockMonotonic(TimeUnit.SECONDS) - cache.lastUpdateInS < 30 =>
+      case Some(cache) if runScriptsScheduler.clockMonotonic(TimeUnit.SECONDS) - cache.lastUpdateInS < settings.cacheTtl.toSeconds =>
         // if currentHeight <= cache.updateHeight =>
         rideScriptCacheHits.increment()
         Task.now(cache.lastResult)
@@ -142,7 +143,8 @@ object DefaultRequestsService {
       enableTraces: Boolean,
       evaluateScriptComplexityLimit: Int,
       maxTxErrorLogSize: Int,
-      parallelization: Int
+      parallelization: Int,
+      cacheTtl: FiniteDuration
   )
 
   private final case class RideScriptRunEnvironment(

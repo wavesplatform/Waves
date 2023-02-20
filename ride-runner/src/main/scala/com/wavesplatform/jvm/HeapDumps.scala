@@ -1,7 +1,9 @@
 package com.wavesplatform.jvm
 
+import cats.syntax.option.*
 import com.sun.management.HotSpotDiagnosticMXBean
 import com.wavesplatform.utils.ScorexLogging
+import play.api.libs.json.{Json, OFormat}
 
 import java.lang.management.ManagementFactory
 import java.nio.file.{Files, Path}
@@ -33,15 +35,37 @@ object HeapDumps extends ScorexLogging {
     Files
       .list(path)
       .toScala(List)
-      .filterNot(_.getFileName == onExitDir)
+      .filterNot(_ == onExitDir)
       .sortBy(x => Files.getLastModifiedTime(x).to(TimeUnit.MILLISECONDS))
       .drop(retainFiles)
       .foreach(Files.delete)
 
+  def all(): List[HeapDump] =
+    java.util.stream.Stream
+      .concat(
+        Files.list(baseDir),
+        Files.list(onExitDir)
+      )
+      .toScala(List)
+      .filterNot(_ == onExitDir)
+      .sortBy(_.getFileName)
+      .map { x =>
+        HeapDump(
+          relativePath = baseDir.relativize(x).toString,
+          size = Files.size(x)
+        )
+      }
+
+  def pathToFile(relativePath: String): Option[Path] = {
+    val resolved = baseDir.resolve(relativePath).normalize()
+    if (resolved.startsWith(baseDir)) resolved.some
+    else none
+  }
+
   /** @param makeAlways
     *   If true makes only if the directory is empty
     */
-  def mk(tag: String, live: Boolean, makeAlways: Boolean = true): Unit = if (enabled) {
+  def mk(tag: String, live: Boolean, makeAlways: Boolean = true): Option[String] = if (enabled) {
     // TODO settings?
     val date = dateFormatter.format(Instant.now().atZone(ZoneId.of("UTC")))
     val file = baseDir.resolve(s"ride-runner-$tag-$date.hprof")
@@ -56,5 +80,12 @@ object HeapDumps extends ScorexLogging {
       log.info(s"Making a heap dump $file")
       mxBean.dumpHeap(file.toString, live)
     }
-  }
+
+    file.getFileName.toString.some
+  } else none
+}
+
+case class HeapDump(relativePath: String, size: Long)
+object HeapDump {
+  implicit val heapDumpFormat: OFormat[HeapDump] = Json.format
 }

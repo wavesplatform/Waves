@@ -9,6 +9,7 @@ JAVA_OPTS="-javaagent:${RIDE_INSTALL_PATH}/kanela-agent/kanela-agent-1.0.16.jar
   -XX:+ParallelRefProcEnabled
   -XX:+UseStringDeduplication
   -Xmx${RIDE_HEAP_SIZE}
+  -XX:MaxMetaspaceSize=128m
   -Dfile.encoding=UTF-8
   -Dlogback.configurationFile=${RIDE_LOGBACK_CONFIG}
   -Dlogback.stdout.level=${RIDE_LOG_LEVEL}

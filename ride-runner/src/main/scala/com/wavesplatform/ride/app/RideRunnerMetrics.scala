@@ -48,5 +48,15 @@ object RideRunnerMetrics {
   private val grpcCallTimer                              = Kamon.timer("grpc.call", "gRPC calls time")
   def grpcCallTimerFor(methodName: String, raw: Boolean) = grpcCallTimer.withTag("method", methodName).withTag("raw", raw)
 
+  private val workSchedulerSize = Kamon.gauge("work-scheduler.size", "A size of queues in a work scheduler")
+  val prioritizedWorkSize = workSchedulerSize.withTag("tpe", "prioritized")
+  // TODO duplicates ride.script.number
+  val allWorkSize = workSchedulerSize.withTag("tpe", "all")
+
+  private val jobSchedulerTime = Kamon.timer("job-scheduler.time")
+  val jobSchedulerPrioritizeTime = jobSchedulerTime.withTag("op", "prioritize")
+  val jobSchedulerPrioritizeManyTime = jobSchedulerTime.withTag("op", "prioritizeMany")
+  val jobSchedulerGetJobTime = jobSchedulerTime.withTag("op", "getJob")
+
   implicit def timeExt(timer: Timer): TimerExt = new TimerExt(timer)
 }

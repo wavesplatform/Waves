@@ -4,6 +4,7 @@ import com.typesafe.config.{Config, ConfigList, ConfigRenderOptions, ConfigValue
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector, RideApi}
 import com.wavesplatform.blockchain.SharedBlockchainData
+import com.wavesplatform.http.ServiceApiRoute
 import com.wavesplatform.ride.DefaultRequestsService
 import com.wavesplatform.ride.app.RideRunnerSettings.DbSettings
 import com.wavesplatform.settings.*
@@ -54,6 +55,7 @@ case class RideRunnerSettings(
     db: DbSettings,
     unhealthyIdleTimeout: FiniteDuration,
     rideSchedulerThreads: Option[Int],
+    serviceApiRoute: ServiceApiRoute.Settings,
     immutableBlockchain: BlockchainSettings,
     sharedBlockchain: SharedBlockchainData.Settings,
     requestsService: DefaultRequestsService.Settings,

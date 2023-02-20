@@ -4,6 +4,8 @@ import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.storage.persistent.{InMemWithoutHeightPersistentCache, PersistentCache}
 import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
 
+import java.util.concurrent.atomic.AtomicInteger
+
 class ExactWithHeightStorageTestSuite extends BaseTestSuite with HasLevelDb with HasTestAccounts {
   "ExactWithHeightStorage" - {
     "loading from a blockchain" - {
@@ -28,9 +30,13 @@ class ExactWithHeightStorageTestSuite extends BaseTestSuite with HasLevelDb with
     }
 
     "reloads from the disk cache if the in-memory cache overfilled" in {
+      val calls = new AtomicInteger(0)
       val persistent = new InMemWithoutHeightPersistentCache[String, Int]
       val storage = new BaseStorage(persistent) {
-        override def getFromBlockchain(key: String): Option[Int] = key.toIntOption
+        override def getFromBlockchain(key: String): Option[Int] = {
+//          if (key == "1") calls.incrementAndGet() // passes if I uncomment
+          key.toIntOption
+        }
       }
 
       def set(key: String, value: Int): Unit = persistent.set(0, key, RemoteData.Cached(value))
@@ -47,6 +53,7 @@ class ExactWithHeightStorageTestSuite extends BaseTestSuite with HasLevelDb with
       }
 
       withClue("1 reloaded:") { storage.get("1") shouldBe 11 }
+      calls.get() shouldBe 1
     }
   }
 

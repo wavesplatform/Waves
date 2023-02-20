@@ -6,7 +6,7 @@ import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
 import com.wavesplatform.database.openDB
-import com.wavesplatform.http.{EvaluateApiRoute, HttpServiceStatus, ServiceRoute}
+import com.wavesplatform.http.{EvaluateApiRoute, HttpServiceStatus, ServiceApiRoute}
 import com.wavesplatform.jvm.HeapDumps
 import com.wavesplatform.ride.DefaultRequestsService
 import com.wavesplatform.state.Height
@@ -171,20 +171,23 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     log.info(s"Initializing REST API on ${settings.restApi.bindAddress}:${settings.restApi.port}...")
     val apiRoutes = Seq(
       EvaluateApiRoute(requestsService.trackAndRun(_).runToFuture(rideScheduler)),
-      ServiceRoute({ () =>
-        val nowMs      = blockchainEventsStreamScheduler.clockMonotonic(TimeUnit.MILLISECONDS)
-        val idleTimeMs = nowMs - lastServiceStatus.lastProcessedTimeMs
-        HttpServiceStatus(
-          healthy = lastServiceStatus.healthy && idleTimeMs < settings.rideRunner.unhealthyIdleTimeoutMs,
-          debug = Json.obj(
-            "nowTime"             -> nowMs,
-            "lastProcessedTime"   -> lastServiceStatus.lastProcessedTimeMs,
-            "lastProcessedHeight" -> lastServiceStatus.lastProcessedHeight,
-            "idleTime"            -> idleTimeMs,
-            "maxObservedHeight"   -> lastServiceStatus.maxObservedHeight
+      ServiceApiRoute(
+        settings.rideRunner.serviceApiRoute,
+        { () =>
+          val nowMs      = blockchainEventsStreamScheduler.clockMonotonic(TimeUnit.MILLISECONDS)
+          val idleTimeMs = nowMs - lastServiceStatus.lastProcessedTimeMs
+          HttpServiceStatus(
+            healthy = lastServiceStatus.healthy && idleTimeMs < settings.rideRunner.unhealthyIdleTimeoutMs,
+            debug = Json.obj(
+              "nowTime"             -> nowMs,
+              "lastProcessedTime"   -> lastServiceStatus.lastProcessedTimeMs,
+              "lastProcessedHeight" -> lastServiceStatus.lastProcessedHeight,
+              "idleTime"            -> idleTimeMs,
+              "maxObservedHeight"   -> lastServiceStatus.maxObservedHeight
+            )
           )
-        )
-      })
+        }
+      )
     )
 
     val httpService = CompositeHttpService(apiRoutes, settings.restApi)
