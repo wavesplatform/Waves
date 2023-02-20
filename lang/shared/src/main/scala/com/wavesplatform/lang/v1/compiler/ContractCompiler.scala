@@ -375,20 +375,23 @@ object ContractCompiler {
           case Left(err) => Left(err)
           case Right(c)  => Right(c)
         }
-      case f: fastparse.Parsed.Failure => Left(f.toString)
+      case f: fastparse.Parsed.Failure =>
+        Left(Parser.toString(input, f))
     }
   }
 
   def compileWithParseResult(
       input: String,
+      offset: Int,
       ctx: CompilerContext,
       version: StdLibVersion,
       needCompaction: Boolean = false,
       removeUnusedCode: Boolean = false,
       saveExprContext: Boolean = true
-  ): Either[String, (Option[DApp], Expressions.DAPP, Iterable[CompilationError])] = {
-    Parser.parseDAPPWithErrorRecovery(input) match {
-      case Right((parseResult, removedCharPosOpt)) =>
+  ): Either[(String, Int, Int), (Option[DApp], Expressions.DAPP, Iterable[CompilationError])] =
+    new Parser()(offset)
+      .parseDAPPWithErrorRecovery(input)
+      .flatMap { case (parseResult, removedCharPosOpt) =>
         compileContract(parseResult, version, needCompaction, removeUnusedCode, ScriptResultSource.CallableFunction, saveExprContext)
           .run(ctx)
           .map(
@@ -407,13 +410,10 @@ object ContractCompiler {
                        ))
                 (compRes._1, compRes._2, errorList)
               }
-              .leftMap(e => s"Compilation failed: ${Show[CompilationError].show(e)}")
+              .leftMap(e => (s"Compilation failed: ${Show[CompilationError].show(e)}", e.start, e.end))
           )
           .value
-
-      case Left(error) => Left(error.toString)
-    }
-  }
+      }
 
   def compileFreeCall(
       input: String,

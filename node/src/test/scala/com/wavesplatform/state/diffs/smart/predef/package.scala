@@ -41,7 +41,8 @@ package object predef {
         Coproduct[Environment.Tthis](Environment.AssetId(Array())),
         ByteStr.empty,
         fixUnicodeFunctions = true,
-        useNewPowPrecision = true
+        useNewPowPrecision = true,
+        fixBigScriptField = true
       )
       r <- EvaluatorV1().apply[T](evalContext, typedExpr).leftMap(_.message)
     } yield r

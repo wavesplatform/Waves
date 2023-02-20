@@ -1,16 +1,14 @@
 package com.wavesplatform.api.http.requests
 
-import cats.instances.list._
-import cats.syntax.traverse._
+import cats.instances.list.*
+import cats.syntax.traverse.*
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
-import play.api.libs.functional.syntax._
-import play.api.libs.json.{Format, JsPath, Reads}
+import play.api.libs.functional.syntax.*
+import play.api.libs.json.{JsPath, Reads}
 
 object SignedExchangeRequestV2 {
-  implicit val orderFormat: Format[Order] = com.wavesplatform.transaction.assets.exchange.OrderJson.orderFormat
-
   implicit val signedExchangeRequestReads: Reads[SignedExchangeRequestV2] = (
     (JsPath \ "senderPublicKey").read[String] and
       (JsPath \ "order1").read[Order] and

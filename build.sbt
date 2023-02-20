@@ -123,7 +123,7 @@ lazy val `waves-node` = (project in file("."))
 
 inScope(Global)(
   Seq(
-    scalaVersion         := "2.13.8",
+    scalaVersion         := "2.13.10",
     organization         := "com.wavesplatform",
     organizationName     := "Waves Platform",
     organizationHomepage := Some(url("https://wavesplatform.com")),
@@ -144,7 +144,6 @@ inScope(Global)(
       "-Wconf:cat=deprecation&site=com.wavesplatform.state.InvokeScriptResult.*:s"
     ),
     crossPaths := false,
-    dependencyOverrides ++= Dependencies.enforcedVersions.value,
     cancelable        := true,
     parallelExecution := true,
     /* http://www.scalatest.org/user_guide/using_the_runner
@@ -194,7 +193,6 @@ checkPRRaw := Def
   .sequential(
     `waves-node` / clean,
     Def.task {
-      (Test / compile).value
       (`lang-tests` / Test / test).value
       (`repl-jvm` / Test / test).value
       (`lang-js` / Compile / fastOptJS).value
@@ -203,6 +201,7 @@ checkPRRaw := Def
       (node / Test / test).value
       (`repl-js` / Compile / fastOptJS).value
       (`node-it` / Test / compile).value
+      (benchmark / Test / compile).value
     }
   )
   .value

@@ -44,8 +44,8 @@ class ReplTest extends AnyPropSpec with Matchers {
 
   property("syntax errors") {
     val repl = Repl()
-    await(repl.execute(""" let a = {{1} """)) shouldBe Left("Compilation failed: [expected a value's expression in 9-9]")
-    await(repl.execute(""" 1 %% 2 """)) shouldBe Left("Compilation failed: [expected a second operator in 4-4]")
+    await(repl.execute("""let a = {{1}""")) shouldBe Left("Can't parse 'let a = {{1}'")
+    await(repl.execute("""1 %% 2""")) shouldBe Left("Compilation failed: [expected a second operator in 3-3]")
   }
 
   property("logic errors") {

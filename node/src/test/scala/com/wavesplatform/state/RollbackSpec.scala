@@ -484,13 +484,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
             TxHelpers.invoke(dApp.toAddress, func = Some(fc.function.funcName), args = fc.args, invoker = invoker, fee = fee)
           )(setScript => diffs.ci.toInvokeExpression(setScript, invoker, Some(fee), Some(fc)))
 
-        d.appendBlock(
-          TestBlock.create(
-            nextTs,
-            parentBlockId,
-            Seq(invoke)
-          )
-        )
+        d.appendBlock(invoke)
         invoke.id()
       }
 
@@ -503,7 +497,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
             val (setScriptToConvert, checkAddress) = if (useInvokeExpression) (Some(setScript), invoker.toAddress) else (None, dApp.toAddress)
             val append                             = appendBlock(d, invoker, dApp, setScriptToConvert) _
 
-            d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq(setScript)))
+            d.appendBlock(setScript)
 
             val startBlockId = d.lastBlockId
 
@@ -520,7 +514,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
             // hardened block rollback
             val issueTxId = append(startBlockId, issueFc)
             val asset     = getAsset(d, issueTxId)
-            d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq()))
+            d.appendBlock()
             d.balance(checkAddress, asset) shouldBe quantity
             d.blockchainUpdater.removeAfter(startBlockId).explicitGet()
             d.balance(checkAddress, asset) shouldBe 0L
@@ -538,7 +532,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
             val (setScriptToConvert, checkAddress) = if (useInvokeExpression) (Some(setScript), invoker.toAddress) else (None, dApp.toAddress)
             val append                             = appendBlock(d, invoker, dApp, setScriptToConvert) _
 
-            d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq(setScript)))
+            d.appendBlock(setScript)
 
             val startBlockId = d.lastBlockId
 
@@ -546,7 +540,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
             val issueTxId = append(startBlockId, issueFc)
             val asset     = getAsset(d, issueTxId)
-            d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq()))
+            d.appendBlock()
 
             val issueBlockId     = d.lastBlockId
             val issueDescription = d.blockchainUpdater.assetDescription(asset)
@@ -563,7 +557,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
             // hardened block rollback
             append(issueBlockId, reissueFc)
             d.balance(checkAddress, asset) shouldBe reissued + quantity
-            d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq()))
+            d.appendBlock()
             d.blockchainUpdater.removeAfter(issueBlockId).explicitGet()
             d.balance(checkAddress, asset) shouldBe quantity
             d.blockchainUpdater.assetDescription(asset) shouldBe issueDescription
@@ -579,7 +573,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
           ) { d =>
             val (setScriptToConvert, checkAddress) = if (useInvokeExpression) (Some(setScript), invoker.toAddress) else (None, dApp.toAddress)
             val append                             = appendBlock(d, invoker, dApp, setScriptToConvert) _
-            d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq(setScript)))
+            d.appendBlock(setScript)
 
             val startBlockId = d.lastBlockId
 
@@ -587,7 +581,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
             val issueTxId = append(startBlockId, issueFc)
             val asset     = getAsset(d, issueTxId)
-            d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq()))
+            d.appendBlock()
 
             val issueBlockId     = d.lastBlockId
             val issueDescription = d.blockchainUpdater.assetDescription(asset)
@@ -604,7 +598,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
             // hardened block rollback
             append(issueBlockId, burntFc)
             d.balance(checkAddress, asset) shouldBe quantity - burnt
-            d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq()))
+            d.appendBlock()
             d.blockchainUpdater.removeAfter(issueBlockId).explicitGet()
             d.balance(checkAddress, asset) shouldBe quantity
             d.blockchainUpdater.assetDescription(asset) shouldBe issueDescription
@@ -621,7 +615,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
             val setScriptToConvert = if (useInvokeExpression) Some(setScript) else None
             val append             = appendBlock(d, invoker, dApp, setScriptToConvert) _
 
-            d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq(setScript)))
+            d.appendBlock(setScript)
 
             val startBlockId = d.lastBlockId
 
@@ -629,7 +623,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
             val issueTxId = append(startBlockId, issueFc)
             val asset     = getAsset(d, issueTxId)
-            d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq()))
+            d.appendBlock()
 
             val issueBlockId     = d.lastBlockId
             val issueDescription = d.blockchainUpdater.assetDescription(asset)
@@ -645,7 +639,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
             // hardened block rollback
             append(issueBlockId, sponsorFc)
             d.blockchainUpdater.assetDescription(asset).get.sponsorship shouldBe sponsorship
-            d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq()))
+            d.appendBlock()
             d.blockchainUpdater.removeAfter(issueBlockId).explicitGet()
             d.blockchainUpdater.assetDescription(asset).get.sponsorship shouldBe 0L
             d.blockchainUpdater.assetDescription(asset) shouldBe issueDescription
@@ -663,7 +657,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
               if (useInvokeExpression) (Some(setScript), invoker.toAddress, invoker.publicKey) else (None, dApp.toAddress, dApp.publicKey)
             val append = appendBlock(d, invoker, dApp, setScriptToConvert) _
 
-            d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq(setScript)))
+            d.appendBlock(setScript)
             val beforeInvoke1 = d.lastBlockId
 
             val (leaseAmount, leaseFc) = leaseFunctionCall(leaseRecipientAddress.toAddress)
@@ -804,10 +798,12 @@ class RollbackSpec extends FreeSpec with WithDomain {
 
             val leaseAmount = smallFeeGen.sample.get
             val leaseTx =
-              LeaseTransaction.selfSigned(2.toByte, leaseSender, leaseRecipientAddress.toAddress, leaseAmount, setScript.fee.value, nextTs).explicitGet()
+              LeaseTransaction
+                .selfSigned(2.toByte, leaseSender, leaseRecipientAddress.toAddress, leaseAmount, setScript.fee.value, nextTs)
+                .explicitGet()
             val leaseId = leaseTx.id()
 
-            d.appendBlock(TestBlock.create(nextTs, d.lastBlockId, Seq(setScript, leaseTx)))
+            d.appendBlock(setScript, leaseTx)
 
             assertLeaseCancel(
               dApp,
