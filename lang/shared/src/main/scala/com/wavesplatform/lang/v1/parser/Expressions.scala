@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.v1.parser
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.v1.compiler.CompilerContext
 import com.wavesplatform.lang.v1.compiler.Types.*
 
 object Expressions {
@@ -108,7 +109,7 @@ object Expressions {
   }
   case class Tuple(types: Seq[Type]) extends Type
 
-  type CtxOpt = Option[Map[String, Pos]]
+  type CtxOpt = Option[CompilerContext]
 
   case class FUNC(position: Pos, expr: EXPR, name: PART[String], args: Seq[(PART[String], Type)]) extends Declaration {
     val allowShadowing = false

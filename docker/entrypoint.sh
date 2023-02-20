@@ -19,4 +19,11 @@ JAVA_OPTS="-Dlogback.stdout.level=${WAVES_LOG_LEVEL}
   -Dconfig.override_with_env_vars=true
   ${JAVA_OPTS}"
 
-java $JAVA_OPTS -cp "${WAVES_INSTALL_PATH}/lib/plugins/*:$WAVES_INSTALL_PATH/lib/*" com.wavesplatform.Application "$WAVES_CONFIG"
+if [ $# -eq 0 ]
+  then
+    ARGS="$WAVES_CONFIG"
+  else
+    ARGS=$@
+fi
+
+java $JAVA_OPTS -cp "${WAVES_INSTALL_PATH}/lib/plugins/*:$WAVES_INSTALL_PATH/lib/*" com.wavesplatform.Application $ARGS

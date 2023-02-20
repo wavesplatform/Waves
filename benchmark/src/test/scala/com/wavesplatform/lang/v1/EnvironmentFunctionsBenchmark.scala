@@ -169,7 +169,7 @@ object EnvironmentFunctionsBenchmark {
 class AddressFromString {
   val ctx: EvaluationContext[Environment, Id] =
     WavesContext
-      .build(Global, DirectiveSet(V4, Account, DApp).explicitGet())
+      .build(Global, DirectiveSet(V4, Account, DApp).explicitGet(), true)
       .evaluationContext(environment)
 
   val expr: Array[EXPR] =
