@@ -41,11 +41,13 @@ import play.api.libs.json.Json.JsValueWrapper
 import scala.concurrent.duration.*
 
 class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPISettingsHelper with WithDomain with TestWallet {
-
   private val MaxDistributionDepth = 1
 
-  def routeTest[A](settings: WavesSettings = DomainPresets.RideV4.addFeatures(BlockchainFeatures.ReduceNFTFee))(f: (Domain, Route) => A): A =
-    withDomain(settings) { d =>
+  def routeTest[A](
+      settings: WavesSettings = DomainPresets.RideV4.addFeatures(BlockchainFeatures.ReduceNFTFee),
+      balances: Seq[AddrWithBalance] = Seq.empty
+  )(f: (Domain, Route) => A): A =
+    withDomain(settings, balances) { d =>
       f(
         d,
         seal(
@@ -312,21 +314,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
     checkDetails(d, route, issue, issue.id().toString, assetDescr)
   }
 
-  routePath(s"/details/{id} - non-smart asset") in withDomain(RideV6, AddrWithBalance.enoughBalances(defaultSigner)) { d =>
-    val route = seal(
-      AssetsApiRoute(
-        restAPISettings,
-        testWallet,
-        DummyTransactionPublisher.accepting,
-        d.blockchain,
-        TestTime(),
-        d.accountsApi,
-        d.assetsApi,
-        MaxDistributionDepth,
-        new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
-      ).route
-    )
-
+  routePath(s"/details/{id} - non-smart asset") in routeTest(RideV6, AddrWithBalance.enoughBalances(defaultSigner)) { (d, route) =>
     val issues = (1 to 10).map(i => (i, issueTransaction())).toMap
 
     d.appendMicroBlock(issues(1))
