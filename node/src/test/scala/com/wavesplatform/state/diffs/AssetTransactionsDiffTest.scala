@@ -225,29 +225,28 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
     val genesis = TxHelpers.genesis(acc.toAddress)
     val issue   = TxHelpers.issue(acc, 100, script = Some(ExprScript(CONST_BOOLEAN(true)).explicitGet()))
 
-    withDomain(RideV6) { d =>
-      d.appendBlock(genesis)
-      d.appendBlock(issue)
-      d.blockchain.assetDescription(IssuedAsset(issue.id())) shouldBe Some(
-        AssetDescription(
-          issue.assetId,
-          issue.sender,
-          issue.name,
-          issue.description,
-          issue.decimals.value,
-          issue.reissuable,
-          BigInt(issue.quantity.value),
-          Height @@ 2,
-          issue.script.map(AssetScriptInfo(_, 0)),
-          0L,
-          issue.decimals.value == 0 && issue.quantity.value == 1 && !issue.reissuable,
-          1,
-          Height @@ 2
+    assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(issue)), RideV6.blockchainSettings.functionalitySettings) {
+      case (blockDiff, newState) =>
+        newState.assetDescription(IssuedAsset(issue.id())) shouldBe Some(
+          AssetDescription(
+            issue.assetId,
+            issue.sender,
+            issue.name,
+            issue.description,
+            issue.decimals.value,
+            issue.reissuable,
+            BigInt(issue.quantity.value),
+            Height @@ 2,
+            issue.script.map(AssetScriptInfo(_, 0)),
+            0L,
+            issue.decimals.value == 0 && issue.quantity.value == 1 && !issue.reissuable,
+            1,
+            Height @@ 2
+          )
         )
-      )
-      d.liquidDiff.transaction(issue.id()) shouldBe defined
-      d.blockchain.transactionInfo(issue.id()).isDefined shouldBe true
-      d.blockchain.transactionInfo(issue.id()).isDefined shouldEqual true
+        blockDiff.transaction(issue.id()) shouldBe defined
+        newState.transactionInfo(issue.id()).isDefined shouldBe true
+        newState.transactionInfo(issue.id()).isDefined shouldEqual true
     }
   }
 
