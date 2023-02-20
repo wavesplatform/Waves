@@ -374,7 +374,7 @@ class RollbackSpec extends FreeSpec with WithDomain {
           TestBlock.create(
             nextTs,
             genesisBlockId,
-            Seq(TxHelpers.dataEntry(sender, dataEntry))
+            Seq(TxHelpers.dataEntry(sender, dataEntry, TxVersion.V1))
           )
         )
 

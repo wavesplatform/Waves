@@ -27,7 +27,7 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
     Post(
       routePath(""),
       Json.obj("method" -> method, "params" -> Json.arr(params*), "id" -> "test")
-    ) ~> new EthRpcRoute(d.blockchain, d.commonApi.transactions, ntpTime).route ~> check(body)
+    ) ~> EthRpcRoute(() => d.blockchain, d.transactionsApi, ntpTime).route ~> check(body)
   }
 
   "eth_chainId" in withDomain(DefaultWavesSettings) { d =>
@@ -270,7 +270,7 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
 
     val issue3 = d.blockchain.accountData(randomKP.toAddress, "assetId").get.asInstanceOf[BinaryDataEntry].value
 
-    new EthRpcRoute(d.blockchain, d.commonApi.transactions, ntpTime).route
+    EthRpcRoute(() => d.blockchain, d.transactionsApi, ntpTime).route
       .anyParamTest(routePath("/assets"), "id")(
         EthEncoding.toHexString(issue1.id().arr.take(20)),
         EthEncoding.toHexString(issue2.id().arr.take(20)),
@@ -324,13 +324,13 @@ class EthRpcRouteSpec extends RouteSpec("/eth") with WithDomain with EthHelpers 
 
   "absence of id" in withDomain() { d =>
       Post(routePath(""), Json.obj("method" -> "eth_chainId"))
-        ~> new EthRpcRoute(d.blockchain, d.commonApi.transactions, ntpTime).route
+        ~> EthRpcRoute(() => d.blockchain, d.transactionsApi, ntpTime).route
         ~> check { responseAs[JsObject] shouldBe Json.obj("id" -> null, "jsonrpc" -> "2.0", "result" -> "0x54") }
   }
 
   "absence of method" in withDomain() { d =>
       Post(routePath(""), Json.obj())
-        ~> new EthRpcRoute(d.blockchain, d.commonApi.transactions, ntpTime).route
+        ~> EthRpcRoute(() => d.blockchain, d.transactionsApi, ntpTime).route
         ~> check { responseAs[JsObject] shouldBe Json.obj() }
   }
 

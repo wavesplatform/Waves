@@ -92,7 +92,7 @@ final class CompositeBlockchain private (
     }
 
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] =
-    if (maybeDiff.isEmpty || to.exists(id => inner.heightOf(id).isDefined)) {
+    if (maybeDiff.isEmpty || to.exists(id => inner.heightOf(id).exists(_ != height))) {
       inner.balanceSnapshots(address, from, to)
     } else {
       val balance    = this.balance(address)

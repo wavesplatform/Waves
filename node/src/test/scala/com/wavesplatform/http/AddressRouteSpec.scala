@@ -56,7 +56,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
   private val addressApiRoute: AddressApiRoute = AddressApiRoute(
     restAPISettings,
     wallet,
-    blockchain,
+    () => blockchain,
     utxPoolSynchronizer,
     new TestTime,
     Schedulers.timeBoundedFixedPool(
@@ -80,7 +80,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
   routePath("/balance/{address}/{confirmations}") in withDomain(balances = Seq(AddrWithBalance(TxHelpers.defaultAddress))) { d =>
     val route =
       addressApiRoute
-        .copy(blockchain = d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(() => d.liquidDiff, d.db, d.blockchainUpdater))
+        .copy(blockchain = () => d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(() => d.liquidDiff, d.db, () => d.blockchainUpdater))
         .route
     val address = TxHelpers.signer(1).toAddress
 
@@ -349,7 +349,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
 
   routePath(s"/scriptInfo/ after ${BlockchainFeatures.SynchronousCalls}") in {
     val blockchain = stub[Blockchain]("blockchain")
-    val route      = seal(addressApiRoute.copy(blockchain = blockchain).route)
+    val route      = seal(addressApiRoute.copy(blockchain = () => blockchain).route)
     (() => blockchain.activatedFeatures).when().returning(Map(BlockchainFeatures.SynchronousCalls.id -> 0))
 
     val script                            = ExprScript(TRUE).explicitGet()
@@ -403,7 +403,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
 
       val route =
         addressApiRoute
-          .copy(blockchain = d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(() => d.liquidDiff, d.db, d.blockchainUpdater))
+          .copy(blockchain = () => d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(() => d.liquidDiff, d.db, () => d.blockchainUpdater))
           .route
 
       val requestBody = Json.obj("keys" -> Seq("test"))
@@ -451,7 +451,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
 
       val route =
         addressApiRoute
-          .copy(blockchain = d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(() => d.liquidDiff, d.db, d.blockchainUpdater))
+          .copy(blockchain = () => d.blockchainUpdater, commonAccountsApi = CommonAccountsApi(() => d.liquidDiff, d.db, () => d.blockchainUpdater))
           .route
 
       val maxLimitKeys      = Seq.fill(addressApiRoute.settings.dataKeysRequestLimit)(key)

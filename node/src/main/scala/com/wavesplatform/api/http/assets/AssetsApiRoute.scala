@@ -1,6 +1,5 @@
 package com.wavesplatform.api.http.assets
 
-import java.util.concurrent.*
 import akka.NotUsed
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.model.headers.Accept
@@ -14,8 +13,8 @@ import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
-import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.api.http.*
+import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.api.http.assets.AssetsApiRoute.DistributionParams
 import com.wavesplatform.api.http.requests.*
 import com.wavesplatform.common.state.ByteStr
@@ -25,11 +24,11 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Blockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.EthereumTransaction.Invocation
-import com.wavesplatform.transaction.{EthereumTransaction, TransactionFactory}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction}
+import com.wavesplatform.transaction.{EthereumTransaction, TransactionFactory}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import io.netty.util.concurrent.DefaultThreadFactory
@@ -37,13 +36,14 @@ import monix.eval.Task
 import monix.execution.Scheduler
 import play.api.libs.json.*
 
+import java.util.concurrent.*
 import scala.concurrent.Future
 
 case class AssetsApiRoute(
     settings: RestAPISettings,
     wallet: Wallet,
     transactionPublisher: TransactionPublisher,
-    blockchain: Blockchain,
+    blockchain: () => Blockchain,
     time: Time,
     commonAccountApi: CommonAccountsApi,
     commonAssetsApi: CommonAssetsApi,
@@ -175,7 +175,7 @@ case class AssetsApiRoute(
       assets match {
         case Some(assets) =>
           Task {
-            assets.map(asset => asset -> blockchain.balance(address, asset))
+            assets.map(asset => asset -> blockchain().balance(address, asset))
           }
         case None =>
           commonAccountApi
@@ -206,7 +206,7 @@ case class AssetsApiRoute(
     }
 
   def balanceDistribution(assetId: IssuedAsset): Route =
-    balanceDistribution(assetId, blockchain.height, Int.MaxValue, None) { l =>
+    balanceDistribution(assetId, blockchain().height, Int.MaxValue, None) { l =>
       Json.toJson(l.map { case (a, b) => a.toString -> b }.toMap)
     }
 
@@ -214,7 +214,7 @@ case class AssetsApiRoute(
     optionalHeaderValueByType(Accept) { accept =>
       val paramsEi: Either[ValidationError, DistributionParams] =
         AssetsApiRoute
-          .validateDistributionParams(blockchain, heightParam, limitParam, settings.distributionAddressLimit, afterParam, maxDistributionDepth)
+          .validateDistributionParams(blockchain(), heightParam, limitParam, settings.distributionAddressLimit, afterParam, maxDistributionDepth)
 
       paramsEi match {
         case Right((height, limit, after)) =>
@@ -250,7 +250,7 @@ case class AssetsApiRoute(
           .toListL
       } { case (assetId, assetDesc) =>
         AssetsApiRoute
-          .jsonDetails(blockchain)(assetId, assetDesc, full = true)
+          .jsonDetails(blockchain())(assetId, assetDesc, full = true)
           .valueOr(err => throw new IllegalArgumentException(err))
       }
     }
@@ -260,13 +260,14 @@ case class AssetsApiRoute(
     Json.obj(
       "address" -> address,
       "assetId" -> assetId.id.toString,
-      "balance" -> JsNumber(BigDecimal(blockchain.balance(address, assetId)))
+      "balance" -> JsNumber(BigDecimal(blockchain().balance(address, assetId)))
     )
 
   private def assetDetails(assetId: IssuedAsset, full: Boolean): Either[ApiError, JsObject] = {
+    val bc = blockchain()
     for {
-      description <- blockchain.assetDescription(assetId).toRight(AssetDoesNotExist(assetId))
-      result      <- AssetsApiRoute.jsonDetails(blockchain)(assetId, description, full).leftMap(CustomValidationError(_))
+      description <- bc.assetDescription(assetId).toRight(AssetDoesNotExist(assetId))
+      result      <- AssetsApiRoute.jsonDetails(bc)(assetId, description, full).leftMap(CustomValidationError(_))
     } yield result
   }
 }

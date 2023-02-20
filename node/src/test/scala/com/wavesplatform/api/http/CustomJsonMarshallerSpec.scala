@@ -62,11 +62,7 @@ class CustomJsonMarshallerSpec
   }
 
   private val transactionsRoute =
-    TransactionsApiRoute(
-      restAPISettings,
-      transactionsApi,
-      testWallet,
-      blockchain,
+    TransactionsApiRoute(restAPISettings, transactionsApi, testWallet, () => blockchain,
       () => utx.size,
       publisher,
       ntpTime,
@@ -110,11 +106,7 @@ class CustomJsonMarshallerSpec
     pending // todo: fix when distributions/portfolio become testable
   }
 
-  private val assetsRoute = AssetsApiRoute(
-    restAPISettings,
-    testWallet,
-    publisher,
-    blockchain,
+  private val assetsRoute = AssetsApiRoute(restAPISettings, testWallet, publisher, () => blockchain,
     ntpTime,
     accountsApi,
     assetsApi,

@@ -3,6 +3,7 @@ package com.wavesplatform.utx
 import com.wavesplatform.ResponsivenessLogs
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.lang.ValidationError
@@ -176,6 +177,9 @@ case class UtxPoolImpl(
 
   def resetPriorityPool(): Unit =
     priorityPool.setPriorityDiffs(Seq.empty)
+
+  def discardedMicrosDiff(): Diff =
+    priorityPool.validPriorityDiffs.fold(Diff())(_.combineE(_).explicitGet())
 
   private[this] def removeFromOrdPool(txId: ByteStr): Option[Transaction] = {
     for (tx <- Option(transactions.remove(txId))) yield {

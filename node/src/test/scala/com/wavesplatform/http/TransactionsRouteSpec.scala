@@ -68,7 +68,7 @@ class TransactionsRouteSpec
     restAPISettings,
     addressTransactions,
     testWallet,
-    blockchain,
+    () => blockchain,
     utxPoolSize,
     utxPoolSynchronizer,
     testTime,
@@ -123,11 +123,11 @@ class TransactionsRouteSpec
     seal(
       new TransactionsApiRoute(
         restAPISettings,
-        d.commonApi.transactions,
+        d.transactionsApi,
         testWallet,
-        d.blockchain,
+        () => d.blockchain,
         () => 0,
-        (t, _) => d.commonApi.transactions.broadcastTransaction(t),
+        (t, _) => d.transactionsApi.broadcastTransaction(t),
         ntpTime,
         new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
       ).route
@@ -398,7 +398,7 @@ class TransactionsRouteSpec
           )
         )
 
-      val route = seal(transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route)
+      val route = seal(transactionsApiRoute.copy(blockchain = () => blockchain, commonApi = transactionsApi).route)
       Get(routePath(s"/info/${transaction.id()}")) ~> route ~> check {
         responseAs[JsObject] should matchJson(s"""{
                                                  |  "type" : 18,
@@ -455,7 +455,7 @@ class TransactionsRouteSpec
           )
         )
 
-      val route = seal(transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route)
+      val route = seal(transactionsApiRoute.copy(blockchain = () => blockchain, commonApi = transactionsApi).route)
       Get(routePath(s"/info/${transaction.id()}")) ~> route ~> check {
         responseAs[JsObject] should matchJson(s"""{
                                                  |  "type" : 18,
@@ -516,7 +516,7 @@ class TransactionsRouteSpec
           )
         )
 
-      val route = transactionsApiRoute.copy(blockchain = blockchain, commonApi = transactionsApi).route
+      val route = transactionsApiRoute.copy(blockchain = () => blockchain, commonApi = transactionsApi).route
       Get(routePath(s"/info/${leaseCancel.id()}")) ~> route ~> check {
         val json = responseAs[JsObject]
         json shouldBe Json.parse(s"""{

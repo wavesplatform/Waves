@@ -52,10 +52,9 @@ class LeaseRouteSpec
     LeaseApiRoute(
       restAPISettings,
       testWallet,
-      domain.blockchain,
       (_, _) => Future.successful(TracedResult(Right(true))),
       ntpTime,
-      CommonAccountsApi(() => domain.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), domain.db, domain.blockchain),
+      CommonAccountsApi(() => domain.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), domain.db, () => domain.blockchain),
       new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
     )
 
@@ -516,10 +515,7 @@ class LeaseRouteSpec
     val blockchain = stub[Blockchain]
     val commonApi  = stub[CommonAccountsApi]
 
-    val route = LeaseApiRoute(
-      restAPISettings,
-      stub[Wallet],
-      blockchain,
+    val route = LeaseApiRoute(restAPISettings, stub[Wallet],
       stub[TransactionPublisher],
       SystemTime,
       commonApi,

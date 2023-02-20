@@ -5,7 +5,6 @@ import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.api.http.RouteTimeout
 import com.wavesplatform.api.http.leasing.LeaseApiRoute
-import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -22,10 +21,7 @@ import scala.concurrent.duration.*
 
 class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with RequestGen with PathMockFactory with RestAPISettingsHelper {
   private[this] val publisher = DummyTransactionPublisher.rejecting(t => TransactionValidationError(GenericError("foo"), t))
-  private[this] val route = LeaseApiRoute(
-    restAPISettings,
-    stub[Wallet],
-    stub[Blockchain],
+  private[this] val route     = LeaseApiRoute(restAPISettings, stub[Wallet],
     publisher,
     stub[Time],
     stub[CommonAccountsApi],

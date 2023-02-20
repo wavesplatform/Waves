@@ -138,8 +138,8 @@ object TxHelpers {
       .selfSigned(version, sender, asset, amount, reissuable = reissuable, fee, timestamp, chainId)
       .explicitGet()
 
-  def dataEntry(account: KeyPair, value: DataEntry[?]): DataTransaction =
-    DataTransaction.selfSigned(TxVersion.V1, account, Seq(value), TestValues.fee * 3, timestamp).explicitGet()
+  def dataEntry(account: KeyPair, value: DataEntry[?], version: TxVersion = TxVersion.V2): DataTransaction =
+    DataTransaction.selfSigned(version, account, Seq(value), TestValues.fee * 3, timestamp).explicitGet()
 
   def dataSingle(account: KeyPair = defaultSigner, key: String = "test", value: String = "test"): DataTransaction =
     data(account, Seq(StringDataEntry(key, value)))
@@ -351,7 +351,7 @@ object TxHelpers {
   }
 
   def setAssetScript(
-      acc: KeyPair,
+      acc: KeyPair = defaultSigner,
       asset: IssuedAsset,
       script: Script,
       fee: Long = FeeConstants(TransactionType.SetAssetScript) * FeeUnit,

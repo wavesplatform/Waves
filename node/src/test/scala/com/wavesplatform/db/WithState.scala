@@ -168,7 +168,8 @@ trait WithDomain extends WithState { _: Suite =>
       settings: WavesSettings =
         DomainPresets.SettingsFromDefaultConfig.addFeatures(BlockchainFeatures.SmartAccounts), // SmartAccounts to allow V2 transfers by default
       balances: Seq[AddrWithBalance] = Seq.empty,
-      wrapDB: DB => DB = identity
+      wrapDB: DB => DB = identity,
+      beforeSetPriorityDiffs: () => Unit = () => ()
   )(test: Domain => A): A =
     withLevelDBWriter(settings) { blockchain =>
       var domain: Domain = null
@@ -180,7 +181,7 @@ trait WithDomain extends WithState { _: Suite =>
         BlockchainUpdateTriggers.combined(domain.triggers),
         loadActiveLeases(db, _, _)
       )
-      domain = Domain(wrapDB(db), bcu, blockchain, settings)
+      domain = Domain(wrapDB(db), bcu, blockchain, settings, beforeSetPriorityDiffs)
       val genesis = balances.map { case AddrWithBalance(address, amount) =>
         TxHelpers.genesis(address, amount)
       }

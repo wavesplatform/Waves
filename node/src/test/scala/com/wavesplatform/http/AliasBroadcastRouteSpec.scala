@@ -20,13 +20,7 @@ import scala.concurrent.duration.DurationInt
 class AliasBroadcastRouteSpec extends RouteSpec("/alias/broadcast/") with RequestGen with PathMockFactory with RestAPISettingsHelper {
   private[this] val utxPoolSynchronizer = DummyTransactionPublisher.rejecting(tx => TransactionValidationError(GenericError("foo"), tx))
 
-  val route = AliasApiRoute(
-    restAPISettings,
-    stub[CommonTransactionsApi],
-    stub[Wallet],
-    utxPoolSynchronizer,
-    stub[Time],
-    stub[Blockchain],
+  val route = AliasApiRoute(restAPISettings, stub[CommonTransactionsApi], stub[Wallet], utxPoolSynchronizer, stub[Time], () => stub[Blockchain],
     new RouteTimeout(60.seconds)(Schedulers.fixedPool(1, "heavy-request-scheduler"))
   ).route
 

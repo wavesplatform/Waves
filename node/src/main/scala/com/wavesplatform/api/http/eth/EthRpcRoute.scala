@@ -30,14 +30,15 @@ import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
-class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi, time: Time) extends ApiRoute {
+case class EthRpcRoute(blockchain: () => Blockchain, transactionsApi: CommonTransactionsApi, time: Time) extends ApiRoute {
   val route: Route = pathPrefix("eth") {
     (path("assets") & anyParam("id", nonEmpty = true, limit = 100).massValidateEthereumIds) { erc20Ids =>
+      val bc = blockchain()
       val results = erc20Ids
         .map(id =>
           id -> (for {
-            wavesId   <- blockchain.resolveERC20Address(ERC20Address(id))
-            assetDesc <- blockchain.assetDescription(wavesId)
+            wavesId   <- bc.resolveERC20Address(ERC20Address(id))
+            assetDesc <- bc.assetDescription(wavesId)
           } yield (wavesId, assetDesc))
         )
         .map { case (id, assetOpt) => Validated.fromOption(assetOpt, EthEncoding.toHexString(id.arr)).toValidatedNel }
@@ -50,25 +51,26 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
         case Validated.Valid(assets) =>
           val jsons = for {
             (assetId, desc) <- assets
-          } yield AssetsApiRoute.jsonDetails(blockchain)(assetId, desc, full = false)
+          } yield AssetsApiRoute.jsonDetails(bc)(assetId, desc, full = false)
           complete(jsons.sequence.leftMap(CustomValidationError(_)).map(JsArray(_))) // TODO: Only first error is displayed
       }
     } ~ (get & path("abi" / AddrSegment)) { addr =>
-      complete(blockchain.accountScript(addr).map(as => ABIConverter(as.script).jsonABI))
+      complete(blockchain().accountScript(addr).map(as => ABIConverter(as.script).jsonABI))
     } ~ (pathEndOrSingleSlash & post & entity(as[JsObject])) { jso =>
+      val bc             = blockchain()
       val id = (jso \ "id").getOrElse(JsNull)
       (jso \ "method").asOpt[String] match {
         case Some("eth_chainId" | "net_version") =>
-          resp(id, quantity(blockchain.settings.addressSchemeCharacter.toInt))
+          resp(id, quantity(bc.settings.addressSchemeCharacter.toInt))
         case Some("eth_blockNumber") =>
-          resp(id, quantity(blockchain.height))
+          resp(id, quantity(bc.height))
         case Some("eth_getTransactionCount") =>
           resp(id, quantity(time.getTimestamp()))
         case Some("eth_getBlockByNumber") =>
           extractParam1[String](jso) { str =>
             val blockNumberOpt = str match {
               case "earliest" => Some(1).asRight
-              case "latest"   => Some(blockchain.height).asRight
+              case "latest"   => Some(bc.height).asRight
               case "pending"  => None.asRight
               case _ =>
                 Try(Some(Integer.parseInt(str.drop(2), 16)))
@@ -88,7 +90,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
             val blockId = ByteStr(toBytes(str))
             resp(
               id,
-              blockchain.heightOf(blockId).flatMap(blockchain.blockHeader).fold[JsValue](JsNull) { _ =>
+              bc.heightOf(blockId).flatMap(bc.blockHeader).fold[JsValue](JsNull) { _ =>
                 Json.obj(
                   "baseFeePerGas" -> "0x0"
                 )
@@ -101,7 +103,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
             resp(
               id,
               toHexString(
-                BigInt(blockchain.balance(address)) * EthereumTransaction.AmountMultiplier
+                BigInt(bc.balance(address)) * EthereumTransaction.AmountMultiplier
               )
             )
           }
@@ -132,7 +134,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
                     Json.obj(
                       "transactionHash"   -> toHexString(tm.transaction.id().arr),
                       "transactionIndex"  -> "0x1",
-                      "blockHash"         -> toHexString(blockchain.lastBlockId.get.arr),
+                      "blockHash"         -> toHexString(bc.lastBlockId.get.arr),
                       "blockNumber"       -> toHexString(BigInteger.valueOf(tm.height)),
                       "from"              -> toHexString(tx.senderAddress().publicKeyHash),
                       "to"                -> tx.underlying.getTo,
@@ -159,7 +161,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
                     Json.obj(
                       "hash"             -> toHexString(tm.transaction.id().arr),
                       "nonce"            -> "0x1",
-                      "blockHash"        -> toHexString(blockchain.lastBlockId.get.arr),
+                      "blockHash"        -> toHexString(bc.lastBlockId.get.arr),
                       "blockNumber"      -> toHexString(BigInteger.valueOf(tm.height)),
                       "transactionIndex" -> "0x1",
                       "from"             -> toHexString(tx.senderAddress().publicKeyHash),
@@ -194,7 +196,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
                   id,
                   encodeResponse(
                     new Uint256(
-                      assetId(contractAddress).fold(0L)(ia => blockchain.balance(Address.fromHexString(dataString.takeRight(40)), ia))
+                      assetId(contractAddress).fold(0L)(ia => bc.balance(Address.fromHexString(dataString.takeRight(40)), ia))
                     )
                   )
                 )
@@ -233,7 +235,7 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
         case Some("eth_getCode") =>
           extractParam1[String](jso) { str =>
             val address = Address.fromHexString(str)
-            resp(id, if (blockchain.hasDApp(address) || assetDescription(str).isDefined) "0xff" else "0x")
+            resp(id, if (bc.hasDApp(address) || assetDescription(str).isDefined) "0xff" else "0x")
           }
         case _ =>
           log.trace(s"Unexpected call: ${Json.stringify(jso)}")
@@ -256,10 +258,10 @@ class EthRpcRoute(blockchain: Blockchain, transactionsApi: CommonTransactionsApi
   private[this] def resp(id: JsValue, resp: Future[JsValueWrapper]) = complete(resp.map(r => Json.obj("id" -> id, "jsonrpc" -> "2.0", "result" -> r)))
 
   private[this] def assetDescription(contractAddress: String) =
-    assetId(contractAddress).flatMap(blockchain.assetDescription)
+    assetId(contractAddress).flatMap(blockchain().assetDescription)
 
   private[this] def assetId(contractAddress: String): Option[IssuedAsset] =
-    blockchain.resolveERC20Address(ERC20Address(ByteStr(toBytes(contractAddress))))
+    blockchain().resolveERC20Address(ERC20Address(ByteStr(toBytes(contractAddress))))
 
   private[this] def encodeResponse(values: Type*): String = "0x" + FunctionEncoder.encodeConstructor(values.map(Type.unwrap).asJava)
 

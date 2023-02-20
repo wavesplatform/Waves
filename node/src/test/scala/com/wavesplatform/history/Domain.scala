@@ -10,6 +10,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.consensus.{PoSCalculator, PoSSelector}
 import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
+import com.wavesplatform.db.TestUtxPool
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures.{BlockV5, RideV6}
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -18,13 +19,13 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.TransactionDiffer
+import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{BlockchainUpdater, *}
 import com.wavesplatform.utils.{EthEncoding, SystemTime}
-import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{Application, TestValues, crypto, database}
+import com.wavesplatform.{TestValues, crypto, database}
 import monix.execution.Scheduler.Implicits.global
 import org.iq80.leveldb.DB
 import org.scalatest.matchers.should.Matchers.*
@@ -36,7 +37,13 @@ import scala.concurrent.duration.*
 import scala.util.Try
 import scala.util.control.NonFatal
 
-case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter, settings: WavesSettings) {
+case class Domain(
+    db: DB,
+    blockchainUpdater: BlockchainUpdaterImpl,
+    levelDBWriter: LevelDBWriter,
+    settings: WavesSettings,
+    beforeSetPriorityDiffs: () => Unit = () => ()
+) {
   import Domain.*
 
   val blockchain: BlockchainUpdaterImpl = blockchainUpdater
@@ -52,9 +59,14 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   def createDiffE(tx: Transaction): Either[ValidationError, Diff] = transactionDiffer(tx).resultE
   def createDiff(tx: Transaction): Diff                           = createDiffE(tx).explicitGet()
 
-  lazy val utxPool: UtxPoolImpl =
-    new UtxPoolImpl(SystemTime, blockchain, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
+  lazy val utxPool =
+    new TestUtxPool(SystemTime, blockchain, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable, beforeSetPriorityDiffs)
   lazy val wallet: Wallet       = Wallet(settings.walletSettings.copy(file = None))
+
+  def blockchainWithDiscardedDiffs(): CompositeBlockchain = {
+    def bc = CompositeBlockchain(blockchain, utxPool.discardedMicrosDiff())
+    utxPool.priorityPool.optimisticRead(bc)(_ => true)
+  }
 
   object commonApi {
 
@@ -64,7 +76,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       *   [[com.wavesplatform.state.diffs.FeeValidation#getMinFee(com.wavesplatform.state.Blockchain, com.wavesplatform.transaction.Transaction)]]
       */
     def calculateFee(tx: Transaction): (Asset, Long, Long) =
-      transactions.calculateFee(tx).explicitGet()
+      transactionsApi.calculateFee(tx).explicitGet()
 
     def calculateWavesFee(tx: Transaction): Long = {
       val (Waves, _, feeInWaves) = calculateFee(tx): @unchecked
@@ -72,7 +84,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     }
 
     def transactionMeta(transactionId: ByteStr): TransactionMeta =
-      transactions
+      transactionsApi
         .transactionById(transactionId)
         .getOrElse(throw new NoSuchElementException(s"No meta for $transactionId"))
 
@@ -83,16 +95,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       }
 
     def addressTransactions(address: Address): Seq[TransactionMeta] =
-      transactions.transactionsByAddress(address, None, Set.empty, None).toListL.runSyncUnsafe()
-
-    lazy val transactions: CommonTransactionsApi = CommonTransactionsApi(
-      blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
-      db,
-      blockchain,
-      utxPool,
-      tx => Future.successful(utxPool.putIfNew(tx)),
-      Application.loadBlockAt(db, blockchain)
-    )
+      transactionsApi.transactionsByAddress(address, None, Set.empty, None).toListL.runSyncUnsafe()
   }
 
   def liquidState: Option[NgState] = {
@@ -135,8 +138,11 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       .getOrElse(TestBlock.create(Nil))
   }
 
-  def liquidDiff: Diff =
-    blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty)
+  def liquidDiff: Diff = {
+    def liquidDiff = blockchainUpdater.bestLiquidDiff.getOrElse(Diff())
+    def totalDiff  = liquidDiff.combineE(utxPool.discardedMicrosDiff()).explicitGet()
+    utxPool.priorityPool.optimisticRead(totalDiff)(_ => true)
+  }
 
   def microBlocks: Vector[MicroBlock] = blockchain.microblockIds.reverseIterator.flatMap(blockchain.microBlock).to(Vector)
 
@@ -159,24 +165,28 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def nftList(address: Address): Seq[(IssuedAsset, AssetDescription)] = db.withResource { resource =>
     AddressPortfolio
-      .nftIterator(resource, address, blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), None, blockchainUpdater.assetDescription)
+      .nftIterator(resource, address, liquidDiff, None, blockchainUpdater.assetDescription)
       .toSeq
   }
 
   def addressTransactions(address: Address, from: Option[ByteStr] = None): Seq[(Height, Transaction)] =
-    AddressTransactions
-      .allAddressTransactions(
-        db,
-        blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
-        address,
-        None,
-        Set.empty,
-        from
-      )
-      .map { case (m, tx) => m.height -> tx }
-      .toSeq
+    transactionsApi
+      .transactionsByAddress(address, None, Set(), from)
+      .map(meta => (meta.height, meta.transaction))
+      .toListL
+      .runSyncUnsafe()
 
-  def portfolio(address: Address): Seq[(IssuedAsset, Long)] = Domain.portfolio(address, db, blockchainUpdater)
+  def portfolio(address: Address): Seq[(IssuedAsset, Long)] =
+    db.withResource { resource =>
+      AddressPortfolio
+        .assetBalanceIterator(
+          resource,
+          address,
+          liquidDiff,
+          id => blockchainUpdater.assetDescription(id).exists(!_.nft)
+        )
+        .toSeq
+    }
 
   def appendAndAssertSucceed(txs: Transaction*): Block = {
     val block = createBlock(Block.PlainBlockVersion, txs)
@@ -392,24 +402,24 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   }
 
   val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(
-    blockchainUpdater.bestLiquidDiff.map(Height(blockchainUpdater.height) -> _),
+    Some(Height(blockchainUpdater.height) -> liquidDiff),
     db,
-    blockchain,
+    () => blockchainWithDiscardedDiffs(),
     utxPool,
-    _ => Future.successful(TracedResult(Right(true))),
+    tx => Future.successful(utxPool.putIfNew(tx)),
     h => blocksApi.blockAtHeight(h)
   )
 
   val accountsApi: CommonAccountsApi = CommonAccountsApi(
-    () => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty),
+    () => liquidDiff,
     db,
-    blockchain
+    () => blockchainWithDiscardedDiffs()
   )
 
   val assetsApi: CommonAssetsApi = CommonAssetsApi(
-    () => blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty),
+    () => liquidDiff,
     db,
-    blockchain
+    () => blockchainWithDiscardedDiffs()
   )
 }
 
@@ -425,16 +435,5 @@ object Domain {
         }
       bcu.processBlock(block, hitSource)
     }
-  }
-
-  def portfolio(address: Address, db: DB, blockchainUpdater: BlockchainUpdaterImpl): Seq[(IssuedAsset, Long)] = db.withResource { resource =>
-    AddressPortfolio
-      .assetBalanceIterator(
-        resource,
-        address,
-        blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty),
-        id => blockchainUpdater.assetDescription(id).exists(!_.nft)
-      )
-      .toSeq
   }
 }

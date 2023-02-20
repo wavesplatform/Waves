@@ -10,9 +10,9 @@ import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.lang.v1.traits.domain.{Lease, Recipient}
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.{DataEntry, Diff, EmptyDataEntry, StringDataEntry, diffs}
-import com.wavesplatform.test.DomainPresets.RideV4
+import com.wavesplatform.test.DomainPresets.{RideV4, RideV6}
 import com.wavesplatform.test.FreeSpec
-import com.wavesplatform.transaction.TxHelpers.data
+import com.wavesplatform.transaction.TxHelpers.{data, secondAddress}
 import com.wavesplatform.transaction.TxVersion.V2
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxHelpers}
 import com.wavesplatform.{BlocksTransactionsHelpers, history}
@@ -34,21 +34,25 @@ class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransacti
       val data4   = data(acc, Seq(EmptyDataEntry("test"), EmptyDataEntry("test1")), version = V2)
       val data5   = data(acc, Seq(EmptyDataEntry("test2"), entry1, entry2), version = V2)
 
-      withDomain(RideV4) { d =>
-        val commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), d.db, d.blockchainUpdater)
-        def dataList(): Set[DataEntry[_]] = commonAccountsApi.dataStream(acc.toAddress, None).toListL.runSyncUnsafe().toSet
 
-        d.appendBlock(genesis)
-        d.appendMicroBlock(data1)
-        dataList() shouldBe Set(entry1)
-        d.appendBlock(data2)
-        dataList() shouldBe Set(entry1, entry2)
-        d.appendMicroBlock(data3)
-        dataList() shouldBe Set(entry1, entry2, entry3)
-        d.appendBlock(data4)
-        dataList() shouldBe Set(entry3)
-        d.appendMicroBlock(data5)
-        dataList() shouldBe Set(entry1, entry2)
+        withDomain(
+          RideV4
+        ) { d =>
+          val commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), d.db, () => d.blockchainUpdater)
+          def dataList(): Set[DataEntry[_]] = commonAccountsApi.dataStream(acc.toAddress, None).toListL.runSyncUnsafe().toSet
+
+          d.appendBlock(genesis)
+          d.appendMicroBlock(data1)
+          dataList() shouldBe Set(entry1)
+          d.appendBlock(data2)
+          dataList() shouldBe Set(entry1, entry2)
+          d.appendMicroBlock(data3)
+          dataList() shouldBe Set(entry1, entry2, entry3)
+          d.appendBlock(data4)
+          dataList() shouldBe Set(entry3)
+          d.appendMicroBlock(data5)
+          dataList() shouldBe Set(entry1, entry2)
+
       }
     }
 
@@ -71,7 +75,7 @@ class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransacti
 
       forAll(preconditions) { case (acc, block1, mb1, block2, mb2) =>
         withDomain(domainSettingsWithFS(TestFunctionalitySettings.withFeatures(BlockchainFeatures.NG, BlockchainFeatures.DataTransaction))) { d =>
-          val commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), d.db, d.blockchainUpdater)
+          val commonAccountsApi = CommonAccountsApi(() => d.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), d.db, () => d.blockchainUpdater)
           def dataList(): Set[DataEntry[_]] = commonAccountsApi.dataStream(acc.toAddress, Some("test_.*")).toListL.runSyncUnsafe().toSet
 
           d.appendBlock(block1)
@@ -145,7 +149,7 @@ class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransacti
           invoke
         )
 
-        val api = CommonAccountsApi(() => Diff.empty, d.db, d.blockchain)
+        val api = CommonAccountsApi(() => Diff.empty, d.db, () => d.blockchain)
         val leaseId = Lease.calculateId(
           Lease(
             Recipient.Address(ByteStr(TxHelpers.defaultAddress.bytes)),
@@ -158,5 +162,22 @@ class CommonAccountApiSpec extends FreeSpec with WithDomain with BlocksTransacti
           LeaseInfo(leaseId, invoke.id(), TxHelpers.secondAddress, TxHelpers.defaultAddress, 1, 2, LeaseInfo.Status.Active)
         )
       }
+  }
+
+  "Take into account discarded diffs" in {
+    withDomain(RideV6) { d =>
+      val recipient    = secondAddress
+      val startBalance = d.balance(recipient)
+
+      val lastBlock = d.appendBlock().id()
+      val transfer  = TxHelpers.transfer(amount = 123)
+
+      d.appendMicroBlock(transfer)
+      d.accountsApi.balance(recipient) - startBalance shouldBe 123
+
+      d.appendKeyBlock(Some(lastBlock))
+      d.utxPool.priorityPool.validPriorityDiffs.head.portfolios(secondAddress).balance shouldBe 123
+      d.accountsApi.balance(recipient) - startBalance shouldBe 123
+    }
   }
 }

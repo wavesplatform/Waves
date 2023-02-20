@@ -47,7 +47,7 @@ object CommonTransactionsApi {
   def apply(
       maybeDiff: => Option[(Height, Diff)],
       db: DB,
-      blockchain: Blockchain,
+      blockchain: () => Blockchain,
       utx: UtxPool,
       publishTransaction: Transaction => Future[TracedResult[ValidationError, Boolean]],
       blockAt: Int => Option[(BlockMeta, Seq[(TxMeta, Transaction)])]
@@ -63,7 +63,7 @@ object CommonTransactionsApi {
       common.addressTransactions(db, maybeDiff, subject, sender, transactionTypes, fromId)
 
     override def transactionById(transactionId: ByteStr): Option[TransactionMeta] =
-      blockchain.transactionInfo(transactionId).map(common.loadTransactionMeta(db, maybeDiff))
+      blockchain().transactionInfo(transactionId).map(common.loadTransactionMeta(db, maybeDiff))
 
     override def unconfirmedTransactions: Seq[Transaction] = utx.all
 
@@ -72,7 +72,7 @@ object CommonTransactionsApi {
 
     override def calculateFee(tx: Transaction): Either[ValidationError, (Asset, Long, Long)] =
       FeeValidation
-        .getMinFee(blockchain, tx)
+        .getMinFee(blockchain(), tx)
         .map {
           case FeeDetails(asset, _, feeInAsset, feeInWaves) =>
             (asset, feeInAsset, feeInWaves)
@@ -83,7 +83,7 @@ object CommonTransactionsApi {
     override def transactionProofs(transactionIds: List[ByteStr]): List[TransactionProof] =
       for {
         transactionId           <- transactionIds
-        (txm, tx)               <- blockchain.transactionInfo(transactionId)
+        (txm, tx)               <- blockchain().transactionInfo(transactionId)
         (meta, allTransactions) <- blockAt(txm.height) if meta.header.version >= Block.ProtoBlockVersion
         transactionProof        <- block.transactionProof(tx, allTransactions.map(_._2))
       } yield transactionProof

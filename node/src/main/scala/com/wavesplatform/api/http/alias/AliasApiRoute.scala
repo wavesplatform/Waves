@@ -21,7 +21,7 @@ case class AliasApiRoute(
     wallet: Wallet,
     transactionPublisher: TransactionPublisher,
     time: Time,
-    blockchain: Blockchain,
+    blockchain: () => Blockchain,
     routeTimeout: RouteTimeout
 ) extends ApiRoute
     with BroadcastRoute
@@ -43,7 +43,7 @@ case class AliasApiRoute(
       Alias
         .create(aliasName)
         .flatMap { a =>
-          blockchain.resolveAlias(a).bimap(_ => TxValidationError.AliasDoesNotExist(a), addr => Json.obj("address" -> addr.toString))
+          blockchain().resolveAlias(a).bimap(_ => TxValidationError.AliasDoesNotExist(a), addr => Json.obj("address" -> addr.toString))
         }
     }
   }
