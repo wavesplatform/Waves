@@ -7,7 +7,7 @@ import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.storage.ActivatedFeatures
 
-package object ride {
+package object riderunner {
 
   // See DiffCommon.countVerifierComplexity
   def estimate(

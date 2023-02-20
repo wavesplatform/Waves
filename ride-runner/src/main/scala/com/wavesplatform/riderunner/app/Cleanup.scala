@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.app
+package com.wavesplatform.riderunner.app
 
 import akka.Done
 import akka.actor.{ActorSystem, CoordinatedShutdown}

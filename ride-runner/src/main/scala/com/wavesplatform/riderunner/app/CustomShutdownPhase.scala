@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.app
+package com.wavesplatform.riderunner.app
 
 sealed abstract class CustomShutdownPhase(private val nameSuffix: String) extends Product with Serializable {
   val name = s"ride-$nameSuffix"

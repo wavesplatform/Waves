@@ -3,7 +3,7 @@ package com.wavesplatform.storage
 import cats.syntax.contravariantSemigroupal.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.database.DBExt
-import com.wavesplatform.ride.app.RideRunnerMetrics.rideScriptTotalNumber
+import com.wavesplatform.riderunner.app.RideRunnerMetrics.rideScriptTotalNumber
 import com.wavesplatform.storage.persistent.CacheKeys
 import org.iq80.leveldb.DB
 import play.api.libs.json.*

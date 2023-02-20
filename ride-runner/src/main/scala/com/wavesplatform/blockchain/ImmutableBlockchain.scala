@@ -13,8 +13,8 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.ride.*
-import com.wavesplatform.ride.input.{RideRunnerInput, decodeStringLikeBytes}
+import com.wavesplatform.riderunner.*
+import com.wavesplatform.riderunner.input.{RideRunnerInput, decodeStringLikeBytes}
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{

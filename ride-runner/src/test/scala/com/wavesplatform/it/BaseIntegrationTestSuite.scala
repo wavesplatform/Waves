@@ -9,7 +9,7 @@ import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, Share
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.ride.DefaultRequestsService
+import com.wavesplatform.riderunner.DefaultRequestsService
 import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
 import com.wavesplatform.storage.HasLevelDb.TestDb
 import com.wavesplatform.storage.persistent.LevelDbPersistentCaches

@@ -1,8 +1,8 @@
-package com.wavesplatform.ride.app
+package com.wavesplatform.riderunner.app
 
 import com.wavesplatform.api.http.utils.UtilsApiRoute
 import com.wavesplatform.blockchain.ImmutableBlockchain
-import com.wavesplatform.ride.input.RideRunnerInput
+import com.wavesplatform.riderunner.input.RideRunnerInput
 import play.api.libs.json.Json
 
 import java.io.File

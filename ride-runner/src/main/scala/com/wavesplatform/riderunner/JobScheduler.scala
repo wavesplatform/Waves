@@ -1,8 +1,8 @@
-package com.wavesplatform.ride
+package com.wavesplatform.riderunner
 
 import cats.syntax.option.*
-import com.wavesplatform.ride.SynchronizedJobScheduler.ImpossibleCase
-import com.wavesplatform.ride.app.RideRunnerMetrics.*
+import com.wavesplatform.riderunner.SynchronizedJobScheduler.ImpossibleCase
+import com.wavesplatform.riderunner.app.RideRunnerMetrics.*
 
 import scala.collection.mutable
 import scala.util.control.NoStackTrace

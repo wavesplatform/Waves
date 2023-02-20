@@ -9,7 +9,7 @@ import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.jvm.HeapDumps
 import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.protobuf.ByteStringExt
-import com.wavesplatform.ride.app.RideRunnerMetrics
+import com.wavesplatform.riderunner.app.RideRunnerMetrics
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.{Status, StatusRuntimeException}

@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.app
+package com.wavesplatform.riderunner.app
 
 import com.typesafe.config.Config
 import com.wavesplatform.metrics.TimerExt

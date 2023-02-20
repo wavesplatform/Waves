@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.app
+package com.wavesplatform.riderunner.app
 
 import com.wavesplatform.api.http.utils.UtilsApiRoute
 import com.wavesplatform.blockchain.ImmutableBlockchain
@@ -8,7 +8,7 @@ import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.lang.API
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.ride.input.*
+import com.wavesplatform.riderunner.input.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
 import play.api.libs.json.Json

@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.input
+package com.wavesplatform.riderunner.input
 
 case class RunnerLeaseBalance(
     in: Long = 0,

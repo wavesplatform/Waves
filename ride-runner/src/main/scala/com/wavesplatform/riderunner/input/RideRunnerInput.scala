@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.input
+package com.wavesplatform.riderunner.input
 
 import cats.syntax.either.*
 import com.google.protobuf.ByteString

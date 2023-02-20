@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.input
+package com.wavesplatform.riderunner.input
 
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.transaction.Asset

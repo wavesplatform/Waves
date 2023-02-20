@@ -1,4 +1,4 @@
-package com.wavesplatform.ride
+package com.wavesplatform.riderunner
 
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr

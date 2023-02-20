@@ -1,12 +1,12 @@
-package com.wavesplatform.ride
+package com.wavesplatform.riderunner
 
 import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.api.http.ApiException
 import com.wavesplatform.api.http.utils.UtilsApiRoute
 import com.wavesplatform.blockchain.{ScriptBlockchain, SharedBlockchainData}
-import com.wavesplatform.ride.DefaultRequestsService.RideScriptRunEnvironment
-import com.wavesplatform.ride.app.RideRunnerMetrics
-import com.wavesplatform.ride.app.RideRunnerMetrics.*
+import com.wavesplatform.riderunner.DefaultRequestsService.RideScriptRunEnvironment
+import com.wavesplatform.riderunner.app.RideRunnerMetrics
+import com.wavesplatform.riderunner.app.RideRunnerMetrics.*
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.storage.{RequestKey, RequestsStorage}
 import com.wavesplatform.utils.ScorexLogging

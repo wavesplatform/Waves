@@ -19,7 +19,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.Block
 import com.wavesplatform.protobuf.transaction.PBTransactions.{toVanillaDataEntry, toVanillaScript}
-import com.wavesplatform.ride.app.RideRunnerMetrics.*
+import com.wavesplatform.riderunner.app.RideRunnerMetrics.*
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, DataEntry, Height}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.ScorexLogging

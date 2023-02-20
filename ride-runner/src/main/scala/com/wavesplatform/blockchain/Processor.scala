@@ -8,8 +8,8 @@ import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
-import com.wavesplatform.ride.RequestsService
-import com.wavesplatform.ride.app.RideRunnerMetrics.*
+import com.wavesplatform.riderunner.RequestsService
+import com.wavesplatform.riderunner.app.RideRunnerMetrics.*
 import com.wavesplatform.state.Height
 import com.wavesplatform.storage.RequestKey
 import com.wavesplatform.storage.actions.AffectedTags

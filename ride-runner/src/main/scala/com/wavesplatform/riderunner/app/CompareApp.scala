@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.app
+package com.wavesplatform.riderunner.app
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http

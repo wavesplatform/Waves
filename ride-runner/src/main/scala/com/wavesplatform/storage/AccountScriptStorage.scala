@@ -6,7 +6,7 @@ import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
-import com.wavesplatform.ride.input.EmptyPublicKey
+import com.wavesplatform.riderunner.input.EmptyPublicKey
 import com.wavesplatform.state.AccountScriptInfo
 import com.wavesplatform.storage.actions.AffectedTags
 import com.wavesplatform.storage.persistent.PersistentCache

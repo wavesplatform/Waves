@@ -1,4 +1,4 @@
-package com.wavesplatform.ride
+package com.wavesplatform.riderunner
 
 import cats.syntax.option.*
 import com.wavesplatform.BaseTestSuite

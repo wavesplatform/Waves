@@ -5,7 +5,7 @@ import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.blockchain.SharedBlockchainData.Settings
 import com.wavesplatform.features.EstimatorProvider
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.ride.estimate
+import com.wavesplatform.riderunner.estimate
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.storage.*
 import com.wavesplatform.storage.persistent.PersistentCaches

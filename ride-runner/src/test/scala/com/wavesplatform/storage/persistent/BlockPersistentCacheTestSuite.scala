@@ -2,7 +2,7 @@ package com.wavesplatform.storage.persistent
 
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.ride.input.EmptyPublicKey
+import com.wavesplatform.riderunner.input.EmptyPublicKey
 
 class BlockPersistentCacheTestSuite extends PersistentTestSuite {
   "BlockPersistentCache" - {
