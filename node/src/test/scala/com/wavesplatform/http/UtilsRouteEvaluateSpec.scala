@@ -39,7 +39,7 @@ class UtilsRouteEvaluateSpec
     },
     restAPISettings,
     Int.MaxValue,
-    () => ScriptEstimatorV3(true, false),
+    () => ScriptEstimatorV3.latest,
     Schedulers.timeBoundedFixedPool(
       new HashedWheelTimer(),
       5.seconds,
