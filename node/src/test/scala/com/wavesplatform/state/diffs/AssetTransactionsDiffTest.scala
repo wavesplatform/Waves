@@ -246,7 +246,7 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
         )
         blockDiff.transaction(issue.id()) shouldBe defined
         newState.transactionInfo(issue.id()).isDefined shouldBe true
-        newState.transactionInfo(issue.id()).isDefined shouldEqual true
+        newState.transactionInfo(issue.id()).isDefined shouldBe true
     }
   }
 
