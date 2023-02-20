@@ -9,9 +9,9 @@ import com.wavesplatform.database.openDB
 import com.wavesplatform.http.{EvaluateApiRoute, HttpServiceStatus, ServiceApiRoute}
 import com.wavesplatform.jvm.HeapDumps
 import com.wavesplatform.riderunner.DefaultRequestsService
+import com.wavesplatform.riderunner.storage.{LevelDbRequestsStorage, RequestKey}
+import com.wavesplatform.riderunner.storage.persistent.LevelDbPersistentCaches
 import com.wavesplatform.state.Height
-import com.wavesplatform.storage.persistent.LevelDbPersistentCaches
-import com.wavesplatform.storage.{LevelDbRequestsStorage, RequestKey}
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.ManagedChannel
 import io.netty.util.concurrent.DefaultThreadFactory

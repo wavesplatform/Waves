@@ -10,9 +10,9 @@ import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.riderunner.RequestsService
 import com.wavesplatform.riderunner.app.RideRunnerMetrics.*
+import com.wavesplatform.riderunner.storage.RequestKey
+import com.wavesplatform.riderunner.storage.actions.AffectedTags
 import com.wavesplatform.state.Height
-import com.wavesplatform.storage.RequestKey
-import com.wavesplatform.storage.actions.AffectedTags
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 

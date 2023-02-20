@@ -7,8 +7,8 @@ import com.wavesplatform.blockchain.{ScriptBlockchain, SharedBlockchainData}
 import com.wavesplatform.riderunner.DefaultRequestsService.RideScriptRunEnvironment
 import com.wavesplatform.riderunner.app.RideRunnerMetrics
 import com.wavesplatform.riderunner.app.RideRunnerMetrics.*
+import com.wavesplatform.riderunner.storage.{RequestKey, RequestsStorage}
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.storage.{RequestKey, RequestsStorage}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.execution.Scheduler

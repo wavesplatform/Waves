@@ -10,10 +10,10 @@ import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, Proce
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.it.TestBlockchainApi
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.riderunner.storage.HasLevelDb.TestDb
+import com.wavesplatform.riderunner.storage.persistent.LevelDbPersistentCaches
+import com.wavesplatform.riderunner.storage.{HasLevelDb, RequestKey, RequestsStorage}
 import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
-import com.wavesplatform.storage.HasLevelDb.TestDb
-import com.wavesplatform.storage.persistent.LevelDbPersistentCaches
-import com.wavesplatform.storage.{HasLevelDb, RequestKey, RequestsStorage}
 import monix.eval.Task
 import monix.execution.schedulers.TestScheduler
 import play.api.libs.json.Json

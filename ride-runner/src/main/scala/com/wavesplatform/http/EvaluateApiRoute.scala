@@ -2,7 +2,7 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.api.http.*
-import com.wavesplatform.storage.RequestKey
+import com.wavesplatform.riderunner.storage.RequestKey
 import play.api.libs.json.*
 
 import scala.concurrent.Future

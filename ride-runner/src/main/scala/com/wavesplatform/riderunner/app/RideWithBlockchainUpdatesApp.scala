@@ -6,9 +6,9 @@ import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, Share
 import com.wavesplatform.database.openDB
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.riderunner.DefaultRequestsService
+import com.wavesplatform.riderunner.storage.{RequestKey, RequestsStorage}
+import com.wavesplatform.riderunner.storage.persistent.LevelDbPersistentCaches
 import com.wavesplatform.state.Height
-import com.wavesplatform.storage.persistent.LevelDbPersistentCaches
-import com.wavesplatform.storage.{RequestKey, RequestsStorage}
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.ManagedChannel
 import io.netty.util.concurrent.DefaultThreadFactory

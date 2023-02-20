@@ -6,9 +6,9 @@ import com.wavesplatform.blockchain.SharedBlockchainData.Settings
 import com.wavesplatform.features.EstimatorProvider
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.riderunner.estimate
+import com.wavesplatform.riderunner.storage.{AccountBalanceStorage, AccountDataStorage, AccountLeaseBalanceStorage, AccountScriptStorage, AliasStorage, AssetStorage, BlockHeadersStorage, ExactWithHeightStorage, TransactionStorage, VrfStorage}
+import com.wavesplatform.riderunner.storage.persistent.PersistentCaches
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.storage.*
-import com.wavesplatform.storage.persistent.PersistentCaches
 import com.wavesplatform.utils.ScorexLogging
 
 import scala.util.chaining.scalaUtilChainingOps
