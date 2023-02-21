@@ -122,7 +122,7 @@ object UtilsEvaluator {
         case (_: EXPR, _, log)                        => Left(InvokeRejectError(s"Calculation complexity limit exceeded", log))
       }
       diff <- ScriptResult
-        .fromObj(ctx, ByteStr.empty, evaluated, ds.stdLibVersion, unusedComplexity = 0)
+        .fromObj(ctx, invoke.id(), evaluated, ds.stdLibVersion, unusedComplexity = 0)
         .bimap(
           _ => Right(Diff.empty),
           r =>

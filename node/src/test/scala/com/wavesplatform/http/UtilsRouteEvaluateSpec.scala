@@ -487,6 +487,15 @@ class UtilsRouteEvaluateSpec
              |
              | @Callable(i)
              | func default() = []
+             |
+             | @Callable(i)
+             | func issueAndTransfer() = {
+             |   let issue = Issue("name", "description", 1000, 4, true, unit, 0)
+             |   [
+             |     issue,
+             |     ScriptTransfer(Address(base58'$defaultAddress'), 1, calculateAssetId(issue))
+             |   ]
+             | }
            """.stripMargin
         )
         d.appendBlock(setScript(secondSigner, dApp))
@@ -514,6 +523,16 @@ class UtilsRouteEvaluateSpec
         // illegal payment asset id
         Post(routePath(s"/script/evaluate/$secondAddress"), Json.parse("""{"payment":[{"amount":1,"assetId":"xxxxx"}]}""")) ~> route ~> check {
           responseAs[String] should include("Accounts balance errors")
+        }
+
+        // issue and transfer
+        Post(
+          routePath(s"/script/evaluate/$secondAddress"),
+          Json.obj("fee" -> 100500000, "call" -> Json.obj("function" -> "issueAndTransfer"))
+        ) ~> route ~> check {
+          val actions = responseAs[JsObject] \ "result" \ "value"
+          (actions \ 0 \ "type").as[String] shouldBe "Issue"
+          (actions \ 1 \ "type").as[String] shouldBe "ScriptTransfer"
         }
       }
     }
