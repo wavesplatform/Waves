@@ -13,7 +13,7 @@ import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import net.ceedubs.ficus.readers.{CollectionReaders, ValueReader}
 import play.api.libs.json.{JsObject, Json}
 
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 case class RideRunnerGlobalSettings(
     rideRunner: RideRunnerSettings,
@@ -69,7 +69,19 @@ case class RideRunnerSettings(
 }
 
 object RideRunnerSettings {
-  case class DbSettings(directory: String)
+  case class DbSettings(directory: String) {
+    def toNode: DBSettings = DBSettings(
+      directory = directory,
+      storeTransactionsByAddress = false,
+      storeInvokeScriptResults = false,
+      storeStateHashes = false,
+      maxCacheSize = 0,
+      maxRollbackDepth = 0,
+      rememberBlocks = 0.seconds,
+      useBloomFilter = false,
+      inMemory = InMemorySettings(SizeInBytes(0L), SizeInBytes(0L))
+    )
+  }
 }
 
 case class CompareSettings(

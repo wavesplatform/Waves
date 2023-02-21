@@ -3,11 +3,11 @@ package com.wavesplatform.riderunner.app
 import akka.actor.ActorSystem
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
-import com.wavesplatform.database.openDB
+import com.wavesplatform.database.RDB
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.riderunner.DefaultRequestsService
-import com.wavesplatform.riderunner.storage.{RequestKey, RequestsStorage}
 import com.wavesplatform.riderunner.storage.persistent.LevelDbPersistentCaches
+import com.wavesplatform.riderunner.storage.{RequestKey, RequestsStorage}
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.ManagedChannel
@@ -113,7 +113,7 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
     )
 
     log.info("Opening a caches DB...")
-    val db = openDB(settings.rideRunner.db.directory)
+    val db = RDB.open(settings.rideRunner.db.toNode).db
     cs.cleanup(CustomShutdownPhase.Db) {
       db.close()
     }

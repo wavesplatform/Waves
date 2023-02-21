@@ -23,7 +23,7 @@ object HeapDumps extends ScorexLogging {
   private val onExitDir = baseDir.resolve("on-exit")
   if (enabled) {
     log.info("Heap dumps enabled")
-    Files.createDirectories(onExitDir)
+    onExitDir.toFile.mkdirs()
   }
 
   def cleanDirs(retainFiles: Int): Unit = if (enabled) {

@@ -6,7 +6,7 @@ import com.wavesplatform.database.DBExt
 import com.wavesplatform.riderunner.app.RideRunnerMetrics.rideScriptTotalNumber
 import com.wavesplatform.riderunner.storage.persistent.CacheKeys
 import com.wavesplatform.riderunner.storage.persistent.CacheKeys.{Requests, RequestsLastIndex}
-import org.iq80.leveldb.DB
+import org.rocksdb.RocksDB
 import play.api.libs.json.*
 
 import java.util.concurrent.atomic.AtomicInteger
@@ -44,7 +44,7 @@ object RequestKey {
   }
 }
 
-class LevelDbRequestsStorage(db: DB) extends RequestsStorage {
+class LevelDbRequestsStorage(db: RocksDB) extends RequestsStorage {
   private val lastIndexKey = RequestsLastIndex.mkKey(())
   private val lastIndex    = new AtomicInteger(db.readOnly(_.getOpt(lastIndexKey).getOrElse(-1)))
   refreshCounter()

@@ -5,7 +5,7 @@ import akka.http.scaladsl.Http
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
-import com.wavesplatform.database.openDB
+import com.wavesplatform.database.RDB
 import com.wavesplatform.http.{EvaluateApiRoute, HttpServiceStatus, ServiceApiRoute}
 import com.wavesplatform.jvm.HeapDumps
 import com.wavesplatform.riderunner.DefaultRequestsService
@@ -108,7 +108,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     )
 
     log.info("Opening a caches DB...")
-    val db = openDB(settings.rideRunner.db.directory)
+    val db = RDB.open(settings.rideRunner.db.toNode).db
     cs.cleanup(CustomShutdownPhase.Db) { db.close() }
     val dbCaches          = new LevelDbPersistentCaches(db)
     val blockchainStorage = new SharedBlockchainData[RequestKey](settings.rideRunner.sharedBlockchain, dbCaches, blockchainApi)

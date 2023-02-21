@@ -88,6 +88,14 @@ class ScriptBlockchain[TagT](storage: SharedBlockchainData[TagT], tag: TagT) ext
   // Ride: transferTransactionById
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] = kill("transferById")
 
+  override def transactionInfos(ids: Seq[BlockId]): Seq[Option[(TxMeta, Transaction)]] = kill("transactionInfos")
+
+  override def leaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance] = kill("leaseBalances")
+
+  override def balances(req: Seq[(Address, Asset)]): Map[(Address, Asset), Long] = kill("balances")
+
+  override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] = kill("wavesBalances")
+
   override def score: BigInt = kill("score")
 
   override def carryFee: Long = kill("carryFee")
@@ -117,6 +125,7 @@ class ScriptBlockchain[TagT](storage: SharedBlockchainData[TagT], tag: TagT) ext
   override def balanceAtHeight(address: Address, height: Int, assetId: Asset): Option[(Int, Long)] = kill("balanceAtHeight")
 
   // GET /eth/assets
+  // TODO see Keys.assetStaticInfo
   override def resolveERC20Address(address: ERC20Address): Option[Asset.IssuedAsset] = kill("resolveERC20Address")
 
   private def kill(methodName: String) = throw new RuntimeException(s"$methodName is not supported, contact with developers")

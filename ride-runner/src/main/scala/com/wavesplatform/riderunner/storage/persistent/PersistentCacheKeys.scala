@@ -1,42 +1,20 @@
 package com.wavesplatform.riderunner.storage.persistent
 
 import com.google.common.primitives.{Ints, Longs, Shorts}
-import com.google.protobuf.CodedInputStream
+import com.google.protobuf.{CodedInputStream, UnsafeByteOperations}
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{
-  AddressId,
-  Key,
-  readAccountScriptInfo,
-  readAssetDetails,
-  readAssetScript,
-  readAssetStaticInfo,
-  readBlockMeta,
-  writeAccountScriptInfo,
-  writeAssetDetails,
-  writeAssetScript,
-  writeAssetStaticInfo,
-  writeBlockMeta
-}
+import com.wavesplatform.database.protobuf.BlockMeta
+import com.wavesplatform.database.{AddressId, Caches, Key, readAccountScriptInfo, readAssetDetails, readAssetScript, readAssetStaticInfo, readBlockMeta, writeAccountScriptInfo, writeAssetDetails, writeAssetScript, writeAssetStaticInfo, writeBlockMeta}
 import com.wavesplatform.meta.getSimpleName
+import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.riderunner.storage.RequestKey
 import com.wavesplatform.riderunner.storage.persistent.AsBytes.ByteArrayOutputStreamOps
 import com.wavesplatform.serialization.*
-import com.wavesplatform.state.{
-  AccountScriptInfo,
-  AssetDescription,
-  AssetInfo,
-  AssetStaticInfo,
-  AssetVolumeInfo,
-  DataEntry,
-  LeaseBalance,
-  TransactionId,
-  TxMeta
-}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetInfo, AssetStaticInfo, AssetVolumeInfo, DataEntry, LeaseBalance, TransactionId, TxMeta}
 import com.wavesplatform.transaction.serialization.impl.DataTxSerializer
 import com.wavesplatform.transaction.{Asset, EthereumTransaction, GenesisTransaction, PBSince, PaymentTransaction, Transaction, TransactionParsers}
 import play.api.libs.json.{JsObject, Json}
@@ -357,15 +335,9 @@ object CacheKeys {
         .writeWithLen(
           writeBlockMeta(
             BlockMeta(
-              header = x.header,
-              signature = x.signature,
-              headerHash = None,
-              height = 0,
-              size = 0,
-              transactionCount = 0,
-              totalFeeInWaves = 0,
-              reward = None,
-              vrf = None
+              header = Some(PBBlocks.protobuf(x.header)),
+              signature = UnsafeByteOperations.unsafeWrap(x.signature.arr),
+              // TODO VRF
             )
           )
         )
@@ -374,14 +346,15 @@ object CacheKeys {
     override def fromByteArray(xs: Array[Byte]): (SignedBlockHeader, Int) = {
       val bb  = ByteBuffer.wrap(xs)
       val len = bb.getInt
-      (readBlockMeta(bb.getByteArray(len)).toSignedHeader, Ints.BYTES + len)
+      (Caches.toSignedHeader(readBlockMeta(bb.getByteArray(len))), Ints.BYTES + len)
     }
   }
 
   // staticInfo, assetDetails, sponsorship, assetScript
   implicit val assetDescriptionAsBytes: AsBytes[AssetDescription] = new AsBytes[AssetDescription] {
     override def toByteArray(x: AssetDescription): Array[Byte] = {
-      val staticInfo = AssetStaticInfo(TransactionId @@ x.originTransactionId, x.issuer, x.decimals, x.nft)
+      // TODO id here is empty, now it is used to optimize reads in NODE for Blockchain.resolveERC20Address
+      val staticInfo = AssetStaticInfo(ByteStr.empty, TransactionId @@ x.originTransactionId, x.issuer, x.decimals, x.nft)
       val assetInfo  = AssetInfo(x.name, x.description, x.lastUpdatedAt)
       val volumeInfo = AssetVolumeInfo(x.reissuable, x.totalVolume)
 

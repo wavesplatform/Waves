@@ -11,12 +11,12 @@ import com.wavesplatform.riderunner.storage.{AccountAssetKey, AccountDataKey}
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, EmptyDataEntry, Height, LeaseBalance, TransactionId}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.ScorexLogging
-import org.iq80.leveldb.DB
+import org.rocksdb.RocksDB
 
 import java.util.concurrent.atomic.AtomicLong
 import scala.util.chaining.scalaUtilChainingOps
 
-class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLogging {
+class LevelDbPersistentCaches(db: RocksDB) extends PersistentCaches with ScorexLogging {
   private val lastAddressIdKey = CacheKeys.LastAddressId.mkKey(())
   private val lastAddressId    = new AtomicLong(db.readOnly(_.getOpt(lastAddressIdKey).getOrElse(-1L)))
 
@@ -315,8 +315,8 @@ class LevelDbPersistentCaches(db: DB) extends PersistentCaches with ScorexLoggin
 
       // TODO #30 Get the last height in one batch
       db.readWrite { rw =>
-        lastHeight = if (rw.prefixExists(Key.prefixBytes)) {
-          val newLastHeight = fromHeight - 1
+        val newLastHeight = fromHeight - 1
+        lastHeight = if (rw.prefixExists(Key.mkKey(newLastHeight).keyBytes)) {
           rw.put(heightKey, newLastHeight)
           Some(newLastHeight)
         } else {
