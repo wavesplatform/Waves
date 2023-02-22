@@ -3,7 +3,6 @@ package com.wavesplatform.riderunner.storage
 import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaDataEntry
-import com.wavesplatform.riderunner.storage.actions.AffectedTags
 import com.wavesplatform.riderunner.storage.persistent.PersistentCache
 import com.wavesplatform.state.DataEntry
 

@@ -7,7 +7,6 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
 import com.wavesplatform.riderunner.input.EmptyPublicKey
-import com.wavesplatform.riderunner.storage.actions.AffectedTags
 import com.wavesplatform.riderunner.storage.persistent.PersistentCache
 import com.wavesplatform.state.AccountScriptInfo
 

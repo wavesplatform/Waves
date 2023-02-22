@@ -1,4 +1,4 @@
-package com.wavesplatform.riderunner.storage.actions
+package com.wavesplatform.riderunner.storage
 
 case class AffectedTags[TagT](xs: Set[TagT]) {
   def ++(that: AffectedTags[TagT]): AffectedTags[TagT] =

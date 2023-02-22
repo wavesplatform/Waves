@@ -3,7 +3,6 @@ package com.wavesplatform.riderunner.storage
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.riderunner.storage.actions.AffectedTags
 import com.wavesplatform.riderunner.storage.persistent.PersistentCache
 
 // It seems, we don't need to update this. Only for some optimization needs

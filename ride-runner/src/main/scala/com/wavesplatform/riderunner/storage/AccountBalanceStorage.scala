@@ -3,7 +3,6 @@ package com.wavesplatform.riderunner.storage
 import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.protobuf.transaction.PBAmounts.toAssetAndAmount
-import com.wavesplatform.riderunner.storage.actions.AffectedTags
 import com.wavesplatform.riderunner.storage.persistent.PersistentCache
 
 // TODO #32 Not all addresses are interesting. Probably, having a wrapped Map[Address, Map[Asset, Long]] is better, because we can filter out values slightly before.

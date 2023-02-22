@@ -5,7 +5,6 @@ import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
-import com.wavesplatform.riderunner.storage.actions.AffectedTags
 import com.wavesplatform.riderunner.storage.persistent.PersistentCache
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset

@@ -5,7 +5,6 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.protobuf.ByteStringExt
-import com.wavesplatform.riderunner.storage.actions.AffectedTags
 import com.wavesplatform.riderunner.storage.persistent.TransactionPersistentCache
 import com.wavesplatform.state.{Height, TransactionId}
 import com.wavesplatform.utils.ScorexLogging

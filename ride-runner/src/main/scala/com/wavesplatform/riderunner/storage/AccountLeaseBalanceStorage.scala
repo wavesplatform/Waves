@@ -4,7 +4,6 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.protobuf.ByteStringExt
-import com.wavesplatform.riderunner.storage.actions.AffectedTags
 import com.wavesplatform.riderunner.storage.persistent.PersistentCache
 import com.wavesplatform.state.LeaseBalance
 

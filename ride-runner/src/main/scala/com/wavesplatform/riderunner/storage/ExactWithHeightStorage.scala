@@ -4,7 +4,6 @@ import cats.syntax.option.*
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.meta.getSimpleName
-import com.wavesplatform.riderunner.storage.actions.AffectedTags
 import com.wavesplatform.riderunner.storage.persistent.PersistentCache
 import com.wavesplatform.utils.ScorexLogging
 import kamon.instrumentation.caffeine.KamonStatsCounter
