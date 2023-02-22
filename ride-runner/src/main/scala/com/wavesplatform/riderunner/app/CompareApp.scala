@@ -77,10 +77,10 @@ object CompareApp extends ScorexLogging {
         rideApi
           .ask(address, request)
           .map { x =>
-            val prefix = s"[$address, $request]"
-            log.info(s"$prefix running")
+            val id = s"[$address, $request]"
+            log.info(s"Running $id")
             val r = x.rideRunner == x.node
-            if (!r) log.warn(s"$prefix different:\nride: ${x.rideRunner}\nnode: ${x.node}")
+            if (!r) log.warn(s"Different $id:\nride: ${x.rideRunner}\nnode: ${x.node}")
             r
           }
       }
@@ -122,20 +122,23 @@ object CompareApp extends ScorexLogging {
 
     log.info(s"Initializing REST API on ${settings.restApi.bindAddress}:${settings.restApi.port}...")
     val apiRoutes = Seq(
-      ServiceApiRoute(ServiceApiRoute.Settings(""), { () =>
-        val nowMs      = scheduler.clockMonotonic(TimeUnit.MILLISECONDS)
-        val idleTimeMs = nowMs - lastServiceStatus.lastProcessedTimeMs
-        HttpServiceStatus(
-          healthy = true, // Because we don't want to affect this container
-          debug = Json.obj(
-            "rideRunnerHealthy" -> lastServiceStatus.rideRunnerHealthy,
-            "nowTime"           -> nowMs,
-            "lastProcessedTime" -> lastServiceStatus.lastProcessedTimeMs,
-            "lastSuccessTime"   -> lastServiceStatus.lastProcessedTimeMs,
-            "idleTime"          -> idleTimeMs
+      ServiceApiRoute(
+        ServiceApiRoute.Settings(""),
+        { () =>
+          val nowMs      = scheduler.clockMonotonic(TimeUnit.MILLISECONDS)
+          val idleTimeMs = nowMs - lastServiceStatus.lastProcessedTimeMs
+          HttpServiceStatus(
+            healthy = true, // Because we don't want to affect this container
+            debug = Json.obj(
+              "rideRunnerHealthy" -> lastServiceStatus.rideRunnerHealthy,
+              "nowTime"           -> nowMs,
+              "lastProcessedTime" -> lastServiceStatus.lastProcessedTimeMs,
+              "lastSuccessTime"   -> lastServiceStatus.lastProcessedTimeMs,
+              "idleTime"          -> idleTimeMs
+            )
           )
-        )
-      })
+        }
+      )
     )
 
     val httpService = CompositeHttpService(apiRoutes, settings.restApi)
