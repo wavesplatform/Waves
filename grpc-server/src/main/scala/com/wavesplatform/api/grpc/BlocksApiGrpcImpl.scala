@@ -6,17 +6,18 @@ import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.grpc.BlockRangeRequest.Filter
 import com.wavesplatform.api.grpc.BlockRequest.Request
 import com.wavesplatform.api.http.ApiError.BlockDoesNotExist
-import com.wavesplatform.protobuf._
+import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.block.PBBlock
 import com.wavesplatform.state.TxMeta
 import com.wavesplatform.transaction.Transaction
 import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
+import monix.reactive.Observable
 
 import scala.concurrent.Future
 
 class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) extends BlocksApiGrpc.BlocksApi {
-  import BlocksApiGrpcImpl._
+  import BlocksApiGrpcImpl.*
 
   override def getCurrentHeight(request: Empty): Future[Int] = {
     Future.successful(commonApi.currentHeight)
@@ -24,16 +25,20 @@ class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) exte
 
   override def getBlockRange(request: BlockRangeRequest, responseObserver: StreamObserver[BlockWithHeight]): Unit = responseObserver.interceptErrors {
     val stream =
-      if (request.includeTransactions)
-        commonApi
-          .blocksRange(request.fromHeight, request.toHeight)
-          .map(toBlockWithHeight)
-      else
-        commonApi
-          .metaRange(request.fromHeight, request.toHeight)
-          .map { meta =>
-            BlockWithHeight(Some(PBBlock(Some(meta.header.toPBHeader), meta.signature.toByteString)), meta.height)
-          }
+      Observable.fromIterator(
+        (if (request.includeTransactions) {
+           commonApi
+             .blocksRange(request.fromHeight, request.toHeight)
+             .map(toBlockWithHeight)
+         } else {
+           commonApi
+             .metaRange(request.fromHeight, request.toHeight)
+             .map { meta =>
+               BlockWithHeight(Some(PBBlock(Some(meta.header.toPBHeader), meta.signature.toByteString)), meta.height)
+             }
+         }).toListL // FIXME: Strict loading because of segfault in leveldb
+          .map(_.iterator)
+      )
 
     responseObserver.completeWith(request.filter match {
       case Filter.GeneratorPublicKey(publicKey) => stream.filter(_.getBlock.getHeader.generator.toPublicKey == publicKey.toPublicKey)
