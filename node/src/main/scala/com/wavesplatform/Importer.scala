@@ -129,7 +129,6 @@ object Importer extends ScorexLogging {
             TracedResult.wrapE(Left(GenericError("Not implemented during import")))
           override def spendableBalanceChanged: Observable[(Address, Asset)] = Observable.empty
           override def actorSystem: ActorSystem                              = extensionActorSystem
-          override def utxEvents: Observable[UtxEvent]                       = Observable.empty
           override def transactionsApi: CommonTransactionsApi =
             CommonTransactionsApi(
               blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),

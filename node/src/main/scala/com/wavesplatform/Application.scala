@@ -95,7 +95,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private[this] val historyRepliesScheduler = fixedPool(poolSize = 2, "history-replier", reporter = log.error("Error in History Replier", _))
   private[this] val minerScheduler          = singleThread("block-miner", reporter = log.error("Error in Miner", _))
 
-  private[this] val transactionAdded = ConcurrentSubject.replayLimited(1)[UtxEvent](scheduler)
+  private[this] val transactionAdded = ConcurrentSubject.replayLimited[UtxEvent](1)(scheduler)
 
   private var extensions = Seq.empty[Extension]
 
