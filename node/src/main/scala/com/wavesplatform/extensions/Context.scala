@@ -31,6 +31,5 @@ trait Context {
 
   def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean]
   def spendableBalanceChanged: Observable[(Address, Asset)]
-  def utxEvents: Observable[UtxEvent]
   def actorSystem: ActorSystem
 }

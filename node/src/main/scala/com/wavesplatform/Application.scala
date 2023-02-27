@@ -95,7 +95,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private[this] val historyRepliesScheduler = fixedPool(poolSize = 2, "history-replier", reporter = log.error("Error in History Replier", _))
   private[this] val minerScheduler          = singleThread("block-miner", reporter = log.error("Error in Miner", _))
 
-  private[this] val utxEvents = ConcurrentSubject.publish[UtxEvent](scheduler)
+  private[this] val transactionAdded = ConcurrentSubject.replayLimited(1)[UtxEvent](scheduler)
 
   private var extensions = Seq.empty[Extension]
 
@@ -124,7 +124,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels            = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val utxStorage =
-      new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable, utxEvents.onNext)
+      new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable, transactionAdded.onNext)
     maybeUtx = Some(utxStorage)
 
     val timer                 = new HashedWheelTimer()
@@ -153,7 +153,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         pos,
         minerScheduler,
         appenderScheduler,
-        utxEvents.collect { case _: UtxEvent.TxAdded =>
+        transactionAdded.collect { case _: UtxEvent.TxAdded =>
           ()
         }
       )
@@ -220,7 +220,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         Await.result(transactionPublisher.validateAndBroadcast(tx, None), Duration.Inf) // TODO: Replace with async if possible
       override def spendableBalanceChanged: Observable[(Address, Asset)] = app.spendableBalanceChanged
       override def actorSystem: ActorSystem                              = app.actorSystem
-      override def utxEvents: Observable[UtxEvent]                       = app.utxEvents
 
       override val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(
         blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
