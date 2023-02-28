@@ -10,7 +10,7 @@ import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.{DBExt, KeyTags, openDB}
-import com.wavesplatform.events.BlockchainUpdateTriggers
+import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
@@ -128,6 +128,7 @@ object Importer extends ScorexLogging {
             TracedResult.wrapE(Left(GenericError("Not implemented during import")))
           override def spendableBalanceChanged: Observable[(Address, Asset)] = Observable.empty
           override def actorSystem: ActorSystem                              = extensionActorSystem
+          override def utxEvents: Observable[UtxEvent]                       = Observable.empty
           override def transactionsApi: CommonTransactionsApi =
             CommonTransactionsApi(
               blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
