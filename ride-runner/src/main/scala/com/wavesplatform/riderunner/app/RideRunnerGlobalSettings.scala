@@ -3,10 +3,10 @@ package com.wavesplatform.riderunner.app
 import com.typesafe.config.{Config, ConfigList, ConfigRenderOptions, ConfigValue}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector, RideApi}
-import com.wavesplatform.blockchain.SharedBlockchainData
 import com.wavesplatform.http.ServiceApiRoute
 import com.wavesplatform.riderunner.DefaultRequestsService
 import com.wavesplatform.riderunner.app.RideRunnerSettings.DbSettings
+import com.wavesplatform.riderunner.storage.SharedBlockchainStorage
 import com.wavesplatform.settings.*
 import net.ceedubs.ficus.Ficus.*
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
@@ -57,14 +57,14 @@ case class RideRunnerSettings(
     rideSchedulerThreads: Option[Int],
     serviceApiRoute: ServiceApiRoute.Settings,
     immutableBlockchain: BlockchainSettings,
-    sharedBlockchain: SharedBlockchainData.Settings,
+    sharedBlockchain: SharedBlockchainStorage.Settings,
     requestsService: DefaultRequestsService.Settings,
     blockchainApi: DefaultBlockchainApi.Settings,
     grpcConnector: GrpcConnector.Settings,
     grpcApiChannel: GrpcChannelSettings,
     blockchainUpdatesApiChannel: GrpcChannelSettings
 ) {
-  val unhealthyIdleTimeoutMs = unhealthyIdleTimeout.toMillis
+  val unhealthyIdleTimeoutMs    = unhealthyIdleTimeout.toMillis
   val exactRideSchedulerThreads = rideSchedulerThreads.getOrElse(Runtime.getRuntime.availableProcessors() * 2).min(4)
 }
 

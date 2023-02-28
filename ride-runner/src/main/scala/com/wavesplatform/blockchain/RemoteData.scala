@@ -26,6 +26,11 @@ object RemoteData {
     case None    => Absence
   }
 
+  def cachedOrUnknown[T](x: Option[T]): RemoteData[T] = x match {
+    case Some(x) => RemoteData.Cached(x)
+    case None    => RemoteData.Unknown
+  }
+
   implicit final class Ops[A](val self: RemoteData[A]) extends AnyVal {
     def orElse(x: => RemoteData[A]): RemoteData[A] = if (self.loaded) self else x
 

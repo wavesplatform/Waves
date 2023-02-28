@@ -59,7 +59,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     val request = RequestKey(aliceAddr, Json.obj("expr" -> "foo()"))
     val requestsService = new DefaultRequestsService(
       settings = DefaultRequestsService.Settings(enableTraces = false, Int.MaxValue, 0, 3, 0.seconds),
-      sharedBlockchainData = blockchainStorage,
+      sharedBlockchain = blockchainStorage,
       storage = new RequestsStorage {
         override def size: Int                   = 1
         override def append(x: RequestKey): Unit = {} // Ignore, because no way to evaluate a new expr

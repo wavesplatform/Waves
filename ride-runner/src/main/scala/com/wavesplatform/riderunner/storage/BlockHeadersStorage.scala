@@ -11,37 +11,46 @@ import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.riderunner.storage.BlockHeadersStorage.BlockInfo
+import com.wavesplatform.riderunner.storage.StorageContext.ReadWrite
 import com.wavesplatform.riderunner.storage.persistent.BlockPersistentCache
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
 
 import scala.util.chaining.scalaUtilChainingOps
 
-class BlockHeadersStorage(blockchainApi: BlockchainApi, persistentCache: BlockPersistentCache) extends OptimisticLockable with ScorexLogging {
-  private var liquidBlocks: NonEmptyList[BlockInfo] = NonEmptyList.one {
-    val height = persistentCache.getLastHeight.getOrElse(blockchainApi.getCurrentBlockchainHeight() - 1)
-    val x      = getInternal(height).getOrElse(throw new RuntimeException(s"Can't find a block at $height"))
-    BlockInfo(height, x.id(), x)
+class BlockHeadersStorage private (
+    blockchainApi: BlockchainApi,
+    persistentCache: BlockPersistentCache
+) extends OptimisticLockable
+    with ScorexLogging {
+  private var liquidBlocks: NonEmptyList[BlockInfo] = _
+
+  private def init()(implicit ctx: ReadWrite): Unit = if (liquidBlocks == null) {
+    liquidBlocks = NonEmptyList.one {
+      val height = persistentCache.getLastHeight.getOrElse(blockchainApi.getCurrentBlockchainHeight() - 1)
+      val x      = getInternal(height).getOrElse(throw new RuntimeException(s"Can't find a block at $height"))
+      BlockInfo(height, x.id(), x)
+    }
   }
 
-  def last: BlockInfo = readLockCond(liquidBlocks.last)(_ => false)
+  def latest: BlockInfo = readLockCond(liquidBlocks.head)(_ => false)
 
-  def getLocal(height: Int): Option[SignedBlockHeader] = persistentCache.get(height)
+  def getLocal(atHeight: Int)(implicit ctx: ReadWrite): Option[SignedBlockHeader] = persistentCache.get(atHeight)
 
-  def get(height: Int): Option[SignedBlockHeader] =
-    readLockCond(if (liquidBlocks.head.height == height) liquidBlocks.head.header.some else none)(_ => false)
-      .orElse(getInternal(height))
+  def get(atHeight: Int)(implicit ctx: ReadWrite): Option[SignedBlockHeader] =
+    readLockCond(if (liquidBlocks.head.height == atHeight) liquidBlocks.head.header.some else none)(_ => false)
+      .orElse(getInternal(atHeight))
 
-  private def getInternal(height: Int): Option[SignedBlockHeader] =
-    persistentCache.get(height).orElse {
-      blockchainApi.getBlockHeader(height).tap {
-        case Some(r) => persistentCache.set(height, r)
+  private def getInternal(atHeight: Int)(implicit ctx: ReadWrite): Option[SignedBlockHeader] =
+    persistentCache.get(atHeight).orElse {
+      blockchainApi.getBlockHeader(atHeight).tap {
+        case Some(r) => persistentCache.set(atHeight, r)
         case None =>
-          log.error(s"Can't find block on height=$height (lastHeight=${persistentCache.getLastHeight}), please contact with developers")
+          log.error(s"Can't find block on height=$atHeight (lastHeight=${persistentCache.getLastHeight}), please contact with developers")
           None
       }
     }
 
-  def update(event: BlockchainUpdated): Unit = writeLock {
+  def update(event: BlockchainUpdated)(implicit ctx: ReadWrite): Unit = writeLock {
     event.update match {
       case Update.Empty => // Ignore
       case Update.Append(append) =>
@@ -94,9 +103,19 @@ class BlockHeadersStorage(blockchainApi: BlockchainApi, persistentCache: BlockPe
     }
   }
 
-  def removeFrom(height: Int): Unit = persistentCache.removeFrom(height)
+  def removeFrom(height: Int)(implicit ctx: ReadWrite): Unit = persistentCache.removeFrom(height)
 }
 
 object BlockHeadersStorage {
+  def apply(
+      blockchainApi: BlockchainApi,
+      persistentCache: BlockPersistentCache
+  )(implicit ctx: ReadWrite): BlockHeadersStorage = {
+    new BlockHeadersStorage(
+      blockchainApi = blockchainApi,
+      persistentCache = persistentCache
+    ).tap(_.init())
+  }
+
   case class BlockInfo(height: Int, id: ByteStr, header: SignedBlockHeader)
 }

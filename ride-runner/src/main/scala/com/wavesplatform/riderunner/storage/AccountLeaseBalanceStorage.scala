@@ -1,11 +1,12 @@
 package com.wavesplatform.riderunner.storage
 
 import com.wavesplatform.account.Address
-import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.api.BlockchainApi
+import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.protobuf.ByteStringExt
+import com.wavesplatform.riderunner.storage.StorageContext.ReadWrite
 import com.wavesplatform.riderunner.storage.persistent.PersistentCache
-import com.wavesplatform.state.LeaseBalance
+import com.wavesplatform.state.{Height, LeaseBalance}
 
 class AccountLeaseBalanceStorage[TagT](
     override val settings: ExactWithHeightStorage.Settings,
@@ -18,17 +19,18 @@ class AccountLeaseBalanceStorage[TagT](
     Some(LeaseBalance(r.leaseIn, r.leaseOut))
   }
 
-  def append(height: Int, update: StateUpdate.LeasingUpdate): AffectedTags[TagT] = {
+  def append(atHeight: Height, update: StateUpdate.LeasingUpdate)(implicit ctx: ReadWrite): AffectedTags[TagT] = {
     val address = toVanillaAddress(update.address, chainId)
-    append(height, address, toVanilla(update))
+    append(atHeight, address, toVanilla(update))
   }
 
-  def undoAppend(height: Int, update: StateUpdate.LeasingUpdate): AffectedTags[TagT] = undoAppend(height, update.address.toAddress)
+  def undoAppend(toHeight: Height, update: StateUpdate.LeasingUpdate)(implicit ctx: ReadWrite): AffectedTags[TagT] =
+    undoAppend(toHeight, update.address.toAddress)
 
   // TODO #21 Copy-paste from append
-  def rollback(rollbackHeight: Int, update: StateUpdate.LeasingUpdate): AffectedTags[TagT] = {
+  def rollbackTo(toHeight: Height, update: StateUpdate.LeasingUpdate)(implicit ctx: ReadWrite): AffectedTags[TagT] = {
     val address = toVanillaAddress(update.address, chainId)
-    rollback(rollbackHeight, address, toVanilla(update))
+    rollback(toHeight, address, toVanilla(update))
   }
 
   private def toVanilla(x: StateUpdate.LeasingUpdate): LeaseBalance = LeaseBalance(x.inAfter, x.outAfter)

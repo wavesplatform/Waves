@@ -13,9 +13,9 @@ class TestProcessor extends Processor {
 
   /** Includes removeBlocksFrom
     */
-  override def forceRollbackOne(): Unit = {}
+  override def forceRollbackLiquid(): Unit = {}
 
-  override def removeBlocksFrom(height: Height): Unit = {
+  override def removeAllFrom(height: Height): Unit = {
     actions = actions.appended(RemoveFrom(height))
   }
 

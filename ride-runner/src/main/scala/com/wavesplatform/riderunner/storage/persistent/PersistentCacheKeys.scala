@@ -260,7 +260,9 @@ object CacheKeys {
 
   object SignedBlockHeaders extends CacheKey[Int, SignedBlockHeader](6)
 
-  object Height extends CacheKey[Unit, Int](7)
+  object Height extends CacheKey[Unit, Int](7) {
+    val Key = mkKey(())
+  }
 
   object VRF extends CacheKey[Int, Option[ByteStr]](8)
 

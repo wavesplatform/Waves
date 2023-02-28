@@ -5,6 +5,7 @@ import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
+import com.wavesplatform.riderunner.storage.StorageContext.ReadWrite
 import com.wavesplatform.riderunner.storage.persistent.PersistentCache
 import com.wavesplatform.state.{AssetDescription, AssetScriptInfo, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -18,19 +19,20 @@ class AssetStorage[TagT](
 ) extends ExactWithHeightStorage[IssuedAsset, AssetDescription, TagT] {
   override def getFromBlockchain(key: IssuedAsset): Option[AssetDescription] = blockchainApi.getAssetDescription(key)
 
-  def append(height: Int, update: StateUpdate.AssetStateUpdate): AffectedTags[TagT] = {
+  def append(atHeight: Height,update: StateUpdate.AssetStateUpdate)(implicit ctx: ReadWrite): AffectedTags[TagT] = {
     val asset = getAsset(update)
-    append(height, asset, update.after.map(AssetStorage.toAssetDescription(asset, _)))
+    append(atHeight, asset, update.after.map(AssetStorage.toAssetDescription(asset, _)))
   }
 
-  def undoAppend(height: Int, update: StateUpdate.AssetStateUpdate): AffectedTags[TagT] = undoAppend(height, getAsset(update))
+  def undoAppend(toHeight: Height, update: StateUpdate.AssetStateUpdate)(implicit ctx: ReadWrite): AffectedTags[TagT] =
+    undoAppend(toHeight, getAsset(update))
 
-  def rollback(rollbackHeight: Int, update: StateUpdate.AssetStateUpdate): AffectedTags[TagT] = {
+  def rollback(toHeight: Height, update: StateUpdate.AssetStateUpdate)(implicit ctx: ReadWrite): AffectedTags[TagT] = {
     val asset = getAsset(update)
-    rollback(rollbackHeight, asset, update.after.map(AssetStorage.toAssetDescription(asset, _)))
+    rollback(toHeight, asset, update.after.map(AssetStorage.toAssetDescription(asset, _)))
   }
 
-  def getAsset(update: StateUpdate.AssetStateUpdate): IssuedAsset =
+  private def getAsset(update: StateUpdate.AssetStateUpdate): IssuedAsset =
     update.before
       .orElse(update.after)
       .getOrElse(throw new RuntimeException(s"Can't get asset id from update: $update"))

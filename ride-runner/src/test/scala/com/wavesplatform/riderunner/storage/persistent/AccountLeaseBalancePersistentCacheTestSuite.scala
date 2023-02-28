@@ -13,63 +13,63 @@ class AccountLeaseBalancePersistentCacheTestSuite extends PersistentTestSuite {
     "set and get" - {
       "cached" - {
         "on the first height" in test { cache =>
-          cache.set(8, cacheKey, cacheValue)
-          cache.set(11, cacheKey, RemoteData.Absence)
+          cache.setDefault(8, cacheKey, cacheValue)
+          cache.setDefault(11, cacheKey, RemoteData.Absence)
 
-          cache.get(8, cacheKey) shouldBe cacheValue
+          cache.getDefault(8, cacheKey) shouldBe cacheValue
         }
 
         "before the max height" in test { cache =>
-          cache.set(8, cacheKey, cacheValue)
-          cache.set(11, cacheKey, RemoteData.Absence)
+          cache.setDefault(8, cacheKey, cacheValue)
+          cache.setDefault(11, cacheKey, RemoteData.Absence)
 
-          cache.get(10, cacheKey) shouldBe cacheValue
+          cache.getDefault(10, cacheKey) shouldBe cacheValue
         }
 
         "on the max height" in test { cache =>
-          cache.set(9, cacheKey, RemoteData.Absence)
-          cache.set(10, cacheKey, cacheValue)
+          cache.setDefault(9, cacheKey, RemoteData.Absence)
+          cache.setDefault(10, cacheKey, cacheValue)
 
-          cache.get(10, cacheKey) shouldBe cacheValue
+          cache.getDefault(10, cacheKey) shouldBe cacheValue
         }
 
         "after the max height" in test { cache =>
-          cache.set(10, cacheKey, cacheValue)
-          cache.get(11, cacheKey) shouldBe cacheValue
+          cache.setDefault(10, cacheKey, cacheValue)
+          cache.getDefault(11, cacheKey) shouldBe cacheValue
         }
       }
 
       "absence" - {
         "before the max height" in test { cache =>
-          cache.set(8, cacheKey, RemoteData.Absence)
-          cache.set(11, cacheKey, cacheValue)
+          cache.setDefault(8, cacheKey, RemoteData.Absence)
+          cache.setDefault(11, cacheKey, cacheValue)
 
-          cache.get(10, cacheKey) shouldBe defaultCacheValue
+          cache.getDefault(10, cacheKey) shouldBe defaultCacheValue
         }
 
         "on the max height" in test { cache =>
-          cache.set(9, cacheKey, cacheValue)
-          cache.set(10, cacheKey, RemoteData.Absence)
+          cache.setDefault(9, cacheKey, cacheValue)
+          cache.setDefault(10, cacheKey, RemoteData.Absence)
 
-          cache.get(10, cacheKey) shouldBe defaultCacheValue
+          cache.getDefault(10, cacheKey) shouldBe defaultCacheValue
         }
 
         "after the max height" in test { cache =>
-          cache.set(9, cacheKey, cacheValue)
-          cache.set(10, cacheKey, RemoteData.Absence)
+          cache.setDefault(9, cacheKey, cacheValue)
+          cache.setDefault(10, cacheKey, RemoteData.Absence)
 
-          cache.get(11, cacheKey) shouldBe defaultCacheValue
+          cache.getDefault(11, cacheKey) shouldBe defaultCacheValue
         }
       }
 
       "unknown" - {
         "on empty" in test { cache =>
-          cache.get(10, cacheKey) shouldBe RemoteData.Unknown
+          cache.getDefault(10, cacheKey) shouldBe RemoteData.Unknown
         }
 
         "before the first known height" in test { cache =>
-          cache.set(11, cacheKey, RemoteData.Absence)
-          cache.get(10, cacheKey) shouldBe RemoteData.Unknown
+          cache.setDefault(11, cacheKey, RemoteData.Absence)
+          cache.getDefault(10, cacheKey) shouldBe RemoteData.Unknown
         }
       }
     }
@@ -77,43 +77,43 @@ class AccountLeaseBalancePersistentCacheTestSuite extends PersistentTestSuite {
     "remove" - {
       "the data is not available for 'get' after deletion" - {
         "on removed height" in test { cache =>
-          cache.set(9, cacheKey, RemoteData.Absence)
+          cache.setDefault(9, cacheKey, RemoteData.Absence)
           cache.remove(9, cacheKey)
 
-          cache.get(10, cacheKey) shouldBe RemoteData.Unknown
+          cache.getDefault(10, cacheKey) shouldBe RemoteData.Unknown
         }
 
         "on next height" in test { cache =>
-          cache.set(11, cacheKey, RemoteData.Absence)
+          cache.setDefault(11, cacheKey, RemoteData.Absence)
           cache.remove(1, cacheKey)
 
-          cache.get(11, cacheKey) shouldBe RemoteData.Unknown
+          cache.getDefault(11, cacheKey) shouldBe RemoteData.Unknown
         }
       }
 
       "returns the last known value before deleted heights" - {
         "cached" in test { cache =>
-          cache.set(9, cacheKey, cacheValue)
-          cache.set(11, cacheKey, RemoteData.Absence)
+          cache.setDefault(9, cacheKey, cacheValue)
+          cache.setDefault(11, cacheKey, RemoteData.Absence)
           cache.remove(10, cacheKey)
 
-          cache.get(10, cacheKey) shouldBe cacheValue
+          cache.getDefault(10, cacheKey) shouldBe cacheValue
         }
 
         "absence" in test { cache =>
-          cache.set(9, cacheKey, RemoteData.Absence)
-          cache.set(11, cacheKey, cacheValue)
+          cache.setDefault(9, cacheKey, RemoteData.Absence)
+          cache.setDefault(11, cacheKey, cacheValue)
           cache.remove(10, cacheKey)
 
-          cache.get(10, cacheKey) shouldBe defaultCacheValue
+          cache.getDefault(10, cacheKey) shouldBe defaultCacheValue
         }
 
         "unknown if empty" in test { cache =>
-          cache.set(10, cacheKey, RemoteData.Absence)
-          cache.set(11, cacheKey, cacheValue)
+          cache.setDefault(10, cacheKey, RemoteData.Absence)
+          cache.setDefault(11, cacheKey, cacheValue)
           cache.remove(10, cacheKey)
 
-          cache.get(10, cacheKey) shouldBe RemoteData.Unknown
+          cache.getDefault(10, cacheKey) shouldBe RemoteData.Unknown
         }
       }
     }

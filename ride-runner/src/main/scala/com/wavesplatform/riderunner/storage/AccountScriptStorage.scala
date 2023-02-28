@@ -7,8 +7,9 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.protobuf.transaction.PBTransactions.toVanillaScript
 import com.wavesplatform.riderunner.input.EmptyPublicKey
+import com.wavesplatform.riderunner.storage.StorageContext.ReadWrite
 import com.wavesplatform.riderunner.storage.persistent.PersistentCache
-import com.wavesplatform.state.AccountScriptInfo
+import com.wavesplatform.state.{AccountScriptInfo, Height}
 
 class AccountScriptStorage[TagT](
     override val settings: ExactWithHeightStorage.Settings,
@@ -23,14 +24,14 @@ class AccountScriptStorage[TagT](
     }
   }
 
-  def append(height: Int, account: PublicKey, newScript: ByteString): AffectedTags[TagT] =
-    append(height, account.toAddress(chainId), toVanillaScript(newScript).map(toAccountScriptInfo(account, _)))
+  def append(atHeight: Height, account: PublicKey, newScript: ByteString)(implicit ctx: ReadWrite): AffectedTags[TagT] =
+    append(atHeight, account.toAddress(chainId), toVanillaScript(newScript).map(toAccountScriptInfo(account, _)))
 
-  def undoAppend(height: Int, account: PublicKey): AffectedTags[TagT] =
-    undoAppend(height, account.toAddress(chainId))
+  def undoAppend(toHeight: Height, account: PublicKey)(implicit ctx: ReadWrite): AffectedTags[TagT] =
+    undoAppend(toHeight, account.toAddress(chainId))
 
-  def rollback(height: Int, account: PublicKey, newScript: ByteString): AffectedTags[TagT] =
-    rollback(height, account.toAddress(chainId), toVanillaScript(newScript).map(toAccountScriptInfo(account, _)))
+  def rollback(toHeight: Height, account: PublicKey, newScript: ByteString)(implicit ctx: ReadWrite): AffectedTags[TagT] =
+    rollback(toHeight, account.toAddress(chainId), toVanillaScript(newScript).map(toAccountScriptInfo(account, _)))
 
   def toAccountScriptInfo(account: PublicKey, script: Script): AccountScriptInfo = {
     val estimated = estimate(script)

@@ -4,13 +4,13 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
-import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
+import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState}
 import com.wavesplatform.database.RDB
 import com.wavesplatform.http.{EvaluateApiRoute, HttpServiceStatus, ServiceApiRoute}
 import com.wavesplatform.jvm.HeapDumps
 import com.wavesplatform.riderunner.DefaultRequestsService
-import com.wavesplatform.riderunner.storage.{LevelDbRequestsStorage, RequestKey}
 import com.wavesplatform.riderunner.storage.persistent.LevelDbPersistentCaches
+import com.wavesplatform.riderunner.storage.{LevelDbRequestsStorage, RequestKey, SharedBlockchainStorage, Storage}
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.ManagedChannel
@@ -110,8 +110,12 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     log.info("Opening a caches DB...")
     val db = RDB.open(settings.rideRunner.db.toNode).db
     cs.cleanup(CustomShutdownPhase.Db) { db.close() }
-    val dbCaches          = new LevelDbPersistentCaches(db)
-    val blockchainStorage = new SharedBlockchainData[RequestKey](settings.rideRunner.sharedBlockchain, dbCaches, blockchainApi)
+
+    val storage = Storage.rocksDb(db)
+    val blockchainStorage = storage.readWrite { implicit rw =>
+      val dbCaches = LevelDbPersistentCaches(storage)
+      SharedBlockchainStorage[RequestKey](settings.rideRunner.sharedBlockchain, storage, dbCaches, blockchainApi)
+    }
 
     val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
     log.info(s"Current height: known=${blockchainStorage.height}, blockchain=$lastHeightAtStart")

@@ -5,6 +5,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.protobuf.ByteStringExt
+import com.wavesplatform.riderunner.storage.StorageContext.ReadWrite
 import com.wavesplatform.riderunner.storage.persistent.TransactionPersistentCache
 import com.wavesplatform.state.{Height, TransactionId}
 import com.wavesplatform.utils.ScorexLogging
@@ -35,7 +36,7 @@ class TransactionStorage[TagT](
 
   def getFromBlockchain(key: TransactionId): Option[Height] = blockchainApi.getTransactionHeight(key)
 
-  def get(txId: TransactionId, tag: TagT): Option[Height] = {
+  def get(txId: TransactionId, tag: TagT)(implicit ctx: ReadWrite): Option[Height] = {
     val origTags = tagsOf(txId)
     if (!origTags.contains(tag)) tags.put(txId, origTags + tag)
 
@@ -55,12 +56,12 @@ class TransactionStorage[TagT](
   }
 
   // Use case: got a transaction, got a rollback, same transaction on new height
-  def setHeight(pbTxId: ByteString, height: Int): AffectedTags[TagT] = {
+  def setHeight(pbTxId: ByteString, height: Height)(implicit ctx: ReadWrite): AffectedTags[TagT] = {
     val txId = TransactionId(pbTxId.toByteStr)
-    setHeight(txId, Height(height))
+    setHeight(txId, height)
   }
 
-  def setHeight(txId: TransactionId, height: Height): AffectedTags[TagT] = {
+  def setHeight(txId: TransactionId, height: Height)(implicit ctx: ReadWrite): AffectedTags[TagT] = {
     val tags = tagsOf(txId)
     if (tags.isEmpty) AffectedTags.empty
     else {
@@ -76,8 +77,8 @@ class TransactionStorage[TagT](
     }
   }
 
-  def remove(pbTxId: ByteString): AffectedTags[TagT] = remove(TransactionId(pbTxId.toByteStr))
-  def remove(txId: TransactionId): AffectedTags[TagT] = {
+  def remove(pbTxId: ByteString)(implicit ctx: ReadWrite): AffectedTags[TagT] = remove(TransactionId(pbTxId.toByteStr))
+  def remove(txId: TransactionId)(implicit ctx: ReadWrite): AffectedTags[TagT] = {
     val tags = tagsOf(txId)
     if (tags.isEmpty) AffectedTags.empty
     else {

@@ -1,8 +1,9 @@
 package com.wavesplatform.riderunner.storage
 
-import com.github.benmanes.caffeine.cache.{CacheLoader, Caffeine}
+import com.github.benmanes.caffeine.cache.Caffeine
 import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.riderunner.storage.StorageContext.ReadWrite
 import com.wavesplatform.riderunner.storage.persistent.VrfPersistentCache
 import com.wavesplatform.utils.ScorexLogging
 import kamon.instrumentation.caffeine.KamonStatsCounter
@@ -16,26 +17,24 @@ class VrfStorage(settings: ExactWithHeightStorage.Settings, blockchainApi: Block
     .softValues()
     .maximumSize(settings.maxEntries)
     .recordStats(() => new KamonStatsCounter("VrfStorage"))
-    .build[Int, Option[ByteStr]] {
-      new CacheLoader[Int, Option[ByteStr]] {
-        override def load(height: Int): Option[ByteStr] = {
-          val cached = persistentCache.get(height)
-          if (cached.loaded) cached.mayBeValue
-          else
-            blockchainApi.getVrf(height).tap { x =>
-              persistentCache.set(height, x)
-              log.trace(s"Set VRF at $height: $x")
-            }
-        }
+    .build[Int, Option[ByteStr]]()
+
+  def get(atHeight: Int)(implicit ctx: ReadWrite): Option[ByteStr] =
+    if (atHeight > currHeight) throw new RuntimeException(s"Can't receive a block VRF with height=$atHeight > current height=$currHeight")
+    else load(atHeight).tap(values.put(atHeight, _))
+
+  private def load(atHeight: Int)(implicit ctx: ReadWrite): Option[ByteStr] = {
+    val cached = persistentCache.get(atHeight)
+    if (cached.loaded) cached.mayBeValue
+    else
+      blockchainApi.getVrf(atHeight).tap { x =>
+        persistentCache.set(atHeight, x)
+        log.trace(s"Set VRF at $atHeight: $x")
       }
-    }
+  }
 
-  def get(height: Int): Option[ByteStr] =
-    if (height > currHeight) throw new RuntimeException(s"Can't receive a block VRF with height=$height > current height=$currHeight")
-    else values.get(height)
-
-  def removeFrom(height: Int): Unit = {
-    persistentCache.removeFrom(height)
-    values.invalidate(height)
+  def remove(heights: Range)(implicit ctx: ReadWrite): Unit = {
+    persistentCache.removeFrom(heights.start)
+    heights.foreach(values.invalidate)
   }
 }

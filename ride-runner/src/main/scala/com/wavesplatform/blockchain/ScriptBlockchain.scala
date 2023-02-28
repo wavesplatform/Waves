@@ -5,27 +5,17 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.riderunner.storage.SharedBlockchainStorage
+import com.wavesplatform.riderunner.storage.StorageContext.ReadWrite
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{
-  AccountScriptInfo,
-  AssetDescription,
-  AssetScriptInfo,
-  BalanceSnapshot,
-  Blockchain,
-  DataEntry,
-  Height,
-  LeaseBalance,
-  TransactionId,
-  TxMeta,
-  VolumeAndFee
-}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, Blockchain, DataEntry, Height, LeaseBalance, TransactionId, TxMeta, VolumeAndFee}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 
-class ScriptBlockchain[TagT](storage: SharedBlockchainData[TagT], tag: TagT) extends Blockchain with ScorexLogging {
+class ScriptBlockchain[TagT](storage: SharedBlockchainStorage[TagT], tag: TagT)(implicit ctx: ReadWrite) extends Blockchain with ScorexLogging {
   override def settings: BlockchainSettings = storage.blockchainSettings
 
   // TODO #16 We don't support it for now, use GET /utils/script/evaluate
@@ -33,10 +23,10 @@ class ScriptBlockchain[TagT](storage: SharedBlockchainData[TagT], tag: TagT) ext
   override def hasData(address: Address): Boolean = kill(s"hasData($address)")
 
   // Ride: get*Value (data), get* (data)
-  override def accountData(address: Address, key: String): Option[DataEntry[?]] = storage.data.get(height, (address, key), tag)
+  override def accountData(address: Address, key: String): Option[DataEntry[?]] = storage.data.get(Height(height), (address, key), tag)
 
   // Ride: scriptHash
-  override def accountScript(address: Address): Option[AccountScriptInfo] = storage.accountScripts.get(height, address, tag)
+  override def accountScript(address: Address): Option[AccountScriptInfo] = storage.accountScripts.get(Height(height), address, tag)
 
   // Indirectly
   override def hasAccountScript(address: Address): Boolean = accountScript(address).nonEmpty
@@ -53,20 +43,20 @@ class ScriptBlockchain[TagT](storage: SharedBlockchainData[TagT], tag: TagT) ext
   override def activatedFeatures: Map[Short, Int] = storage.activatedFeatures
 
   // Ride: assetInfo
-  override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription] = storage.assets.get(height, id, tag)
+  override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription] = storage.assets.get(Height(height), id, tag)
 
   // Ride (indirectly): asset script validation
   override def assetScript(id: Asset.IssuedAsset): Option[AssetScriptInfo] = assetDescription(id).flatMap(_.script)
 
   // Ride: get*Value (data), get* (data), isDataStorageUntouched, balance, scriptHash, wavesBalance
   override def resolveAlias(a: Alias): Either[ValidationError, Address] =
-    storage.aliases.get(height, a, tag).toRight(AliasDoesNotExist(a): ValidationError)
+    storage.aliases.get(Height(height), a, tag).toRight(AliasDoesNotExist(a): ValidationError)
 
   // Ride: wavesBalance
-  override def leaseBalance(address: Address): LeaseBalance = storage.accountLeaseBalances.get(height, address, tag).getOrElse(LeaseBalance.empty)
+  override def leaseBalance(address: Address): LeaseBalance = storage.accountLeaseBalances.get(Height(height), address, tag).getOrElse(LeaseBalance.empty)
 
   // Ride: assetBalance, wavesBalance
-  override def balance(address: Address, mayBeAssetId: Asset): Long = storage.accountBalances.get(height, (address, mayBeAssetId), tag).getOrElse(0L)
+  override def balance(address: Address, mayBeAssetId: Asset): Long = storage.accountBalances.get(Height(height), (address, mayBeAssetId), tag).getOrElse(0L)
 
   // Retrieves Waves balance snapshot in the [from, to] range (inclusive)
   // Ride: wavesBalance (specifies to=None), "to" always None and means "to the end"

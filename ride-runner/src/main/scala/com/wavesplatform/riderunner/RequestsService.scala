@@ -3,12 +3,12 @@ package com.wavesplatform.riderunner
 import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.api.http.ApiException
 import com.wavesplatform.api.http.utils.UtilsApiRoute
-import com.wavesplatform.blockchain.{ScriptBlockchain, SharedBlockchainData}
+import com.wavesplatform.blockchain.ScriptBlockchain
 import com.wavesplatform.riderunner.DefaultRequestsService.RideScriptRunEnvironment
 import com.wavesplatform.riderunner.app.RideRunnerMetrics
 import com.wavesplatform.riderunner.app.RideRunnerMetrics.*
-import com.wavesplatform.riderunner.storage.{RequestKey, RequestsStorage}
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.riderunner.storage.{RequestKey, RequestsStorage, SharedBlockchainStorage}
+import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.execution.Scheduler
@@ -27,20 +27,20 @@ trait RequestsService {
 
 class DefaultRequestsService(
     settings: DefaultRequestsService.Settings,
-    sharedBlockchainData: SharedBlockchainData[RequestKey],
+    sharedBlockchain: SharedBlockchainStorage[RequestKey],
     storage: RequestsStorage,
     runScriptsScheduler: Scheduler
 ) extends RequestsService
     with ScorexLogging {
   private val scripts: TrieMap[RequestKey, RideScriptRunEnvironment] =
-    TrieMap.from(storage.all().map(k => (k, RideScriptRunEnvironment(k, sharedBlockchainData))))
+    TrieMap.from(storage.all().map(k => (k, RideScriptRunEnvironment(k, sharedBlockchain))))
 
 //  private val jobScheduler: JobScheduler[RequestKey] = SynchronizedJobScheduler(settings.parallelization, scripts.keys)
 
   // To get rid of duplicated requests
   private val inProgress = new ConcurrentHashMap[RequestKey, Task[JsObject]]()
 
-  override def runAll(): Task[Unit] = runManyAll(sharedBlockchainData.height, scripts.values.toList)
+  override def runAll(): Task[Unit] = runManyAll(sharedBlockchain.height, scripts.values.toList)
 
   override def runAffected(atHeight: Int, affected: Set[RequestKey]): Task[Unit] =
     // runMany(atHeight, affected.toList.flatMap(scripts.get))
@@ -48,7 +48,7 @@ class DefaultRequestsService(
     Task.unit
 
   override def trackAndRun(request: RequestKey): Task[JsObject] = {
-    val currentHeight = sharedBlockchainData.height
+    val currentHeight = Height(sharedBlockchain.height)
     val cache         = scripts.get(request)
     cache match {
       // TODO -1 ? Will eliminate calls to blockchain
@@ -61,11 +61,11 @@ class DefaultRequestsService(
         val task = Task {
           rideScriptCacheMisses.increment()
           if (cache.isEmpty) storage.append(request)
-          sharedBlockchainData.accountScripts.getUntagged(currentHeight, request.address)
+          sharedBlockchain.accountScripts.getUntagged(currentHeight, request.address)
         }.flatMap {
           // TODO #19 Change/move an error to an appropriate layer
           case None => Task.raiseError(ApiException(CustomValidationError(s"Address ${request.address} is not dApp")))
-          case _    => runOne(currentHeight, RideScriptRunEnvironment(request, sharedBlockchainData), hasCaches = false)
+          case _    => runOne(currentHeight, RideScriptRunEnvironment(request, sharedBlockchain), hasCaches = false)
         }
 
         val completeTask = task.doOnFinish(_ => Task(inProgress.remove(request)))
@@ -156,7 +156,7 @@ object DefaultRequestsService {
   )
 
   private object RideScriptRunEnvironment {
-    def apply(key: RequestKey, blockchainStorage: SharedBlockchainData[RequestKey]): RideScriptRunEnvironment =
-      new RideScriptRunEnvironment(new ScriptBlockchain[RequestKey](blockchainStorage, key), key, JsObject.empty, 0, 0L)
+    def apply(key: RequestKey, sharedBlockchain: SharedBlockchainStorage[RequestKey]): RideScriptRunEnvironment =
+      new RideScriptRunEnvironment(new ScriptBlockchain[RequestKey](sharedBlockchain, key), key, JsObject.empty, 0, 0L)
   }
 }

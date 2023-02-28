@@ -97,7 +97,7 @@ object BlockchainState extends ScorexLogging {
       // Almost impossible on MainNet and TestNet, so we can neglect this
       require(currHeight > 1, "Uncaught case. Check a connectivity to gRPC servers, remove all caches and restart the service")
 
-      processor.forceRollbackOne()
+      processor.forceRollbackLiquid()
       val r = ResolvingFork.forceRollBackOne(currHeight, workingStateHeight)
 
       blockchainUpdatesStream.start(r.processedHeight + 1)
@@ -151,7 +151,7 @@ object BlockchainState extends ScorexLogging {
                 processor.hasLocalBlockAt(h, currBlockId) match {
                   case Some(true) | None => orig // true - same blocks
                   case _ =>
-                    processor.removeBlocksFrom(h)
+                    processor.removeAllFrom(h)
                     orig.withDifferentBlocks
                 }
 
@@ -168,7 +168,7 @@ object BlockchainState extends ScorexLogging {
 
           case _: Update.Rollback =>
             // It works even for micro blocks, because we have a restored version of data in event
-            processor.removeBlocksFrom(Height(h + 1))
+            processor.removeAllFrom(Height(h + 1))
             processor.process(event.getUpdate)
             ignore
 
@@ -182,7 +182,7 @@ object BlockchainState extends ScorexLogging {
             processor.runAffectedScripts().as(orig.withHeight(h))
 
           case _: Update.Rollback =>
-            processor.removeBlocksFrom(Height(h + 1))
+            processor.removeAllFrom(Height(h + 1))
             processor.process(event.getUpdate)
             val r = ResolvingFork.from(Height(event.getUpdate.height), orig.processedHeight)
             logStatusChanged(r)
@@ -205,7 +205,7 @@ object BlockchainState extends ScorexLogging {
             } else Task.now(updated)
 
           case _: Update.Rollback =>
-            processor.removeBlocksFrom(Height(h + 1))
+            processor.removeAllFrom(Height(h + 1))
             processor.process(event.getUpdate)
             Task.now(orig.apply(event))
 

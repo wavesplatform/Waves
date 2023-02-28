@@ -114,7 +114,7 @@ class RequestsServiceTestSuite extends BaseTestSuite with HasGrpc with HasLevelD
 
     val requestsService = new DefaultRequestsService(
       settings = DefaultRequestsService.Settings(enableTraces = false, Int.MaxValue, 0, 3, 0.seconds),
-      sharedBlockchainData = blockchainStorage,
+      sharedBlockchain = blockchainStorage,
       storage = requestsStorage,
       runScriptsScheduler = testScheduler
     )
