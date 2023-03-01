@@ -34,8 +34,7 @@ class MicroBlockMinerImpl(
     minerScheduler: SchedulerService,
     appenderScheduler: SchedulerService,
     transactionAdded: Observable[Unit],
-    nextMicroBlockSize: Int => Int,
-    sendStats: (MicroBlock, BlockId) => Unit = BlockStats.mined
+    nextMicroBlockSize: Int => Int
 ) extends MicroBlockMiner
     with ScorexLogging {
 
@@ -118,7 +117,7 @@ class MicroBlockMinerImpl(
             .liftTo[Task]
           (signedBlock, microBlock) = blocks
           blockId <- appendMicroBlock(microBlock)
-          _ = sendStats(microBlock, blockId)
+          _ = BlockStats.mined(microBlock, blockId)
           _ <- broadcastMicroBlock(account, microBlock, blockId)
         } yield {
           if (updatedTotalConstraint.isFull) Stop
