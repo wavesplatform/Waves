@@ -45,6 +45,7 @@ case class UtxPoolImpl(
     maxTxErrorLogSize: Int,
     isMiningEnabled: Boolean,
     onEvent: UtxEvent => Unit = _ => (),
+    transactionAdded: Unit => Unit = _ => (),
     nanoTimeSource: () => TxTimestamp = () => System.nanoTime()
 ) extends ScorexLogging
     with AutoCloseable
@@ -466,7 +467,10 @@ case class UtxPoolImpl(
         { _ =>
           PoolMetrics.addTransaction(tx)
           ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Received)
-          diff.foreach(diff => onEvent(UtxEvent.TxAdded(tx, diff))) // Only emits event if diff was computed
+          diff.foreach { diff =>
+            transactionAdded(())
+            onEvent(UtxEvent.TxAdded(tx, diff))
+          } // Only emits event if diff was computed
           tx
         }
       )
