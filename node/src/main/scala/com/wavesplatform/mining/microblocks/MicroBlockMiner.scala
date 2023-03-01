@@ -2,6 +2,7 @@ package com.wavesplatform.mining.microblocks
 
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
+import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.mining.{MinerDebugInfo, MiningConstraint}
 import com.wavesplatform.settings.MinerSettings
 import com.wavesplatform.state.Blockchain
@@ -30,7 +31,7 @@ object MicroBlockMiner {
       settings: MinerSettings,
       minerScheduler: SchedulerService,
       appenderScheduler: SchedulerService,
-      transactionAdded: Observable[Unit],
+      transactionAdded: Observable[UtxEvent.TxAdded],
       nextMicroBlockSize: Int => Int = identity
   ): MicroBlockMiner =
     new MicroBlockMinerImpl(

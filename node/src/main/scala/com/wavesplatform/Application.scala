@@ -96,7 +96,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private[this] val minerScheduler          = singleThread("block-miner", reporter = log.error("Error in Miner", _))
 
   private[this] val utxEvents        = ConcurrentSubject.publish[UtxEvent](scheduler)
-  private[this] val transactionAdded = ConcurrentSubject.replayLimited[Unit](1)(scheduler)
+  private[this] val transactionAdded = ConcurrentSubject.replayLimited[UtxEvent.TxAdded](1)(scheduler)
 
   private var extensions = Seq.empty[Extension]
 

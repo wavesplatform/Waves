@@ -8,6 +8,7 @@ import com.wavesplatform.common.utils.*
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.UtxEvent
+import com.wavesplatform.events.UtxEvent.TxAdded
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl
 import com.wavesplatform.settings.TestFunctionalitySettings
@@ -108,7 +109,7 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
     withDomain(RideV6, Seq(AddrWithBalance(defaultAddress, TestValues.bigMoney))) { d =>
       import Scheduler.Implicits.global
       val utxEvents        = ConcurrentSubject.publish[UtxEvent]
-      val transactionAdded = ConcurrentSubject.replayLimited[Unit](1)
+      val transactionAdded = ConcurrentSubject.replayLimited[TxAdded](1)
 
       val utxPool = new UtxPool {
         val eventHasBeenSent = new CountDownLatch(1)
@@ -119,8 +120,8 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
           RideV6.maxTxErrorLogSize,
           RideV6.minerSettings.enable,
           utxEvents.onNext,
-          { _ =>
-            transactionAdded.onNext(())
+          { event =>
+            transactionAdded.onNext(event)
             eventHasBeenSent.countDown()
           }
         )
