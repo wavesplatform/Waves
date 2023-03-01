@@ -26,7 +26,7 @@ class RideApi(settings: Settings, httpBackend: SttpBackend[Identity, Any]) exten
       .body
       .flatMap { rawJson =>
         Json.parse(rawJson) match {
-          case x: JsObject => x.asRight
+          case x: JsObject => (x - "stateChanges").asRight // TODO
           case x           => s"Expected a JsObject, but got:\n$x".asLeft
         }
       }
