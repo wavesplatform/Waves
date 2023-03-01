@@ -2,7 +2,7 @@ package com.wavesplatform.riderunner.storage.persistent
 
 import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.riderunner.storage.AccountAssetKey
+import com.wavesplatform.riderunner.storage.{AccountAssetKey, Storage}
 import com.wavesplatform.transaction.{Asset, AssetIdLength}
 
 class AccountBalancePersistentCacheTestSuite extends PersistentTestSuite {
@@ -18,115 +18,213 @@ class AccountBalancePersistentCacheTestSuite extends PersistentTestSuite {
     val cacheKey = (alice.publicKey.toAddress, asset)
     "set and get" - {
       "cached" - {
-        "on the first height" in test { cache =>
-          cache.setDefault(8, cacheKey, cacheValue)
-          cache.setDefault(11, cacheKey, RemoteData.Absence)
+        "on the first height" in test { (db, cache) =>
+          db.readWrite { implicit ctx =>
+            cache.set(8, cacheKey, cacheValue)
+          }
 
-          cache.getDefault(8, cacheKey) shouldBe cacheValue
+          db.readWrite { implicit ctx =>
+            cache.set(11, cacheKey, RemoteData.Absence)
+          }
+
+          db.readOnly { implicit ctx =>
+            cache.get(8, cacheKey) shouldBe cacheValue
+          }
         }
 
-        "before the max height" in test { cache =>
-          cache.setDefault(8, cacheKey, cacheValue)
-          cache.setDefault(11, cacheKey, RemoteData.Absence)
+        "before the max height" in test { (db, cache) =>
+          db.readWrite { implicit ctx =>
+            cache.set(8, cacheKey, cacheValue)
+          }
 
-          cache.getDefault(10, cacheKey) shouldBe cacheValue
+          db.readWrite { implicit ctx =>
+            cache.set(11, cacheKey, RemoteData.Absence)
+          }
+
+          db.readOnly { implicit ctx =>
+            cache.get(10, cacheKey) shouldBe cacheValue
+          }
         }
 
-        "on the max height" in test { cache =>
-          cache.setDefault(9, cacheKey, RemoteData.Absence)
-          cache.setDefault(10, cacheKey, cacheValue)
+        "on the max height" in test { (db, cache) =>
+          db.readWrite { implicit ctx =>
+            cache.set(9, cacheKey, RemoteData.Absence)
+          }
 
-          cache.getDefault(10, cacheKey) shouldBe cacheValue
+          db.readWrite { implicit ctx =>
+            cache.set(10, cacheKey, cacheValue)
+          }
+
+          db.readOnly { implicit ctx =>
+            cache.get(10, cacheKey) shouldBe cacheValue
+          }
         }
 
-        "after the max height" in test { cache =>
-          cache.setDefault(10, cacheKey, cacheValue)
-          cache.getDefault(11, cacheKey) shouldBe cacheValue
+        "after the max height" in test { (db, cache) =>
+          db.readWrite { implicit ctx =>
+            cache.set(10, cacheKey, cacheValue)
+          }
+
+          db.readOnly { implicit ctx =>
+            cache.get(11, cacheKey) shouldBe cacheValue
+          }
         }
       }
 
       "absence" - {
-        "before the max height" in test { cache =>
-          cache.setDefault(8, cacheKey, RemoteData.Absence)
-          cache.setDefault(11, cacheKey, cacheValue)
+        "before the max height" in test { (db, cache) =>
+          db.readWrite { implicit ctx =>
+            cache.set(8, cacheKey, RemoteData.Absence)
+          }
 
-          cache.getDefault(10, cacheKey) shouldBe defaultCacheValue
+          db.readWrite { implicit ctx =>
+            cache.set(11, cacheKey, cacheValue)
+          }
+
+          db.readOnly { implicit ctx =>
+            cache.get(10, cacheKey) shouldBe defaultCacheValue
+          }
         }
 
-        "on the max height" in test { cache =>
-          cache.setDefault(9, cacheKey, cacheValue)
-          cache.setDefault(10, cacheKey, RemoteData.Absence)
+        "on the max height" in test { (db, cache) =>
+          db.readWrite { implicit ctx =>
+            cache.set(9, cacheKey, cacheValue)
+          }
 
-          cache.getDefault(10, cacheKey) shouldBe defaultCacheValue
+          db.readWrite { implicit ctx =>
+            cache.set(10, cacheKey, RemoteData.Absence)
+          }
+
+          db.readOnly { implicit ctx =>
+            cache.get(10, cacheKey) shouldBe defaultCacheValue
+          }
         }
 
-        "after the max height" in test { cache =>
-          cache.setDefault(9, cacheKey, cacheValue)
-          cache.setDefault(10, cacheKey, RemoteData.Absence)
+        "after the max height" in test { (db, cache) =>
+          db.readWrite { implicit ctx =>
+            cache.set(9, cacheKey, cacheValue)
+          }
 
-          cache.getDefault(11, cacheKey) shouldBe defaultCacheValue
+          db.readWrite { implicit ctx =>
+            cache.set(10, cacheKey, RemoteData.Absence)
+          }
+
+          db.readOnly { implicit ctx =>
+            cache.get(11, cacheKey) shouldBe defaultCacheValue
+          }
         }
       }
 
       "unknown" - {
-        "on empty" in test { cache =>
-          cache.getDefault(10, cacheKey) shouldBe RemoteData.Unknown
+        "on empty" in test { (db, cache) =>
+          db.readOnly { implicit ctx =>
+            cache.get(10, cacheKey) shouldBe RemoteData.Unknown
+          }
         }
 
-        "before the first known height" in test { cache =>
-          cache.setDefault(11, cacheKey, RemoteData.Absence)
-          cache.getDefault(10, cacheKey) shouldBe RemoteData.Unknown
+        "before the first known height" in test { (db, cache) =>
+          db.readWrite { implicit ctx =>
+            cache.set(11, cacheKey, RemoteData.Absence)
+          }
+
+          db.readOnly { implicit ctx =>
+            cache.get(10, cacheKey) shouldBe RemoteData.Unknown
+          }
         }
       }
     }
 
     "remove" - {
       "the data is not available for 'get' after deletion" - {
-        "on removed height" in test { cache =>
-          cache.setDefault(9, cacheKey, RemoteData.Absence)
-          cache.remove(9, cacheKey)
+        "on removed height" in test { (db, cache) =>
+          db.readWrite { implicit ctx =>
+            cache.set(9, cacheKey, RemoteData.Absence)
+          }
 
-          cache.getDefault(10, cacheKey) shouldBe RemoteData.Unknown
+          db.readWrite { implicit ctx =>
+            cache.remove(9, cacheKey)
+          }
+
+          db.readOnly { implicit ctx =>
+            cache.get(10, cacheKey) shouldBe RemoteData.Unknown
+          }
         }
 
-        "on next height" in test { cache =>
-          cache.setDefault(11, cacheKey, RemoteData.Absence)
-          cache.remove(1, cacheKey)
+        "on next height" in test { (db, cache) =>
+          db.readWrite { implicit ctx =>
+            cache.set(11, cacheKey, RemoteData.Absence)
+          }
 
-          cache.getDefault(11, cacheKey) shouldBe RemoteData.Unknown
+          db.readWrite { implicit ctx =>
+            cache.remove(1, cacheKey)
+          }
+
+          db.readOnly { implicit ctx =>
+            cache.get(11, cacheKey) shouldBe RemoteData.Unknown
+          }
         }
       }
 
       "returns the last known value before deleted heights" - {
-        "cached" in test { cache =>
-          cache.setDefault(9, cacheKey, cacheValue)
-          cache.setDefault(11, cacheKey, RemoteData.Absence)
-          cache.remove(10, cacheKey)
+        "cached" in test { (db, cache) =>
+          db.readWrite { implicit ctx =>
+            cache.set(9, cacheKey, cacheValue)
+          }
 
-          cache.getDefault(10, cacheKey) shouldBe cacheValue
+          db.readWrite { implicit ctx =>
+            cache.set(11, cacheKey, RemoteData.Absence)
+          }
+
+          db.readWrite { implicit ctx =>
+            cache.remove(10, cacheKey)
+          }
+
+          db.readOnly { implicit ctx =>
+            cache.get(10, cacheKey) shouldBe cacheValue
+          }
         }
 
-        "absence" in test { cache =>
-          cache.setDefault(9, cacheKey, RemoteData.Absence)
-          cache.setDefault(11, cacheKey, cacheValue)
-          cache.remove(10, cacheKey)
+        "absence" in test { (db, cache) =>
+          db.readWrite { implicit ctx =>
+            cache.set(9, cacheKey, RemoteData.Absence)
+          }
 
-          cache.getDefault(10, cacheKey) shouldBe defaultCacheValue
+          db.readWrite { implicit ctx =>
+            cache.set(11, cacheKey, cacheValue)
+          }
+
+          db.readWrite { implicit ctx =>
+            cache.remove(10, cacheKey)
+          }
+
+          db.readOnly { implicit ctx =>
+            cache.get(10, cacheKey) shouldBe defaultCacheValue
+          }
         }
 
-        "unknown if empty" in test { cache =>
-          cache.setDefault(10, cacheKey, RemoteData.Absence)
-          cache.setDefault(11, cacheKey, cacheValue)
-          cache.remove(10, cacheKey)
+        "unknown if empty" in test { (db, cache) =>
+          db.readWrite { implicit ctx =>
+            cache.set(10, cacheKey, RemoteData.Absence)
+          }
 
-          cache.getDefault(10, cacheKey) shouldBe RemoteData.Unknown
+          db.readWrite { implicit ctx =>
+            cache.set(11, cacheKey, cacheValue)
+          }
+
+          db.readWrite { implicit ctx =>
+            cache.remove(10, cacheKey)
+          }
+
+          db.readOnly { implicit ctx =>
+            cache.get(10, cacheKey) shouldBe RemoteData.Unknown
+          }
         }
       }
     }
   }
 
-  private def test(f: PersistentCache[AccountAssetKey, Long] => Unit): Unit = withDb { db =>
-    val caches = new LevelDbPersistentCaches(db)
-    f(caches.accountBalances)
+  private def test(f: (Storage, PersistentCache[AccountAssetKey, Long]) => Unit): Unit = withDb { db =>
+    val caches = db.readOnly(LevelDbPersistentCaches(db)(_))
+    f(db, caches.accountBalances)
   }
 }

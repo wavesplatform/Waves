@@ -1,20 +1,103 @@
 package com.wavesplatform.riderunner.storage
 
+import cats.syntax.option.*
 import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.database.{DBExt, Key, RW, ReadOnlyDB}
 import com.wavesplatform.riderunner.storage.StorageContext.{ReadOnly, ReadWrite}
 import com.wavesplatform.riderunner.storage.persistent.LevelDbPersistentCaches.ReadOnlyDBOps
-import org.rocksdb.RocksDB
+import monix.eval.Task
+import org.rocksdb.*
+
+import scala.util.Using
 
 trait Storage {
+  def asyncReadOnly[T](f: ReadOnly => Task[T]): Task[T]
   def readOnly[T](f: ReadOnly => T): T
+
+  def asyncReadWrite[T](f: ReadWrite => Task[T]): Task[T]
   def readWrite[T](f: ReadWrite => T): T
+
+  def mkReadWriteHandle: ReadWriteHandle
+}
+
+class ReadWriteHandle(db: RocksDB) extends AutoCloseable {
+  val snapshot    = db.getSnapshot
+  val readOptions = new ReadOptions().setSnapshot(snapshot).setVerifyChecksums(false)
+  val batch       = new WriteBatch()
+
+  override def close(): Unit = {
+    try Using.resource(new WriteOptions().setSync(false).setDisableWAL(true))(db.write(_, batch))
+    finally {}
+
+    try readOptions.close()
+    finally {}
+
+    try snapshot.close()
+    finally {}
+  }
 }
 
 object Storage {
   def rocksDb(db: RocksDB): Storage = new Storage {
-    override def readOnly[T](f: ReadOnly => T): T   = db.readOnly(x => f(new ReadOnly(x)))
+    override def asyncReadOnly[T](f: ReadOnly => Task[T]): Task[T] = {
+      var snapshot = none[Snapshot]
+      var options  = none[ReadOptions]
+      Task {
+        val s = db.getSnapshot
+        val o = new ReadOptions().setSnapshot(s).setVerifyChecksums(false)
+        snapshot = s.some
+        options = o.some
+        new ReadOnly(new ReadOnlyDB(db, o))
+      }
+        .flatMap(f)
+        .doOnFinish { _ =>
+          Task {
+            try options.foreach(_.close())
+            finally {}
+            try snapshot.foreach(_.close())
+            finally {}
+          }
+        }
+    }
+
+    override def readOnly[T](f: ReadOnly => T): T = db.readOnly(x => f(new ReadOnly(x)))
+
+    override def asyncReadWrite[T](f: ReadWrite => Task[T]): Task[T] = {
+      var snapshot    = none[Snapshot]
+      var readOptions = none[ReadOptions]
+      var batch       = none[WriteBatch]
+      Task {
+        val s  = db.getSnapshot
+        val ro = new ReadOptions().setSnapshot(s).setVerifyChecksums(false)
+        val b  = new WriteBatch()
+        snapshot = s.some
+        readOptions = ro.some
+        batch = b.some
+        new ReadWrite(new RW(db, ro, b))
+      }
+        .flatMap(f)
+        .doOnFinish { _ =>
+          Task {
+            try
+              batch.foreach { b =>
+                Using.resource(new WriteOptions().setSync(false).setDisableWAL(true)) { wo =>
+                  db.write(wo, b)
+                }
+              }
+            finally {}
+
+            try readOptions.foreach(_.close())
+            finally {}
+
+            try snapshot.foreach(_.close())
+            finally {}
+          }
+        }
+    }
+
     override def readWrite[T](f: ReadWrite => T): T = db.readWrite(x => f(new ReadWrite(x)))
+
+    override def mkReadWriteHandle: ReadWriteHandle = new ReadWriteHandle(db)
   }
 }
 

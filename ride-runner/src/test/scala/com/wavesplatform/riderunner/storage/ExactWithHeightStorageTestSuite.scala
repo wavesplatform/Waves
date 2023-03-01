@@ -1,12 +1,16 @@
 package com.wavesplatform.riderunner.storage
 
 import com.wavesplatform.blockchain.RemoteData
+import com.wavesplatform.riderunner.storage.StorageContext.ReadWrite
 import com.wavesplatform.riderunner.storage.persistent.{InMemWithoutHeightPersistentCache, PersistentCache}
+import com.wavesplatform.state.Height
 import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
 
 import java.util.concurrent.atomic.AtomicInteger
 
-class ExactWithHeightStorageTestSuite extends BaseTestSuite with HasLevelDb with HasTestAccounts {
+class ExactWithHeightStorageTestSuite extends BaseTestSuite with HasDb with HasTestAccounts {
+  private implicit val ctx = new ReadWrite(null)
+
   "ExactWithHeightStorage" - {
     "loading from a blockchain" - {
       "if it hasn't the key, stores it as Absent" in {
@@ -57,10 +61,11 @@ class ExactWithHeightStorageTestSuite extends BaseTestSuite with HasLevelDb with
     }
   }
 
-  private class BaseStorage(override val persistentCache: PersistentCache[String, Int]) extends ExactWithHeightStorage[String, Int, Int] {
+  private class BaseStorage(override val persistentCache: PersistentCache[String, Int])
+      extends ExactWithHeightStorage[String, Int, Int] {
     override lazy val settings: ExactWithHeightStorage.Settings = ExactWithHeightStorage.Settings(2)
     override def getFromBlockchain(key: String): Option[Int]    = None
     def get(key: String): Int                                   = getOpt(key).value
-    def getOpt(key: String): Option[Int]                        = get(0, key, Int.MaxValue)
+    def getOpt(key: String): Option[Int]                        = get(Height(0), key, Int.MaxValue)
   }
 }

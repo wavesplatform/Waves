@@ -1,6 +1,6 @@
 package com.wavesplatform.riderunner.storage.persistent
 
-import com.wavesplatform.riderunner.storage.AccountDataKey
+import com.wavesplatform.riderunner.storage.{AccountDataKey, Storage}
 import com.wavesplatform.state.{BooleanDataEntry, DataEntry}
 
 class AccountDataPersistentCacheTestSuite extends PersistentCacheTestSuite[AccountDataKey, DataEntry[?]] {
@@ -8,8 +8,8 @@ class AccountDataPersistentCacheTestSuite extends PersistentCacheTestSuite[Accou
   protected override val defaultKey   = (alice.publicKey.toAddress, defaultPairDataKey)
   protected override val defaultValue = BooleanDataEntry(defaultPairDataKey, value = true)
 
-  protected override def test(f: PersistentCache[AccountDataKey, DataEntry[?]] => Unit): Unit = withDb { db =>
-    val caches = new LevelDbPersistentCaches(db)
-    f(caches.accountDataEntries)
+  protected override def test(f: (Storage, PersistentCache[AccountDataKey, DataEntry[?]]) => Unit): Unit = withDb { db =>
+    val caches = db.readOnly(LevelDbPersistentCaches(db)(_))
+    f(db, caches.accountDataEntries)
   }
 }

@@ -5,14 +5,14 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.DefaultBlockchainApi.*
 import com.wavesplatform.api.HasGrpc
 import com.wavesplatform.block.SignedBlockHeader
-import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, SharedBlockchainData}
+import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState}
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.riderunner.DefaultRequestsService
-import com.wavesplatform.riderunner.storage.HasLevelDb.TestDb
+import com.wavesplatform.riderunner.storage.HasDb.TestDb
 import com.wavesplatform.riderunner.storage.persistent.LevelDbPersistentCaches
-import com.wavesplatform.riderunner.storage.{HasLevelDb, RequestKey, RequestsStorage}
+import com.wavesplatform.riderunner.storage.{HasDb, RequestKey, RequestsStorage, SharedBlockchainStorage}
 import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
 import com.wavesplatform.{BaseTestSuite, HasMonixHelpers}
 import monix.eval.Task
@@ -23,7 +23,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 import scala.util.Using
 
-abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with HasLevelDb with HasMonixHelpers {
+abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with HasDb with HasMonixHelpers {
   protected val initX = 0
 
   /** @param xPlusHeight
@@ -48,19 +48,22 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
         else super.getAccountDataEntry(address, key)
     }
 
-    val testDb   = use(TestDb.mk())
-    val dbCaches = new LevelDbPersistentCaches(testDb.db)
-    val blockchainStorage = new SharedBlockchainData[RequestKey](
-      settings.rideRunner.sharedBlockchain,
-      dbCaches,
-      blockchainApi
-    )
+    val testDb = use(TestDb.mk())
+    val blockchainStorage = testDb.storage.readWrite { implicit ctx =>
+      SharedBlockchainStorage[RequestKey](
+        settings.rideRunner.sharedBlockchain,
+        testDb.storage,
+        LevelDbPersistentCaches(testDb.storage),
+        blockchainApi
+      )
+    }
 
     val request = RequestKey(aliceAddr, Json.obj("expr" -> "foo()"))
     val requestsService = new DefaultRequestsService(
       settings = DefaultRequestsService.Settings(enableTraces = false, Int.MaxValue, 0, 3, 0.seconds),
+      storage = testDb.storage,
       sharedBlockchain = blockchainStorage,
-      storage = new RequestsStorage {
+      requestsStorage = new RequestsStorage {
         override def size: Int                   = 1
         override def append(x: RequestKey): Unit = {} // Ignore, because no way to evaluate a new expr
         override def all(): List[RequestKey]     = List(request)

@@ -127,6 +127,7 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
 
     val requestsService = new DefaultRequestsService(
       settings.rideRunner.requestsService,
+      storage,
       blockchainStorage,
       new RequestsStorage {
         override def size: Int                   = scripts.size

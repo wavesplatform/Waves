@@ -2,23 +2,26 @@ package com.wavesplatform.riderunner.storage
 
 import com.google.common.io.MoreFiles
 import com.wavesplatform.database.RDB.newColumnFamilyOptions
-import com.wavesplatform.riderunner.storage.HasLevelDb.TestDb
+import com.wavesplatform.riderunner.storage.HasDb.TestDb
 import org.rocksdb.{ColumnFamilyDescriptor, ColumnFamilyHandle, DBOptions, DbPath, RocksDB, Statistics}
 
 import java.nio.file.{Files, Path}
 import java.util
 import scala.jdk.CollectionConverters.SeqHasAsJava
 
-trait HasLevelDb {
-  protected def withDb[A](f: RocksDB => A): A = TestDb.mk().withDb(f)
+trait HasDb {
+  protected def withDb[A](f: Storage => A): A = TestDb.mk().withDb(f)
 }
 
-object HasLevelDb {
+object HasDb {
+  // TODO TestStorage
   case class TestDb(path: Path, db: RocksDB, clean: Boolean = true) extends AutoCloseable {
+    val storage = Storage.rocksDb(db)
+
     def withoutCleaning: TestDb = copy(clean = false)
 
-    def withDb[A](f: RocksDB => A): A = {
-      try f(db)
+    def withDb[A](f: Storage => A): A = {
+      try f(storage)
       finally close()
     }
 

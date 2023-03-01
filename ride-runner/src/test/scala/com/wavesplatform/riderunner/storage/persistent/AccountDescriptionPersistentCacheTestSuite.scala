@@ -2,6 +2,7 @@ package com.wavesplatform.riderunner.storage.persistent
 
 import com.google.protobuf.UnsafeByteOperations
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.riderunner.storage.Storage
 import com.wavesplatform.state.{AssetDescription, Height}
 import com.wavesplatform.transaction.{Asset, AssetIdLength}
 
@@ -23,8 +24,8 @@ class AccountDescriptionPersistentCacheTestSuite extends PersistentCacheTestSuit
     nft = false
   )
 
-  protected override def test(f: PersistentCache[Asset.IssuedAsset, AssetDescription] => Unit): Unit = withDb { db =>
-    val caches = new LevelDbPersistentCaches(db)
-    f(caches.assetDescriptions)
+  protected override def test(f: (Storage, PersistentCache[Asset.IssuedAsset, AssetDescription]) => Unit): Unit = withDb { db =>
+    val caches = db.readOnly(LevelDbPersistentCaches(db)(_))
+    f(db, caches.assetDescriptions)
   }
 }

@@ -6,13 +6,13 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.DefaultBlockchainApi.toVanilla
 import com.wavesplatform.api.HasGrpc
 import com.wavesplatform.block.SignedBlockHeader
-import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, Processor, SharedBlockchainData}
+import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, Processor}
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.it.TestBlockchainApi
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.riderunner.storage.HasLevelDb.TestDb
+import com.wavesplatform.riderunner.storage.HasDb.TestDb
 import com.wavesplatform.riderunner.storage.persistent.LevelDbPersistentCaches
-import com.wavesplatform.riderunner.storage.{HasLevelDb, RequestKey, RequestsStorage}
+import com.wavesplatform.riderunner.storage.{HasDb, RequestKey, RequestsStorage, SharedBlockchainStorage}
 import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
 import monix.eval.Task
 import monix.execution.schedulers.TestScheduler
@@ -22,7 +22,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 import scala.util.Using
 
-class RequestsServiceTestSuite extends BaseTestSuite with HasGrpc with HasLevelDb {
+class RequestsServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
   private val aRequest = RequestKey(aliceAddr, Json.obj("expr" -> "default()"))
   private val bRequest = RequestKey(bobAddr, Json.obj("expr" -> "default()"))
   private val cRequest = RequestKey(carlAddr, Json.obj("expr" -> "default()"))
@@ -104,18 +104,21 @@ class RequestsServiceTestSuite extends BaseTestSuite with HasGrpc with HasLevelD
         else super.getAccountDataEntry(address, key)
     }
 
-    val testDb   = use(TestDb.mk())
-    val dbCaches = new LevelDbPersistentCaches(testDb.db)
-    val blockchainStorage = new SharedBlockchainData[RequestKey](
-      settings.rideRunner.sharedBlockchain,
-      dbCaches,
-      blockchainApi
-    )
+    val testDb = use(TestDb.mk())
+    val blockchainStorage = testDb.storage.readWrite { implicit ctx =>
+      SharedBlockchainStorage[RequestKey](
+        settings.rideRunner.sharedBlockchain,
+        testDb.storage,
+        LevelDbPersistentCaches(testDb.storage),
+        blockchainApi
+      )
+    }
 
     val requestsService = new DefaultRequestsService(
       settings = DefaultRequestsService.Settings(enableTraces = false, Int.MaxValue, 0, 3, 0.seconds),
+      storage = testDb.storage,
       sharedBlockchain = blockchainStorage,
-      storage = requestsStorage,
+      requestsStorage = requestsStorage,
       runScriptsScheduler = testScheduler
     )
     val processor               = new BlockchainProcessor(blockchainStorage, requestsService)

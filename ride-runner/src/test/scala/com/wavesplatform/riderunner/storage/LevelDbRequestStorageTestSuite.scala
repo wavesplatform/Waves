@@ -1,10 +1,10 @@
 package com.wavesplatform.riderunner.storage
 
-import com.wavesplatform.riderunner.storage.HasLevelDb.TestDb
+import com.wavesplatform.riderunner.storage.HasDb.TestDb
 import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
 import play.api.libs.json.Json
 
-class LevelDbRequestStorageTestSuite extends BaseTestSuite with HasLevelDb with HasTestAccounts {
+class LevelDbRequestStorageTestSuite extends BaseTestSuite with HasDb with HasTestAccounts {
   "LevelDbRequestStorageTestSuite" - {
     "added entries are preserved during restarts" in {
       val entry1 = RequestKey(alice.toAddress, Json.obj("foo" -> 1))

@@ -3,6 +3,7 @@ package com.wavesplatform.riderunner.storage.persistent
 import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.DigestLength
+import com.wavesplatform.riderunner.storage.Storage
 import com.wavesplatform.state.{Height, TransactionId}
 
 class TransactionsPersistentCacheTestSuite extends PersistentTestSuite {
@@ -12,30 +13,46 @@ class TransactionsPersistentCacheTestSuite extends PersistentTestSuite {
 
   "TransactionsPersistentCache" - {
     "set and get" - {
-      "last set wins" in test { cache =>
-        cache.setHeight(defaultTxId, defaultCachedValue)
-        cache.setHeight(defaultTxId, RemoteData.Absence)
+      "last set wins" in test { (db, cache) =>
+        db.readWrite { implicit ctx =>
+          cache.setHeight(defaultTxId, defaultCachedValue)
+        }
 
-        cache.getHeight(defaultTxId) shouldBe RemoteData.Absence
+        db.readWrite { implicit ctx =>
+          cache.setHeight(defaultTxId, RemoteData.Absence)
+        }
+
+        db.readOnly { implicit ctx =>
+          cache.getHeight(defaultTxId) shouldBe RemoteData.Absence
+        }
       }
 
-      "unknown on empty" in test { cache =>
-        cache.getHeight(defaultTxId) shouldBe RemoteData.Unknown
+      "unknown on empty" in test { (db, cache) =>
+        db.readOnly { implicit ctx =>
+          cache.getHeight(defaultTxId) shouldBe RemoteData.Unknown
+        }
       }
     }
 
     "remove" - {
-      "the data is not available for 'get' after deletion" - test { cache =>
-        cache.setHeight(defaultTxId, defaultCachedValue)
-        cache.remove(defaultTxId)
+      "the data is not available for 'get' after deletion" - test { (db, cache) =>
+        db.readWrite { implicit ctx =>
+          cache.setHeight(defaultTxId, defaultCachedValue)
+        }
 
-        cache.getHeight(defaultTxId) shouldBe RemoteData.Unknown
+        db.readWrite { implicit ctx =>
+          cache.remove(defaultTxId)
+        }
+
+        db.readOnly { implicit ctx =>
+          cache.getHeight(defaultTxId) shouldBe RemoteData.Unknown
+        }
       }
     }
   }
 
-  private def test(f: TransactionPersistentCache => Unit): Unit = withDb { db =>
-    val caches = new LevelDbPersistentCaches(db)
-    f(caches.transactions)
+  private def test(f: (Storage, TransactionPersistentCache) => Unit): Unit = withDb { db =>
+    val caches = db.readOnly(LevelDbPersistentCaches(db)(_))
+    f(db, caches.transactions)
   }
 }
