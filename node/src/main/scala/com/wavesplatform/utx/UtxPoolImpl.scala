@@ -534,7 +534,7 @@ case class UtxPoolImpl(
     TxCleanup.runCleanupAsync()
   }
 
-  def scheduleCleanup(): Unit = {
+  override def scheduleCleanup(): Unit = {
     TxCleanup.runCleanupAsync()
   }
 

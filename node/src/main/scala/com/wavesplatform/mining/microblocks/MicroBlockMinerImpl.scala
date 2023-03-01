@@ -15,8 +15,8 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.appender.MicroblockAppender
 import com.wavesplatform.transaction.{BlockchainUpdater, Transaction}
 import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.utx.UtxPool.PackStrategy
-import com.wavesplatform.utx.UtxPoolImpl
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
 import monix.eval.Task
@@ -29,7 +29,7 @@ class MicroBlockMinerImpl(
     setDebugState: MinerDebugInfo.State => Unit,
     allChannels: ChannelGroup,
     blockchainUpdater: BlockchainUpdater & Blockchain,
-    utx: UtxPoolImpl,
+    utx: UtxPool,
     settings: MinerSettings,
     minerScheduler: SchedulerService,
     appenderScheduler: SchedulerService,
@@ -92,7 +92,7 @@ class MicroBlockMinerImpl(
             )
           )
         log.trace(s"Finished pack for ${accumulatedBlock.id()}")
-        val updatedTotalConstraint = updatedMdConstraint.constraints.head
+        val updatedTotalConstraint = updatedMdConstraint.head
         cb.onSuccess(unconfirmed -> updatedTotalConstraint)
       }
       Task.eval {

@@ -3,6 +3,7 @@ package com.wavesplatform.mining
 import com.wavesplatform.TestValues
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.ProtoBlockVersion
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
@@ -10,19 +11,22 @@ import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl
 import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.test.DomainPresets.RideV6
 import com.wavesplatform.test.FlatSpec
 import com.wavesplatform.transaction.TxHelpers.{defaultAddress, defaultSigner, secondAddress, transfer}
-import com.wavesplatform.transaction.{CreateAliasTransaction, TxVersion}
+import com.wavesplatform.transaction.{CreateAliasTransaction, Transaction, TxVersion}
 import com.wavesplatform.utils.Schedulers
-import com.wavesplatform.utx.UtxPoolImpl
+import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import org.scalamock.scalatest.PathMockFactory
 
 import java.util.concurrent.CountDownLatch
+import scala.concurrent.Await
 import scala.concurrent.duration.*
+import scala.concurrent.duration.Duration.Inf
 import scala.util.Random
 
 class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain {
@@ -102,22 +106,50 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
 
   "Micro block miner" should "retry packing UTX regardless of when event has been sent" in {
     withDomain(RideV6, Seq(AddrWithBalance(defaultAddress, TestValues.bigMoney))) { d =>
-      val utxEventHasBeenSent    = new CountDownLatch(1)
-      val microBlockHasBeenMined = new CountDownLatch(1)
+      import Scheduler.Implicits.global
+      val utxEvents        = ConcurrentSubject.publish[UtxEvent]
+      val transactionAdded = ConcurrentSubject.replayLimited[Unit](1)
 
-      val transactionAdded = ConcurrentSubject.replayLimited[UtxEvent](1)(Schedulers.singleThread("utxEvents"))
+      val utxPool = new UtxPool {
+        val eventHasBeenSent = new CountDownLatch(1)
+        val inner = new UtxPoolImpl(
+          ntpTime,
+          d.blockchainUpdater,
+          RideV6.utxSettings,
+          RideV6.maxTxErrorLogSize,
+          RideV6.minerSettings.enable,
+          utxEvents.onNext,
+          { _ =>
+            transactionAdded.onNext(())
+            eventHasBeenSent.countDown()
+          }
+        )
 
-      val utxPool = new UtxPoolImpl(
-        ntpTime,
-        d.blockchainUpdater,
-        RideV6.utxSettings,
-        RideV6.maxTxErrorLogSize,
-        RideV6.minerSettings.enable,
-        { event =>
-          transactionAdded.onNext(event)
-          utxEventHasBeenSent.countDown()
+        override def putIfNew(tx: Transaction, forceValidate: Boolean) =
+          inner.putIfNew(tx, forceValidate)
+
+        override def packUnconfirmed(
+            rest: MultiDimensionalMiningConstraint,
+            strategy: UtxPool.PackStrategy,
+            cancelled: () => Boolean
+        ): (Option[Seq[Transaction]], MiningConstraint) = {
+          val (txs, constraint) = inner.packUnconfirmed(rest, strategy, cancelled)
+          val waitingConstraint = new MiningConstraint {
+            def isFull                                          = { eventHasBeenSent.await(); constraint.isFull }
+            def isOverfilled                                    = constraint.isOverfilled
+            def put(b: Blockchain, tx: Transaction, diff: Diff) = constraint.put(b, tx, diff)
+          }
+          (txs, waitingConstraint)
         }
-      )
+
+        override def removeAll(txs: Iterable[Transaction]): Unit = ???
+        override def all                                         = ???
+        override def size                                        = ???
+        override def transactionById(transactionId: ByteStr)     = ???
+        override def close(): Unit                               = ???
+        override def scheduleCleanup(): Unit                     = ???
+      }
+
       val microBlockMiner = new MicroBlockMinerImpl(
         _ => (),
         null,
@@ -126,23 +158,19 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
         RideV6.minerSettings,
         Schedulers.singleThread("miner"),
         Schedulers.singleThread("appender"),
-        transactionAdded
-          .collect { case _: UtxEvent.TxAdded => () }
-          .delayExecutionWith(Observable.eval(utxEventHasBeenSent.await())),
-        identity,
-        sendStats = (_, _) => microBlockHasBeenMined.countDown()
+        transactionAdded,
+        identity
       )
 
       val block      = d.appendBlock(ProtoBlockVersion)
       val constraint = OneDimensionalMiningConstraint(5, TxEstimators.one, "limit")
-
-      microBlockMiner
+      val mined = microBlockMiner
         .generateMicroBlockSequence(defaultSigner, block, constraint, 0)
-        .runAsync(println)(Schedulers.singleThread("micro-block-miner"))
+        .runToFuture(Schedulers.singleThread("micro-block-miner"))
 
-      utxPool.putIfNew(transfer(amount = 123)).resultE.explicitGet()
-      microBlockHasBeenMined.await()
+      utxPool.putIfNew(transfer(amount = 123))
 
+      Await.result(mined, Inf)
       d.balance(secondAddress) shouldBe 123
     }
   }
