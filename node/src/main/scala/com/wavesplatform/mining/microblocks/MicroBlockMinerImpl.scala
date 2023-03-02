@@ -132,7 +132,7 @@ class MicroBlockMinerImpl(
         } else {
           log.trace("UTX is empty, waiting for new transactions")
           transactionAdded
-            .filterNot(added => accumulatedBlock.transactionData.contains(added.tx))
+            .filterNot(added => accumulatedBlock.transactionData.contains(added.tx) || blockchainUpdater.containsTransaction(added.tx))
             .headL
             .map(_ => Retry)
         }
