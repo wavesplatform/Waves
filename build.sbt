@@ -143,7 +143,7 @@ inScope(Global)(
       "-Wconf:cat=deprecation&site=com.wavesplatform.protobuf.transaction.InvokeScriptResult.*:s", // Ignore deprecated argsBytes
       "-Wconf:cat=deprecation&site=com.wavesplatform.state.InvokeScriptResult.*:s"
     ),
-    crossPaths := false,
+    crossPaths        := false,
     cancelable        := true,
     parallelExecution := true,
     /* http://www.scalatest.org/user_guide/using_the_runner
@@ -158,8 +158,7 @@ inScope(Global)(
     testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true"),
     network         := Network.default(),
     instrumentation := false,
-    resolvers ++= Resolver.sonatypeOssRepos("snapshots") ++ Seq(Resolver.mavenLocal) ++
-      Seq(MavenRepository("wvservices-releases", "https://nexus.wvservices.com/repository/maven-releases/")),
+    resolvers ++= Resolver.sonatypeOssRepos("snapshots") ++ Seq(Resolver.mavenLocal),
     Compile / doc / sources                := Seq.empty,
     Compile / packageDoc / publishArtifact := false,
     concurrentRestrictions                 := Seq(Tags.limit(Tags.Test, math.min(EvaluateTask.SystemProcessors, 8))),
