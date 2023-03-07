@@ -16,7 +16,7 @@ import scala.concurrent.Future
 class TransactionSynchronizerSpec extends PropSpec with WithDomain {
   property("synchronizer should broadcast transactions on new both microblocks and blocks") {
     withDomain(RideV6) { d =>
-      val heights =
+      val blockIds =
         Observable
           .repeatEval(d.blockchain.lastBlockId.getOrElse(ByteStr.empty))
           .distinctUntilChanged(Eq.fromUniversalEquals)
@@ -27,7 +27,7 @@ class TransactionSynchronizerSpec extends PropSpec with WithDomain {
       val broadcastCount = AtomicInt(0)
       TransactionSynchronizer(
         UtxSynchronizerSettings(1000000, 8, 5000, true),
-        heights,
+        blockIds,
         txs.map((null, _)),
         (_, _) => Future.successful { broadcastCount.increment(); TracedResult(Right(true)) }
       )(Schedulers.fixedPool(4, "synchronizer"))
