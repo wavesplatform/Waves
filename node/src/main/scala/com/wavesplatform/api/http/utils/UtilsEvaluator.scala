@@ -23,7 +23,7 @@ import com.wavesplatform.lang.{ValidationError, utils}
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, ScriptExtraFee}
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.diffs.invoke.InvokeDiffsCommon.processActions
-import com.wavesplatform.state.diffs.invoke.{InvokeScriptTransactionLike, StructuredCallableActions}
+import com.wavesplatform.state.diffs.invoke.{InvokeDiffsCommon, InvokeScriptTransactionLike, StructuredCallableActions}
 import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, Portfolio}
 import com.wavesplatform.transaction.TransactionType.{InvokeScript, TransactionType}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvokeRejectError}
@@ -76,8 +76,9 @@ object UtilsEvaluator {
       dAppToExpr: DApp => Either[ValidationError, EXPR]
   ): Either[ValidationError, (EVALUATED, Int, Log[Id], InvokeScriptResult)] =
     for {
-      _  <- InvokeScriptTxValidator.checkAmounts(invoke.payments).toEither.leftMap(_.head)
-      ds <- DirectiveSet(script.stdLibVersion, Account, DAppType).leftMap(GenericError(_))
+      _            <- InvokeScriptTxValidator.checkAmounts(invoke.payments).toEither.leftMap(_.head)
+      ds           <- DirectiveSet(script.stdLibVersion, Account, DAppType).leftMap(GenericError(_))
+      paymentsDiff <- InvokeDiffsCommon.paymentsPart(invoke, dAppAddress, Map())
       environment = new DAppEnvironment(
         AddressScheme.current.chainId,
         Coeval.raiseError(new IllegalStateException("No input entity available")),
@@ -98,7 +99,7 @@ object UtilsEvaluator {
         availablePayments = ContractLimits.MaxTotalPaymentAmountRideV6,
         availableData = ContractLimits.MaxWriteSetSize,
         availableDataSize = ContractLimits.MaxTotalWriteSetSizeInBytes,
-        currentDiff = Diff.empty,
+        currentDiff = paymentsDiff,
         invocationRoot = DAppEnvironment.InvocationTreeTracker(DAppEnvironment.DAppInvocation(dAppAddress, null, Nil))
       )
       ctx  = BlockchainContext.build(ds, environment, fixUnicodeFunctions = true, useNewPowPrecision = true, fixBigScriptField = true)

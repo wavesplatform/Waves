@@ -496,6 +496,12 @@ class UtilsRouteEvaluateSpec
              |     ScriptTransfer(Address(base58'$defaultAddress'), 1, calculateAssetId(issue))
              |   ]
              | }
+             |
+             | @Callable(i)
+             | func syncCallWithPayment() = {
+             |   strict r = Address(base58'$defaultAddress').invoke("default", [], [AttachedPayment(unit, 100)])
+             |   []
+             | }
            """.stripMargin
         )
         d.appendBlock(setScript(secondSigner, dApp))
@@ -533,6 +539,26 @@ class UtilsRouteEvaluateSpec
           val actions = responseAs[JsObject] \ "result" \ "value"
           (actions \ 0 \ "type").as[String] shouldBe "Issue"
           (actions \ 1 \ "type").as[String] shouldBe "ScriptTransfer"
+        }
+
+        // transaction payment attached to sync call
+        d.appendBlock(setScript(defaultSigner, dApp))
+        Post(
+          routePath(s"/script/evaluate/$secondAddress"),
+          Json.parse("""{"call": {"function":"syncCallWithPayment"}, "payment":[{"amount":100,"assetId":null}]}""")
+        ) ~> route ~> check {
+          (responseAs[JsObject] \ "payment" \ 0 \ "amount").as[Int] shouldBe 100
+          (responseAs[JsObject] \ "stateChanges" \ "invokes" \ 0 \ "payment" \ 0 \ "amount").as[Int] shouldBe 100
+        }
+
+        // not enough payment amount to attach to sync call
+        d.appendBlock(setScript(defaultSigner, dApp))
+        Post(
+          routePath(s"/script/evaluate/$secondAddress"),
+          Json.parse("""{"call": {"function":"syncCallWithPayment"}, "payment":[{"amount":99,"assetId":null}]}""")
+        ) ~> route ~> check {
+          (responseAs[JsObject] \ "payment" \ 0 \ "amount").as[Int] shouldBe 99
+          (responseAs[JsObject] \ "message").as[String] should include("negative waves balance")
         }
       }
     }
