@@ -1,7 +1,6 @@
 package com.wavesplatform.database
 
 import java.util
-
 import cats.data.Ior
 import cats.syntax.monoid.*
 import cats.syntax.option.*
