@@ -7,14 +7,38 @@ import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.BlockMeta
-import com.wavesplatform.database.{AddressId, Caches, Key, readAccountScriptInfo, readAssetDetails, readAssetScript, readAssetStaticInfo, readBlockMeta, writeAccountScriptInfo, writeAssetDetails, writeAssetScript, writeAssetStaticInfo, writeBlockMeta}
+import com.wavesplatform.database.{
+  AddressId,
+  Caches,
+  Key,
+  readAccountScriptInfo,
+  readAssetDetails,
+  readAssetScript,
+  readAssetStaticInfo,
+  readBlockMeta,
+  writeAccountScriptInfo,
+  writeAssetDetails,
+  writeAssetScript,
+  writeAssetStaticInfo,
+  writeBlockMeta
+}
 import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
-import com.wavesplatform.riderunner.storage.RequestKey
 import com.wavesplatform.riderunner.storage.persistent.AsBytes.ByteArrayOutputStreamOps
+import com.wavesplatform.riderunner.storage.{DbKeyIndex, RequestKey}
 import com.wavesplatform.serialization.*
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetInfo, AssetStaticInfo, AssetVolumeInfo, DataEntry, LeaseBalance, TransactionId, TxMeta}
+import com.wavesplatform.state.{
+  AccountScriptInfo,
+  AssetDescription,
+  AssetInfo,
+  AssetStaticInfo,
+  AssetVolumeInfo,
+  DataEntry,
+  LeaseBalance,
+  TransactionId,
+  TxMeta
+}
 import com.wavesplatform.transaction.serialization.impl.DataTxSerializer
 import com.wavesplatform.transaction.{Asset, EthereumTransaction, GenesisTransaction, PBSince, PaymentTransaction, Transaction, TransactionParsers}
 import play.api.libs.json.{JsObject, Json}
@@ -252,38 +276,40 @@ object CacheKeys {
   object LastAddressId extends CacheKey[Unit, AddressId](0)
   object AddressIds    extends CacheKey[Address, AddressId](1)
 
-  object AccountDataEntriesHistory extends CacheHistoryKey[(AddressId, String)](2)
-  object AccountDataEntries        extends CacheKey[(AddressId, String, Int), Option[DataEntry[?]]](3)
+  object AccountDataEntriesIndexes extends CacheKey[((AddressId, String), DbKeyIndex), Unit](10)
+  // TODO stats: how often keys are changed?
+  object AccountDataEntriesHistory extends CacheHistoryKey[DbKeyIndex](11)
+  object AccountDataEntries        extends CacheKey[(DbKeyIndex, Int), Option[DataEntry[?]]](12)
 
-  object AccountScriptsHistory extends CacheHistoryKey[AddressId](4)
-  object AccountScripts        extends CacheKey[(AddressId, Int), Option[AccountScriptInfo]](5)
+  object AccountScriptsHistory extends CacheHistoryKey[AddressId](21)
+  object AccountScripts        extends CacheKey[(AddressId, Int), Option[AccountScriptInfo]](22)
 
-  object SignedBlockHeaders extends CacheKey[Int, SignedBlockHeader](6)
+  object SignedBlockHeaders extends CacheKey[Int, SignedBlockHeader](30)
 
-  object Height extends CacheKey[Unit, Int](7) {
+  object Height extends CacheKey[Unit, Int](40) {
     val Key = mkKey(())
   }
 
-  object VRF extends CacheKey[Int, Option[ByteStr]](8)
+  object VRF extends CacheKey[Int, Option[ByteStr]](50)
 
-  object ActivatedFeatures extends CacheKey[Unit, Map[Short, Int]](9)
+  object ActivatedFeatures extends CacheKey[Unit, Map[Short, Int]](60)
 
-  object AssetDescriptionsHistory extends CacheHistoryKey[Asset.IssuedAsset](11)
-  object AssetDescriptions        extends CacheKey[(Asset.IssuedAsset, Int), Option[AssetDescription]](12)
+  object AssetDescriptionsHistory extends CacheHistoryKey[Asset.IssuedAsset](71)
+  object AssetDescriptions        extends CacheKey[(Asset.IssuedAsset, Int), Option[AssetDescription]](72)
 
   // TODO #25 Store AddressId
-  object Aliases extends CacheKey[Alias, Option[Address]](13)
+  object Aliases extends CacheKey[Alias, Option[Address]](80)
 
-  object AccountAssetsHistory extends CacheHistoryKey[(AddressId, Asset)](14)
-  object AccountAssets        extends CacheKey[(AddressId, Asset, Int), Long](15)
+  object AccountAssetsHistory extends CacheHistoryKey[(AddressId, Asset)](91)
+  object AccountAssets        extends CacheKey[(AddressId, Asset, Int), Long](92)
 
-  object AccountLeaseBalancesHistory extends CacheHistoryKey[AddressId](16)
-  object AccountLeaseBalances        extends CacheKey[(AddressId, Int), LeaseBalance](17)
+  object AccountLeaseBalancesHistory extends CacheHistoryKey[AddressId](101)
+  object AccountLeaseBalances        extends CacheKey[(AddressId, Int), LeaseBalance](102)
 
-  object Transactions extends CacheKey[TransactionId, Option[Int]](18)
+  object Transactions extends CacheKey[TransactionId, Option[Int]](110)
 
-  object RequestsLastIndex extends CacheKey[Unit, Int](19)
-  object Requests          extends CacheKey[Int, RequestKey](20)
+  object RequestsLastIndex extends CacheKey[Unit, Int](121)
+  object Requests          extends CacheKey[Int, RequestKey](122)
 
   implicit val jsObjectAsBytes: AsBytes[JsObject] = AsBytes[String].transform(
     s =>
@@ -297,6 +323,8 @@ object CacheKeys {
   implicit val byteStrAsBytes: AsBytes[ByteStr] = AsBytes[Array[Byte]].transform(ByteStr(_), _.arr)
 
   implicit val transactionIdAsBytes: AsBytes[TransactionId] = byteStrAsBytes.transform(TransactionId(_), x => x)
+
+  implicit val dbKeyIndex: AsBytes[DbKeyIndex] = AsBytes.intAsBytes.transform(DbKeyIndex(_), x => x)
 
   implicit val addressId: AsBytes[AddressId] = new AsBytes[AddressId] {
     override def toByteArray(x: AddressId): Array[Byte] = x.toByteArray
@@ -338,7 +366,7 @@ object CacheKeys {
           writeBlockMeta(
             BlockMeta(
               header = Some(PBBlocks.protobuf(x.header)),
-              signature = UnsafeByteOperations.unsafeWrap(x.signature.arr),
+              signature = UnsafeByteOperations.unsafeWrap(x.signature.arr)
               // TODO VRF
             )
           )

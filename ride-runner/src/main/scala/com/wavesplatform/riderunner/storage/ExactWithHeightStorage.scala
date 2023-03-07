@@ -17,6 +17,7 @@ import scala.util.chaining.*
 trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging {
   storage =>
   def settings: ExactWithHeightStorage.Settings
+  // TODO use indexes!!!!
 
   // We can look up tags to determine if a key has been known, because tags are always in RAM
   protected val tags = Caffeine

@@ -33,22 +33,22 @@ class ExactWithHeightStorageTestSuite extends BaseTestSuite with HasDb with HasT
       }
     }
 
-    "reloads from the disk cache if the in-memory cache overfilled" in {
+    "reloads from the disk cache if the in-memory cache overfilled and cleared" in {
       val calls      = new AtomicInteger(0)
       val persistent = new InMemWithoutHeightPersistentCache[String, Int]
       val storage = new BaseStorage(persistent) {
         override def getFromBlockchain(key: String): Option[Int] = {
-//          if (key == "1") calls.incrementAndGet() // passes if I uncomment
+          if (key == "1") calls.incrementAndGet() // passes if I uncomment
           key.toIntOption
         }
       }
 
-      def set(key: String, value: Int): Unit = persistent.set(0, key, RemoteData.Cached(value))
+      def setOnDisk(key: String, value: Int): Unit = persistent.set(0, key, RemoteData.Cached(value))
 
       storage.get("1") shouldBe 1
       storage.get("2") shouldBe 2
 
-      set("1", 11)
+      setOnDisk("1", 11)
       withClue("displace old entries:") {
         // Yes, we have to do it at least three times (twice with cleanup)
         Iterator.continually(3 to 4).take(3).flatten.foreach { x =>
@@ -61,8 +61,7 @@ class ExactWithHeightStorageTestSuite extends BaseTestSuite with HasDb with HasT
     }
   }
 
-  private class BaseStorage(override val persistentCache: PersistentCache[String, Int])
-      extends ExactWithHeightStorage[String, Int, Int] {
+  private class BaseStorage(override val persistentCache: PersistentCache[String, Int]) extends ExactWithHeightStorage[String, Int, Int] {
     override lazy val settings: ExactWithHeightStorage.Settings = ExactWithHeightStorage.Settings(2)
     override def getFromBlockchain(key: String): Option[Int]    = None
     def get(key: String): Int                                   = getOpt(key).value

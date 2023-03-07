@@ -85,8 +85,9 @@ class SharedBlockchainStorage[TagT] private (
       .orElse(RemoteData.loaded(fromBlockchain(key)).tap(updateCache(key, _)))
       .mayBeValue
 
-  def removeAllFrom(height: Height): Unit = {
-    // TODO
+  def removeAllFrom(height: Height): Unit = storage.readWrite { implicit ctx =>
+    // TODO remove all keys too
+    blockHeaders.removeFrom(height)
   }
 
   private val empty = AffectedTags[TagT](Set.empty)

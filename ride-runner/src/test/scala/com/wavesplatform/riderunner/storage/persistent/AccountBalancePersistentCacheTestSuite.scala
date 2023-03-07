@@ -27,7 +27,7 @@ class AccountBalancePersistentCacheTestSuite extends PersistentTestSuite {
             cache.set(11, cacheKey, RemoteData.Absence)
           }
 
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(8, cacheKey) shouldBe cacheValue
           }
         }
@@ -41,7 +41,7 @@ class AccountBalancePersistentCacheTestSuite extends PersistentTestSuite {
             cache.set(11, cacheKey, RemoteData.Absence)
           }
 
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(10, cacheKey) shouldBe cacheValue
           }
         }
@@ -55,7 +55,7 @@ class AccountBalancePersistentCacheTestSuite extends PersistentTestSuite {
             cache.set(10, cacheKey, cacheValue)
           }
 
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(10, cacheKey) shouldBe cacheValue
           }
         }
@@ -65,7 +65,7 @@ class AccountBalancePersistentCacheTestSuite extends PersistentTestSuite {
             cache.set(10, cacheKey, cacheValue)
           }
 
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(11, cacheKey) shouldBe cacheValue
           }
         }
@@ -81,7 +81,7 @@ class AccountBalancePersistentCacheTestSuite extends PersistentTestSuite {
             cache.set(11, cacheKey, cacheValue)
           }
 
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(10, cacheKey) shouldBe defaultCacheValue
           }
         }
@@ -95,7 +95,7 @@ class AccountBalancePersistentCacheTestSuite extends PersistentTestSuite {
             cache.set(10, cacheKey, RemoteData.Absence)
           }
 
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(10, cacheKey) shouldBe defaultCacheValue
           }
         }
@@ -109,7 +109,7 @@ class AccountBalancePersistentCacheTestSuite extends PersistentTestSuite {
             cache.set(10, cacheKey, RemoteData.Absence)
           }
 
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(11, cacheKey) shouldBe defaultCacheValue
           }
         }
@@ -117,7 +117,7 @@ class AccountBalancePersistentCacheTestSuite extends PersistentTestSuite {
 
       "unknown" - {
         "on empty" in test { (db, cache) =>
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(10, cacheKey) shouldBe RemoteData.Unknown
           }
         }
@@ -127,7 +127,7 @@ class AccountBalancePersistentCacheTestSuite extends PersistentTestSuite {
             cache.set(11, cacheKey, RemoteData.Absence)
           }
 
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(10, cacheKey) shouldBe RemoteData.Unknown
           }
         }
@@ -145,7 +145,7 @@ class AccountBalancePersistentCacheTestSuite extends PersistentTestSuite {
             cache.remove(9, cacheKey)
           }
 
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(10, cacheKey) shouldBe RemoteData.Unknown
           }
         }
@@ -159,7 +159,7 @@ class AccountBalancePersistentCacheTestSuite extends PersistentTestSuite {
             cache.remove(1, cacheKey)
           }
 
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(11, cacheKey) shouldBe RemoteData.Unknown
           }
         }
@@ -179,7 +179,7 @@ class AccountBalancePersistentCacheTestSuite extends PersistentTestSuite {
             cache.remove(10, cacheKey)
           }
 
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(10, cacheKey) shouldBe cacheValue
           }
         }
@@ -197,7 +197,7 @@ class AccountBalancePersistentCacheTestSuite extends PersistentTestSuite {
             cache.remove(10, cacheKey)
           }
 
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(10, cacheKey) shouldBe defaultCacheValue
           }
         }
@@ -215,7 +215,7 @@ class AccountBalancePersistentCacheTestSuite extends PersistentTestSuite {
             cache.remove(10, cacheKey)
           }
 
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(10, cacheKey) shouldBe RemoteData.Unknown
           }
         }
@@ -224,7 +224,7 @@ class AccountBalancePersistentCacheTestSuite extends PersistentTestSuite {
   }
 
   private def test(f: (Storage, PersistentCache[AccountAssetKey, Long]) => Unit): Unit = withDb { db =>
-    val caches = db.readOnly(LevelDbPersistentCaches(db)(_))
+    val caches = db.readWrite(LevelDbPersistentCaches(db)(_))
     f(db, caches.accountBalances)
   }
 }

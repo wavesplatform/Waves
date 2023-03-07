@@ -20,7 +20,7 @@ abstract class PersistentCacheTestSuite[KeyT, ValueT] extends PersistentTestSuit
             cache.set(11, defaultKey, RemoteData.Absence)
           }
 
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(8, defaultKey) shouldBe defaultCachedValue
           }
         }
@@ -34,7 +34,7 @@ abstract class PersistentCacheTestSuite[KeyT, ValueT] extends PersistentTestSuit
             cache.set(11, defaultKey, RemoteData.Absence)
           }
 
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(10, defaultKey) shouldBe defaultCachedValue
           }
         }
@@ -48,7 +48,7 @@ abstract class PersistentCacheTestSuite[KeyT, ValueT] extends PersistentTestSuit
             cache.set(10, defaultKey, defaultCachedValue)
           }
 
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(10, defaultKey) shouldBe defaultCachedValue
           }
         }
@@ -58,7 +58,7 @@ abstract class PersistentCacheTestSuite[KeyT, ValueT] extends PersistentTestSuit
             cache.set(10, defaultKey, defaultCachedValue)
           }
 
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(11, defaultKey) shouldBe defaultCachedValue
           }
         }
@@ -74,7 +74,7 @@ abstract class PersistentCacheTestSuite[KeyT, ValueT] extends PersistentTestSuit
             cache.set(11, defaultKey, defaultCachedValue)
           }
 
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(10, defaultKey) shouldBe RemoteData.Absence
           }
         }
@@ -88,7 +88,7 @@ abstract class PersistentCacheTestSuite[KeyT, ValueT] extends PersistentTestSuit
             cache.set(10, defaultKey, RemoteData.Absence)
           }
 
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(10, defaultKey) shouldBe RemoteData.Absence
           }
         }
@@ -102,7 +102,7 @@ abstract class PersistentCacheTestSuite[KeyT, ValueT] extends PersistentTestSuit
             cache.set(10, defaultKey, RemoteData.Absence)
           }
 
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(11, defaultKey) shouldBe RemoteData.Absence
           }
         }
@@ -110,7 +110,7 @@ abstract class PersistentCacheTestSuite[KeyT, ValueT] extends PersistentTestSuit
 
       "unknown" - {
         "on empty" in test { (db, cache) =>
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(10, defaultKey) shouldBe RemoteData.Unknown
           }
         }
@@ -120,7 +120,7 @@ abstract class PersistentCacheTestSuite[KeyT, ValueT] extends PersistentTestSuit
             cache.set(11, defaultKey, RemoteData.Absence)
           }
 
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(10, defaultKey) shouldBe RemoteData.Unknown
           }
         }
@@ -138,7 +138,7 @@ abstract class PersistentCacheTestSuite[KeyT, ValueT] extends PersistentTestSuit
             cache.remove(9, defaultKey)
           }
 
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(10, defaultKey) shouldBe RemoteData.Unknown
           }
         }
@@ -152,7 +152,7 @@ abstract class PersistentCacheTestSuite[KeyT, ValueT] extends PersistentTestSuit
             cache.remove(1, defaultKey)
           }
 
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(11, defaultKey) shouldBe RemoteData.Unknown
           }
         }
@@ -172,7 +172,7 @@ abstract class PersistentCacheTestSuite[KeyT, ValueT] extends PersistentTestSuit
             cache.remove(10, defaultKey)
           }
 
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(10, defaultKey) shouldBe defaultCachedValue
           }
         }
@@ -190,7 +190,7 @@ abstract class PersistentCacheTestSuite[KeyT, ValueT] extends PersistentTestSuit
             cache.remove(10, defaultKey)
           }
 
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(10, defaultKey) shouldBe RemoteData.Absence
           }
         }
@@ -208,7 +208,7 @@ abstract class PersistentCacheTestSuite[KeyT, ValueT] extends PersistentTestSuit
             cache.remove(10, defaultKey)
           }
 
-          db.readOnly { implicit ctx =>
+          db.readWrite { implicit ctx =>
             cache.get(10, defaultKey) shouldBe RemoteData.Unknown
           }
         }
