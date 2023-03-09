@@ -278,13 +278,21 @@ object SharedBlockchainStorage {
       storage: Storage,
       persistentCaches: PersistentCaches,
       blockchainApi: BlockchainApi
-  )(implicit ctx: ReadWrite): SharedBlockchainStorage[TagT] = new SharedBlockchainStorage[TagT](
-    settings,
-    storage,
-    persistentCaches,
-    blockchainApi,
-    BlockHeadersStorage(blockchainApi, persistentCaches.blockHeaders)
-  )
+  )(implicit ctx: ReadWrite): SharedBlockchainStorage[TagT] =
+    new SharedBlockchainStorage[TagT](
+      settings,
+      storage,
+      persistentCaches,
+      blockchainApi,
+      BlockHeadersStorage(blockchainApi, persistentCaches.blockHeaders)
+    ).tap { r =>
+      r.data.load()
+      r.accountScripts.load()
+      r.assets.load()
+      r.aliases.load() // TODO ???
+      r.accountBalances.load()
+      r.accountLeaseBalances.load()
+    }
 
   case class Settings(blockchain: BlockchainSettings, caches: CachesSettings)
 

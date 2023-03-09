@@ -46,6 +46,17 @@ object RemoteData {
       case Unknown   => Unknown
     }
 
+    def filterToUnknown(f: A => Boolean): RemoteData[A] = self match {
+      case Cached(value) => if (f(value)) self else Unknown
+      case _             => self
+    }
+
+    def extract(ifUnknown: => A, ifAbsence: => A): A = self match {
+      case Cached(value) => value
+      case Absence       => ifAbsence
+      case Unknown       => ifUnknown
+    }
+
     def flatMap[B](f: A => RemoteData[B]): RemoteData[B] = self match {
       case Cached(value) => f(value)
       case Absence       => Absence

@@ -274,12 +274,12 @@ sealed abstract class CacheHistoryKey[KeyT: AsBytes](prefix: Short) extends Cach
 
 object CacheKeys {
   object LastAddressId extends CacheKey[Unit, AddressId](0)
-  object AddressIds    extends CacheKey[Address, AddressId](1)
+  object AddressToId    extends CacheKey[Address, AddressId](1)
+  object IdToAddress    extends CacheKey[AddressId, Address](2)
 
-  object AccountDataEntriesIndexes extends CacheKey[((AddressId, String), DbKeyIndex), Unit](10)
   // TODO stats: how often keys are changed?
-  object AccountDataEntriesHistory extends CacheHistoryKey[DbKeyIndex](11)
-  object AccountDataEntries        extends CacheKey[(DbKeyIndex, Int), Option[DataEntry[?]]](12)
+  object AccountDataEntriesHistory extends CacheHistoryKey[(AddressId, String)](11)
+  object AccountDataEntries        extends CacheKey[(AddressId, String, Int), Option[DataEntry[?]]](12)
 
   object AccountScriptsHistory extends CacheHistoryKey[AddressId](21)
   object AccountScripts        extends CacheKey[(AddressId, Int), Option[AccountScriptInfo]](22)

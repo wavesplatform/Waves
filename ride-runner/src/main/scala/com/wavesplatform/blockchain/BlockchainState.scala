@@ -76,8 +76,9 @@ object BlockchainState extends ScorexLogging {
   }
 
   private val grpcStatusesToRestart = Set(
-    Status.Code.INTERNAL, // RST_STREAM closed stream. HTTP/2 error code: INTERNAL_ERROR
-    Status.Code.UNKNOWN   // Probably it is an issue with a balancer
+    Status.Code.INTERNAL,   // RST_STREAM closed stream. HTTP/2 error code: INTERNAL_ERROR
+    Status.Code.UNKNOWN,    // Probably it is an issue with a balancer
+    Status.Code.UNAVAILABLE // Failed keepalives or something, let's try again
   )
 
   def apply(
@@ -86,6 +87,7 @@ object BlockchainState extends ScorexLogging {
       orig: BlockchainState,
       event: WrappedEvent[SubscribeEvent]
   ): Task[BlockchainState] = {
+    // TODO return Task and do a delay before starting again
     def forceRestart(): BlockchainState = {
       val (currHeight, workingStateHeight) = orig match {
         // -1 because of how ResolvingFork.resolveFork works. TODO #62 replace origHeight in ResolvingFork by resolveHeight

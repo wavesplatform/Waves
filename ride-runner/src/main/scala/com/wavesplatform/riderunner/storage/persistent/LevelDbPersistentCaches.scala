@@ -1,5 +1,7 @@
 package com.wavesplatform.riderunner.storage.persistent
 
+import java.lang.{Long => JLong}
+import com.github.benmanes.caffeine.cache.{Cache, Caffeine}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.blockchain.RemoteData
@@ -12,6 +14,7 @@ import com.wavesplatform.riderunner.storage.{AccountAssetKey, AccountDataKey, Ke
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, EmptyDataEntry, Height, LeaseBalance, TransactionId}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.ScorexLogging
+import kamon.instrumentation.caffeine.KamonStatsCounter
 
 import java.util.concurrent.atomic.AtomicLong
 import scala.util.chaining.scalaUtilChainingOps
@@ -22,19 +25,19 @@ class LevelDbPersistentCaches private (storage: Storage, initialBlockHeadersLast
 
   override val accountDataEntries: PersistentCache[AccountDataKey, DataEntry[?]] = new PersistentCache[AccountDataKey, DataEntry[?]]
     with ScorexLogging {
-    // TODO batch
-    private val indexes: KeyIndexStorage[(AddressId, String)] = storage.readOnly { implicit ctx =>
-      KeyIndexStorage(CacheKeys.AccountDataEntriesIndexes)
-    }
+    override def getAllKeys()(implicit ctx: ReadOnly): List[(Address, String)] = for {
+      (addressId, key) <- KeyIndexStorage.mkList(CacheKeys.AccountDataEntriesHistory)
+      address          <- getAddress(addressId)
+    } yield (address, key)
 
     override def get(maxHeight: Int, key: (Address, String))(implicit ctx: ReadWrite): RemoteData[DataEntry[?]] =
       RemoteData
         .cachedOrUnknown(getAddressId(key._1))
-        .flatMap { addressId => RemoteData.cachedOrUnknown(indexes.getIndexOf((addressId, key._2))) }
-        .flatMap { dbIndex =>
+        .flatMap { addressId =>
+          // TODO move to ctx
           ctx.db.readHistoricalFromDbOpt(
-            CacheKeys.AccountDataEntriesHistory.mkKey(dbIndex),
-            h => CacheKeys.AccountDataEntries.mkKey((dbIndex, h)),
+            CacheKeys.AccountDataEntriesHistory.mkKey((addressId, key._2)),
+            h => CacheKeys.AccountDataEntries.mkKey((addressId, key._2, h)),
             maxHeight
           )
         }
@@ -42,10 +45,9 @@ class LevelDbPersistentCaches private (storage: Storage, initialBlockHeadersLast
 
     override def set(atHeight: Int, key: (Address, String), data: RemoteData[DataEntry[?]])(implicit ctx: ReadWrite): Unit = {
       val addressId = getOrMkAddressId(key._1)
-      val dbIndex   = indexes.getOrMkIndexOf((addressId, key._2))
       ctx.writeHistoricalToDbOpt(
-        CacheKeys.AccountDataEntriesHistory.mkKey(dbIndex),
-        h => CacheKeys.AccountDataEntries.mkKey((dbIndex, h)),
+        CacheKeys.AccountDataEntriesHistory.mkKey((addressId, key._2)),
+        h => CacheKeys.AccountDataEntries.mkKey((addressId, key._2, h)),
         atHeight,
         data.flatMap {
           // HACK, see DataTxSerializer.serializeEntry because
@@ -58,21 +60,22 @@ class LevelDbPersistentCaches private (storage: Storage, initialBlockHeadersLast
 
     override def remove(fromHeight: Int, key: (Address, String))(implicit ctx: ReadWrite): RemoteData[DataEntry[?]] = {
       val addressId = getOrMkAddressId(key._1)
-      indexes.getIndexOf((addressId, key._2)) match {
-        case None => RemoteData.Unknown
-        case Some(dbIndex) =>
-          ctx
-            .removeAfterAndGetLatestExistedOpt(
-              CacheKeys.AccountDataEntriesHistory.mkKey(dbIndex),
-              h => CacheKeys.AccountDataEntries.mkKey((dbIndex, h)),
-              fromHeight
-            )
-            .tap { _ => log.trace(s"remove($key, $fromHeight)") }
-      }
+      ctx
+        .removeAfterAndGetLatestExistedOpt(
+          CacheKeys.AccountDataEntriesHistory.mkKey((addressId, key._2)),
+          h => CacheKeys.AccountDataEntries.mkKey((addressId, key._2, h)),
+          fromHeight
+        )
+        .tap { _ => log.trace(s"remove($key, $fromHeight)") }
     }
   }
 
   override val accountScripts: PersistentCache[Address, AccountScriptInfo] = new PersistentCache[Address, AccountScriptInfo] with ScorexLogging {
+    override def getAllKeys()(implicit ctx: ReadOnly): List[Address] = for {
+      addressId <- KeyIndexStorage.mkList(CacheKeys.AccountScriptsHistory)
+      address   <- getAddress(addressId)
+    } yield address
+
     override def get(maxHeight: Int, key: Address)(implicit ctx: ReadWrite): RemoteData[AccountScriptInfo] =
       RemoteData
         .cachedOrUnknown(getAddressId(key))
@@ -110,6 +113,8 @@ class LevelDbPersistentCaches private (storage: Storage, initialBlockHeadersLast
 
   override val assetDescriptions: PersistentCache[Asset.IssuedAsset, AssetDescription] = new PersistentCache[Asset.IssuedAsset, AssetDescription]
     with ScorexLogging {
+    override def getAllKeys()(implicit ctx: ReadOnly): List[Asset.IssuedAsset] = KeyIndexStorage.mkList(CacheKeys.AssetDescriptionsHistory)
+
     override def get(maxHeight: Int, key: Asset.IssuedAsset)(implicit ctx: ReadWrite): RemoteData[AssetDescription] =
       ctx.db
         .readHistoricalFromDbOpt(
@@ -141,6 +146,8 @@ class LevelDbPersistentCaches private (storage: Storage, initialBlockHeadersLast
   }
 
   override def aliases: PersistentCache[Alias, Address] = new PersistentCache[Alias, Address] with ScorexLogging {
+    override def getAllKeys()(implicit ctx: ReadOnly): List[Alias] = List.empty // KeyIndexStorage.mkList(CacheKeys.Aliases)
+
     override def get(maxHeight: Int, key: Alias)(implicit ctx: ReadWrite): RemoteData[Address] =
       ctx.db
         .readFromDbOpt(CacheKeys.Aliases.mkKey(key))
@@ -159,6 +166,11 @@ class LevelDbPersistentCaches private (storage: Storage, initialBlockHeadersLast
   }
 
   override val accountBalances: PersistentCache[AccountAssetKey, Long] = new PersistentCache[AccountAssetKey, Long] with ScorexLogging {
+    override def getAllKeys()(implicit ctx: ReadOnly): List[AccountAssetKey] = for {
+      (addressId, assetId) <- KeyIndexStorage.mkList(CacheKeys.AccountAssetsHistory)
+      address              <- getAddress(addressId)
+    } yield (address, assetId)
+
     override def get(maxHeight: Int, key: AccountAssetKey)(implicit ctx: ReadWrite): RemoteData[Long] = {
       val (address, asset) = key
       RemoteData
@@ -200,6 +212,11 @@ class LevelDbPersistentCaches private (storage: Storage, initialBlockHeadersLast
   }
 
   override def accountLeaseBalances: PersistentCache[Address, LeaseBalance] = new PersistentCache[Address, LeaseBalance] with ScorexLogging {
+    override def getAllKeys()(implicit ctx: ReadOnly): List[Address] = for {
+      addressId <- KeyIndexStorage.mkList(CacheKeys.AccountLeaseBalancesHistory)
+      address   <- getAddress(addressId)
+    } yield address
+
     override def get(maxHeight: Int, key: Address)(implicit ctx: ReadWrite): RemoteData[LeaseBalance] =
       RemoteData
         .cachedOrUnknown(getAddressId(key))
@@ -344,22 +361,50 @@ class LevelDbPersistentCaches private (storage: Storage, initialBlockHeadersLast
     log.trace("setActivatedFeatures")
   }
 
-  // TODO #12: Caching from NODE
-  private def getAddressId(address: Address)(implicit ctx: ReadOnly): Option[AddressId] =
-    ctx.db.getOpt(CacheKeys.AddressIds.mkKey(address))
+  // TODO #12: Caching from NODE, settings
+  private val addressIdCache: Cache[Address, java.lang.Long] =
+    Caffeine
+      .newBuilder()
+      .maximumSize(1000)
+      .softValues()
+      .recordStats(() => new KamonStatsCounter("Addresses"))
+      .build()
 
-  private def getOrMkAddressId(address: Address)(implicit ctx: ReadWrite): AddressId = {
-    val key = CacheKeys.AddressIds.mkKey(address)
-    ctx.db.getOpt(key) match {
-      case Some(r) => r
-      case None =>
-        val newId = AddressId(lastAddressId.incrementAndGet())
-        log.trace(s"getOrMkAddressId($address): new $newId")
-        ctx.db.put(key, newId)
-        ctx.db.put(lastAddressIdKey, newId)
-        newId
-    }
-  }
+  private def getAddress(addressId: AddressId)(implicit ctx: ReadOnly): Option[Address] =
+    ctx.db.getOpt(CacheKeys.IdToAddress.mkKey(addressId))
+
+  private def getAddressId(address: Address)(implicit ctx: ReadOnly): Option[AddressId] =
+    Option(
+      addressIdCache.get(
+        address,
+        { address =>
+          ctx.db.getOpt(CacheKeys.AddressToId.mkKey(address)).fold[JLong](null)(x => JLong.valueOf(x))
+        }
+      )
+    ).map(x => AddressId.apply(x.toLong))
+
+  private def getOrMkAddressId(address: Address)(implicit ctx: ReadWrite): AddressId = AddressId(
+    addressIdCache
+      .get(
+        address,
+        { address =>
+          val key = CacheKeys.AddressToId.mkKey(address)
+          val r = ctx.db.getOpt(key) match {
+            case Some(r) => r
+            case None =>
+              val newId = AddressId(lastAddressId.incrementAndGet())
+              log.trace(s"getOrMkAddressId($address): new $newId")
+              ctx.db.put(key, newId)
+              ctx.db.put(CacheKeys.IdToAddress.mkKey(newId), address)
+              ctx.db.put(lastAddressIdKey, newId)
+              newId
+          }
+
+          JLong.valueOf(r.toLong)
+        }
+      )
+      .toLong
+  )
 }
 
 object LevelDbPersistentCaches {

@@ -3,6 +3,7 @@ package com.wavesplatform.riderunner.storage
 import com.wavesplatform.riderunner.storage.StorageContext.{ReadOnly, ReadWrite}
 import com.wavesplatform.riderunner.storage.persistent.CacheKey
 
+import java.lang
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -33,5 +34,23 @@ object KeyIndexStorage {
     }
 
     new KeyIndexStorage[KeyT](cacheKey, new AtomicInteger(lastIndex), indexes)
+  }
+
+  def mkSet[KeyT](historyKey: CacheKey[KeyT, Seq[Int]])(implicit ctx: ReadOnly): ConcurrentHashMap.KeySetView[KeyT, lang.Boolean] = {
+    val r = ConcurrentHashMap.newKeySet[KeyT]()
+    ctx.db.iterateOverPrefix(historyKey.prefixBytes) { dbEntry =>
+      val key = historyKey.parseKey(dbEntry.getKey)
+      r.add(key)
+    }
+    r
+  }
+
+  def mkList[KeyT](historyKey: CacheKey[KeyT, Seq[Int]])(implicit ctx: ReadOnly): List[KeyT] = {
+    var r = List.empty[KeyT]
+    ctx.db.iterateOverPrefix(historyKey.prefixBytes) { dbEntry =>
+      val key = historyKey.parseKey(dbEntry.getKey)
+      r = key :: r
+    }
+    r
   }
 }
