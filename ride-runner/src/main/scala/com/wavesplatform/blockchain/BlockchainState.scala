@@ -159,13 +159,18 @@ object BlockchainState extends ScorexLogging {
 
             processor.process(event.getUpdate)
             if (h >= comparedBlocks.workingHeight) {
-              log.info(s"[$h] Reached the current height, run all scripts")
+//              log.info(s"[$h] Reached the current height, run all scripts")
+//              val r = Working(h)
+//              processor.runAffectedScripts().as {
+//                logStatusChanged(r)
+//                HeapDumps.mk("init", live = true, makeAlways = false)
+//                r
+//              }
+              log.info(s"[$h] Reached the current height")
               val r = Working(h)
-              processor.runAffectedScripts().as {
-                logStatusChanged(r)
-                HeapDumps.mk("init", live = true, makeAlways = false)
-                r
-              }
+              logStatusChanged(r)
+              HeapDumps.mk("init", live = true, makeAlways = false)
+              Task.now(r)
             } else Task.now(comparedBlocks.copy(processedHeight = h))
 
           case _: Update.Rollback =>

@@ -2,6 +2,7 @@ package com.wavesplatform.riderunner.app
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import com.google.common.io.{MoreFiles, RecursiveDeleteOption}
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState}
@@ -22,9 +23,14 @@ import play.api.libs.json.Json
 import sttp.client3.HttpURLConnectionBackend
 
 import java.io.File
+import java.nio.charset.StandardCharsets
+import java.nio.file.{Files, Paths}
 import java.util.concurrent.*
+import java.util.stream.Collector
 import scala.concurrent.Await
 import scala.concurrent.duration.{Duration, DurationInt}
+import scala.io.Source
+import scala.util.Using
 
 object RideWithBlockchainUpdatesService extends ScorexLogging {
   def main(args: Array[String]): Unit = {
@@ -107,7 +113,22 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
       httpBackend = httpBackend
     )
 
-    log.info("Opening a caches DB...")
+    // TODO HACK: remove
+    {
+      val cleanupIterationPath = Paths.get(settings.rideRunner.db.directory, "..", "cleanup").normalize()
+      val cleanupIteration =
+        if (cleanupIterationPath.toFile.exists()) Files.readString(cleanupIterationPath, StandardCharsets.UTF_8).toIntOption.getOrElse(0)
+        else 0
+
+      val cleanTo = 1
+      if (cleanupIteration < cleanTo) {
+        log.info(s"Cleaning the DB with caches from $cleanupIteration to $cleanTo...")
+        MoreFiles.deleteRecursively(Paths.get(settings.rideRunner.db.directory))
+        Files.writeString(cleanupIterationPath, cleanTo.toString)
+      }
+    }
+
+    log.info("Opening a DB with caches...")
     val db = RDB.open(settings.rideRunner.db.toNode).db
     cs.cleanup(CustomShutdownPhase.Db) { db.close() }
 
