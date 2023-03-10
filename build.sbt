@@ -121,6 +121,11 @@ lazy val `waves-node` = (project in file("."))
     `repl-jvm`
   )
 
+lazy val `waves-load` = project.dependsOn(`waves-node`)
+  .settings(
+  //  libraryDependencies ++= gatling ++ gelf ++ gatlingPicatinny ++ janino ++ gatlingGrpc ++ grpcDeps ++ wavesProto ++ wavesTransactions,
+  )
+
 inScope(Global)(
   Seq(
     scalaVersion         := "2.13.10",
