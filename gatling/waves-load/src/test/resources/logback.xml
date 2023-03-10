@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <if condition='property("CONSOLE_LOGGING").contains("ON")'>
+        <then>
+            <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+                <encoder>
+                    <pattern>%date{yyy-MM-dd'T'HH:mm:ss.SSSXXX, UTC} ${PROJECT:-debug}%replace(%msg){'[\r\n]+', ' '}%n</pattern>
+                </encoder>
+            </appender>
+        </then>
+    </if>
+
+    <if condition='property("FILE_LOGGING").contains("ON")'>
+        <then>
+            <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+                <filter class="ch.qos.logback.classic.filter.LevelFilter">
+                    <level>DEBUG</level>
+                    <onMatch>ACCEPT</onMatch>
+                    <onMismatch>DENY</onMismatch>
+                </filter>
+                <encoder>
+                    <pattern>%date{yyy-MM-dd'T'HH:mm:ss.SSSXXX, UTC} ${PROJECT:-debug}%replace(%msg){'[\r\n]+', ' '}%n</pattern>
+                </encoder>
+                <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+                    <fileNamePattern>target/gatling-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+                    <maxFileSize>100MB</maxFileSize>
+                    <maxHistory>5</maxHistory>
+                    <totalSizeCap>500MB</totalSizeCap>
+                </rollingPolicy>
+            </appender>
+
+            <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
+                <appender-ref ref="FILE"/>
+            </appender>
+        </then>
+    </if>
+
+    <if condition='property("GRAYLOG_LOGGING").contains("ON")'>
+        <then>
+            <appender name="GELF" class="de.siegmar.logbackgelf.GelfTcpAppender">
+                <filter class="ch.qos.logback.classic.filter.LevelFilter">
+                    <level>DEBUG</level>
+                    <onMatch>ACCEPT</onMatch>
+                    <onMismatch>DENY</onMismatch>
+                </filter>
+                <graylogHost>${GRAYLOG_HOST}</graylogHost>
+                <graylogPort>${GRAYLOG_PORT}</graylogPort>
+                <connectTimeout>15000</connectTimeout>
+                <reconnectInterval>300</reconnectInterval>
+                <maxRetries>2</maxRetries>
+                <retryDelay>3000</retryDelay>
+                <poolSize>2</poolSize>
+                <poolMaxWaitTime>5000</poolMaxWaitTime>
+                <encoder class="de.siegmar.logbackgelf.GelfEncoder">
+                    <includeRawMessage>false</includeRawMessage>
+                    <includeMarker>true</includeMarker>
+                    <includeMdcData>true</includeMdcData>
+                    <includeCallerData>false</includeCallerData>
+                    <includeRootCauseData>false</includeRootCauseData>
+                    <includeLevelName>false</includeLevelName>
+                    <shortPatternLayout class="ch.qos.logback.classic.PatternLayout">
+                        <pattern>${GRAYLOG_STREAM}</pattern>
+                    </shortPatternLayout>
+                    <fullPatternLayout class="ch.qos.logback.classic.PatternLayout">
+                        <pattern>%d{HH:mm:ss.SSS} %logger{15} - %msg%n%rEx</pattern>
+                    </fullPatternLayout>
+                    <numbersAsString>false</numbersAsString>
+                </encoder>
+            </appender>
+
+            <appender name="ASYNC_GELF" class="ch.qos.logback.classic.AsyncAppender">
+                <appender-ref ref="GELF"/>
+            </appender>
+        </then>
+    </if>
+
+    <logger name="io.gatling.http.engine.response.DefaultStatsProcessor" level="DEBUG"/>
+
+    <root level="${ROOT_LOGGING_LEVEL:-ERROR}">
+        <if condition='property("CONSOLE_LOGGING").contains("ON")'>
+            <then>
+                <appender-ref ref="CONSOLE"/>
+            </then>
+        </if>
+        <if condition='property("FILE_LOGGING").contains("ON")'>
+            <then>
+                <appender-ref ref="ASYNC_FILE"/>
+            </then>
+        </if>
+        <if condition='property("GRAYLOG_LOGGING").contains("ON")'>
+            <then>
+                <appender-ref ref="ASYNC_GELF"/>
+            </then>
+        </if>
+    </root>
+
+</configuration>

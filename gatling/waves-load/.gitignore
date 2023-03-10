@@ -1,0 +1,11 @@
+/target/
+/.settings
+/.classpath
+/.idea
+/.vscode
+/.project
+/project/project/
+/project/target/
+/report/
+*.log
+/results/
