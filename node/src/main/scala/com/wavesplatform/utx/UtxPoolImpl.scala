@@ -45,7 +45,6 @@ case class UtxPoolImpl(
     maxTxErrorLogSize: Int,
     isMiningEnabled: Boolean,
     onEvent: UtxEvent => Unit = _ => (),
-    transactionAdded: UtxEvent.TxAdded => Unit = _ => (),
     nanoTimeSource: () => TxTimestamp = () => System.nanoTime()
 ) extends ScorexLogging
     with AutoCloseable
@@ -462,19 +461,11 @@ case class UtxPoolImpl(
 
   private[this] object TxStateActions {
     def addReceived(tx: Transaction, diff: Option[Diff]): Unit =
-      UtxPoolImpl.this.transactions.computeIfAbsent(
-        tx.id(),
-        { _ =>
-          PoolMetrics.addTransaction(tx)
-          ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Received)
-          diff.foreach { diff =>
-            val event = UtxEvent.TxAdded(tx, diff)
-            transactionAdded(event)
-            onEvent(event)
-          } // Only emits event if diff was computed
-          tx
-        }
-      )
+      if (transactions.putIfAbsent(tx.id(), tx) == null) {
+        diff.foreach(diff => onEvent(UtxEvent.TxAdded(tx, diff)))
+        PoolMetrics.addTransaction(tx)
+        ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Received)
+      }
 
     def removeMined(tx: Transaction): Unit = {
       ResponsivenessLogs.writeEvent(blockchain.height, tx, ResponsivenessLogs.TxEvent.Mined)

@@ -7,7 +7,6 @@ import com.wavesplatform.block.Block.*
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
-import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.metrics.{BlockStats, Instrumented, *}
 import com.wavesplatform.mining.Miner.*
@@ -58,7 +57,7 @@ class MinerImpl(
     pos: PoSSelector,
     val minerScheduler: SchedulerService,
     val appenderScheduler: SchedulerService,
-    transactionAdded: Observable[UtxEvent.TxAdded]
+    transactionAdded: Observable[Unit]
 ) extends Miner
     with MinerDebugInfo
     with ScorexLogging {

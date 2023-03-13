@@ -95,8 +95,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private[this] val historyRepliesScheduler = fixedPool(poolSize = 2, "history-replier", reporter = log.error("Error in History Replier", _))
   private[this] val minerScheduler          = singleThread("block-miner", reporter = log.error("Error in Miner", _))
 
-  private[this] val utxEvents        = ConcurrentSubject.publish[UtxEvent](scheduler)
-  private[this] val transactionAdded = ConcurrentSubject.replayLimited[UtxEvent.TxAdded](1)(scheduler)
+  private[this] val utxEvents = ConcurrentSubject.publish[UtxEvent](scheduler)
 
   private var extensions = Seq.empty[Extension]
 
@@ -125,15 +124,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels            = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val utxStorage =
-      new UtxPoolImpl(
-        time,
-        blockchainUpdater,
-        settings.utxSettings,
-        settings.maxTxErrorLogSize,
-        settings.minerSettings.enable,
-        utxEvents.onNext,
-        transactionAdded.onNext
-      )
+      new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable, utxEvents.onNext)
     maybeUtx = Some(utxStorage)
 
     val timer                 = new HashedWheelTimer()
@@ -162,7 +153,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         pos,
         minerScheduler,
         appenderScheduler,
-        transactionAdded
+        utxEvents.collect { case _: UtxEvent.TxAdded =>
+          ()
+        }
       )
 
     val processBlock =

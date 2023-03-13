@@ -8,7 +8,6 @@ import com.wavesplatform.common.utils.*
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.UtxEvent
-import com.wavesplatform.events.UtxEvent.TxAdded
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl
 import com.wavesplatform.settings.TestFunctionalitySettings
@@ -108,8 +107,7 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
   "Micro block miner" should "retry packing UTX regardless of when event has been sent" in {
     withDomain(RideV6, Seq(AddrWithBalance(defaultAddress, TestValues.bigMoney))) { d =>
       import Scheduler.Implicits.global
-      val utxEvents        = ConcurrentSubject.publish[UtxEvent]
-      val transactionAdded = ConcurrentSubject.replayLimited[TxAdded](1)
+      val utxEvents = ConcurrentSubject.publish[UtxEvent]
 
       val utxPool = new UtxPool {
         val eventHasBeenSent = new CountDownLatch(1)
@@ -119,15 +117,11 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
           RideV6.utxSettings,
           RideV6.maxTxErrorLogSize,
           RideV6.minerSettings.enable,
-          utxEvents.onNext,
           { event =>
-            transactionAdded.onNext(event)
+            utxEvents.onNext(event)
             eventHasBeenSent.countDown()
           }
         )
-
-        override def putIfNew(tx: Transaction, forceValidate: Boolean) =
-          inner.putIfNew(tx, forceValidate)
 
         override def packUnconfirmed(
             rest: MultiDimensionalMiningConstraint,
@@ -143,12 +137,13 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
           (txs, waitingConstraint)
         }
 
-        override def removeAll(txs: Iterable[Transaction]): Unit = ???
-        override def all                                         = ???
-        override def size                                        = ???
-        override def transactionById(transactionId: ByteStr)     = ???
-        override def close(): Unit                               = ???
-        override def scheduleCleanup(): Unit                     = ???
+        override def putIfNew(tx: Transaction, forceValidate: Boolean) = inner.putIfNew(tx, forceValidate)
+        override def removeAll(txs: Iterable[Transaction]): Unit       = inner.removeAll(txs)
+        override def all                                               = inner.all
+        override def size                                              = inner.size
+        override def transactionById(transactionId: ByteStr)           = inner.transactionById(transactionId)
+        override def close(): Unit                                     = inner.close()
+        override def scheduleCleanup(): Unit                           = inner.scheduleCleanup()
       }
 
       val microBlockMiner = new MicroBlockMinerImpl(
@@ -159,19 +154,19 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
         RideV6.minerSettings,
         Schedulers.singleThread("miner"),
         Schedulers.singleThread("appender"),
-        transactionAdded,
+        utxEvents.collect { case _: UtxEvent.TxAdded => () },
         identity
       )
 
       val block      = d.appendBlock(ProtoBlockVersion)
       val constraint = OneDimensionalMiningConstraint(5, TxEstimators.one, "limit")
-      val mined = microBlockMiner
+      microBlockMiner
         .generateMicroBlockSequence(defaultSigner, block, constraint, 0)
         .runToFuture(Schedulers.singleThread("micro-block-miner"))
 
       utxPool.putIfNew(transfer(amount = 123))
 
-      Await.result(mined, Inf)
+      while (d.lastBlockId == block.id()) Thread.sleep(100)
       d.balance(secondAddress) shouldBe 123
     }
   }

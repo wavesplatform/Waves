@@ -6,7 +6,6 @@ import cats.syntax.either.*
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
-import com.wavesplatform.events.UtxEvent.TxAdded
 import com.wavesplatform.metrics.*
 import com.wavesplatform.mining.*
 import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl.*
@@ -34,7 +33,7 @@ class MicroBlockMinerImpl(
     settings: MinerSettings,
     minerScheduler: SchedulerService,
     appenderScheduler: SchedulerService,
-    transactionAdded: Observable[TxAdded],
+    transactionAdded: Observable[Unit],
     nextMicroBlockSize: Int => Int
 ) extends MicroBlockMiner
     with ScorexLogging {
@@ -129,13 +128,13 @@ class MicroBlockMinerImpl(
         if (updatedTotalConstraint.isFull) {
           log.trace(s"Stopping forging microBlocks, the block is full: $updatedTotalConstraint")
           Task.now(Stop)
-        } else {
-          log.trace("UTX is empty, waiting for new transactions")
-          transactionAdded
-            .filterNot(added => accumulatedBlock.transactionData.contains(added.tx) || blockchainUpdater.containsTransaction(added.tx))
-            .headL
-            .map(_ => Retry)
-        }
+        } else
+          Task
+            .race(
+              if (utx.size > 0) Task.now(Retry) else Task.never,
+              transactionAdded.headL.map(_ => Retry)
+            )
+            .map(_.merge)
     }
   }
 
