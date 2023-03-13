@@ -1,7 +1,6 @@
 package com.wavesplatform.api.http
 
 import akka.NotUsed
-import akka.http.scaladsl.common.EntityStreamingSupport
 import akka.http.scaladsl.marshalling.*
 import akka.http.scaladsl.model.MediaTypes.{`application/json`, `text/plain`}
 import akka.http.scaladsl.model.*
@@ -100,12 +99,6 @@ trait ApiMarshallers extends JsonFormats {
 
   // preserve support for using plain strings as request entities
   implicit val stringMarshaller: ToEntityMarshaller[String] = PredefinedToEntityMarshallers.stringMarshaller(`text/plain`)
-
-  def jsonStream(prefix: String, delimiter: String, suffix: String): EntityStreamingSupport =
-    EntityStreamingSupport
-      .json()
-      .withContentType(ContentType(CustomJson.jsonWithNumbersAsStrings))
-      .withFramingRenderer(Flow[ByteString].intersperse(ByteString(prefix), ByteString(delimiter), ByteString(suffix)))
 
   private def selectMarshallingForContentType[T](marshallings: Seq[Marshalling[T]], contentType: ContentType): Option[() => T] = {
     contentType match {

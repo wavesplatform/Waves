@@ -27,7 +27,6 @@ object Dependencies {
   val akkaHttp           = akkaHttpModule("akka-http")
   val jacksonModuleScala = jacksonModule("module", "module-scala").withCrossVersion(CrossVersion.Binary())
   val googleGuava        = "com.google.guava"              % "guava"             % "31.1-jre"
-  val cafeine            = "com.github.ben-manes.caffeine" % "caffeine"          % "2.9.2"
   val kamonCore          = kamonModule("core")
   val machinist          = "org.typelevel"                %% "machinist"         % "0.6.8"
   val logback            = "ch.qos.logback"                % "logback-classic"   % "1.3.5" // 1.4.x and later is built for Java 11
@@ -120,7 +119,6 @@ object Dependencies {
       kamonModule("executors"),
       "org.influxdb" % "influxdb-java" % "2.23",
       googleGuava,
-      cafeine,
       "com.google.code.findbugs" % "jsr305"    % "3.0.2" % Compile, // javax.annotation stubs
       "com.typesafe.play"       %% "play-json" % "2.9.3",
       akkaModule("actor"),
@@ -135,14 +133,12 @@ object Dependencies {
       "eu.timepit"                            %% "refined-cats"          % "0.10.1" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
       "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-core"   % "2.13.5.2",
       "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-macros" % "2.13.5.2" % "provided",
-      "org.eclipse.collections"                % "eclipse-collections"   % "11.1.0",
-      "org.mapdb"                              % "mapdb"                 % "3.0.8",
       "com.esaulpaugh"                         % "headlong"              % "9.0.0",
       web3jModule("abi"),
       akkaModule("testkit")                              % Test,
       akkaHttpModule("akka-http-testkit")                % Test,
       leveldbJava().exclude("com.google.guava", "guava") % Test
-    ) ++ test ++ console ++ logDeps ++ dbDeps ++ protobuf.value
+    ) ++ test ++ console ++ logDeps ++ dbDeps ++ protobuf.value ++ langCompilerPlugins.value
   )
 
   lazy val scalapbRuntime = Def.setting {

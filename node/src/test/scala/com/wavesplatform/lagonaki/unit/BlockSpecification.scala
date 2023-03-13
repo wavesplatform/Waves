@@ -36,8 +36,6 @@ class BlockSpecification extends PropSpec {
       baseTarget          <- arbitrary[Long]
       reference           <- byteArrayGen(Block.BlockIdLength).map(r => ByteStr(r))
       generationSignature <- byteArrayGen(Block.GenerationSignatureLength)
-      assetBytes          <- byteArrayGen(AssetIdLength)
-      assetId = Some(ByteStr(assetBytes))
       sender                                  <- accountGen
       recipient                               <- accountGen
       paymentTransaction: TransferTransaction <- wavesTransferGeneratorP(time, sender, recipient.toAddress)

@@ -11,24 +11,23 @@ jobs:
   check-pr:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-java@v1
+      - uses: actions/checkout@v3
+      - uses: actions/setup-java@v3
         with:
-          java-version: 1.8
+          distribution: 'zulu'
+          java-version: '8'
       - name: Cache SBT
-        uses: actions/cache@v1
+        uses: actions/cache@v3
         with:
           path: ~/.sbt
           key: sbt-cache-${{ hashFiles('project/build.properties') }}
       - name: Cache Coursier
-        uses: actions/cache@v1
+        uses: actions/cache@v3
         with:
           path: ~/.cache/coursier
           key: coursier-cache
       - name: Check PR
-        run: |
-          sbt --mem 6144 --batch checkPR
-          find ~/.cache/coursier -type d -name '*SNAPSHOT' | xargs rm -vrf {} \;
+        run: sbt --mem 6144 --batch checkPR
       - uses: dorny/paths-filter@v2
         id: filter
         with:
@@ -37,6 +36,20 @@ jobs:
               - 'lang/**'
               - 'build.sbt'
               - 'project/*'
+      - name: Compile external sources
+        if: steps.filter.outputs.lang == 'true'
+        run: |
+          sbt lang/assembly
+          git clone https://github.com/waves-exchange/neutrino-contract
+          git clone https://github.com/waves-exchange/contracts
+          git clone https://oauth2:${{ secrets.DUCKS_GITHUB_TOKEN }}@github.com/akharazyan/wavesducks-public
+          git clone https://oauth2:${{ secrets.SWOPFI_GITLAB_TOKEN }}@gitlabwp.wvservices.com/swopfi/swopfi-smart-contracts
+          find neutrino-contract/script     -name "*.ride" -type f -exec java -jar lang/jvm/target/file-compiler.jar {} +;     
+          find contracts/ride               -name "*.ride" -type f -exec java -jar lang/jvm/target/file-compiler.jar {} +;     
+          find wavesducks-public/ride       -name "*.ride" -type f -exec java -jar lang/jvm/target/file-compiler.jar {} +;     
+          find swopfi-smart-contracts/dApps -name "*.ride" -type f -exec java -jar lang/jvm/target/file-compiler.jar {} +;
+      - name: Clean cache
+        run: find ~/.cache/coursier -type d -name '*SNAPSHOT' | xargs rm -vrf {} \;
       - name: Prepare version
         if: false # steps.filter.outputs.lang == 'true'
         id: sbt-version

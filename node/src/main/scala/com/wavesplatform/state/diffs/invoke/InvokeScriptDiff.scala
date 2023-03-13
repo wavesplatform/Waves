@@ -269,7 +269,7 @@ object InvokeScriptDiff {
               CoevalR(
                 Coeval.now(
                   InvokeDiffsCommon.processActions(
-                    actions,
+                    StructuredCallableActions(actions, blockchain),
                     version,
                     dAppAddress,
                     pk,

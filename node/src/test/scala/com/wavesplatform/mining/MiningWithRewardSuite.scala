@@ -27,7 +27,6 @@ import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.Observable
-import org.rocksdb.RocksDB
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.compatible.Assertion
 import org.scalatest.flatspec.AsyncFlatSpec

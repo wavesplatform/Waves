@@ -5,7 +5,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.database.openDB
+import com.wavesplatform.database.RDB
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
@@ -23,8 +23,9 @@ object BaseTargetChecker {
       .withFallback(defaultReference())
       .resolve()
 
+
     val settings               = WavesSettings.fromRootConfig(sharedConfig)
-    val db                     = openDB(settings.dbSettings.copy(directory = "/tmp/tmp-db"))
+    val db                     = RDB.open(settings.dbSettings.copy(directory = "/tmp/tmp-db"))
     val ntpTime                = new NTP("ntp.pool.org")
     val (blockchainUpdater, _) = StorageFactory(settings, db, ntpTime, BlockchainUpdateTriggers.noop)
     val poSSelector            = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)

@@ -157,7 +157,7 @@ object InvokeDiffsCommon {
   }
 
   def processActions(
-      actions: List[CallableAction],
+      actions: StructuredCallableActions,
       version: StdLibVersion,
       dAppAddress: Address,
       dAppPublicKey: PublicKey,
@@ -172,73 +172,26 @@ object InvokeDiffsCommon {
       enableExecutionLog: Boolean,
       log: Log[Id]
   ): TracedResult[ValidationError, Diff] = {
-    val complexityLimit =
-      if (limitedExecution) ContractLimits.FailFreeInvokeComplexity - storingComplexity
-      else Int.MaxValue
-
-    val actionsByType  = actions.groupBy(a => if (classOf[DataOp].isAssignableFrom(a.getClass)) classOf[DataOp] else a.getClass).withDefaultValue(Nil)
-    val transferList   = actionsByType(classOf[AssetTransfer]).asInstanceOf[List[AssetTransfer]]
-    val issueList      = actionsByType(classOf[Issue]).asInstanceOf[List[Issue]]
-    val reissueList    = actionsByType(classOf[Reissue]).asInstanceOf[List[Reissue]]
-    val burnList       = actionsByType(classOf[Burn]).asInstanceOf[List[Burn]]
-    val sponsorFeeList = actionsByType(classOf[SponsorFee]).asInstanceOf[List[SponsorFee]]
-    val leaseList      = actionsByType(classOf[Lease]).asInstanceOf[List[Lease]]
-    val leaseCancelList = actionsByType(classOf[LeaseCancel]).asInstanceOf[List[LeaseCancel]]
-    val dataEntries     = actionsByType(classOf[DataOp]).asInstanceOf[List[DataOp]].map(dataItemToEntry)
-
+    val verifierCount          = if (blockchain.hasPaidVerifier(tx.sender.toAddress)) 1 else 0
+    val additionalScriptsCount = actions.complexities.size + verifierCount + tx.paymentAssets.count(blockchain.hasAssetScript)
     for {
-      _ <- TracedResult(checkDataEntries(blockchain, tx, dataEntries, version)).leftMap(
-        FailedTransactionError.dAppExecution(_, storingComplexity, log)
-      )
-      _ <- TracedResult(checkLeaseCancels(leaseCancelList)).leftMap(FailedTransactionError.dAppExecution(_, storingComplexity, log))
-      _ <- TracedResult(
-        checkScriptActionsAmount(version, actions, transferList, leaseList, leaseCancelList, dataEntries)
-          .leftMap(FailedTransactionError.dAppExecution(_, storingComplexity, log))
-      )
-
-      _ <- TracedResult(checkSelfPayments(dAppAddress, blockchain, tx, version, transferList))
-        .leftMap(FailedTransactionError.dAppExecution(_, storingComplexity, log))
-      _ <- TracedResult(
-        Either.cond(transferList.map(_.amount).forall(_ >= 0), (), FailedTransactionError.dAppExecution("Negative amount", storingComplexity, log))
-      )
-      _ <- TracedResult(checkOverflow(transferList.map(_.amount))).leftMap(FailedTransactionError.dAppExecution(_, storingComplexity, log))
-
-      actionAssets = transferList.flatMap(_.assetId).map(IssuedAsset(_)) ++
-        reissueList.map(r => IssuedAsset(r.assetId)) ++
-        burnList.map(b => IssuedAsset(b.assetId)) ++
-        sponsorFeeList.map(sf => IssuedAsset(sf.assetId))
-
-      actionComplexities     = actionAssets.flatMap(blockchain.assetScript(_).map(_.complexity))
-      verifierCount          = if (blockchain.hasPaidVerifier(tx.sender.toAddress)) 1 else 0
-      additionalScriptsCount = actionComplexities.size + verifierCount + tx.paymentAssets.count(blockchain.hasAssetScript)
-
+      _ <- checkActions(actions, version, dAppAddress, storingComplexity, tx, limitedExecution, totalComplexityLimit, log)
       feeDiff <-
         if (isSyncCall)
           TracedResult.wrapValue(Map[Address, Portfolio]())
         else {
           val feeActionsCount = if (blockchain.isFeatureActivated(SynchronousCalls)) verifierCount else additionalScriptsCount
           val stepLimit       = ContractLimits.MaxComplexityByVersion(version)
-
           calcAndCheckFee(
             FailedTransactionError.feeForActions(_, _, log),
             tx.root,
             blockchain,
             stepLimit,
             storingComplexity.min(stepLimit), // complexity increased by sync calls should not require fee for additional steps
-            issueList ++ otherIssues,
+            actions.issueList ++ otherIssues,
             feeActionsCount
           ).map(_._2)
-
         }
-
-      _ <- TracedResult(
-        Either.cond(
-          actionComplexities.sum + storingComplexity <= totalComplexityLimit || limitedExecution, // limited execution has own restriction "complexityLimit"
-          (),
-          FailedTransactionError.feeForActions(s"Invoke complexity limit = $totalComplexityLimit is exceeded", storingComplexity, log)
-        )
-      )
-
       paymentsAndFeeDiff <-
         if (isSyncCall) {
           TracedResult.wrapValue(Diff.empty)
@@ -247,7 +200,66 @@ object InvokeDiffsCommon {
         } else {
           TracedResult.wrapValue(Diff(portfolios = txFeeDiff(blockchain, tx.root).explicitGet()._2))
         }
+      complexityLimit =
+        if (limitedExecution) ContractLimits.FailFreeInvokeComplexity - storingComplexity
+        else Int.MaxValue
+      compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey, enableExecutionLog)(actions.list, paymentsAndFeeDiff, complexityLimit)
+        .leftMap {
+          case failed: FailedTransactionError => failed.addComplexity(storingComplexity).withLog(log)
+          case other                          => other
+        }
+      isr <- actionsToScriptResult(actions, storingComplexity, tx, log)
+      resultDiff = compositeDiff
+        .withScriptRuns(if (isSyncCall) 0 else additionalScriptsCount + 1)
+        .withScriptResults(Map(tx.txId -> isr))
+        .withScriptsComplexity(storingComplexity + compositeDiff.scriptsComplexity)
+    } yield resultDiff
+  }
 
+  def checkActions(
+      actions: StructuredCallableActions,
+      version: StdLibVersion,
+      dAppAddress: Address,
+      storingComplexity: Int,
+      tx: InvokeScriptLike,
+      limitedExecution: Boolean,
+      totalComplexityLimit: Int,
+      log: Log[Id]
+  ): TracedResult[ValidationError, Unit] = {
+    import actions.*
+    for {
+      _ <- TracedResult(checkDataEntries(blockchain, tx, dataEntries, version)).leftMap(
+        FailedTransactionError.dAppExecution(_, storingComplexity, log)
+      )
+      _ <- TracedResult(checkLeaseCancels(leaseCancelList)).leftMap(FailedTransactionError.dAppExecution(_, storingComplexity, log))
+      _ <- TracedResult(
+        checkScriptActionsAmount(version, actions.list, transferList, leaseList, leaseCancelList, dataEntries)
+          .leftMap(FailedTransactionError.dAppExecution(_, storingComplexity, log))
+      )
+      _ <- TracedResult(checkSelfPayments(dAppAddress, blockchain, tx, version, transferList))
+        .leftMap(FailedTransactionError.dAppExecution(_, storingComplexity, log))
+      _ <- TracedResult(
+        Either.cond(transferList.map(_.amount).forall(_ >= 0), (), FailedTransactionError.dAppExecution("Negative amount", storingComplexity, log))
+      )
+      _ <- TracedResult(checkOverflow(transferList.map(_.amount))).leftMap(FailedTransactionError.dAppExecution(_, storingComplexity, log))
+      _ <- TracedResult(
+        Either.cond(
+          actions.complexities.sum + storingComplexity <= totalComplexityLimit || limitedExecution, // limited execution has own restriction "complexityLimit"
+          (),
+          FailedTransactionError.feeForActions(s"Invoke complexity limit = $totalComplexityLimit is exceeded", storingComplexity, log)
+        )
+      )
+    } yield ()
+  }
+
+  def actionsToScriptResult(
+      actions: StructuredCallableActions,
+      storingComplexity: Int,
+      tx: InvokeScriptLike,
+      log: Log[Id]
+  ): TracedResult[ValidationError, InvokeScriptResult] = {
+    import actions.*
+    for {
       resultTransfers <- transferList.traverse { transfer =>
         resolveAddress(transfer.address, blockchain)
           .map(InvokeScriptResult.Payment(_, Asset.fromCompatId(transfer.assetId), transfer.amount))
@@ -256,36 +268,20 @@ object InvokeDiffsCommon {
             case e                         => e
           }
       }
-
-      compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey, enableExecutionLog)(
-        actions,
-        paymentsAndFeeDiff,
-        complexityLimit
-      )
-        .leftMap {
-          case failed: FailedTransactionError => failed.addComplexity(storingComplexity).withLog(log)
-          case other                          => other
-        }
-
-      isr = InvokeScriptResult(
-        dataEntries,
-        resultTransfers,
-        issueList,
-        reissueList,
-        burnList,
-        sponsorFeeList,
-        leaseList.map { case l @ Lease(recipient, amount, nonce) =>
-          val id = Lease.calculateId(l, tx.txId)
-          InvokeScriptResult.Lease(AddressOrAlias.fromRide(recipient).explicitGet(), amount, nonce, id)
-        },
-        leaseCancelList
-      )
-
-      resultDiff = compositeDiff
-        .withScriptRuns(if (isSyncCall) 0 else additionalScriptsCount + 1)
-        .withScriptResults(Map(tx.txId -> isr))
-        .withScriptsComplexity(storingComplexity + compositeDiff.scriptsComplexity)
-    } yield resultDiff
+      leaseListWithIds <- leaseList.traverse { case l @ Lease(recipient, amount, nonce) =>
+        val id = Lease.calculateId(l, tx.txId)
+        AddressOrAlias.fromRide(recipient).map(r => InvokeScriptResult.Lease(r, amount, nonce, id))
+      }
+    } yield InvokeScriptResult(
+      dataEntries,
+      resultTransfers,
+      issueList,
+      reissueList,
+      burnList,
+      sponsorFeeList,
+      leaseListWithIds,
+      leaseCancelList
+    )
   }
 
   def paymentsPart(tx: InvokeScriptLike, dAppAddress: Address, feePart: Map[Address, Portfolio]): Either[GenericError, Diff] =
@@ -466,7 +462,7 @@ object InvokeDiffsCommon {
         val AssetTransfer(addressRepr, recipient, amount, asset) = transfer
 
         for {
-          address <- TracedResult(Address.fromBytes(addressRepr.bytes.arr))
+          address <- resolveAddress(addressRepr, blockchain)
           diff <- Asset.fromCompatId(asset) match {
             case Waves =>
               TracedResult(Diff.combine(Map(address -> Portfolio(amount)), Map(dAppAddress -> Portfolio(-amount))).map(p => Diff(portfolios = p)))
