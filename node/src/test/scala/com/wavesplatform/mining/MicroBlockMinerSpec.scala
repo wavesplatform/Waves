@@ -24,9 +24,7 @@ import monix.reactive.subjects.ConcurrentSubject
 import org.scalamock.scalatest.PathMockFactory
 
 import java.util.concurrent.CountDownLatch
-import scala.concurrent.Await
 import scala.concurrent.duration.*
-import scala.concurrent.duration.Duration.Inf
 import scala.util.Random
 
 class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain {
