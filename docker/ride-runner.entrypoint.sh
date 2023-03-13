@@ -2,10 +2,10 @@
 shopt -s nullglob
 
 JAVA_OPTS="-javaagent:${RIDE_INSTALL_PATH}/kanela-agent/kanela-agent-1.0.16.jar
-  -server
   -XX:+ExitOnOutOfMemoryError
   -XX:+HeapDumpOnOutOfMemoryError
   -XX:HeapDumpPath=${RDATA}/heap-dumps/on-exit
+  -XX:+UseG1GC
   -XX:+ParallelRefProcEnabled
   -XX:+UseStringDeduplication
   -Xmx${RIDE_HEAP_SIZE}

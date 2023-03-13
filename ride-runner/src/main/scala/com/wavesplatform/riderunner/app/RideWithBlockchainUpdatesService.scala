@@ -2,7 +2,7 @@ package com.wavesplatform.riderunner.app
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import com.google.common.io.{MoreFiles, RecursiveDeleteOption}
+import com.google.common.io.MoreFiles
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState}
@@ -26,11 +26,8 @@ import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths}
 import java.util.concurrent.*
-import java.util.stream.Collector
 import scala.concurrent.Await
 import scala.concurrent.duration.{Duration, DurationInt}
-import scala.io.Source
-import scala.util.Using
 
 object RideWithBlockchainUpdatesService extends ScorexLogging {
   def main(args: Array[String]): Unit = {
@@ -120,10 +117,12 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
         if (cleanupIterationPath.toFile.exists()) Files.readString(cleanupIterationPath, StandardCharsets.UTF_8).toIntOption.getOrElse(0)
         else 0
 
-      val cleanTo = 1
+      val cleanTo = 2 // Increase if you want to clean the database
       if (cleanupIteration < cleanTo) {
         log.info(s"Cleaning the DB with caches from $cleanupIteration to $cleanTo...")
-        MoreFiles.deleteRecursively(Paths.get(settings.rideRunner.db.directory))
+        new File(settings.rideRunner.db.directory).listFiles().foreach { file =>
+          MoreFiles.deleteRecursively(file.toPath)
+        }
         Files.writeString(cleanupIterationPath, cleanTo.toString)
       }
     }
@@ -132,6 +131,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     val db = RDB.open(settings.rideRunner.db.toNode).db
     cs.cleanup(CustomShutdownPhase.Db) { db.close() }
 
+    log.info("Loading data from caches...")
     val storage = Storage.rocksDb(db)
     val blockchainStorage = storage.readWrite { implicit rw =>
       val dbCaches = LevelDbPersistentCaches(storage)
@@ -152,8 +152,8 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
       rideScheduler
     )
 
-    log.info("Warming up caches...") // Helps to figure out, which data is used by a script
-    Await.result(requestsService.runAll().runToFuture(rideScheduler), Duration.Inf)
+    // log.info("Warming up caches...") // Helps to figure out, which data is used by a script
+    // Await.result(requestsService.runAll().runToFuture(rideScheduler), Duration.Inf)
 
     val lastSafeKnownHeight = Height(math.max(0, blockchainStorage.height - 100 - 1)) // A rollback is not possible
     val workingHeight       = Height(math.max(blockchainStorage.height, lastHeightAtStart))
@@ -220,7 +220,8 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     val httpFuture = Http()
       .newServerAt(settings.restApi.bindAddress, settings.restApi.port)
       .bindFlow(httpService.loggingCompositeRoute)
-    Await.result(httpFuture, 20.seconds)
+    val http = Await.result(httpFuture, 20.seconds)
+    cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream) { http.terminate(5.seconds) }
 
     log.info("Initialization completed")
     Await.result(events, Duration.Inf)

@@ -137,8 +137,8 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
       rideScheduler
     )
 
-    log.info("Warming up caches...") // Helps to figure out, which data is used by a script
-    Await.result(requestsService.runAll().runToFuture(rideScheduler), Duration.Inf)
+    // log.info("Warming up caches...") // Helps to figure out, which data is used by a script
+    // Await.result(requestsService.runAll().runToFuture(rideScheduler), Duration.Inf)
 
     // mainnet
     val lastSafeKnownHeight = Height(3393500)                 // math.max(0, blockchainStorage.height - 100 - 1)) // A rollback is not possible

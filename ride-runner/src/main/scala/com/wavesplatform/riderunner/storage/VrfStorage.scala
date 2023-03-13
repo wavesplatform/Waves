@@ -21,6 +21,7 @@ class VrfStorage(settings: ExactWithHeightStorage.Settings, blockchainApi: Block
 
   def get(atHeight: Int)(implicit ctx: ReadWrite): Option[ByteStr] =
     if (atHeight > currHeight) throw new RuntimeException(s"Can't receive a block VRF with height=$atHeight > current height=$currHeight")
+    else if (atHeight < 1) None
     else load(atHeight).tap(values.put(atHeight, _))
 
   private def load(atHeight: Int)(implicit ctx: ReadWrite): Option[ByteStr] = {

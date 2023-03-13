@@ -169,7 +169,7 @@ object BlockchainState extends ScorexLogging {
               log.info(s"[$h] Reached the current height")
               val r = Working(h)
               logStatusChanged(r)
-              HeapDumps.mk("init", live = true, makeAlways = false)
+              // HeapDumps.mk("init", live = true, makeAlways = false)
               Task.now(r)
             } else Task.now(comparedBlocks.copy(processedHeight = h))
 

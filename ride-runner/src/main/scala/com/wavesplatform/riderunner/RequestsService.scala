@@ -1,5 +1,6 @@
 package com.wavesplatform.riderunner
 
+import com.github.benmanes.caffeine.cache.Caffeine
 import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.api.http.ApiException
 import com.wavesplatform.api.http.utils.UtilsApiRoute
@@ -11,12 +12,12 @@ import com.wavesplatform.riderunner.storage.StorageContext.ReadWrite
 import com.wavesplatform.riderunner.storage.{RequestKey, RequestsStorage, SharedBlockchainStorage, Storage}
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
+import kamon.instrumentation.caffeine.KamonStatsCounter
 import monix.eval.Task
 import monix.execution.Scheduler
 import play.api.libs.json.JsObject
 
 import java.util.concurrent.{ConcurrentHashMap, TimeUnit}
-import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration.FiniteDuration
 
 trait RequestsService {
@@ -33,16 +34,25 @@ class DefaultRequestsService(
     runScriptsScheduler: Scheduler
 ) extends RequestsService
     with ScorexLogging {
-  private val scripts: TrieMap[RequestKey, RideScriptRunEnvironment] =
-    TrieMap.from(requestsStorage.all().map(k => (k, RideScriptRunEnvironment(k))))
+//  private val scripts: TrieMap[RequestKey, RideScriptRunEnvironment] =
+//    TrieMap.from(requestsStorage.all().map(k => (k, RideScriptRunEnvironment(k))))
+  private val scripts = Caffeine
+    .newBuilder()
+    .softValues()
+    .maximumSize(10000)
+    .recordStats(() => new KamonStatsCounter("Scripts"))
+    .build[RequestKey, RideScriptRunEnvironment]()
 
 //  private val jobScheduler: JobScheduler[RequestKey] = SynchronizedJobScheduler(settings.parallelization, scripts.keys)
 
   // To get rid of duplicated requests
   private val inProgress = new ConcurrentHashMap[RequestKey, Task[JsObject]]()
 
-  override def runAll(): Task[Unit] = storage.asyncReadWrite { implicit ctx =>
+  override def runAll(): Task[Unit] = {
+    /*storage.asyncReadWrite { implicit ctx =>
     runManyAll(sharedBlockchain.height, scripts.values.toList)
+  }*/
+    Task.unit
   }
 
   override def runAffected(atHeight: Int, affected: Set[RequestKey]): Task[Unit] =
@@ -52,26 +62,28 @@ class DefaultRequestsService(
 
   override def trackAndRun(request: RequestKey): Task[JsObject] = {
     val currentHeight = Height(sharedBlockchain.height)
-    val cache         = scripts.get(request)
+    val cache         = Option(scripts.getIfPresent(request))
     cache match {
       // TODO -1 ? Will eliminate calls to blockchain
       case Some(cache) if runScriptsScheduler.clockMonotonic(TimeUnit.SECONDS) - cache.lastUpdateInS < settings.cacheTtl.toSeconds =>
-        // if currentHeight <= cache.updateHeight =>
         rideScriptCacheHits.increment()
         Task.now(cache.lastResult)
 
       case _ =>
-        val task = storage.asyncReadWrite { implicit rw =>
+        val task = // storage.asyncReadWrite { implicit rw =>
           Task {
             rideScriptCacheMisses.increment()
-            if (cache.isEmpty) requestsStorage.append(request)
-            sharedBlockchain.accountScripts.getUntagged(currentHeight, request.address)
+            storage.readWrite { implicit ctx =>
+              sharedBlockchain.accountScripts.getUntagged(currentHeight, request.address)
+            }
           }.flatMap {
             // TODO #19 Change/move an error to an appropriate layer
             case None => Task.raiseError(ApiException(CustomValidationError(s"Address ${request.address} is not dApp")))
-            case _    => runOne(currentHeight, RideScriptRunEnvironment(request), hasCaches = false)
+            case _ =>
+              if (cache.isEmpty) requestsStorage.append(request)
+              runOne(currentHeight, RideScriptRunEnvironment(request), hasCaches = false)
           }
-        }
+//        }
 
         val completeTask = task.doOnFinish(_ => Task(inProgress.remove(request)))
         inProgress.computeIfAbsent(request, _ => completeTask)
@@ -91,20 +103,24 @@ class DefaultRequestsService(
   }
 
   private def runMany(height: Int, scripts: Iterable[RideScriptRunEnvironment])(implicit ctx: ReadWrite): Task[Unit] = {
-    val r = Task
-      .parTraverseUnordered(scripts)((script: RideScriptRunEnvironment) => runOne(height, script, hasCaches = true))
-      .as(())
-      .executeOn(runScriptsScheduler)
-
-    val start = System.nanoTime()
-    r.tapEval(_ => Task.now(RideRunnerMetrics.rideScriptRunOnHeightTime(false).update((System.nanoTime() - start).toDouble)))
+//    val r = Task
+//      .parTraverseUnordered(scripts)((script: RideScriptRunEnvironment) => runOne(height, script, hasCaches = true))
+//      .as(())
+//      .executeOn(runScriptsScheduler)
+//
+//    val start = System.nanoTime()
+//    r.tapEval(_ => Task.now(RideRunnerMetrics.rideScriptRunOnHeightTime(false).update((System.nanoTime() - start).toDouble)))
+    Task.unit
   }
 
-  private def runOne(height: Int, script: RideScriptRunEnvironment, hasCaches: Boolean)(implicit ctx: ReadWrite): Task[JsObject] = Task {
-    val updatedResult = rideScriptRunTime.withTag("has-caches", hasCaches).measure {
-      val result = evaluate(script)
-      // Removed, because I'm not sure it is required. TODO restore stateChanges?
-      result - "stateChanges"
+//  private def runOne(height: Int, script: RideScriptRunEnvironment, hasCaches: Boolean)(implicit ctx: ReadWrite): Task[JsObject] = Task {
+  private def runOne(height: Int, script: RideScriptRunEnvironment, hasCaches: Boolean): Task[JsObject] = Task {
+    val updatedResult = storage.readWrite { implicit ctx =>
+      rideScriptRunTime.withTag("has-caches", hasCaches).measure {
+        val result = evaluate(script)
+        // Removed, because I'm not sure it is required. TODO restore stateChanges?
+        result - "stateChanges"
+      }
     }
 
     val origResult = script.lastResult

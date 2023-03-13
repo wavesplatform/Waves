@@ -40,8 +40,8 @@ class ReadWriteHandle(db: RocksDB) extends AutoCloseable {
 object Storage {
   def rocksDb(db: RocksDB): Storage = new Storage {
     override def asyncReadOnly[T](f: ReadOnly => Task[T]): Task[T] = {
-      var snapshot = none[Snapshot]
-      var options  = none[ReadOptions]
+      @volatile var snapshot = none[Snapshot]
+      @volatile var options  = none[ReadOptions]
       Task {
         val s = db.getSnapshot
         val o = new ReadOptions().setSnapshot(s).setVerifyChecksums(false)
@@ -63,9 +63,9 @@ object Storage {
     override def readOnly[T](f: ReadOnly => T): T = db.readOnly(x => f(new ReadOnly(x)))
 
     override def asyncReadWrite[T](f: ReadWrite => Task[T]): Task[T] = {
-      var snapshot    = none[Snapshot]
-      var readOptions = none[ReadOptions]
-      var batch       = none[WriteBatch]
+      @volatile var snapshot    = none[Snapshot]
+      @volatile var readOptions = none[ReadOptions]
+      @volatile var batch       = none[WriteBatch]
       Task {
         val s  = db.getSnapshot
         val ro = new ReadOptions().setSnapshot(s).setVerifyChecksums(false)
@@ -104,6 +104,7 @@ object Storage {
 object StorageContext {
   class ReadOnly(val db: ReadOnlyDB)
   class ReadWrite(override val db: RW) extends ReadOnly(db) {
+    // TODO cleanup < 100
     def writeHistoricalToDbOpt[T](
         historyKey: Key[Seq[Int]],
         dataOnHeightKey: Int => Key[Option[T]],

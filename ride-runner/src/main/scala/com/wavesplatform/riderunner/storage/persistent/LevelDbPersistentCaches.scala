@@ -1,6 +1,5 @@
 package com.wavesplatform.riderunner.storage.persistent
 
-import java.lang.{Long => JLong}
 import com.github.benmanes.caffeine.cache.{Cache, Caffeine}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.SignedBlockHeader
@@ -13,9 +12,11 @@ import com.wavesplatform.riderunner.storage.persistent.LevelDbPersistentCaches.R
 import com.wavesplatform.riderunner.storage.{AccountAssetKey, AccountDataKey, KeyIndexStorage, Storage}
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, EmptyDataEntry, Height, LeaseBalance, TransactionId}
 import com.wavesplatform.transaction.Asset
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
 import kamon.instrumentation.caffeine.KamonStatsCounter
+import org.slf4j.LoggerFactory
 
+import java.lang.Long as JLong
 import java.util.concurrent.atomic.AtomicLong
 import scala.util.chaining.scalaUtilChainingOps
 
@@ -23,8 +24,9 @@ class LevelDbPersistentCaches private (storage: Storage, initialBlockHeadersLast
   private val lastAddressIdKey = CacheKeys.LastAddressId.mkKey(())
   private val lastAddressId    = new AtomicLong(storage.readOnly(_.db.getOpt(lastAddressIdKey).getOrElse(-1L)))
 
-  override val accountDataEntries: PersistentCache[AccountDataKey, DataEntry[?]] = new PersistentCache[AccountDataKey, DataEntry[?]]
-    with ScorexLogging {
+  override val accountDataEntries: PersistentCache[AccountDataKey, DataEntry[?]] = new PersistentCache[AccountDataKey, DataEntry[?]] {
+    protected lazy val log = LoggerFacade(LoggerFactory.getLogger("LevelDbPersistentCaches.accountData"))
+
     override def getAllKeys()(implicit ctx: ReadOnly): List[(Address, String)] = for {
       (addressId, key) <- KeyIndexStorage.mkList(CacheKeys.AccountDataEntriesHistory)
       address          <- getAddress(addressId)
@@ -70,7 +72,9 @@ class LevelDbPersistentCaches private (storage: Storage, initialBlockHeadersLast
     }
   }
 
-  override val accountScripts: PersistentCache[Address, AccountScriptInfo] = new PersistentCache[Address, AccountScriptInfo] with ScorexLogging {
+  override val accountScripts: PersistentCache[Address, AccountScriptInfo] = new PersistentCache[Address, AccountScriptInfo] {
+    protected lazy val log = LoggerFacade(LoggerFactory.getLogger("LevelDbPersistentCaches.accountScripts"))
+
     override def getAllKeys()(implicit ctx: ReadOnly): List[Address] = for {
       addressId <- KeyIndexStorage.mkList(CacheKeys.AccountScriptsHistory)
       address   <- getAddress(addressId)
@@ -111,8 +115,9 @@ class LevelDbPersistentCaches private (storage: Storage, initialBlockHeadersLast
     }
   }
 
-  override val assetDescriptions: PersistentCache[Asset.IssuedAsset, AssetDescription] = new PersistentCache[Asset.IssuedAsset, AssetDescription]
-    with ScorexLogging {
+  override val assetDescriptions: PersistentCache[Asset.IssuedAsset, AssetDescription] = new PersistentCache[Asset.IssuedAsset, AssetDescription] {
+    protected lazy val log = LoggerFacade(LoggerFactory.getLogger("LevelDbPersistentCaches.assetDescriptions"))
+
     override def getAllKeys()(implicit ctx: ReadOnly): List[Asset.IssuedAsset] = KeyIndexStorage.mkList(CacheKeys.AssetDescriptionsHistory)
 
     override def get(maxHeight: Int, key: Asset.IssuedAsset)(implicit ctx: ReadWrite): RemoteData[AssetDescription] =
@@ -145,7 +150,9 @@ class LevelDbPersistentCaches private (storage: Storage, initialBlockHeadersLast
     }
   }
 
-  override def aliases: PersistentCache[Alias, Address] = new PersistentCache[Alias, Address] with ScorexLogging {
+  override def aliases: PersistentCache[Alias, Address] = new PersistentCache[Alias, Address] {
+    protected lazy val log = LoggerFacade(LoggerFactory.getLogger("LevelDbPersistentCaches.aliases"))
+
     override def getAllKeys()(implicit ctx: ReadOnly): List[Alias] = List.empty // KeyIndexStorage.mkList(CacheKeys.Aliases)
 
     override def get(maxHeight: Int, key: Alias)(implicit ctx: ReadWrite): RemoteData[Address] =
@@ -165,7 +172,9 @@ class LevelDbPersistentCaches private (storage: Storage, initialBlockHeadersLast
     }
   }
 
-  override val accountBalances: PersistentCache[AccountAssetKey, Long] = new PersistentCache[AccountAssetKey, Long] with ScorexLogging {
+  override val accountBalances: PersistentCache[AccountAssetKey, Long] = new PersistentCache[AccountAssetKey, Long] {
+    protected lazy val log = LoggerFacade(LoggerFactory.getLogger("LevelDbPersistentCaches.accountBalances"))
+
     override def getAllKeys()(implicit ctx: ReadOnly): List[AccountAssetKey] = for {
       (addressId, assetId) <- KeyIndexStorage.mkList(CacheKeys.AccountAssetsHistory)
       address              <- getAddress(addressId)
@@ -211,7 +220,9 @@ class LevelDbPersistentCaches private (storage: Storage, initialBlockHeadersLast
     }
   }
 
-  override def accountLeaseBalances: PersistentCache[Address, LeaseBalance] = new PersistentCache[Address, LeaseBalance] with ScorexLogging {
+  override def accountLeaseBalances: PersistentCache[Address, LeaseBalance] = new PersistentCache[Address, LeaseBalance] {
+    protected lazy val log = LoggerFacade(LoggerFactory.getLogger("LevelDbPersistentCaches.accountLeaseBalances"))
+
     override def getAllKeys()(implicit ctx: ReadOnly): List[Address] = for {
       addressId <- KeyIndexStorage.mkList(CacheKeys.AccountLeaseBalancesHistory)
       address   <- getAddress(addressId)
@@ -253,7 +264,9 @@ class LevelDbPersistentCaches private (storage: Storage, initialBlockHeadersLast
     }
   }
 
-  override val transactions: TransactionPersistentCache = new TransactionPersistentCache with ScorexLogging {
+  override val transactions: TransactionPersistentCache = new TransactionPersistentCache {
+    protected lazy val log = LoggerFacade(LoggerFactory.getLogger("LevelDbPersistentCaches.transactions"))
+
     override def getHeight(txId: TransactionId)(implicit ctx: ReadOnly): RemoteData[Height] =
       ctx.db
         .readFromDbOpt(CacheKeys.Transactions.mkKey(txId))
@@ -269,6 +282,8 @@ class LevelDbPersistentCaches private (storage: Storage, initialBlockHeadersLast
   }
 
   override val blockHeaders = new BlockPersistentCache {
+    protected lazy val log = LoggerFacade(LoggerFactory.getLogger("LevelDbPersistentCaches.blockHeaders"))
+
     private val Key = CacheKeys.SignedBlockHeaders
 
     @volatile private var lastHeight = initialBlockHeadersLastHeight
@@ -320,7 +335,9 @@ class LevelDbPersistentCaches private (storage: Storage, initialBlockHeadersLast
     }
   }
 
-  override def vrf: VrfPersistentCache = new VrfPersistentCache with ScorexLogging {
+  override def vrf: VrfPersistentCache = new VrfPersistentCache {
+    protected lazy val log = LoggerFacade(LoggerFactory.getLogger("LevelDbPersistentCaches.vrf"))
+
     val Key = CacheKeys.VRF
 
     override def get(height: Int)(implicit ctx: ReadOnly): RemoteData[ByteStr] =
