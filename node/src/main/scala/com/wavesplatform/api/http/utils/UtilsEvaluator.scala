@@ -22,7 +22,6 @@ import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.{ValidationError, utils}
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, ScriptExtraFee}
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.state.diffs.invoke.InvokeDiffsCommon.processActions
 import com.wavesplatform.state.diffs.invoke.{InvokeDiffsCommon, InvokeScriptTransactionLike, StructuredCallableActions}
 import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, Portfolio}
 import com.wavesplatform.transaction.TransactionType.{InvokeScript, TransactionType}
@@ -127,7 +126,7 @@ object UtilsEvaluator {
         .bimap(
           _ => Right(Diff.empty),
           r =>
-            processActions(
+            InvokeDiffsCommon.processActions(
               StructuredCallableActions(r.actions, blockchain),
               ds.stdLibVersion,
               dAppAddress,
