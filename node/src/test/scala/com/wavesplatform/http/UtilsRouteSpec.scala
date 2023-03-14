@@ -1,6 +1,5 @@
 package com.wavesplatform.http
 
-import akka.http.scaladsl.testkit.RouteTestTimeout
 import com.google.protobuf.ByteString
 import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
 import com.wavesplatform.api.http.requests.ScriptWithImportsRequest
@@ -37,9 +36,6 @@ import play.api.libs.json.*
 import scala.concurrent.duration.*
 
 class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with PropertyChecks with PathMockFactory with Inside with WithDomain {
-  implicit val routeTestTimeout: RouteTestTimeout = RouteTestTimeout(10.seconds)
-  implicit val timeout: FiniteDuration            = routeTestTimeout.duration
-
   private val estimator = ScriptEstimatorV2
 
   private val utilsApi: UtilsApiRoute = UtilsApiRoute(
