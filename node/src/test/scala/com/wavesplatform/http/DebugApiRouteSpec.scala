@@ -2155,7 +2155,7 @@ class DebugApiRouteSpec
                |                "recipient": "$leaseAddress",
                |                "amount": $amount,
                |                "height": null,
-               |                "status": null,
+               |                "status": "canceled",
                |                "cancelHeight": null,
                |                "cancelTransactionId": null
                |              }
@@ -2168,7 +2168,7 @@ class DebugApiRouteSpec
                |                "recipient": null,
                |                "amount": null,
                |                "height": null,
-               |                "status": null,
+               |                "status": "canceled",
                |                "cancelHeight": null,
                |                "cancelTransactionId": null
                |              }, {

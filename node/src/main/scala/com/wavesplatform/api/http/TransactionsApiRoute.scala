@@ -365,12 +365,15 @@ object TransactionsApiRoute {
       val recipientOpt         = recipientParamOpt.orElse(detailsOpt.map(_.recipient))
       val resolvedRecipientOpt = recipientOpt.flatMap(r => blockchain.resolveAlias(r).toOption)
 
-      val dataOpt = detailsOpt.map(_.status match {
-        case LeaseDetails.Status.Active                  => (true, None, None)
-        case LeaseDetails.Status.Cancelled(height, txId) => (false, Some(height), txId)
-        case LeaseDetails.Status.Expired(height)         => (false, Some(height), None)
-      })
+      val statusOpt = detailsOpt.map(_.status)
+      val status    = LeaseStatus(statusOpt.contains(LeaseDetails.Status.Active))
+      val statusDataOpt = statusOpt.map {
+        case LeaseDetails.Status.Active                  => (None, None)
+        case LeaseDetails.Status.Cancelled(height, txId) => (Some(height), txId)
+        case LeaseDetails.Status.Expired(height)         => (Some(height), None)
+      }
 
+      println(status)
       LeaseRef(
         leaseId,
         detailsOpt.map(_.sourceId),
@@ -378,9 +381,9 @@ object TransactionsApiRoute {
         resolvedRecipientOpt,
         amountOpt orElse detailsOpt.map(_.amount),
         txMetaOpt.map(_.height),
-        dataOpt.map(d => LeaseStatus(d._1)),
-        dataOpt.flatMap(_._2),
-        dataOpt.flatMap(_._3)
+        status,
+        statusDataOpt.flatMap(_._1),
+        statusDataOpt.flatMap(_._2)
       )
     }
 
@@ -412,7 +415,7 @@ object TransactionsApiRoute {
       recipient: Option[Address],
       amount: Option[Long],
       height: Option[Int],
-      status: Option[LeaseStatus] = Some(LeaseStatus.active),
+      status: LeaseStatus = LeaseStatus.active,
       cancelHeight: Option[Int] = None,
       cancelTransactionId: Option[ByteStr] = None
   )
