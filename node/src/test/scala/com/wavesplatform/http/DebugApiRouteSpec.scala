@@ -2524,7 +2524,160 @@ class DebugApiRouteSpec
                |        }
                |      ],
                |      "result": "failure",
-               |      "error": "InvokeRejectError(error = Explicit script termination)"
+               |      "error": "InvokeRejectError(error = Explicit script termination)",
+               |      "vars" : [ {
+               |        "name" : "i",
+               |        "type" : "Invocation",
+               |        "value" : {
+               |          "originCaller" : {
+               |            "type" : "Address",
+               |            "value" : {
+               |              "bytes" : {
+               |                "type" : "ByteVector",
+               |                "value" : "$defaultAddress"
+               |              }
+               |            }
+               |          },
+               |          "payments" : {
+               |            "type" : "Array",
+               |            "value" : [ ]
+               |          },
+               |          "callerPublicKey" : {
+               |            "type" : "ByteVector",
+               |            "value" : "${defaultSigner.publicKey}"
+               |          },
+               |          "feeAssetId" : {
+               |            "type" : "Unit",
+               |            "value" : { }
+               |          },
+               |          "originCallerPublicKey" : {
+               |            "type" : "ByteVector",
+               |            "value" : "${defaultSigner.publicKey}"
+               |          },
+               |          "transactionId" : {
+               |            "type" : "ByteVector",
+               |            "value" : "${invoke.id()}"
+               |          },
+               |          "caller" : {
+               |            "type" : "Address",
+               |            "value" : {
+               |              "bytes" : {
+               |                "type" : "ByteVector",
+               |                "value" : "$defaultAddress"
+               |              }
+               |            }
+               |          },
+               |          "fee" : {
+               |            "type" : "Int",
+               |            "value" : 500000
+               |          }
+               |        }
+               |      }, {
+               |        "name" : "default.@args",
+               |        "type" : "Array",
+               |        "value" : [ ]
+               |      }, {
+               |        "name" : "Address.@args",
+               |        "type" : "Array",
+               |        "value" : [ {
+               |          "type" : "ByteVector",
+               |          "value" : "3MsY23LPQnvPZnBKpvs6YcnCvGjLVD42pSy"
+               |        } ]
+               |      }, {
+               |        "name" : "Address.@complexity",
+               |        "type" : "Int",
+               |        "value" : 1
+               |      }, {
+               |        "name" : "@complexityLimit",
+               |        "type" : "Int",
+               |        "value" : 51999
+               |      }, {
+               |        "name" : "invoke.@args",
+               |        "type" : "Array",
+               |        "value" : [ {
+               |          "type" : "Address",
+               |          "value" : {
+               |            "bytes" : {
+               |              "type" : "ByteVector",
+               |              "value" : "3MsY23LPQnvPZnBKpvs6YcnCvGjLVD42pSy"
+               |            }
+               |          }
+               |        }, {
+               |          "type" : "String",
+               |          "value" : "default"
+               |        }, {
+               |          "type" : "Array",
+               |          "value" : [ ]
+               |        }, {
+               |          "type" : "Array",
+               |          "value" : [ ]
+               |        } ]
+               |      }, {
+               |        "name" : "invoke.@complexity",
+               |        "type" : "Int",
+               |        "value" : 75
+               |      }, {
+               |        "name" : "@complexityLimit",
+               |        "type" : "Int",
+               |        "value" : 51924
+               |      }, {
+               |        "name" : "default.@complexity",
+               |        "type" : "Int",
+               |        "value" : 8
+               |      }, {
+               |        "name" : "@complexityLimit",
+               |        "type" : "Int",
+               |        "value" : 51916
+               |      }, {
+               |        "name" : "r",
+               |        "type" : "Unit",
+               |        "value" : { }
+               |      }, {
+               |        "name" : "==.@args",
+               |        "type" : "Array",
+               |        "value" : [ {
+               |          "type" : "Unit",
+               |          "value" : { }
+               |        }, {
+               |          "type" : "Unit",
+               |          "value" : { }
+               |        } ]
+               |      }, {
+               |        "name" : "==.@complexity",
+               |        "type" : "Int",
+               |        "value" : 1
+               |      }, {
+               |        "name" : "@complexityLimit",
+               |        "type" : "Int",
+               |        "value" : 51915
+               |      }, {
+               |        "name" : "throw.@args",
+               |        "type" : "Array",
+               |        "value" : [ ]
+               |      }, {
+               |        "name" : "throw.@complexity",
+               |        "type" : "Int",
+               |        "value" : 1
+               |      }, {
+               |        "name" : "@complexityLimit",
+               |        "type" : "Int",
+               |        "value" : 51914
+               |      }, {
+               |        "name" : "throw.@args",
+               |        "type" : "Array",
+               |        "value" : [ {
+               |          "type" : "String",
+               |          "value" : "Explicit script termination"
+               |        } ]
+               |      }, {
+               |        "name" : "throw.@complexity",
+               |        "type" : "Int",
+               |        "value" : 1
+               |      }, {
+               |        "name" : "@complexityLimit",
+               |        "type" : "Int",
+               |        "value" : 51913
+               |      } ]
                |    }
                |  ],
                |  "height": 3,
