@@ -373,7 +373,6 @@ object TransactionsApiRoute {
         case LeaseDetails.Status.Expired(height)         => (Some(height), None)
       }
 
-      println(status)
       LeaseRef(
         leaseId,
         detailsOpt.map(_.sourceId),
