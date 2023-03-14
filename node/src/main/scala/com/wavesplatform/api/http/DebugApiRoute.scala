@@ -7,7 +7,7 @@ import akka.http.scaladsl.server.Route
 import cats.syntax.either.*
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.Version
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, PKKeyPair}
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.http.TransactionsApiRoute.TransactionJsonSerializer
 import com.wavesplatform.common.state.ByteStr
@@ -149,8 +149,14 @@ case class DebugApiRoute(
   }
 
   def minerInfo: Route = (path("minerInfo") & get) {
-    complete(
-      wallet.privateKeyAccounts
+    complete {
+      val accounts = if (ws.minerSettings.privateKeys.nonEmpty) {
+        ws.minerSettings.privateKeys.map(PKKeyPair(_))
+      } else {
+        wallet.privateKeyAccounts
+      }
+
+      accounts
         .filterNot(account => blockchain.hasAccountScript(account.toAddress))
         .map { account =>
           (account.toAddress, miner.getNextBlockGenerationOffset(account))
@@ -166,7 +172,8 @@ case class DebugApiRoute(
             System.currentTimeMillis() + offset.toMillis
           )
         }
-    )
+
+    }
   }
 
   def configInfo: Route = (path("configInfo") & get & parameter("full".as[Boolean])) { full =>

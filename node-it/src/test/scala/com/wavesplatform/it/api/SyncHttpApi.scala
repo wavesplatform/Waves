@@ -3,7 +3,7 @@ package com.wavesplatform.it.api
 import java.net.InetSocketAddress
 import akka.http.scaladsl.model.StatusCodes.BadRequest
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
-import com.wavesplatform.account.{AddressOrAlias, KeyPair}
+import com.wavesplatform.account.{AddressOrAlias, KeyPair, SeedKeyPair}
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.IssueRequest
 import com.wavesplatform.api.http.{ApiError, DebugMessage}
@@ -590,7 +590,7 @@ object SyncHttpApi extends Assertions with matchers.should.Matchers {
     def ensureTxDoesntExist(txId: String): Unit =
       sync(async(n).ensureTxDoesntExist(txId))
 
-    def createKeyPair(): KeyPair = sync(async(n).createKeyPair())
+    def createKeyPair(): SeedKeyPair = sync(async(n).createKeyPair())
 
     def createKeyPairServerSide(): KeyPair = sync(async(n).createKeyPairServerSide())
 
