@@ -190,6 +190,17 @@ class DebugApiRouteSpec
       }
     }
 
+    "NoSuchElementException" in {
+      val blockchain = createBlockchainStub { b =>
+        (b.accountScript _).when(*).throws(new NoSuchElementException())
+      }
+      val route = handleAllExceptions(routeWithBlockchain(blockchain))
+      validatePost(TxHelpers.invoke()) ~> route ~> check {
+        responseAs[String] shouldBe """{"error":0,"message":"Error is unknown"}"""
+        response.status shouldBe StatusCodes.InternalServerError
+      }
+    }
+
     "exchange tx with fail script" in {
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(TxHelpers.defaultAddress, *).returns(Long.MaxValue)
