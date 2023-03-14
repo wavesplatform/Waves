@@ -7,7 +7,7 @@ import cats.instances.list.*
 import cats.syntax.alternative.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
 import com.wavesplatform.api.http.ApiError.*
 import com.wavesplatform.block.Block
@@ -355,10 +355,15 @@ object TransactionsApiRoute {
     private[this] def isBlockV5(height: Int): Boolean = blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height)
 
     // Extended lease format. Overrides default
-    private[this] def leaseIdToLeaseRef(leaseId: ByteStr): LeaseRef = {
-      val detailsOpt   = blockchain.leaseDetails(leaseId)
-      val txMetaOpt    = detailsOpt.flatMap(d => blockchain.transactionMeta(d.sourceId))
-      val recipientOpt = detailsOpt.flatMap(d => blockchain.resolveAlias(d.recipient).toOption)
+    private[this] def leaseIdToLeaseRef(
+        leaseId: ByteStr,
+        recipientParamOpt: Option[AddressOrAlias] = None,
+        amountOpt: Option[Long] = None
+    ): LeaseRef = {
+      val detailsOpt           = blockchain.leaseDetails(leaseId)
+      val txMetaOpt            = detailsOpt.flatMap(d => blockchain.transactionMeta(d.sourceId))
+      val recipientOpt         = recipientParamOpt.orElse(detailsOpt.map(_.recipient))
+      val resolvedRecipientOpt = recipientOpt.flatMap(r => blockchain.resolveAlias(r).toOption)
 
       val dataOpt = detailsOpt.map(_.status match {
         case LeaseDetails.Status.Active                  => (true, None, None)
@@ -370,17 +375,17 @@ object TransactionsApiRoute {
         leaseId,
         detailsOpt.map(_.sourceId),
         detailsOpt.map(_.sender.toAddress),
-        recipientOpt,
-        detailsOpt.map(_.amount),
+        resolvedRecipientOpt,
+        amountOpt orElse detailsOpt.map(_.amount),
         txMetaOpt.map(_.height),
         dataOpt.map(d => LeaseStatus(d._1)),
-        dataOpt.flatMap(d => d._2),
+        dataOpt.flatMap(_._2),
         dataOpt.flatMap(_._3)
       )
     }
 
     private[http] implicit val leaseWrites: OWrites[InvokeScriptResult.Lease] =
-      LeaseRef.jsonWrites.contramap((l: InvokeScriptResult.Lease) => leaseIdToLeaseRef(l.id))
+      LeaseRef.jsonWrites.contramap((l: InvokeScriptResult.Lease) => leaseIdToLeaseRef(l.id, Some(l.recipient), Some(l.amount)))
 
     private[http] implicit val leaseCancelWrites: OWrites[InvokeScriptResult.LeaseCancel] =
       LeaseRef.jsonWrites.contramap((l: InvokeScriptResult.LeaseCancel) => leaseIdToLeaseRef(l.id))
