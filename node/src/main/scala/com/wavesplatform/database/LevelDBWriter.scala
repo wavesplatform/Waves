@@ -263,13 +263,8 @@ abstract class LevelDBWriter private[database] (
     addressId(address).fold(LeaseBalance.empty)(loadLeaseBalance(db, _))
   }
 
-  private[database] def loadLposPortfolio(db: ReadOnlyDB, addressId: AddressId) = Portfolio(
-    db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId)).getOrElse(0L),
-    loadLeaseBalance(db, addressId)
-  )
-
   override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] =
-    writableDB.withResource(r => database.loadAssetDescription(r, this, asset))
+    writableDB.withResource(r => database.loadAssetDescription(r, asset))
 
   override protected def loadVolumeAndFee(orderId: ByteStr): VolumeAndFee =
     loadWithFilter(orderFilter, Keys.filledVolumeAndFeeHistory(orderId)) { (ro, history) =>
@@ -446,7 +441,8 @@ abstract class LevelDBWriter private[database] (
           ByteString.copyFrom(staticInfo.issuer.arr),
           staticInfo.decimals,
           staticInfo.nft,
-          assetNum + 1
+          assetNum + 1,
+          height
         )
         rw.put(Keys.assetStaticInfo(asset), Some(pbStaticInfo))
         rw.put(Keys.assetDetails(asset)(height), (info, volumeInfo))

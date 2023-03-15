@@ -564,11 +564,10 @@ package object database {
       h <- resource.get(historyKey).headOption
     } yield resource.get(valueKey(h))
 
-  def loadAssetDescription(resource: DBResource, levelDb: LevelDBWriter, asset: IssuedAsset): Option[AssetDescription] =
+  def loadAssetDescription(resource: DBResource, asset: IssuedAsset): Option[AssetDescription] =
     for {
       pbStaticInfo       <- resource.get(Keys.assetStaticInfo(asset))
       (info, volumeInfo) <- fromHistory(resource, Keys.assetDetailsHistory(asset), Keys.assetDetails(asset))
-      (txMeta, _)        <- levelDb.transactionInfo(pbStaticInfo.sourceId.toByteStr).filter { case (tm, _) => tm.succeeded }
       sponsorship = fromHistory(resource, Keys.sponsorshipHistory(asset), Keys.sponsorship(asset)).fold(0L)(_.minFee)
       script      = fromHistory(resource, Keys.assetScriptHistory(asset), Keys.assetScript(asset)).flatten
     } yield AssetDescription(
@@ -584,7 +583,7 @@ package object database {
       sponsorship,
       pbStaticInfo.isNft,
       pbStaticInfo.sequenceInBlock,
-      txMeta.height
+      Height(pbStaticInfo.height)
     )
 
   def loadActiveLeases(db: DB, fromHeight: Int, toHeight: Int): Seq[LeaseTransaction] = db.withResource { r =>
