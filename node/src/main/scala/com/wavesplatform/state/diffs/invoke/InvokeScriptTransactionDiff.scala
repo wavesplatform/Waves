@@ -175,8 +175,7 @@ object InvokeScriptTransactionDiff {
           limitedExecution,
           ContractLimits.MaxTotalInvokeComplexity(version),
           otherIssues,
-          log,
-          forcePaymentsDiff = false
+          log
         )
 
         process = (actions: List[CallableAction], unusedComplexity: Long) => {

@@ -23,6 +23,7 @@ import com.wavesplatform.lang.{ValidationError, utils}
 import com.wavesplatform.state.diffs.FeeValidation.{FeeConstants, ScriptExtraFee}
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.diffs.invoke.{InvokeDiffsCommon, InvokeScriptTransactionLike, StructuredCallableActions}
+import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.{Blockchain, Diff, InvokeScriptResult, Portfolio}
 import com.wavesplatform.transaction.TransactionType.{InvokeScript, TransactionType}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvokeRejectError}
@@ -133,19 +134,19 @@ object UtilsEvaluator {
               dAppPk,
               usedComplexity,
               invoke,
-              blockchain,
+              CompositeBlockchain(blockchain, paymentsDiff),
               System.currentTimeMillis(),
               isSyncCall = false,
               limitedExecution = false,
               limit,
               Nil,
-              log,
-              forcePaymentsDiff = true
+              log
             ).resultE
         )
         .merge
-      _ <- TransactionDiffer.validateBalance(blockchain, InvokeScript, addWavesToDefaultInvoker(diff))
-      _ <- TransactionDiffer.assetsVerifierDiff(blockchain, invoke, verify = true, diff, Int.MaxValue).resultE
+      totalDiff <- diff.combineE(paymentsDiff)
+      _ <- TransactionDiffer.validateBalance(blockchain, InvokeScript, addWavesToDefaultInvoker(totalDiff))
+      _ <- TransactionDiffer.assetsVerifierDiff(blockchain, invoke, verify = true, totalDiff, Int.MaxValue).resultE
       rootScriptResult  = diff.scriptResults.headOption.map(_._2).getOrElse(InvokeScriptResult.empty)
       innerScriptResult = environment.currentDiff.scriptResults.values.fold(InvokeScriptResult.empty)(_ |+| _)
     } yield (evaluated, usedComplexity, log, innerScriptResult |+| rootScriptResult)

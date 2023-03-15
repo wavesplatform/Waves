@@ -169,8 +169,7 @@ object InvokeDiffsCommon {
       limitedExecution: Boolean,
       totalComplexityLimit: Int,
       otherIssues: Seq[Issue],
-      log: Log[Id],
-      forcePaymentsDiff: Boolean
+      log: Log[Id]
   ): TracedResult[ValidationError, Diff] = {
     val verifierCount          = if (blockchain.hasPaidVerifier(tx.sender.toAddress)) 1 else 0
     val additionalScriptsCount = actions.complexities.size + verifierCount + tx.paymentAssets.count(blockchain.hasAssetScript)
@@ -195,7 +194,7 @@ object InvokeDiffsCommon {
       paymentsAndFeeDiff <-
         if (isSyncCall) {
           TracedResult.wrapValue(Diff.empty)
-        } else if (version < V5 || forcePaymentsDiff) {
+        } else if (version < V5) {
           TracedResult(paymentsPart(tx, dAppAddress, feeDiff))
         } else {
           TracedResult.wrapValue(Diff(portfolios = txFeeDiff(blockchain, tx.root).explicitGet()._2))
