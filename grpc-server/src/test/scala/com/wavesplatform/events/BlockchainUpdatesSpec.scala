@@ -67,8 +67,8 @@ class BlockchainUpdatesSpec extends FreeSpec with WithBUDomain with ScalaFutures
     None,
     0L,
     nft = false,
-    0,
-    Height @@ 0
+    sequenceInBlock = 1,
+    issueHeight = Height @@ 2
   )
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(10 seconds, 500 millis)

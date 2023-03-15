@@ -206,7 +206,7 @@ object StateUpdate {
           v.sponsorship,
           v.nft,
           v.sequenceInBlock,
-          v.issueHeight
+          Height @@ v.issueHeight
         )
       }
 
