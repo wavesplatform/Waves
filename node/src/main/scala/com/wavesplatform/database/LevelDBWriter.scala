@@ -1,12 +1,12 @@
 package com.wavesplatform.database
 
-import java.util
 import cats.data.Ior
 import cats.syntax.option.*
 import cats.syntax.semigroup.*
 import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
 import com.google.common.primitives.{Bytes, Ints}
+import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
@@ -15,7 +15,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.database
 import com.wavesplatform.database.patch.DisableHijackedAliases
-import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, TransactionMeta}
+import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, StaticAssetInfo, TransactionMeta}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBAmounts
@@ -36,6 +36,7 @@ import monix.reactive.Observer
 import org.iq80.leveldb.DB
 import org.slf4j.LoggerFactory
 
+import java.util
 import scala.annotation.tailrec
 import scala.collection.immutable.VectorMap
 import scala.collection.mutable.ArrayBuffer
@@ -440,7 +441,14 @@ abstract class LevelDBWriter private[database] (
       }
 
       for (((asset, NewAssetInfo(staticInfo, info, volumeInfo)), assetNum) <- issuedAssets.zipWithIndex) {
-        rw.put(Keys.assetStaticInfo(asset), Some((AssetNum(assetNum + 1), staticInfo)))
+        val pbStaticInfo = StaticAssetInfo(
+          ByteString.copyFrom(staticInfo.source.arr),
+          ByteString.copyFrom(staticInfo.issuer.arr),
+          staticInfo.decimals,
+          staticInfo.nft,
+          assetNum + 1
+        )
+        rw.put(Keys.assetStaticInfo(asset), Some(pbStaticInfo))
         rw.put(Keys.assetDetails(asset)(height), (info, volumeInfo))
       }
 

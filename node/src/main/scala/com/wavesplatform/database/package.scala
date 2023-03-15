@@ -328,28 +328,6 @@ package object database {
     ).toByteArray
   }
 
-  def writeAssetStaticInfo(sai: (AssetNum, AssetStaticInfo)): Array[Byte] =
-    pb.StaticAssetInfo(
-      ByteString.copyFrom(sai._2.source.arr),
-      ByteString.copyFrom(sai._2.issuer.arr),
-      sai._2.decimals,
-      sai._2.nft,
-      sai._1
-    ).toByteArray
-
-  def readAssetStaticInfo(bb: Array[Byte]): (AssetNum, AssetStaticInfo) = {
-    val sai = pb.StaticAssetInfo.parseFrom(bb)
-    (
-      AssetNum(sai.sequenceInBlock),
-      AssetStaticInfo(
-        TransactionId(sai.sourceId.toByteStr),
-        PublicKey(sai.issuerPublicKey.toByteArray),
-        sai.decimals,
-        sai.isNft
-      )
-    )
-  }
-
   def writeBlockMeta(data: BlockMeta): Array[Byte] =
     pb.BlockMeta(
       Some(PBBlocks.protobuf(data.header)),
@@ -588,24 +566,24 @@ package object database {
 
   def loadAssetDescription(resource: DBResource, levelDb: LevelDBWriter, asset: IssuedAsset): Option[AssetDescription] =
     for {
-      (sequenceInBlock, staticInfo) <- resource.get(Keys.assetStaticInfo(asset))
-      (info, volumeInfo)            <- fromHistory(resource, Keys.assetDetailsHistory(asset), Keys.assetDetails(asset))
-      (txMeta, _)                   <- levelDb.transactionInfo(staticInfo.source).filter { case (tm, _) => tm.succeeded }
+      pbStaticInfo       <- resource.get(Keys.assetStaticInfo(asset))
+      (info, volumeInfo) <- fromHistory(resource, Keys.assetDetailsHistory(asset), Keys.assetDetails(asset))
+      (txMeta, _)        <- levelDb.transactionInfo(pbStaticInfo.sourceId.toByteStr).filter { case (tm, _) => tm.succeeded }
       sponsorship = fromHistory(resource, Keys.sponsorshipHistory(asset), Keys.sponsorship(asset)).fold(0L)(_.minFee)
       script      = fromHistory(resource, Keys.assetScriptHistory(asset), Keys.assetScript(asset)).flatten
     } yield AssetDescription(
-      staticInfo.source,
-      staticInfo.issuer,
+      pbStaticInfo.sourceId.toByteStr,
+      PublicKey(pbStaticInfo.issuerPublicKey.toByteStr),
       info.name,
       info.description,
-      staticInfo.decimals,
+      pbStaticInfo.decimals,
       volumeInfo.isReissuable,
       volumeInfo.volume,
       info.lastUpdatedAt,
       script,
       sponsorship,
-      staticInfo.nft,
-      sequenceInBlock,
+      pbStaticInfo.isNft,
+      pbStaticInfo.sequenceInBlock,
       txMeta.height
     )
 
