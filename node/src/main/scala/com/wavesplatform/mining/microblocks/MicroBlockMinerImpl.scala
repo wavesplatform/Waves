@@ -128,13 +128,15 @@ class MicroBlockMinerImpl(
         if (updatedTotalConstraint.isFull) {
           log.trace(s"Stopping forging microBlocks, the block is full: $updatedTotalConstraint")
           Task.now(Stop)
-        } else
+        } else {
+          log.trace("UTX is empty, waiting for new transactions")
           Task
             .race(
               transactionAdded.headL.map(_ => Retry),
               if (utx.size > 0) Task.now(Retry) else Task.never
             )
             .map(_.merge)
+        }
     }
   }
 
