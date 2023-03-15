@@ -34,8 +34,8 @@ final class CompositeBlockchain private (
 
   def diff: Diff = maybeDiff.getOrElse(Diff.empty)
 
-  private lazy val indexedIssuedAssets: VectorMap[IssuedAsset, (NewAssetInfo, Int)] =
-    VectorMap.empty ++
+  private lazy val indexedIssuedAssets: Map[IssuedAsset, (NewAssetInfo, Int)] =
+    Map.empty ++
       diff.issuedAssets.zipWithIndex
         .map { case ((asset, info), i) => asset -> (info, i + 1) }
 
@@ -212,7 +212,7 @@ object CompositeBlockchain {
       asset: IssuedAsset,
       diff: Diff,
       height: Int,
-      indexedIssuedAssets: VectorMap[IssuedAsset, (NewAssetInfo, Int)],
+      indexedIssuedAssets: Map[IssuedAsset, (NewAssetInfo, Int)],
       innerAssetDescription: => Option[AssetDescription]
   ): Option[AssetDescription] = {
     indexedIssuedAssets
