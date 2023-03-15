@@ -18,8 +18,6 @@ import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, Alias
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionLike}
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 
-import scala.collection.immutable.VectorMap
-
 final class CompositeBlockchain private (
     inner: Blockchain,
     maybeDiff: Option[Diff] = None,
