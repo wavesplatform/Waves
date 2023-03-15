@@ -131,8 +131,8 @@ class MicroBlockMinerImpl(
         } else
           Task
             .race(
-              if (utx.size > 0) Task.now(Retry) else Task.never,
-              transactionAdded.headL.map(_ => Retry)
+              transactionAdded.headL.map(_ => Retry),
+              if (utx.size > 0) Task.now(Retry) else Task.never
             )
             .map(_.merge)
     }
