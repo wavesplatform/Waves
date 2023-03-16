@@ -2,7 +2,7 @@ package com.wavesplatform.extensions
 
 import akka.actor.ActorSystem
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.common._
+import com.wavesplatform.api.common.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.lang.ValidationError
