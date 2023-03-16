@@ -36,15 +36,15 @@ object ContractEvaluator {
   case class ExprWithInvArg(expr: EXPR, invArg: Option[LET])
   case class LogExtraInfo(invokedFuncName: Option[String] = None, invArg: Option[LET] = None, dAppAddress: Option[Address] = None)
 
-  def buildSyntheticCall(contract: DApp, call: EXPR): EXPR = {
+  def buildSyntheticCall(contract: DApp, call: EXPR, callerAddress: ByteStr, callerPk: ByteStr): EXPR = {
     val callables = contract.callableFuncs.flatMap { cf =>
       val argName = cf.annotation.invocationArgName
       val invocation = Invocation(
         null,
-        Recipient.Address(ByteStr(new Array[Byte](26))),
-        ByteStr(new Array[Byte](32)),
-        Recipient.Address(ByteStr(new Array[Byte](26))),
-        ByteStr(new Array[Byte](32)),
+        Recipient.Address(callerAddress),
+        callerPk,
+        Recipient.Address(callerAddress),
+        callerPk,
         AttachedPayments.Single(None),
         ByteStr(new Array[Byte](32)),
         0L,
@@ -52,8 +52,7 @@ object ContractEvaluator {
       )
       LET(argName, Bindings.buildInvocation(invocation, StdLibVersion.VersionDic.default)) :: cf.u :: Nil
     }
-
-    foldDeclarations(contract.decs ++ callables, BLOCK(LET("__synthetic_call", TRUE), call))
+    foldDeclarations(contract.decs ++ callables, call)
   }
 
   def buildExprFromInvocation(c: DApp, i: Invocation, version: StdLibVersion): Either[ExecutionError, ExprWithInvArg] = {
@@ -92,8 +91,8 @@ object ContractEvaluator {
     }
   }
 
-  private def foldDeclarations(dec: List[DECLARATION], block: BLOCK) =
-    dec.foldRight(block)((d, e) => BLOCK(d, e))
+  private def foldDeclarations(dec: List[DECLARATION], expr: EXPR) =
+    dec.foldRight(expr)((d, e) => BLOCK(d, e))
 
   def verify(
       decls: List[DECLARATION],
