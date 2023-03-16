@@ -1,8 +1,5 @@
 package com.wavesplatform.api
 
-import java.util.NoSuchElementException
-import java.util.concurrent.ExecutionException
-
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.*
@@ -23,6 +20,7 @@ import monix.execution.Scheduler
 import org.slf4j.LoggerFactory
 import play.api.libs.json.*
 
+import java.util.concurrent.ExecutionException
 import scala.concurrent.Future
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
@@ -137,7 +135,6 @@ package object http {
   val jsonExceptionHandler: ExceptionHandler = ExceptionHandler {
     case JsResultException(err)                                         => complete(WrongJson(errors = err))
     case PlayJsonException(cause, errors)                               => complete(WrongJson(cause, errors))
-    case e: NoSuchElementException                                      => complete(WrongJson(Some(e)))
     case e: IllegalArgumentException                                    => complete(ApiError.fromValidationError(GenericError(e)))
     case e: AssertionError                                              => complete(ApiError.fromValidationError(GenericError(e)))
     case e: ExecutionException if e.getCause != null && e.getCause != e => jsonExceptionHandler(e.getCause)
