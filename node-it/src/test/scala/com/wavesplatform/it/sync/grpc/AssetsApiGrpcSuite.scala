@@ -34,13 +34,10 @@ class AssetsApiGrpcSuite extends BaseFreeSpec with ActivationStatusRequest with 
     nftList should have size 20
     nftList.map(_.assetInfo.get.name) should contain theSameElementsAs nftTxs.keySet
 
-    val nftResponseHeights = nftList.map(_.assetInfo.get.issueHeight)
-    nftResponseHeights should contain theSameElementsAs nftTxsHeights
-
-    nftList
-      .groupMap(_.assetInfo.get.issueHeight)(_.assetInfo.get.sequenceInBlock)
-      .values
-      .foreach(nums => nums shouldBe (1 to nums.size))
+    val nftHeightsWithSequences = nftList.map(r => (r.assetInfo.get.issueHeight, r.assetInfo.get.sequenceInBlock))
+    nftHeightsWithSequences should be(sorted)
+    nftHeightsWithSequences.map(_._1) should contain theSameElementsAs nftTxsHeights
+    nftHeightsWithSequences.groupMap(_._1)(_._2).values.foreach(nums => nums shouldBe (1 to nums.size))
   }
 
   override def nodeConfigs: Seq[Config] =
