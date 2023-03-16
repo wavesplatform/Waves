@@ -215,7 +215,7 @@ object InvokeDiffsCommon {
     } yield resultDiff
   }
 
-  def checkActions(
+  private def checkActions(
       actions: StructuredCallableActions,
       version: StdLibVersion,
       dAppAddress: Address,
@@ -251,7 +251,7 @@ object InvokeDiffsCommon {
     } yield ()
   }
 
-  def actionsToScriptResult(
+  private def actionsToScriptResult(
       actions: StructuredCallableActions,
       storingComplexity: Int,
       tx: InvokeScriptLike,
