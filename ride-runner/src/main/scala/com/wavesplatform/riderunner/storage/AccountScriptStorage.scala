@@ -20,18 +20,36 @@ class AccountScriptStorage[TagT](
 ) extends ExactWithHeightStorage[Address, AccountScriptInfo, TagT] {
   override def getFromBlockchain(key: Address): Option[AccountScriptInfo] = {
     blockchainApi.getAccountScript(key).map { script =>
-      toAccountScriptInfo(EmptyPublicKey, script) // EmptyPublicKey will be replaced during an update
+      val r = toAccountScriptInfo(EmptyPublicKey, script) // EmptyPublicKey will be replaced during an update
+      // log.info(s"saved scripts (getFromBlockchain): $key, info=${r.hashCode()}, script=${script.hashCode()}, script.src=${script.bytes().base64Raw}")
+      r
     }
   }
 
-  def append(atHeight: Height, account: PublicKey, newScript: ByteString)(implicit ctx: ReadWrite): AffectedTags[TagT] =
-    append(atHeight, account.toAddress(chainId), toVanillaScript(newScript).map(toAccountScriptInfo(account, _)))
+  def append(atHeight: Height, account: PublicKey, newScript: ByteString)(implicit ctx: ReadWrite): AffectedTags[TagT] = {
+    val address       = account.toAddress(chainId)
+    val vanillaScript = toVanillaScript(newScript)
+    val scriptInfo    = vanillaScript.map(toAccountScriptInfo(account, _))
+//    log.info(
+//      s"saved scripts (append): $address, info=${scriptInfo.map(_.hashCode())}, " +
+//        s"script=${vanillaScript.map(_.hashCode())}, script.src=${vanillaScript.map(_.bytes().base64Raw)}"
+//    )
+    append(atHeight, address, scriptInfo)
+  }
 
   def undoAppend(toHeight: Height, account: PublicKey)(implicit ctx: ReadWrite): AffectedTags[TagT] =
     undoAppend(toHeight, account.toAddress(chainId))
 
-  def rollback(toHeight: Height, account: PublicKey, newScript: ByteString)(implicit ctx: ReadWrite): AffectedTags[TagT] =
-    rollback(toHeight, account.toAddress(chainId), toVanillaScript(newScript).map(toAccountScriptInfo(account, _)))
+  def rollback(toHeight: Height, account: PublicKey, newScript: ByteString)(implicit ctx: ReadWrite): AffectedTags[TagT] = {
+    val address       = account.toAddress(chainId)
+    val vanillaScript = toVanillaScript(newScript)
+    val scriptInfo    = vanillaScript.map(toAccountScriptInfo(account, _))
+//    log.info(
+//      s"saved scripts (rollback): $address, info=${scriptInfo.map(_.hashCode())}, " +
+//        s"script=${vanillaScript.map(_.hashCode())}, script.src=${vanillaScript.map(_.bytes().base64Raw)}"
+//    )
+    rollback(toHeight, address, scriptInfo)
+  }
 
   def toAccountScriptInfo(account: PublicKey, script: Script): AccountScriptInfo = {
     val estimated = estimate(script)

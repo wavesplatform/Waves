@@ -30,10 +30,13 @@ object RideRunnerMetrics {
   private val rideScriptRunOnHeightTime_ = Kamon.gauge("ride.script.run-on-height", "Run script running time", MeasurementUnit.time.nanoseconds)
   def rideScriptRunOnHeightTime(force: Boolean) = rideScriptRunOnHeightTime_.withTag("force", force)
 
-  val rideScriptTotalNumber = Kamon.gauge("ride.script.number", "Total registered RIDE scripts").withoutTags()
-  val rideScriptCacheHits   = Kamon.counter("ride.script.cache.hit", "Cache hits for whole script").withoutTags()
-  val rideScriptCacheMisses = Kamon.counter("ride.script.cache.miss", "Cache misses for whole script").withoutTags()
-  val rideScriptRunTime     = Kamon.timer("ride.script.run", "Script running time")
+  val rideRequestTotalNumber = Kamon.gauge("ride.request.number", "Total registered unique RIDE requests").withoutTags()
+  val rideRequestCacheHits   = Kamon.counter("ride.request.cache.hit", "Cache hits for whole request").withoutTags()
+  val rideRequestCacheMisses = Kamon.counter("ride.request.cache.miss", "Cache misses for whole request").withoutTags()
+  val rideRequestRunTime     = Kamon.timer("ride.request.run", "Request running time")
+
+  private val rideStorageKeyNumber          = Kamon.counter("ride.storage.number", "Number of unique keys in storage")
+  def rideStorageKeyNumberFor(name: String) = rideStorageKeyNumber.withTag("name", name)
 
   private val rideScriptCalls    = Kamon.counter("ride.script.calls", "Ride calls")
   val rideScriptOkCalls          = rideScriptCalls.withTag("type", "ok")
@@ -49,14 +52,14 @@ object RideRunnerMetrics {
   def grpcCallTimerFor(methodName: String, raw: Boolean) = grpcCallTimer.withTag("method", methodName).withTag("raw", raw)
 
   private val workSchedulerSize = Kamon.gauge("work-scheduler.size", "A size of queues in a work scheduler")
-  val prioritizedWorkSize = workSchedulerSize.withTag("tpe", "prioritized")
+  val prioritizedWorkSize       = workSchedulerSize.withTag("tpe", "prioritized")
   // TODO duplicates ride.script.number
   val allWorkSize = workSchedulerSize.withTag("tpe", "all")
 
-  private val jobSchedulerTime = Kamon.timer("job-scheduler.time")
-  val jobSchedulerPrioritizeTime = jobSchedulerTime.withTag("op", "prioritize")
+  private val jobSchedulerTime       = Kamon.timer("job-scheduler.time")
+  val jobSchedulerPrioritizeTime     = jobSchedulerTime.withTag("op", "prioritize")
   val jobSchedulerPrioritizeManyTime = jobSchedulerTime.withTag("op", "prioritizeMany")
-  val jobSchedulerGetJobTime = jobSchedulerTime.withTag("op", "getJob")
+  val jobSchedulerGetJobTime         = jobSchedulerTime.withTag("op", "getJob")
 
   implicit def timeExt(timer: Timer): TimerExt = new TimerExt(timer)
 }

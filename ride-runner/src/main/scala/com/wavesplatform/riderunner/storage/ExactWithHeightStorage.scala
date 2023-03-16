@@ -4,6 +4,7 @@ import cats.syntax.option.*
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.meta.getSimpleName
+import com.wavesplatform.riderunner.app.RideRunnerMetrics.rideStorageKeyNumberFor
 import com.wavesplatform.riderunner.storage.StorageContext.{ReadOnly, ReadWrite}
 import com.wavesplatform.riderunner.storage.persistent.PersistentCache
 import com.wavesplatform.state.Height
@@ -18,6 +19,10 @@ import scala.util.chaining.*
 trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging {
   storage =>
   def settings: ExactWithHeightStorage.Settings
+
+  private val name          = getSimpleName(this)
+  private val numberCounter = rideStorageKeyNumberFor(name)
+
   // TODO use indexes!!!!
 
   // We can look up tags to determine if a key has been known, because tags are always in RAM
@@ -32,6 +37,7 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
 
   def load()(implicit ctx: ReadOnly): Unit = {
     persistentCache.getAllKeys().foreach(x => tags.put(x, Set.empty[TagT]))
+    numberCounter.increment(tags.size())
   }
 
   protected val values = Caffeine
@@ -42,8 +48,6 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
     .build[KeyT, RemoteData[ValueT]]()
 
   private def tagsOf(key: KeyT): Option[Set[TagT]] = Option(tags.get(key))
-
-  lazy val name = getSimpleName(this)
 
   def getFromBlockchain(key: KeyT): Option[ValueT]
 
@@ -68,10 +72,13 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
         { (key: KeyT) =>
           val cached = persistentCache.get(atMaxHeight, key)
           if (cached.loaded) cached
-          else
+          else // TODO #36 This could be updated in a different thread
             RemoteData
               .loaded(getFromBlockchain(key))
-              .tap(r => persistentCache.set(atMaxHeight, key, r)) // TODO #36 This could be updated in a different thread
+              .tap { r =>
+                persistentCache.set(atMaxHeight, key, r)
+                numberCounter.increment()
+              }
         }
       )
       .mayBeValue

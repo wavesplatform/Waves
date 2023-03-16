@@ -2,7 +2,7 @@ package com.wavesplatform.riderunner.storage
 
 import cats.syntax.contravariantSemigroupal.*
 import com.wavesplatform.account.Address
-import com.wavesplatform.riderunner.app.RideRunnerMetrics.rideScriptTotalNumber
+import com.wavesplatform.riderunner.app.RideRunnerMetrics.rideRequestTotalNumber
 import com.wavesplatform.riderunner.storage.persistent.CacheKeys
 import com.wavesplatform.riderunner.storage.persistent.CacheKeys.{Requests, RequestsLastIndex}
 import play.api.libs.json.*
@@ -66,5 +66,5 @@ class LevelDbRequestsStorage(storage: Storage) extends RequestsStorage {
     refreshCounter()
   }
 
-  private def refreshCounter(): Unit = rideScriptTotalNumber.update(size)
+  private def refreshCounter(): Unit = rideRequestTotalNumber.update(size)
 }

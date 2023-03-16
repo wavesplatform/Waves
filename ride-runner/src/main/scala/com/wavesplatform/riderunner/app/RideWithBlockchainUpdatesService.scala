@@ -112,18 +112,33 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
 
     // TODO HACK: remove
     {
-      val cleanupIterationPath = Paths.get(settings.rideRunner.db.directory, "..", "cleanup").normalize()
+      val rootPath             = Paths.get(settings.rideRunner.db.directory, "..").normalize()
+      val cleanupIterationPath = rootPath.resolve("cleanup")
       val cleanupIteration =
-        if (cleanupIterationPath.toFile.exists()) Files.readString(cleanupIterationPath, StandardCharsets.UTF_8).toIntOption.getOrElse(0)
-        else 0
+        if (cleanupIterationPath.toFile.exists()) Files.readString(cleanupIterationPath, StandardCharsets.UTF_8).trim
+        else "-1" // to differ cases
 
-      val cleanTo = 2 // Increase if you want to clean the database
-      if (cleanupIteration < cleanTo) {
-        log.info(s"Cleaning the DB with caches from $cleanupIteration to $cleanTo...")
+      if (cleanupIteration == "-1") {
+        rootPath.toFile.listFiles().foreach { file =>
+          println(s"File before: $file")
+        }
+      }
+
+      val cleanTo = -10 // Increase if you want to clean the database
+      if (cleanupIteration.toIntOption.getOrElse(-2) < cleanTo) {
+        log.info(
+          s"Cleaning the DB with caches in ${settings.rideRunner.db.directory} from $cleanupIteration ($cleanupIterationPath) to $cleanTo..."
+        )
         new File(settings.rideRunner.db.directory).listFiles().foreach { file =>
           MoreFiles.deleteRecursively(file.toPath)
         }
         Files.writeString(cleanupIterationPath, cleanTo.toString)
+      }
+
+      if (cleanupIteration == "-1") {
+        rootPath.toFile.listFiles().foreach { file =>
+          println(s"File after: $file")
+        }
       }
     }
 
@@ -142,7 +157,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     log.info(s"Current height: known=${blockchainStorage.height}, blockchain=$lastHeightAtStart")
 
     val requestsStorage = new LevelDbRequestsStorage(storage)
-    log.info(s"There are ${requestsStorage.all().size} scripts")
+    log.info(s"There are ${requestsStorage.size} scripts")
 
     val requestsService = new DefaultRequestsService(
       settings.rideRunner.requestsService,
@@ -222,6 +237,12 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
       .bindFlow(httpService.loggingCompositeRoute)
     val http = Await.result(httpFuture, 20.seconds)
     cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream) { http.terminate(5.seconds) }
+
+    val gc = blockchainEventsStreamScheduler.scheduleAtFixedRate(20.minutes, 20.minutes) {
+      log.info("Running GC...")
+      System.gc()
+    }
+    cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream) { gc.cancel() }
 
     log.info("Initialization completed")
     Await.result(events, Duration.Inf)

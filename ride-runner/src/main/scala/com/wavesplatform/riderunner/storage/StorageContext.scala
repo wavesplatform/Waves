@@ -39,6 +39,7 @@ class ReadWriteHandle(db: RocksDB) extends AutoCloseable {
 
 object Storage {
   def rocksDb(db: RocksDB): Storage = new Storage {
+    // TODO bracket
     override def asyncReadOnly[T](f: ReadOnly => Task[T]): Task[T] = {
       @volatile var snapshot = none[Snapshot]
       @volatile var options  = none[ReadOptions]
