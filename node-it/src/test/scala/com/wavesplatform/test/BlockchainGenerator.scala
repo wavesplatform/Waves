@@ -1,6 +1,6 @@
 package com.wavesplatform.test
 
-import com.wavesplatform.{Application, Exporter, checkGenesis, crypto}
+import com.wavesplatform.{Exporter, checkGenesis, crypto}
 import com.wavesplatform.Exporter.IO
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -39,9 +39,10 @@ import monix.reactive.Observer
 import monix.reactive.subjects.ConcurrentSubject
 import org.web3j.crypto.{ECKeyPair, RawTransaction}
 
-import java.io.{BufferedOutputStream, File}
+import java.io.BufferedOutputStream
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
+import scala.language.reflectiveCalls
 import scala.util.{Failure, Success}
 
 // @formatter:off
