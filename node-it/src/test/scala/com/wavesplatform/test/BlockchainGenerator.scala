@@ -44,12 +44,22 @@ import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success}
 
-/** Usage example: <pre> object Example extends App { val generator = new BlockchainGenerator(Application.loadApplicationConfig(Some(new
-  * File("path-to-config-file")))) val sender = KeyPair("123".getBytes) val recipient =
-  * Address.fromString("3FddHK1Y3vPdcVKZshWCWea4gS5th6G1UE6").getOrElse(sender.toAddress) val genBlocks = (1 to 10).map { idx => GenBlock( (1 to
-  * 5).map(txIdx => GenTx(TxHelpers.transfer(sender, recipient, amount = (idx * 10 + txIdx) * 100000000L), Right(sender))), signer = sender ) }
-  * generator.generateBinaryFile(genBlocks) </pre>
-  */
+// @formatter:off
+/** Usage example: <pre> object Example extends App {
+ *  val wavesSettings = Application.loadApplicationConfig(Some(new File("path-to-config-file")))
+ *  val generator = new BlockchainGenerator(wavesSettings)
+ *  val sender = KeyPair("123".getBytes)
+ *  val recipient = Address.fromString("3FddHK1Y3vPdcVKZshWCWea4gS5th6G1UE6").getOrElse(sender.toAddress)
+ *  val genBlocks = (1 to 10).map { idx =>
+ *    GenBlock(
+ *      (1 to 5).map(txIdx => GenTx(TxHelpers.transfer(sender, recipient, amount = (idx * 10 + txIdx) * 100000000L), Right(sender))),
+ *      signer = sender
+ *    )
+ *  }
+ *  generator.generateBinaryFile(genBlocks)
+ * </pre>
+ */
+// @formatter:on
 class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
 
   private val settings: WavesSettings = wavesSettings.copy(minerSettings = wavesSettings.minerSettings.copy(quorum = 0))
