@@ -2458,6 +2458,20 @@ paths:
                   balance:
                     type: integer
                     format: int64
+            application/json;large-significand-format=string:
+              schema:
+                required:
+                  - address
+                  - assetId
+                  - balance
+                type: object
+                properties:
+                  address:
+                    type: string
+                  assetId:
+                    type: string
+                  balance:
+                    type: string
   '/assets/{assetId}/distribution':
     get:
       tags:
@@ -2473,10 +2487,23 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AssetDistribution'
+                type: object
+                additionalProperties:
+                  type: integer
+                  format: int64
+                description: map of assetId <-> balance
+                example:
+                  2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY: 15
+                  3PPqZ623dAfbmxmnpTjwV6yD5GA5s3PJiUG: 25
             application/json;large-significand-format=string:
               schema:
-                $ref: '#/components/schemas/AssetDistributionLSF'
+                type: object
+                additionalProperties:
+                  type: string
+                description: map of assetId <-> balance
+                example:
+                  2eEUvypDSivnzPiLrbYEW39SM8yMZ1aq4eJuiKfs4sEY: "15"
+                  3PPqZ623dAfbmxmnpTjwV6yD5GA5s3PJiUG: "25"
       deprecated: true
   '/assets/{assetId}/distribution/{height}/limit/{limit}':
     get:
@@ -2561,6 +2588,11 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/AssetDetails'
+            application/json;large-significand-format=string:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AssetDetailsLSF'
   '/leasing/active/{address}':
     get:
       tags:
@@ -2795,8 +2827,8 @@ paths:
                   format: int64
                 description: map of address <-> balance
                 example:
-                  addr1: "0"
-                  addr2: "100"
+                  addr1: 0
+                  addr2: 100
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
@@ -3145,8 +3177,8 @@ paths:
                   type: string
                 description: map of address <-> balance
                 example:
-                  addr1: 0
-                  addr2: 100
+                  addr1: "1"
+                  addr2: "1234567890"
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
@@ -3482,9 +3514,9 @@ components:
       properties:
         hasNext:
           type: boolean
-        last:
+        lastItem:
           $ref: '#/components/schemas/Address'
-        values:
+        items:
           additionalProperties:
             type: integer
             format: int64
@@ -3501,9 +3533,9 @@ components:
       properties:
         hasNext:
           type: boolean
-        last:
+        lastItem:
           $ref: '#/components/schemas/Address'
-        values:
+        items:
           additionalProperties:
             type: string
           description: map of assetId <-> balance
@@ -3525,6 +3557,10 @@ components:
           $ref: '#/components/schemas/AssetName'
         description:
           $ref: '#/components/schemas/AssetDescription'
+        quantity:
+          type: integer
+          format: int64
+          description: Total supply of the asset
         decimals:
           $ref: '#/components/schemas/AssetDecimals'
     AssetDetailsBaseLSF:
@@ -3542,6 +3578,9 @@ components:
           $ref: '#/components/schemas/AssetName'
         description:
           $ref: '#/components/schemas/AssetDescription'
+        quantity:
+          type: string
+          description: Total supply of the asset
         decimals:
           type: string
     AssetDetails:
@@ -3928,7 +3967,7 @@ components:
             transactions:
               type: array
               items:
-                $ref: '#/components/schemas/Transaction'
+                $ref: '#/components/schemas/TransactionLSF'
     CompiledScript:
       required:
         - script
