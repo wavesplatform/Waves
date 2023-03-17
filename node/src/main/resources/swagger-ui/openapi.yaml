@@ -2827,6 +2827,15 @@ paths:
                 example:
                   addr1: 0
                   addr2: 100
+            application/json;large-significand-format=string:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                description: map of address <-> balance
+                example:
+                  addr1: "0"
+                  addr2: "100"
         '403':
           $ref: '#/components/responses/ApiKeyNotValid'
       security:
