@@ -95,7 +95,7 @@ case class InvokeScriptTrace(
     ) ++ (resultE match {
       case Right(value) => TraceStep.maybeErrorJson(None) ++ Json.obj("result" -> TraceStep.scriptResultJson(invokeId, value))
       case Left(e)      => TraceStep.maybeErrorJson(Some(e))
-    }) ++ (if (logged && resultE.isRight) Json.obj(TraceStep.logJson(log)) else JsObject.empty)
+    }) ++ (if (logged) Json.obj(TraceStep.logJson(log)) else JsObject.empty)
   }
 }
 
