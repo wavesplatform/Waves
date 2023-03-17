@@ -5,7 +5,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, TransactionMeta}
+import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, StaticAssetInfo, TransactionMeta}
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.*
 import com.wavesplatform.state.reader.LeaseDetails
@@ -165,8 +165,8 @@ object Keys {
     as => writeStrings(as.map(_.name).toSeq)
   )
 
-  def assetStaticInfo(asset: IssuedAsset): Key[Option[AssetStaticInfo]] =
-    Key.opt(AssetStaticInfo, asset.id.arr, readAssetStaticInfo, writeAssetStaticInfo)
+  def assetStaticInfo(asset: IssuedAsset): Key[Option[StaticAssetInfo]] =
+    Key.opt(AssetStaticInfo, asset.id.arr, StaticAssetInfo.parseFrom, _.toByteArray)
 
   def nftCount(addressId: AddressId): Key[Int] =
     Key(NftCount, addressId.toByteArray, Option(_).fold(0)(Ints.fromByteArray), Ints.toByteArray)
