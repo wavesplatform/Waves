@@ -207,7 +207,9 @@ object StateUpdate {
           Height @@ v.lastUpdated,
           v.scriptInfo.map(fromPBScriptInfo),
           v.sponsorship,
-          v.nft
+          v.nft,
+          v.sequenceInBlock,
+          Height @@ v.issueHeight
         )
       }
 
@@ -232,7 +234,9 @@ object StateUpdate {
           sponsorship = v.sponsorship,
           nft = v.nft,
           safeVolume = ByteString.copyFrom(v.totalVolume.toByteArray),
-          lastUpdated = v.lastUpdatedAt
+          lastUpdated = v.lastUpdatedAt,
+          sequenceInBlock = v.sequenceInBlock,
+          issueHeight = v.issueHeight
         )
       }
 

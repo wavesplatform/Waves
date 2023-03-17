@@ -13,6 +13,7 @@ import com.wavesplatform.state.TxMeta
 import com.wavesplatform.transaction.Transaction
 import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
+import monix.reactive.Observable
 
 import scala.concurrent.Future
 
@@ -25,14 +26,18 @@ class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) exte
 
   override def getBlockRange(request: BlockRangeRequest, responseObserver: StreamObserver[BlockWithHeight]): Unit = responseObserver.interceptErrors {
     val stream =
-      if (request.includeTransactions)
-        commonApi
-          .blocksRange(request.fromHeight, request.toHeight)
-          .map(toBlockWithHeight)
-      else
-        commonApi
-          .metaRange(request.fromHeight, request.toHeight)
-          .map(toBlockWithHeight)
+      Observable.fromIterator(
+        (if (request.includeTransactions) {
+           commonApi
+             .blocksRange(request.fromHeight, request.toHeight)
+             .map(toBlockWithHeight)
+         } else {
+           commonApi
+             .metaRange(request.fromHeight, request.toHeight)
+             .map(toBlockWithHeight)
+         }).toListL // FIXME: Strict loading because of segfault in leveldb
+          .map(_.iterator)
+      )
 
     responseObserver.completeWith(request.filter match {
       case Filter.GeneratorPublicKey(publicKey) => stream.filter(_.getBlock.getHeader.generator.toPublicKey == publicKey.toPublicKey)

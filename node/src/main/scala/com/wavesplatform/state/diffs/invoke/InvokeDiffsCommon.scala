@@ -215,7 +215,7 @@ object InvokeDiffsCommon {
     } yield resultDiff
   }
 
-  def checkActions(
+  private def checkActions(
       actions: StructuredCallableActions,
       version: StdLibVersion,
       dAppAddress: Address,
@@ -251,7 +251,7 @@ object InvokeDiffsCommon {
     } yield ()
   }
 
-  def actionsToScriptResult(
+  private def actionsToScriptResult(
       actions: StructuredCallableActions,
       storingComplexity: Int,
       tx: InvokeScriptLike,
@@ -553,7 +553,7 @@ object InvokeDiffsCommon {
           Right(
             Diff(
               portfolios = Map(pk.toAddress -> Portfolio(assets = VectorMap(asset -> issue.quantity))),
-              issuedAssets = Map(asset -> NewAssetInfo(staticInfo, info, volumeInfo)),
+              issuedAssets = VectorMap(asset -> NewAssetInfo(staticInfo, info, volumeInfo)),
               assetScripts = Map(asset -> None)
             )
           )
