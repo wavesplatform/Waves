@@ -4,10 +4,10 @@ import scala.concurrent.Future
 
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.common.{CommonTransactionsApi, TransactionMeta}
-import com.wavesplatform.protobuf._
-import com.wavesplatform.protobuf.transaction._
+import com.wavesplatform.protobuf.*
+import com.wavesplatform.protobuf.transaction.*
 import com.wavesplatform.protobuf.utils.PBImplicitConversions.PBRecipientImplicitConversionOps
-import com.wavesplatform.state.{Blockchain, InvokeScriptResult => VISR}
+import com.wavesplatform.state.{Blockchain, InvokeScriptResult as VISR}
 import com.wavesplatform.transaction.{Authorized, EthereumTransaction}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import io.grpc.{Status, StatusRuntimeException}
@@ -32,21 +32,31 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
           val maybeSender = Option(request.sender)
             .collect { case s if !s.isEmpty => s.toAddress }
 
-          commonApi.transactionsByAddress(
-            recipientAddrOrAlias,
-            maybeSender,
-            Set.empty,
-            None
+          Observable.fromIterator(
+            commonApi
+              .transactionsByAddress(
+                recipientAddrOrAlias,
+                maybeSender,
+                Set.empty,
+                None
+              )
+              .toListL // FIXME: Strict loading because of segfault in leveldb
+              .map(_.iterator)
           )
 
         // By sender
         case None if !request.sender.isEmpty =>
           val senderAddress = request.sender.toAddress
-          commonApi.transactionsByAddress(
-            senderAddress,
-            Some(senderAddress),
-            Set.empty,
-            None
+          Observable.fromIterator(
+            commonApi
+              .transactionsByAddress(
+                senderAddress,
+                Some(senderAddress),
+                Set.empty,
+                None
+              )
+              .toListL // FIXME: Strict loading because of segfault in leveldb
+              .map(_.iterator)
           )
 
         // By ids
@@ -84,12 +94,11 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
     responseObserver.interceptErrors {
       val result = Observable(request.transactionIds*)
         .flatMap(txId => Observable.fromIterable(commonApi.transactionById(txId.toByteStr)))
-        .collect {
-          case TransactionMeta.Invoke(_, transaction, _, _, invokeScriptResult) =>
-            InvokeScriptResultResponse.of(
-              Some(PBTransactions.protobuf(transaction)),
-              invokeScriptResult.map(VISR.toPB(_, addressForTransfer = true))
-            )
+        .collect { case TransactionMeta.Invoke(_, transaction, _, _, invokeScriptResult) =>
+          InvokeScriptResultResponse.of(
+            Some(PBTransactions.protobuf(transaction)),
+            invokeScriptResult.map(VISR.toPB(_, addressForTransfer = true))
+          )
         }
 
       responseObserver.completeWith(result)
@@ -120,9 +129,9 @@ class TransactionsApiGrpcImpl(blockchain: Blockchain, commonApi: CommonTransacti
     (for {
       vtxEither <- Future(tx.toVanilla) // Intercept runtime errors
       vtx       <- vtxEither.toFuture
-      _         <- Either.cond(!vtx.isInstanceOf[EthereumTransaction], (), GenericError("ETH transactions should not be broadcasted over gRPC")).toFuture
-      result    <- commonApi.broadcastTransaction(vtx)
-      _         <- result.resultE.toFuture // Check for success
+      _      <- Either.cond(!vtx.isInstanceOf[EthereumTransaction], (), GenericError("ETH transactions should not be broadcasted over gRPC")).toFuture
+      result <- commonApi.broadcastTransaction(vtx)
+      _      <- result.resultE.toFuture // Check for success
     } yield tx).wrapErrors
 }
 
@@ -132,7 +141,7 @@ private object TransactionsApiGrpcImpl {
     val status        = if (meta.succeeded) ApplicationStatus.SUCCEEDED else ApplicationStatus.SCRIPT_EXECUTION_FAILED
     val invokeScriptResult = meta match {
       case TransactionMeta.Invoke(_, _, _, _, r) => r.map(VISR.toPB(_, addressForTransfer = true))
-      case _                                  => None
+      case _                                     => None
     }
 
     TransactionResponse(transactionId, meta.height, Some(meta.transaction.toPB), status, invokeScriptResult)
