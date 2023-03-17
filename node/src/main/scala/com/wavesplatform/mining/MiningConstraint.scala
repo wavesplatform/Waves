@@ -8,6 +8,7 @@ trait MiningConstraint {
   def isFull: Boolean
   def isOverfilled: Boolean
   def put(blockchain: Blockchain, x: Transaction, diff: Diff): MiningConstraint
+  def head: MiningConstraint = this
 }
 
 object MiningConstraint {
@@ -40,8 +41,8 @@ case class MultiDimensionalMiningConstraint(constraints: NonEmptyList[MiningCons
   override def isOverfilled: Boolean = constraints.exists(_.isOverfilled)
   override def put(blockchain: Blockchain, x: Transaction, diff: Diff): MultiDimensionalMiningConstraint =
     MultiDimensionalMiningConstraint(constraints.map(_.put(blockchain, x, diff)))
-
-  override def toString: String = s"Constraint([${constraints.head}${constraints.tail.mkString(",", ",", "")}])"
+  override def head: MiningConstraint = constraints.head
+  override def toString: String       = s"Constraint([${constraints.head}${constraints.tail.mkString(",", ",", "")}])"
 }
 
 object MultiDimensionalMiningConstraint {

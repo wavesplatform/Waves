@@ -2109,7 +2109,6 @@ paths:
           text/plain:
             schema:
               type: string
-        required: true
       responses:
         '200':
           description: successful operation
@@ -2134,7 +2133,6 @@ paths:
           text/plain:
             schema:
               type: string
-        required: true
       responses:
         '200':
           description: successful operation

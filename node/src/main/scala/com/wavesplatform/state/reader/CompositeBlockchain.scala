@@ -53,19 +53,22 @@ final class CompositeBlockchain private (
       .orElse(diff.leaseState.get(leaseId))
 
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] =
-    diff.transaction(id)
+    diff
+      .transaction(id)
       .collect { case NewTransactionInfo(tx: TransferTransaction, _, true, _) =>
         (height, tx)
       }
       .orElse(inner.transferById(id))
 
   override def transactionInfo(id: ByteStr): Option[(TxMeta, Transaction)] =
-    diff.transaction(id)
+    diff
+      .transaction(id)
       .map(t => (TxMeta(Height(this.height), t.applied, t.spentComplexity), t.transaction))
       .orElse(inner.transactionInfo(id))
 
   override def transactionMeta(id: ByteStr): Option[TxMeta] =
-    diff.transaction(id)
+    diff
+      .transaction(id)
       .map(t => TxMeta(Height(this.height), t.applied, t.spentComplexity))
       .orElse(inner.transactionMeta(id))
 

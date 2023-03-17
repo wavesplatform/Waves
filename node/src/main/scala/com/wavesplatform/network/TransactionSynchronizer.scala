@@ -12,7 +12,7 @@ import monix.reactive.{Observable, OverflowStrategy}
 object TransactionSynchronizer extends LazyLogging {
   def apply(
       settings: UtxSynchronizerSettings,
-      lastHeight: Observable[Int],
+      lastBlockId: Observable[ByteStr],
       transactions: Observable[(Channel, Transaction)],
       transactionValidator: TransactionPublisher
   )(implicit scheduler: Scheduler): Cancelable = {
@@ -22,8 +22,8 @@ object TransactionSynchronizer extends LazyLogging {
       .maximumSize(settings.networkTxCacheSize)
       .build[ByteStr, Object]
 
-    lastHeight.foreach { h =>
-      logger.trace(s"Invalidating known transactions at height $h")
+    lastBlockId.foreach { id =>
+      logger.trace(s"Invalidating known transactions for block id $id")
       knownTransactions.invalidateAll()
     }
 
