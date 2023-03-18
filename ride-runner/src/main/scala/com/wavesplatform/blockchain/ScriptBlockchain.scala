@@ -9,7 +9,19 @@ import com.wavesplatform.riderunner.storage.SharedBlockchainStorage
 import com.wavesplatform.riderunner.storage.StorageContext.ReadWrite
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, Blockchain, DataEntry, Height, LeaseBalance, TransactionId, TxMeta, VolumeAndFee}
+import com.wavesplatform.state.{
+  AccountScriptInfo,
+  AssetDescription,
+  AssetScriptInfo,
+  BalanceSnapshot,
+  Blockchain,
+  DataEntry,
+  Height,
+  LeaseBalance,
+  TransactionId,
+  TxMeta,
+  VolumeAndFee
+}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
@@ -53,10 +65,12 @@ class ScriptBlockchain[TagT](storage: SharedBlockchainStorage[TagT], tag: TagT)(
     storage.aliases.get(Height(height), a, tag).toRight(AliasDoesNotExist(a): ValidationError)
 
   // Ride: wavesBalance
-  override def leaseBalance(address: Address): LeaseBalance = storage.accountLeaseBalances.get(Height(height), address, tag).getOrElse(LeaseBalance.empty)
+  override def leaseBalance(address: Address): LeaseBalance =
+    storage.accountLeaseBalances.get(Height(height), address, tag).getOrElse(LeaseBalance.empty)
 
   // Ride: assetBalance, wavesBalance
-  override def balance(address: Address, mayBeAssetId: Asset): Long = storage.accountBalances.get(Height(height), (address, mayBeAssetId), tag).getOrElse(0L)
+  override def balance(address: Address, mayBeAssetId: Asset): Long =
+    storage.accountBalances.get(Height(height), (address, mayBeAssetId), tag).getOrElse(0L)
 
   // Retrieves Waves balance snapshot in the [from, to] range (inclusive)
   // Ride: wavesBalance (specifies to=None), "to" always None and means "to the end"
@@ -115,7 +129,7 @@ class ScriptBlockchain[TagT](storage: SharedBlockchainStorage[TagT], tag: TagT)(
   override def balanceAtHeight(address: Address, height: Int, assetId: Asset): Option[(Int, Long)] = kill("balanceAtHeight")
 
   // GET /eth/assets
-  // TODO see Keys.assetStaticInfo
+  // TODO #99 see Keys.assetStaticInfo
   override def resolveERC20Address(address: ERC20Address): Option[Asset.IssuedAsset] = kill("resolveERC20Address")
 
   private def kill(methodName: String) = throw new RuntimeException(s"$methodName is not supported, contact with developers")

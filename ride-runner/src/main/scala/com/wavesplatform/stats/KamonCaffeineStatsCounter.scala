@@ -4,6 +4,7 @@ import com.github.benmanes.caffeine.cache.RemovalCause
 import com.github.benmanes.caffeine.cache.stats.{CacheStats, StatsCounter}
 import kamon.Kamon
 
+// Tags that is easier to show in Grafana than with original KamonStatsCounter.
 class KamonCaffeineStatsCounter(name: String) extends StatsCounter {
   val hitsCounter     = Kamon.counter("cache.hits").withTag("name", name)
   val missesCounter   = Kamon.counter("cache.misses").withTag("name", name)

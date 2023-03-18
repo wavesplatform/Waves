@@ -26,7 +26,7 @@ import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.riderunner.storage.persistent.AsBytes.ByteArrayOutputStreamOps
-import com.wavesplatform.riderunner.storage.{DbKeyIndex, RequestKey}
+import com.wavesplatform.riderunner.storage.{DbKeyIndex, ScriptRequest}
 import com.wavesplatform.serialization.*
 import com.wavesplatform.state.{
   AccountScriptInfo,
@@ -146,7 +146,6 @@ object AsBytes {
     }
   }
 
-  // TODO #24 Generalize with tuple3
   implicit def tuple2[A, B](implicit aAsBytes: AsBytes[A], bAsBytes: AsBytes[B]): AsBytes[(A, B)] = new AsBytes[(A, B)] {
     override def toByteArray(x: (A, B)): Array[Byte] = {
       val (a, b) = x
@@ -274,8 +273,8 @@ sealed abstract class CacheHistoryKey[KeyT: AsBytes](prefix: Short) extends Cach
 
 object CacheKeys {
   object LastAddressId extends CacheKey[Unit, AddressId](0)
-  object AddressToId    extends CacheKey[Address, AddressId](1)
-  object IdToAddress    extends CacheKey[AddressId, Address](2)
+  object AddressToId   extends CacheKey[Address, AddressId](1)
+  object IdToAddress   extends CacheKey[AddressId, Address](2)
 
   // TODO stats: how often keys are changed?
   object AccountDataEntriesHistory extends CacheHistoryKey[(AddressId, String)](11)
@@ -309,7 +308,7 @@ object CacheKeys {
   object Transactions extends CacheKey[TransactionId, Option[Int]](110)
 
   object RequestsLastIndex extends CacheKey[Unit, Int](121)
-  object Requests          extends CacheKey[Int, RequestKey](122)
+  object Requests          extends CacheKey[Int, ScriptRequest](122)
 
   implicit val jsObjectAsBytes: AsBytes[JsObject] = AsBytes[String].transform(
     s =>
@@ -367,7 +366,7 @@ object CacheKeys {
             BlockMeta(
               header = Some(PBBlocks.protobuf(x.header)),
               signature = UnsafeByteOperations.unsafeWrap(x.signature.arr)
-              // TODO VRF
+              // TODO #15 Optimize working with VRF
             )
           )
         )
@@ -380,7 +379,6 @@ object CacheKeys {
     }
   }
 
-  // staticInfo, assetDetails, sponsorship, assetScript
   implicit val assetDescriptionAsBytes: AsBytes[AssetDescription] = new AsBytes[AssetDescription] {
     override def toByteArray(x: AssetDescription): Array[Byte] = {
       // TODO id here is empty, now it is used to optimize reads in NODE for Blockchain.resolveERC20Address
@@ -409,7 +407,6 @@ object CacheKeys {
 
       val sponsorship = bb.getLong
 
-      // TODO #26 Use AsBytes.option
       val (script, scriptLen) = bb.getByte match {
         case 0 => (None, 1)
         case 1 =>
@@ -487,8 +484,8 @@ object CacheKeys {
     }
   }
 
-  implicit val requestKeyAsBytes: AsBytes[RequestKey] = AsBytes[(Address, JsObject)].transform(
-    Function.tupled(RequestKey.apply),
+  implicit val requestKeyAsBytes: AsBytes[ScriptRequest] = AsBytes[(Address, JsObject)].transform(
+    Function.tupled(ScriptRequest.apply),
     x => (x.address, x.requestBody)
   )
 }

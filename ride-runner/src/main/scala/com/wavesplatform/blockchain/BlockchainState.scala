@@ -6,7 +6,6 @@ import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
-import com.wavesplatform.jvm.HeapDumps
 import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.riderunner.app.RideRunnerMetrics
@@ -129,9 +128,6 @@ object BlockchainState extends ScorexLogging {
     }
   }
 
-  // Why do we require the processor instead of returning a list of actions?
-  // 1. We have to know about blocks at height, so we need at least 1 dependency
-  // 2. Side effects is the only reason for being of BlockchainState
   def apply(processor: Processor, orig: BlockchainState, event: SubscribeEvent): Task[BlockchainState] = {
     val update = event.getUpdate.update
     val h      = Height(event.getUpdate.height)
@@ -159,17 +155,9 @@ object BlockchainState extends ScorexLogging {
 
             processor.process(event.getUpdate)
             if (h >= comparedBlocks.workingHeight) {
-//              log.info(s"[$h] Reached the current height, run all scripts")
-//              val r = Working(h)
-//              processor.runAffectedScripts().as {
-//                logStatusChanged(r)
-//                HeapDumps.mk("init", live = true, makeAlways = false)
-//                r
-//              }
               log.info(s"[$h] Reached the current height")
               val r = Working(h)
               logStatusChanged(r)
-              // HeapDumps.mk("init", live = true, makeAlways = false)
               Task.now(r)
             } else Task.now(comparedBlocks.copy(processedHeight = h))
 

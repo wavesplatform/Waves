@@ -37,6 +37,7 @@ class RideDb(
 
 }
 
+// TODO #101 Settings (those won't break a DB)
 object RideDb extends ScorexLogging {
   case class Settings(directory: String)
 

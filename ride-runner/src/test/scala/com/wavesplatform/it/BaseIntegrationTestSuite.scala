@@ -11,8 +11,8 @@ import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.riderunner.DefaultRequestService
 import com.wavesplatform.riderunner.storage.HasDb.TestDb
-import com.wavesplatform.riderunner.storage.persistent.LevelDbPersistentCaches
-import com.wavesplatform.riderunner.storage.{HasDb, RequestKey, RequestsStorage, SharedBlockchainStorage}
+import com.wavesplatform.riderunner.storage.persistent.DefaultPersistentCaches
+import com.wavesplatform.riderunner.storage.{HasDb, ScriptRequest, RequestsStorage, SharedBlockchainStorage}
 import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
 import com.wavesplatform.{BaseTestSuite, HasMonixHelpers}
 import monix.eval.Task
@@ -50,23 +50,23 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
 
     val testDb = use(TestDb.mk())
     val blockchainStorage = testDb.storage.readWrite { implicit ctx =>
-      SharedBlockchainStorage[RequestKey](
+      SharedBlockchainStorage[ScriptRequest](
         settings.rideRunner.sharedBlockchain,
         testDb.storage,
-        LevelDbPersistentCaches(testDb.storage),
+        DefaultPersistentCaches(testDb.storage),
         blockchainApi
       )
     }
 
-    val request = RequestKey(aliceAddr, Json.obj("expr" -> "foo()"))
+    val request = ScriptRequest(aliceAddr, Json.obj("expr" -> "foo()"))
     val requestsService = new DefaultRequestService(
       settings = DefaultRequestService.Settings(enableTraces = false, Int.MaxValue, 0, 3, 0.seconds),
       storage = testDb.storage,
       sharedBlockchain = blockchainStorage,
       requestsStorage = new RequestsStorage {
         override def size: Int                   = 1
-        override def append(x: RequestKey): Unit = {} // Ignore, because no way to evaluate a new expr
-        override def all(): List[RequestKey]     = List(request)
+        override def append(x: ScriptRequest): Unit = {} // Ignore, because no way to evaluate a new expr
+        override def all(): List[ScriptRequest]     = List(request)
       },
       runScriptsScheduler = testScheduler
     )

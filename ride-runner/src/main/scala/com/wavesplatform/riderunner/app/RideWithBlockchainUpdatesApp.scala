@@ -6,8 +6,8 @@ import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState}
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.riderunner.DefaultRequestService
 import com.wavesplatform.riderunner.db.RideDb
-import com.wavesplatform.riderunner.storage.persistent.LevelDbPersistentCaches
-import com.wavesplatform.riderunner.storage.{RequestKey, RequestsStorage, SharedBlockchainStorage, Storage}
+import com.wavesplatform.riderunner.storage.persistent.DefaultPersistentCaches
+import com.wavesplatform.riderunner.storage.{ScriptRequest, RequestsStorage, SharedBlockchainStorage, Storage}
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.ManagedChannel
@@ -36,7 +36,7 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
 
     val scripts = Json
       .parse(Using(Source.fromFile(inputFile))(_.getLines().mkString("\n")).get)
-      .as[List[RequestKey]]
+      .as[List[ScriptRequest]]
 
     log.info("Starting...")
     implicit val actorSystem = ActorSystem("ride-runner", globalConfig)
@@ -118,8 +118,8 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
 
     val storage = Storage.rocksDb(db)
     val blockchainStorage = storage.readWrite { implicit rw =>
-      val dbCaches = LevelDbPersistentCaches(storage)
-      SharedBlockchainStorage[RequestKey](settings.rideRunner.sharedBlockchain, storage, dbCaches, blockchainApi)
+      val dbCaches = DefaultPersistentCaches(storage)
+      SharedBlockchainStorage[ScriptRequest](settings.rideRunner.sharedBlockchain, storage, dbCaches, blockchainApi)
     }
 
     val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
@@ -131,20 +131,23 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
       blockchainStorage,
       new RequestsStorage {
         override def size: Int                   = scripts.size
-        override def all(): List[RequestKey]     = scripts
-        override def append(x: RequestKey): Unit = {} // Ignore, because no way to evaluate a new expr
+        override def all(): List[ScriptRequest]     = scripts
+        override def append(x: ScriptRequest): Unit = {} // Ignore, because no way to evaluate a new expr
       },
       rideScheduler
     )
 
+    // TODO #100 Fix App with BlockchainUpdates
     // log.info("Warming up caches...") // Helps to figure out, which data is used by a script
     // Await.result(requestsService.runAll().runToFuture(rideScheduler), Duration.Inf)
 
+    // TODO #100 Settings?
     // mainnet
     val lastSafeKnownHeight = Height(3393500)                 // math.max(0, blockchainStorage.height - 100 - 1)) // A rollback is not possible
     val workingHeight       = Height(lastSafeKnownHeight + 3) // Height(math.max(blockchainStorage.height, lastHeightAtStart))
     val endHeight           = Height(workingHeight + 1)       // 101 // lastHeightAtStart
 
+    // TODO #100 Settings?
     // testnet
     //      val lastKnownHeight = Height(2327973)
     //      val endHeight   = Height(lastKnownHeight + 1)

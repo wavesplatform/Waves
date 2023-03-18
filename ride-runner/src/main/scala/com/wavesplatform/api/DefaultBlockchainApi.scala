@@ -210,7 +210,7 @@ class DefaultBlockchainApi(
       .tap(_ => log.trace(s"getBlockHeaderRange($fromHeight, $toHeight)"))
   }
 
-  // TODO #5: It seems VRF only from REST API, take from gRPC/BlockchainUpdates API
+  // TODO #5: It seems VRF can be obtained only from REST API, take from gRPC/BlockchainUpdates API when it will be possible
   override def getVrf(height: Int): Option[ByteStr] = {
     basicRequest
       .get(uri"${settings.nodeApiBaseUri}/blocks/headers/at/$height")

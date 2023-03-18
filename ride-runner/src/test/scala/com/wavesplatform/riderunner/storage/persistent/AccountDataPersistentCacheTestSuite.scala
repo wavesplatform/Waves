@@ -9,7 +9,7 @@ class AccountDataPersistentCacheTestSuite extends PersistentCacheTestSuite[Accou
   protected override val defaultValue = BooleanDataEntry(defaultPairDataKey, value = true)
 
   protected override def test(f: (Storage, PersistentCache[AccountDataKey, DataEntry[?]]) => Unit): Unit = withDb { db =>
-    val caches = db.readOnly(LevelDbPersistentCaches(db)(_))
+    val caches = db.readOnly(DefaultPersistentCaches(db)(_))
     f(db, caches.accountDataEntries)
   }
 }

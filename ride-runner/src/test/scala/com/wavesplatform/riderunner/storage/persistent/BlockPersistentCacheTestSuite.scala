@@ -227,7 +227,7 @@ class BlockPersistentCacheTestSuite extends PersistentTestSuite {
     )
 
   private def test(f: (Storage, BlockPersistentCache) => Unit): Unit = withDb { db =>
-    val caches = db.readOnly(LevelDbPersistentCaches(db)(_))
+    val caches = db.readOnly(DefaultPersistentCaches(db)(_))
     f(db, caches.blockHeaders)
   }
 }

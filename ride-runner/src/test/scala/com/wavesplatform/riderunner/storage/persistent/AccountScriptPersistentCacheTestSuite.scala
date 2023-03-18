@@ -16,7 +16,7 @@ class AccountScriptPersistentCacheTestSuite extends PersistentCacheTestSuite[Add
   )
 
   protected override def test(f: (Storage, PersistentCache[Address, AccountScriptInfo]) => Unit): Unit = withDb { db =>
-    val caches = db.readOnly(LevelDbPersistentCaches(db)(_))
+    val caches = db.readOnly(DefaultPersistentCaches(db)(_))
     f(db, caches.accountScripts)
   }
 }

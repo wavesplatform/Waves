@@ -8,8 +8,8 @@ import com.wavesplatform.riderunner.app.RideRunnerMetrics.rideStorageKeyNumberFo
 import com.wavesplatform.riderunner.storage.StorageContext.{ReadOnly, ReadWrite}
 import com.wavesplatform.riderunner.storage.persistent.PersistentCache
 import com.wavesplatform.state.Height
+import com.wavesplatform.stats.KamonCaffeineStatsCounter
 import com.wavesplatform.utils.ScorexLogging
-import kamon.instrumentation.caffeine.KamonStatsCounter
 import org.eclipse.collections.impl.map.mutable.ConcurrentHashMap
 
 import scala.util.chaining.*
@@ -23,16 +23,10 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
   private val name          = getSimpleName(this)
   private val numberCounter = rideStorageKeyNumberFor(name)
 
-  // TODO use indexes!!!!
-
   // We can look up tags to determine if a key has been known, because tags are always in RAM
-  // not exist - we don't known this key
-  // exist, but empty - we known this key, but doesn't remember for what
-  // exist and non-empty - we exactly know, why do we need this key
-//  protected val tags = Caffeine
-//    .newBuilder()
-//    .recordStats(() => new KamonStatsCounter(s"$name.tags"))
-//    .build[KeyT, Set[TagT]]()
+  //   not exist - we don't known this key
+  //   exist, but empty - we known this key, but doesn't remember why
+  //   exist and non-empty - we know, why do we need this key (but there are probably more tags)
   protected val tags = new ConcurrentHashMap[KeyT, Set[TagT]]()
 
   def load()(implicit ctx: ReadOnly): Unit = {
@@ -44,7 +38,7 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
     .newBuilder()
     .softValues()
     .maximumSize(settings.maxEntries)
-    .recordStats(() => new KamonStatsCounter(s"$name.values"))
+    .recordStats(() => new KamonCaffeineStatsCounter(s"$name.values"))
     .build[KeyT, RemoteData[ValueT]]()
 
   private def tagsOf(key: KeyT): Option[Set[TagT]] = Option(tags.get(key))
@@ -56,10 +50,9 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
   // For REST API
   def getUntagged(atMaxHeight: Height, key: KeyT)(implicit ctx: ReadWrite): Option[ValueT] = getLatestInternal(atMaxHeight, key, None)
 
-  // For running scripts
+  // To run scripts after their data changed
   def get(atMaxHeight: Height, key: KeyT, tag: TagT)(implicit ctx: ReadWrite): Option[ValueT] = getLatestInternal(atMaxHeight, key, Some(tag))
 
-  // Only for REST API or running scripts
   private def getLatestInternal(atMaxHeight: Height, key: KeyT, tag: Option[TagT])(implicit ctx: ReadWrite): Option[ValueT] = {
     tag.foreach { tag =>
       // TODO if contains one value - then it wasn't before, optimize values insertion

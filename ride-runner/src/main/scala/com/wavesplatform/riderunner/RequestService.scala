@@ -9,10 +9,10 @@ import com.wavesplatform.riderunner.DefaultRequestService.RideScriptRunEnvironme
 import com.wavesplatform.riderunner.app.RideRunnerMetrics
 import com.wavesplatform.riderunner.app.RideRunnerMetrics.*
 import com.wavesplatform.riderunner.storage.StorageContext.ReadWrite
-import com.wavesplatform.riderunner.storage.{RequestKey, RequestsStorage, SharedBlockchainStorage, Storage}
+import com.wavesplatform.riderunner.storage.{RequestsStorage, ScriptRequest, SharedBlockchainStorage, Storage}
 import com.wavesplatform.state.Height
+import com.wavesplatform.stats.KamonCaffeineStatsCounter
 import com.wavesplatform.utils.ScorexLogging
-import kamon.instrumentation.caffeine.KamonStatsCounter
 import monix.eval.Task
 import monix.execution.Scheduler
 import play.api.libs.json.JsObject
@@ -22,54 +22,51 @@ import scala.concurrent.duration.FiniteDuration
 
 trait RequestService {
   def runAll(): Task[Unit]
-  def runAffected(atHeight: Int, affected: Set[RequestKey]): Task[Unit]
-  def trackAndRun(request: RequestKey): Task[JsObject]
+  def runAffected(atHeight: Int, affected: Set[ScriptRequest]): Task[Unit]
+  def trackAndRun(request: ScriptRequest): Task[JsObject]
 }
 
 class DefaultRequestService(
     settings: DefaultRequestService.Settings,
     storage: Storage,
-    sharedBlockchain: SharedBlockchainStorage[RequestKey],
+    sharedBlockchain: SharedBlockchainStorage[ScriptRequest],
     requestsStorage: RequestsStorage,
     runScriptsScheduler: Scheduler
 ) extends RequestService
     with ScorexLogging {
-//  private val scripts: TrieMap[RequestKey, RideScriptRunEnvironment] =
-//    TrieMap.from(requestsStorage.all().map(k => (k, RideScriptRunEnvironment(k))))
   private val requests = Caffeine
     .newBuilder()
     .softValues()
-    .maximumSize(10000)
-    .recordStats(() => new KamonStatsCounter("Requests"))
-    .build[RequestKey, RideScriptRunEnvironment]()
-
-//  private val jobScheduler: JobScheduler[RequestKey] = SynchronizedJobScheduler(settings.parallelization, scripts.keys)
+    .maximumSize(10000) // TODO #96 settings and metrics
+    .recordStats(() => new KamonCaffeineStatsCounter("Requests"))
+    .build[ScriptRequest, RideScriptRunEnvironment]()
 
   // To get rid of duplicated requests
-  private val inProgress = new ConcurrentHashMap[RequestKey, Task[JsObject]]()
+  private val inProgress = new ConcurrentHashMap[ScriptRequest, Task[JsObject]]()
 
   override def runAll(): Task[Unit] = {
+    // TODO #98 Resources in bracket
     /*storage.asyncReadWrite { implicit ctx =>
     runManyAll(sharedBlockchain.height, scripts.values.toList)
   }*/
     Task.unit
   }
 
-  override def runAffected(atHeight: Int, affected: Set[RequestKey]): Task[Unit] =
+  override def runAffected(atHeight: Int, affected: Set[ScriptRequest]): Task[Unit] =
     // runMany(atHeight, affected.toList.flatMap(scripts.get))
     // Task.now(jobScheduler.prioritize(affected))
     Task.unit
 
-  override def trackAndRun(request: RequestKey): Task[JsObject] = {
+  override def trackAndRun(request: ScriptRequest): Task[JsObject] = {
     val currentHeight = Height(sharedBlockchain.height)
     val cache         = Option(requests.getIfPresent(request))
     cache match {
-      // TODO -1 ? Will eliminate calls to blockchain
       case Some(cache) if runScriptsScheduler.clockMonotonic(TimeUnit.SECONDS) - cache.lastUpdateInS < settings.cacheTtl.toSeconds =>
         rideRequestCacheHits.increment()
         Task.now(cache.lastResult)
 
       case _ =>
+        // TODO #98 Resources in bracket
         val task = // storage.asyncReadWrite { implicit rw =>
           Task {
             rideRequestCacheMisses.increment()
@@ -114,13 +111,12 @@ class DefaultRequestService(
     Task.unit
   }
 
-//  private def runOne(height: Int, script: RideScriptRunEnvironment, hasCaches: Boolean)(implicit ctx: ReadWrite): Task[JsObject] = Task {
+  // TODO #98 Resources in bracket
+  //  private def runOne(height: Int, script: RideScriptRunEnvironment, hasCaches: Boolean)(implicit ctx: ReadWrite): Task[JsObject] = Task {
   private def runOne(height: Int, script: RideScriptRunEnvironment, hasCaches: Boolean): Task[JsObject] = Task {
     val updatedResult = storage.readWrite { implicit ctx =>
       rideRequestRunTime.withTag("has-caches", hasCaches).measure {
-        val result = evaluate(script)
-        // Removed, because I'm not sure it is required. TODO restore stateChanges?
-        result - "stateChanges"
+        evaluate(script) - "stateChanges" // Not required for now
       }
     }
 
@@ -132,16 +128,15 @@ class DefaultRequestService(
 
     if ((updatedResult \ "error").isEmpty) {
       val complexity = (updatedResult \ "complexity").as[Int]
-      log.info(f"result=ok; addr=${script.key.address}; req=${script.key.requestBody}; complexity=$complexity")
+      log.trace(f"result=ok; addr=${script.key.address}; req=${script.key.requestBody}; complexity=$complexity")
 
-      // TODO consumes CPU?
       if (
         origResult == JsObject.empty ||
         updatedResult \ "result" \ "value" != origResult \ "result" \ "value"
       ) rideScriptOkCalls.increment()
       else rideScriptUnnecessaryCalls.increment()
     } else {
-      log.info(f"result=failed; addr=${script.key.address}; req=${script.key.requestBody}; errorCode=${(updatedResult \ "error").as[Int]}")
+      log.trace(f"result=failed; addr=${script.key.address}; req=${script.key.requestBody}; errorCode=${(updatedResult \ "error").as[Int]}")
       rideScriptFailedCalls.increment()
     }
 
@@ -152,7 +147,7 @@ class DefaultRequestService(
 
   private def evaluate(script: RideScriptRunEnvironment)(implicit ctx: ReadWrite): JsObject = UtilsApiRoute.evaluate(
     settings.evaluateScriptComplexityLimit,
-    new ScriptBlockchain[RequestKey](sharedBlockchain, script.key),
+    new ScriptBlockchain[ScriptRequest](sharedBlockchain, script.key),
     script.key.address,
     script.key.requestBody,
     settings.enableTraces,
@@ -170,13 +165,13 @@ object DefaultRequestService {
   )
 
   private final case class RideScriptRunEnvironment(
-      key: RequestKey,
+      key: ScriptRequest,
       lastResult: JsObject,
       updateHeight: Int,
       lastUpdateInS: Long
   )
 
   private object RideScriptRunEnvironment {
-    def apply(key: RequestKey): RideScriptRunEnvironment = new RideScriptRunEnvironment(key, JsObject.empty, 0, 0L)
+    def apply(key: ScriptRequest): RideScriptRunEnvironment = new RideScriptRunEnvironment(key, JsObject.empty, 0, 0L)
   }
 }

@@ -86,7 +86,7 @@ class SharedBlockchainStorage[TagT] private (
       .mayBeValue
 
   def removeAllFrom(height: Height): Unit = storage.readWrite { implicit ctx =>
-    // TODO remove all keys too
+    // TODO #99 Remove all keys from height
     blockHeaders.removeFrom(height)
   }
 
@@ -94,14 +94,12 @@ class SharedBlockchainStorage[TagT] private (
   def process(event: BlockchainUpdated): AffectedTags[TagT] =
     storage.readWrite { implicit ctx =>
       val toHeight = Height(event.height)
-      // TODO ProcessResult here is better, because we don't need to combine sets on new Block
       val affected = event.update match {
         case Update.Empty         => AffectedTags.empty[TagT] // Ignore
         case Update.Append(evt)   => append(toHeight, evt)
         case Update.Rollback(evt) => rollback(Height(height), toHeight, evt)
       }
 
-      // Update this in the end, because a service could be suddenly turned off and we won't know, that we should re-read this block
       blockHeaders.update(event)
       log.info(s"Processed ${event.height}")
 
@@ -110,7 +108,6 @@ class SharedBlockchainStorage[TagT] private (
 
   def append(atHeight: Height, evt: BlockchainUpdated.Append)(implicit ctx: ReadWrite): AffectedTags[TagT] = {
     val (txs, timer) = evt.body match {
-      // PBBlocks.vanilla(block.getBlock.getHeader)
       case Body.Block(block)           => (block.getBlock.transactions, blockProcessingTime.some)
       case Body.MicroBlock(microBlock) => (microBlock.getMicroBlock.getMicroBlock.transactions, microBlockProcessingTime.some)
       case Body.Empty                  => (Seq.empty, none)
@@ -215,9 +212,6 @@ class SharedBlockchainStorage[TagT] private (
     }
 
   private def undoAppend(toHeight: Height, append: BlockchainUpdated.Append)(implicit ctx: ReadWrite): AffectedTags[TagT] = {
-    // Almost all scripts use the height, so we can run all of them
-    //    val withUpdatedHeight = accumulatedChanges.copy(newHeight = h) // TODO #31 Affect all scripts if height is increased
-
     val (txs, timer) = append.body match {
       case Body.Block(block)           => (block.getBlock.transactions, blockProcessingTime.some)
       case Body.MicroBlock(microBlock) => (microBlock.getMicroBlock.getMicroBlock.transactions, microBlockProcessingTime.some)

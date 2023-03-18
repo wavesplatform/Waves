@@ -1,5 +1,6 @@
 # To build: docker build -t wavesplatform/ride-runner:latest -f docker/ride-runner.Dockerfile docker
-FROM eclipse-temurin:17-jre
+# JDK for now, because I need jmap, e.g. ijmap -dump:format=b,file=heap-dump.hprof
+FROM eclipse-temurin:17-jdk
 
 # /usr/local/async-profiler/build/libasyncProfiler.so
 ENV ASYNCPROF_VERSION=2.9

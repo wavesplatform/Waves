@@ -219,7 +219,7 @@ class AccountLeaseBalancePersistentCacheTestSuite extends PersistentTestSuite {
   }
 
   private def test(f: (Storage, PersistentCache[Address, LeaseBalance]) => Unit): Unit = withDb { db =>
-    val caches = db.readWrite(LevelDbPersistentCaches(db)(_))
+    val caches = db.readWrite(DefaultPersistentCaches(db)(_))
     f(db, caches.accountLeaseBalances)
   }
 }

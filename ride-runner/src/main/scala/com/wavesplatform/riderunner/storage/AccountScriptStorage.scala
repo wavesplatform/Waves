@@ -20,9 +20,7 @@ class AccountScriptStorage[TagT](
 ) extends ExactWithHeightStorage[Address, AccountScriptInfo, TagT] {
   override def getFromBlockchain(key: Address): Option[AccountScriptInfo] = {
     blockchainApi.getAccountScript(key).map { script =>
-      val r = toAccountScriptInfo(EmptyPublicKey, script) // EmptyPublicKey will be replaced during an update
-      // log.info(s"saved scripts (getFromBlockchain): $key, info=${r.hashCode()}, script=${script.hashCode()}, script.src=${script.bytes().base64Raw}")
-      r
+      toAccountScriptInfo(EmptyPublicKey, script) // EmptyPublicKey will be replaced during an update
     }
   }
 
@@ -30,10 +28,6 @@ class AccountScriptStorage[TagT](
     val address       = account.toAddress(chainId)
     val vanillaScript = toVanillaScript(newScript)
     val scriptInfo    = vanillaScript.map(toAccountScriptInfo(account, _))
-//    log.info(
-//      s"saved scripts (append): $address, info=${scriptInfo.map(_.hashCode())}, " +
-//        s"script=${vanillaScript.map(_.hashCode())}, script.src=${vanillaScript.map(_.bytes().base64Raw)}"
-//    )
     append(atHeight, address, scriptInfo)
   }
 
@@ -44,10 +38,6 @@ class AccountScriptStorage[TagT](
     val address       = account.toAddress(chainId)
     val vanillaScript = toVanillaScript(newScript)
     val scriptInfo    = vanillaScript.map(toAccountScriptInfo(account, _))
-//    log.info(
-//      s"saved scripts (rollback): $address, info=${scriptInfo.map(_.hashCode())}, " +
-//        s"script=${vanillaScript.map(_.hashCode())}, script.src=${vanillaScript.map(_.bytes().base64Raw)}"
-//    )
     rollback(toHeight, address, scriptInfo)
   }
 

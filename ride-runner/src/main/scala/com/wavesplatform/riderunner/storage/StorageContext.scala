@@ -4,7 +4,7 @@ import cats.syntax.option.*
 import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.database.{DBExt, Key, RW, ReadOnlyDB}
 import com.wavesplatform.riderunner.storage.StorageContext.{ReadOnly, ReadWrite}
-import com.wavesplatform.riderunner.storage.persistent.LevelDbPersistentCaches.ReadOnlyDBOps
+import com.wavesplatform.riderunner.storage.persistent.DefaultPersistentCaches.ReadOnlyDBOps
 import monix.eval.Task
 import org.rocksdb.*
 
@@ -37,9 +37,9 @@ class ReadWriteHandle(db: RocksDB) extends AutoCloseable {
   }
 }
 
+// TODO #98 Wrapped Task.bracket instead of vars
 object Storage {
   def rocksDb(db: RocksDB): Storage = new Storage {
-    // TODO bracket
     override def asyncReadOnly[T](f: ReadOnly => Task[T]): Task[T] = {
       @volatile var snapshot = none[Snapshot]
       @volatile var options  = none[ReadOptions]
@@ -49,16 +49,14 @@ object Storage {
         snapshot = s.some
         options = o.some
         new ReadOnly(new ReadOnlyDB(db, o))
-      }
-        .flatMap(f)
-        .doOnFinish { _ =>
-          Task {
-            try options.foreach(_.close())
-            finally {}
-            try snapshot.foreach(_.close())
-            finally {}
-          }
+      }.bracket(f) { _ =>
+        Task {
+          try options.foreach(_.close())
+          finally {}
+          try snapshot.foreach(_.close())
+          finally {}
         }
+      }
     }
 
     override def readOnly[T](f: ReadOnly => T): T = db.readOnly(x => f(new ReadOnly(x)))
@@ -75,25 +73,23 @@ object Storage {
         readOptions = ro.some
         batch = b.some
         new ReadWrite(new RW(db, ro, b))
-      }
-        .flatMap(f)
-        .doOnFinish { _ =>
-          Task {
-            try
-              batch.foreach { b =>
-                Using.resource(new WriteOptions().setSync(false).setDisableWAL(true)) { wo =>
-                  db.write(wo, b)
-                }
+      }.bracket(f) { _ =>
+        Task {
+          try
+            batch.foreach { b =>
+              Using.resource(new WriteOptions().setSync(false).setDisableWAL(true)) { wo =>
+                db.write(wo, b)
               }
-            finally {}
+            }
+          finally {}
 
-            try readOptions.foreach(_.close())
-            finally {}
+          try readOptions.foreach(_.close())
+          finally {}
 
-            try snapshot.foreach(_.close())
-            finally {}
-          }
+          try snapshot.foreach(_.close())
+          finally {}
         }
+      }
     }
 
     override def readWrite[T](f: ReadWrite => T): T = db.readWrite(x => f(new ReadWrite(x)))

@@ -11,17 +11,16 @@ import java.util.concurrent.atomic.AtomicInteger
 
 trait RequestsStorage {
   def size: Int
-  def all(): List[RequestKey]
+  def all(): List[ScriptRequest]
 
   /** Doesn't check presence
     */
-  def append(x: RequestKey): Unit
+  def append(x: ScriptRequest): Unit
 }
 
-// TODO rename
-final case class RequestKey(address: Address, requestBody: JsObject)
-object RequestKey {
-  implicit val requestsKeyReads: Reads[RequestKey] = Reads {
+final case class ScriptRequest(address: Address, requestBody: JsObject)
+object ScriptRequest {
+  implicit val requestsKeyReads: Reads[ScriptRequest] = Reads {
     case JsArray(rawAddress +: rawRequestBody +: xs) if xs.isEmpty =>
       val address = rawAddress match {
         case JsString(rawAddress) => Address.fromString(rawAddress).left.map(e => s"Expected '$rawAddress' to be an address: $e")
@@ -33,7 +32,7 @@ object RequestKey {
         case x           => Left(s"Expected a JsObject, got: $x")
       }
 
-      (address, requestBody).mapN(RequestKey.apply) match {
+      (address, requestBody).mapN(ScriptRequest.apply) match {
         case Left(e)  => JsError(s"Can't parse RequestKey: $e")
         case Right(r) => JsSuccess(r)
       }
@@ -42,23 +41,22 @@ object RequestKey {
   }
 }
 
-// TODO
-class LevelDbRequestsStorage(storage: Storage) extends RequestsStorage {
+class DefaultRequestsStorage(storage: Storage) extends RequestsStorage {
   private val lastIndexKey = RequestsLastIndex.mkKey(())
   private val lastIndex    = new AtomicInteger(storage.readOnly(_.db.getOpt(lastIndexKey).getOrElse(-1)))
   refreshCounter()
 
   override def size: Int = lastIndex.get() + 1
 
-  override def all(): List[RequestKey] = storage.readOnly { ro =>
-    var r = List.empty[RequestKey]
+  override def all(): List[ScriptRequest] = storage.readOnly { ro =>
+    var r = List.empty[ScriptRequest]
     ro.db.iterateOver(Requests.prefixBytes) { entry =>
       r = CacheKeys.Requests.parseValue(entry.getValue) :: r
     }
     r // .reverse the order doesn't matter
   }
 
-  override def append(x: RequestKey): Unit = storage.readWrite { rw =>
+  override def append(x: ScriptRequest): Unit = storage.readWrite { rw =>
     val newIndex = lastIndex.incrementAndGet()
     val key      = CacheKeys.Requests.mkKey(newIndex)
     rw.db.put(lastIndexKey, newIndex)

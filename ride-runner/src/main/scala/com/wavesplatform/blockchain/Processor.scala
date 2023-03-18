@@ -5,7 +5,7 @@ import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.riderunner.RequestService
-import com.wavesplatform.riderunner.storage.{AffectedTags, RequestKey, SharedBlockchainStorage}
+import com.wavesplatform.riderunner.storage.{AffectedTags, ScriptRequest, SharedBlockchainStorage}
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
@@ -31,11 +31,11 @@ trait Processor {
   def runAffectedScripts(): Task[Unit]
 }
 
-class BlockchainProcessor(blockchainStorage: SharedBlockchainStorage[RequestKey], requestsService: RequestService)
+class BlockchainProcessor(blockchainStorage: SharedBlockchainStorage[ScriptRequest], requestsService: RequestService)
     extends Processor
     with ScorexLogging {
 
-  private val accumulatedChanges   = new AtomicReference(new ProcessResult[RequestKey]())
+  private val accumulatedChanges   = new AtomicReference(new ProcessResult[ScriptRequest]())
   @volatile private var lastEvents = List.empty[BlockchainUpdated]
 
   override def process(event: BlockchainUpdated): Unit = {
@@ -94,12 +94,10 @@ class BlockchainProcessor(blockchainStorage: SharedBlockchainStorage[RequestKey]
   override def removeAllFrom(height: Height): Unit = blockchainStorage.removeAllFrom(height)
 }
 
-// TODO #18: don't calculate affectedScripts if all scripts are affected
-// Use totalScripts: Int = 0, but not all scripts are affected! Probably cancel?
 case class ProcessResult[TagT](
     newHeight: Int = 0,
     affectedScripts: AffectedTags[TagT] = AffectedTags(Set.empty[TagT]),
-    all: Boolean = false
+    all: Boolean = false // TODO #94 Remove
 ) {
   def withAffectedTags(xs: AffectedTags[TagT]): ProcessResult[TagT] = if (all) this else copy(affectedScripts = affectedScripts ++ xs)
   def combine(x: ProcessResult[TagT]): ProcessResult[TagT] =
@@ -107,10 +105,6 @@ case class ProcessResult[TagT](
     else copy(newHeight = math.max(newHeight, x.newHeight), affectedScripts = affectedScripts ++ x.affectedScripts)
 
   def withoutAffectedTags: ProcessResult[TagT] = copy(affectedScripts = AffectedTags.empty[TagT], all = false)
-  def withAll(atHeight: Int): ProcessResult[TagT] = ProcessResult[TagT](
-    newHeight = atHeight,
-    all = true
-  )
 
   def isEmpty: Boolean    = affectedScripts.isEmpty && !all
   def affected: Set[TagT] = affectedScripts.xs

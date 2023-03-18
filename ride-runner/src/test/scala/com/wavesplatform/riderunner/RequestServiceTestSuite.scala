@@ -11,8 +11,8 @@ import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.it.TestBlockchainApi
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.riderunner.storage.HasDb.TestDb
-import com.wavesplatform.riderunner.storage.persistent.LevelDbPersistentCaches
-import com.wavesplatform.riderunner.storage.{HasDb, RequestKey, RequestsStorage, SharedBlockchainStorage}
+import com.wavesplatform.riderunner.storage.persistent.DefaultPersistentCaches
+import com.wavesplatform.riderunner.storage.{HasDb, ScriptRequest, RequestsStorage, SharedBlockchainStorage}
 import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
 import monix.eval.Task
 import monix.execution.schedulers.TestScheduler
@@ -23,14 +23,14 @@ import scala.concurrent.duration.DurationInt
 import scala.util.Using
 
 class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
-  private val aRequest = RequestKey(aliceAddr, Json.obj("expr" -> "default()"))
-  private val bRequest = RequestKey(bobAddr, Json.obj("expr" -> "default()"))
-  private val cRequest = RequestKey(carlAddr, Json.obj("expr" -> "default()"))
+  private val aRequest = ScriptRequest(aliceAddr, Json.obj("expr" -> "default()"))
+  private val bRequest = ScriptRequest(bobAddr, Json.obj("expr" -> "default()"))
+  private val cRequest = ScriptRequest(carlAddr, Json.obj("expr" -> "default()"))
 
   private val requestsStorage = new RequestsStorage {
-    override val all: List[RequestKey]       = List(aRequest, bRequest, cRequest)
+    override val all: List[ScriptRequest]       = List(aRequest, bRequest, cRequest)
     override val size: Int                   = all.size
-    override def append(x: RequestKey): Unit = {} // Ignore, because no way to evaluate a new expr
+    override def append(x: ScriptRequest): Unit = {} // Ignore, because no way to evaluate a new expr
   }
 
   private val accountScripts = Map(
@@ -81,7 +81,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
       blockchainApi: TestBlockchainApi,
       scheduler: TestScheduler
   ) {
-    def trackAndRun(request: RequestKey): Int = {
+    def trackAndRun(request: ScriptRequest): Int = {
       val task = requests.trackAndRun(request).runToFuture(scheduler)
       scheduler.tick()
       val r = Await.result(task, 5.seconds)
@@ -106,10 +106,10 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
 
     val testDb = use(TestDb.mk())
     val blockchainStorage = testDb.storage.readWrite { implicit ctx =>
-      SharedBlockchainStorage[RequestKey](
+      SharedBlockchainStorage[ScriptRequest](
         settings.rideRunner.sharedBlockchain,
         testDb.storage,
-        LevelDbPersistentCaches(testDb.storage),
+        DefaultPersistentCaches(testDb.storage),
         blockchainApi
       )
     }

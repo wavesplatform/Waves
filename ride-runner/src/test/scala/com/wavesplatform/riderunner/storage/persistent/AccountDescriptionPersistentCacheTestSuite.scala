@@ -25,7 +25,7 @@ class AccountDescriptionPersistentCacheTestSuite extends PersistentCacheTestSuit
   )
 
   protected override def test(f: (Storage, PersistentCache[Asset.IssuedAsset, AssetDescription]) => Unit): Unit = withDb { db =>
-    val caches = db.readOnly(LevelDbPersistentCaches(db)(_))
+    val caches = db.readOnly(DefaultPersistentCaches(db)(_))
     f(db, caches.assetDescriptions)
   }
 }

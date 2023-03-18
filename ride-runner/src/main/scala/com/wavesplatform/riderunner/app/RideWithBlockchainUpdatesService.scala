@@ -6,11 +6,10 @@ import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState}
 import com.wavesplatform.http.{EvaluateApiRoute, HttpServiceStatus, ServiceApiRoute}
-import com.wavesplatform.jvm.HeapDumps
 import com.wavesplatform.riderunner.DefaultRequestService
 import com.wavesplatform.riderunner.db.RideDb
-import com.wavesplatform.riderunner.storage.persistent.LevelDbPersistentCaches
-import com.wavesplatform.riderunner.storage.{LevelDbRequestsStorage, RequestKey, SharedBlockchainStorage, Storage}
+import com.wavesplatform.riderunner.storage.persistent.DefaultPersistentCaches
+import com.wavesplatform.riderunner.storage.{DefaultRequestsStorage, ScriptRequest, SharedBlockchainStorage, Storage}
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.ManagedChannel
@@ -39,8 +38,6 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
       val metrics = new RideRunnerMetrics(globalConfig)
       cs.cleanup(CustomShutdownPhase.Metrics) { metrics.close() }
     }
-
-    HeapDumps.cleanDirs(5)
 
     log.info("Initializing thread pools...")
     def mkScheduler(name: String, threads: Int): Scheduler = {
@@ -107,7 +104,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
       httpBackend = httpBackend
     )
 
-    // TODO HACK: remove
+    // TODO HACK: Remove when the storage format cemented
 //    {
 //      val rootPath             = Paths.get(settings.rideRunner.db.directory, "..").normalize()
 //      val cleanupIterationPath = rootPath.resolve("cleanup")
@@ -150,14 +147,14 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     log.info("Loading data from caches...")
     val storage = Storage.rocksDb(rideDb.db)
     val blockchainStorage = storage.readWrite { implicit rw =>
-      val dbCaches = LevelDbPersistentCaches(storage)
-      SharedBlockchainStorage[RequestKey](settings.rideRunner.sharedBlockchain, storage, dbCaches, blockchainApi)
+      val dbCaches = DefaultPersistentCaches(storage)
+      SharedBlockchainStorage[ScriptRequest](settings.rideRunner.sharedBlockchain, storage, dbCaches, blockchainApi)
     }
 
     val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
     log.info(s"Current height: known=${blockchainStorage.height}, blockchain=$lastHeightAtStart")
 
-    val requestsStorage = new LevelDbRequestsStorage(storage)
+    val requestsStorage = new DefaultRequestsStorage(storage)
     log.info(s"There are ${requestsStorage.size} scripts")
 
     val requestService = new DefaultRequestService(

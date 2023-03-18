@@ -1,3 +1,3 @@
 package com.wavesplatform.collections
 
-object syntax extends AbstractMapSyntax with MapSyntax with OptionSyntax
+object syntax extends OptionSyntax

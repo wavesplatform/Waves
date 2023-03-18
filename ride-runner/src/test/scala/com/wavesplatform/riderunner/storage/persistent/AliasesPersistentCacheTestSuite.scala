@@ -9,7 +9,7 @@ class AliasesPersistentCacheTestSuite extends PersistentCacheTestSuite[Alias, Ad
   protected override val defaultValue = alice.toAddress
 
   protected override def test(f: (Storage, PersistentCache[Alias, Address]) => Unit): Unit = withDb { db =>
-    val caches = db.readOnly(LevelDbPersistentCaches(db)(_))
+    val caches = db.readOnly(DefaultPersistentCaches(db)(_))
     f(db, caches.aliases)
   }
 }

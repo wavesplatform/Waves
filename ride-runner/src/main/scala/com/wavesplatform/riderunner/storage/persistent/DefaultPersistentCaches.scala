@@ -8,19 +8,19 @@ import com.wavesplatform.collections.syntax.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{AddressId, Key, ReadOnlyDB}
 import com.wavesplatform.riderunner.storage.StorageContext.{ReadOnly, ReadWrite}
-import com.wavesplatform.riderunner.storage.persistent.LevelDbPersistentCaches.ReadOnlyDBOps
+import com.wavesplatform.riderunner.storage.persistent.DefaultPersistentCaches.ReadOnlyDBOps
 import com.wavesplatform.riderunner.storage.{AccountAssetKey, AccountDataKey, KeyIndexStorage, Storage}
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, EmptyDataEntry, Height, LeaseBalance, TransactionId}
+import com.wavesplatform.stats.KamonCaffeineStatsCounter
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
-import kamon.instrumentation.caffeine.KamonStatsCounter
 import org.slf4j.LoggerFactory
 
 import java.lang.Long as JLong
 import java.util.concurrent.atomic.AtomicLong
 import scala.util.chaining.scalaUtilChainingOps
 
-class LevelDbPersistentCaches private (storage: Storage, initialBlockHeadersLastHeight: Option[Int]) extends PersistentCaches with ScorexLogging {
+class DefaultPersistentCaches private (storage: Storage, initialBlockHeadersLastHeight: Option[Int]) extends PersistentCaches with ScorexLogging {
   private val lastAddressIdKey = CacheKeys.LastAddressId.mkKey(())
   private val lastAddressId    = new AtomicLong(storage.readOnly(_.db.getOpt(lastAddressIdKey).getOrElse(-1L)))
 
@@ -362,7 +362,6 @@ class LevelDbPersistentCaches private (storage: Storage, initialBlockHeadersLast
 
   private val activatedFeaturesDbKey = CacheKeys.ActivatedFeatures.mkKey(())
 
-  // TODO
   override def getActivatedFeatures(): RemoteData[Map[Short, Int]] = {
     val r = storage.readOnly(_.db.getOpt(activatedFeaturesDbKey)) match {
       case None     => RemoteData.Unknown
@@ -384,7 +383,7 @@ class LevelDbPersistentCaches private (storage: Storage, initialBlockHeadersLast
       .newBuilder()
       .maximumSize(1000)
       .softValues()
-      .recordStats(() => new KamonStatsCounter("Addresses"))
+      .recordStats(() => new KamonCaffeineStatsCounter("Addresses"))
       .build()
 
   private def getAddress(addressId: AddressId)(implicit ctx: ReadOnly): Option[Address] =
@@ -424,9 +423,9 @@ class LevelDbPersistentCaches private (storage: Storage, initialBlockHeadersLast
   )
 }
 
-object LevelDbPersistentCaches {
-  def apply(storage: Storage)(implicit ctx: ReadOnly): LevelDbPersistentCaches =
-    new LevelDbPersistentCaches(storage, ctx.db.getOpt(CacheKeys.Height.Key))
+object DefaultPersistentCaches {
+  def apply(storage: Storage)(implicit ctx: ReadOnly): DefaultPersistentCaches =
+    new DefaultPersistentCaches(storage, ctx.db.getOpt(CacheKeys.Height.Key))
 
   implicit final class ReadOnlyDBOps(val self: ReadOnlyDB) extends AnyVal {
     // TODO move to ctx

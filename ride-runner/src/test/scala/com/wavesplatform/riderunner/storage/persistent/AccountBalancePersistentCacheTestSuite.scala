@@ -224,7 +224,7 @@ class AccountBalancePersistentCacheTestSuite extends PersistentTestSuite {
   }
 
   private def test(f: (Storage, PersistentCache[AccountAssetKey, Long]) => Unit): Unit = withDb { db =>
-    val caches = db.readWrite(LevelDbPersistentCaches(db)(_))
+    val caches = db.readWrite(DefaultPersistentCaches(db)(_))
     f(db, caches.accountBalances)
   }
 }
