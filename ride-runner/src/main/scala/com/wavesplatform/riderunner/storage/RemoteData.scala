@@ -1,4 +1,4 @@
-package com.wavesplatform.blockchain
+package com.wavesplatform.riderunner.storage
 
 sealed trait RemoteData[+ValueT] extends Product with Serializable {
   def loaded: Boolean

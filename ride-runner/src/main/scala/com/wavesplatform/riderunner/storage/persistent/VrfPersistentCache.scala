@@ -1,7 +1,7 @@
 package com.wavesplatform.riderunner.storage.persistent
 
-import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.riderunner.storage.RemoteData
 import com.wavesplatform.riderunner.storage.StorageContext.{ReadOnly, ReadWrite}
 
 trait VrfPersistentCache {

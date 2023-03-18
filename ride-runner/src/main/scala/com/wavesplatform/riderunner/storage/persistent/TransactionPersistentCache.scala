@@ -1,6 +1,6 @@
 package com.wavesplatform.riderunner.storage.persistent
 
-import com.wavesplatform.blockchain.RemoteData
+import com.wavesplatform.riderunner.storage.RemoteData
 import com.wavesplatform.riderunner.storage.StorageContext.{ReadOnly, ReadWrite}
 import com.wavesplatform.state.{Height, TransactionId}
 

@@ -1,8 +1,7 @@
 package com.wavesplatform.riderunner.storage.persistent
 
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.blockchain.RemoteData
-import com.wavesplatform.riderunner.storage.{AccountAssetKey, AccountDataKey}
+import com.wavesplatform.riderunner.storage.{AccountAssetKey, AccountDataKey, RemoteData}
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, LeaseBalance}
 import com.wavesplatform.transaction.Asset
 

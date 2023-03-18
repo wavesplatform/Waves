@@ -1,7 +1,6 @@
 package com.wavesplatform.riderunner.storage.persistent
 
-import com.wavesplatform.blockchain.RemoteData
-import com.wavesplatform.riderunner.storage.StorageContext
+import com.wavesplatform.riderunner.storage.{RemoteData, StorageContext}
 import com.wavesplatform.riderunner.storage.StorageContext.ReadWrite
 
 import scala.collection.concurrent.TrieMap

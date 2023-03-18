@@ -1,18 +1,17 @@
 package com.wavesplatform.riderunner
 
 import cats.syntax.option.*
-import com.wavesplatform.BaseTestSuite
+import com.wavesplatform.{BaseTestSuite, riderunner}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.DefaultBlockchainApi.toVanilla
 import com.wavesplatform.api.HasGrpc
 import com.wavesplatform.block.SignedBlockHeader
-import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState, Processor}
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.it.TestBlockchainApi
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.riderunner.storage.HasDb.TestDb
 import com.wavesplatform.riderunner.storage.persistent.DefaultPersistentCaches
-import com.wavesplatform.riderunner.storage.{HasDb, ScriptRequest, RequestsStorage, SharedBlockchainStorage}
+import com.wavesplatform.riderunner.storage.{HasDb, RequestsStorage, ScriptRequest, SharedBlockchainStorage}
 import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
 import monix.eval.Task
 import monix.execution.schedulers.TestScheduler
@@ -133,7 +132,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
         }
       )
       .scanEval(Task.now[BlockchainState](BlockchainState.Starting(Height(0), workingHeight))) {
-        BlockchainState(processor, blockchainUpdatesStream, _, _)
+        riderunner.BlockchainState(processor, blockchainUpdatesStream, _, _)
       }
       .doOnError { e =>
         Task {

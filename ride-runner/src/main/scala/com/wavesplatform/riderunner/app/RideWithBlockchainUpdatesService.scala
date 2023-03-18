@@ -4,9 +4,9 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
-import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState}
 import com.wavesplatform.http.{EvaluateApiRoute, HttpServiceStatus, ServiceApiRoute}
-import com.wavesplatform.riderunner.DefaultRequestService
+import com.wavesplatform.riderunner
+import com.wavesplatform.riderunner.{BlockchainProcessor, BlockchainState, DefaultRequestService}
 import com.wavesplatform.riderunner.db.RideDb
 import com.wavesplatform.riderunner.storage.persistent.DefaultPersistentCaches
 import com.wavesplatform.riderunner.storage.{DefaultRequestsStorage, ScriptRequest, SharedBlockchainStorage, Storage}
@@ -181,7 +181,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     val events = blockchainUpdatesStream.downstream
       .doOnError(e => Task { log.error("Error!", e) })
       .scanEval(Task.now[BlockchainState](BlockchainState.Starting(lastSafeKnownHeight, workingHeight))) {
-        BlockchainState(processor, blockchainUpdatesStream, _, _)
+        riderunner.BlockchainState(processor, blockchainUpdatesStream, _, _)
       }
       .doOnNext { state =>
         Task {

@@ -5,16 +5,15 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.DefaultBlockchainApi.*
 import com.wavesplatform.api.HasGrpc
 import com.wavesplatform.block.SignedBlockHeader
-import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState}
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.riderunner.DefaultRequestService
+import com.wavesplatform.riderunner.{BlockchainProcessor, BlockchainState, DefaultRequestService}
 import com.wavesplatform.riderunner.storage.HasDb.TestDb
 import com.wavesplatform.riderunner.storage.persistent.DefaultPersistentCaches
-import com.wavesplatform.riderunner.storage.{HasDb, ScriptRequest, RequestsStorage, SharedBlockchainStorage}
+import com.wavesplatform.riderunner.storage.{HasDb, RequestsStorage, ScriptRequest, SharedBlockchainStorage}
 import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
-import com.wavesplatform.{BaseTestSuite, HasMonixHelpers}
+import com.wavesplatform.{BaseTestSuite, HasMonixHelpers, riderunner}
 import monix.eval.Task
 import monix.execution.schedulers.TestScheduler
 import play.api.libs.json.Json
@@ -92,7 +91,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
       )
       .take(events.size)
       .scanEval(Task.now[BlockchainState](BlockchainState.Starting(Height(0), workingHeight))) {
-        BlockchainState(processor, blockchainUpdatesStream, _, _)
+        riderunner.BlockchainState(processor, blockchainUpdatesStream, _, _)
       }
       .doOnError { e =>
         Task {

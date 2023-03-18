@@ -1,8 +1,7 @@
 package com.wavesplatform.riderunner.storage.persistent
 
 import com.wavesplatform.account.Address
-import com.wavesplatform.blockchain.RemoteData
-import com.wavesplatform.riderunner.storage.Storage
+import com.wavesplatform.riderunner.storage.{RemoteData, Storage}
 import com.wavesplatform.state.LeaseBalance
 
 class AccountLeaseBalancePersistentCacheTestSuite extends PersistentTestSuite {

@@ -3,7 +3,6 @@ package com.wavesplatform.riderunner.storage
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.google.protobuf.ByteString
 import com.wavesplatform.api.BlockchainApi
-import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.riderunner.storage.StorageContext.ReadWrite
 import com.wavesplatform.riderunner.storage.persistent.TransactionPersistentCache

@@ -1,10 +1,9 @@
-package com.wavesplatform.blockchain
+package com.wavesplatform.riderunner
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
-import com.wavesplatform.riderunner.RequestService
 import com.wavesplatform.riderunner.storage.{AffectedTags, ScriptRequest, SharedBlockchainStorage}
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging

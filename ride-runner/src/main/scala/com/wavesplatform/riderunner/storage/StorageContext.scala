@@ -1,7 +1,6 @@
 package com.wavesplatform.riderunner.storage
 
 import cats.syntax.option.*
-import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.database.{DBExt, Key, RW, ReadOnlyDB}
 import com.wavesplatform.riderunner.storage.StorageContext.{ReadOnly, ReadWrite}
 import com.wavesplatform.riderunner.storage.persistent.DefaultPersistentCaches.ReadOnlyDBOps

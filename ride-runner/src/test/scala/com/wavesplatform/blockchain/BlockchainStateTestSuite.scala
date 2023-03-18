@@ -1,9 +1,10 @@
 package com.wavesplatform.blockchain
 
-import com.wavesplatform.BaseTestSuite
+import com.wavesplatform.{BaseTestSuite, riderunner}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.events.protobuf.BlockchainUpdated
+import com.wavesplatform.riderunner.{BlockchainState, Processor}
 import com.wavesplatform.state.Height
 import monix.execution.Scheduler.Implicits.global
 
@@ -198,5 +199,5 @@ class BlockchainStateTestSuite extends BaseTestSuite {
   )
 
   private def nextState(processor: Processor, orig: BlockchainState, event: SubscribeEvent): BlockchainState =
-    Await.result(BlockchainState(processor, orig, event).runToFuture, 10.seconds)
+    Await.result(riderunner.BlockchainState(processor, orig, event).runToFuture, 10.seconds)
 }

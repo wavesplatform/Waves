@@ -2,7 +2,6 @@ package com.wavesplatform.riderunner.storage
 
 import cats.syntax.option.*
 import com.wavesplatform.api.BlockchainApi
-import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body

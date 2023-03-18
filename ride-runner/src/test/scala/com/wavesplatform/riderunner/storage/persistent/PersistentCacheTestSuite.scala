@@ -1,8 +1,7 @@
 package com.wavesplatform.riderunner.storage.persistent
 
-import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.meta.getSimpleName
-import com.wavesplatform.riderunner.storage.Storage
+import com.wavesplatform.riderunner.storage.{RemoteData, Storage}
 
 abstract class PersistentCacheTestSuite[KeyT, ValueT] extends PersistentTestSuite {
   private val name                    = getSimpleName(this).replace("TestSuite", "")

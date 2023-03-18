@@ -2,12 +2,12 @@ package com.wavesplatform.riderunner.app
 
 import akka.actor.ActorSystem
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
-import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState}
 import com.wavesplatform.events.WrappedEvent
-import com.wavesplatform.riderunner.DefaultRequestService
+import com.wavesplatform.riderunner
+import com.wavesplatform.riderunner.{BlockchainProcessor, BlockchainState, DefaultRequestService}
 import com.wavesplatform.riderunner.db.RideDb
 import com.wavesplatform.riderunner.storage.persistent.DefaultPersistentCaches
-import com.wavesplatform.riderunner.storage.{ScriptRequest, RequestsStorage, SharedBlockchainStorage, Storage}
+import com.wavesplatform.riderunner.storage.{RequestsStorage, ScriptRequest, SharedBlockchainStorage, Storage}
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.ManagedChannel
@@ -175,7 +175,7 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
           false
       }
       .collect { case WrappedEvent.Next(event) => event }
-      .scanEval(Task.now[BlockchainState](BlockchainState.Starting(lastSafeKnownHeight, workingHeight)))(BlockchainState(processor, _, _))
+      .scanEval(Task.now[BlockchainState](BlockchainState.Starting(lastSafeKnownHeight, workingHeight)))(riderunner.BlockchainState(processor, _, _))
       .lastL
       .runToFuture(blockchainEventsStreamScheduler)
 

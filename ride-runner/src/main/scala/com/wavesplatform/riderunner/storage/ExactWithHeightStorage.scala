@@ -2,7 +2,6 @@ package com.wavesplatform.riderunner.storage
 
 import cats.syntax.option.*
 import com.github.benmanes.caffeine.cache.Caffeine
-import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.riderunner.app.RideRunnerMetrics.rideStorageKeyNumberFor
 import com.wavesplatform.riderunner.storage.StorageContext.{ReadOnly, ReadWrite}

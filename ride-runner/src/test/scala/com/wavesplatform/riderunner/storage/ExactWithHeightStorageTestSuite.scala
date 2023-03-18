@@ -1,6 +1,5 @@
 package com.wavesplatform.riderunner.storage
 
-import com.wavesplatform.blockchain.RemoteData
 import com.wavesplatform.riderunner.storage.StorageContext.ReadWrite
 import com.wavesplatform.riderunner.storage.persistent.{InMemWithoutHeightPersistentCache, PersistentCache}
 import com.wavesplatform.state.Height

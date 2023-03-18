@@ -1,4 +1,4 @@
-package com.wavesplatform.blockchain
+package com.wavesplatform.riderunner
 
 import com.wavesplatform.api.BlockchainApi.BlockchainUpdatesStream
 import com.wavesplatform.events.WrappedEvent
