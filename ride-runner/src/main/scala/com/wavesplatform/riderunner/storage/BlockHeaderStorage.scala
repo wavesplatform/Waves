@@ -10,22 +10,24 @@ import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.riderunner.storage.BlockHeadersStorage.BlockInfo
+import com.wavesplatform.riderunner.storage.BlockHeaderStorage.BlockInfo
 import com.wavesplatform.riderunner.storage.StorageContext.ReadWrite
 import com.wavesplatform.riderunner.storage.persistent.BlockPersistentCache
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
 
 import scala.util.chaining.scalaUtilChainingOps
 
-class BlockHeadersStorage private (
+class BlockHeaderStorage private (
     blockchainApi: BlockchainApi,
     persistentCache: BlockPersistentCache
 ) extends OptimisticLockable
     with ScorexLogging {
-  private var liquidBlocks: NonEmptyList[BlockInfo] = _
+  private var liquidBlocks: NonEmptyList[BlockInfo] = _ // TODO move to constructor
 
+  // TODO init at height
   private def init()(implicit ctx: ReadWrite): Unit = if (liquidBlocks == null) {
     liquidBlocks = NonEmptyList.one {
+      // TODO -100 instead of getLastHeight
       val height = persistentCache.getLastHeight.getOrElse(blockchainApi.getCurrentBlockchainHeight() - 1)
       val x      = getInternal(height).getOrElse(throw new RuntimeException(s"Can't find a block at $height"))
       BlockInfo(height, x.id(), x)
@@ -34,6 +36,7 @@ class BlockHeadersStorage private (
 
   def latest: BlockInfo = readLockCond(liquidBlocks.head)(_ => false)
 
+  // TODO liquidBlocks?
   def getLocal(atHeight: Int)(implicit ctx: ReadWrite): Option[SignedBlockHeader] = persistentCache.get(atHeight)
 
   def get(atHeight: Int)(implicit ctx: ReadWrite): Option[SignedBlockHeader] =
@@ -106,12 +109,12 @@ class BlockHeadersStorage private (
   def removeFrom(height: Int)(implicit ctx: ReadWrite): Unit = persistentCache.removeFrom(height)
 }
 
-object BlockHeadersStorage {
+object BlockHeaderStorage {
   def apply(
       blockchainApi: BlockchainApi,
       persistentCache: BlockPersistentCache
-  )(implicit ctx: ReadWrite): BlockHeadersStorage = {
-    new BlockHeadersStorage(
+  )(implicit ctx: ReadWrite): BlockHeaderStorage = {
+    new BlockHeaderStorage(
       blockchainApi = blockchainApi,
       persistentCache = persistentCache
     ).tap(_.init())

@@ -3,9 +3,9 @@ package com.wavesplatform.riderunner.app
 import akka.actor.ActorSystem
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState}
-import com.wavesplatform.database.RDB
 import com.wavesplatform.events.WrappedEvent
-import com.wavesplatform.riderunner.DefaultRequestsService
+import com.wavesplatform.riderunner.DefaultRequestService
+import com.wavesplatform.riderunner.db.RideDb
 import com.wavesplatform.riderunner.storage.persistent.LevelDbPersistentCaches
 import com.wavesplatform.riderunner.storage.{RequestKey, RequestsStorage, SharedBlockchainStorage, Storage}
 import com.wavesplatform.state.Height
@@ -113,7 +113,7 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
     )
 
     log.info("Opening a caches DB...")
-    val db = RDB.open(settings.rideRunner.db.toNode).db
+    val db = RideDb.open(settings.rideRunner.db).db
     cs.cleanup(CustomShutdownPhase.Db) { db.close() }
 
     val storage = Storage.rocksDb(db)
@@ -125,7 +125,7 @@ object RideWithBlockchainUpdatesApp extends ScorexLogging {
     val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
     log.info(s"Current height: known=${blockchainStorage.height}, blockchain=$lastHeightAtStart")
 
-    val requestsService = new DefaultRequestsService(
+    val requestsService = new DefaultRequestService(
       settings.rideRunner.requestsService,
       storage,
       blockchainStorage,

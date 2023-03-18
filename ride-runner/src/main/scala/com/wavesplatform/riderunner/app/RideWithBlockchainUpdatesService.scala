@@ -2,14 +2,13 @@ package com.wavesplatform.riderunner.app
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import com.google.common.io.MoreFiles
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState}
-import com.wavesplatform.database.RDB
 import com.wavesplatform.http.{EvaluateApiRoute, HttpServiceStatus, ServiceApiRoute}
 import com.wavesplatform.jvm.HeapDumps
-import com.wavesplatform.riderunner.DefaultRequestsService
+import com.wavesplatform.riderunner.DefaultRequestService
+import com.wavesplatform.riderunner.db.RideDb
 import com.wavesplatform.riderunner.storage.persistent.LevelDbPersistentCaches
 import com.wavesplatform.riderunner.storage.{LevelDbRequestsStorage, RequestKey, SharedBlockchainStorage, Storage}
 import com.wavesplatform.state.Height
@@ -23,8 +22,6 @@ import play.api.libs.json.Json
 import sttp.client3.HttpURLConnectionBackend
 
 import java.io.File
-import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Paths}
 import java.util.concurrent.*
 import scala.concurrent.Await
 import scala.concurrent.duration.{Duration, DurationInt}
@@ -111,43 +108,47 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     )
 
     // TODO HACK: remove
-    {
-      val rootPath             = Paths.get(settings.rideRunner.db.directory, "..").normalize()
-      val cleanupIterationPath = rootPath.resolve("cleanup")
-      val cleanupIteration =
-        if (cleanupIterationPath.toFile.exists()) Files.readString(cleanupIterationPath, StandardCharsets.UTF_8).trim
-        else "-1" // to differ cases
-
-      if (cleanupIteration == "-1") {
-        rootPath.toFile.listFiles().foreach { file =>
-          println(s"File before: $file")
-        }
-      }
-
-      val cleanTo = -10 // Increase if you want to clean the database
-      if (cleanupIteration.toIntOption.getOrElse(-2) < cleanTo) {
-        log.info(
-          s"Cleaning the DB with caches in ${settings.rideRunner.db.directory} from $cleanupIteration ($cleanupIterationPath) to $cleanTo..."
-        )
-        new File(settings.rideRunner.db.directory).listFiles().foreach { file =>
-          MoreFiles.deleteRecursively(file.toPath)
-        }
-        Files.writeString(cleanupIterationPath, cleanTo.toString)
-      }
-
-      if (cleanupIteration == "-1") {
-        rootPath.toFile.listFiles().foreach { file =>
-          println(s"File after: $file")
-        }
-      }
-    }
+//    {
+//      val rootPath             = Paths.get(settings.rideRunner.db.directory, "..").normalize()
+//      val cleanupIterationPath = rootPath.resolve("cleanup")
+//      val cleanupIteration =
+//        if (cleanupIterationPath.toFile.exists()) Files.readString(cleanupIterationPath, StandardCharsets.UTF_8).trim
+//        else "-1" // to differ cases
+//
+//      if (cleanupIteration == "-1") {
+//        rootPath.toFile.listFiles().foreach { file =>
+//          println(s"File before: $file")
+//        }
+//      }
+//
+//      val cleanTo = -10 // Increase if you want to clean the database
+//      if (cleanupIteration.toIntOption.getOrElse(-2) < cleanTo) {
+//        log.info(
+//          s"Cleaning the DB with caches in ${settings.rideRunner.db.directory} from $cleanupIteration ($cleanupIterationPath) to $cleanTo..."
+//        )
+//        new File(settings.rideRunner.db.directory).listFiles().foreach { file =>
+//          MoreFiles.deleteRecursively(file.toPath)
+//        }
+//        Files.writeString(cleanupIterationPath, cleanTo.toString)
+//      }
+//
+//      if (cleanupIteration == "-1") {
+//        rootPath.toFile.listFiles().foreach { file =>
+//          println(s"File after: $file")
+//        }
+//      }
+//    }
 
     log.info("Opening a DB with caches...")
-    val db = RDB.open(settings.rideRunner.db.toNode).db
-    cs.cleanup(CustomShutdownPhase.Db) { db.close() }
+    val rideDb          = RideDb.open(settings.rideRunner.db)
+    val sendDbStatsTask = blockchainEventsStreamScheduler.scheduleAtFixedRate(30.seconds, 30.seconds) { rideDb.sendStats() }
+    cs.cleanup(CustomShutdownPhase.Db) {
+      sendDbStatsTask.cancel()
+      rideDb.db.close()
+    }
 
     log.info("Loading data from caches...")
-    val storage = Storage.rocksDb(db)
+    val storage = Storage.rocksDb(rideDb.db)
     val blockchainStorage = storage.readWrite { implicit rw =>
       val dbCaches = LevelDbPersistentCaches(storage)
       SharedBlockchainStorage[RequestKey](settings.rideRunner.sharedBlockchain, storage, dbCaches, blockchainApi)
@@ -159,7 +160,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     val requestsStorage = new LevelDbRequestsStorage(storage)
     log.info(s"There are ${requestsStorage.size} scripts")
 
-    val requestsService = new DefaultRequestsService(
+    val requestService = new DefaultRequestService(
       settings.rideRunner.requestsService,
       storage,
       blockchainStorage,
@@ -177,7 +178,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
     val blockchainUpdatesStream = blockchainApi.mkBlockchainUpdatesStream(blockchainEventsStreamScheduler)
     cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream) { blockchainUpdatesStream.close() }
 
-    val processor = new BlockchainProcessor(blockchainStorage, requestsService)
+    val processor = new BlockchainProcessor(blockchainStorage, requestService)
 
     @volatile var lastServiceStatus = ServiceStatus()
     val events = blockchainUpdatesStream.downstream
@@ -211,7 +212,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
 
     log.info(s"Initializing REST API on ${settings.restApi.bindAddress}:${settings.restApi.port}...")
     val apiRoutes = Seq(
-      EvaluateApiRoute(requestsService.trackAndRun(_).runToFuture(rideScheduler)),
+      EvaluateApiRoute(requestService.trackAndRun(_).runToFuture(rideScheduler)),
       ServiceApiRoute(
         settings.rideRunner.serviceApiRoute,
         { () =>

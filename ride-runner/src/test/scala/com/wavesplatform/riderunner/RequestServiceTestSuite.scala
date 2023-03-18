@@ -22,7 +22,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 import scala.util.Using
 
-class RequestsServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
+class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
   private val aRequest = RequestKey(aliceAddr, Json.obj("expr" -> "default()"))
   private val bRequest = RequestKey(bobAddr, Json.obj("expr" -> "default()"))
   private val cRequest = RequestKey(carlAddr, Json.obj("expr" -> "default()"))
@@ -76,7 +76,7 @@ class RequestsServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
   }
 
   private case class TestDependencies(
-      requests: RequestsService,
+      requests: RequestService,
       processor: Processor,
       blockchainApi: TestBlockchainApi,
       scheduler: TestScheduler
@@ -114,8 +114,8 @@ class RequestsServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
       )
     }
 
-    val requestsService = new DefaultRequestsService(
-      settings = DefaultRequestsService.Settings(enableTraces = false, Int.MaxValue, 0, 3, 0.seconds),
+    val requestsService = new DefaultRequestService(
+      settings = DefaultRequestService.Settings(enableTraces = false, Int.MaxValue, 0, 3, 0.seconds),
       storage = testDb.storage,
       sharedBlockchain = blockchainStorage,
       requestsStorage = requestsStorage,

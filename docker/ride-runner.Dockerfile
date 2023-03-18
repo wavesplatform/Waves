@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y wget unzip gosu || exit 1; \
 
 # Temporarly here to experiment on a test env
 ENV RIDE_LOG_LEVEL=INFO
-ENV RIDE_HEAP_SIZE=700m
+ENV RIDE_HEAP_SIZE=1500m
 ENV RIDE_NETWORK=mainnet
 ENV RIDE_APP=com.wavesplatform.riderunner.app.RideWithBlockchainUpdatesService
 

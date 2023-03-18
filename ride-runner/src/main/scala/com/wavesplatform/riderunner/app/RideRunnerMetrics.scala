@@ -61,5 +61,8 @@ object RideRunnerMetrics {
   val jobSchedulerPrioritizeManyTime = jobSchedulerTime.withTag("op", "prioritizeMany")
   val jobSchedulerGetJobTime         = jobSchedulerTime.withTag("op", "getJob")
 
+  val columnFamilyProperties = Kamon.gauge("rocksdb.props", "RocksDB column family properties")
+  val dbStats                = Kamon.gauge("rocksdb.stats", "RocksDB statistics")
+
   implicit def timeExt(timer: Timer): TimerExt = new TimerExt(timer)
 }

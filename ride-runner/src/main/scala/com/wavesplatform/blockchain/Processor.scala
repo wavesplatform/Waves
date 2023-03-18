@@ -4,7 +4,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
-import com.wavesplatform.riderunner.RequestsService
+import com.wavesplatform.riderunner.RequestService
 import com.wavesplatform.riderunner.storage.{AffectedTags, RequestKey, SharedBlockchainStorage}
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
@@ -31,7 +31,7 @@ trait Processor {
   def runAffectedScripts(): Task[Unit]
 }
 
-class BlockchainProcessor(blockchainStorage: SharedBlockchainStorage[RequestKey], requestsService: RequestsService)
+class BlockchainProcessor(blockchainStorage: SharedBlockchainStorage[RequestKey], requestsService: RequestService)
     extends Processor
     with ScorexLogging {
 

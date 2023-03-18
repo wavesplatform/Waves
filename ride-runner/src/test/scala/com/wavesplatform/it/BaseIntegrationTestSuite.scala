@@ -9,7 +9,7 @@ import com.wavesplatform.blockchain.{BlockchainProcessor, BlockchainState}
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.riderunner.DefaultRequestsService
+import com.wavesplatform.riderunner.DefaultRequestService
 import com.wavesplatform.riderunner.storage.HasDb.TestDb
 import com.wavesplatform.riderunner.storage.persistent.LevelDbPersistentCaches
 import com.wavesplatform.riderunner.storage.{HasDb, RequestKey, RequestsStorage, SharedBlockchainStorage}
@@ -59,8 +59,8 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     }
 
     val request = RequestKey(aliceAddr, Json.obj("expr" -> "foo()"))
-    val requestsService = new DefaultRequestsService(
-      settings = DefaultRequestsService.Settings(enableTraces = false, Int.MaxValue, 0, 3, 0.seconds),
+    val requestsService = new DefaultRequestService(
+      settings = DefaultRequestService.Settings(enableTraces = false, Int.MaxValue, 0, 3, 0.seconds),
       storage = testDb.storage,
       sharedBlockchain = blockchainStorage,
       requestsStorage = new RequestsStorage {

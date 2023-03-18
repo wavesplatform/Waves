@@ -28,7 +28,7 @@ class SharedBlockchainStorage[TagT] private (
     storage: Storage,
     persistentCaches: PersistentCaches,
     blockchainApi: BlockchainApi,
-    val blockHeaders: BlockHeadersStorage
+    val blockHeaders: BlockHeaderStorage
 ) extends ScorexLogging {
   val blockchainSettings: BlockchainSettings = settings.blockchain
 
@@ -284,7 +284,7 @@ object SharedBlockchainStorage {
       storage,
       persistentCaches,
       blockchainApi,
-      BlockHeadersStorage(blockchainApi, persistentCaches.blockHeaders)
+      BlockHeaderStorage(blockchainApi, persistentCaches.blockHeaders)
     ).tap { r =>
       r.data.load()
       r.accountScripts.load()

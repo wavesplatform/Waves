@@ -5,7 +5,7 @@ import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.api.http.ApiException
 import com.wavesplatform.api.http.utils.UtilsApiRoute
 import com.wavesplatform.blockchain.ScriptBlockchain
-import com.wavesplatform.riderunner.DefaultRequestsService.RideScriptRunEnvironment
+import com.wavesplatform.riderunner.DefaultRequestService.RideScriptRunEnvironment
 import com.wavesplatform.riderunner.app.RideRunnerMetrics
 import com.wavesplatform.riderunner.app.RideRunnerMetrics.*
 import com.wavesplatform.riderunner.storage.StorageContext.ReadWrite
@@ -20,19 +20,19 @@ import play.api.libs.json.JsObject
 import java.util.concurrent.{ConcurrentHashMap, TimeUnit}
 import scala.concurrent.duration.FiniteDuration
 
-trait RequestsService {
+trait RequestService {
   def runAll(): Task[Unit]
   def runAffected(atHeight: Int, affected: Set[RequestKey]): Task[Unit]
   def trackAndRun(request: RequestKey): Task[JsObject]
 }
 
-class DefaultRequestsService(
-    settings: DefaultRequestsService.Settings,
+class DefaultRequestService(
+    settings: DefaultRequestService.Settings,
     storage: Storage,
     sharedBlockchain: SharedBlockchainStorage[RequestKey],
     requestsStorage: RequestsStorage,
     runScriptsScheduler: Scheduler
-) extends RequestsService
+) extends RequestService
     with ScorexLogging {
 //  private val scripts: TrieMap[RequestKey, RideScriptRunEnvironment] =
 //    TrieMap.from(requestsStorage.all().map(k => (k, RideScriptRunEnvironment(k))))
@@ -160,7 +160,7 @@ class DefaultRequestsService(
   )
 }
 
-object DefaultRequestsService {
+object DefaultRequestService {
   case class Settings(
       enableTraces: Boolean,
       evaluateScriptComplexityLimit: Int,

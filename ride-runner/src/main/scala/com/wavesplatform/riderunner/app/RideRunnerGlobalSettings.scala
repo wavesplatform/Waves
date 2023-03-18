@@ -4,8 +4,8 @@ import com.typesafe.config.{Config, ConfigList, ConfigRenderOptions, ConfigValue
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector, RideApi}
 import com.wavesplatform.http.ServiceApiRoute
-import com.wavesplatform.riderunner.DefaultRequestsService
-import com.wavesplatform.riderunner.app.RideRunnerSettings.DbSettings
+import com.wavesplatform.riderunner.DefaultRequestService
+import com.wavesplatform.riderunner.db.RideDb
 import com.wavesplatform.riderunner.storage.SharedBlockchainStorage
 import com.wavesplatform.settings.*
 import net.ceedubs.ficus.Ficus.*
@@ -13,7 +13,7 @@ import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
 import net.ceedubs.ficus.readers.{CollectionReaders, ValueReader}
 import play.api.libs.json.{JsObject, Json}
 
-import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.concurrent.duration.FiniteDuration
 
 case class RideRunnerGlobalSettings(
     rideRunner: RideRunnerSettings,
@@ -52,13 +52,13 @@ object RideRunnerGlobalSettings {
 }
 
 case class RideRunnerSettings(
-    db: DbSettings,
+    db: RideDb.Settings,
     unhealthyIdleTimeout: FiniteDuration,
     rideSchedulerThreads: Option[Int],
     serviceApiRoute: ServiceApiRoute.Settings,
     immutableBlockchain: BlockchainSettings,
     sharedBlockchain: SharedBlockchainStorage.Settings,
-    requestsService: DefaultRequestsService.Settings,
+    requestsService: DefaultRequestService.Settings,
     blockchainApi: DefaultBlockchainApi.Settings,
     grpcConnector: GrpcConnector.Settings,
     grpcApiChannel: GrpcChannelSettings,
@@ -66,22 +66,6 @@ case class RideRunnerSettings(
 ) {
   val unhealthyIdleTimeoutMs    = unhealthyIdleTimeout.toMillis
   val exactRideSchedulerThreads = rideSchedulerThreads.getOrElse(Runtime.getRuntime.availableProcessors() * 2).min(4)
-}
-
-object RideRunnerSettings {
-  case class DbSettings(directory: String) {
-    def toNode: DBSettings = DBSettings(
-      directory = directory,
-      storeTransactionsByAddress = false,
-      storeInvokeScriptResults = false,
-      storeStateHashes = false,
-      maxCacheSize = 0,
-      maxRollbackDepth = 0,
-      rememberBlocks = 0.seconds,
-      useBloomFilter = false,
-      inMemory = InMemorySettings(SizeInBytes(0L), SizeInBytes(0L))
-    )
-  }
 }
 
 case class CompareSettings(
