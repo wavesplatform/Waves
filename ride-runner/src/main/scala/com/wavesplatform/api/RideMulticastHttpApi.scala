@@ -2,13 +2,13 @@ package com.wavesplatform.api
 
 import cats.syntax.either.*
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.RideApi.{AskResult, Settings}
+import com.wavesplatform.api.RideMulticastHttpApi.{AskResult, Settings}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import play.api.libs.json.{JsObject, Json}
 import sttp.client3.*
 
-class RideApi(settings: Settings, httpBackend: SttpBackend[Identity, Any]) extends ScorexLogging {
+class RideMulticastHttpApi(settings: Settings, httpBackend: SttpBackend[Identity, Any]) extends ScorexLogging {
   def ask(address: Address, request: JsObject, trace: Boolean = false): Task[AskResult] = Task
     .parZip2(
       Task(evaluate(settings.rideRunnerApiBaseUri, address, request, trace)),
@@ -32,7 +32,7 @@ class RideApi(settings: Settings, httpBackend: SttpBackend[Identity, Any]) exten
       }
 }
 
-object RideApi {
+object RideMulticastHttpApi {
   case class Settings(rideRunnerApiBaseUri: String, nodeApiBaseUri: String)
 
   case class AskResult(rideRunner: Either[String, JsObject], node: Either[String, JsObject])

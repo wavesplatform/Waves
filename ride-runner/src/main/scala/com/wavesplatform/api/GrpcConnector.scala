@@ -21,9 +21,7 @@ class GrpcConnector(settings: Settings) extends AutoCloseable with ScorexLogging
       .build()
   }
 
-  override def close(): Unit = {
-    executor.shutdown()
-  }
+  override def close(): Unit = executor.shutdown()
 }
 
 object GrpcConnector {

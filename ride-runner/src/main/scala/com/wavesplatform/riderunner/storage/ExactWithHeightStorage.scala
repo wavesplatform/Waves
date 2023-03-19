@@ -3,11 +3,11 @@ package com.wavesplatform.riderunner.storage
 import cats.syntax.option.*
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.wavesplatform.meta.getSimpleName
-import com.wavesplatform.riderunner.app.RideRunnerMetrics.rideStorageKeyNumberFor
+import com.wavesplatform.riderunner.stats.KamonCaffeineStats
+import com.wavesplatform.riderunner.stats.RideRunnerStats.rideStorageKeyNumberFor
 import com.wavesplatform.riderunner.storage.StorageContext.{ReadOnly, ReadWrite}
 import com.wavesplatform.riderunner.storage.persistent.PersistentCache
 import com.wavesplatform.state.Height
-import com.wavesplatform.stats.KamonCaffeineStatsCounter
 import com.wavesplatform.utils.ScorexLogging
 import org.eclipse.collections.impl.map.mutable.ConcurrentHashMap
 
@@ -37,7 +37,7 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
     .newBuilder()
     .softValues()
     .maximumSize(settings.maxEntries)
-    .recordStats(() => new KamonCaffeineStatsCounter(s"$name.values"))
+    .recordStats(() => new KamonCaffeineStats(s"$name.values"))
     .build[KeyT, RemoteData[ValueT]]()
 
   private def tagsOf(key: KeyT): Option[Set[TagT]] = Option(tags.get(key))

@@ -4,10 +4,10 @@ import com.github.benmanes.caffeine.cache.Caffeine
 import com.google.protobuf.ByteString
 import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.protobuf.ByteStringExt
+import com.wavesplatform.riderunner.stats.KamonCaffeineStats
 import com.wavesplatform.riderunner.storage.StorageContext.ReadWrite
 import com.wavesplatform.riderunner.storage.persistent.TransactionPersistentCache
 import com.wavesplatform.state.{Height, TransactionId}
-import com.wavesplatform.stats.KamonCaffeineStatsCounter
 import com.wavesplatform.utils.ScorexLogging
 
 import scala.util.chaining.scalaUtilChainingOps
@@ -22,14 +22,14 @@ class TransactionStorage[TagT](
 
   protected val tags = Caffeine
     .newBuilder()
-    .recordStats(() => new KamonCaffeineStatsCounter("TransactionStorage.tags"))
+    .recordStats(() => new KamonCaffeineStats("TransactionStorage.tags"))
     .build[TransactionId, Set[TagT]]()
 
   protected val values = Caffeine
     .newBuilder()
     .softValues()
     .maximumSize(settings.maxEntries)
-    .recordStats(() => new KamonCaffeineStatsCounter("TransactionStorage.values"))
+    .recordStats(() => new KamonCaffeineStats("TransactionStorage.values"))
     .build[TransactionId, RemoteData[Height]]()
 
   private def tagsOf(key: TransactionId): Set[TagT] = Option(tags.getIfPresent(key)).getOrElse(Set.empty)

@@ -11,7 +11,7 @@ import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
-import com.wavesplatform.riderunner.app.RideRunnerMetrics.*
+import com.wavesplatform.riderunner.stats.RideRunnerStats.*
 import com.wavesplatform.riderunner.estimate
 import com.wavesplatform.riderunner.storage.SharedBlockchainStorage.Settings
 import com.wavesplatform.riderunner.storage.StorageContext.ReadWrite

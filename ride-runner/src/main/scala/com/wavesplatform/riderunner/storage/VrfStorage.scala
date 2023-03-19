@@ -3,9 +3,9 @@ package com.wavesplatform.riderunner.storage
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.riderunner.stats.KamonCaffeineStats
 import com.wavesplatform.riderunner.storage.StorageContext.ReadWrite
 import com.wavesplatform.riderunner.storage.persistent.VrfPersistentCache
-import com.wavesplatform.stats.KamonCaffeineStatsCounter
 import com.wavesplatform.utils.ScorexLogging
 
 import scala.util.chaining.scalaUtilChainingOps
@@ -17,7 +17,7 @@ class VrfStorage(settings: ExactWithHeightStorage.Settings, blockchainApi: Block
     .newBuilder()
     .softValues()
     .maximumSize(settings.maxEntries)
-    .recordStats(() => new KamonCaffeineStatsCounter("VrfStorage"))
+    .recordStats(() => new KamonCaffeineStats("VrfStorage"))
     .build[Int, Option[ByteStr]]()
 
   def get(atHeight: Int)(implicit ctx: ReadWrite): Option[ByteStr] =

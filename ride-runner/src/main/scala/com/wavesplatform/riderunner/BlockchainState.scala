@@ -8,7 +8,7 @@ import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.protobuf.ByteStringExt
-import com.wavesplatform.riderunner.app.RideRunnerMetrics
+import com.wavesplatform.riderunner.stats.RideRunnerStats
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.{Status, StatusRuntimeException}
@@ -131,7 +131,7 @@ object BlockchainState extends ScorexLogging {
   def apply(processor: Processor, orig: BlockchainState, event: SubscribeEvent): Task[BlockchainState] = {
     val update = event.getUpdate.update
     val h      = Height(event.getUpdate.height)
-    RideRunnerMetrics.lastKnownHeight.update(h)
+    RideRunnerStats.lastKnownHeight.update(h)
 
     val currBlockId = event.getUpdate.id.toByteStr
     log.info(s"$orig + ${getUpdateType(update)}(id=$currBlockId, h=$h)")

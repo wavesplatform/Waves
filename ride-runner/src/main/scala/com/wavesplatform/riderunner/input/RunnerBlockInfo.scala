@@ -1,6 +1,7 @@
 package com.wavesplatform.riderunner.input
 
 import com.wavesplatform.account.PublicKey
+import com.wavesplatform.account.PublicKeys.EmptyPublicKey
 import com.wavesplatform.common.state.ByteStr
 
 case class RunnerBlockInfo(

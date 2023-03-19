@@ -1,4 +1,4 @@
-package com.wavesplatform.http
+package com.wavesplatform.riderunner.http
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.api.http.*

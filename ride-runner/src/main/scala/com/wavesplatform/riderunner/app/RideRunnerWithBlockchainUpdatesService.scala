@@ -4,10 +4,11 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
-import com.wavesplatform.http.{EvaluateApiRoute, HttpServiceStatus, ServiceApiRoute}
 import com.wavesplatform.riderunner
 import com.wavesplatform.riderunner.{BlockchainProcessor, BlockchainState, DefaultRequestService}
 import com.wavesplatform.riderunner.db.RideDb
+import com.wavesplatform.riderunner.http.{EvaluateApiRoute, HttpServiceStatus, ServiceApiRoute}
+import com.wavesplatform.riderunner.stats.RideRunnerStats
 import com.wavesplatform.riderunner.storage.persistent.DefaultPersistentCaches
 import com.wavesplatform.riderunner.storage.{DefaultRequestsStorage, ScriptRequest, SharedBlockchainStorage, Storage}
 import com.wavesplatform.state.Height
@@ -25,7 +26,7 @@ import java.util.concurrent.*
 import scala.concurrent.Await
 import scala.concurrent.duration.{Duration, DurationInt}
 
-object RideWithBlockchainUpdatesService extends ScorexLogging {
+object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     val (globalConfig, settings) = AppInitializer.init(args.headOption.map(new File(_)))
 
@@ -35,7 +36,7 @@ object RideWithBlockchainUpdatesService extends ScorexLogging {
 
     val metricsEnabled = globalConfig.getBoolean("kamon.enable")
     if (metricsEnabled) {
-      val metrics = new RideRunnerMetrics(globalConfig)
+      val metrics = new RideRunnerStats(globalConfig)
       cs.cleanup(CustomShutdownPhase.Metrics) { metrics.close() }
     }
 

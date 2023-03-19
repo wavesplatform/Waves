@@ -1,4 +1,4 @@
-package com.wavesplatform.blockchain
+package com.wavesplatform.riderunner.blockchain
 
 import com.google.protobuf.UnsafeByteOperations
 import com.wavesplatform.account.{Address, Alias}

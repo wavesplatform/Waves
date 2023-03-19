@@ -4,14 +4,13 @@ import com.github.benmanes.caffeine.cache.Caffeine
 import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.api.http.ApiException
 import com.wavesplatform.api.http.utils.UtilsApiRoute
-import com.wavesplatform.blockchain.ScriptBlockchain
 import com.wavesplatform.riderunner.DefaultRequestService.RideScriptRunEnvironment
-import com.wavesplatform.riderunner.app.RideRunnerMetrics
-import com.wavesplatform.riderunner.app.RideRunnerMetrics.*
+import com.wavesplatform.riderunner.stats.RideRunnerStats.*
+import com.wavesplatform.riderunner.blockchain.ScriptBlockchain
+import com.wavesplatform.riderunner.stats.{KamonCaffeineStats, RideRunnerStats}
 import com.wavesplatform.riderunner.storage.StorageContext.ReadWrite
 import com.wavesplatform.riderunner.storage.{RequestsStorage, ScriptRequest, SharedBlockchainStorage, Storage}
 import com.wavesplatform.state.Height
-import com.wavesplatform.stats.KamonCaffeineStatsCounter
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.execution.Scheduler
@@ -38,7 +37,7 @@ class DefaultRequestService(
     .newBuilder()
     .softValues()
     .maximumSize(10000) // TODO #96 settings and metrics
-    .recordStats(() => new KamonCaffeineStatsCounter("Requests"))
+    .recordStats(() => new KamonCaffeineStats("Requests"))
     .build[ScriptRequest, RideScriptRunEnvironment]()
 
   // To get rid of duplicated requests
@@ -97,7 +96,7 @@ class DefaultRequestService(
       .executeOn(runScriptsScheduler)
 
     val start = System.nanoTime()
-    r.tapEval(_ => Task.now(RideRunnerMetrics.rideScriptRunOnHeightTime(true).update((System.nanoTime() - start).toDouble)))
+    r.tapEval(_ => Task.now(RideRunnerStats.rideScriptRunOnHeightTime(true).update((System.nanoTime() - start).toDouble)))
   }
 
   private def runMany(height: Int, scripts: Iterable[RideScriptRunEnvironment])(implicit ctx: ReadWrite): Task[Unit] = {

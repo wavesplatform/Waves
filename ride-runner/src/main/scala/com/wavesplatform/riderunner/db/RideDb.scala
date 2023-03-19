@@ -1,6 +1,6 @@
 package com.wavesplatform.riderunner.db
 
-import com.wavesplatform.riderunner.app.RideRunnerMetrics.{columnFamilyProperties, dbStats}
+import com.wavesplatform.riderunner.stats.RideRunnerStats.{columnFamilyProperties, dbStats}
 import com.wavesplatform.utils.*
 import org.rocksdb.{ColumnFamilyHandle, RocksDB, Statistics, TickerType, *}
 

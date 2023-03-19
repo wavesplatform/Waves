@@ -1,14 +1,15 @@
 package com.wavesplatform.riderunner.input
 
 import com.wavesplatform.account.PublicKey
+import com.wavesplatform.account.PublicKeys.EmptyPublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.*
 import com.wavesplatform.state.InvokeScriptResult.DataEntry
 import com.wavesplatform.transaction.Asset
 
-/**
-  * @param data Some(Map.empty) means the data was here
+/** @param data
+  *   Some(Map.empty) means the data was here
   */
 case class RunnerAccountState(
     scriptInfo: Option[RunnerScriptInfo] = None,

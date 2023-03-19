@@ -2,10 +2,10 @@ package com.wavesplatform.riderunner.app
 
 import com.typesafe.config.{Config, ConfigList, ConfigRenderOptions, ConfigValue}
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector, RideApi}
-import com.wavesplatform.http.ServiceApiRoute
+import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector, RideMulticastHttpApi}
 import com.wavesplatform.riderunner.DefaultRequestService
 import com.wavesplatform.riderunner.db.RideDb
+import com.wavesplatform.riderunner.http.ServiceApiRoute
 import com.wavesplatform.riderunner.storage.SharedBlockchainStorage
 import com.wavesplatform.settings.*
 import net.ceedubs.ficus.Ficus.*
@@ -16,9 +16,9 @@ import play.api.libs.json.{JsObject, Json}
 import scala.concurrent.duration.FiniteDuration
 
 case class RideRunnerGlobalSettings(
-    rideRunner: RideRunnerSettings,
+    rideRunner: RideRunnerAppSettings,
     restApi: RestAPISettings,
-    compare: CompareSettings
+    compareApp: CompareAppSettings
 )
 
 object RideRunnerGlobalSettings {
@@ -51,7 +51,7 @@ object RideRunnerGlobalSettings {
     }
 }
 
-case class RideRunnerSettings(
+case class RideRunnerAppSettings(
     db: RideDb.Settings,
     unhealthyIdleTimeout: FiniteDuration,
     rideSchedulerThreads: Option[Int],
@@ -68,10 +68,10 @@ case class RideRunnerSettings(
   val exactRideSchedulerThreads = rideSchedulerThreads.getOrElse(Runtime.getRuntime.availableProcessors() * 2).min(4)
 }
 
-case class CompareSettings(
+case class CompareAppSettings(
     requestsDelay: FiniteDuration,
     failedChecksToleranceTimer: FiniteDuration,
     maxChecks: Option[Long],
-    rideApi: RideApi.Settings,
+    rideApi: RideMulticastHttpApi.Settings,
     testRequests: List[(Address, JsObject)]
 )

@@ -1,6 +1,7 @@
 package com.wavesplatform.riderunner.input
 
 import com.wavesplatform.account.PublicKey
+import com.wavesplatform.account.PublicKeys.EmptyPublicKey
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 

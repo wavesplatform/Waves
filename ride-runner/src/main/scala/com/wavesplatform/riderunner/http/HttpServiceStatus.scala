@@ -1,4 +1,4 @@
-package com.wavesplatform.http
+package com.wavesplatform.riderunner.http
 
 import play.api.libs.json.{JsNull, JsValue, Json, OFormat}
 

@@ -1,7 +1,7 @@
 package com.wavesplatform.riderunner.app
 
 import com.wavesplatform.api.http.utils.UtilsApiRoute
-import com.wavesplatform.blockchain.ImmutableBlockchain
+import com.wavesplatform.riderunner.blockchain.ImmutableBlockchain
 import com.wavesplatform.riderunner.input.RideRunnerInput
 import play.api.libs.json.Json
 
@@ -9,7 +9,7 @@ import java.io.File
 import scala.io.Source
 import scala.util.Using
 
-object RideWithPreparedStateApp {
+object RideRunnerWithPreparedStateApp {
   def main(args: Array[String]): Unit = {
     if (args.length < 2) throw new IllegalArgumentException("Usage: <path-to-app.conf> <path-to-input.json>")
 

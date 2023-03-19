@@ -1,4 +1,4 @@
-package com.wavesplatform.riderunner.app
+package com.wavesplatform.riderunner.stats
 
 import com.typesafe.config.Config
 import com.wavesplatform.metrics.TimerExt
@@ -10,7 +10,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 import scala.util.Try
 
-class RideRunnerMetrics(globalConfig: Config) extends AutoCloseable with ScorexLogging {
+class RideRunnerStats(globalConfig: Config) extends AutoCloseable with ScorexLogging {
   // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
   //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
   if (globalConfig.getBoolean("kamon.enable")) {
@@ -24,7 +24,7 @@ class RideRunnerMetrics(globalConfig: Config) extends AutoCloseable with ScorexL
   override def close(): Unit = Try(Await.result(Kamon.stop(), 5 seconds))
 }
 
-object RideRunnerMetrics {
+object RideRunnerStats {
   val lastKnownHeight = Kamon.gauge("ride.height", "The last known blockchain height").withoutTags()
 
   private val rideScriptRunOnHeightTime_ = Kamon.gauge("ride.script.run-on-height", "Run script running time", MeasurementUnit.time.nanoseconds)

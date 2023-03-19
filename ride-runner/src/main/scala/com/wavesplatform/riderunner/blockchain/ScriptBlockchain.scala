@@ -1,4 +1,4 @@
-package com.wavesplatform.blockchain
+package com.wavesplatform.riderunner.blockchain
 
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
@@ -117,7 +117,7 @@ class ScriptBlockchain[TagT](storage: SharedBlockchainStorage[TagT], tag: TagT)(
 
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee = kill("filledVolumeAndFee")
 
-  override def transactionInfo(id: BlockId) = kill("transactionInfo")
+  override def transactionInfo(id: BlockId): Option[(TxMeta, Transaction)] = kill("transactionInfo")
 
   /** Block reward related */
   override def blockReward(height: Int): Option[Long] = kill("blockReward")

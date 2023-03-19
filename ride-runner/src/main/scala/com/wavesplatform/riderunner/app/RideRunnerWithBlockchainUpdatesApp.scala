@@ -25,7 +25,7 @@ import scala.concurrent.duration.{Duration, DurationInt}
 import scala.io.Source
 import scala.util.Using
 
-object RideWithBlockchainUpdatesApp extends ScorexLogging {
+object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     val (globalConfig, settings) = AppInitializer.init(args.headOption.map(new File(_)))
 

@@ -6,11 +6,11 @@ import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.collections.syntax.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{AddressId, Key, ReadOnlyDB}
+import com.wavesplatform.riderunner.stats.KamonCaffeineStats
 import com.wavesplatform.riderunner.storage.StorageContext.{ReadOnly, ReadWrite}
 import com.wavesplatform.riderunner.storage.persistent.DefaultPersistentCaches.ReadOnlyDBOps
 import com.wavesplatform.riderunner.storage.{AccountAssetKey, AccountDataKey, KeyIndexStorage, RemoteData, Storage}
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, EmptyDataEntry, Height, LeaseBalance, TransactionId}
-import com.wavesplatform.stats.KamonCaffeineStatsCounter
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
 import org.slf4j.LoggerFactory
@@ -382,7 +382,7 @@ class DefaultPersistentCaches private (storage: Storage, initialBlockHeadersLast
       .newBuilder()
       .maximumSize(1000)
       .softValues()
-      .recordStats(() => new KamonCaffeineStatsCounter("Addresses"))
+      .recordStats(() => new KamonCaffeineStats("Addresses"))
       .build()
 
   private def getAddress(addressId: AddressId)(implicit ctx: ReadOnly): Option[Address] =

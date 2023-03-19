@@ -1,6 +1,7 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model.HttpRequest
+import com.wavesplatform.riderunner.http.EvaluateApiRoute
 import com.wavesplatform.wallet.Wallet
 import play.api.libs.json.*
 

@@ -2,7 +2,7 @@ package com.wavesplatform.riderunner.storage
 
 import cats.syntax.contravariantSemigroupal.*
 import com.wavesplatform.account.Address
-import com.wavesplatform.riderunner.app.RideRunnerMetrics.rideRequestTotalNumber
+import com.wavesplatform.riderunner.stats.RideRunnerStats.rideRequestTotalNumber
 import com.wavesplatform.riderunner.storage.persistent.CacheKeys
 import com.wavesplatform.riderunner.storage.persistent.CacheKeys.{Requests, RequestsLastIndex}
 import play.api.libs.json.*
