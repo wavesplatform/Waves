@@ -32,7 +32,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     implicit val testScheduler = TestScheduler()
 
     val blockchainApi = new TestBlockchainApi() {
-      override def getCurrentBlockchainHeight(): Int = 2
+      override def getCurrentBlockchainHeight(): Int = 1
 
       override def getBlockHeader(height: Int): Option[SignedBlockHeader] = toVanilla(mkPbBlock(height)).some
 
@@ -48,7 +48,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     }
 
     val testDb = use(TestDb.mk())
-    val blockchainStorage = testDb.storage.readWrite { implicit ctx =>
+    val sharedBlockchain = testDb.storage.readWrite { implicit ctx =>
       SharedBlockchainStorage[ScriptRequest](
         settings.rideRunner.sharedBlockchain,
         testDb.storage,
@@ -61,7 +61,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     val requestService = new DefaultRequestService(
       settings = DefaultRequestService.Settings(enableTraces = true, Int.MaxValue, 0, 3, 0.seconds),
       storage = testDb.storage,
-      sharedBlockchain = blockchainStorage,
+      sharedBlockchain = sharedBlockchain,
       requestsStorage = new RequestsStorage {
         override def size: Int                      = 1
         override def append(x: ScriptRequest): Unit = {} // Ignore, because no way to evaluate a new expr
@@ -69,7 +69,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
       },
       runScriptsScheduler = testScheduler
     )
-    val processor = new BlockchainProcessor(blockchainStorage, requestService)
+    val processor = new BlockchainProcessor(sharedBlockchain, requestService)
 
     requestService.runAll().runToFuture
     testScheduler.tick(1.milli) // 1 millisecond to detect that script will be ran in the end

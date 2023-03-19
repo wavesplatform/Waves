@@ -14,7 +14,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
           mkBlockAppendEvent(
             height = 2,
             forkNumber = 1,
-            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
+            dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 2))
           )
         ),
         WrappedEvent.Failed(UpstreamTimeoutException(90.seconds)),

@@ -120,18 +120,18 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
     cs.cleanup(CustomShutdownPhase.Db) { db.close() }
 
     val storage = PersistentStorage.rocksDb(db)
-    val blockchainStorage = storage.readWrite { implicit rw =>
+    val sharedBlockchain = storage.readWrite { implicit rw =>
       val dbCaches = DefaultPersistentCaches(storage)
       SharedBlockchainStorage[ScriptRequest](settings.rideRunner.sharedBlockchain, storage, dbCaches, blockchainApi)
     }
 
     val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
-    log.info(s"Current height: known=${blockchainStorage.height}, blockchain=$lastHeightAtStart")
+    log.info(s"Current height: shared (local or network)=${sharedBlockchain.height}, network=$lastHeightAtStart")
 
     val requestsService = new DefaultRequestService(
       settings.rideRunner.requestsService,
       storage,
-      blockchainStorage,
+      sharedBlockchain,
       new RequestsStorage {
         override def size: Int                      = scripts.size
         override def all(): List[ScriptRequest]     = scripts
@@ -145,15 +145,9 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
     // Await.result(requestsService.runAll().runToFuture(rideScheduler), Duration.Inf)
 
     // TODO #100 Settings?
-    // mainnet
-    val lastSafeKnownHeight = Height(3393500)                 // math.max(0, blockchainStorage.height - 100 - 1)) // A rollback is not possible
-    val workingHeight       = Height(lastSafeKnownHeight + 3) // Height(math.max(blockchainStorage.height, lastHeightAtStart))
+    val lastSafeKnownHeight = Height(math.max(1, sharedBlockchain.height - 100 - 1)) // A rollback is not possible
+    val workingHeight       = Height(math.max(sharedBlockchain.height, lastHeightAtStart))
     val endHeight           = Height(workingHeight + 1)       // 101 // lastHeightAtStart
-
-    // TODO #100 Settings?
-    // testnet
-    //      val lastKnownHeight = Height(2327973)
-    //      val endHeight   = Height(lastKnownHeight + 1)
 
     log.info(s"Watching blockchain updates...")
     val blockchainUpdates = blockchainApi.mkBlockchainUpdatesStream(blockchainEventsStreamScheduler)
@@ -161,7 +155,7 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
       blockchainUpdates.close()
     }
 
-    val processor = new BlockchainProcessor(blockchainStorage, requestsService)
+    val processor = new BlockchainProcessor(sharedBlockchain, requestsService)
     val events = blockchainUpdates.downstream
       .doOnError(e =>
         Task {

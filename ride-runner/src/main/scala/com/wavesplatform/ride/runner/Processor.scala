@@ -31,7 +31,7 @@ trait Processor {
   def runAffectedScripts(): Task[Unit]
 }
 
-class BlockchainProcessor(blockchainStorage: SharedBlockchainStorage[ScriptRequest], requestsService: RequestService)
+class BlockchainProcessor(sharedBlockchain: SharedBlockchainStorage[ScriptRequest], requestsService: RequestService)
     extends Processor
     with ScorexLogging {
 
@@ -58,7 +58,7 @@ class BlockchainProcessor(blockchainStorage: SharedBlockchainStorage[ScriptReque
       case Update.Empty => // Ignore
     }
 
-    val affected = blockchainStorage.process(event)
+    val affected = sharedBlockchain.process(event)
     accumulatedChanges.accumulateAndGet(
       ProcessResult(height, affected),
       { (orig, update) => orig.combine(update) }
@@ -74,7 +74,7 @@ class BlockchainProcessor(blockchainStorage: SharedBlockchainStorage[ScriptReque
   }
 
   override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] =
-    blockchainStorage.hasLocalBlockAt(height, id)
+    sharedBlockchain.hasLocalBlockAt(height, id)
 
   /** Includes removeBlocksFrom
     */
@@ -83,7 +83,7 @@ class BlockchainProcessor(blockchainStorage: SharedBlockchainStorage[ScriptReque
       case Nil => throw new RuntimeException("Can't force rollback one")
       case last :: _ => // a liquid block with same height
         val rollbackToHeight = Height(last.height - 1)
-        val affected         = blockchainStorage.undo(lastEvents)
+        val affected         = sharedBlockchain.undo(lastEvents)
         if (!affected.isEmpty)
           accumulatedChanges.getAndAccumulate(
             ProcessResult(rollbackToHeight, affected),
@@ -92,7 +92,7 @@ class BlockchainProcessor(blockchainStorage: SharedBlockchainStorage[ScriptReque
         removeAllFrom(Height(last.height))
     }
 
-  override def removeAllFrom(height: Height): Unit = blockchainStorage.removeAllFrom(height)
+  override def removeAllFrom(height: Height): Unit = sharedBlockchain.removeAllFrom(height)
 }
 
 case class ProcessResult[TagT](

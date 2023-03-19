@@ -46,7 +46,7 @@ class SharedBlockchainStorage[TagT] private (
   val vrf = new VrfStorage(settings.caches.vrf, blockchainApi, persistentCaches.vrf, height)
 
   // Ride: wavesBalance, height, lastBlock
-  def height: Int = blockHeaders.latest.height
+  def height: Int = blockHeaders.latestHeight.getOrElse(blockchainApi.getCurrentBlockchainHeight())
 
   def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] =
     storage.readWrite { implicit ctx =>

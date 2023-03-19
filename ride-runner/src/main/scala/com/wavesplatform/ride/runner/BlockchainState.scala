@@ -68,7 +68,7 @@ object BlockchainState extends ScorexLogging {
 
     def forceRollBackOne(processedHeight: Height, workingStateHeight: Height): ResolvingFork =
       ResolvingFork(
-        processedHeight = Height(processedHeight - 1),
+        processedHeight = Height(processedHeight - 1), // Drop one block, because it could be updated (liquid)
         processedMicroBlockNumber = 0,
         minResolveHeight = workingStateHeight
       )
@@ -89,7 +89,7 @@ object BlockchainState extends ScorexLogging {
     // TODO return Task and do a delay before starting again
     def forceRestart(): BlockchainState = {
       val (currHeight, workingStateHeight) = orig match {
-        // -1 because of how ResolvingFork.resolveFork works. TODO #62 replace origHeight in ResolvingFork by resolveHeight
+        // TODO #62 replace origHeight in ResolvingFork by resolveHeight
         case orig: Starting      => (orig.processedHeight, orig.workingHeight)
         case Working(height)     => (height, height)
         case orig: ResolvingFork => (orig.processedHeight, orig.minResolveHeight)

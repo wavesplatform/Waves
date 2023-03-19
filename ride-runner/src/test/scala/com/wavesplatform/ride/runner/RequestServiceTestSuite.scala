@@ -104,7 +104,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
     }
 
     val testDb = use(TestDb.mk())
-    val blockchainStorage = testDb.storage.readWrite { implicit ctx =>
+    val sharedBlockchain = testDb.storage.readWrite { implicit ctx =>
       SharedBlockchainStorage[ScriptRequest](
         settings.rideRunner.sharedBlockchain,
         testDb.storage,
@@ -116,11 +116,11 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
     val requestsService = new DefaultRequestService(
       settings = DefaultRequestService.Settings(enableTraces = false, Int.MaxValue, 0, 3, 0.seconds),
       storage = testDb.storage,
-      sharedBlockchain = blockchainStorage,
+      sharedBlockchain = sharedBlockchain,
       requestsStorage = requestsStorage,
       runScriptsScheduler = testScheduler
     )
-    val processor               = new BlockchainProcessor(blockchainStorage, requestsService)
+    val processor               = new BlockchainProcessor(sharedBlockchain, requestsService)
     val blockchainUpdatesStream = use(blockchainApi.mkBlockchainUpdatesStream(testScheduler))
 
     val workingHeight = Height(1)
@@ -149,7 +149,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
     f(
       TestDependencies(
         requestsService,
-        new BlockchainProcessor(blockchainStorage, requestsService),
+        new BlockchainProcessor(sharedBlockchain, requestsService),
         blockchainApi,
         testScheduler
       )

@@ -9,7 +9,7 @@ class ServiceApiRouteTestSuite extends RouteSpec("/utils") with RestAPISettingsH
       val request: HttpRequest = Get("/ride/status")
 
       val healthyRoute = seal(
-        ServiceApiRoute(ServiceApiRoute.Settings(""), () => HttpServiceStatus(healthy = true)).route
+        ServiceApiRoute(() => HttpServiceStatus(healthy = true)).route
       )
 
       "HttpStatus is OK when the service is healthy" in request ~> healthyRoute ~> check {
@@ -17,7 +17,7 @@ class ServiceApiRouteTestSuite extends RouteSpec("/utils") with RestAPISettingsH
       }
 
       val unhealthyRoute = seal(
-        ServiceApiRoute(ServiceApiRoute.Settings(""), () => HttpServiceStatus(healthy = false)).route
+        ServiceApiRoute(() => HttpServiceStatus(healthy = false)).route
       )
 
       "HttpStatus is InternalServerError when the service is unhealthy" in request ~> unhealthyRoute ~> check {

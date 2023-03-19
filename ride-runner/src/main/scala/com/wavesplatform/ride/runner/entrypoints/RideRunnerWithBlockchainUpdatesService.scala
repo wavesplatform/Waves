@@ -144,13 +144,13 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
 
     log.info("Loading data from caches...")
     val storage = PersistentStorage.rocksDb(rideDb.db)
-    val blockchainStorage = storage.readWrite { implicit rw =>
+    val sharedBlockchain = storage.readWrite { implicit rw =>
       val dbCaches = DefaultPersistentCaches(storage)
       SharedBlockchainStorage[ScriptRequest](settings.rideRunner.sharedBlockchain, storage, dbCaches, blockchainApi)
     }
 
     val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
-    log.info(s"Current height: known=${blockchainStorage.height}, blockchain=$lastHeightAtStart")
+    log.info(s"Current height: shared (local or network)=${sharedBlockchain.height}, network=$lastHeightAtStart")
 
     val requestsStorage = new DefaultRequestsStorage(storage)
     log.info(s"There are ${requestsStorage.size} scripts")
@@ -158,22 +158,19 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
     val requestService = new DefaultRequestService(
       settings.rideRunner.requestsService,
       storage,
-      blockchainStorage,
+      sharedBlockchain,
       requestsStorage,
       rideScheduler
     )
 
-    // log.info("Warming up caches...") // Helps to figure out, which data is used by a script
-    // Await.result(requestsService.runAll().runToFuture(rideScheduler), Duration.Inf)
-
-    val lastSafeKnownHeight = Height(math.max(0, blockchainStorage.height - 100 - 1)) // A rollback is not possible
-    val workingHeight       = Height(math.max(blockchainStorage.height, lastHeightAtStart))
+    val lastSafeKnownHeight = Height(math.max(1, sharedBlockchain.height - 100 - 1)) // A rollback is not possible
+    val workingHeight       = Height(math.max(sharedBlockchain.height, lastHeightAtStart))
 
     log.info(s"Watching blockchain updates...")
     val blockchainUpdatesStream = blockchainApi.mkBlockchainUpdatesStream(blockchainEventsStreamScheduler)
     cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream) { blockchainUpdatesStream.close() }
 
-    val processor = new BlockchainProcessor(blockchainStorage, requestService)
+    val processor = new BlockchainProcessor(sharedBlockchain, requestService)
 
     @volatile var lastServiceStatus = ServiceStatus()
     val events = blockchainUpdatesStream.downstream

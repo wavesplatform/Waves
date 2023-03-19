@@ -1,7 +1,5 @@
 package com.wavesplatform.ride.runner.storage
 
-import cats.data.NonEmptyList
-import cats.syntax.option.*
 import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
@@ -11,37 +9,33 @@ import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.ride.runner.storage.BlockHeaderStorage.BlockInfo
-import com.wavesplatform.ride.runner.storage.persistent.PersistentStorageContext.ReadWrite
 import com.wavesplatform.ride.runner.storage.persistent.BlockPersistentCache
+import com.wavesplatform.ride.runner.storage.persistent.PersistentStorageContext.ReadWrite
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
 
 import scala.util.chaining.scalaUtilChainingOps
 
 class BlockHeaderStorage private (
     blockchainApi: BlockchainApi,
-    persistentCache: BlockPersistentCache
+    persistentCache: BlockPersistentCache,
+    var liquidBlocks: List[BlockInfo]
 ) extends OptimisticLockable
     with ScorexLogging {
-  private var liquidBlocks: NonEmptyList[BlockInfo] = _ // TODO move to constructor
 
-  // TODO init at height
-  private def init()(implicit ctx: ReadWrite): Unit = if (liquidBlocks == null) {
-    liquidBlocks = NonEmptyList.one {
-      // TODO -100 instead of getLastHeight
-      val height = persistentCache.getLastHeight.getOrElse(blockchainApi.getCurrentBlockchainHeight() - 1)
-      val x      = getInternal(height).getOrElse(throw new RuntimeException(s"Can't find a block at $height"))
-      BlockInfo(height, x.id(), x)
-    }
-  }
+  /** @return
+    *   None if there is no stored blocks
+    */
+  def latestHeight: Option[Int] = readLockCond(liquidBlocks.headOption)(_ => false).map(_.height)
 
-  def latest: BlockInfo = readLockCond(liquidBlocks.head)(_ => false)
-
-  // TODO liquidBlocks?
-  def getLocal(atHeight: Int)(implicit ctx: ReadWrite): Option[SignedBlockHeader] = persistentCache.get(atHeight)
+  def getLocal(atHeight: Int)(implicit ctx: ReadWrite): Option[SignedBlockHeader] =
+    getFromLiquidBlockOr(atHeight, persistentCache.get(atHeight))
 
   def get(atHeight: Int)(implicit ctx: ReadWrite): Option[SignedBlockHeader] =
-    readLockCond(if (liquidBlocks.head.height == atHeight) liquidBlocks.head.header.some else none)(_ => false)
-      .orElse(getInternal(atHeight))
+    getFromLiquidBlockOr(atHeight, getInternal(atHeight))
+
+  private def getFromLiquidBlockOr(atHeight: Int, or: => Option[SignedBlockHeader]): Option[SignedBlockHeader] =
+    readLockCond(liquidBlocks.headOption.collect { case x if x.height == atHeight => x.header })(_ => false)
+      .orElse(or)
 
   private def getInternal(atHeight: Int)(implicit ctx: ReadWrite): Option[SignedBlockHeader] =
     persistentCache.get(atHeight).orElse {
@@ -67,10 +61,10 @@ class BlockHeaderStorage private (
             )
             log.debug(s"Update at ${newFullBlock.height} with ${newFullBlock.id.toString.take(5)}")
             persistentCache.set(newFullBlock.height, newFullBlock.header)
-            liquidBlocks = NonEmptyList.one(newFullBlock)
+            liquidBlocks = newFullBlock :: Nil
 
           case Body.MicroBlock(microBlock) =>
-            val last = liquidBlocks.head
+            val last = liquidBlocks.headOption.getOrElse(throw new IllegalStateException("I haven't gotten a key block, but received a micro block"))
             // See NgState.forgeBlock and Block.Create
             val newLiquidBlock = BlockInfo(
               event.height,
@@ -88,20 +82,18 @@ class BlockHeaderStorage private (
       case _: Update.Rollback =>
         val toBlockId = event.id.toByteStr
         val toHeight  = event.height
-        val dropped   = liquidBlocks.toList.dropWhile(x => x.id != toBlockId && x.height >= toHeight)
+        val dropped   = liquidBlocks.dropWhile(x => x.id != toBlockId && x.height >= toHeight)
         dropped match {
           case Nil =>
             log.debug(s"Remove from ${toHeight + 1}")
             persistentCache.removeFrom(toHeight + 1)
-            liquidBlocks = NonEmptyList.one {
-              val header = getInternal(toHeight).getOrElse(throw new RuntimeException(s"Can't get block at $toHeight"))
-              BlockInfo(toHeight, header.id(), header)
-            }
+            val header = getInternal(toHeight).getOrElse(throw new RuntimeException(s"Can't get block at $toHeight"))
+            liquidBlocks = BlockInfo(toHeight, header.id(), header) :: Nil
 
           case last :: rest =>
             log.debug(s"Replace at ${last.height} with ${last.id.toString.take(5)}")
             persistentCache.set(last.height, last.header)
-            liquidBlocks = NonEmptyList(last, rest)
+            liquidBlocks = last :: rest
         }
     }
   }
@@ -113,12 +105,14 @@ object BlockHeaderStorage {
   def apply(
       blockchainApi: BlockchainApi,
       persistentCache: BlockPersistentCache
-  )(implicit ctx: ReadWrite): BlockHeaderStorage = {
-    new BlockHeaderStorage(
-      blockchainApi = blockchainApi,
-      persistentCache = persistentCache
-    ).tap(_.init())
-  }
+  )(implicit ctx: ReadWrite): BlockHeaderStorage = new BlockHeaderStorage(
+    blockchainApi = blockchainApi,
+    persistentCache = persistentCache,
+    liquidBlocks = for {
+      h <- persistentCache.getLastHeight.toList
+      b <- persistentCache.get(h)
+    } yield BlockInfo(h, b.id(), b)
+  )
 
   case class BlockInfo(height: Int, id: ByteStr, header: SignedBlockHeader)
 }
