@@ -41,7 +41,7 @@ object ScriptRequest {
   }
 }
 
-class DefaultRequestsStorage(storage: Storage) extends RequestsStorage {
+class DefaultRequestsStorage(storage: DiskStorage) extends RequestsStorage {
   private val lastIndexKey = RequestsLastIndex.mkKey(())
   private val lastIndex    = new AtomicInteger(storage.readOnly(_.db.getOpt(lastIndexKey).getOrElse(-1)))
   refreshCounter()

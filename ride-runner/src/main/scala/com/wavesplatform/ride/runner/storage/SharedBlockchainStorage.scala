@@ -24,7 +24,7 @@ import scala.util.chaining.scalaUtilChainingOps
 
 class SharedBlockchainStorage[TagT] private (
     settings: Settings,
-    storage: Storage,
+    storage: DiskStorage,
     persistentCaches: PersistentCaches,
     blockchainApi: BlockchainApi,
     val blockHeaders: BlockHeaderStorage
@@ -266,7 +266,7 @@ class SharedBlockchainStorage[TagT] private (
 object SharedBlockchainStorage {
   def apply[TagT](
       settings: Settings,
-      storage: Storage,
+      storage: DiskStorage,
       persistentCaches: PersistentCaches,
       blockchainApi: BlockchainApi
   )(implicit ctx: ReadWrite): SharedBlockchainStorage[TagT] =

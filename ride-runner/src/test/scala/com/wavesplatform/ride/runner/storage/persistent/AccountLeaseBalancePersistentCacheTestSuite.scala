@@ -1,7 +1,7 @@
 package com.wavesplatform.ride.runner.storage.persistent
 
 import com.wavesplatform.account.Address
-import com.wavesplatform.ride.runner.storage.{RemoteData, Storage}
+import com.wavesplatform.ride.runner.storage.{RemoteData, DiskStorage}
 import com.wavesplatform.state.LeaseBalance
 
 class AccountLeaseBalancePersistentCacheTestSuite extends PersistentTestSuite {
@@ -217,7 +217,7 @@ class AccountLeaseBalancePersistentCacheTestSuite extends PersistentTestSuite {
     }
   }
 
-  private def test(f: (Storage, PersistentCache[Address, LeaseBalance]) => Unit): Unit = withDb { db =>
+  private def test(f: (DiskStorage, PersistentCache[Address, LeaseBalance]) => Unit): Unit = withDb { db =>
     val caches = db.readWrite(DefaultPersistentCaches(db)(_))
     f(db, caches.accountLeaseBalances)
   }

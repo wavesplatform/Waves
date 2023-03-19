@@ -9,7 +9,7 @@ import org.rocksdb.*
 
 import scala.util.Using
 
-trait Storage {
+trait DiskStorage {
   def asyncReadOnly[T](f: ReadOnly => Task[T]): Task[T]
   def readOnly[T](f: ReadOnly => T): T
 
@@ -37,8 +37,8 @@ class ReadWriteHandle(db: RocksDB) extends AutoCloseable {
 }
 
 // TODO #98 Wrapped Task.bracket instead of vars
-object Storage {
-  def rocksDb(db: RocksDB): Storage = new Storage {
+object DiskStorage {
+  def rocksDb(db: RocksDB): DiskStorage = new DiskStorage {
     override def asyncReadOnly[T](f: ReadOnly => Task[T]): Task[T] = {
       @volatile var snapshot = none[Snapshot]
       @volatile var options  = none[ReadOptions]

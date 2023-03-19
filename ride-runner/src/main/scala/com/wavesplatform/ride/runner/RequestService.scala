@@ -6,10 +6,10 @@ import com.wavesplatform.api.http.ApiException
 import com.wavesplatform.api.http.utils.UtilsApiRoute
 import com.wavesplatform.ride.runner.DefaultRequestService.RideScriptRunEnvironment
 import com.wavesplatform.ride.runner.blockchain.ScriptBlockchain
-import com.wavesplatform.ride.runner.stats.{KamonCaffeineStats, RideRunnerStats}
 import com.wavesplatform.ride.runner.stats.RideRunnerStats.*
+import com.wavesplatform.ride.runner.stats.{KamonCaffeineStats, RideRunnerStats}
 import com.wavesplatform.ride.runner.storage.StorageContext.ReadWrite
-import com.wavesplatform.ride.runner.storage.{RequestsStorage, ScriptRequest, SharedBlockchainStorage, Storage}
+import com.wavesplatform.ride.runner.storage.{DiskStorage, RequestsStorage, ScriptRequest, SharedBlockchainStorage}
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
@@ -27,7 +27,7 @@ trait RequestService {
 
 class DefaultRequestService(
     settings: DefaultRequestService.Settings,
-    storage: Storage,
+    storage: DiskStorage,
     sharedBlockchain: SharedBlockchainStorage[ScriptRequest],
     requestsStorage: RequestsStorage,
     runScriptsScheduler: Scheduler

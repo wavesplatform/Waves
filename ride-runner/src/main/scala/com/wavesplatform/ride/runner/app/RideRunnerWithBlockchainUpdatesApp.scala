@@ -5,7 +5,7 @@ import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcCon
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.ride.runner.db.RideDb
 import com.wavesplatform.ride.runner.storage.persistent.DefaultPersistentCaches
-import com.wavesplatform.ride.runner.storage.{RequestsStorage, ScriptRequest, SharedBlockchainStorage, Storage}
+import com.wavesplatform.ride.runner.storage.{RequestsStorage, ScriptRequest, SharedBlockchainStorage, DiskStorage}
 import com.wavesplatform.ride.runner.{BlockchainProcessor, BlockchainState, DefaultRequestService}
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
@@ -115,7 +115,7 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
     val db = RideDb.open(settings.rideRunner.db).db
     cs.cleanup(CustomShutdownPhase.Db) { db.close() }
 
-    val storage = Storage.rocksDb(db)
+    val storage = DiskStorage.rocksDb(db)
     val blockchainStorage = storage.readWrite { implicit rw =>
       val dbCaches = DefaultPersistentCaches(storage)
       SharedBlockchainStorage[ScriptRequest](settings.rideRunner.sharedBlockchain, storage, dbCaches, blockchainApi)

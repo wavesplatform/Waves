@@ -2,7 +2,7 @@ package com.wavesplatform.ride.runner.storage.persistent
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.DigestLength
-import com.wavesplatform.ride.runner.storage.{RemoteData, Storage}
+import com.wavesplatform.ride.runner.storage.{RemoteData, DiskStorage}
 import com.wavesplatform.state.{Height, TransactionId}
 
 class TransactionsPersistentCacheTestSuite extends PersistentTestSuite {
@@ -50,7 +50,7 @@ class TransactionsPersistentCacheTestSuite extends PersistentTestSuite {
     }
   }
 
-  private def test(f: (Storage, TransactionPersistentCache) => Unit): Unit = withDb { db =>
+  private def test(f: (DiskStorage, TransactionPersistentCache) => Unit): Unit = withDb { db =>
     val caches = db.readOnly(DefaultPersistentCaches(db)(_))
     f(db, caches.transactions)
   }

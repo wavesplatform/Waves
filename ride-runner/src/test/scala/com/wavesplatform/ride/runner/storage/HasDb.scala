@@ -10,17 +10,17 @@ import java.util
 import scala.jdk.CollectionConverters.SeqHasAsJava
 
 trait HasDb {
-  protected def withDb[A](f: Storage => A): A = TestDb.mk().withDb(f)
+  protected def withDb[A](f: DiskStorage => A): A = TestDb.mk().withDb(f)
 }
 
 object HasDb {
   // TODO TestStorage
   case class TestDb(path: Path, db: RocksDB, clean: Boolean = true) extends AutoCloseable {
-    val storage = Storage.rocksDb(db)
+    val storage = DiskStorage.rocksDb(db)
 
     def withoutCleaning: TestDb = copy(clean = false)
 
-    def withDb[A](f: Storage => A): A = {
+    def withDb[A](f: DiskStorage => A): A = {
       try f(storage)
       finally close()
     }

@@ -8,7 +8,7 @@ import com.wavesplatform.ride.runner.db.RideDb
 import com.wavesplatform.ride.runner.http.{EvaluateApiRoute, HttpServiceStatus, ServiceApiRoute}
 import com.wavesplatform.ride.runner.stats.RideRunnerStats
 import com.wavesplatform.ride.runner.storage.persistent.DefaultPersistentCaches
-import com.wavesplatform.ride.runner.storage.{DefaultRequestsStorage, ScriptRequest, SharedBlockchainStorage, Storage}
+import com.wavesplatform.ride.runner.storage.{DefaultRequestsStorage, ScriptRequest, SharedBlockchainStorage, DiskStorage}
 import com.wavesplatform.ride.runner.{BlockchainProcessor, BlockchainState, DefaultRequestService}
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
@@ -145,7 +145,7 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
     }
 
     log.info("Loading data from caches...")
-    val storage = Storage.rocksDb(rideDb.db)
+    val storage = DiskStorage.rocksDb(rideDb.db)
     val blockchainStorage = storage.readWrite { implicit rw =>
       val dbCaches = DefaultPersistentCaches(storage)
       SharedBlockchainStorage[ScriptRequest](settings.rideRunner.sharedBlockchain, storage, dbCaches, blockchainApi)
