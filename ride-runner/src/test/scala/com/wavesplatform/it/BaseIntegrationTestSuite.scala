@@ -8,15 +8,15 @@ import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.riderunner.{BlockchainProcessor, BlockchainState, DefaultRequestService}
-import com.wavesplatform.riderunner.storage.HasDb.TestDb
-import com.wavesplatform.riderunner.storage.persistent.DefaultPersistentCaches
-import com.wavesplatform.riderunner.storage.{HasDb, RequestsStorage, ScriptRequest, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.storage.HasDb.TestDb
+import com.wavesplatform.ride.runner.storage.persistent.DefaultPersistentCaches
+import com.wavesplatform.ride.runner.storage.{HasDb, RequestsStorage, ScriptRequest, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.{BlockchainProcessor, BlockchainState, DefaultRequestService}
 import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
-import com.wavesplatform.{BaseTestSuite, HasMonixHelpers, riderunner}
+import com.wavesplatform.{BaseTestSuite, HasMonixHelpers}
 import monix.eval.Task
 import monix.execution.schedulers.TestScheduler
-import play.api.libs.json.Json
+import play.api.libs.json.{JsObject, Json}
 
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
@@ -58,24 +58,24 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     }
 
     val request = ScriptRequest(aliceAddr, Json.obj("expr" -> "foo()"))
-    val requestsService = new DefaultRequestService(
-      settings = DefaultRequestService.Settings(enableTraces = false, Int.MaxValue, 0, 3, 0.seconds),
+    val requestService = new DefaultRequestService(
+      settings = DefaultRequestService.Settings(enableTraces = true, Int.MaxValue, 0, 3, 0.seconds),
       storage = testDb.storage,
       sharedBlockchain = blockchainStorage,
       requestsStorage = new RequestsStorage {
-        override def size: Int                   = 1
+        override def size: Int                      = 1
         override def append(x: ScriptRequest): Unit = {} // Ignore, because no way to evaluate a new expr
         override def all(): List[ScriptRequest]     = List(request)
       },
       runScriptsScheduler = testScheduler
     )
-    val processor = new BlockchainProcessor(blockchainStorage, requestsService)
+    val processor = new BlockchainProcessor(blockchainStorage, requestService)
 
-    requestsService.runAll().runToFuture
+    requestService.runAll().runToFuture
     testScheduler.tick(1.milli) // 1 millisecond to detect that script will be ran in the end
 
-    def getScriptResult = {
-      val r = requestsService.trackAndRun(request).runToFuture
+    def getScriptResult: JsObject = {
+      val r = requestService.trackAndRun(request).runToFuture
       testScheduler.tick()
       Await.result(r, 5.seconds)
     }
@@ -91,7 +91,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
       )
       .take(events.size)
       .scanEval(Task.now[BlockchainState](BlockchainState.Starting(Height(0), workingHeight))) {
-        riderunner.BlockchainState(processor, blockchainUpdatesStream, _, _)
+        BlockchainState(processor, blockchainUpdatesStream, _, _)
       }
       .doOnError { e =>
         Task {
@@ -101,6 +101,9 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
       }
       .lastL
       .runToFuture
+
+    // We don't have a correct mock for getFromBlockchain, so we need to track changes from BlockchainUpdates
+    val _ = getScriptResult // So, track this script
 
     blockchainUpdatesStream.start(1)
     events.foreach(blockchainApi.blockchainUpdatesUpstream.onNext)
@@ -113,7 +116,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     log.info(s"The last result: ${Await.result(eventsStream, 5.seconds)}")
 
     val after = getScriptResult
-    withClue(Json.prettyPrint(after)) {
+    withClue(s"result.value._2.value at ${Json.prettyPrint(after)}") {
       (after \ "result" \ "value" \ "_2" \ "value").as[Int] shouldBe xPlusHeight
     }
   }.get

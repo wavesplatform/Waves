@@ -1,7 +1,7 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
-import com.wavesplatform.riderunner.http.{HttpServiceStatus, ServiceApiRoute}
+import com.wavesplatform.ride.runner.http.{HttpServiceStatus, ServiceApiRoute}
 
 class ServiceApiRouteTestSuite extends RouteSpec("/utils") with RestAPISettingsHelper {
   "ServiceStatusRoute" - {

@@ -3,7 +3,7 @@ package com.wavesplatform.blockchain
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.events.protobuf.BlockchainUpdated
-import com.wavesplatform.riderunner.Processor
+import com.wavesplatform.ride.runner.Processor
 import com.wavesplatform.state.Height
 import monix.eval.Task
 

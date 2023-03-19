@@ -92,7 +92,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
   }
 
   "a transaction isn't received after a timeout if the previous event is" - {
-    "a block" in test(
+    "a block append" in test(
       events = List(
         WrappedEvent.Next(mkBlockAppendEvent(1, 1)),
         WrappedEvent.Next(
@@ -103,8 +103,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
           )
         ),
         WrappedEvent.Failed(UpstreamTimeoutException(90.seconds)), // Removes the last block, so we didn't see the data update
-        WrappedEvent.Next(mkBlockAppendEvent(2, 2)),
-        WrappedEvent.Next(mkMicroBlockAppendEvent(2, 2, 1)) // Resolves a synthetic fork
+        WrappedEvent.Next(mkBlockAppendEvent(2, 2))
       ),
       xPlusHeight = 2
     )
@@ -123,9 +122,8 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
         ),
         WrappedEvent.Next(mkMicroBlockAppendEvent(2, 2, 2)),
         WrappedEvent.Failed(UpstreamTimeoutException(90.seconds)), // Removes the last block, so we didn't see the data update
-        WrappedEvent.Next(mkBlockAppendEvent(2, 2)),
-        WrappedEvent.Next(mkMicroBlockAppendEvent(2, 2, 1)) // Resolves a synthetic fork
-        // It's okay, that we don't wait for a next micro block (as on a previous fork), because by default a timeout happens after 90s,
+        WrappedEvent.Next(mkBlockAppendEvent(2, 2))
+        // It's okay, that we don't wait for a micro block (as on a previous fork), because by default a timeout happens after 90s,
         // so there is a new block probably.
       ),
       xPlusHeight = 2
@@ -230,8 +228,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
         ),
         WrappedEvent.Next(mkBlockAppendEvent(3, 1)),
         WrappedEvent.Failed(UpstreamTimeoutException(90.seconds)), // Removes the last block, so we didn't see the data update
-        WrappedEvent.Next(mkBlockAppendEvent(3, 2)),
-        WrappedEvent.Next(mkMicroBlockAppendEvent(3, 2, 1)) // Resolves a synthetic fork
+        WrappedEvent.Next(mkBlockAppendEvent(3, 2))
       ),
       xPlusHeight = 4
     )
@@ -252,8 +249,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
           WrappedEvent.Next(mkRollbackEvent(3, 1)),
           WrappedEvent.Failed(UpstreamTimeoutException(90.seconds)),
           WrappedEvent.Next(mkBlockAppendEvent(3, 2)),
-          WrappedEvent.Next(mkBlockAppendEvent(4, 2)),
-          WrappedEvent.Next(mkMicroBlockAppendEvent(4, 2, 1)) // Resolves a synthetic fork
+          WrappedEvent.Next(mkBlockAppendEvent(4, 2))
         ),
         xPlusHeight = 5
       )
@@ -274,8 +270,7 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
           WrappedEvent.Next(mkRollbackEvent(3, 1, 1)),
           WrappedEvent.Failed(UpstreamTimeoutException(90.seconds)),
           WrappedEvent.Next(mkBlockAppendEvent(3, 2)),
-          WrappedEvent.Next(mkBlockAppendEvent(4, 2)),
-          WrappedEvent.Next(mkMicroBlockAppendEvent(4, 2, 1)) // Resolves a synthetic fork
+          WrappedEvent.Next(mkBlockAppendEvent(4, 2))
         ),
         xPlusHeight = 5
       )
