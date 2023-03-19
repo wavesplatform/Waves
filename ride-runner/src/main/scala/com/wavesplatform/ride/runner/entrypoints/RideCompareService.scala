@@ -1,7 +1,8 @@
-package com.wavesplatform.ride.runner.app
+package com.wavesplatform.ride.runner.entrypoints
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import com.wavesplatform.account.Address
 import com.wavesplatform.api.RideMulticastHttpApi
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.ride.runner.http.{HttpServiceStatus, ServiceApiRoute}
@@ -12,18 +13,26 @@ import kamon.instrumentation.executor.ExecutorInstrumentation
 import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
 import monix.reactive.Observable
-import play.api.libs.json.Json
+import play.api.libs.json.{JsObject, Json}
 import sttp.client3.HttpURLConnectionBackend
 
 import java.io.File
 import java.util.concurrent.{LinkedBlockingQueue, RejectedExecutionException, ThreadPoolExecutor, TimeUnit}
 import scala.concurrent.Await
-import scala.concurrent.duration.{Duration, DurationInt}
+import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
 
-object CompareApp extends ScorexLogging {
+object RideCompareService extends ScorexLogging {
+  case class Settings(
+      requestsDelay: FiniteDuration,
+      failedChecksToleranceTimer: FiniteDuration,
+      maxChecks: Option[Long],
+      rideApi: RideMulticastHttpApi.Settings,
+      testRequests: List[(Address, JsObject)]
+  )
+
   def main(args: Array[String]): Unit = {
     val (globalConfig, settings) = AppInitializer.init(args.headOption.map(new File(_)))
-    if (settings.compareApp.testRequests.isEmpty) throw new IllegalArgumentException("Specify waves.compare.test-requests in config")
+    if (settings.rideCompareService.testRequests.isEmpty) throw new IllegalArgumentException("Specify waves.compare.test-requests in config")
 
     log.info("Starting...")
     implicit val actorSystem = ActorSystem("compare-app", globalConfig)
@@ -38,7 +47,7 @@ object CompareApp extends ScorexLogging {
     val httpBackend = HttpURLConnectionBackend()
     cs.cleanupTask(CustomShutdownPhase.ApiClient, "httpBackend") { httpBackend.close() }
 
-    val rideApi = new RideMulticastHttpApi(settings.compareApp.rideApi, httpBackend)
+    val rideApi = new RideMulticastHttpApi(settings.rideCompareService.rideApi, httpBackend)
 
     def mkScheduler(name: String, threads: Int): Scheduler = {
       val executor = new ThreadPoolExecutor(
@@ -72,9 +81,9 @@ object CompareApp extends ScorexLogging {
     }
 
     val scheduler = mkScheduler("probes", 3)
-    log.info(s"Found ${settings.compareApp.testRequests.size} scripts")
+    log.info(s"Found ${settings.rideCompareService.testRequests.size} scripts")
     val task: Task[Boolean] = Task
-      .traverse(settings.compareApp.testRequests) { case (address, request) =>
+      .traverse(settings.rideCompareService.testRequests) { case (address, request) =>
         rideApi
           .ask(address, request)
           .map { x =>
@@ -97,7 +106,7 @@ object CompareApp extends ScorexLogging {
     @volatile var lastServiceStatus = ServiceStatus()
     val loop = {
       val s = Observable
-        .intervalWithFixedDelay(settings.compareApp.requestsDelay)
+        .intervalWithFixedDelay(settings.rideCompareService.requestsDelay)
         .mapEval(_ => task)
         .scan(now) { case (lastSuccessTs, lastCheckSuccess) =>
           val n = now
@@ -106,7 +115,7 @@ object CompareApp extends ScorexLogging {
             lastServiceStatus = lastServiceStatus.copy(lastSuccessTimeMs = n)
             n
           } else {
-            if (n - lastSuccessTs > settings.compareApp.failedChecksToleranceTimer.toMillis) {
+            if (n - lastSuccessTs > settings.rideCompareService.failedChecksToleranceTimer.toMillis) {
               lastServiceStatus = lastServiceStatus.copy(rideRunnerHealthy = false)
               log.error(s"Failed since $lastSuccessTs")
             }
@@ -114,7 +123,7 @@ object CompareApp extends ScorexLogging {
           }
         }
 
-      settings.compareApp.maxChecks
+      settings.rideCompareService.maxChecks
         .fold(s)(s.take)
         .lastL
         .runToFuture(scheduler)
@@ -124,7 +133,6 @@ object CompareApp extends ScorexLogging {
     log.info(s"Initializing REST API on ${settings.restApi.bindAddress}:${settings.restApi.port}...")
     val apiRoutes = Seq(
       ServiceApiRoute(
-        ServiceApiRoute.Settings(""),
         { () =>
           val nowMs      = scheduler.clockMonotonic(TimeUnit.MILLISECONDS)
           val idleTimeMs = nowMs - lastServiceStatus.lastProcessedTimeMs

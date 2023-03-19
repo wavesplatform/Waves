@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.runner.app
+package com.wavesplatform.ride.runner.entrypoints
 
 import akka.Done
 import akka.actor.{ActorSystem, CoordinatedShutdown}
@@ -19,5 +19,5 @@ class Cleanup(actorSystem: ActorSystem) {
       }(actorSystem.dispatcher)
     }
 
-  def forceStop(): Unit = Await.result(cs.run(CoordinatedShutdown.UnknownReason), Duration.Inf)
+  def forceStop(): Unit = Await.result(cs.run(ProgramFinishedReason), Duration.Inf)
 }

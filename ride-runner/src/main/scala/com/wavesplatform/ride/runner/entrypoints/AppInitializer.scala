@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.runner.app
+package com.wavesplatform.ride.runner.entrypoints
 
 import com.typesafe.config.{Config, ConfigFactory, ConfigParseOptions}
 import com.wavesplatform.Version

@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.runner.app
+package com.wavesplatform.ride.runner.entrypoints
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
@@ -211,7 +211,6 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
     val apiRoutes = Seq(
       EvaluateApiRoute(requestService.trackAndRun(_).runToFuture(rideScheduler)),
       ServiceApiRoute(
-        settings.rideRunner.serviceApiRoute,
         { () =>
           val nowMs      = blockchainEventsStreamScheduler.clockMonotonic(TimeUnit.MILLISECONDS)
           val idleTimeMs = nowMs - lastServiceStatus.lastProcessedTimeMs

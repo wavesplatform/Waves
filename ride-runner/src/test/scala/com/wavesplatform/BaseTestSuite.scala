@@ -1,7 +1,7 @@
 package com.wavesplatform
 
 import com.wavesplatform.meta.getSimpleName
-import com.wavesplatform.ride.runner.app.AppInitializer
+import com.wavesplatform.ride.runner.entrypoints.AppInitializer
 import com.wavesplatform.utils.ScorexLogging
 import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers

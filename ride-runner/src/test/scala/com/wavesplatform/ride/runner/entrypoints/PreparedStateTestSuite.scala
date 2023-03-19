@@ -1,4 +1,4 @@
-package com.wavesplatform.ride.runner.app
+package com.wavesplatform.ride.runner.entrypoints
 
 import com.wavesplatform.api.http.utils.UtilsApiRoute
 import com.wavesplatform.common.state.ByteStr

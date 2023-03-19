@@ -1,11 +1,10 @@
-package com.wavesplatform.ride.runner.app
+package com.wavesplatform.ride.runner.entrypoints
 
 import com.typesafe.config.{Config, ConfigList, ConfigRenderOptions, ConfigValue}
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector, RideMulticastHttpApi}
+import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.ride.runner.DefaultRequestService
 import com.wavesplatform.ride.runner.db.RideDb
-import com.wavesplatform.ride.runner.http.ServiceApiRoute
 import com.wavesplatform.ride.runner.storage.SharedBlockchainStorage
 import com.wavesplatform.settings.*
 import net.ceedubs.ficus.Ficus.*
@@ -16,9 +15,9 @@ import play.api.libs.json.{JsObject, Json}
 import scala.concurrent.duration.FiniteDuration
 
 case class RideRunnerGlobalSettings(
-    rideRunner: RideRunnerAppSettings,
     restApi: RestAPISettings,
-    compareApp: CompareAppSettings
+    rideRunner: RideRunnerCommonSettings,
+    rideCompareService: RideCompareService.Settings
 )
 
 object RideRunnerGlobalSettings {
@@ -51,11 +50,10 @@ object RideRunnerGlobalSettings {
     }
 }
 
-case class RideRunnerAppSettings(
+case class RideRunnerCommonSettings(
     db: RideDb.Settings,
     unhealthyIdleTimeout: FiniteDuration,
     rideSchedulerThreads: Option[Int],
-    serviceApiRoute: ServiceApiRoute.Settings,
     immutableBlockchain: BlockchainSettings,
     sharedBlockchain: SharedBlockchainStorage.Settings,
     requestsService: DefaultRequestService.Settings,
@@ -67,11 +65,3 @@ case class RideRunnerAppSettings(
   val unhealthyIdleTimeoutMs    = unhealthyIdleTimeout.toMillis
   val exactRideSchedulerThreads = rideSchedulerThreads.getOrElse(Runtime.getRuntime.availableProcessors() * 2).min(4)
 }
-
-case class CompareAppSettings(
-    requestsDelay: FiniteDuration,
-    failedChecksToleranceTimer: FiniteDuration,
-    maxChecks: Option[Long],
-    rideApi: RideMulticastHttpApi.Settings,
-    testRequests: List[(Address, JsObject)]
-)
