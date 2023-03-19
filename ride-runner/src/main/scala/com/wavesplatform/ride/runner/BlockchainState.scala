@@ -15,12 +15,16 @@ import io.grpc.{Status, StatusRuntimeException}
 import monix.eval.Task
 import monix.execution.exceptions.UpstreamTimeoutException
 
+import scala.concurrent.duration.FiniteDuration
+
 // TODO #8: move. Doesn't relate to blockchain itself, move to the business domain
 sealed trait BlockchainState extends Product with Serializable {
   def processedHeight: Height
 }
 
 object BlockchainState extends ScorexLogging {
+  case class Settings(delayBeforeForceRestart: FiniteDuration)
+
   case class Starting(processedHeight: Height, workingHeight: Height, foundDifferentBlocks: Boolean = false) extends BlockchainState {
     def withDifferentBlocks: Starting = copy(foundDifferentBlocks = true)
   }
@@ -81,13 +85,13 @@ object BlockchainState extends ScorexLogging {
   )
 
   def apply(
+      settings: Settings,
       processor: Processor,
       blockchainUpdatesStream: BlockchainUpdatesStream,
       orig: BlockchainState,
       event: WrappedEvent[SubscribeEvent]
   ): Task[BlockchainState] = {
-    // TODO return Task and do a delay before starting again
-    def forceRestart(): BlockchainState = {
+    def forceRestart(): Task[BlockchainState] = {
       val (currHeight, workingStateHeight) = orig match {
         // TODO #62 replace origHeight in ResolvingFork by resolveHeight
         case orig: Starting      => (orig.processedHeight, orig.workingHeight)
@@ -101,21 +105,24 @@ object BlockchainState extends ScorexLogging {
       processor.forceRollbackLiquid()
       val r = ResolvingFork.forceRollBackOne(currHeight, workingStateHeight)
 
-      blockchainUpdatesStream.start(r.processedHeight + 1)
       log.warn(s"Closed by a remote part, restarting. Reason: $event")
-      r
+
+      Task {
+        blockchainUpdatesStream.start(r.processedHeight + 1)
+        r
+      }.delayExecution(settings.delayBeforeForceRestart)
     }
 
     event match {
       case WrappedEvent.Next(event) => apply(processor, orig, event)
-      case WrappedEvent.Closed      => Task(forceRestart())
+      case WrappedEvent.Closed      => forceRestart()
       case WrappedEvent.Failed(e) =>
-        Task {
-          e match {
-            case e: StatusRuntimeException if grpcStatusesToRestart.contains(e.getStatus.getCode) => forceRestart()
-            case _: UpstreamTimeoutException                                                      => forceRestart()
+        e match {
+          case e: StatusRuntimeException if grpcStatusesToRestart.contains(e.getStatus.getCode) => forceRestart()
+          case _: UpstreamTimeoutException                                                      => forceRestart()
 
-            case _ =>
+          case _ =>
+            Task {
               val message = e match {
                 case e: StatusRuntimeException => s"Got an unhandled StatusRuntimeException, ${e.getStatus}, ${e.getTrailers.toString}"
                 case _                         => "Got an unexpected error"
@@ -123,7 +130,7 @@ object BlockchainState extends ScorexLogging {
               log.error(s"$message. Contact with developers", e)
               blockchainUpdatesStream.close()
               orig
-          }
+            }
         }
     }
   }

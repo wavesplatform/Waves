@@ -132,7 +132,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
         }
       )
       .scanEval(Task.now[BlockchainState](BlockchainState.Starting(Height(0), workingHeight))) {
-        BlockchainState(processor, blockchainUpdatesStream, _, _)
+        BlockchainState(BlockchainState.Settings(1.second), processor, blockchainUpdatesStream, _, _)
       }
       .doOnError { e =>
         Task {

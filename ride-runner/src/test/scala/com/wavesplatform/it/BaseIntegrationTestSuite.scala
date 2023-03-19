@@ -82,7 +82,8 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
 
     val blockchainUpdatesStream = use(blockchainApi.mkBlockchainUpdatesStream(testScheduler))
 
-    val workingHeight = Height(1)
+    val blockchainStateSettings = BlockchainState.Settings(1.second)
+    val workingHeight           = Height(1)
     val eventsStream = blockchainUpdatesStream.downstream
       .doOnError(e =>
         Task {
@@ -91,7 +92,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
       )
       .take(events.size)
       .scanEval(Task.now[BlockchainState](BlockchainState.Starting(Height(0), workingHeight))) {
-        BlockchainState(processor, blockchainUpdatesStream, _, _)
+        BlockchainState(blockchainStateSettings, processor, blockchainUpdatesStream, _, _)
       }
       .doOnError { e =>
         Task {
@@ -108,6 +109,8 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     blockchainUpdatesStream.start(1)
     events.foreach(blockchainApi.blockchainUpdatesUpstream.onNext)
 
+    testScheduler.tick()
+    testScheduler.tick(blockchainStateSettings.delayBeforeForceRestart)
     testScheduler.tick()
 
     withClue(dumpedTasks) {

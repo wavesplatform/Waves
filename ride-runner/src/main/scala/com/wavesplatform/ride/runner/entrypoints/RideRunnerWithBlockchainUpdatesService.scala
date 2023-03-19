@@ -176,7 +176,7 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
     val events = blockchainUpdatesStream.downstream
       .doOnError(e => Task { log.error("Error!", e) })
       .scanEval(Task.now[BlockchainState](BlockchainState.Starting(lastSafeKnownHeight, workingHeight))) {
-        BlockchainState(processor, blockchainUpdatesStream, _, _)
+        BlockchainState(settings.rideRunner.blockchainState, processor, blockchainUpdatesStream, _, _)
       }
       .doOnNext { state =>
         Task {
