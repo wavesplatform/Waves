@@ -3,7 +3,7 @@ package com.wavesplatform.ride.runner.storage
 import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.protobuf.transaction.PBAmounts.toAssetAndAmount
-import com.wavesplatform.ride.runner.storage.StorageContext.ReadWrite
+import com.wavesplatform.ride.runner.storage.persistent.PersistentStorageContext.ReadWrite
 import com.wavesplatform.ride.runner.storage.persistent.PersistentCache
 import com.wavesplatform.state.Height
 

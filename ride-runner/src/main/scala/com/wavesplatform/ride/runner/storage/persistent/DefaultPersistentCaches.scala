@@ -7,9 +7,9 @@ import com.wavesplatform.collections.syntax.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{AddressId, Key, ReadOnlyDB}
 import com.wavesplatform.ride.runner.stats.KamonCaffeineStats
-import com.wavesplatform.ride.runner.storage.StorageContext.{ReadOnly, ReadWrite}
+import PersistentStorageContext.{ReadOnly, ReadWrite}
 import com.wavesplatform.ride.runner.storage.persistent.DefaultPersistentCaches.ReadOnlyDBOps
-import com.wavesplatform.ride.runner.storage.{AccountAssetKey, AccountDataKey, KeyIndexStorage, RemoteData, DiskStorage}
+import com.wavesplatform.ride.runner.storage.{AccountAssetKey, AccountDataKey, KeyIndexStorage, RemoteData}
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, EmptyDataEntry, Height, LeaseBalance, TransactionId}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.{LoggerFacade, ScorexLogging}
@@ -19,7 +19,7 @@ import java.lang.Long as JLong
 import java.util.concurrent.atomic.AtomicLong
 import scala.util.chaining.scalaUtilChainingOps
 
-class DefaultPersistentCaches private (storage: DiskStorage, initialBlockHeadersLastHeight: Option[Int]) extends PersistentCaches with ScorexLogging {
+class DefaultPersistentCaches private (storage: PersistentStorage, initialBlockHeadersLastHeight: Option[Int]) extends PersistentCaches with ScorexLogging {
   private val lastAddressIdKey = CacheKeys.LastAddressId.mkKey(())
   private val lastAddressId    = new AtomicLong(storage.readOnly(_.db.getOpt(lastAddressIdKey).getOrElse(-1L)))
 
@@ -423,7 +423,7 @@ class DefaultPersistentCaches private (storage: DiskStorage, initialBlockHeaders
 }
 
 object DefaultPersistentCaches {
-  def apply(storage: DiskStorage)(implicit ctx: ReadOnly): DefaultPersistentCaches =
+  def apply(storage: PersistentStorage)(implicit ctx: ReadOnly): DefaultPersistentCaches =
     new DefaultPersistentCaches(storage, ctx.db.getOpt(CacheKeys.Height.Key))
 
   implicit final class ReadOnlyDBOps(val self: ReadOnlyDB) extends AnyVal {

@@ -1,6 +1,6 @@
 package com.wavesplatform.ride.runner.storage
 
-import com.wavesplatform.ride.runner.storage.StorageContext.{ReadOnly, ReadWrite}
+import com.wavesplatform.ride.runner.storage.persistent.PersistentStorageContext.{ReadOnly, ReadWrite}
 import com.wavesplatform.ride.runner.storage.persistent.CacheKey
 
 import java.lang

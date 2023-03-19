@@ -14,8 +14,8 @@ import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.ride.runner.estimate
 import com.wavesplatform.ride.runner.stats.RideRunnerStats.*
 import com.wavesplatform.ride.runner.storage.SharedBlockchainStorage.Settings
-import com.wavesplatform.ride.runner.storage.StorageContext.ReadWrite
-import com.wavesplatform.ride.runner.storage.persistent.PersistentCaches
+import com.wavesplatform.ride.runner.storage.persistent.PersistentStorageContext.ReadWrite
+import com.wavesplatform.ride.runner.storage.persistent.{PersistentCaches, PersistentStorage}
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
@@ -24,7 +24,7 @@ import scala.util.chaining.scalaUtilChainingOps
 
 class SharedBlockchainStorage[TagT] private (
     settings: Settings,
-    storage: DiskStorage,
+    storage: PersistentStorage,
     persistentCaches: PersistentCaches,
     blockchainApi: BlockchainApi,
     val blockHeaders: BlockHeaderStorage
@@ -266,7 +266,7 @@ class SharedBlockchainStorage[TagT] private (
 object SharedBlockchainStorage {
   def apply[TagT](
       settings: Settings,
-      storage: DiskStorage,
+      storage: PersistentStorage,
       persistentCaches: PersistentCaches,
       blockchainApi: BlockchainApi
   )(implicit ctx: ReadWrite): SharedBlockchainStorage[TagT] =

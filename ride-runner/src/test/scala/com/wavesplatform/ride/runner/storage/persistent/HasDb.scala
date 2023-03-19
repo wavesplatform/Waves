@@ -1,8 +1,8 @@
-package com.wavesplatform.ride.runner.storage
+package com.wavesplatform.ride.runner.storage.persistent
 
 import com.google.common.io.MoreFiles
 import com.wavesplatform.database.RDB.newColumnFamilyOptions
-import com.wavesplatform.ride.runner.storage.HasDb.TestDb
+import com.wavesplatform.ride.runner.storage.persistent.HasDb.TestDb
 import org.rocksdb.{ColumnFamilyDescriptor, ColumnFamilyHandle, DBOptions, DbPath, RocksDB, Statistics}
 
 import java.nio.file.{Files, Path}
@@ -10,17 +10,17 @@ import java.util
 import scala.jdk.CollectionConverters.SeqHasAsJava
 
 trait HasDb {
-  protected def withDb[A](f: DiskStorage => A): A = TestDb.mk().withDb(f)
+  protected def withDb[A](f: PersistentStorage => A): A = TestDb.mk().withDb(f)
 }
 
 object HasDb {
   // TODO TestStorage
   case class TestDb(path: Path, db: RocksDB, clean: Boolean = true) extends AutoCloseable {
-    val storage = DiskStorage.rocksDb(db)
+    val storage = PersistentStorage.rocksDb(db)
 
     def withoutCleaning: TestDb = copy(clean = false)
 
-    def withDb[A](f: DiskStorage => A): A = {
+    def withDb[A](f: PersistentStorage => A): A = {
       try f(storage)
       finally close()
     }

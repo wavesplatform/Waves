@@ -6,7 +6,7 @@ import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.ride.runner.storage.SharedBlockchainStorage
-import com.wavesplatform.ride.runner.storage.StorageContext.ReadWrite
+import com.wavesplatform.ride.runner.storage.persistent.PersistentStorageContext.ReadWrite
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{

@@ -5,7 +5,7 @@ import com.github.benmanes.caffeine.cache.Caffeine
 import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.ride.runner.stats.KamonCaffeineStats
 import com.wavesplatform.ride.runner.stats.RideRunnerStats.rideStorageKeyNumberFor
-import com.wavesplatform.ride.runner.storage.StorageContext.{ReadOnly, ReadWrite}
+import com.wavesplatform.ride.runner.storage.persistent.PersistentStorageContext.{ReadOnly, ReadWrite}
 import com.wavesplatform.ride.runner.storage.persistent.PersistentCache
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging

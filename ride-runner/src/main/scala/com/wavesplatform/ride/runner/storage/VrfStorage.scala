@@ -4,7 +4,7 @@ import com.github.benmanes.caffeine.cache.Caffeine
 import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.ride.runner.stats.KamonCaffeineStats
-import com.wavesplatform.ride.runner.storage.StorageContext.ReadWrite
+import com.wavesplatform.ride.runner.storage.persistent.PersistentStorageContext.ReadWrite
 import com.wavesplatform.ride.runner.storage.persistent.VrfPersistentCache
 import com.wavesplatform.utils.ScorexLogging
 

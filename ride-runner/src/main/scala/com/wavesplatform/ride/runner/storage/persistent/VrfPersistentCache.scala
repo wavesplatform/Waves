@@ -2,7 +2,7 @@ package com.wavesplatform.ride.runner.storage.persistent
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.ride.runner.storage.RemoteData
-import com.wavesplatform.ride.runner.storage.StorageContext.{ReadOnly, ReadWrite}
+import PersistentStorageContext.{ReadOnly, ReadWrite}
 
 trait VrfPersistentCache {
   def get(height: Int)(implicit ctx: ReadOnly): RemoteData[ByteStr]

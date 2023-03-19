@@ -1,7 +1,7 @@
 package com.wavesplatform.ride.runner.storage.persistent
 
 import com.wavesplatform.block.SignedBlockHeader
-import com.wavesplatform.ride.runner.storage.StorageContext.{ReadOnly, ReadWrite}
+import PersistentStorageContext.{ReadOnly, ReadWrite}
 
 trait BlockPersistentCache {
   def getLastHeight(implicit ctx: ReadOnly): Option[Int]

@@ -3,7 +3,6 @@ package com.wavesplatform.ride.runner.storage.persistent
 import com.wavesplatform.account.PublicKeys.EmptyPublicKey
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.ride.runner.storage.DiskStorage
 
 class BlockPersistentCacheTestSuite extends PersistentTestSuite {
   "BlockPersistentCache" - {
@@ -226,7 +225,7 @@ class BlockPersistentCacheTestSuite extends PersistentTestSuite {
       ByteStr.empty
     )
 
-  private def test(f: (DiskStorage, BlockPersistentCache) => Unit): Unit = withDb { db =>
+  private def test(f: (PersistentStorage, BlockPersistentCache) => Unit): Unit = withDb { db =>
     val caches = db.readOnly(DefaultPersistentCaches(db)(_))
     f(db, caches.blockHeaders)
   }

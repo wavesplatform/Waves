@@ -11,7 +11,7 @@ import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.ride.runner.storage.BlockHeaderStorage.BlockInfo
-import com.wavesplatform.ride.runner.storage.StorageContext.ReadWrite
+import com.wavesplatform.ride.runner.storage.persistent.PersistentStorageContext.ReadWrite
 import com.wavesplatform.ride.runner.storage.persistent.BlockPersistentCache
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
 

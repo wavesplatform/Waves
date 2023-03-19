@@ -9,9 +9,9 @@ import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.it.TestBlockchainApi
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.ride.runner.storage.HasDb.TestDb
-import com.wavesplatform.ride.runner.storage.persistent.DefaultPersistentCaches
-import com.wavesplatform.ride.runner.storage.{HasDb, RequestsStorage, ScriptRequest, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.storage.persistent.HasDb.TestDb
+import com.wavesplatform.ride.runner.storage.persistent.{DefaultPersistentCaches, HasDb}
+import com.wavesplatform.ride.runner.storage.{RequestsStorage, ScriptRequest, SharedBlockchainStorage}
 import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
 import monix.eval.Task
 import monix.execution.schedulers.TestScheduler

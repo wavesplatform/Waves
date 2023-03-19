@@ -1,7 +1,7 @@
 package com.wavesplatform.ride.runner.storage.persistent
 
 import com.wavesplatform.ride.runner.storage.RemoteData
-import com.wavesplatform.ride.runner.storage.StorageContext.{ReadOnly, ReadWrite}
+import PersistentStorageContext.{ReadOnly, ReadWrite}
 
 trait PersistentCache[KeyT, ValueT] {
   def getAllKeys()(implicit ctx: ReadOnly): List[KeyT]

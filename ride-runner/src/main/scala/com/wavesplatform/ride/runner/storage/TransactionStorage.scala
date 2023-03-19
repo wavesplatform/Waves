@@ -5,7 +5,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.ride.runner.stats.KamonCaffeineStats
-import com.wavesplatform.ride.runner.storage.StorageContext.ReadWrite
+import com.wavesplatform.ride.runner.storage.persistent.PersistentStorageContext.ReadWrite
 import com.wavesplatform.ride.runner.storage.persistent.TransactionPersistentCache
 import com.wavesplatform.state.{Height, TransactionId}
 import com.wavesplatform.utils.ScorexLogging

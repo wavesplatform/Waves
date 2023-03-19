@@ -1,6 +1,7 @@
 package com.wavesplatform.ride.runner.storage
 
-import com.wavesplatform.ride.runner.storage.HasDb.TestDb
+import com.wavesplatform.ride.runner.storage.persistent.HasDb
+import com.wavesplatform.ride.runner.storage.persistent.HasDb.TestDb
 import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
 import play.api.libs.json.Json
 

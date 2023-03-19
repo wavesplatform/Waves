@@ -3,7 +3,7 @@ package com.wavesplatform.ride.runner.storage
 import cats.syntax.contravariantSemigroupal.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.ride.runner.stats.RideRunnerStats.rideRequestTotalNumber
-import com.wavesplatform.ride.runner.storage.persistent.CacheKeys
+import com.wavesplatform.ride.runner.storage.persistent.{CacheKeys, PersistentStorage}
 import com.wavesplatform.ride.runner.storage.persistent.CacheKeys.{Requests, RequestsLastIndex}
 import play.api.libs.json.*
 
@@ -41,7 +41,7 @@ object ScriptRequest {
   }
 }
 
-class DefaultRequestsStorage(storage: DiskStorage) extends RequestsStorage {
+class DefaultRequestsStorage(storage: PersistentStorage) extends RequestsStorage {
   private val lastIndexKey = RequestsLastIndex.mkKey(())
   private val lastIndex    = new AtomicInteger(storage.readOnly(_.db.getOpt(lastIndexKey).getOrElse(-1)))
   refreshCounter()

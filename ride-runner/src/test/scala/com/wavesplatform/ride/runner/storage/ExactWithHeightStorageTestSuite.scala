@@ -1,7 +1,7 @@
 package com.wavesplatform.ride.runner.storage
 
-import com.wavesplatform.ride.runner.storage.StorageContext.ReadWrite
-import com.wavesplatform.ride.runner.storage.persistent.{InMemWithoutHeightPersistentCache, PersistentCache}
+import com.wavesplatform.ride.runner.storage.persistent.PersistentStorageContext.ReadWrite
+import com.wavesplatform.ride.runner.storage.persistent.{HasDb, InMemWithoutHeightPersistentCache, PersistentCache}
 import com.wavesplatform.state.Height
 import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
 

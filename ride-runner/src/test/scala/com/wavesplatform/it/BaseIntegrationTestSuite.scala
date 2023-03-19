@@ -8,9 +8,9 @@ import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.ride.runner.storage.HasDb.TestDb
-import com.wavesplatform.ride.runner.storage.persistent.DefaultPersistentCaches
-import com.wavesplatform.ride.runner.storage.{HasDb, RequestsStorage, ScriptRequest, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.storage.persistent.HasDb.TestDb
+import com.wavesplatform.ride.runner.storage.persistent.{DefaultPersistentCaches, HasDb}
+import com.wavesplatform.ride.runner.storage.{RequestsStorage, ScriptRequest, SharedBlockchainStorage}
 import com.wavesplatform.ride.runner.{BlockchainProcessor, BlockchainState, DefaultRequestService}
 import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
 import com.wavesplatform.{BaseTestSuite, HasMonixHelpers}
