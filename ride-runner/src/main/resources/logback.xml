@@ -25,6 +25,7 @@
 
     <!-- Process and host metrics -->
     <logger name="oshi" level="WARN"/>
+    <logger name="kamon" level="ERROR"/>
 
     <!-- App -->
     <logger name="com.wavesplatform.storage.persistent" level="WARN"/>

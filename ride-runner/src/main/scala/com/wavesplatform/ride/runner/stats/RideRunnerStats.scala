@@ -13,15 +13,12 @@ import scala.util.Try
 class RideRunnerStats(globalConfig: Config) extends AutoCloseable with ScorexLogging {
   // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
   //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
-  if (globalConfig.getBoolean("kamon.enable")) {
-    Kamon.init(globalConfig)
-    log.info("Metrics enabled")
-  } else {
-    Kamon.stop()
-    log.info("Metrics disabled")
-  }
+  Kamon.init(globalConfig)
 
-  override def close(): Unit = Try(Await.result(Kamon.stop(), 5 seconds))
+  if (Kamon.enabled()) log.info("Metrics enabled")
+  else log.info("Metrics disabled")
+
+  override def close(): Unit = if (Kamon.enabled()) { Try(Await.result(Kamon.stop(), 5 seconds)) }
 }
 
 object RideRunnerStats {

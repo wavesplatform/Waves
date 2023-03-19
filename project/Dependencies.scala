@@ -11,7 +11,7 @@ object Dependencies {
 
   def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.2.10"
 
-  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.5.12"
+  private def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "2.6.0"
 
   private def jacksonModule(group: String, module: String) = s"com.fasterxml.jackson.$group" % s"jackson-$module" % "2.14.1"
 
@@ -181,5 +181,5 @@ object Dependencies {
   }
 
   lazy val kanela =
-    Seq("io.kamon" % "kanela-agent" % "1.0.16")
+    Seq("io.kamon" % "kanela-agent" % "1.0.17")
 }

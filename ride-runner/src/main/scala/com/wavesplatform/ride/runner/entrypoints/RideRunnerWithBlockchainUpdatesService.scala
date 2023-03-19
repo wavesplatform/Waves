@@ -14,6 +14,7 @@ import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.ManagedChannel
 import io.netty.util.concurrent.DefaultThreadFactory
+import kamon.Kamon
 import kamon.instrumentation.executor.ExecutorInstrumentation
 import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
@@ -33,11 +34,8 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
     implicit val actorSystem = ActorSystem("ride-runner", globalConfig)
     val cs                   = new Cleanup(actorSystem)
 
-    val metricsEnabled = globalConfig.getBoolean("kamon.enable")
-    if (metricsEnabled) {
-      val metrics = new RideRunnerStats(globalConfig)
-      cs.cleanup(CustomShutdownPhase.Metrics) { metrics.close() }
-    }
+    val metrics = new RideRunnerStats(globalConfig)
+    cs.cleanup(CustomShutdownPhase.Metrics) { metrics.close() }
 
     log.info("Initializing thread pools...")
     def mkScheduler(name: String, threads: Int): Scheduler = {
@@ -55,7 +53,7 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
       )
 
       val monixScheduler = Scheduler(
-        executor = if (metricsEnabled) ExecutorInstrumentation.instrument(executor, name) else executor,
+        executor = if (Kamon.enabled()) ExecutorInstrumentation.instrument(executor, name) else executor,
         executionModel = ExecutionModel.AlwaysAsyncExecution
       )
 

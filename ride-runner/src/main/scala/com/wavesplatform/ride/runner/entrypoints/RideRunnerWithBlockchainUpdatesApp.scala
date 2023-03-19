@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.ride.runner.db.RideDb
+import com.wavesplatform.ride.runner.stats.RideRunnerStats
 import com.wavesplatform.ride.runner.storage.persistent.{DefaultPersistentCaches, PersistentStorage}
 import com.wavesplatform.ride.runner.storage.{RequestsStorage, ScriptRequest, SharedBlockchainStorage}
 import com.wavesplatform.ride.runner.{BlockchainProcessor, BlockchainState, DefaultRequestService}
@@ -40,6 +41,9 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
     log.info("Starting...")
     implicit val actorSystem = ActorSystem("ride-runner", globalConfig)
     val cs                   = new Cleanup(actorSystem)
+
+    val metrics = new RideRunnerStats(globalConfig)
+    cs.cleanup(CustomShutdownPhase.Metrics) { metrics.close() }
 
     log.info("Initializing thread pools...")
 
