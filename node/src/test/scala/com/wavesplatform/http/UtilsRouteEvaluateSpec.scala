@@ -355,6 +355,11 @@ class UtilsRouteEvaluateSpec
             s"""{"result":{"type":"BigInt","value":${PureContext.BigIntMax}},"complexity":65,"expr":"parseBigIntValue(\\"${PureContext.BigIntMax}\\")","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
           )
         }
+        evalScript(s"""parseBigIntValue("${PureContext.BigIntMax}")""") ~> Accept(CustomJson.jsonWithNumbersAsStrings) ~> route ~> check {
+          (responseAs[JsObject] - "stateChanges") should matchJson(
+            s"""{"result":{"type":"BigInt","value":"${PureContext.BigIntMax.toString()}"},"complexity":65,"expr":"parseBigIntValue(\\"${PureContext.BigIntMax}\\")","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
+          )
+        }
 
         val dAppAccount2 = TxHelpers.secondSigner
         val dAppAddress2 = TxHelpers.secondAddress

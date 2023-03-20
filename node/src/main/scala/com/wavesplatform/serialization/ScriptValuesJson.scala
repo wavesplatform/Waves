@@ -11,6 +11,7 @@ object ScriptValuesJson {
     case CONST_BYTESTR(bs)              => Json.obj("type" -> "ByteVector", "value" -> bs.toString)
     case CONST_STRING(str)              => Json.obj("type" -> "String", "value" -> str)
     case CONST_BOOLEAN(b)               => Json.obj("type" -> "Boolean", "value" -> b)
+    case CONST_BIGINT(b) if intAsString => Json.obj("type" -> "BigInt", "value" -> b.toString)
     case CONST_BIGINT(b)                => Json.obj("type" -> "BigInt", "value" -> b)
     case CaseObj(caseType, fields)      => Json.obj("type" -> caseType.name, "value" -> JsObject(mapFields(intAsString, fields)))
     case ARR(xs)                        => Json.obj("type" -> "Array", "value" -> xs.map(serializeValue(_, intAsString)))
