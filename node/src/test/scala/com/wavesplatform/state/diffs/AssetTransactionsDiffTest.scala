@@ -15,7 +15,6 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils.*
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BOOLEAN
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, TestCompiler}
-import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state.*
@@ -226,32 +225,27 @@ class AssetTransactionsDiffTest extends PropSpec with BlocksTransactionsHelpers 
     val genesis = TxHelpers.genesis(acc.toAddress)
     val issue   = TxHelpers.issue(acc, 100, script = Some(ExprScript(CONST_BOOLEAN(true)).explicitGet()))
 
-    assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(issue)), smartEnabledFS) { case (blockDiff, newState) =>
-      newState.assetDescription(IssuedAsset(issue.id())) shouldBe Some(
-        AssetDescription(
-          issue.assetId,
-          issue.sender,
-          issue.name,
-          issue.description,
-          issue.decimals.value,
-          issue.reissuable,
-          BigInt(issue.quantity.value),
-          Height @@ 2,
-          issue.script.map(s =>
-            AssetScriptInfo(
-              s,
-              Script
-                .estimate(s, ScriptEstimatorV1, fixEstimateOfVerifier = true, useContractVerifierLimit = false)
-                .explicitGet()
-            )
-          ),
-          0L,
-          issue.decimals.value == 0 && issue.quantity.value == 1 && !issue.reissuable
+    assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(issue)), RideV6.blockchainSettings.functionalitySettings) {
+      case (blockDiff, newState) =>
+        newState.assetDescription(IssuedAsset(issue.id())) shouldBe Some(
+          AssetDescription(
+            issue.assetId,
+            issue.sender,
+            issue.name,
+            issue.description,
+            issue.decimals.value,
+            issue.reissuable,
+            BigInt(issue.quantity.value),
+            Height @@ 2,
+            issue.script.map(AssetScriptInfo(_, 0)),
+            0L,
+            issue.decimals.value == 0 && issue.quantity.value == 1 && !issue.reissuable,
+            1,
+            Height @@ 2
+          )
         )
-      )
-      blockDiff.transaction(issue.id()) shouldBe defined
-      newState.transactionInfo(issue.id()).isDefined shouldBe true
-      newState.transactionInfo(issue.id()).isDefined shouldEqual true
+        blockDiff.transaction(issue.id()) shouldBe defined
+        newState.transactionInfo(issue.id()).isDefined shouldBe true
     }
   }
 

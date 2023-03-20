@@ -3268,6 +3268,8 @@ components:
               type: boolean
             scripted:
               type: boolean
+            sequenceInBlock:
+              type: integer
             minSponsoredAssetFee:
               type: integer
               format: int64

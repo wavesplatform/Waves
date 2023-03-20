@@ -223,7 +223,9 @@ class DebugApiRouteSpec
                 Height(1),
                 Some(AssetScriptInfo(assetScript, comp)),
                 0,
-                nft = false
+                nft = false,
+                0,
+                Height(1)
               )
             )
           )
@@ -272,7 +274,9 @@ class DebugApiRouteSpec
                 Height(1),
                 Some(AssetScriptInfo(assetScript, assetScriptComplexity)),
                 0,
-                nft = false
+                nft = false,
+                0,
+                Height(1)
               )
             )
           )
@@ -3162,7 +3166,9 @@ class DebugApiRouteSpec
                 Height(1),
                 Some(AssetScriptInfo(assetScript, assetScriptComplexity)),
                 0,
-                nft = false
+                nft = false,
+                0,
+                Height(1)
               )
             )
           )

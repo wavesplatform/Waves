@@ -1,7 +1,5 @@
 package com.wavesplatform.db
 
-import java.nio.file.Files
-
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
@@ -19,7 +17,7 @@ import com.wavesplatform.settings.{TestFunctionalitySettings as TFS, *}
 import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.utils.TestLevelDB
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, Portfolio}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff, NgState, Portfolio}
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, Transaction, TxHelpers}
@@ -29,6 +27,8 @@ import monix.reactive.subjects.{PublishSubject, Subject}
 import org.iq80.leveldb.{DB, Options}
 import org.scalatest.Suite
 import org.scalatest.matchers.should.Matchers
+
+import java.nio.file.Files
 
 trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
   protected val ignoreSpendableBalanceChanged: Subject[(Address, Asset), (Address, Asset)] = PublishSubject()
@@ -114,7 +114,8 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
     }
 
     val BlockDiffer.Result(diff, fees, totalFee, _, _) = differ(state, preconditions.lastOption, block).explicitGet()
-    val cb                                             = CompositeBlockchain(state, diff)
+    val ngState = NgState(block, diff, fees, totalFee, fs.preActivatedFeatures.keySet, None, block.header.generationSignature, Map())
+    val cb      = CompositeBlockchain(state, ngState)
     assertion(diff, cb)
 
     state.append(diff, fees, totalFee, None, block.header.generationSignature, block)
