@@ -46,7 +46,7 @@ import scala.language.reflectiveCalls
 import scala.util.{Failure, Success}
 
 // @formatter:off
-/** Usage example: <pre> object Example extends App {
+/** Usage example: <pre>object Example extends App {
  *  val wavesSettings = Application.loadApplicationConfig(Some(new File("path-to-config-file")))
  *  val generator = new BlockchainGenerator(wavesSettings)
  *  val sender = KeyPair("123".getBytes)
@@ -58,6 +58,7 @@ import scala.util.{Failure, Success}
  *    )
  *  }
  *  generator.generateBinaryFile(genBlocks)
+ *}
  * </pre>
  */
 // @formatter:on
