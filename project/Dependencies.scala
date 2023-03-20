@@ -35,8 +35,8 @@ object Dependencies {
   val curve25519         = "com.wavesplatform"   % "curve25519-java"   % "0.6.4"
   val nettyHandler       = "io.netty"            % "netty-handler"     % "4.1.85.Final"
 
-  val catsCore   = catsModule("core", "2.9.0")
-  val shapeless  = Def.setting("com.chuusai" %%% "shapeless" % "2.3.10")
+  val catsCore  = catsModule("core", "2.9.0")
+  val shapeless = Def.setting("com.chuusai" %%% "shapeless" % "2.3.10")
 
   val scalaTest   = "org.scalatest" %% "scalatest" % "3.2.14" % Test
   val scalaJsTest = Def.setting("com.lihaoyi" %%% "utest" % "0.8.1" % Test)
@@ -63,7 +63,7 @@ object Dependencies {
       "com.lihaoyi" %%% "fastparse" % "2.3.3",
       shapeless.value,
       "org.typelevel" %%% "cats-mtl" % "1.3.0",
-      "ch.obermuhlner"  % "big-math"      % "2.3.2",
+      "ch.obermuhlner"  % "big-math" % "2.3.2",
       curve25519,
       bouncyCastleProvider,
       "com.wavesplatform" % "zwaves"       % "0.1.0-SNAPSHOT",
