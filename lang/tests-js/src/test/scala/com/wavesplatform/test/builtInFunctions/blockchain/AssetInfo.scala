@@ -3,7 +3,7 @@ package com.wavesplatform.test.builtInFunctions.blockchain
 import _root_.testHelpers.GeneratorContractsForBuiltInFunctions
 import _root_.testHelpers.RandomDataGenerator.{randomAliasDataArrayElement, randomBoolean, randomByteVectorArrayElement, randomInt}
 import com.wavesplatform.JsTestBase
-import testHelpers.TestDataConstantsAndMethods.{actualVersions, invalidFunctionError, nonMatchingTypes, rideV3Result}
+import testHelpers.TestDataConstantsAndMethods.{actualVersions, invalidFunctionError, nonMatchingTypes}
 import utest.{Tests, test}
 
 object AssetInfo extends JsTestBase {
@@ -33,11 +33,11 @@ object AssetInfo extends JsTestBase {
 
     test("negative cases") {
       for (version <- actualVersions) {
-        val precondition = new GeneratorContractsForBuiltInFunctions("", version)
+        val precondition = new GeneratorContractsForBuiltInFunctions("Asset", version)
         for (
           (asset, function, error) <- Seq(
             (randomByteVectorArrayElement, invalidAssetInfo, invalidFunctionError("assetInfo", 1)),
-            (randomByteVectorArrayElement, invalidAssetInfoArg, invalidFunctionError("assetInfo", 1)),
+            (randomByteVectorArrayElement, invalidAssetInfoArg, nonMatchingTypes("ByteVector")),
             (randomAliasDataArrayElement, assetInfo, nonMatchingTypes("ByteVector")),
             (randomBoolean.toString, assetInfoArgBeforeFunc, nonMatchingTypes("ByteVector")),
           )

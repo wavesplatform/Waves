@@ -2,8 +2,8 @@ package com.wavesplatform.test.builtInFunctions.blockchain
 
 import com.wavesplatform.JsTestBase
 import com.wavesplatform.lang.directives.values.V3
-import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomDigestAlgorithmTypeArrayElement, randomInt, randomStringArrayElement}
 import testHelpers.GeneratorContractsForBuiltInFunctions
+import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomAliasDataArrayElement, randomDigestAlgorithmTypeArrayElement, randomStringArrayElement}
 import testHelpers.TestDataConstantsAndMethods.{actualVersionsWithoutV3, invalidFunctionError, nonMatchingTypes, thisVariable}
 import utest.{Tests, test}
 

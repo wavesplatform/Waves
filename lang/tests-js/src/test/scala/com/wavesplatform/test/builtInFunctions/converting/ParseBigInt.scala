@@ -3,7 +3,7 @@ package com.wavesplatform.test.builtInFunctions.converting
 import com.wavesplatform.JsTestBase
 import testHelpers.GeneratorContractsForBuiltInFunctions
 import testHelpers.RandomDataGenerator.{randomBoolean, randomInt, randomStringArrayElement}
-import testHelpers.TestDataConstantsAndMethods.{UNDEFINED_TYPE, actualVersions, nonMatchingTypes, oldVersions, versionsSupportingTheNewFeatures}
+import testHelpers.TestDataConstantsAndMethods.{UNDEFINED_TYPE, nonMatchingTypes, oldVersions, versionsSupportingTheNewFeatures}
 import utest.{Tests, test}
 
 object ParseBigInt extends JsTestBase {

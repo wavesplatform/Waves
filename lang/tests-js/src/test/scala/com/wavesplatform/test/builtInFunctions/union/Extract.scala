@@ -3,7 +3,7 @@ package com.wavesplatform.test.builtInFunctions.union
 import com.wavesplatform.JsTestBase
 import com.wavesplatform.lang.directives.values.V3
 import testHelpers.GeneratorContractsForBuiltInFunctions
-import testHelpers.RandomDataGenerator.{randomAddressDataArrayElement, randomInt, randomUnionArrayElement}
+import testHelpers.RandomDataGenerator.{randomInt, randomUnionArrayElement}
 import testHelpers.TestDataConstantsAndMethods.{CANT_FIND_FUNCTION, MATCHING_NOT_EXHAUSTIVE, actualVersionsWithoutV3, invalidFunctionError}
 import utest.{Tests, test}
 

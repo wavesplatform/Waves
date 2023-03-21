@@ -2,8 +2,8 @@ package com.wavesplatform.test.builtInFunctions.list
 
 import com.wavesplatform.JsTestBase
 import testHelpers.GeneratorContractsForBuiltInFunctions
-import testHelpers.RandomDataGenerator.{randomAliasDataArrayElement, randomInt, randomIssuesArrayElement, randomStringArrayElement}
-import testHelpers.TestDataConstantsAndMethods.{actualVersionsWithoutV3, intList, nonMatchingTypes, stringList}
+import testHelpers.RandomDataGenerator.{randomAliasDataArrayElement, randomInt, randomIssuesArrayElement}
+import testHelpers.TestDataConstantsAndMethods.{actualVersionsWithoutV3, nonMatchingTypes, stringList}
 import utest.{Tests, test}
 
 object RemoveByIndex extends JsTestBase {
