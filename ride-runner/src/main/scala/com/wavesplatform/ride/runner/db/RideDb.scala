@@ -8,6 +8,7 @@ import java.io.File
 import java.util
 import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.{CollectionHasAsScala, SeqHasAsJava}
+import scala.util.Try
 
 class RideDb(
     val db: RocksDB,
@@ -16,16 +17,20 @@ class RideDb(
 ) {
   def sendStats(): Unit = {
     RocksDbProperties.All.foreach { propName =>
-      val propValue = db.getAggregatedLongProperty(propName)
-      dbStats.withTag("name", propName).update(propValue.toDouble)
+      Try {
+        val propValue = db.getAggregatedLongProperty(propName)
+        dbStats.withTag("name", propName).update(propValue.toDouble)
+      }
 
       handles.foreach { cfh =>
-        val cfName    = new String(cfh.getName)
-        val propValue = db.getLongProperty(cfh, propName)
-        columnFamilyProperties
-          .withTag("cf", cfName)
-          .withTag("name", propName)
-          .update(propValue.toDouble)
+        val cfName = new String(cfh.getName)
+        Try {
+          val propValue = db.getLongProperty(cfh, propName)
+          columnFamilyProperties
+            .withTag("cf", cfName)
+            .withTag("name", propName)
+            .update(propValue.toDouble)
+        }
       }
     }
 
