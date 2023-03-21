@@ -5,6 +5,7 @@ import com.wavesplatform.Exporter.IO
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.openDB
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
@@ -37,9 +38,11 @@ import io.netty.channel.group.DefaultChannelGroup
 import monix.execution.Scheduler.Implicits.global
 import monix.reactive.Observer
 import monix.reactive.subjects.ConcurrentSubject
+import org.apache.commons.io.FileUtils
 import org.web3j.crypto.{ECKeyPair, RawTransaction}
 
 import java.io.BufferedOutputStream
+import java.nio.file.Files
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 import scala.language.reflectiveCalls
@@ -58,6 +61,10 @@ import scala.util.{Failure, Success}
  *    )
  *  }
  *  generator.generateBinaryFile(genBlocks)
+ *
+ *  // only if you use Application.loadApplicationConfig method to create WavesSettings object
+ *  Try(Await.result(Kamon.stopModules(), 10.seconds))
+ *  Metrics.shutdown()
  *}
  * </pre>
  */
@@ -70,23 +77,25 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
     generateBlockchain(genBlocks)
 
   def generateBinaryFile(genBlocks: Seq[GenBlock]): Unit = {
-    val height = genBlocks.size + 1
-    log.info(s"Exporting to $height")
-    val outputFilename = s"blockchain-$height"
+    val targetHeight = genBlocks.size + 1
+    log.info(s"Exporting to $targetHeight")
+    val outputFilename = s"blockchain-$targetHeight"
     log.info(s"Output file: $outputFilename")
 
     Exporter.IO.createOutputStream(outputFilename) match {
       case Success(output) =>
-        val bos = new BufferedOutputStream(output, 10 * 1024 * 1024)
-        generateBlockchain(genBlocks, block => IO.exportBlockToBinary(bos, () => Some(block), legacy = true))
-        log.info(s"Finished exporting $height blocks")
+        val bos   = new BufferedOutputStream(output, 10 * 1024 * 1024)
+        val dbDir = Files.createTempDirectory("generator-temp-db")
+        generateBlockchain(genBlocks, block => IO.exportBlockToBinary(bos, () => Some(block), legacy = true), Some(dbDir.toString))
+        log.info(s"Finished exporting $targetHeight blocks")
         bos.close()
         output.close()
+        FileUtils.deleteDirectory(dbDir.toFile)
       case Failure(ex) => log.error(s"Failed to create file '$outputFilename': $ex")
     }
   }
 
-  private def generateBlockchain(genBlocks: Seq[GenBlock], exportToFile: Block => Unit = _ => ()): Unit = {
+  private def generateBlockchain(genBlocks: Seq[GenBlock], exportToFile: Block => Unit = _ => (), tempDbDir: Option[String] = None): Unit = {
     val scheduler = Schedulers.singleThread("appender")
     val time = new Time {
       val startTime: Long = settings.blockchainSettings.genesisSettings.timestamp
@@ -97,7 +106,7 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
       override def correctedTime(): Long = time
       override def getTimestamp(): Long  = time
     }
-    val db = openDB(settings.dbSettings.directory)
+    val db = openDB(tempDbDir.getOrElse(settings.dbSettings.directory))
     val (blockchain, _) =
       StorageFactory(settings, db, time, Observer.empty, BlockchainUpdateTriggers.noop)
     val utxPool     = new UtxPoolImpl(time, blockchain, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
@@ -124,9 +133,9 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
     val result = genBlocks.foldLeft[Either[ValidationError, Unit]](Right(())) {
       case (res @ Left(_), _) => res
       case (_, genBlock) =>
+        time.time = miner.nextBlockGenerationTime(blockchain, blockchain.height, blockchain.lastBlockHeader.get, genBlock.signer).explicitGet()
         val correctedTimeTxs = genBlock.txs.map(correctTxTimestamp(_, time))
 
-        time.time += settings.blockchainSettings.genesisSettings.averageBlockDelay.toMillis
         miner.forgeBlock(genBlock.signer) match {
           case Right((block, _)) =>
             for {
