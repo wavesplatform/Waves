@@ -38,19 +38,18 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
   private[this] val grpcServer: Server = NettyServerBuilder
     .forAddress(new InetSocketAddress("0.0.0.0", settings.grpcPort))
     .permitKeepAliveTime(settings.minKeepAlive.toNanos, TimeUnit.NANOSECONDS)
-    .addStreamTracerFactory(
-      (fullMethodName: String, headers: Metadata) =>
-        new ServerStreamTracer {
-          private[this] var callInfo = Option.empty[ServerStreamTracer.ServerCallInfo[_, _]]
-          private[this] def callId   = callInfo.fold("???")(ci => Integer.toHexString(System.identityHashCode(ci)))
+    .addStreamTracerFactory((fullMethodName: String, headers: Metadata) =>
+      new ServerStreamTracer {
+        private[this] var callInfo = Option.empty[ServerStreamTracer.ServerCallInfo[_, _]]
+        private[this] def callId   = callInfo.fold("???")(ci => Integer.toHexString(System.identityHashCode(ci)))
 
-          override def serverCallStarted(callInfo: ServerStreamTracer.ServerCallInfo[_, _]): Unit = {
-            this.callInfo = Some(callInfo)
-            log.trace(s"[$callId] gRPC call started: $fullMethodName, headers: $headers")
-          }
+        override def serverCallStarted(callInfo: ServerStreamTracer.ServerCallInfo[_, _]): Unit = {
+          this.callInfo = Some(callInfo)
+          log.trace(s"[$callId] gRPC call started: $fullMethodName, headers: $headers")
+        }
 
-          override def streamClosed(status: Status): Unit =
-            log.trace(s"[$callId] gRPC call closed with status: $status")
+        override def streamClosed(status: Status): Unit =
+          log.trace(s"[$callId] gRPC call closed with status: $status")
       }
     )
     .addService(BlockchainUpdatesApiGrpc.bindService(repo, scheduler))
@@ -96,8 +95,9 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
       block: Block,
       diff: BlockDiffer.DetailedDiff,
       minerReward: Option[Long],
+      hitSource: ByteStr,
       blockchainBeforeWithMinerReward: Blockchain
-  ): Unit = repo.onProcessBlock(block, diff, minerReward, blockchainBeforeWithMinerReward)
+  ): Unit = repo.onProcessBlock(block, diff, minerReward, hitSource, blockchainBeforeWithMinerReward)
 
   override def onProcessMicroBlock(
       microBlock: MicroBlock,

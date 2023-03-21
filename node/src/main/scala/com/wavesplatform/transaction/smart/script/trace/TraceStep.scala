@@ -95,7 +95,7 @@ case class InvokeScriptTrace(
     ) ++ (resultE match {
       case Right(value) => TraceStep.maybeErrorJson(None) ++ Json.obj("result" -> TraceStep.scriptResultJson(invokeId, value))
       case Left(e)      => TraceStep.maybeErrorJson(Some(e))
-    }) ++ (if (logged && resultE.isRight) Json.obj(TraceStep.logJson(log)) else JsObject.empty)
+    }) ++ (if (logged) Json.obj(TraceStep.logJson(log)) else JsObject.empty)
   }
 }
 
@@ -118,7 +118,7 @@ object TraceStep {
 
   def logJson(l: Log[Id]): (String, JsValueWrapper) =
     "vars" -> l.collect {
-      case (k, Right(v)) if !LogKeys.TraceExcluded.exists(k.contains)   => Json.obj("name" -> k) ++ ScriptValuesJson.serializeValue(v)
+      case (k, Right(v)) if !LogKeys.TraceExcluded.exists(k.contains)   => Json.obj("name" -> k) ++ ScriptValuesJson.serializeValue(v, intAsString = false)
       case (k, Left(CommonError(_, Some(fte: FailedTransactionError)))) => Json.obj("name" -> k, "error" -> fte.error)
       case (k, Left(err))                                               => Json.obj("name" -> k, "error" -> err.message)
     }

@@ -13,8 +13,9 @@ import com.wavesplatform.test.PropSpec
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
-import com.wavesplatform.transaction.{Proofs, TxValidationError}
+import com.wavesplatform.transaction.{Proofs, Transaction, TxValidationError}
 import com.wavesplatform.utils.JsonMatchers
+import play.api.libs.json.{JsObject, Json}
 
 class TraceResultJsonTest extends PropSpec with JsonMatchers {
   private val tx = (
@@ -36,6 +37,17 @@ class TraceResultJsonTest extends PropSpec with JsonMatchers {
       )
     } yield tx
   ).explicitGet()
+
+  def json[E, A](result: TracedResult[E, A])(implicit ev1: E => ApiError, ev2: A => Transaction): JsObject = {
+    val resultJson = result.resultE match {
+      case Right(value) => value.json()
+      case Left(e)      => e.json
+    }
+    resultJson ++ Json.obj("trace" -> result.trace.map(_.json))
+  }
+
+  def loggedJson[E, A](result: TracedResult[E, A])(implicit ev1: E => ApiError, ev2: A => Transaction): JsObject =
+    json(result) ++ Json.obj("trace" -> result.trace.map(_.loggedJson))
 
   property("suitable TracedResult json") {
     val vars = List(
@@ -61,7 +73,7 @@ class TraceResultJsonTest extends PropSpec with JsonMatchers {
     )
 
     val result = TracedResult(Right(tx), trace)
-    result.json should matchJson("""{
+    json(result) should matchJson("""{
                                       |  "type": 16,
                                       |  "id": "2hoMeTHAneLExjFo2a9ei7D4co5zzr9VyT7tmBmAGmeu",
                                       |  "sender": "3MvtiFpnSA7uYKXV3myLwRK3u2NEV91iJYW",
@@ -131,7 +143,7 @@ class TraceResultJsonTest extends PropSpec with JsonMatchers {
                                       |  ]
                                       |}""".stripMargin)
 
-    result.loggedJson should matchJson(
+    loggedJson(result) should matchJson(
       """{
         |  "type": 16,
         |  "id": "2hoMeTHAneLExjFo2a9ei7D4co5zzr9VyT7tmBmAGmeu",
@@ -236,7 +248,7 @@ class TraceResultJsonTest extends PropSpec with JsonMatchers {
     val scriptExecutionError = ScriptExecutionError(tx, reason, isTokenScript = false)
 
     val result = TracedResult(Left(scriptExecutionError), trace)
-    result.json should matchJson("""{
+    json(result) should matchJson("""{
                                       |  "error": 306,
                                       |  "message": "Error while executing account-script: error reason",
                                       |  "transaction": {
