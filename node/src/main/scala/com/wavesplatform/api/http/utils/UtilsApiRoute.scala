@@ -1,4 +1,5 @@
 package com.wavesplatform.api.http.utils
+import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.{PathMatcher1, Route}
 import cats.syntax.either.*
 import com.wavesplatform.account.{Address, PublicKey}
@@ -255,7 +256,12 @@ case class UtilsApiRoute(
     })
 
   def evaluate: Route =
-    (path("script" / "evaluate" / ScriptedAddress) & jsonPostD[JsObject] & parameter("trace".as[Boolean] ? false)) { (address, request, trace) =>
+    (
+      path("script" / "evaluate" / ScriptedAddress)
+        & jsonPostD[JsObject]
+        & parameter("trace".as[Boolean] ? false)
+        & optionalHeaderValueByType(Accept)
+    ) { (address, request, trace, accept) =>
       val scriptInfo = blockchain.accountScript(address).get
       val pk         = scriptInfo.publicKey
       val script     = scriptInfo.script
@@ -289,9 +295,10 @@ case class UtilsApiRoute(
             case e                           => ApiError.fromValidationError(e).json
           },
           { case (result, complexity, log, scriptResult) =>
+            val intAsString = accept.exists(_.mediaRanges.exists(CustomJson.acceptsNumbersAsStrings))
             val traceObj = if (trace) Json.obj(TraceStep.logJson(log)) else Json.obj()
             traceObj ++ Json.obj(
-              "result"       -> ScriptValuesJson.serializeValue(result),
+              "result"       -> ScriptValuesJson.serializeValue(result, intAsString),
               "complexity"   -> complexity,
               "stateChanges" -> scriptResult
             )
