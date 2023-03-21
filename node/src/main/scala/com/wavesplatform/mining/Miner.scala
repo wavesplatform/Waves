@@ -5,6 +5,7 @@ import cats.syntax.either.*
 import com.wavesplatform.account.{Address, KeyPair, PKKeyPair}
 import com.wavesplatform.block.Block.*
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.features.BlockchainFeatures
@@ -137,17 +138,17 @@ class MinerImpl(
       )
       .leftMap(_.toString)
 
-  private def packTransactionsForKeyBlock(): (Seq[Transaction], MiningConstraint) = {
+  private def packTransactionsForKeyBlock(): (Seq[Transaction], MiningConstraint, ByteStr) = {
     val estimators = MiningConstraints(blockchainUpdater, blockchainUpdater.height, Some(minerSettings))
-    if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG)) (Seq.empty, estimators.total)
+    if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG)) (Seq.empty, estimators.total, TxStateSnapshotHashBuilder.EmptyHash)
     else {
       val mdConstraint = MultiDimensionalMiningConstraint(estimators.total, estimators.keyBlock)
-      val (maybeUnconfirmed, updatedMdConstraint) = Instrumented.logMeasure(log, "packing unconfirmed transactions for block")(
+      val (maybeUnconfirmed, updatedMdConstraint, stateHash) = Instrumented.logMeasure(log, "packing unconfirmed transactions for block")(
         utx.packUnconfirmed(mdConstraint, PackStrategy.Limit(settings.minerSettings.microBlockInterval))
       )
       val unconfirmed = maybeUnconfirmed.getOrElse(Seq.empty)
       log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
-      (unconfirmed, updatedMdConstraint.constraints.head)
+      (unconfirmed, updatedMdConstraint.constraints.head, stateHash)
     }
   }
 
@@ -177,7 +178,7 @@ class MinerImpl(
         s"Block time $blockTime is from the future: current time is $currentTime, MaxTimeDrift = ${appender.MaxTimeDrift}"
       )
       consensusData <- consensusData(height, account, lastBlockHeader, blockTime)
-      (unconfirmed, totalConstraint) = packTransactionsForKeyBlock()
+      (unconfirmed, totalConstraint, stateHash) = packTransactionsForKeyBlock()
       block <- Block
         .buildAndSign(
           version,
@@ -188,7 +189,8 @@ class MinerImpl(
           unconfirmed,
           account,
           blockFeatures(version),
-          blockRewardVote(version)
+          blockRewardVote(version),
+          stateHash
         )
         .leftMap(_.err)
     } yield (block, totalConstraint))

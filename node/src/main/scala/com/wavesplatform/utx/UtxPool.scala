@@ -19,8 +19,9 @@ trait UtxPool extends AutoCloseable {
   def packUnconfirmed(
       rest: MultiDimensionalMiningConstraint,
       strategy: PackStrategy = PackStrategy.Unlimited,
-      cancelled: () => Boolean = () => false
-  ): (Option[Seq[Transaction]], MiningConstraint)
+      cancelled: () => Boolean = () => false,
+      initStateHash: Option[ByteStr] = None
+  ): (Option[Seq[Transaction]], MiningConstraint, ByteStr)
 }
 
 object UtxPool {

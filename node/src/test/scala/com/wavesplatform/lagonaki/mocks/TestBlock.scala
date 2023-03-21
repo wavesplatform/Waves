@@ -1,10 +1,10 @@
 package com.wavesplatform.lagonaki.mocks
 
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.block._
+import com.wavesplatform.block.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.crypto._
+import com.wavesplatform.crypto.*
 import com.wavesplatform.transaction.Transaction
 
 import scala.util.{Random, Try}
@@ -29,7 +29,8 @@ object TestBlock {
         txs = b.transactionData,
         signer = signer,
         featureVotes = b.header.featureVotes,
-        rewardVote = b.header.rewardVote
+        rewardVote = b.header.rewardVote,
+        stateHash = b.header.stateHash
       )
 
     x.explicitGet()
@@ -57,7 +58,8 @@ object TestBlock {
       signer: KeyPair = defaultSigner,
       version: Byte = 2,
       features: Seq[Short] = Seq.empty[Short],
-      rewardVote: Long = -1L
+      rewardVote: Long = -1L,
+      stateHash: ByteStr = ByteStr.empty
   ): Block =
     sign(
       signer,
@@ -72,7 +74,8 @@ object TestBlock {
         generator = signer.publicKey,
         featureVotes = features,
         rewardVote = rewardVote,
-        transactionData = txs
+        transactionData = txs,
+        stateHash = stateHash
       )
     )
 
@@ -89,6 +92,7 @@ object TestBlock {
           defaultSigner.publicKey,
           Seq.empty,
           -1L,
+          ByteStr.empty,
           ByteStr.empty
         ),
         ByteStr.empty,
@@ -108,7 +112,8 @@ object TestBlock {
         defaultSigner.publicKey,
         features,
         -1L,
-        Seq.empty
+        Seq.empty,
+        ByteStr.empty
       )
     )
 }

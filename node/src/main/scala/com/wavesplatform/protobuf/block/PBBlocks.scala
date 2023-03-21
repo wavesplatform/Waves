@@ -7,7 +7,7 @@ import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.protobuf.ByteStringExt
-import com.wavesplatform.protobuf.block.Block.{Header => PBHeader}
+import com.wavesplatform.protobuf.block.Block.Header as PBHeader
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 
@@ -22,7 +22,8 @@ object PBBlocks {
       header.generator.toPublicKey,
       header.featureVotes.map(_.toShort),
       header.rewardVote,
-      header.transactionsRoot.toByteStr
+      header.transactionsRoot.toByteStr,
+      header.stateHash.toByteStr
     )
 
   def vanilla(block: PBBlock, unsafe: Boolean = false): Try[VanillaBlock] = Try {
@@ -40,11 +41,12 @@ object PBBlocks {
     header.version,
     ByteString.copyFrom(header.generator.arr),
     header.rewardVote,
-    ByteString.copyFrom(header.transactionsRoot.arr)
+    ByteString.copyFrom(header.transactionsRoot.arr),
+    ByteString.copyFrom(header.stateHash.arr)
   )
 
   def protobuf(block: VanillaBlock): PBBlock = {
-    import block._
+    import block.*
 
     new PBBlock(
       Some(protobuf(header)),

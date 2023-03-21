@@ -60,6 +60,14 @@ package object serialization {
       result
     }
 
+    def getByteArrayOrEmpty(size: Int): Array[Byte] = {
+      if (buf.limit() - buf.position() >= size) {
+        getByteArray(size)
+      } else {
+        Array.emptyByteArray
+      }
+    }
+
     def getShortArray(size: Int): Array[Short] = {
       val result = new Array[Short](size)
       buf.asShortBuffer().get(result)

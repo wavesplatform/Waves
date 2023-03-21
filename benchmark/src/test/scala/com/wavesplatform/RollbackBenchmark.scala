@@ -63,7 +63,8 @@ object RollbackBenchmark extends ScorexLogging {
         GenesisTransaction.create(issuer.publicKey.toAddress, 100000e8.toLong, time.getTimestamp()).explicitGet() +: assets,
         issuer,
         Seq.empty,
-        -1
+        -1,
+        ByteStr.empty
       )
       .explicitGet()
 
@@ -84,7 +85,18 @@ object RollbackBenchmark extends ScorexLogging {
 
     val nextBlock =
       Block
-        .buildAndSign(2.toByte, time.getTimestamp(), genesisBlock.id(), 1000, Block.GenesisGenerationSignature, Seq.empty, issuer, Seq.empty, -1)
+        .buildAndSign(
+          2.toByte,
+          time.getTimestamp(),
+          genesisBlock.id(),
+          1000,
+          Block.GenesisGenerationSignature,
+          Seq.empty,
+          issuer,
+          Seq.empty,
+          -1,
+          ByteStr.empty
+        )
         .explicitGet()
     val nextDiff = Diff(portfolios = addresses.map(_ -> Portfolio(1, assets = VectorMap(IssuedAsset(assets.head.id()) -> 1L))).toMap)
 

@@ -217,17 +217,17 @@ class BlocksApiRouteSpec extends RouteSpec("/blocks") with PathMockFactory with 
   routePath("/delay/{blockId}/{number}") in {
     val blocks = Vector(
       Block(
-        BlockHeader(1, 0, ByteStr.empty, 0, ByteStr.empty, TxHelpers.defaultSigner.publicKey, Nil, 0, ByteStr.empty),
+        BlockHeader(1, 0, ByteStr.empty, 0, ByteStr.empty, TxHelpers.defaultSigner.publicKey, Nil, 0, ByteStr.empty, ByteStr.empty),
         ByteStr(Random.nextBytes(64)),
         Nil
       ),
       Block(
-        BlockHeader(1, 1000, ByteStr.empty, 0, ByteStr.empty, TxHelpers.defaultSigner.publicKey, Nil, 0, ByteStr.empty),
+        BlockHeader(1, 1000, ByteStr.empty, 0, ByteStr.empty, TxHelpers.defaultSigner.publicKey, Nil, 0, ByteStr.empty, ByteStr.empty),
         ByteStr(Random.nextBytes(64)),
         Nil
       ),
       Block(
-        BlockHeader(1, 2000, ByteStr.empty, 0, ByteStr.empty, TxHelpers.defaultSigner.publicKey, Nil, 0, ByteStr.empty),
+        BlockHeader(1, 2000, ByteStr.empty, 0, ByteStr.empty, TxHelpers.defaultSigner.publicKey, Nil, 0, ByteStr.empty, ByteStr.empty),
         ByteStr(Random.nextBytes(64)),
         Nil
       )

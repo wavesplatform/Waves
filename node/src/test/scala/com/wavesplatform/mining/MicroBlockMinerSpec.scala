@@ -90,7 +90,8 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
           Nil,
           acc,
           Nil,
-          0
+          0,
+          ByteStr.empty
         )
         .explicitGet()
 
@@ -124,15 +125,16 @@ class MicroBlockMinerSpec extends FlatSpec with PathMockFactory with WithDomain 
         override def packUnconfirmed(
             rest: MultiDimensionalMiningConstraint,
             strategy: UtxPool.PackStrategy,
-            cancelled: () => Boolean
-        ): (Option[Seq[Transaction]], MiningConstraint) = {
-          val (txs, constraint) = inner.packUnconfirmed(rest, strategy, cancelled)
+            cancelled: () => Boolean,
+            initStateHash: Option[ByteStr]
+        ): (Option[Seq[Transaction]], MiningConstraint, ByteStr) = {
+          val (txs, constraint, stateHash) = inner.packUnconfirmed(rest, strategy, cancelled)
           val waitingConstraint = new MiningConstraint {
             def isFull                                          = { eventHasBeenSent.await(); constraint.isFull }
             def isOverfilled                                    = constraint.isOverfilled
             def put(b: Blockchain, tx: Transaction, diff: Diff) = constraint.put(b, tx, diff)
           }
-          (txs, waitingConstraint)
+          (txs, waitingConstraint, stateHash)
         }
 
         override def putIfNew(tx: Transaction, forceValidate: Boolean) = inner.putIfNew(tx, forceValidate)

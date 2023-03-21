@@ -59,7 +59,8 @@ class BlockV5Test extends FlatSpec with WithDomain with OptionValues with Either
           Seq.empty,
           defaultSigner,
           features.sorted,
-          -1
+          -1,
+          ByteStr.empty
         )
         .explicitGet()
 

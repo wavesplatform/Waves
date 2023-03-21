@@ -253,14 +253,17 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
         lastBlock.transactionData ++ txs,
         defaultSigner,
         lastBlock.header.featureVotes,
-        lastBlock.header.rewardVote
+        lastBlock.header.rewardVote,
+        lastBlock.header.stateHash
       )
       .explicitGet()
-    MicroBlock.buildAndSign(lastBlock.header.version, defaultSigner, txs, blockchainUpdater.lastBlockId.get, block.signature).explicitGet()
+    MicroBlock
+      .buildAndSign(lastBlock.header.version, defaultSigner, txs, blockchainUpdater.lastBlockId.get, block.signature, lastBlock.header.stateHash)
+      .explicitGet()
   }
 
   def appendMicroBlock(txs: Transaction*): BlockId = {
-    val mb = createMicroBlock(txs: _*)
+    val mb = createMicroBlock(txs*)
     blockchainUpdater.processMicroBlock(mb).explicitGet()
   }
 
@@ -332,7 +335,8 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
         txs = txs,
         featureVotes = Nil,
         rewardVote = -1L,
-        signer = generator
+        signer = generator,
+        stateHash = ByteStr.empty
       )
       .explicitGet()
   }

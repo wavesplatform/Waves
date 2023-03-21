@@ -32,7 +32,7 @@ class TransactionsByAddressSpec extends FreeSpec with BlockGen with WithDomain {
 
   def mkBlock(sender: KeyPair, reference: ByteStr, transactions: Seq[Transaction]): Block =
     Block
-      .buildAndSign(3.toByte, ntpNow, reference, 1000, ByteStr(new Array[Byte](32)), transactions, sender, Seq.empty, -1L)
+      .buildAndSign(3.toByte, ntpNow, reference, 1000, ByteStr(new Array[Byte](32)), transactions, sender, Seq.empty, -1L, ByteStr.empty)
       .explicitGet()
 
   val setup: Seq[(KeyPair, KeyPair, KeyPair, Seq[Block])] = {
@@ -70,23 +70,22 @@ class TransactionsByAddressSpec extends FreeSpec with BlockGen with WithDomain {
   }
 
   private def test(f: (Address, Seq[Block], Domain) => Unit)(implicit pos: Position): Unit = {
-    setup.foreach {
-      case (sender, r1, r2, blocks) =>
-        withDomain() { d =>
-          for (b <- blocks) {
-            d.blockchainUpdater.processBlock(b, b.header.generationSignature, verify = false)
-          }
-
-          Seq[Address](sender.toAddress, r1.toAddress, r2.toAddress).foreach(f(_, blocks, d))
-
-          d.blockchainUpdater.processBlock(
-            TestBlock.create(System.currentTimeMillis(), blocks.last.signature, Seq.empty),
-            ByteStr(new Array[Byte](32)),
-            verify = false
-          )
-
-          Seq[Address](sender.toAddress, r1.toAddress, r2.toAddress).foreach(f(_, blocks, d))
+    setup.foreach { case (sender, r1, r2, blocks) =>
+      withDomain() { d =>
+        for (b <- blocks) {
+          d.blockchainUpdater.processBlock(b, b.header.generationSignature, verify = false)
         }
+
+        Seq[Address](sender.toAddress, r1.toAddress, r2.toAddress).foreach(f(_, blocks, d))
+
+        d.blockchainUpdater.processBlock(
+          TestBlock.create(System.currentTimeMillis(), blocks.last.signature, Seq.empty),
+          ByteStr(new Array[Byte](32)),
+          verify = false
+        )
+
+        Seq[Address](sender.toAddress, r1.toAddress, r2.toAddress).foreach(f(_, blocks, d))
+      }
     }
   }
 

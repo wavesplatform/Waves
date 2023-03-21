@@ -23,12 +23,12 @@ class BlockDifferDetailedDiffTest extends FreeSpec with WithState {
         BlockDiffer.fromBlock(blockchain, prevBlock, b, MiningConstraint.Unlimited, b.header.generationSignature)
 
       preconditions.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
-        val BlockDiffer.Result(diff, fees, totalFee, _, _) = differ(state, prevBlock, curBlock).explicitGet()
+        val BlockDiffer.Result(diff, fees, totalFee, _, _, _) = differ(state, prevBlock, curBlock).explicitGet()
         state.append(diff, fees, totalFee, None, curBlock.header.generationSignature, curBlock)
         Some(curBlock)
       }
 
-      val BlockDiffer.Result(diff, _, _, _, detailedDiff) = differ(state, preconditions.lastOption, block).explicitGet()
+      val BlockDiffer.Result(diff, _, _, _, detailedDiff, _) = differ(state, preconditions.lastOption, block).explicitGet()
       assertion(diff, detailedDiff)
     }
 
@@ -41,12 +41,11 @@ class BlockDifferDetailedDiffTest extends FreeSpec with WithState {
       }
 
       val (master, b) = genesisBlock
-      assertDetailedDiff(Seq.empty, b) {
-        case (diff, DetailedDiff(parentDiff, transactionDiffs)) =>
-          diff.portfolios(master).balance shouldBe ENOUGH_AMT
-          parentDiff.portfolios.get(master) shouldBe None
-          transactionDiffs.length shouldBe 1
-          transactionDiffs.head.portfolios(master).balance shouldBe ENOUGH_AMT
+      assertDetailedDiff(Seq.empty, b) { case (diff, DetailedDiff(parentDiff, transactionDiffs)) =>
+        diff.portfolios(master).balance shouldBe ENOUGH_AMT
+        parentDiff.portfolios.get(master) shouldBe None
+        transactionDiffs.length shouldBe 1
+        transactionDiffs.head.portfolios(master).balance shouldBe ENOUGH_AMT
       }
     }
 
@@ -70,23 +69,21 @@ class BlockDifferDetailedDiffTest extends FreeSpec with WithState {
 
       "transaction diffs are correct" in {
         val (addr1, addr2, amt1, amt2, b) = genesisTransfersBlock
-        assertDetailedDiff(Seq.empty, b) {
-          case (_, DetailedDiff(_, td)) =>
-            val transactionDiffs = td.reverse
-            transactionDiffs.head.portfolios(addr1).balance shouldBe ENOUGH_AMT
-            transactionDiffs(1).portfolios(addr1).balance shouldBe -(amt1 + transactionFee)
-            transactionDiffs(1).portfolios(addr2).balance shouldBe amt1
-            transactionDiffs(2).portfolios(addr2).balance shouldBe -(amt2 + transactionFee)
-            transactionDiffs(2).portfolios(addr1).balance shouldBe amt2
+        assertDetailedDiff(Seq.empty, b) { case (_, DetailedDiff(_, td)) =>
+          val transactionDiffs = td.reverse
+          transactionDiffs.head.portfolios(addr1).balance shouldBe ENOUGH_AMT
+          transactionDiffs(1).portfolios(addr1).balance shouldBe -(amt1 + transactionFee)
+          transactionDiffs(1).portfolios(addr2).balance shouldBe amt1
+          transactionDiffs(2).portfolios(addr2).balance shouldBe -(amt2 + transactionFee)
+          transactionDiffs(2).portfolios(addr1).balance shouldBe amt2
         }
       }
 
       "miner reward is correct" - {
         "without NG" in {
           val (addr1, _, _, _, b) = genesisTransfersBlock
-          assertDetailedDiff(Seq.empty, b) {
-            case (_, DetailedDiff(parentDiff, _)) =>
-              parentDiff.portfolios(addr1).balance shouldBe 20
+          assertDetailedDiff(Seq.empty, b) { case (_, DetailedDiff(parentDiff, _)) =>
+            parentDiff.portfolios(addr1).balance shouldBe 20
           }
         }
 
@@ -95,9 +92,8 @@ class BlockDifferDetailedDiffTest extends FreeSpec with WithState {
 
           "no history — only 40% from current block" in {
             val (addr1, _, _, _, b) = genesisTransfersBlock
-            assertDetailedDiff(Seq.empty, b, ngFs) {
-              case (_, DetailedDiff(parentDiff, _)) =>
-                parentDiff.portfolios(addr1).balance shouldBe (transactionFee * 2 * 0.4) // 40%
+            assertDetailedDiff(Seq.empty, b, ngFs) { case (_, DetailedDiff(parentDiff, _)) =>
+              parentDiff.portfolios(addr1).balance shouldBe (transactionFee * 2 * 0.4) // 40%
             }
           }
 
@@ -124,9 +120,8 @@ class BlockDifferDetailedDiffTest extends FreeSpec with WithState {
             }
 
             val (history, block, ngMiner) = blocksNgMiner
-            assertDetailedDiff(history, block, ngFs) {
-              case (_, DetailedDiff(parentDiff, _)) =>
-                parentDiff.portfolios(ngMiner).balance shouldBe transactionFee // 60% + 40%
+            assertDetailedDiff(history, block, ngFs) { case (_, DetailedDiff(parentDiff, _)) =>
+              parentDiff.portfolios(ngMiner).balance shouldBe transactionFee // 60% + 40%
             }
           }
         }

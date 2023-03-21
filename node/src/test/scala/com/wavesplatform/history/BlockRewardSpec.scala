@@ -262,7 +262,7 @@ class BlockRewardSpec extends FreeSpec with WithDomain {
     "when NG state is empty" in forAll(ngEmptyScenario) { case (miner1, miner2, b2s, b3, m3s) =>
       withDomain(rewardSettings) { d =>
         b2s.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
-          val BlockDiffer.Result(diff, carryFee, totalFee, _, _) = differ(d.levelDBWriter, prevBlock, curBlock)
+          val BlockDiffer.Result(diff, carryFee, totalFee, _, _, _) = differ(d.levelDBWriter, prevBlock, curBlock)
           d.levelDBWriter.append(diff, carryFee, totalFee, None, curBlock.header.generationSignature, curBlock)
           Some(curBlock)
         }
