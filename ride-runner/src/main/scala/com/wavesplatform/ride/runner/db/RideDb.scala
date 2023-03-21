@@ -64,11 +64,10 @@ object RideDb extends ScorexLogging {
       // may not be necessary when WAL is disabled, but nevertheless recommended to avoid
       // many small SST files
       .setAvoidFlushDuringRecovery(true)
-      // limit the size of the manifest (logs all operations), otherwise it will grow
-      // unbounded
-      .setMaxManifestFileSize(256 * 1024 * 1024L)
+      // limit the size of the manifest (logs all operations), otherwise it will grow unbounded
+      .setMaxManifestFileSize(32 * 1024 * 1024L)
       .setIncreaseParallelism(4)
-      .setMaxOpenFiles(100)
+      .setMaxOpenFiles(50)
       // keep 1 hour of logs - completely arbitrary. we should keep what we think would be
       // a good balance between useful for performance and small for replication
       .setLogFileTimeToRoll(30.minutes.toSeconds)
@@ -90,7 +89,7 @@ object RideDb extends ScorexLogging {
         new ColumnFamilyDescriptor(
           RocksDB.DEFAULT_COLUMN_FAMILY,
           // TODO Settings
-          newColumnFamilyOptions(12.0, 16 << 10, 256 << 20, 32 << 20, 0.6)
+          newColumnFamilyOptions(12.0, 16 << 10, 256 << 20, 8 << 20, 0.6)
             .setCfPaths(Seq(new DbPath(new File(dbDir, "ride").toPath, 0L)).asJava)
         )
       ).asJava,
