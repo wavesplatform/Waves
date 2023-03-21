@@ -31,7 +31,7 @@ class AssetsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatcher
         NFTRequest.of(ByteString.copyFrom(sender.toAddress.bytes), 10, ByteString.EMPTY),
         observer
       )
-      result.runSyncUnsafe() shouldBe nftIssues.map { nftTx =>
+      result.runSyncUnsafe() shouldBe nftIssues.zipWithIndex.map { case (nftTx, i) =>
         NFTResponse.of(
           ByteString.copyFrom(nftTx.asset.id.arr),
           Some(
@@ -45,7 +45,9 @@ class AssetsApiGrpcSpec extends FreeSpec with BeforeAndAfterAll with DiffMatcher
               None,
               0,
               None,
-              0
+              0,
+              sequenceInBlock = i + 1,
+              issueHeight = 2
             )
           )
         )

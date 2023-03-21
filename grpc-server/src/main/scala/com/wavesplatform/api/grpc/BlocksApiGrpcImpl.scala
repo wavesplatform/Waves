@@ -1,5 +1,6 @@
 package com.wavesplatform.api.grpc
 
+import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
@@ -33,9 +34,7 @@ class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) exte
          } else {
            commonApi
              .metaRange(request.fromHeight, request.toHeight)
-             .map { meta =>
-               BlockWithHeight(Some(PBBlock(Some(meta.header.toPBHeader), meta.signature.toByteString)), meta.height)
-             }
+             .map(toBlockWithHeight)
          }).toListL // FIXME: Strict loading because of segfault in leveldb
           .map(_.iterator)
       )
@@ -71,9 +70,16 @@ class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) exte
 }
 
 object BlocksApiGrpcImpl {
-  private def toBlockWithHeight(v: (BlockMeta, Seq[(TxMeta, Transaction)])) =
-    BlockWithHeight(Some(PBBlock(Some(v._1.header.toPBHeader), v._1.signature.toByteString, v._2.map(_._2.toPB))), v._1.height)
+  private def toBlockWithHeight(v: (BlockMeta, Seq[(TxMeta, Transaction)])) = {
+    val (blockMeta, txs) = v
+
+    BlockWithHeight(
+      Some(PBBlock(Some(blockMeta.header.toPBHeader), blockMeta.signature.toByteString, txs.map(_._2.toPB))),
+      blockMeta.height,
+      blockMeta.vrf.fold(ByteString.EMPTY)(_.toByteString)
+    )
+  }
 
   private def toBlockWithHeight(m: BlockMeta) =
-    BlockWithHeight(Some(PBBlock(Some(m.header.toPBHeader), m.signature.toByteString)), m.height)
+    BlockWithHeight(Some(PBBlock(Some(m.header.toPBHeader), m.signature.toByteString)), m.height, m.vrf.fold(ByteString.EMPTY)(_.toByteString))
 }

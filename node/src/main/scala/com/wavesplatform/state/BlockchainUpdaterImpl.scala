@@ -223,7 +223,7 @@ class BlockchainUpdaterImpl(
                     .map { r =>
                       val updatedBlockchain = CompositeBlockchain(leveldb, r.diff, block, hitSource, r.carry, reward)
                       miner.scheduleMining(Some(updatedBlockchain))
-                      blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, reward, referencedBlockchain)
+                      blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, reward, hitSource, referencedBlockchain)
                       Option((r, Nil, reward, hitSource))
                     }
               }
@@ -251,7 +251,7 @@ class BlockchainUpdaterImpl(
                       )
                       val (mbs, diffs) = ng.allDiffs.unzip
                       log.trace(s"Discarded microblocks = $mbs, diffs = ${diffs.map(_.hashString)}")
-                      blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, ng.reward, referencedBlockchain)
+                      blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, ng.reward, hitSource, referencedBlockchain)
                       Some((r, diffs, ng.reward, hitSource))
                     }
                 } else if (areVersionsOfSameBlock(block, ng.base)) {
@@ -276,7 +276,7 @@ class BlockchainUpdaterImpl(
                         verify
                       )
                       .map { r =>
-                        blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, ng.reward, referencedBlockchain)
+                        blockchainUpdateTriggers.onProcessBlock(block, r.detailedDiff, ng.reward, hitSource, referencedBlockchain)
                         Some((r, Nil, ng.reward, hitSource))
                       }
                   }
@@ -341,7 +341,7 @@ class BlockchainUpdaterImpl(
                         )
                         miner.scheduleMining(Some(tempBlockchain))
 
-                        blockchainUpdateTriggers.onProcessBlock(block, differResult.detailedDiff, reward, this)
+                        blockchainUpdateTriggers.onProcessBlock(block, differResult.detailedDiff, reward, hitSource, this)
 
                         leveldb.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)
                         BlockStats.appended(referencedForgedBlock, referencedLiquidDiff.scriptsComplexity)
