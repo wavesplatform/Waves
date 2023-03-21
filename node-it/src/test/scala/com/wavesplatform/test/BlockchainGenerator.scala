@@ -73,8 +73,8 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
 
   private val settings: WavesSettings = wavesSettings.copy(minerSettings = wavesSettings.minerSettings.copy(quorum = 0))
 
-  def generateDb(genBlocks: Seq[GenBlock]): Unit =
-    generateBlockchain(genBlocks)
+  def generateDb(genBlocks: Seq[GenBlock], dbDirPath: String = settings.dbSettings.directory): Unit =
+    generateBlockchain(genBlocks, dbDirPath)
 
   def generateBinaryFile(genBlocks: Seq[GenBlock]): Unit = {
     val targetHeight = genBlocks.size + 1
@@ -84,18 +84,18 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
 
     Exporter.IO.createOutputStream(outputFilename) match {
       case Success(output) =>
-        val bos   = new BufferedOutputStream(output, 10 * 1024 * 1024)
-        val dbDir = Files.createTempDirectory("generator-temp-db")
-        generateBlockchain(genBlocks, block => IO.exportBlockToBinary(bos, () => Some(block), legacy = true), Some(dbDir.toString))
+        val bos       = new BufferedOutputStream(output, 10 * 1024 * 1024)
+        val dbDirPath = Files.createTempDirectory("generator-temp-db")
+        generateBlockchain(genBlocks, dbDirPath.toString, block => IO.exportBlockToBinary(bos, () => Some(block), legacy = true))
         log.info(s"Finished exporting $targetHeight blocks")
         bos.close()
         output.close()
-        FileUtils.deleteDirectory(dbDir.toFile)
+        FileUtils.deleteDirectory(dbDirPath.toFile)
       case Failure(ex) => log.error(s"Failed to create file '$outputFilename': $ex")
     }
   }
 
-  private def generateBlockchain(genBlocks: Seq[GenBlock], exportToFile: Block => Unit = _ => (), tempDbDir: Option[String] = None): Unit = {
+  private def generateBlockchain(genBlocks: Seq[GenBlock], dbDirPath: String, exportToFile: Block => Unit = _ => ()): Unit = {
     val scheduler = Schedulers.singleThread("appender")
     val time = new Time {
       val startTime: Long = settings.blockchainSettings.genesisSettings.timestamp
@@ -106,7 +106,7 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
       override def correctedTime(): Long = time
       override def getTimestamp(): Long  = time
     }
-    val db = openDB(tempDbDir.getOrElse(settings.dbSettings.directory))
+    val db = openDB(dbDirPath)
     val (blockchain, _) =
       StorageFactory(settings, db, time, Observer.empty, BlockchainUpdateTriggers.noop)
     val utxPool     = new UtxPoolImpl(time, blockchain, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
