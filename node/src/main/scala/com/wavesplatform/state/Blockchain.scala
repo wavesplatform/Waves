@@ -165,6 +165,8 @@ object Blockchain {
 
     def isFeatureActivated(feature: BlockchainFeature, height: Int = blockchain.height): Boolean =
       Blockchain.isFeatureActivated(blockchain.activatedFeatures, feature, height)
+//    def isFeatureActivated(feature: BlockchainFeature, height: Int = 3565470): Boolean =
+//      Blockchain.isFeatureActivated(blockchain.activatedFeatures, feature, 3565470)
 
     def activatedFeaturesAt(height: Int): Set[Short] =
       blockchain.activatedFeatures.collect {

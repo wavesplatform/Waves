@@ -11,8 +11,7 @@ import com.wavesplatform.features.EstimatorProvider.EstimatorBlockchainExt
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.Script.ComplexityInfo
-import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
-import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.ride.runner.*
 import com.wavesplatform.ride.runner.input.{RideRunnerInput, decodeStringLikeBytes}
 import com.wavesplatform.settings.BlockchainSettings
@@ -48,24 +47,10 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
     input.accountData.getOrElse(acc, Map.empty).get(key)
 
   // Ride: scriptHash
-  override def accountScript(address: Address): Option[AccountScriptInfo] = {
+  override def accountScript(address: Address): Option[AccountScriptInfo] =
     input.accountScript.get(address).map { input =>
-      val complexityInfo = Set(ScriptEstimatorV1, ScriptEstimatorV2, this.estimator).map { estimator =>
-        estimator.version -> complexityInfoOf(isAsset = false, input.script)
-      }
-
-      val (lastEstimatorVersion, lastComplexityInfo) = complexityInfo.last
-      AccountScriptInfo(
-        script = input.script,
-        publicKey = input.publicKey,
-        verifierComplexity = lastComplexityInfo.verifierComplexity,
-        complexitiesByEstimator = complexityInfo
-          .map { case (v, complexityInfo) => v -> complexityInfo.callableComplexities }
-          .toMap
-          .updated(lastEstimatorVersion, lastComplexityInfo.callableComplexities) // to preserve
-      )
+      mkAccountScript(this.estimator, activatedFeatures, height, input.publicKey, input.script)
     }
-  }
 
   // Indirectly
   override def hasAccountScript(address: Address): Boolean = accountScript(address).nonEmpty
@@ -101,7 +86,7 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
       totalVolume = info.quantity,
       lastUpdatedAt = Height(1),
       script = info.script.map { script =>
-        val complexityInfo = complexityInfoOf(isAsset = true, script)
+        val complexityInfo = complexityInfoOf(this.estimator, isAsset = true, script)
         AssetScriptInfo(script, complexityInfo.verifierComplexity)
       },
       sponsorship = info.minSponsoredAssetFee,
@@ -137,8 +122,8 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
     // "to" always None
     input.balanceSnapshots.getOrElse(address, Seq(BalanceSnapshot(height, 0, 0, 0))).filter(_.height >= from)
 
-  private def complexityInfoOf(isAsset: Boolean, script: Script): ComplexityInfo =
-    estimate(height, activatedFeatures, this.estimator, script, isAsset = isAsset, withCombinedContext = true)
+  private def complexityInfoOf(estimator: ScriptEstimator, isAsset: Boolean, script: Script): ComplexityInfo =
+    estimate(height, activatedFeatures, estimator, script, isAsset = isAsset, withCombinedContext = true)
 
   private lazy val transactionMetaById: Map[ByteStr, TxMeta] = for {
     (id, tx) <- input.transactions

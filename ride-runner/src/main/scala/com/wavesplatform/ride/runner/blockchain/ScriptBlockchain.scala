@@ -27,6 +27,8 @@ import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 
+import java.io.{PrintWriter, StringWriter}
+
 class ScriptBlockchain[TagT](sharedBlockchain: SharedBlockchainStorage[TagT], tag: TagT)(implicit ctx: ReadWrite)
     extends Blockchain
     with ScorexLogging {
@@ -37,10 +39,11 @@ class ScriptBlockchain[TagT](sharedBlockchain: SharedBlockchainStorage[TagT], ta
   override def hasData(address: Address): Boolean = kill(s"hasData($address)")
 
   // Ride: get*Value (data), get* (data)
-  override def accountData(address: Address, key: String): Option[DataEntry[?]] = sharedBlockchain.data.get(Height(height), (address, key), tag)
+  override def accountData(address: Address, key: String): Option[DataEntry[?]] =
+    sharedBlockchain.data.get(Height(untaggedHeight), (address, key), tag)
 
   // Ride: scriptHash
-  override def accountScript(address: Address): Option[AccountScriptInfo] = sharedBlockchain.accountScripts.get(Height(height), address, tag)
+  override def accountScript(address: Address): Option[AccountScriptInfo] = sharedBlockchain.accountScripts.get(Height(untaggedHeight), address, tag)
 
   // Indirectly
   override def hasAccountScript(address: Address): Boolean = accountScript(address).nonEmpty
@@ -51,28 +54,38 @@ class ScriptBlockchain[TagT](sharedBlockchain: SharedBlockchainStorage[TagT], ta
   // Ride: blockInfoByHeight
   override def hitSource(height: Int): Option[ByteStr] = sharedBlockchain.vrf.get(height) // TODO #?, tag)
 
+  private def untaggedHeight: Int = {
+    sharedBlockchain.height
+  }
+
   // Ride: wavesBalance, height, lastBlock
-  override def height: Int = sharedBlockchain.height
+  override def height: Int = {
+//    val sw = new StringWriter()
+//    new RuntimeException().printStackTrace(new PrintWriter(sw))
+//    val exceptionAsString = sw.toString()
+//    println(s"Called height:\n$exceptionAsString")
+    sharedBlockchain.taggedHeight.get(tag)
+  }
 
   override def activatedFeatures: Map[Short, Int] = sharedBlockchain.activatedFeatures
 
   // Ride: assetInfo
-  override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription] = sharedBlockchain.assets.get(Height(height), id, tag)
+  override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription] = sharedBlockchain.assets.get(Height(untaggedHeight), id, tag)
 
   // Ride (indirectly): asset script validation
   override def assetScript(id: Asset.IssuedAsset): Option[AssetScriptInfo] = assetDescription(id).flatMap(_.script)
 
   // Ride: get*Value (data), get* (data), isDataStorageUntouched, balance, scriptHash, wavesBalance
   override def resolveAlias(a: Alias): Either[ValidationError, Address] =
-    sharedBlockchain.aliases.get(Height(height), a, tag).toRight(AliasDoesNotExist(a): ValidationError)
+    sharedBlockchain.aliases.get(Height(untaggedHeight), a, tag).toRight(AliasDoesNotExist(a): ValidationError)
 
   // Ride: wavesBalance
   override def leaseBalance(address: Address): LeaseBalance =
-    sharedBlockchain.accountLeaseBalances.get(Height(height), address, tag).getOrElse(LeaseBalance.empty)
+    sharedBlockchain.accountLeaseBalances.get(Height(untaggedHeight), address, tag).getOrElse(LeaseBalance.empty)
 
   // Ride: assetBalance, wavesBalance
   override def balance(address: Address, mayBeAssetId: Asset): Long =
-    sharedBlockchain.accountBalances.get(Height(height), (address, mayBeAssetId), tag).getOrElse(0L)
+    sharedBlockchain.accountBalances.get(Height(untaggedHeight), (address, mayBeAssetId), tag).getOrElse(0L)
 
   // Retrieves Waves balance snapshot in the [from, to] range (inclusive)
   // Ride: wavesBalance (specifies to=None), "to" always None and means "to the end"
@@ -80,7 +93,7 @@ class ScriptBlockchain[TagT](sharedBlockchain: SharedBlockchainStorage[TagT], ta
     // NOTE: This code leads to a wrong generating balance, but we see no use-cases for now
     val lb           = leaseBalance(address)
     val wavesBalance = balance(address, Asset.Waves)
-    List(BalanceSnapshot(height, wavesBalance, lb.in, lb.out))
+    List(BalanceSnapshot(untaggedHeight, wavesBalance, lb.in, lb.out))
   }
 
   private def withTransactions(id: ByteStr): Option[Height] = sharedBlockchain.transactions.get(TransactionId(id), tag)
