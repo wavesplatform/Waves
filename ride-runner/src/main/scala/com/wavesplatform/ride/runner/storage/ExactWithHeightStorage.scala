@@ -55,6 +55,7 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
   private def getLatestInternal(atMaxHeight: Height, key: KeyT, tag: Option[TagT])(implicit ctx: ReadWrite): Option[ValueT] = {
     tag.foreach { tag =>
       // TODO if contains one value - then it wasn't before, optimize values insertion
+      // TODO if there is no key - go to blockchain!
       tags.compute(key, (_, origTags) => Option(origTags).getOrElse(Set.empty) + tag)
     }
 

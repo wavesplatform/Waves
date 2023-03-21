@@ -2,6 +2,7 @@ package com.wavesplatform.ride.runner.entrypoints
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import com.google.common.io.MoreFiles
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.ride.runner.db.RideDb
@@ -22,6 +23,8 @@ import play.api.libs.json.Json
 import sttp.client3.HttpURLConnectionBackend
 
 import java.io.File
+import java.nio.charset.StandardCharsets
+import java.nio.file.{Files, Paths}
 import java.util.concurrent.*
 import scala.concurrent.Await
 import scala.concurrent.duration.{Duration, DurationInt}
@@ -103,36 +106,36 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
     )
 
     // TODO HACK: Remove when the storage format cemented
-//    {
-//      val rootPath             = Paths.get(settings.rideRunner.db.directory, "..").normalize()
-//      val cleanupIterationPath = rootPath.resolve("cleanup")
-//      val cleanupIteration =
-//        if (cleanupIterationPath.toFile.exists()) Files.readString(cleanupIterationPath, StandardCharsets.UTF_8).trim
-//        else "-1" // to differ cases
-//
-//      if (cleanupIteration == "-1") {
-//        rootPath.toFile.listFiles().foreach { file =>
-//          println(s"File before: $file")
-//        }
-//      }
-//
-//      val cleanTo = -10 // Increase if you want to clean the database
-//      if (cleanupIteration.toIntOption.getOrElse(-2) < cleanTo) {
-//        log.info(
-//          s"Cleaning the DB with caches in ${settings.rideRunner.db.directory} from $cleanupIteration ($cleanupIterationPath) to $cleanTo..."
-//        )
-//        new File(settings.rideRunner.db.directory).listFiles().foreach { file =>
-//          MoreFiles.deleteRecursively(file.toPath)
-//        }
-//        Files.writeString(cleanupIterationPath, cleanTo.toString)
-//      }
-//
-//      if (cleanupIteration == "-1") {
-//        rootPath.toFile.listFiles().foreach { file =>
-//          println(s"File after: $file")
-//        }
-//      }
-//    }
+    {
+      val rootPath             = Paths.get(settings.rideRunner.db.directory, "..").normalize()
+      val cleanupIterationPath = rootPath.resolve("cleanup")
+      val cleanupIteration =
+        if (cleanupIterationPath.toFile.exists()) Files.readString(cleanupIterationPath, StandardCharsets.UTF_8).trim
+        else "-1" // to differ cases
+
+      if (cleanupIteration == "-1") {
+        rootPath.toFile.listFiles().foreach { file =>
+          println(s"File before: $file")
+        }
+      }
+
+      val cleanTo = 1 // Increase if you want to clean the database
+      if (cleanupIteration.toIntOption.getOrElse(-2) < cleanTo) {
+        log.info(
+          s"Cleaning the DB with caches in ${settings.rideRunner.db.directory} from $cleanupIteration ($cleanupIterationPath) to $cleanTo..."
+        )
+        rootPath.toFile.listFiles().foreach { file =>
+          if (file.getAbsolutePath != cleanupIterationPath.toAbsolutePath.toString) MoreFiles.deleteRecursively(file.toPath)
+        }
+        Files.writeString(cleanupIterationPath, cleanTo.toString)
+      }
+
+      if (cleanupIteration == "-1") {
+        rootPath.toFile.listFiles().foreach { file =>
+          println(s"File after: $file")
+        }
+      }
+    }
 
     log.info("Opening a DB with caches...")
     val rideDb          = RideDb.open(settings.rideRunner.db)
