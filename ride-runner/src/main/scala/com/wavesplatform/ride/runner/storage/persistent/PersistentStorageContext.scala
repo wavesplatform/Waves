@@ -1,6 +1,6 @@
 package com.wavesplatform.ride.runner.storage.persistent
 
-import com.wavesplatform.database.{Key, RW, ReadOnlyDB}
+import com.wavesplatform.database.rocksdb.{Key, RW, ReadOnlyDB}
 import com.wavesplatform.ride.runner.storage.RemoteData
 import com.wavesplatform.ride.runner.storage.persistent.DefaultPersistentCaches.ReadOnlyDBOps
 

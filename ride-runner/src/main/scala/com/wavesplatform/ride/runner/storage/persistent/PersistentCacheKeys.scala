@@ -6,23 +6,22 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.protobuf.BlockMeta
-import com.wavesplatform.database.{
+import com.wavesplatform.database.protobuf.BlockMeta as PBBlockMeta
+import com.wavesplatform.database.rocksdb.{
   AddressId,
-  Caches,
   Key,
   readAccountScriptInfo,
   readAssetDetails,
   readAssetScript,
-  readAssetStaticInfo,
   readBlockMeta,
   writeAccountScriptInfo,
   writeAssetDetails,
   writeAssetScript,
-  writeAssetStaticInfo,
   writeBlockMeta
 }
+import com.wavesplatform.database.{readAssetStaticInfo, writeAssetStaticInfo}
 import com.wavesplatform.meta.getSimpleName
+import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.ride.runner.storage.persistent.AsBytes.ByteArrayOutputStreamOps
@@ -363,7 +362,7 @@ object CacheKeys {
       new ByteArrayOutputStream()
         .writeWithLen(
           writeBlockMeta(
-            BlockMeta(
+            PBBlockMeta(
               header = Some(PBBlocks.protobuf(x.header)),
               signature = UnsafeByteOperations.unsafeWrap(x.signature.arr)
               // TODO #15 Optimize working with VRF
@@ -375,14 +374,16 @@ object CacheKeys {
     override def fromByteArray(xs: Array[Byte]): (SignedBlockHeader, Int) = {
       val bb  = ByteBuffer.wrap(xs)
       val len = bb.getInt
-      (Caches.toSignedHeader(readBlockMeta(bb.getByteArray(len))), Ints.BYTES + len)
+      (toSignedHeader(readBlockMeta(bb.getByteArray(len))), Ints.BYTES + len)
     }
+
+    private def toSignedHeader(m: PBBlockMeta): SignedBlockHeader = SignedBlockHeader(PBBlocks.vanilla(m.getHeader), m.signature.toByteStr)
   }
 
   implicit val assetDescriptionAsBytes: AsBytes[AssetDescription] = new AsBytes[AssetDescription] {
     override def toByteArray(x: AssetDescription): Array[Byte] = {
       // TODO id here is empty, now it is used to optimize reads in NODE for Blockchain.resolveERC20Address
-      val staticInfo = AssetStaticInfo(ByteStr.empty, TransactionId @@ x.originTransactionId, x.issuer, x.decimals, x.nft)
+      val staticInfo = AssetStaticInfo(TransactionId @@ x.originTransactionId, x.issuer, x.decimals, x.nft)
       val assetInfo  = AssetInfo(x.name, x.description, x.lastUpdatedAt)
       val volumeInfo = AssetVolumeInfo(x.reissuable, x.totalVolume)
 

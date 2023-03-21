@@ -159,7 +159,8 @@ inScope(Global)(
     testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true"),
     network         := Network.default(),
     instrumentation := false,
-    resolvers ++= Resolver.sonatypeOssRepos("snapshots") ++ Seq(Resolver.mavenLocal),
+    resolvers ++= Resolver.sonatypeOssRepos("snapshots") ++ Seq(Resolver.mavenLocal) ++
+      Seq(MavenRepository("wvservices-releases", "https://nexus.wvservices.com/repository/maven-releases/")),
     Compile / doc / sources                := Seq.empty,
     Compile / packageDoc / publishArtifact := false,
     concurrentRestrictions                 := Seq(Tags.limit(Tags.Test, math.min(EvaluateTask.SystemProcessors, 8))),
@@ -184,7 +185,7 @@ packageAll := {
   buildTarballsForDocker.value
 }
 
-lazy val buildTarballsForDocker = taskKey[Unit]("Package node, grpc-server and ride-runner tarballs and copy them to docker/target")
+lazy val buildTarballsForDocker = taskKey[Unit]("Package node and grpc-server tarballs and copy them to docker/target")
 buildTarballsForDocker := {
   // TODO temporarily disabled
   //  IO.copyFile((node / Universal / packageZipTarball).value, new File(baseDirectory.value, "docker/target/waves.tgz"))

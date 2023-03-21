@@ -9,8 +9,8 @@ import com.wavesplatform.ride.runner.storage.persistent.PersistentStorageContext
 import com.wavesplatform.ride.runner.storage.persistent.PersistentCache
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
-import org.eclipse.collections.impl.map.mutable.ConcurrentHashMap
 
+import java.util.concurrent.ConcurrentHashMap
 import scala.util.chaining.*
 
 /** Exact, because stores not only a value, but an absence of it too

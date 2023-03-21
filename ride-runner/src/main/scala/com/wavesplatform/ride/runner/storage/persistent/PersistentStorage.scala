@@ -1,7 +1,7 @@
 package com.wavesplatform.ride.runner.storage.persistent
 
 import cats.syntax.option.*
-import com.wavesplatform.database.{DBExt, RW, ReadOnlyDB}
+import com.wavesplatform.database.rocksdb.{DBExt, RW, ReadOnlyDB}
 import com.wavesplatform.ride.runner.storage.persistent.PersistentStorageContext.{ReadOnly, ReadWrite}
 import monix.eval.Task
 import org.rocksdb.*

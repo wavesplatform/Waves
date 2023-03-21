@@ -94,14 +94,6 @@ class ScriptBlockchain[TagT](sharedBlockchain: SharedBlockchainStorage[TagT], ta
   // Ride: transferTransactionById
   override def transferById(id: ByteStr): Option[(Int, TransferTransactionLike)] = kill("transferById")
 
-  override def transactionInfos(ids: Seq[BlockId]): Seq[Option[(TxMeta, Transaction)]] = kill("transactionInfos")
-
-  override def leaseBalances(addresses: Seq[Address]): Map[Address, LeaseBalance] = kill("leaseBalances")
-
-  override def balances(req: Seq[(Address, Asset)]): Map[(Address, Asset), Long] = kill("balances")
-
-  override def wavesBalances(addresses: Seq[Address]): Map[Address, Long] = kill("wavesBalances")
-
   override def score: BigInt = kill("score")
 
   override def carryFee: Long = kill("carryFee")

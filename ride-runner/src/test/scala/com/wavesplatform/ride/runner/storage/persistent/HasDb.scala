@@ -1,7 +1,7 @@
 package com.wavesplatform.ride.runner.storage.persistent
 
 import com.google.common.io.MoreFiles
-import com.wavesplatform.database.RDB.newColumnFamilyOptions
+import com.wavesplatform.ride.runner.db.RideDb.newColumnFamilyOptions
 import com.wavesplatform.ride.runner.storage.persistent.HasDb.TestDb
 import org.rocksdb.{ColumnFamilyDescriptor, ColumnFamilyHandle, DBOptions, DbPath, RocksDB, Statistics}
 
@@ -49,7 +49,7 @@ object HasDb {
         Seq(
           new ColumnFamilyDescriptor(
             RocksDB.DEFAULT_COLUMN_FAMILY,
-            newColumnFamilyOptions(12.0, 16 << 10, 512 << 20, 0.6)
+            newColumnFamilyOptions(12.0, 16 << 10, 128 << 20, 32 << 20, 0.6)
               .setCfPaths(Seq(new DbPath(path.resolve("default"), 0L)).asJava)
           )
         ).asJava,

@@ -5,9 +5,10 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.collections.syntax.*
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.{AddressId, Key, ReadOnlyDB}
+import com.wavesplatform.database.rocksdb.{AddressId, Key}
 import com.wavesplatform.ride.runner.stats.KamonCaffeineStats
 import PersistentStorageContext.{ReadOnly, ReadWrite}
+import com.wavesplatform.database.rocksdb.ReadOnlyDB
 import com.wavesplatform.ride.runner.storage.persistent.DefaultPersistentCaches.ReadOnlyDBOps
 import com.wavesplatform.ride.runner.storage.{AccountAssetKey, AccountDataKey, KeyIndexStorage, RemoteData}
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, DataEntry, EmptyDataEntry, Height, LeaseBalance, TransactionId}

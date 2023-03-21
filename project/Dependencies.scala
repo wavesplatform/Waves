@@ -157,6 +157,7 @@ object Dependencies {
 
   lazy val rideRunner = Def.setting(
     Seq(
+      "com.wavesplatform" % "rocksdbjni" % "7.10.0",
       "com.thesamet.scalapb" %% "scalapb-json4s" % "0.11.1",
       // https://github.com/netty/netty/wiki/Native-transports
       // "io.netty"                      % "netty-transport-native-epoll"  % "4.1.79.Final" classifier "linux-x86_64",
