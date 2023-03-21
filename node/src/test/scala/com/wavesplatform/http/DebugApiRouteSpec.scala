@@ -4,9 +4,10 @@ import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import com.typesafe.config.ConfigObject
 import com.wavesplatform.*
-import com.wavesplatform.account.Alias
+import com.wavesplatform.account.{Alias, KeyPair}
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
+import com.wavesplatform.api.http.DebugApiRoute.AccountMiningInfo
 import com.wavesplatform.api.http.{DebugApiRoute, RouteTimeout, handleAllExceptions}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
@@ -25,8 +26,9 @@ import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Lease, Recipient}
+import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.PeerDatabase
-import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
+import com.wavesplatform.settings.{TestFunctionalitySettings, WalletSettings, WavesSettings}
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.reader.LeaseDetails
@@ -39,11 +41,15 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{ERC20Address, Transaction, TxHelpers, TxVersion}
 import com.wavesplatform.utils.Schedulers
+import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.{BlockchainStubHelpers, NTPTime, TestValues, TestWallet}
 import monix.eval.Task
+import monix.execution.schedulers.SchedulerService
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{Assertion, OptionValues}
 import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
 
+import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.*
 import scala.util.Random
 
@@ -59,24 +65,38 @@ class DebugApiRouteSpec
     with OptionValues {
   import DomainPresets.*
 
-  val wavesSettings: WavesSettings = WavesSettings.default()
+  val wavesSettings: WavesSettings = WavesSettings.default().copy(restAPISettings = restAPISettings)
   val configObject: ConfigObject   = wavesSettings.config.root()
+
   trait Blockchain1 extends Blockchain with NG
   val blockchain: Blockchain1 = stub[Blockchain1]
-  val block: Block            = TestBlock.create(Nil)
+  (blockchain.hasAccountScript _).when(*).returns(false)
+  (() => blockchain.microblockIds).when().returns(Seq.empty)
+  (blockchain.heightOf _).when(*).returns(None)
+  (() => blockchain.height).when().returns(0)
+  (blockchain.balanceSnapshots _).when(*, *, *).returns(Seq.empty)
+
+  val miner: Miner & MinerDebugInfo = new Miner with MinerDebugInfo {
+    override def scheduleMining(blockchain: Option[Blockchain]): Unit                           = ()
+    override def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration] = Right(FiniteDuration(0, TimeUnit.SECONDS))
+    override def state: MinerDebugInfo.State                                                    = MinerDebugInfo.Disabled
+  }
+
+  val block: Block = TestBlock.create(Nil)
   val testStateHash: StateHash = {
     def randomHash: ByteStr = ByteStr(Array.fill(32)(Random.nextInt(256).toByte))
     val hashes              = SectionId.values.map((_, randomHash)).toMap
     StateHash(randomHash, hashes)
   }
 
-  val scheduler = Schedulers.fixedPool(1, "heavy-request-scheduler")
+  val scheduler: SchedulerService = Schedulers.fixedPool(1, "heavy-request-scheduler")
+  val wallet: Wallet              = Wallet(WalletSettings(None, Some("password"), Some(ByteStr(TxHelpers.defaultSigner.seed))))
   val debugApiRoute: DebugApiRoute =
     DebugApiRoute(
       wavesSettings,
       ntpTime,
       blockchain,
-      null,
+      wallet,
       null,
       stub[CommonTransactionsApi],
       null,
@@ -84,7 +104,7 @@ class DebugApiRouteSpec
       null,
       (_, _) => Task.raiseError(new NotImplementedError("")),
       null,
-      null,
+      miner,
       null,
       null,
       null,
@@ -3418,6 +3438,27 @@ class DebugApiRouteSpec
       Get(routePath(s"/stateChanges/info/$txId")) ~> route ~> check {
         status shouldBe StatusCodes.MovedPermanently
         header(Location.name).map(_.value) shouldBe Some(s"/transactions/info/$txId")
+      }
+    }
+  }
+
+  routePath("/minerInfo") - {
+    "returns info from wallet if miner private keys not specified in config" in {
+      val acc = wallet.generateNewAccount()
+
+      acc shouldBe defined
+      Get(routePath("/minerInfo")) ~> ApiKeyHeader ~> route ~> check {
+        responseAs[Seq[AccountMiningInfo]].map(_.address) shouldBe acc.toSeq.map(_.toAddress.toString)
+      }
+    }
+
+    "returns info only for miner private keys from config when specified" in {
+      val minerAccs   = Seq(TxHelpers.signer(1), TxHelpers.signer(2))
+      val minerConfig = debugApiRoute.ws.minerSettings.copy(privateKeys = minerAccs.map(_.privateKey))
+      val debugRoute  = debugApiRoute.copy(ws = debugApiRoute.ws.copy(minerSettings = minerConfig))
+
+      Get(routePath("/minerInfo")) ~> ApiKeyHeader ~> debugRoute.route ~> check {
+        responseAs[Seq[AccountMiningInfo]].map(_.address) shouldBe minerAccs.map(_.toAddress.toString)
       }
     }
   }
