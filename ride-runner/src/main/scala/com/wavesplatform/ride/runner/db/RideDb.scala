@@ -6,7 +6,6 @@ import org.rocksdb.{ColumnFamilyHandle, RocksDB, Statistics, TickerType, *}
 
 import java.io.File
 import java.util
-import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.{CollectionHasAsScala, SeqHasAsJava}
 import scala.util.Try
 
@@ -56,22 +55,12 @@ object RideDb extends ScorexLogging {
       .setStatsDumpPeriodSec(30)
       .setCreateIfMissing(true)
       .setParanoidChecks(true)
-      // .setIncreaseParallelism(4)
+      .setIncreaseParallelism(4)
       // .setBytesPerSync(2 << 20)
       .setMaxBackgroundJobs(4)
       .setCreateMissingColumnFamilies(true)
 //      .setWriteBufferManager(new WriteBufferManager())
-      // may not be necessary when WAL is disabled, but nevertheless recommended to avoid
-      // many small SST files
-      .setAvoidFlushDuringRecovery(true)
-      // limit the size of the manifest (logs all operations), otherwise it will grow unbounded
-      .setMaxManifestFileSize(32 * 1024 * 1024L)
-      .setIncreaseParallelism(4)
       .setMaxOpenFiles(50)
-      // keep 1 hour of logs - completely arbitrary. we should keep what we think would be
-      // a good balance between useful for performance and small for replication
-      .setLogFileTimeToRoll(30.minutes.toSeconds)
-      .setKeepLogFileNum(2)
 
     // https://github.com/facebook/rocksdb/issues/9667#issuecomment-1060614090
     val stats = new Statistics()
