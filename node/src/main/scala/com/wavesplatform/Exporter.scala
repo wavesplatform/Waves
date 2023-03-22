@@ -57,9 +57,9 @@ object Exporter extends ScorexLogging {
           val start         = System.currentTimeMillis()
           exportedBytes += IO.writeHeader(bos, format)
           (2 to height).foreach { h =>
-            val getBlock = () => db.readOnly(ro => database.loadBlock(Height(h), ro))
-            exportedBytes += (if (format == "JSON") IO.exportBlockToJson(bos, getBlock, h)
-                              else IO.exportBlockToBinary(bos, getBlock, format == Formats.Binary))
+            val block = db.readOnly(ro => database.loadBlock(Height(h), ro))
+            exportedBytes += (if (format == "JSON") IO.exportBlockToJson(bos, block, h)
+                              else IO.exportBlockToBinary(bos, block, format == Formats.Binary))
             if (h % (height / 10) == 0)
               log.info(s"$h blocks exported, ${humanReadableSize(exportedBytes)} written")
           }
@@ -81,8 +81,8 @@ object Exporter extends ScorexLogging {
     def createOutputStream(filename: String): Try[FileOutputStream] =
       Try(new FileOutputStream(filename))
 
-    def exportBlockToBinary(stream: OutputStream, maybeBlock: () => Option[Block], legacy: Boolean): Int = {
-      val maybeBlockBytes = maybeBlock().map(_.bytes())
+    def exportBlockToBinary(stream: OutputStream, maybeBlock: Option[Block], legacy: Boolean): Int = {
+      val maybeBlockBytes = maybeBlock.map(_.bytes())
       maybeBlockBytes
         .map { oldBytes =>
           val bytes       = if (legacy) oldBytes else PBBlocks.clearChainId(PBBlocks.protobuf(Block.parseBytes(oldBytes).get)).toByteArray
@@ -96,8 +96,8 @@ object Exporter extends ScorexLogging {
         .getOrElse(0)
     }
 
-    def exportBlockToJson(stream: OutputStream, maybeBlock: () => Option[Block], height: Int): Int = {
-      maybeBlock()
+    def exportBlockToJson(stream: OutputStream, maybeBlock: Option[Block], height: Int): Int = {
+      maybeBlock
         .map { block =>
           val len = if (height != 2) {
             val bytes = ",\n".utf8Bytes

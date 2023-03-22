@@ -86,7 +86,7 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
       case Success(output) =>
         val bos       = new BufferedOutputStream(output, 10 * 1024 * 1024)
         val dbDirPath = Files.createTempDirectory("generator-temp-db")
-        generateBlockchain(genBlocks, dbDirPath.toString, block => IO.exportBlockToBinary(bos, () => Some(block), legacy = true))
+        generateBlockchain(genBlocks, dbDirPath.toString, block => IO.exportBlockToBinary(bos, Some(block), legacy = true))
         log.info(s"Finished exporting $targetHeight blocks")
         bos.close()
         output.close()
