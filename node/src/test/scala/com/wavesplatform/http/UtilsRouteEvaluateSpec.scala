@@ -1,6 +1,8 @@
 package com.wavesplatform.http
+import akka.http.scaladsl.model.headers.Accept
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.ApiError.ScriptExecutionError
+import com.wavesplatform.api.http.CustomJson
 import com.wavesplatform.api.http.utils.{UtilsApiRoute, UtilsInvocationRequest}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.db.WithDomain
@@ -58,6 +60,7 @@ class UtilsRouteEvaluateSpec
       s"""
          |let letFromContract = $letFromContract
          |
+         |func any(value: Any) = value
          |func test(i: Int) = i * 10
          |func testB() = true
          |func testBS() = base58'MATCHER'
@@ -352,6 +355,11 @@ class UtilsRouteEvaluateSpec
             s"""{"result":{"type":"BigInt","value":${PureContext.BigIntMax}},"complexity":65,"expr":"parseBigIntValue(\\"${PureContext.BigIntMax}\\")","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
           )
         }
+        evalScript(s"""parseBigIntValue("${PureContext.BigIntMax}")""") ~> Accept(CustomJson.jsonWithNumbersAsStrings) ~> route ~> check {
+          (responseAs[JsObject] - "stateChanges") should matchJson(
+            s"""{"result":{"type":"BigInt","value":"${PureContext.BigIntMax.toString()}"},"complexity":65,"expr":"parseBigIntValue(\\"${PureContext.BigIntMax}\\")","address":"3MtGzgmNa5fMjGCcPi5nqMTdtZkfojyWHL9"}"""
+          )
+        }
 
         val dAppAccount2 = TxHelpers.secondSigner
         val dAppAddress2 = TxHelpers.secondAddress
@@ -382,6 +390,16 @@ class UtilsRouteEvaluateSpec
 
         evalScript(s"nestedCalls([(\"$dAppAddress2\", \"call\", [123, \"abc\"]), (\"$dAppAddress\", \"getValue\", [])])") ~> route ~> check {
           (responseAs[JsValue] \ "result" \ "value").as[String] shouldBe "abc123\nvalue\n"
+        }
+
+        evalScript(s"any(${Long.MaxValue})") ~> Accept(CustomJson.jsonWithNumbersAsStrings) ~> route ~> check {
+          responseJson shouldBe Json.obj("type" -> "Int", "value" -> s"${Long.MaxValue}")
+        }
+
+        evalScript(s"any([${Long.MaxValue}, 0, ${Long.MinValue}])") ~> Accept(CustomJson.jsonWithNumbersAsStrings) ~> route ~> check {
+          (responseJson \ "type").as[String] shouldBe "Array"
+          (responseJson \ "value").get.toString shouldBe
+            s"""[{"type":"Int","value":"${Long.MaxValue}"},{"type":"Int","value":"0"},{"type":"Int","value":"${Long.MinValue}"}]"""
         }
       }
     }

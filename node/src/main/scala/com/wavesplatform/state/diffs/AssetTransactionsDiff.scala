@@ -48,7 +48,7 @@ object AssetTransactionsDiff {
         .map(script =>
           Diff(
             portfolios = VectorMap(tx.sender.toAddress -> Portfolio.build(-tx.fee.value, asset, tx.quantity.value)),
-            issuedAssets = Map(asset -> NewAssetInfo(staticInfo, info, volumeInfo)),
+            issuedAssets = VectorMap(asset -> NewAssetInfo(staticInfo, info, volumeInfo)),
             assetScripts = Map(asset -> script.map(AssetScriptInfo.tupled)),
             scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
           )
