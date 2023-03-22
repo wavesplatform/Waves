@@ -165,7 +165,7 @@ case class NgState(
       base.copy(
         transactionData = newTransactions,
         signature = microBlock.totalResBlockSig,
-        header = base.header.copy(transactionsRoot = createTransactionsRoot(microBlock))
+        header = base.header.copy(transactionsRoot = createTransactionsRoot(microBlock), stateHash = microBlock.stateHash)
       )
     fullBlock.id()
   }
