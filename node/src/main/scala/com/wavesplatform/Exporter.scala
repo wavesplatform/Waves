@@ -1,7 +1,6 @@
 package com.wavesplatform
 
 import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
-
 import com.google.common.primitives.Ints
 import com.wavesplatform.block.Block
 import com.wavesplatform.database.{DBExt, openDB}
@@ -18,7 +17,7 @@ import scopt.OParser
 
 import scala.concurrent.Await
 import scala.concurrent.duration.*
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success, Try, Using}
 
 object Exporter extends ScorexLogging {
   private[wavesplatform] object Formats {
@@ -41,39 +40,45 @@ object Exporter extends ScorexLogging {
 
       val settings = Application.loadApplicationConfig(configFile)
 
-      val time             = new NTP(settings.ntpServer)
-      val db               = openDB(settings.dbSettings.directory)
-      val (blockchain, _)  = StorageFactory(settings, db, time, Observer.empty, BlockchainUpdateTriggers.noop)
-      val blockchainHeight = blockchain.height
-      val height           = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
-      log.info(s"Blockchain height is $blockchainHeight exporting to $height")
-      val outputFilename = s"$outputFileNamePrefix-$height"
-      log.info(s"Output file: $outputFilename")
+      Using.resources(
+        new NTP(settings.ntpServer),
+        openDB(settings.dbSettings.directory)
+      ) { (time, db) =>
+        val (blockchain, _)  = StorageFactory(settings, db, time, Observer.empty, BlockchainUpdateTriggers.noop)
+        val blockchainHeight = blockchain.height
+        val height           = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
+        log.info(s"Blockchain height is $blockchainHeight exporting to $height")
+        val outputFilename = s"$outputFileNamePrefix-$height"
+        log.info(s"Output file: $outputFilename")
 
-      IO.createOutputStream(outputFilename) match {
-        case Success(output) =>
-          var exportedBytes = 0L
-          val bos           = new BufferedOutputStream(output, 10 * 1024 * 1024)
-          val start         = System.currentTimeMillis()
-          exportedBytes += IO.writeHeader(bos, format)
-          (2 to height).foreach { h =>
-            val block = db.readOnly(ro => database.loadBlock(Height(h), ro))
-            exportedBytes += (if (format == "JSON") IO.exportBlockToJson(bos, block, h)
-                              else IO.exportBlockToBinary(bos, block, format == Formats.Binary))
-            if (h % (height / 10) == 0)
-              log.info(s"$h blocks exported, ${humanReadableSize(exportedBytes)} written")
+        Using.resource {
+          IO.createOutputStream(outputFilename) match {
+            case Success(output) => output
+            case Failure(ex) =>
+              log.error(s"Failed to create file '$outputFilename': $ex")
+              throw ex
           }
-          exportedBytes += IO.writeFooter(bos, format)
-          val duration = System.currentTimeMillis() - start
-          log.info(s"Finished exporting $height blocks in ${humanReadableDuration(duration)}, ${humanReadableSize(exportedBytes)} written")
-          bos.close()
-          output.close()
-        case Failure(ex) => log.error(s"Failed to create file '$outputFilename': $ex")
+        } { output =>
+          Using.resource(new BufferedOutputStream(output, 10 * 1024 * 1024)) { bos =>
+            var exportedBytes = 0L
+            val start         = System.currentTimeMillis()
+            exportedBytes += IO.writeHeader(bos, format)
+            (2 to height).foreach { h =>
+              val block = db.readOnly(ro => database.loadBlock(Height(h), ro))
+              exportedBytes += (if (format == "JSON") IO.exportBlockToJson(bos, block, h)
+                                else IO.exportBlockToBinary(bos, block, format == Formats.Binary))
+              if (h % (height / 10) == 0)
+                log.info(s"$h blocks exported, ${humanReadableSize(exportedBytes)} written")
+            }
+            exportedBytes += IO.writeFooter(bos, format)
+            val duration = System.currentTimeMillis() - start
+            log.info(s"Finished exporting $height blocks in ${humanReadableDuration(duration)}, ${humanReadableSize(exportedBytes)} written")
+          }
+        }
       }
 
       Try(Await.result(Kamon.stopModules(), 10.seconds))
       Metrics.shutdown()
-      time.close()
     }
   }
 
