@@ -12,6 +12,7 @@ import com.wavesplatform.api.http.requests.{TransferV1Request, TransferV2Request
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.{Domain, defaultSigner}
 import com.wavesplatform.lang.directives.values.V6
@@ -40,11 +41,13 @@ import play.api.libs.json.Json.JsValueWrapper
 import scala.concurrent.duration.*
 
 class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPISettingsHelper with WithDomain with TestWallet {
-
   private val MaxDistributionDepth = 1
 
-  def routeTest[A](settings: WavesSettings = DomainPresets.RideV4.addFeatures(BlockchainFeatures.ReduceNFTFee))(f: (Domain, Route) => A): A =
-    withDomain(settings) { d =>
+  def routeTest[A](
+      settings: WavesSettings = DomainPresets.RideV4.addFeatures(BlockchainFeatures.ReduceNFTFee),
+      balances: Seq[AddrWithBalance] = Seq.empty
+  )(f: (Domain, Route) => A): A =
+    withDomain(settings, balances) { d =>
       f(
         d,
         seal(
@@ -114,7 +117,9 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
     lastUpdatedAt = Height(1),
     script = None,
     sponsorship = 0,
-    nft = false
+    nft = false,
+    1,
+    Height(1)
   )
 
   "/balance/{address}" - {
@@ -309,13 +314,29 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
     checkDetails(d, route, issue, issue.id().toString, assetDescr)
   }
 
-  routePath(s"/details/{id} - non-smart asset") in routeTest() { (d, route) =>
-    val tx = issueTransaction()
+  routePath(s"/details/{id} - non-smart asset") in routeTest(RideV6, AddrWithBalance.enoughBalances(defaultSigner)) { (d, route) =>
+    val issues = (1 to 10).map(i => (i, issueTransaction())).toMap
 
-    d.appendBlock(TxHelpers.genesis(tx.sender.toAddress))
-    d.appendBlock(tx)
+    d.appendMicroBlock(issues(1))
+    checkDetails(route, issues(1), issues(1).id().toString, assetDesc)
 
-    checkDetails(d, route, tx, tx.id().toString, assetDesc)
+    (2 to 6).foreach { i =>
+      d.appendMicroBlock(issues(i))
+      checkDetails(route, issues(i), issues(i).id().toString, assetDesc.copy(sequenceInBlock = i))
+    }
+
+    d.appendKeyBlock()
+    (1 to 6).foreach { i =>
+      checkDetails(route, issues(i), issues(i).id().toString, assetDesc.copy(sequenceInBlock = i))
+    }
+
+    d.appendBlock((7 to 10).map(issues): _*)
+    (1 to 6).foreach { i =>
+      checkDetails(route, issues(i), issues(i).id().toString, assetDesc.copy(sequenceInBlock = i))
+    }
+    (7 to 10).foreach { i =>
+      checkDetails(route, issues(i), issues(i).id().toString, assetDesc.copy(sequenceInBlock = i - 6, issueHeight = Height @@ 2))
+    }
   }
 
   routePath("/{assetId}/distribution/{height}/limit/{limit}") in routeTest() { (d, route) =>
@@ -404,7 +425,9 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
             Height(d.blockchain.height),
             script.map(s => AssetScriptInfo(s, 1L)),
             0L,
-            nft = false
+            nft = false,
+            1,
+            Height(1)
           ),
           issueTransaction.id().toString,
           responseAs[Seq[JsObject]].head
@@ -442,7 +465,8 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
                                  |  "quantity" : ${issueTx.quantity.value},
                                  |  "scripted" : false,
                                  |  "minSponsoredAssetFee" : null,
-                                 |  "originTransactionId" : "${issueTx.id()}"
+                                 |  "originTransactionId" : "${issueTx.id()}",
+                                 |  "sequenceInBlock" : 1
                                  |}
                                  |""".stripMargin)
       }
@@ -584,18 +608,22 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
 
   private def checkDetails(domain: Domain, route: Route, tx: Transaction, assetId: String, assetDesc: AssetDescription): Unit = {
     domain.liquidAndSolidAssert { () =>
-      Get(routePath(s"/details/$assetId")) ~> route ~> check {
-        val response = responseAs[JsObject]
-        checkResponse(tx, assetDesc, assetId, response)
-      }
-      Get(routePath(s"/details?id=$assetId")) ~> route ~> check {
-        val responses = responseAs[List[JsObject]]
-        responses.foreach(response => checkResponse(tx, assetDesc, assetId, response))
-      }
-      Post(routePath("/details"), Json.obj("ids" -> List(s"$assetId"))) ~> route ~> check {
-        val responses = responseAs[List[JsObject]]
-        responses.foreach(response => checkResponse(tx, assetDesc, assetId, response))
-      }
+      checkDetails(route, tx, assetId, assetDesc)
+    }
+  }
+
+  private def checkDetails(route: Route, tx: Transaction, assetId: String, assetDesc: AssetDescription): Unit = {
+    Get(routePath(s"/details/$assetId")) ~> route ~> check {
+      val response = responseAs[JsObject]
+      checkResponse(tx, assetDesc, assetId, response)
+    }
+    Get(routePath(s"/details?id=$assetId")) ~> route ~> check {
+      val responses = responseAs[List[JsObject]]
+      responses.foreach(response => checkResponse(tx, assetDesc, assetId, response))
+    }
+    Post(routePath("/details"), Json.obj("ids" -> List(s"$assetId"))) ~> route ~> check {
+      val responses = responseAs[List[JsObject]]
+      responses.foreach(response => checkResponse(tx, assetDesc, assetId, response))
     }
   }
 
@@ -610,5 +638,6 @@ class AssetsRouteSpec extends RouteSpec("/assets") with Eventually with RestAPIS
     (response \ "quantity").as[BigDecimal] shouldBe desc.totalVolume
     (response \ "minSponsoredAssetFee").asOpt[Long] shouldBe empty
     (response \ "originTransactionId").as[String] shouldBe tx.id().toString
+    (response \ "sequenceInBlock").as[Int] shouldBe desc.sequenceInBlock
   }
 }

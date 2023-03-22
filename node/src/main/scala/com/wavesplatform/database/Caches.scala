@@ -20,6 +20,7 @@ import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.ObservedLoadingCache
 import monix.reactive.Observer
 
+import scala.collection.immutable.VectorMap
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.reflect.ClassTag
@@ -165,7 +166,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       leaseBalances: Map[AddressId, LeaseBalance],
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       leaseStates: Map[ByteStr, LeaseDetails],
-      issuedAssets: Map[IssuedAsset, NewAssetInfo],
+      issuedAssets: VectorMap[IssuedAsset, NewAssetInfo],
       reissuedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
       filledQuantity: Map[ByteStr, VolumeAndFee],
       scripts: Map[AddressId, Option[AccountScriptInfo]],

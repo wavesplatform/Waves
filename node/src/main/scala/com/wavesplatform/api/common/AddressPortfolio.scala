@@ -108,7 +108,7 @@ object AddressPortfolio {
         .fold[Iterator[(IssuedAsset, Long)]](Iterator())(addressId => new AssetBalanceIterator(addressId, resource).asScala),
       includeAsset,
       diff.portfolios.getOrElse(address, Portfolio.empty).assets
-    ).asScala.filter {
-      case (asset, balance) => includeAsset(asset) && balance > 0
+    ).asScala.filter { case (asset, balance) =>
+      includeAsset(asset) && balance > 0
     }
 }
