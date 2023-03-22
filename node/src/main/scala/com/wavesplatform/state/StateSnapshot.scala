@@ -7,7 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta.Payload
 import com.wavesplatform.lang.script.ScriptReader
-import com.wavesplatform.protobuf.snapshot.{TransactionStateSnapshot, TransactionStateSnapshot as S}
+import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
 import com.wavesplatform.protobuf.{AddressExt, Amount, ByteStrExt, ByteStringExt}
 import com.wavesplatform.state.reader.LeaseDetails
@@ -17,6 +17,8 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import scala.collection.immutable.VectorMap
 
 object StateSnapshot {
+  import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot as S
+
   def fromDiff(diff: Diff): TransactionStateSnapshot = {
     val (balances, leaseBalance) =
       diff.portfolios.toSeq.map { case (address, Portfolio(wavesAmount, lease, assets)) =>
