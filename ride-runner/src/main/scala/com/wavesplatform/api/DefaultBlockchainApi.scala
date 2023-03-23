@@ -249,13 +249,16 @@ class DefaultBlockchainApi(
         decimals = x.decimals,
         reissuable = x.reissuable,
         totalVolume = x.totalVolume,
-        lastUpdatedAt = Height(1), // not used, see: https://docs.waves.tech/en/ride/structures/common-structures/asset#fields
         script = for {
           pbScript <- x.script
           script   <- toVanillaScript(pbScript.scriptBytes)
         } yield AssetScriptInfo(script, pbScript.complexity),
         sponsorship = x.sponsorship,
-        nft = false // not used, see: https://docs.waves.tech/en/ride/structures/common-structures/asset#fields
+        // All next fields are not used, see: https://docs.waves.tech/en/ride/structures/common-structures/asset#fields
+        lastUpdatedAt = Height @@ 0,
+        nft = false,
+        sequenceInBlock = 0,
+        issueHeight = Height @@ 0
       )
     }
 

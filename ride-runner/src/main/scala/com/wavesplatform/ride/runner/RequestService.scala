@@ -151,7 +151,8 @@ class DefaultRequestService(
     script.key.address,
     script.key.requestBody,
     settings.enableTraces,
-    settings.maxTxErrorLogSize
+    settings.maxTxErrorLogSize,
+    intAsString = true // TODO #110 Int as string in evaluate
   )
 }
 

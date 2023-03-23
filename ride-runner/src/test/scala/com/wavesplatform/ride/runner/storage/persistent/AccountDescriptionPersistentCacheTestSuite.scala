@@ -20,7 +20,9 @@ class AccountDescriptionPersistentCacheTestSuite extends PersistentCacheTestSuit
     lastUpdatedAt = Height(0),
     script = None,
     sponsorship = 0,
-    nft = false
+    nft = false,
+    sequenceInBlock = 0,
+    issueHeight = Height @@ 0
   )
 
   protected override def test(f: (PersistentStorage, PersistentCache[Asset.IssuedAsset, AssetDescription]) => Unit): Unit = withDb { db =>

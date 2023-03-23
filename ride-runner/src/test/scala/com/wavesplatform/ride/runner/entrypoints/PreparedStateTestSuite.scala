@@ -71,7 +71,8 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
         address = input.address,
         request = input.request,
         trace = input.trace,
-        maxTxErrorLogSize = 0
+        maxTxErrorLogSize = 0,
+        intAsString = true
       )
 
       withClue(Json.prettyPrint(apiResult)) {
@@ -104,7 +105,8 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
         address = input.address,
         request = input.request,
         trace = input.trace,
-        maxTxErrorLogSize = 0
+        maxTxErrorLogSize = 0,
+        intAsString = true
       )
 
       withClue(Json.prettyPrint(apiResult)) {

@@ -6,20 +6,8 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.protobuf.BlockMeta as PBBlockMeta
-import com.wavesplatform.database.rocksdb.{
-  AddressId,
-  Key,
-  readAccountScriptInfo,
-  readAssetDetails,
-  readAssetScript,
-  readBlockMeta,
-  writeAccountScriptInfo,
-  writeAssetDetails,
-  writeAssetScript,
-  writeBlockMeta
-}
-import com.wavesplatform.database.{readAssetStaticInfo, writeAssetStaticInfo}
+import com.wavesplatform.database.protobuf.{StaticAssetInfo, BlockMeta as PBBlockMeta}
+import com.wavesplatform.database.rocksdb.{AddressId, Key, readAccountScriptInfo, readAssetDetails, readAssetScript, readBlockMeta, writeAccountScriptInfo, writeAssetDetails, writeAssetScript, writeBlockMeta}
 import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
@@ -27,17 +15,8 @@ import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactio
 import com.wavesplatform.ride.runner.storage.persistent.AsBytes.ByteArrayOutputStreamOps
 import com.wavesplatform.ride.runner.storage.{DbKeyIndex, ScriptRequest}
 import com.wavesplatform.serialization.*
-import com.wavesplatform.state.{
-  AccountScriptInfo,
-  AssetDescription,
-  AssetInfo,
-  AssetStaticInfo,
-  AssetVolumeInfo,
-  DataEntry,
-  LeaseBalance,
-  TransactionId,
-  TxMeta
-}
+import com.wavesplatform.state
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetInfo, AssetVolumeInfo, DataEntry, LeaseBalance, TransactionId, TxMeta}
 import com.wavesplatform.transaction.serialization.impl.DataTxSerializer
 import com.wavesplatform.transaction.{Asset, EthereumTransaction, GenesisTransaction, PBSince, PaymentTransaction, Transaction, TransactionParsers}
 import play.api.libs.json.{JsObject, Json}
@@ -383,12 +362,17 @@ object CacheKeys {
   implicit val assetDescriptionAsBytes: AsBytes[AssetDescription] = new AsBytes[AssetDescription] {
     override def toByteArray(x: AssetDescription): Array[Byte] = {
       // TODO id here is empty, now it is used to optimize reads in NODE for Blockchain.resolveERC20Address
-      val staticInfo = AssetStaticInfo(TransactionId @@ x.originTransactionId, x.issuer, x.decimals, x.nft)
+      val staticInfo = StaticAssetInfo(
+        sourceId = UnsafeByteOperations.unsafeWrap(x.originTransactionId.arr),
+        issuerPublicKey = UnsafeByteOperations.unsafeWrap(x.issuer.arr),
+        decimals = x.decimals,
+        isNft = x.nft
+      )
       val assetInfo  = AssetInfo(x.name, x.description, x.lastUpdatedAt)
       val volumeInfo = AssetVolumeInfo(x.reissuable, x.totalVolume)
 
       val r = new ByteArrayOutputStream()
-        .writeWithLen(writeAssetStaticInfo(staticInfo))
+        .writeWithLen(StaticAssetInfo.toByteArray(staticInfo))
         .writeWithLen(writeAssetDetails((assetInfo, volumeInfo)))
         .writeLong(x.sponsorship)
         .writeBool(x.script.nonEmpty)
@@ -401,7 +385,7 @@ object CacheKeys {
       val bb = ByteBuffer.wrap(xs)
 
       val staticInfoLen = bb.getInt
-      val staticInfo    = readAssetStaticInfo(bb.getByteArray(staticInfoLen))
+      val staticInfo    = StaticAssetInfo.parseFrom(bb.getByteArray(staticInfoLen))
 
       val detailsLen              = bb.getInt
       val (assetInfo, volumeInfo) = readAssetDetails(bb.getByteArray(detailsLen))
@@ -418,8 +402,8 @@ object CacheKeys {
       }
 
       val r = AssetDescription(
-        staticInfo.source,
-        staticInfo.issuer,
+        staticInfo.sourceId.toByteStr,
+        staticInfo.issuerPublicKey.toPublicKey,
         assetInfo.name,
         assetInfo.description,
         staticInfo.decimals,
@@ -428,7 +412,9 @@ object CacheKeys {
         assetInfo.lastUpdatedAt,
         script,
         sponsorship,
-        staticInfo.nft
+        staticInfo.isNft,
+        staticInfo.sequenceInBlock,
+        state.Height @@ staticInfo.height
       )
       (r, Ints.BYTES + staticInfoLen + Ints.BYTES + detailsLen + Longs.BYTES + scriptLen)
     }

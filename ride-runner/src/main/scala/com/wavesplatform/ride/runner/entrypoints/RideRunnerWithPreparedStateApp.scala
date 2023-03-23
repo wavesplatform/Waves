@@ -28,7 +28,8 @@ object RideRunnerWithPreparedStateApp {
       address = input.address,
       request = input.request,
       trace = input.trace,
-      maxTxErrorLogSize = globalSettings.rideRunner.requestsService.maxTxErrorLogSize
+      maxTxErrorLogSize = globalSettings.rideRunner.requestsService.maxTxErrorLogSize,
+      intAsString = true // TODO #110 Int as string in evaluate
     )
 
     println(Json.prettyPrint(apiResult))

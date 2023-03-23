@@ -1916,7 +1916,6 @@ paths:
           text/plain:
             schema:
               type: string
-        required: true
       responses:
         '200':
           description: successful operation
@@ -1941,7 +1940,6 @@ paths:
           text/plain:
             schema:
               type: string
-        required: true
       responses:
         '200':
           description: successful operation
@@ -3270,6 +3268,8 @@ components:
               type: boolean
             scripted:
               type: boolean
+            sequenceInBlock:
+              type: integer
             minSponsoredAssetFee:
               type: integer
               format: int64

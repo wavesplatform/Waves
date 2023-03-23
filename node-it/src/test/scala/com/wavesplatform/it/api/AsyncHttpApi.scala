@@ -5,7 +5,7 @@ import java.net.{InetSocketAddress, URLEncoder}
 import java.util.concurrent.TimeoutException
 import java.util.{NoSuchElementException, UUID}
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
+import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair, SeedKeyPair}
 import com.wavesplatform.api.http.DebugMessage.*
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.{IssueRequest, TransferRequest}
@@ -31,7 +31,18 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeExpressionTransaction, InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, Proofs, TxDecimals, TxExchangeAmount, TxExchangePrice, TxNonNegativeAmount, TxPositiveAmount, TxVersion}
+import com.wavesplatform.transaction.{
+  Asset,
+  CreateAliasTransaction,
+  DataTransaction,
+  Proofs,
+  TxDecimals,
+  TxExchangeAmount,
+  TxExchangePrice,
+  TxNonNegativeAmount,
+  TxPositiveAmount,
+  TxVersion
+}
 import org.asynchttpclient.*
 import org.asynchttpclient.Dsl.{delete as _delete, get as _get, post as _post, put as _put}
 import org.asynchttpclient.util.HttpConstants.ResponseStatusCodes.OK_200
@@ -822,7 +833,7 @@ object AsyncHttpApi extends Assertions {
         })
     }
 
-    def createKeyPair(): Future[KeyPair] = Future.successful(n.generateKeyPair())
+    def createKeyPair(): Future[SeedKeyPair] = Future.successful(n.generateKeyPair())
 
     def createKeyPairServerSide(): Future[KeyPair] =
       for {

@@ -99,13 +99,16 @@ class ImmutableBlockchain(override val settings: BlockchainSettings, input: Ride
       decimals = info.decimals,
       reissuable = info.reissuable,
       totalVolume = info.quantity,
-      lastUpdatedAt = Height(1),
       script = info.script.map { script =>
         val complexityInfo = complexityInfoOf(isAsset = true, script)
         AssetScriptInfo(script, complexityInfo.verifierComplexity)
       },
       sponsorship = info.minSponsoredAssetFee,
-      nft = this.isFeatureActivated(BlockchainFeatures.ReduceNFTFee) && info.quantity == 1 && info.decimals == 0 && !info.reissuable
+      // All next fields are not used, see: https://docs.waves.tech/en/ride/structures/common-structures/asset#fields
+      lastUpdatedAt = Height @@ 0,
+      nft = false,
+      sequenceInBlock = 0,
+      issueHeight = Height @@ 0
     )
   }
 

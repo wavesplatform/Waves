@@ -49,12 +49,15 @@ object AssetStorage {
     decimals = update.decimals,
     reissuable = update.reissuable,
     totalVolume = update.volume,
-    lastUpdatedAt = Height(update.lastUpdated),
     script = for {
       pbScript <- update.scriptInfo
       script   <- toVanillaScript(pbScript.script)
     } yield AssetScriptInfo(script, pbScript.complexity),
     sponsorship = update.sponsorship,
-    nft = update.nft
+    // All next fields are not used, see: https://docs.waves.tech/en/ride/structures/common-structures/asset#fields
+    lastUpdatedAt = Height @@ 0,
+    nft = false,
+    sequenceInBlock = 0,
+    issueHeight = Height @@ 1
   )
 }

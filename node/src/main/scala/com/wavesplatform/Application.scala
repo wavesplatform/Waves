@@ -3,8 +3,8 @@ package com.wavesplatform
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
+import cats.Eq
 import cats.instances.bigInt.*
-import cats.instances.int.*
 import cats.syntax.option.*
 import com.typesafe.config.*
 import com.wavesplatform.account.{Address, AddressScheme}
@@ -302,7 +302,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     TransactionSynchronizer(
       settings.synchronizationSettings.utxSynchronizer,
-      lastBlockInfo.map(_.height).distinctUntilChanged,
+      lastBlockInfo.map(_.id).distinctUntilChanged(Eq.fromUniversalEquals),
       transactions,
       transactionPublisher
     )
