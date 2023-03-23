@@ -1,9 +1,9 @@
 package com.wavesplatform.lang.directives.values
-import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveKey}
+import com.wavesplatform.lang.directives.DirectiveDictionary
 
 sealed abstract class StdLibVersion(id: Int) extends DirectiveValue(id.toString, id) with Product with Serializable with Ordered[StdLibVersion] {
   override val value: Any = id
-  override def key: DirectiveKey = resolveKey[StdLibVersion]
+  override def key        = resolveKey[StdLibVersion]
 
   override def compare(that: StdLibVersion): Int = id compare that.id
 }
