@@ -57,7 +57,8 @@ object TestBlock {
       signer: KeyPair = defaultSigner,
       version: Byte = 2,
       features: Seq[Short] = Seq.empty[Short],
-      rewardVote: Long = -1L
+      rewardVote: Long = -1L,
+      baseTarget: Long = 2L
   ): Block =
     sign(
       signer,
@@ -65,7 +66,7 @@ object TestBlock {
         timestamp = time,
         version = version,
         reference = ref,
-        baseTarget = 2L,
+        baseTarget = baseTarget,
         generationSignature =
           if (version < Block.ProtoBlockVersion) ByteStr(Array.fill(Block.GenerationSignatureLength)(0: Byte))
           else ByteStr(Array.fill(Block.GenerationVRFSignatureLength)(0: Byte)),
