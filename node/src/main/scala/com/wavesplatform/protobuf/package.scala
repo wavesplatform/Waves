@@ -4,6 +4,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.transaction.PBRecipients
+import com.wavesplatform.transaction.Asset.IssuedAsset
 
 package object protobuf {
   implicit class ByteStrExt(val bs: ByteStr) extends AnyVal {
@@ -16,6 +17,7 @@ package object protobuf {
 
   implicit class ByteStringExt(val bs: ByteString) extends AnyVal {
     def toByteStr: ByteStr     = ByteStr(bs.toByteArray)
+    def toAssetId: IssuedAsset = IssuedAsset(ByteStr(bs.toByteArray))
     def toPublicKey: PublicKey = PublicKey(bs.toByteArray)
     def toAddress: Address =
       PBRecipients

@@ -109,18 +109,18 @@ object StateSnapshot {
       s.balances.map { b =>
         val portfolio =
           if (b.getAmount.assetId.isEmpty) Portfolio.waves(b.getAmount.amount)
-          else Portfolio.build(IssuedAsset(b.getAmount.assetId.toByteStr), b.getAmount.amount)
+          else Portfolio.build(b.getAmount.assetId.toAssetId, b.getAmount.amount)
         b.address.toAddress -> portfolio
       }.toMap
     val leaseBalances = s.leaseBalances.map(b => b.address.toAddress -> Portfolio(lease = LeaseBalance(in = b.in, out = b.out))).toMap
-    val assetVolumes  = s.assetVolumes.map(v => IssuedAsset(v.assetId.toByteStr) -> AssetVolumeInfo(v.reissuable, BigInt(v.volume.toByteArray))).toMap
+    val assetVolumes  = s.assetVolumes.map(v => v.assetId.toAssetId -> AssetVolumeInfo(v.reissuable, BigInt(v.volume.toByteArray))).toMap
     val assetDynamics =
-      s.assetNamesAndDescriptions.map(a => IssuedAsset(a.assetId.toByteStr) -> AssetInfo(a.name, a.description, Height @@ a.lastUpdated)).toMap
+      s.assetNamesAndDescriptions.map(a => a.assetId.toAssetId -> AssetInfo(a.name, a.description, Height @@ a.lastUpdated)).toMap
     val issuedAssets =
       VectorMap[IssuedAsset, NewAssetInfo]() ++ s.assetStatics.map { s =>
         val static = AssetStaticInfo(TransactionId @@ s.sourceTransactionId.toByteStr, PublicKey @@ s.issuer.toByteStr, s.decimals, s.nft)
-        val asset  = IssuedAsset(s.assetId.toByteStr)
-        asset -> NewAssetInfo(static, assetDynamics(asset), assetVolumes(asset))
+        val asset  = s.assetId.toAssetId
+        s.assetId.toAssetId -> NewAssetInfo(static, assetDynamics(asset), assetVolumes(asset))
       }
     val updatedAssets =
       (assetVolumes.keySet ++ assetDynamics.keySet)
@@ -172,15 +172,13 @@ object StateSnapshot {
         )
         .toMap,
       s.assetScripts
-        .map(info =>
-          IssuedAsset(info.assetId.toByteStr) -> Some(AssetScriptInfo(ScriptReader.fromBytes(info.script.toByteArray).explicitGet(), info.complexity))
-        )
+        .map(info => info.assetId.toAssetId -> Some(AssetScriptInfo(ScriptReader.fromBytes(info.script.toByteArray).explicitGet(), info.complexity)))
         .toMap,
       s.accountData
         .map(data => data.address.toAddress -> AccountDataInfo(data.entry.map(e => e.key -> PBTransactions.toVanillaDataEntry(e)).toMap))
         .toMap,
       s.sponsorships
-        .map(data => IssuedAsset(data.assetId.toByteStr) -> (if (data.minFee == 0) SponsorshipNoInfo else SponsorshipValue(data.minFee)))
+        .map(data => data.assetId.toAssetId -> (if (data.minFee == 0) SponsorshipNoInfo else SponsorshipValue(data.minFee)))
         .toMap,
       scriptsRun = 0,
       s.totalComplexity,
