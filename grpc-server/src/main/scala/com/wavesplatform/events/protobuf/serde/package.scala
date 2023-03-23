@@ -5,10 +5,10 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.events.StateUpdate.AssetInfo
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.{Append, Rollback, Update}
-import com.wavesplatform.protobuf._
+import com.wavesplatform.protobuf.*
 import com.wavesplatform.protobuf.block.{PBBlocks, PBMicroBlocks}
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.{events => ve}
+import com.wavesplatform.events as ve
 
 import scala.util.{Failure, Try}
 
@@ -16,19 +16,21 @@ package object serde {
 
   implicit class BlockchainUpdatedProtobuf(val self: ve.BlockchainUpdated) extends AnyVal {
 
-    import BlockchainUpdatedProtobuf._
+    import BlockchainUpdatedProtobuf.*
 
     def protobuf: BlockchainUpdated =
       self match {
         case ve.BlockAppended(
-            id,
-            height,
-            block,
-            updatedWavesAmount,
-            blockStateUpdate,
-            transactionStateUpdates,
-            transactionsMetadata,
-            referencedAssets
+              id,
+              height,
+              block,
+              updatedWavesAmount,
+              vrf,
+              activatedFeatures,
+              blockStateUpdate,
+              transactionStateUpdates,
+              transactionsMetadata,
+              referencedAssets
             ) =>
           val blockUpdate = Some(blockStateUpdate).filterNot(_.isEmpty).map(_.protobuf)
           val txsUpdates  = transactionStateUpdates.map(_.protobuf)
@@ -45,7 +47,9 @@ package object serde {
                 body = Append.Body.Block(
                   Append.BlockAppend(
                     block = Some(PBBlocks.protobuf(block)),
-                    updatedWavesAmount = updatedWavesAmount
+                    updatedWavesAmount = updatedWavesAmount,
+                    activatedFeatures = activatedFeatures,
+                    vrf = vrf.fold(ByteString.EMPTY)(_.toByteString)
                   )
                 )
               )
@@ -54,14 +58,14 @@ package object serde {
           )
 
         case ve.MicroBlockAppended(
-            totalBlockId,
-            height,
-            microBlock,
-            microBlockStateUpdate,
-            transactionStateUpdates,
-            transactionsMetadata,
-            totalTransactionsRoot,
-            referencedAssets
+              totalBlockId,
+              height,
+              microBlock,
+              microBlockStateUpdate,
+              transactionStateUpdates,
+              transactionsMetadata,
+              totalTransactionsRoot,
+              referencedAssets
             ) =>
           val microBlockUpdate = Some(microBlockStateUpdate).filterNot(_.isEmpty).map(_.protobuf)
           val txsUpdates       = transactionStateUpdates.map(_.protobuf)
@@ -94,7 +98,8 @@ package object serde {
                 Rollback.RollbackType.BLOCK,
                 result.removedTransactionIds.map(_.toByteString),
                 result.removedBlocks.map(PBBlocks.protobuf),
-                Some(result.stateUpdate.protobuf)
+                Some(result.stateUpdate.protobuf),
+                result.deactivatedFeatures
               )
             ),
             referencedAssets = referencedAssets.map(AssetInfo.toPB)
@@ -131,6 +136,8 @@ package object serde {
                 height = self.height,
                 block = body.block.map(PBBlocks.vanilla(_, unsafe = true).get).orNull,
                 updatedWavesAmount = body.updatedWavesAmount,
+                vrf = Option.unless(body.vrf.isEmpty)(body.vrf.toByteStr),
+                activatedFeatures = body.activatedFeatures,
                 blockStateUpdate = append.stateUpdate.fold(Monoid[ve.StateUpdate].empty)(_.vanilla.get),
                 transactionStateUpdates = append.transactionStateUpdates.map(_.vanilla.get),
                 transactionMetadata = append.transactionsMetadata,

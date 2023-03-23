@@ -683,7 +683,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       maxEntryCount: Int,
       useForScript: Boolean = false,
       withDeleteEntry: Boolean = false,
-      sender: Option[KeyPair] = None
+      sender: Option[SeedKeyPair] = None
   ): Gen[DataTransaction] =
     (for {
       timestamp <- timestampGen

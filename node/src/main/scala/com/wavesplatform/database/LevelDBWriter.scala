@@ -1,13 +1,12 @@
 package com.wavesplatform.database
 
-import java.util
-
 import cats.data.Ior
 import cats.syntax.option.*
 import cats.syntax.semigroup.*
 import com.google.common.cache.CacheBuilder
 import com.google.common.collect.MultimapBuilder
 import com.google.common.primitives.{Bytes, Ints}
+import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
@@ -16,7 +15,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.*
 import com.wavesplatform.database
 import com.wavesplatform.database.patch.DisableHijackedAliases
-import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, TransactionMeta}
+import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, StaticAssetInfo, TransactionMeta}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.PBAmounts
@@ -37,7 +36,9 @@ import monix.reactive.Observer
 import org.iq80.leveldb.DB
 import org.slf4j.LoggerFactory
 
+import java.util
 import scala.annotation.tailrec
+import scala.collection.immutable.VectorMap
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
@@ -262,11 +263,6 @@ abstract class LevelDBWriter private[database] (
     addressId(address).fold(LeaseBalance.empty)(loadLeaseBalance(db, _))
   }
 
-  private[database] def loadLposPortfolio(db: ReadOnlyDB, addressId: AddressId) = Portfolio(
-    db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId)).getOrElse(0L),
-    loadLeaseBalance(db, addressId)
-  )
-
   override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] =
     writableDB.withResource(r => database.loadAssetDescription(r, asset))
 
@@ -368,7 +364,7 @@ abstract class LevelDBWriter private[database] (
       leaseBalances: Map[AddressId, LeaseBalance],
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       leaseStates: Map[ByteStr, LeaseDetails],
-      issuedAssets: Map[IssuedAsset, NewAssetInfo],
+      issuedAssets: VectorMap[IssuedAsset, NewAssetInfo],
       updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
       filledQuantity: Map[ByteStr, VolumeAndFee],
       scripts: Map[AddressId, Option[AccountScriptInfo]],
@@ -439,8 +435,16 @@ abstract class LevelDBWriter private[database] (
         expiredKeys ++= updateHistory(rw, Keys.filledVolumeAndFeeHistory(orderId), threshold, Keys.filledVolumeAndFee(orderId))
       }
 
-      for ((asset, NewAssetInfo(staticInfo, info, volumeInfo)) <- issuedAssets) {
-        rw.put(Keys.assetStaticInfo(asset), staticInfo.some)
+      for (((asset, NewAssetInfo(staticInfo, info, volumeInfo)), assetNum) <- issuedAssets.zipWithIndex) {
+        val pbStaticInfo = StaticAssetInfo(
+          ByteString.copyFrom(staticInfo.source.arr),
+          ByteString.copyFrom(staticInfo.issuer.arr),
+          staticInfo.decimals,
+          staticInfo.nft,
+          assetNum + 1,
+          height
+        )
+        rw.put(Keys.assetStaticInfo(asset), Some(pbStaticInfo))
         rw.put(Keys.assetDetails(asset)(height), (info, volumeInfo))
       }
 
@@ -535,10 +539,13 @@ abstract class LevelDBWriter private[database] (
         rw.put(Keys.wavesAmount(height), wavesAmount(height - 1) + lastReward)
       }
 
-      for (case (asset, sp: SponsorshipValue) <- sponsorship) {
-        rw.put(Keys.sponsorship(asset)(height), sp)
-        expiredKeys ++= updateHistory(rw, Keys.sponsorshipHistory(asset), threshold, Keys.sponsorship(asset))
-      }
+      for (case sp <- sponsorship)
+        sp match {
+          case (asset, value: SponsorshipValue) =>
+            rw.put(Keys.sponsorship(asset)(height), value)
+            expiredKeys ++= updateHistory(rw, Keys.sponsorshipHistory(asset), threshold, Keys.sponsorship(asset))
+          case _ =>
+        }
 
       rw.put(Keys.issuedAssets(height), issuedAssets.keySet.toSeq)
       rw.put(Keys.updatedAssets(height), updatedAssets.keySet.toSeq)

@@ -4,17 +4,7 @@ import com.wavesplatform.JsTestBase
 import com.wavesplatform.lang.directives.values.V3
 import testHelpers.GeneratorContractsForBuiltInFunctions
 import testHelpers.RandomDataGenerator.{dataEntryForTests, randomBoolean, randomInt, randomStringArrayElement}
-import testHelpers.TestDataConstantsAndMethods.{
-  CANT_FIND_A_FUNCTION_OVERLOAD,
-  GreaterV3ResultBinaryEntry,
-  actualVersions,
-  actualVersionsWithoutV3,
-  binaryEntryForTests,
-  booleanEntryForTests,
-  integerEntryForTests,
-  rideV3Result,
-  stringEntryForTests
-}
+import testHelpers.TestDataConstantsAndMethods.*
 import utest.{Tests, test}
 
 object GetBinary extends JsTestBase {

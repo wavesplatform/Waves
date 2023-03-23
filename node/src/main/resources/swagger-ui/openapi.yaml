@@ -1852,6 +1852,23 @@ paths:
                       type:
                         type: string
                       value: { }
+                  complexity:
+                    type: integer
+                    format: int64
+                  stateChanges:
+                    $ref: '#/components/schemas/StateChanges'
+                  vars:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        type:
+                          type: string
+                        value: { }
+                        error:
+                          type: string
         '400':
           description: Conflicting request structure
           content:
@@ -1899,7 +1916,6 @@ paths:
           text/plain:
             schema:
               type: string
-        required: true
       responses:
         '200':
           description: successful operation
@@ -1924,7 +1940,6 @@ paths:
           text/plain:
             schema:
               type: string
-        required: true
       responses:
         '200':
           description: successful operation
@@ -3253,6 +3268,8 @@ components:
               type: boolean
             scripted:
               type: boolean
+            sequenceInBlock:
+              type: integer
             minSponsoredAssetFee:
               type: integer
               format: int64

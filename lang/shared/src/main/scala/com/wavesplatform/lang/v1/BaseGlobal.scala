@@ -1,32 +1,33 @@
 package com.wavesplatform.lang.v1
 
-import scala.annotation.tailrec
-import scala.util.Random
-
 import cats.syntax.either.*
 import com.wavesplatform.lang.ValidationError.ScriptParseError
-import com.wavesplatform.lang.contract.meta.{FunctionSignatures, MetaMapper, ParsedMeta}
 import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.meta.{FunctionSignatures, MetaMapper, ParsedMeta}
 import com.wavesplatform.lang.contract.serialization.{ContractSerDeV1, ContractSerDeV2}
 import com.wavesplatform.lang.directives.values.{Account, Call, Expression, ScriptType, StdLibVersion, V1, V2, V6, DApp as DAppType}
-import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.BaseGlobal.{ArrayView, DAppInfo}
-import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext, ContractCompiler, ExpressionCompiler}
 import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.ScriptResultSource.CallableFunction
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.Types.FINAL
-import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
+import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext, ContractCompiler, ExpressionCompiler}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v3.DAppEstimation
+import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.Rounding.*
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.serialization.{SerdeV1, SerdeV2}
+
+import scala.annotation.tailrec
+import scala.util.Random
 
 /** This is a hack class for IDEA. The Global class is in JS/JVM modules. And IDEA can't find the Global class in the "shared" module, but it should!
   */
@@ -135,15 +136,21 @@ trait BaseGlobal {
       needCompaction: Boolean,
       removeUnusedCode: Boolean
   ): Either[String, (Array[Byte], (Long, Map[String, Long]), Expressions.DAPP, Iterable[CompilationError])] = {
-    (for {
+    val result = for {
       compRes <- ContractCompiler.compileWithParseResult(input, offset, ctx, stdLibVersion, needCompaction, removeUnusedCode)
       (compDAppOpt, exprDApp, compErrorList) = compRes
       complexityWithMap <-
         if (compDAppOpt.nonEmpty && compErrorList.isEmpty)
-          ContractScript.estimateComplexity(stdLibVersion, compDAppOpt.get, estimator, fixEstimateOfVerifier = true).leftMap((_, 0, 0))
+          ContractScript
+            .estimateFully(stdLibVersion, compDAppOpt.get, estimator)
+            .map(de => (de.maxAnnotatedComplexity._2, de.annotatedComplexities))
+            .leftMap((_, 0, 0))
         else Right((0L, Map.empty[String, Long]))
-      bytes <- if (compDAppOpt.nonEmpty && compErrorList.isEmpty) serializeContract(compDAppOpt.get, stdLibVersion).leftMap((_, 0, 0)) else Right(Array.empty[Byte])
-    } yield (bytes, complexityWithMap, exprDApp, compErrorList))
+      bytes <-
+        if (compDAppOpt.nonEmpty && compErrorList.isEmpty) serializeContract(compDAppOpt.get, stdLibVersion).leftMap((_, 0, 0))
+        else Right(Array.empty[Byte])
+    } yield (bytes, complexityWithMap, exprDApp, compErrorList)
+    result
       .recover { case (e, start, end) =>
         (Array.empty[Byte], (0L, Map.empty[String, Long]), Expressions.DAPP(AnyPos, List.empty, List.empty), List(Generic(start, end, e)))
       }
@@ -203,31 +210,29 @@ trait BaseGlobal {
   def compileContract(
       input: String,
       ctx: CompilerContext,
-      stdLibVersion: StdLibVersion,
+      version: StdLibVersion,
       estimator: ScriptEstimator,
       needCompaction: Boolean,
       removeUnusedCode: Boolean
   ): Either[String, DAppInfo] =
     for {
-      dApp                       <- ContractCompiler.compile(input, ctx, stdLibVersion, CallableFunction, needCompaction, removeUnusedCode)
-      bytes                      <- serializeContract(dApp, stdLibVersion)
-      _                          <- ContractScript.validateBytes(bytes)
-      userFunctionComplexities   <- ContractScript.estimateUserFunctions(stdLibVersion, dApp, estimator)
-      globalVariableComplexities <- ContractScript.estimateGlobalVariables(stdLibVersion, dApp, estimator)
-      (maxComplexity, annotatedComplexities) <- ContractScript.estimateComplexityExact(stdLibVersion, dApp, estimator, fixEstimateOfVerifier = true)
-      _ <- ContractScript.checkComplexity(stdLibVersion, dApp, maxComplexity, annotatedComplexities, useReducedVerifierLimit = true)
+      dApp  <- ContractCompiler.compile(input, ctx, version, CallableFunction, needCompaction, removeUnusedCode)
+      bytes <- serializeContract(dApp, version)
+      _     <- ContractScript.validateBytes(bytes)
+      de @ DAppEstimation(annotatedComplexities, globalLetsCosts, globalFunctionsCosts) <- ContractScript.estimateFully(version, dApp, estimator)
+      _ <- ContractScript.checkComplexity(version, dApp, de.maxAnnotatedComplexity, annotatedComplexities, useReducedVerifierLimit = true)
       (verifierComplexity, callableComplexities) = dApp.verifierFuncOpt.fold(
         (0L, annotatedComplexities)
       )(v => (annotatedComplexities(v.u.name), annotatedComplexities - v.u.name))
     } yield DAppInfo(
       bytes,
       dApp,
-      maxComplexity,
+      de.maxAnnotatedComplexity,
       annotatedComplexities,
       verifierComplexity,
       callableComplexities,
-      userFunctionComplexities.toMap,
-      globalVariableComplexities.toMap
+      globalFunctionsCosts,
+      globalLetsCosts
     )
 
   def checkContract(
