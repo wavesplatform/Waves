@@ -976,7 +976,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
     eval[CONST_BOOLEAN](
       defaultFullContext.evaluationContext(environment),
-      FUNCTION_CALL(FunctionHeader.Native(EQ), List(term, REF("unit")))
+      FUNCTION_CALL(FunctionHeader.Native(EQ), List(term, REF(GlobalValNames.Unit)))
     ) shouldBe evaluated(false)
   }
 
@@ -1112,7 +1112,7 @@ class EvaluatorV1V2Test extends PropSpec with EitherValues {
 
     evalToBytes(toBytesBoolean, TRUE) shouldBe evaluated(ByteStr.fromBytes(1))
     evalToBytes(toBytesBoolean, FALSE) shouldBe evaluated(ByteStr.fromBytes(0))
-    evalToBytes(toStringBoolean, REF("unit")) should produce("Can't apply (CaseObj) to 'toString(b: Boolean)'")
+    evalToBytes(toStringBoolean, REF(GlobalValNames.Unit)) should produce("Can't apply (CaseObj) to 'toString(b: Boolean)'")
 
     forAll(Gen.choose(Long.MinValue, Long.MaxValue), Gen.alphaNumStr) { (n, s) =>
       evalToBytes(toBytesLong, CONST_LONG(n)) shouldBe evaluated(ByteStr(ByteBuffer.allocate(8).putLong(n).array))
