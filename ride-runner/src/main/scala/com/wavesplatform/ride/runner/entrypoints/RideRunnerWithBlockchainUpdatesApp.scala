@@ -2,15 +2,18 @@ package com.wavesplatform.ride.runner.entrypoints
 
 import akka.actor.ActorSystem
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
-import com.wavesplatform.ride.runner.DefaultRequestService
+import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.ride.runner.db.RideDb
 import com.wavesplatform.ride.runner.stats.RideRunnerStats
 import com.wavesplatform.ride.runner.storage.persistent.{DefaultPersistentCaches, PersistentStorage}
 import com.wavesplatform.ride.runner.storage.{RequestsStorage, ScriptRequest, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.{BlockchainProcessor, BlockchainState, DefaultRequestService}
+import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.ManagedChannel
 import io.netty.util.concurrent.DefaultThreadFactory
 import kamon.instrumentation.executor.ExecutorInstrumentation
+import monix.eval.Task
 import monix.execution.{ExecutionModel, Scheduler}
 import play.api.libs.json.Json
 import sttp.client3.HttpURLConnectionBackend
@@ -122,6 +125,9 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
       SharedBlockchainStorage[ScriptRequest](settings.rideRunner.sharedBlockchain, storage, dbCaches, blockchainApi)
     }
 
+    val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
+    log.info(s"Current height: shared (local or network)=${sharedBlockchain.height}, network=$lastHeightAtStart")
+
     val requestsService = new DefaultRequestService(
       settings.rideRunner.requestsService,
       storage,
@@ -136,7 +142,44 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
 
     // TODO #100 Fix App with BlockchainUpdates
     // log.info("Warming up caches...") // Helps to figure out, which data is used by a script
-    Await.result(requestsService.trackAndRun(scripts.head).runToFuture(rideScheduler), Duration.Inf)
+    // Await.result(requestsService.runAll().runToFuture(rideScheduler), Duration.Inf)
+
+    // TODO #100 Settings?
+    val lastSafeKnownHeight = Height(math.max(1, sharedBlockchain.height - 100 - 1)) // A rollback is not possible
+    val workingHeight       = Height(math.max(sharedBlockchain.height, lastHeightAtStart))
+    val endHeight           = Height(workingHeight + 1)       // 101 // lastHeightAtStart
+
+    log.info(s"Watching blockchain updates...")
+    val blockchainUpdates = blockchainApi.mkBlockchainUpdatesStream(blockchainEventsStreamScheduler)
+    cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream) {
+      blockchainUpdates.close()
+    }
+
+    val processor = new BlockchainProcessor(sharedBlockchain, requestsService)
+    val events = blockchainUpdates.downstream
+      .doOnError(e =>
+        Task {
+          log.error("Error!", e)
+        }
+      )
+      .takeWhile {
+        case WrappedEvent.Next(_) => true
+        case WrappedEvent.Closed =>
+          log.info("Blockchain stream closed")
+          false
+        case WrappedEvent.Failed(error) =>
+          log.error("Blockchain stream failed", error)
+          false
+      }
+      .collect { case WrappedEvent.Next(event) => event }
+      .scanEval(Task.now[BlockchainState](BlockchainState.Starting(lastSafeKnownHeight, workingHeight)))(BlockchainState(processor, _, _))
+      .lastL
+      .runToFuture(blockchainEventsStreamScheduler)
+
+    blockchainUpdates.start(lastSafeKnownHeight + 1, endHeight)
+
+    log.info("Initialization completed")
+    Await.result(events, Duration.Inf)
 
     log.info("Done")
     cs.forceStop()

@@ -47,7 +47,6 @@ class SharedBlockchainStorage[TagT] private (
 
   // Ride: wavesBalance, height, lastBlock
   def height: Int = blockHeaders.latestHeight.getOrElse(blockchainApi.getCurrentBlockchainHeight())
-  val taggedHeight = new HeightTagsStorage[TagT](height)
 
   def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] =
     storage.readWrite { implicit ctx =>
