@@ -18,6 +18,7 @@ import scala.collection.immutable.VectorMap
 
 object StateSnapshot {
   import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot as S
+  private val lastEstimator = 3
 
   def fromDiff(diff: Diff): TransactionStateSnapshot = {
     val (balances, leaseBalance) =
@@ -73,7 +74,7 @@ object StateSnapshot {
           address.toByteString,
           scriptOpt.fold(ByteString.EMPTY)(_.script.bytes().toByteString),
           scriptOpt.fold(0L)(_.verifierComplexity),
-          scriptOpt.fold(Map[String, Long]())(_.complexitiesByEstimator(3))
+          scriptOpt.fold(Map[String, Long]())(_.complexitiesByEstimator(lastEstimator))
         )
       }.toSeq,
       diff.accountData.map { case (address, data) =>
@@ -84,7 +85,7 @@ object StateSnapshot {
           case SponsorshipValue(minFee) => minFee
           case SponsorshipNoInfo        => 0
         }
-        S.Sponsorship(asset.fold(ByteString.EMPTY)(_.id.toByteString), minFee)
+        S.Sponsorship(asset.id.toByteString, minFee)
       }.toSeq,
       diff.scriptResults.map { case (txId, script) =>
         S.ScriptResult(txId.toByteString, Some(InvokeScriptResult.toPB(script, addressForTransfer = true)))
@@ -150,30 +151,41 @@ object StateSnapshot {
               PBRecipients.toAddressOrAlias(ls.getRecipient, AddressScheme.current.chainId).explicitGet(),
               ls.amount,
               ls.status match {
-                case S.LeaseState.Status.Cancelled(c) => LeaseDetails.Status.Cancelled(c.height, Some(c.transactionId.toByteStr))
-                case S.LeaseState.Status.Active(_)    => LeaseDetails.Status.Active
-                case _                                => ???
+                case S.LeaseState.Status.Cancelled(c) =>
+                  LeaseDetails.Status.Cancelled(c.height, if (c.transactionId.isEmpty) None else Some(c.transactionId.toByteStr))
+                case S.LeaseState.Status.Active(_) =>
+                  LeaseDetails.Status.Active
+                case _ =>
+                  ???
               },
               ls.originTransactionId.toByteStr,
               ls.height
             )
         )
         .toMap,
-      s.accountScripts
-        .map(info =>
-          info.senderPublicKey.toPublicKey.toAddress -> Some(
-            AccountScriptInfo(
-              info.senderPublicKey.toPublicKey,
-              ScriptReader.fromBytes(info.script.toByteArray).explicitGet(),
-              info.verifierComplexity,
-              Map(3 -> info.callableComplexities)
+      s.accountScripts.map { pbInfo =>
+        val info =
+          if (pbInfo.script.isEmpty)
+            None
+          else
+            Some(
+              AccountScriptInfo(
+                pbInfo.senderPublicKey.toPublicKey,
+                ScriptReader.fromBytes(pbInfo.script.toByteArray).explicitGet(),
+                pbInfo.verifierComplexity,
+                Map(lastEstimator -> pbInfo.callableComplexities)
+              )
             )
-          )
-        )
-        .toMap,
-      s.assetScripts
-        .map(info => info.assetId.toAssetId -> Some(AssetScriptInfo(ScriptReader.fromBytes(info.script.toByteArray).explicitGet(), info.complexity)))
-        .toMap,
+        pbInfo.senderPublicKey.toPublicKey.toAddress -> info
+      }.toMap,
+      s.assetScripts.map { pbInfo =>
+        val info =
+          if (pbInfo.script.isEmpty)
+            None
+          else
+            Some(AssetScriptInfo(ScriptReader.fromBytes(pbInfo.script.toByteArray).explicitGet(), pbInfo.complexity))
+        pbInfo.assetId.toAssetId -> info
+      }.toMap,
       s.accountData
         .map(data => data.address.toAddress -> AccountDataInfo(data.entry.map(e => e.key -> PBTransactions.toVanillaDataEntry(e)).toMap))
         .toMap,
