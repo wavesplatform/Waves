@@ -13,6 +13,7 @@ import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.state.StateSnapshotOps.{DiffOps, TransactionStateSnapshotOps}
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -152,8 +153,44 @@ case class Diff private (
     scriptsComplexity: Long,
     scriptResults: Map[ByteStr, InvokeScriptResult],
     ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta],
-    transactionFilter: Option[BloomFilter[Array[Byte]]]
+    transactionFilter: Option[BloomFilter[Array[Byte]]],
+    check: Boolean
 ) {
+  lazy val snapshot = this.toSnapshot
+  lazy val rDiff    = snapshot.toDiff
+  lazy val eDiff = {
+    val compactedAssets =
+      issuedAssets.map { case (asset, info) =>
+        asset -> info.copy(volume = info.volume |+| updatedAssets.get(asset).flatMap(_.right).getOrElse(AssetVolumeInfo(true, 0)))
+      }
+    val filteredUpdatedAssets = updatedAssets.flatMap { case (asset, value) =>
+      val newValue = value match {
+        case Ior.Right(_) if issuedAssets.contains(asset)   => None
+        case Ior.Both(a, _) if issuedAssets.contains(asset) => Some(Ior.Left(a))
+        case r @ Ior.Right(_)                               => Some(r)
+        case b @ Ior.Both(_, _)                             => Some(b)
+        case l @ Ior.Left(_)                                => Some(l)
+      }
+      newValue.map(asset -> _)
+    }
+    val adaptedScripts =
+      scripts.view.mapValues { info =>
+        info.map(c =>
+          c.copy(complexitiesByEstimator = c.complexitiesByEstimator.view.filter { case (v, complexities) => v == 3 && complexities.nonEmpty }.toMap)
+        )
+      }.toMap
+    this.copy(
+      scriptsRun = 0,
+      transactions = Vector(),
+      transactionFilter = None,
+      issuedAssets = compactedAssets,
+      updatedAssets = filteredUpdatedAssets,
+      scripts = adaptedScripts,
+      check = false
+    )
+  }
+  if (check && eDiff != rDiff) throw new RuntimeException(s"Expected: $eDiff\nActual:   $rDiff\n$snapshot")
+
   @inline
   final def combineE(newer: Diff): Either[ValidationError, Diff] = combineF(newer).leftMap(GenericError(_))
 
@@ -201,7 +238,8 @@ case class Diff private (
           scriptResults = scriptResults.combine(newer.scriptResults),
           scriptsComplexity = scriptsComplexity + newer.scriptsComplexity,
           ethereumTransactionMeta = ethereumTransactionMeta ++ newer.ethereumTransactionMeta,
-          transactionFilter = newFilter
+          transactionFilter = newFilter,
+          check = true
         )
       }
 }
@@ -221,7 +259,8 @@ object Diff {
       scriptsRun: Int = 0,
       scriptsComplexity: Long = 0,
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty,
-      ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map.empty
+      ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] = Map.empty,
+      check: Boolean = true
   ): Diff =
     new Diff(
       Vector.empty,
@@ -239,7 +278,8 @@ object Diff {
       scriptsComplexity,
       scriptResults,
       ethereumTransactionMeta,
-      None
+      None,
+      check
     )
 
   def withTransactions(
@@ -275,7 +315,8 @@ object Diff {
       scriptsComplexity,
       scriptResults,
       ethereumTransactionMeta,
-      mkFilterForTransactions(nti.map(_.transaction)*)
+      mkFilterForTransactions(nti.map(_.transaction)*),
+      check = true
     )
 
   val empty: Diff = Diff()
