@@ -1,17 +1,17 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
-import cats.implicits._
+import cats.implicits.*
 import cats.{Id, Monad}
 import com.wavesplatform.common.merkle.Merkle.createRoot
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.{ExecutionError, CommonError}
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, _}
-import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, *}
+import com.wavesplatform.lang.v1.compiler.Terms.*
+import com.wavesplatform.lang.v1.compiler.Types.*
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, Terms}
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.ContextfulVal
-import com.wavesplatform.lang.v1.evaluator.FunctionIds._
+import com.wavesplatform.lang.v1.evaluator.FunctionIds.*
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, EvaluationContext, NativeFunction}
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
@@ -20,7 +20,7 @@ import scala.collection.mutable
 
 object CryptoContext {
 
-  private val rsaTypeNames = List("NoAlg", "Md5", "Sha1", "Sha224", "Sha256", "Sha384", "Sha512", "Sha3224", "Sha3256", "Sha3384", "Sha3512")
+  val rsaTypeNames = List("NoAlg", "Md5", "Sha1", "Sha224", "Sha256", "Sha384", "Sha512", "Sha3224", "Sha3256", "Sha3384", "Sha3512")
 
   private def rsaHashAlgs(v: StdLibVersion) = {
     rsaTypeNames.map(CASETYPEREF(_, List.empty, v > V3))
@@ -371,7 +371,7 @@ object CryptoContext {
       ) {
         case xs @ ARR(proof) :: CONST_BYTESTR(value) :: CONST_LONG(index) :: Nil =>
           val filteredProofs = proof.collect {
-            case bs@CONST_BYTESTR(v) if v.size == 32 => bs
+            case bs @ CONST_BYTESTR(v) if v.size == 32 => bs
           }
 
           if (value.size == 32 && proof.length <= 16 && filteredProofs.size == proof.size) {

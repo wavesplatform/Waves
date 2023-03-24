@@ -6,7 +6,7 @@ import com.wavesplatform.lang.utils.*
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms.*
 import com.wavesplatform.lang.v1.compiler.{Decompiler, ExpressionCompiler}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{GlobalValNames, PureContext}
 import com.wavesplatform.test.{PropSpec, *}
 
 class UnderscoreTest extends PropSpec {
@@ -103,7 +103,7 @@ class UnderscoreTest extends PropSpec {
                       Native(1100),
                       List(
                         CONST_LONG(3),
-                        FUNCTION_CALL(Native(1100), List(CONST_LONG(4), FUNCTION_CALL(Native(1100), List(CONST_LONG(5), REF("nil")))))
+                        FUNCTION_CALL(Native(1100), List(CONST_LONG(4), FUNCTION_CALL(Native(1100), List(CONST_LONG(5), REF(GlobalValNames.Nil)))))
                       )
                     )
                   )

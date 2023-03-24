@@ -5,6 +5,7 @@ import cats.instances.list.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import com.wavesplatform.lang.v1.parser.BinaryOperation.*
 import com.wavesplatform.lang.v1.parser.Expressions.*
@@ -583,7 +584,7 @@ class Parser(implicit offset: Int) {
   }
 
   def parseReplExpr(str: String): Parsed[EXPR] = {
-    def unit[A: P]     = Pass(REF(AnyPos, VALID(AnyPos, "unit")))
+    def unit[A: P]     = Pass(REF(AnyPos, VALID(AnyPos, GlobalValNames.Unit)))
     def replAtom[A: P] = baseAtom(block(Some(unit))(_))
     def replExpr[A: P] = binaryOp(baseAtom(replAtom(_))(_), opsByPriority)
     parse(str, replExpr(_), verboseFailures = true)
