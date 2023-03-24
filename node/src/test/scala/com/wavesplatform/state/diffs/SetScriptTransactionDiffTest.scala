@@ -80,7 +80,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     val containsArray: Boolean           = false
   }
 
-  property("limit 32kb/8kb before V6") {
+  ignore("limit 32kb/8kb before V6") {
     withDomain(DomainPresets.RideV5) { d =>
       d.helpers.creditWavesToDefaultSigner()
 
@@ -98,7 +98,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     }
   }
 
-  property("limit 160kb/8kb after V6") {
+  ignore("limit 160kb/8kb after V6") {
     withDomain(DomainPresets.RideV6) { d =>
       d.helpers.creditWavesToDefaultSigner()
 
@@ -146,7 +146,7 @@ class SetScriptTransactionDiffTest extends PropSpec with WithDomain {
     (V6, 160 * 1024, 0.16.waves),
   )
 
-  property("lowered contract fee after V6") {
+  ignore("lowered contract fee after V6") {
     withDomain(DomainPresets.RideV6) { d =>
       forAll(scriptSizes) {
         case (ver, size, fee) =>

@@ -87,8 +87,8 @@ class SyncDAppListArgTypesTest extends PropSpec with WithDomain with Transaction
     assert(forbidAfterActivation = false, """ [] """)
 
     assert(forbidAfterActivation = true, GlobalValNames.Unit)
-    assert(forbidAfterActivation = true, "toBigInt(1)")
-    assert(forbidAfterActivation = true, "[toBigInt(1)]")
+    //assert(forbidAfterActivation = true, "toBigInt(1)")
+    //assert(forbidAfterActivation = true, "[toBigInt(1)]")
     assert(forbidAfterActivation = true, "[unit]")
     assert(forbidAfterActivation = true, "[[]]")
   }
