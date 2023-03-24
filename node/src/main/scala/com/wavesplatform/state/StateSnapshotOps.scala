@@ -108,11 +108,7 @@ object StateSnapshotOps {
         diff.accountData.map { case (address, data) =>
           S.AccountData(address.toByteString, data.data.values.map(PBTransactions.toPBDataEntry).toSeq)
         }.toSeq,
-        diff.sponsorship.map { case (asset, sponsorship) =>
-          val minFee = sponsorship match {
-            case SponsorshipValue(minFee) => minFee
-            case SponsorshipNoInfo        => 0
-          }
+        diff.sponsorship.collect { case (asset, SponsorshipValue(minFee)) =>
           S.Sponsorship(asset.id.toByteString, minFee)
         }.toSeq,
         diff.scriptResults.map { case (txId, script) =>
@@ -223,7 +219,7 @@ object StateSnapshotOps {
           .map(data => data.address.toAddress -> AccountDataInfo(data.entry.map(e => e.key -> PBTransactions.toVanillaDataEntry(e)).toMap))
           .toMap,
         s.sponsorships
-          .map(data => data.assetId.toAssetId -> (if (data.minFee == 0) SponsorshipNoInfo else SponsorshipValue(data.minFee)))
+          .map(data => data.assetId.toAssetId -> SponsorshipValue(data.minFee))
           .toMap,
         scriptsRun = 0,
         s.totalComplexity,
