@@ -1,8 +1,8 @@
 package com.wavesplatform.state
 import cats.data.Ior
-import cats.implicits.catsSyntaxAlternativeSeparate
+import cats.implicits.{catsSyntaxAlternativeSeparate, catsSyntaxSemigroup}
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{AddressScheme, Alias, PublicKey}
+import com.wavesplatform.account.{Address, AddressScheme, Alias, PublicKey}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta.Payload
@@ -12,7 +12,7 @@ import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
 import com.wavesplatform.protobuf.{AddressExt, Amount, ByteStrExt, ByteStringExt}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.reader.LeaseDetails.Status
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 
 import scala.collection.immutable.VectorMap
 
@@ -33,15 +33,17 @@ object StateSnapshotOps {
           (assetBalances.toSeq :+ wavesBalance, leaseBalance)
         }.separate
       val assetVolumes =
-        diff.updatedAssets.collect {
-          case (asset, Ior.Right(volume))   => (asset, volume)
-          case (asset, Ior.Both(_, volume)) => (asset, volume)
-        } ++ diff.issuedAssets.map { case (asset, info) => (asset, info.volume) }
+        diff.issuedAssets.view.mapValues(_.volume).toMap |+|
+          diff.updatedAssets.collect {
+            case (asset, Ior.Right(volume))   => (asset, volume)
+            case (asset, Ior.Both(_, volume)) => (asset, volume)
+          }
       val assetNamesAndDescriptions =
-        diff.updatedAssets.collect {
-          case (asset, Ior.Left(info))    => (asset, info)
-          case (asset, Ior.Both(info, _)) => (asset, info)
-        } ++ diff.issuedAssets.map { case (asset, info) => (asset, info.dynamic) }
+        diff.issuedAssets.view.mapValues(_.dynamic).toMap ++
+          diff.updatedAssets.collect {
+            case (asset, Ior.Left(info))    => (asset, info)
+            case (asset, Ior.Both(info, _)) => (asset, info)
+          }
       TransactionStateSnapshot(
         balances.flatten,
         leaseBalance,
@@ -61,7 +63,7 @@ object StateSnapshotOps {
           S.AssetNameAndDescription(asset.id.toByteString, info.name.toStringUtf8, info.description.toStringUtf8, info.lastUpdatedAt)
         }.toSeq,
         diff.assetScripts.map { case (asset, script) =>
-          S.AssetScript(asset.id.toByteString, script.fold(ByteString.EMPTY)(_.script.bytes().toByteString), script.map(_.complexity).getOrElse(0))
+          S.AssetScript(asset.id.toByteString, script.fold(ByteString.EMPTY)(_.script.bytes().toByteString), script.fold(0L)(_.complexity))
         }.toSeq,
         diff.aliases.map { case (alias, address) => S.Alias(address.toByteString, alias.name) }.toSeq,
         diff.orderFills.map { case (orderId, VolumeAndFee(volume, fee)) => S.OrderFill(orderId.toByteString, volume, fee) }.toSeq,
@@ -85,11 +87,22 @@ object StateSnapshotOps {
           )
         }.toSeq,
         diff.scripts.map { case (address, scriptOpt) =>
-          S.AccountScript(
-            address.toByteString,
-            scriptOpt.fold(ByteString.EMPTY)(_.script.bytes().toByteString),
-            scriptOpt.fold(0L)(_.verifierComplexity),
-            scriptOpt.fold(Map[String, Long]())(_.complexitiesByEstimator(lastEstimator))
+          scriptOpt.fold(
+            S.AccountScript(
+              address.toByteString,
+              ByteString.EMPTY,
+              ByteString.EMPTY,
+              0,
+              Map[String, Long]()
+            )
+          )(script =>
+            S.AccountScript(
+              address.toByteString,
+              script.publicKey.toByteString,
+              script.script.bytes().toByteString,
+              script.verifierComplexity,
+              script.complexitiesByEstimator.getOrElse(lastEstimator, Map())
+            )
           )
         }.toSeq,
         diff.accountData.map { case (address, data) =>
@@ -123,15 +136,18 @@ object StateSnapshotOps {
 
   implicit class TransactionStateSnapshotOps(val s: TransactionStateSnapshot) extends AnyVal {
     def toDiff: Diff = {
-      val balances =
-        s.balances.map { b =>
-          val portfolio =
-            if (b.getAmount.assetId.isEmpty) Portfolio.waves(b.getAmount.amount)
-            else Portfolio.build(b.getAmount.assetId.toAssetId, b.getAmount.amount)
-          b.address.toAddress -> portfolio
-        }.toMap
-      val leaseBalances = s.leaseBalances.map(b => b.address.toAddress -> Portfolio(lease = LeaseBalance(in = b.in, out = b.out))).toMap
-      val assetVolumes  = s.assetVolumes.map(v => v.assetId.toAssetId -> AssetVolumeInfo(v.reissuable, BigInt(v.volume.toByteArray))).toMap
+      val balancePortfolios =
+        s.balances
+          .foldLeft(Map[Address, Portfolio]()) { (portfolios, nextBalance) =>
+            val asset =
+              if (nextBalance.getAmount.assetId.isEmpty) Waves
+              else nextBalance.getAmount.assetId.toAssetId
+            val portfolio = Portfolio.build(asset, nextBalance.getAmount.amount)
+            val address   = nextBalance.address.toAddress
+            Diff.combine(portfolios, Map(address -> portfolio)).explicitGet()
+          }
+      val leasePortfolios = s.leaseBalances.map(b => b.address.toAddress -> Portfolio(lease = LeaseBalance(in = b.in, out = b.out))).toMap
+      val assetVolumes    = s.assetVolumes.map(v => v.assetId.toAssetId -> AssetVolumeInfo(v.reissuable, BigInt(v.volume.toByteArray))).toMap
       val assetDynamics =
         s.assetNamesAndDescriptions.map(a => a.assetId.toAssetId -> AssetInfo(a.name, a.description, Height @@ a.lastUpdated)).toMap
       val issuedAssets =
@@ -140,7 +156,7 @@ object StateSnapshotOps {
           val asset  = s.assetId.toAssetId
           s.assetId.toAssetId -> NewAssetInfo(static, assetDynamics(asset), assetVolumes(asset))
         }
-      val updatedAssets =
+      val updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] =
         (assetVolumes.keySet ++ assetDynamics.keySet)
           .filterNot(issuedAssets.contains)
           .map { asset =>
@@ -155,7 +171,7 @@ object StateSnapshotOps {
           }
           .toMap
       Diff(
-        Diff.combine(balances, leaseBalances).explicitGet(),
+        Diff.combine(balancePortfolios, leasePortfolios).explicitGet(),
         issuedAssets,
         updatedAssets,
         s.aliases.map(a => Alias.create(a.alias).explicitGet() -> a.address.toAddress).toMap,
@@ -190,10 +206,10 @@ object StateSnapshotOps {
                   pbInfo.senderPublicKey.toPublicKey,
                   ScriptReader.fromBytes(pbInfo.script.toByteArray).explicitGet(),
                   pbInfo.verifierComplexity,
-                  Map(lastEstimator -> pbInfo.callableComplexities)
+                  if (pbInfo.callableComplexities.nonEmpty) Map(lastEstimator -> pbInfo.callableComplexities) else Map()
                 )
               )
-          pbInfo.senderPublicKey.toPublicKey.toAddress -> info
+          pbInfo.senderAddress.toAddress -> info
         }.toMap,
         s.assetScripts.map { pbInfo =>
           val info =
@@ -222,7 +238,8 @@ object StateSnapshotOps {
               Payload.Transfer(EthereumTransactionMeta.Transfer(publicKeyHash, amount))
           }
           m.transactionId.toByteStr -> EthereumTransactionMeta(payload)
-        }.toMap
+        }.toMap,
+        check = false
       )
     }
   }
