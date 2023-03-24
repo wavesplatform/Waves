@@ -857,7 +857,7 @@ class ContractCompilerCompactorTest extends PropSpec {
     compiled.explicitGet().decs.map(_.name) shouldBe List("user")
   }
 
-  property("compaction should work correctly wih global variables") {
+  property("compaction should work correctly with global variables") {
     def script(varName: String): String =
       s"""
          |{-# STDLIB_VERSION 6 #-}
@@ -891,7 +891,7 @@ class ContractCompilerCompactorTest extends PropSpec {
     }
   }
 
-  property("compaction should work correctly wih global user functions") {
+  property("compaction should work correctly with global user functions") {
     val globalUserFunctions =
       fullCtxForV(V6).functions
         .filter(f => f.header.isInstanceOf[User] && f.name.head.isLetter)
