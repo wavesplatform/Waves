@@ -200,14 +200,14 @@ class BrokenUnicodeTest extends PropSpec with WithDomain with EitherValues {
     )
   }
 
-  private def assertNoFix(d: Domain): Unit = {
-    val (genesisTxs, setNoFix, _, checkNoFix, _) = scenario(V5)
-    d.appendBlock(genesisTxs*)
-    d.appendBlock(setNoFix*)
-    d.appendBlock(checkNoFix*)
-    checkNoFix.foreach(tx => d.blockchain.transactionSucceeded(tx.id.value()) shouldBe true)
-  }
-
+//  private def assertNoFix(d: Domain): Unit = {
+//    val (genesisTxs, setNoFix, _, checkNoFix, _) = scenario(V5)
+//    d.appendBlock(genesisTxs*)
+//    d.appendBlock(setNoFix*)
+//    d.appendBlock(checkNoFix*)
+//    checkNoFix.foreach(tx => d.blockchain.transactionSucceeded(tx.id.value()) shouldBe true)
+//  }
+//
   private def assertFix(d: Domain, lastVersion: StdLibVersion): Unit = {
     val (genesisTxs, setNoFix, setFix, checkNoFix, checkFix) = scenario(lastVersion)
     d.appendBlock(genesisTxs*)

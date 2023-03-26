@@ -2,21 +2,19 @@ package com.wavesplatform.state.patch
 
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils._
+import com.wavesplatform.common.utils.*
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.test._
-import com.wavesplatform.test.DomainPresets._
-import com.wavesplatform.transaction.TxHelpers
+import com.wavesplatform.test.*
+import com.wavesplatform.test.DomainPresets.*
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.BeforeAndAfterAll
 
 class CancelLeasesToDisabledAliasesSpec extends FlatSpec with PathMockFactory with WithDomain with BeforeAndAfterAll {
   val MainnetSettings: WavesSettings = {
-    import SettingsFromDefaultConfig.blockchainSettings.{functionalitySettings => fs}
+    import SettingsFromDefaultConfig.blockchainSettings.functionalitySettings as fs
     SettingsFromDefaultConfig.copy(
       blockchainSettings = SettingsFromDefaultConfig.blockchainSettings.copy(
         addressSchemeCharacter = 'W',
