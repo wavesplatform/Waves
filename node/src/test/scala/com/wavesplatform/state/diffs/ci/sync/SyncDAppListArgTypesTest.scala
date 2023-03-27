@@ -4,15 +4,14 @@ import com.wavesplatform.TransactionGenBase
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.features.BlockchainFeatures.*
+import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TestCompiler
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.GlobalValNames
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.ci.ciFee
-import com.wavesplatform.test.*
+import com.wavesplatform.test._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.utils.Signed
@@ -86,9 +85,9 @@ class SyncDAppListArgTypesTest extends PropSpec with WithDomain with Transaction
     assert(forbidAfterActivation = false, """ [1, "s", true, base58''] """)
     assert(forbidAfterActivation = false, """ [] """)
 
-    assert(forbidAfterActivation = true, GlobalValNames.Unit)
-    //assert(forbidAfterActivation = true, "toBigInt(1)")
-    //assert(forbidAfterActivation = true, "[toBigInt(1)]")
+    assert(forbidAfterActivation = true, "unit")
+    assert(forbidAfterActivation = true, "toBigInt(1)")
+    assert(forbidAfterActivation = true, "[toBigInt(1)]")
     assert(forbidAfterActivation = true, "[unit]")
     assert(forbidAfterActivation = true, "[[]]")
   }
