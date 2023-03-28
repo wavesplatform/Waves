@@ -231,15 +231,9 @@ object JsAPITest extends JsTestBase {
           |{-# SCRIPT_TYPE ACCOUNT #-}
           |
           |func call(a: String, b: Int) = {
-          |    let zzz = "\ud87e"
+          |    let zzz = "aaa\ud87ebbb"
           |    ([], zzz)
           |}
-          |
-          |@Callable(i)
-          |func call_1(a: String) = call(a, 3)
-          |
-          |@Callable(i)
-          |func call_2(a: String, b: Int) = call(a, b)
         """.stripMargin
       assertCompileError(script, "contains ill-formed characters")
     }
