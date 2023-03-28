@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs
 
 import cats.implicits.toBifunctorOps
 import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.features.OverdraftValidationProvider.*
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures, RideVersionProvider}
 import com.wavesplatform.lang.ValidationError
@@ -109,6 +110,7 @@ object CommonValidation {
 
   def disallowDuplicateIds[T <: Transaction](blockchain: Blockchain, tx: T): Either[ValidationError, T] = tx match {
     case _: PaymentTransaction => Right(tx)
+    case _: CreateAliasTransaction if blockchain.height < DisableHijackedAliases.height => Right(tx)
     case _ =>
       val id = tx.id()
       Either.cond(!blockchain.containsTransaction(tx), tx, AlreadyInTheState(id, blockchain.transactionMeta(id).get.height))

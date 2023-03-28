@@ -97,7 +97,8 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside with With
     assertDiffEi(
       Seq(TestBlock.create(Seq(genesis1, genesis2, issueTransaction, preTransferTransaction, preSetAssetScriptTransaction))),
       TestBlock.create(Seq(transferTransaction)),
-      RideV6.blockchainSettings.functionalitySettings
+      RideV6.blockchainSettings.functionalitySettings,
+      enableExecutionLog = true
     ) { error =>
       inside(error) { case Left(TransactionValidationError(see: ScriptExecutionError, _)) =>
         val expected =

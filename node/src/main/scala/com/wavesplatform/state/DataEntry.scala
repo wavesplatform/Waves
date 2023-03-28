@@ -1,6 +1,8 @@
 package com.wavesplatform.state
 
+import com.github.plokhotnyuk.jsoniter_scala.core.{JsonValueCodec, JsonWriter}
 import com.google.common.primitives.{Bytes, Longs, Shorts}
+import com.wavesplatform.api.http.StreamSerializerUtils.*
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.traits.domain.{DataItem, DataOp}
 import com.wavesplatform.serialization.Deser
@@ -41,8 +43,8 @@ object DataEntry {
     val String  = Value(3)
   }
 
-  implicit object Format extends Format[DataEntry[_]] {
-    def reads(jsv: JsValue): JsResult[DataEntry[_]] = {
+  implicit object Format extends Format[DataEntry[?]] {
+    def reads(jsv: JsValue): JsResult[DataEntry[?]] = {
       jsv \ "key" match {
         case JsDefined(JsString(key)) =>
           jsv \ "type" match {
@@ -78,14 +80,41 @@ object DataEntry {
       }
     }
 
-    def writes(item: DataEntry[_]): JsValue = item.toJson
+    def writes(item: DataEntry[?]): JsValue = item.toJson
   }
 
-  implicit class DataEntryExt(private val de: DataEntry[_]) extends AnyVal {
+  def dataEntryCodec(numberAsString: Boolean): JsonValueCodec[DataEntry[?]] = new OnlyEncodeJsonValueCodec[DataEntry[?]] {
+    override def encodeValue(x: DataEntry[?], out: JsonWriter): Unit = {
+      out.writeObjectStart()
+      x match {
+        case BinaryDataEntry(key, value) =>
+          out.writeKeyValue("type", "binary")
+          out.writeKeyValue("key", key)
+          out.writeKeyValue("value", value.base64)
+        case IntegerDataEntry(key, value) =>
+          out.writeKeyValue("type", "integer")
+          out.writeKeyValue("key", key)
+          out.writeKeyValue("value", value, numberAsString)
+        case BooleanDataEntry(key, value) =>
+          out.writeKeyValue("type", "boolean")
+          out.writeKeyValue("key", key)
+          out.writeKeyValue("value", value)
+        case StringDataEntry(key, value) =>
+          out.writeKeyValue("type", "string")
+          out.writeKeyValue("key", key)
+          out.writeKeyValue("value", value)
+        case EmptyDataEntry(key) =>
+          out.writeKeyValue("key", key)
+      }
+      out.writeObjectEnd()
+    }
+  }
+
+  implicit class DataEntryExt(private val de: DataEntry[?]) extends AnyVal {
     def isEmpty: Boolean = de.isInstanceOf[EmptyDataEntry]
   }
 
-  def fromLangDataOp(di: DataOp): DataEntry[_] = di match {
+  def fromLangDataOp(di: DataOp): DataEntry[?] = di match {
     case DataItem.Lng(k, v)  => IntegerDataEntry(k, v)
     case DataItem.Bool(k, v) => BooleanDataEntry(k, v)
     case DataItem.Bin(k, v)  => BinaryDataEntry(k, v)

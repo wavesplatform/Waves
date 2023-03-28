@@ -7,13 +7,13 @@ import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.database.openDB
+import com.wavesplatform.database.RDB
 import com.wavesplatform.events.{BlockchainUpdateTriggers, UtxEvent}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerImpl}
-import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.settings.{DBSettings, WavesSettings}
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.test.BlockchainGenerator.{GenBlock, GenTx}
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -36,7 +36,6 @@ import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.DefaultChannelGroup
 import monix.execution.Scheduler.Implicits.global
-import monix.reactive.Observer
 import monix.reactive.subjects.ConcurrentSubject
 import org.apache.commons.io.FileUtils
 import org.web3j.crypto.{ECKeyPair, RawTransaction}
@@ -74,7 +73,7 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
   private val settings: WavesSettings = wavesSettings.copy(minerSettings = wavesSettings.minerSettings.copy(quorum = 0))
 
   def generateDb(genBlocks: Seq[GenBlock], dbDirPath: String = settings.dbSettings.directory): Unit =
-    generateBlockchain(genBlocks, dbDirPath)
+    generateBlockchain(genBlocks, settings.dbSettings.copy(directory = dbDirPath))
 
   def generateBinaryFile(genBlocks: Seq[GenBlock]): Unit = {
     val targetHeight = genBlocks.size + 1
@@ -92,14 +91,18 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
     } { output =>
       Using.resource(new BufferedOutputStream(output, 10 * 1024 * 1024)) { bos =>
         val dbDirPath = Files.createTempDirectory("generator-temp-db")
-        generateBlockchain(genBlocks, dbDirPath.toString, block => IO.exportBlockToBinary(bos, Some(block), legacy = true))
+        generateBlockchain(
+          genBlocks,
+          settings.dbSettings.copy(directory = dbDirPath.toString),
+          block => IO.exportBlockToBinary(bos, Some(block), legacy = true)
+        )
         log.info(s"Finished exporting $targetHeight blocks")
         FileUtils.deleteDirectory(dbDirPath.toFile)
       }
     }
   }
 
-  private def generateBlockchain(genBlocks: Seq[GenBlock], dbDirPath: String, exportToFile: Block => Unit = _ => ()): Unit = {
+  private def generateBlockchain(genBlocks: Seq[GenBlock], dbSettings: DBSettings, exportToFile: Block => Unit = _ => ()): Unit = {
     val scheduler = Schedulers.singleThread("appender")
     val time = new Time {
       val startTime: Long = settings.blockchainSettings.genesisSettings.timestamp
@@ -110,9 +113,9 @@ class BlockchainGenerator(wavesSettings: WavesSettings) extends ScorexLogging {
       override def correctedTime(): Long = time
       override def getTimestamp(): Long  = time
     }
-    Using.resource(openDB(dbDirPath)) { db =>
+    Using.resource(RDB.open(dbSettings)) { db =>
       val (blockchain, _) =
-        StorageFactory(settings, db, time, Observer.empty, BlockchainUpdateTriggers.noop)
+        StorageFactory(settings, db, time, BlockchainUpdateTriggers.noop)
       Using.resource(new UtxPoolImpl(time, blockchain, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)) { utxPool =>
         val pos         = PoSSelector(blockchain, settings.synchronizationSettings.maxBaseTarget)
         val extAppender = BlockAppender(blockchain, time, utxPool, pos, scheduler) _

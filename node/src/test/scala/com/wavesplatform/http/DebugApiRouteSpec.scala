@@ -128,6 +128,47 @@ class DebugApiRouteSpec
     }
   }
 
+  routePath("/balances/history/{address}") - {
+    val acc1 = TxHelpers.defaultSigner
+    val acc2 = TxHelpers.secondSigner
+
+    val initBalance = 5.waves
+
+    "works" in withDomain(balances = Seq(AddrWithBalance(acc2.toAddress, initBalance), AddrWithBalance(acc1.toAddress))) { d =>
+      val tx1 = TxHelpers.transfer(acc2, acc1.toAddress, 1.waves)
+      val tx2 = TxHelpers.transfer(acc1, acc2.toAddress, 3.waves)
+      val tx3 = TxHelpers.transfer(acc2, acc1.toAddress, 4.waves)
+      val tx4 = TxHelpers.transfer(acc1, acc2.toAddress, 5.waves)
+
+      d.appendBlock(tx1)
+      d.appendBlock(tx2)
+      d.appendBlock()
+      d.appendBlock(tx3)
+      d.appendBlock(tx4)
+      d.appendBlock()
+
+      val expectedBalance2 = initBalance - tx1.fee.value - tx1.amount.value
+      val expectedBalance3 = expectedBalance2 + tx2.amount.value
+      val expectedBalance5 = expectedBalance3 - tx3.fee.value - tx3.amount.value
+      val expectedBalance6 = expectedBalance5 + tx4.amount.value
+
+      Get(routePath(s"/balances/history/${acc2.toAddress}")) ~> routeWithBlockchain(d) ~> check {
+        status shouldBe StatusCodes.OK
+        responseAs[JsArray] shouldBe Json.toJson(
+          Seq(
+            6 -> expectedBalance6,
+            5 -> expectedBalance5,
+            3 -> expectedBalance3,
+            2 -> expectedBalance2,
+            1 -> initBalance
+          ).map { case (height, balance) =>
+            Json.obj("height" -> height, "balance" -> balance)
+          }
+        )
+      }
+    }
+  }
+
   routePath("/stateHash") - {
     "works" - {
       val settingsWithStateHashes = DomainPresets.SettingsFromDefaultConfig.copy(
@@ -152,7 +193,7 @@ class DebugApiRouteSpec
         d.appendBlock(blockAt2)
         d.appendBlock(TestBlock.create(0, blockAt2.id(), Nil))
 
-        val stateHashAt2 = d.levelDBWriter.loadStateHash(2).value
+        val stateHashAt2 = d.rocksDBWriter.loadStateHash(2).value
         Get(routePath(s"/stateHash/$suffix")) ~> routeWithBlockchain(d) ~> check {
           status shouldBe StatusCodes.OK
           responseAs[JsObject] shouldBe (Json.toJson(stateHashAt2).as[JsObject] ++ Json.obj(
@@ -184,6 +225,7 @@ class DebugApiRouteSpec
     "valid tx" in {
       val blockchain = createBlockchainStub()
       (blockchain.balance _).when(TxHelpers.defaultSigner.publicKey.toAddress, *).returns(Long.MaxValue)
+      (blockchain.wavesBalances _).when(Seq(TxHelpers.defaultAddress)).returns(Map(TxHelpers.defaultAddress -> Long.MaxValue))
 
       val route = routeWithBlockchain(blockchain)
 
@@ -198,6 +240,7 @@ class DebugApiRouteSpec
     "invalid tx" in {
       val blockchain = createBlockchainStub()
       (blockchain.balance _).when(TxHelpers.defaultSigner.publicKey.toAddress, *).returns(0)
+      (blockchain.wavesBalances _).when(Seq(TxHelpers.defaultAddress)).returns(Map(TxHelpers.defaultAddress -> 0))
 
       val route = routeWithBlockchain(blockchain)
 
@@ -224,6 +267,7 @@ class DebugApiRouteSpec
     "exchange tx with fail script" in {
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(TxHelpers.defaultAddress, *).returns(Long.MaxValue)
+        (blockchain.wavesBalances _).when(Seq(TxHelpers.defaultAddress)).returns(Map(TxHelpers.defaultAddress -> Long.MaxValue))
 
         val (assetScript, comp) =
           ScriptCompiler.compile("if true then throw(\"error\") else false", ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()
@@ -268,6 +312,7 @@ class DebugApiRouteSpec
     "invoke tx with asset failing" in {
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(*, *).returns(Long.MaxValue / 2)
+        (blockchain.wavesBalances _).when(*).returns(Map(TxHelpers.defaultAddress -> Long.MaxValue / 2))
 
         val (assetScript, assetScriptComplexity) = ScriptCompiler
           .compile(
@@ -1590,6 +1635,7 @@ class DebugApiRouteSpec
 
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(*, *).returns(Long.MaxValue)
+        (blockchain.wavesBalances _).when(*).returns(Map(TxHelpers.defaultAddress -> Long.MaxValue))
 
         (blockchain.resolveAlias _).when(Alias.create(recipient2.name).explicitGet()).returning(Right(TxHelpers.secondAddress))
 
@@ -2738,6 +2784,7 @@ class DebugApiRouteSpec
 
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(*, *).returns(Long.MaxValue)
+        (blockchain.wavesBalances _).when(*).returns(Map(TxHelpers.defaultAddress -> Long.MaxValue))
         blockchain.stub.activateAllFeatures()
 
         val (dAppScript, _) = ScriptCompiler
@@ -3167,6 +3214,7 @@ class DebugApiRouteSpec
     "transfer transaction with asset fail" in {
       val blockchain = createBlockchainStub { blockchain =>
         (blockchain.balance _).when(*, *).returns(Long.MaxValue / 2)
+        (blockchain.wavesBalances _).when(*).returns(Map(TxHelpers.defaultAddress -> Long.MaxValue / 2))
 
         val (assetScript, assetScriptComplexity) =
           ScriptCompiler.compile("false", ScriptEstimatorV3(fixOverflow = true, overhead = true)).explicitGet()
@@ -3231,6 +3279,9 @@ class DebugApiRouteSpec
         (() => blockchain.settings).when().returns(WavesSettings.default().blockchainSettings.copy(functionalitySettings = settings))
         (() => blockchain.activatedFeatures).when().returns(settings.preActivatedFeatures)
         (blockchain.balance _).when(*, *).returns(ENOUGH_AMT)
+        (blockchain.wavesBalances _)
+          .when(*)
+          .returns(Map(TxHelpers.defaultAddress -> ENOUGH_AMT, TxHelpers.secondAddress -> ENOUGH_AMT, TxHelpers.address(3) -> ENOUGH_AMT))
 
         val script                = ExprScript(TRUE).explicitGet()
         def info(complexity: Int) = Some(AccountScriptInfo(TxHelpers.secondSigner.publicKey, script, complexity))
@@ -3471,7 +3522,8 @@ class DebugApiRouteSpec
       .copy(
         blockchain = d.blockchain,
         priorityPoolBlockchain = () => d.blockchain,
-        loadStateHash = d.levelDBWriter.loadStateHash
+        loadBalanceHistory = d.rocksDBWriter.loadBalanceHistory,
+        loadStateHash = d.rocksDBWriter.loadStateHash
       )
       .route
 

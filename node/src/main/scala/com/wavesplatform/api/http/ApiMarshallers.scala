@@ -2,12 +2,13 @@ package com.wavesplatform.api.http
 
 import akka.NotUsed
 import akka.http.scaladsl.marshalling.*
-import akka.http.scaladsl.model.*
 import akka.http.scaladsl.model.MediaTypes.{`application/json`, `text/plain`}
+import akka.http.scaladsl.model.*
 import akka.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, PredefinedFromEntityUnmarshallers, Unmarshaller}
 import akka.http.scaladsl.util.FastFuture
 import akka.stream.scaladsl.{Flow, Source}
 import akka.util.ByteString
+import com.github.plokhotnyuk.jsoniter_scala.core.{JsonValueCodec, writeToArray}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
@@ -33,12 +34,11 @@ trait ApiMarshallers extends JsonFormats {
 
   def tracedResultMarshaller[A](includeTrace: Boolean)(implicit writes: OWrites[A]): ToResponseMarshaller[TracedResult[ApiError, A]] =
     fromStatusCodeAndValue[StatusCode, JsValue]
-      .compose(
-        ae =>
-          (
-            ae.resultE.fold(_.code, _ => StatusCodes.OK),
-            ae.resultE.fold(_.json, writes.writes) ++ (if (includeTrace) Json.obj("trace" -> ae.trace.map(_.loggedJson)) else Json.obj())
-          )
+      .compose(ae =>
+        (
+          ae.resultE.fold(_.code, _ => StatusCodes.OK),
+          ae.resultE.fold(_.json, writes.writes) ++ (if (includeTrace) Json.obj("trace" -> ae.trace.map(_.loggedJson)) else Json.obj())
+        )
       )
 
   private[this] lazy val jsonStringUnmarshaller =
@@ -48,6 +48,12 @@ trait ApiMarshallers extends JsonFormats {
         case (ByteString.empty, _) => throw Unmarshaller.NoContentException
         case (data, charset)       => data.decodeString(charset.nioCharset.name)
       }
+
+  private[this] lazy val jsonByteStringMarshaller =
+    Marshaller.byteStringMarshaller(`application/json`)
+
+  private[this] lazy val customJsonByteStringMarshaller =
+    Marshaller.byteStringMarshaller(CustomJson.jsonWithNumbersAsStrings)
 
   private[this] lazy val jsonStringMarshaller =
     Marshaller.stringMarshaller(`application/json`)
@@ -83,6 +89,14 @@ trait ApiMarshallers extends JsonFormats {
         .compose(writes.writes)
     )
 
+  implicit def jsonBytesMarshaller[A](implicit codec: Boolean => JsonValueCodec[A]): ToEntityMarshaller[A] =
+    Marshaller.oneOf(
+      jsonByteStringMarshaller
+        .compose(v => ByteString.fromArrayUnsafe(writeToArray[A](v)(codec(false)))),
+      customJsonByteStringMarshaller
+        .compose(v => ByteString.fromArrayUnsafe(writeToArray[A](v)(codec(true))))
+    )
+
   // preserve support for using plain strings as request entities
   implicit val stringMarshaller: ToEntityMarshaller[String] = PredefinedToEntityMarshallers.stringMarshaller(`text/plain`)
 
@@ -98,12 +112,28 @@ trait ApiMarshallers extends JsonFormats {
     }
   }
 
-  def jsonStreamMarshaller(prefix: String = "[", delimiter: String = ",", suffix: String = "]"): ToResponseMarshaller[Source[JsValue, NotUsed]] = {
-    val pjm             = playJsonMarshaller[JsValue].map(_.dataBytes)
+  def jsonBytesStreamMarshaller[A](
+      prefix: String = "[",
+      delimiter: String = ",",
+      suffix: String = "]"
+  )(implicit codec: Boolean => JsonValueCodec[A]): ToResponseMarshaller[Source[A, NotUsed]] =
+    jsonStreamMarshaller(jsonBytesMarshaller[A])(prefix, delimiter, suffix)
+
+  def playJsonStreamMarshaller(
+      prefix: String = "[",
+      delimiter: String = ",",
+      suffix: String = "]"
+  ): ToResponseMarshaller[Source[JsValue, NotUsed]] =
+    jsonStreamMarshaller(playJsonMarshaller[JsValue])(prefix, delimiter, suffix)
+
+  private def jsonStreamMarshaller[A](
+      marshaller: ToEntityMarshaller[A]
+  )(prefix: String, delimiter: String, suffix: String): Marshaller[Source[A, NotUsed], HttpResponse] = {
+    val bsm             = marshaller.map(_.dataBytes)
     val framingRenderer = Flow[ByteString].intersperse(ByteString(prefix), ByteString(delimiter), ByteString(suffix))
-    Marshaller[Source[JsValue, NotUsed], HttpResponse] { implicit ec => source =>
+    Marshaller[Source[A, NotUsed], HttpResponse] { implicit ec => source =>
       val availableMarshallingsPerElement = source.mapAsync(1) { t =>
-        pjm(t)(ec)
+        bsm(t)(ec)
       }
       FastFuture.successful(List(`application/json`, CustomJson.jsonWithNumbersAsStrings).map { contentType =>
         Marshalling.WithFixedContentType(

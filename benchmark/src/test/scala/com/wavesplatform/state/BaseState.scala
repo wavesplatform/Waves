@@ -3,35 +3,35 @@ package com.wavesplatform.state
 import java.io.File
 import java.nio.file.Files
 
+import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter}
+import com.wavesplatform.database.{RDB, RocksDBWriter}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.BlockDiffer
-import com.wavesplatform.state.utils.TestLevelDB
+import com.wavesplatform.state.utils.TestRocksDB
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
-import monix.execution.UncaughtExceptionReporter
-import monix.reactive.Observer
-import org.iq80.leveldb.{DB, Options}
 import org.openjdk.jmh.annotations.{Setup, TearDown}
 import org.scalacheck.{Arbitrary, Gen}
 
 trait BaseState {
-  import BaseState._
+  import BaseState.*
 
+  val benchSettings: Settings = Settings.fromConfig(ConfigFactory.load())
+  val wavesSettings: WavesSettings = {
+    val config = loadConfig(ConfigFactory.parseFile(new File(benchSettings.networkConfigFile)))
+    WavesSettings.fromRootConfig(config)
+  }
   private val fsSettings: FunctionalitySettings = updateFunctionalitySettings(FunctionalitySettings.TESTNET)
-  private val db: DB = {
-    val dir     = Files.createTempDirectory("state-synthetic").toAbsolutePath.toString
-    val options = new Options()
-    options.createIfMissing(true)
-    LevelDBFactory.factory.open(new File(dir), options)
+  private val rdb: RDB = {
+    val dir = Files.createTempDirectory("state-synthetic").toAbsolutePath.toString
+    RDB.open(wavesSettings.dbSettings.copy(directory = dir))
   }
 
-  private val portfolioChanges = Observer.empty(UncaughtExceptionReporter.default)
-  val state: LevelDBWriter     = TestLevelDB.withFunctionalitySettings(db, portfolioChanges, fsSettings)
+  val state: RocksDBWriter = TestRocksDB.withFunctionalitySettings(rdb, fsSettings)
 
   private var _richAccount: KeyPair = _
   def richAccount: KeyPair          = _richAccount
@@ -52,12 +52,11 @@ trait BaseState {
       transferTxs <- Gen.sequence[Vector[Transaction], Transaction]((1 to TxsInBlock).map { i =>
         txGenP(sender, base.header.timestamp + i)
       })
-    } yield
-      TestBlock.create(
-        time = transferTxs.last.timestamp,
-        ref = base.id(),
-        txs = transferTxs
-      )
+    } yield TestBlock.create(
+      time = transferTxs.last.timestamp,
+      ref = base.id(),
+      txs = transferTxs
+    )
 
   private val initGen: Gen[(KeyPair, Block)] = for {
     rich <- accountGen
@@ -98,7 +97,7 @@ trait BaseState {
 
   @TearDown
   def close(): Unit = {
-    db.close()
+    rdb.close()
   }
 }
 

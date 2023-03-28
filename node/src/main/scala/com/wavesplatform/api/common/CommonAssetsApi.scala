@@ -8,12 +8,14 @@ import com.wavesplatform.state.{AssetDescription, Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import monix.reactive.Observable
-import org.iq80.leveldb.DB
+import org.rocksdb.RocksDB
 
 trait CommonAssetsApi {
   def description(assetId: IssuedAsset): Option[AssetDescription]
 
   def fullInfo(assetId: IssuedAsset): Option[AssetInfo]
+
+  def fullInfos(assetIds: Seq[IssuedAsset]): Seq[Option[AssetInfo]]
 
   def wavesDistribution(height: Int, after: Option[Address]): Observable[(Address, Long)]
 
@@ -23,7 +25,7 @@ trait CommonAssetsApi {
 object CommonAssetsApi {
   final case class AssetInfo(description: AssetDescription, issueTransaction: Option[IssueTransaction], sponsorBalance: Option[Long])
 
-  def apply(diff: () => Diff, db: DB, blockchain: Blockchain): CommonAssetsApi = new CommonAssetsApi {
+  def apply(diff: () => Diff, db: RocksDB, blockchain: Blockchain): CommonAssetsApi = new CommonAssetsApi {
     def description(assetId: IssuedAsset): Option[AssetDescription] =
       blockchain.assetDescription(assetId)
 
@@ -37,13 +39,30 @@ object CommonAssetsApi {
         sponsorBalance
       )
 
+    override def fullInfos(assetIds: Seq[IssuedAsset]): Seq[Option[AssetInfo]] = {
+      blockchain
+        .transactionInfos(assetIds.map(_.id))
+        .view
+        .zip(assetIds)
+        .map { case (tx, assetId) =>
+          blockchain.assetDescription(assetId).map { desc =>
+            AssetInfo(
+              desc,
+              tx.collect { case (tm, it: IssueTransaction) if tm.succeeded => it },
+              if (desc.sponsorship != 0) Some(blockchain.wavesPortfolio(desc.issuer.toAddress).spendableBalance) else None
+            )
+          }
+        }
+        .toSeq
+    }
+
     override def wavesDistribution(height: Int, after: Option[Address]): Observable[(Address, Long)] =
       balanceDistribution(
         db,
         height,
         after,
         if (height == blockchain.height) diff().portfolios else Map.empty[Address, Portfolio],
-        KeyTags.WavesBalance.prefixBytes,
+        KeyTags.WavesBalanceHistory.prefixBytes,
         bs => AddressId.fromByteArray(bs.slice(2, bs.length - 4)),
         _.balance
       )
@@ -54,7 +73,7 @@ object CommonAssetsApi {
         height,
         after,
         if (height == blockchain.height) diff().portfolios else Map.empty[Address, Portfolio],
-        KeyTags.AssetBalance.prefixBytes ++ asset.id.arr,
+        KeyTags.AssetBalanceHistory.prefixBytes ++ asset.id.arr,
         bs => AddressId.fromByteArray(bs.slice(2 + crypto.DigestLength, bs.length - 4)),
         _.assets.getOrElse(asset, 0L)
       )

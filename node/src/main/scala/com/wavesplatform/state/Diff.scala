@@ -7,7 +7,7 @@ import cats.kernel.{Monoid, Semigroup}
 import cats.syntax.either.*
 import com.google.common.hash.{BloomFilter, Funnels}
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, Alias, PublicKey}
+import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.features.BlockchainFeatures
@@ -57,7 +57,7 @@ object AssetInfo {
     AssetInfo(ByteString.copyFromUtf8(name), ByteString.copyFromUtf8(description), lastUpdatedAt)
 }
 
-case class AssetStaticInfo(source: TransactionId, issuer: PublicKey, decimals: Int, nft: Boolean)
+case class AssetStaticInfo(id: ByteStr, source: TransactionId, issuer: PublicKey, decimals: Int, nft: Boolean)
 
 case class AssetVolumeInfo(isReissuable: Boolean, volume: BigInt)
 object AssetVolumeInfo {
@@ -85,16 +85,6 @@ case class AssetDescription(
     sequenceInBlock: Int,
     issueHeight: Height
 )
-
-case class AccountDataInfo(data: Map[String, DataEntry[?]])
-
-object AccountDataInfo {
-  implicit val accountDataInfoMonoid: Monoid[AccountDataInfo] = new Monoid[AccountDataInfo] {
-    override def empty: AccountDataInfo = AccountDataInfo(Map.empty)
-
-    override def combine(x: AccountDataInfo, y: AccountDataInfo): AccountDataInfo = AccountDataInfo(x.data ++ y.data)
-  }
-}
 
 sealed abstract class Sponsorship
 case class SponsorshipValue(minFee: Long) extends Sponsorship
@@ -144,6 +134,8 @@ case class NewTransactionInfo(transaction: Transaction, affected: Set[Address], 
 
 case class NewAssetInfo(static: AssetStaticInfo, dynamic: AssetInfo, volume: AssetVolumeInfo)
 
+case class LeaseActionInfo(invokeId: ByteStr, dAppPublicKey: PublicKey, recipient: AddressOrAlias, amount: Long)
+
 case class Diff private (
     transactions: Vector[NewTransactionInfo],
     portfolios: Map[Address, Portfolio],
@@ -154,7 +146,7 @@ case class Diff private (
     leaseState: Map[ByteStr, LeaseDetails],
     scripts: Map[Address, Option[AccountScriptInfo]],
     assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]],
-    accountData: Map[Address, AccountDataInfo],
+    accountData: Map[Address, Map[String, DataEntry[?]]],
     sponsorship: Map[IssuedAsset, Sponsorship],
     scriptsRun: Int,
     scriptsComplexity: Long,
@@ -164,6 +156,9 @@ case class Diff private (
 ) {
   @inline
   final def combineE(newer: Diff): Either[ValidationError, Diff] = combineF(newer).leftMap(GenericError(_))
+
+  def containsTransaction(txId: ByteStr): Boolean =
+    transactions.nonEmpty && transactionFilter.exists(_.mightContain(txId.arr)) && transactions.exists(_.transaction.id() == txId)
 
   def transaction(txId: ByteStr): Option[NewTransactionInfo] =
     if (transactions.nonEmpty && transactionFilter.exists(_.mightContain(txId.arr)))
@@ -200,7 +195,7 @@ case class Diff private (
           leaseState = leaseState ++ newer.leaseState,
           scripts = scripts ++ newer.scripts,
           assetScripts = assetScripts ++ newer.assetScripts,
-          accountData = accountData.combine(newer.accountData),
+          accountData = Diff.combine(accountData, newer.accountData),
           sponsorship = sponsorship.combine(newer.sponsorship),
           scriptsRun = scriptsRun + newer.scriptsRun,
           scriptResults = scriptResults.combine(newer.scriptResults),
@@ -221,7 +216,7 @@ object Diff {
       leaseState: Map[ByteStr, LeaseDetails] = Map.empty,
       scripts: Map[Address, Option[AccountScriptInfo]] = Map.empty,
       assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] = Map.empty,
-      accountData: Map[Address, AccountDataInfo] = Map.empty,
+      accountData: Map[Address, Map[String, DataEntry[?]]] = Map.empty,
       sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
       scriptsRun: Int = 0,
       scriptsComplexity: Long = 0,
@@ -257,7 +252,7 @@ object Diff {
       leaseState: Map[ByteStr, LeaseDetails] = Map.empty,
       scripts: Map[Address, Option[AccountScriptInfo]] = Map.empty,
       assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] = Map.empty,
-      accountData: Map[Address, AccountDataInfo] = Map.empty,
+      accountData: Map[Address, Map[String, DataEntry[?]]] = Map.empty,
       sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
       scriptsRun: Int = 0,
       scriptsComplexity: Long = 0,
@@ -301,6 +296,16 @@ object Diff {
           }
         case (r, _) => r
       }
+
+  def combine[K, IK, IV](first: Map[K, Map[IK, IV]], second: Map[K, Map[IK, IV]]): Map[K, Map[IK, IV]] = {
+    if (first.isEmpty) {
+      second
+    } else {
+      first ++ second.map { case (k, innerMap) =>
+        k -> first.get(k).fold(innerMap)(_ ++ innerMap)
+      }
+    }
+  }
 
   private def mkFilter() =
     BloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), 10000, 0.01f)

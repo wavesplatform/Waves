@@ -29,19 +29,22 @@ object TransactionSynchronizer extends LazyLogging {
 
     def transactionIsNew(txId: ByteStr): Boolean = {
       var isNew = false
-      knownTransactions.get(txId, { () =>
-        isNew = true; dummy
-      })
+      knownTransactions.get(
+        txId,
+        { () =>
+          isNew = true; dummy
+        }
+      )
       isNew
     }
 
     transactions
-      .filter {
-        case (_, tx) => transactionIsNew(tx.id())
+      .filter { case (_, tx) =>
+        transactionIsNew(tx.id())
       }
       .whileBusyBuffer(OverflowStrategy.DropNew(settings.maxQueueSize))
-      .mapParallelUnorderedF(settings.maxThreads) {
-        case (channel, tx) => transactionValidator.validateAndBroadcast(tx, Some(channel))
+      .mapParallelUnorderedF(settings.maxThreads) { case (channel, tx) =>
+        transactionValidator.validateAndBroadcast(tx, Some(channel))
       }
       .subscribe()
   }

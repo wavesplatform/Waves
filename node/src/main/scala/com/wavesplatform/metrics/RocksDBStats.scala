@@ -5,9 +5,9 @@ import kamon.Kamon
 import kamon.metric.{MeasurementUnit, Metric}
 
 //noinspection TypeAnnotation
-object LevelDBStats {
+object RocksDBStats {
   implicit class DbHistogramExt(private val h: Metric.Histogram) extends AnyVal {
-    def recordTagged(key: Key[_], value: Array[Byte]): Unit = recordTagged(key.name, value)
+    def recordTagged(key: Key[?], value: Array[Byte]): Unit = recordTagged(key.name, value)
 
     def recordTagged(tag: String, value: Array[Byte]): Unit =
       h.withTag("key", tag).record(Option(value).fold(0L)(_.length))

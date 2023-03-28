@@ -7,10 +7,10 @@ import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.lang.directives.values.V5
 import com.wavesplatform.lang.v1.compiler.TestCompiler
 import com.wavesplatform.test.PropSpec
-import com.wavesplatform.transaction.TxHelpers._
+import com.wavesplatform.transaction.TxHelpers.*
 
 class InvokeAffectedAddressTest extends PropSpec with WithDomain {
-  import DomainPresets._
+  import DomainPresets.*
 
   private def dApp(failed: Boolean) =
     TestCompiler(V5).compileContract(

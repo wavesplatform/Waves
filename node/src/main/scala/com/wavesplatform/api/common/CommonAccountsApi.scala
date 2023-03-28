@@ -1,17 +1,22 @@
 package com.wavesplatform.api.common
 
+import java.util.regex.Pattern
+
+import com.google.common.base.Charsets
+import com.google.common.collect.AbstractIterator
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.AddressPortfolio.{assetBalanceIterator, nftIterator}
 import com.wavesplatform.api.common.TransactionMeta.Ethereum
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database
-import com.wavesplatform.database.{DBExt, KeyTags, Keys}
+import com.wavesplatform.database.{DBExt, DBResource, KeyTags, Keys, RDB}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.patch.CancelLeasesToDisabledAliases
+import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.reader.LeaseDetails.Status
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Diff, Height, InvokeScriptResult}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Height, InvokeScriptResult}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.EthereumTransaction.Invocation
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -19,7 +24,8 @@ import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.{EthereumTransaction, TransactionType}
 import monix.eval.Task
 import monix.reactive.Observable
-import org.iq80.leveldb.DB
+
+import scala.jdk.CollectionConverters.*
 
 trait CommonAccountsApi {
   import CommonAccountsApi.*
@@ -32,9 +38,9 @@ trait CommonAccountsApi {
 
   def assetBalance(address: Address, asset: IssuedAsset): Long
 
-  def portfolio(address: Address): Observable[(IssuedAsset, Long)]
+  def portfolio(address: Address): Observable[Seq[(IssuedAsset, Long)]]
 
-  def nftList(address: Address, after: Option[IssuedAsset]): Observable[(IssuedAsset, AssetDescription)]
+  def nftList(address: Address, after: Option[IssuedAsset]): Observable[Seq[(IssuedAsset, AssetDescription)]]
 
   def script(address: Address): Option[AccountScriptInfo]
 
@@ -50,12 +56,13 @@ trait CommonAccountsApi {
 }
 
 object CommonAccountsApi {
-  def includeNft(blockchain: Blockchain)(assetId: IssuedAsset): Boolean =
-    !blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee) || !blockchain.assetDescription(assetId).exists(_.nft)
-
   final case class BalanceDetails(regular: Long, generating: Long, available: Long, effective: Long, leaseIn: Long, leaseOut: Long)
 
-  def apply(diff: () => Diff, db: DB, blockchain: Blockchain): CommonAccountsApi = new CommonAccountsApi {
+  def apply(
+      compositeBlockchain: () => CompositeBlockchain,
+      rdb: RDB,
+      blockchain: Blockchain
+  ): CommonAccountsApi = new CommonAccountsApi {
 
     override def balance(address: Address, confirmations: Int = 0): Long =
       blockchain.balance(address, blockchain.height, confirmations)
@@ -80,17 +87,22 @@ object CommonAccountsApi {
 
     override def assetBalance(address: Address, asset: IssuedAsset): Long = blockchain.balance(address, asset)
 
-    override def portfolio(address: Address): Observable[(IssuedAsset, Long)] = {
-      val currentDiff = diff()
-      db.resourceObservable.flatMap { resource =>
-        Observable.fromIterator(Task(assetBalanceIterator(resource, address, currentDiff, includeNft(blockchain))))
+    override def portfolio(address: Address): Observable[Seq[(IssuedAsset, Long)]] = {
+      val featureNotActivated = !blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee)
+      val compBlockchain      = compositeBlockchain()
+      def includeNft(assetId: IssuedAsset): Boolean =
+        featureNotActivated || !compBlockchain.assetDescription(assetId).exists(_.nft)
+
+      rdb.db.resourceObservable.flatMap { resource =>
+        Observable
+          .fromIterator(Task(assetBalanceIterator(resource, address, compBlockchain.diff, includeNft)))
       }
     }
 
-    override def nftList(address: Address, after: Option[IssuedAsset]): Observable[(IssuedAsset, AssetDescription)] = {
-      val currentDiff = diff()
-      db.resourceObservable.flatMap { resource =>
-        Observable.fromIterator(Task(nftIterator(resource, address, currentDiff, after, blockchain.assetDescription)))
+    override def nftList(address: Address, after: Option[IssuedAsset]): Observable[Seq[(IssuedAsset, AssetDescription)]] = {
+      rdb.db.resourceObservable.flatMap { resource =>
+        Observable
+          .fromIterator(Task(nftIterator(resource, address, compositeBlockchain().diff, after, blockchain.assetDescription)))
       }
     }
 
@@ -101,35 +113,25 @@ object CommonAccountsApi {
 
     override def dataStream(address: Address, regex: Option[String]): Observable[DataEntry[?]] = Observable.defer {
       val pattern = regex.map(_.r.pattern)
-      val entriesFromDiff = diff().accountData
+      val entriesFromDiff = compositeBlockchain().diff.accountData
         .get(address)
-        .fold[Map[String, DataEntry[?]]](Map.empty)(_.data.filter { case (k, _) => pattern.forall(_.matcher(k).matches()) })
+        .fold(Array.empty[DataEntry[?]])(_.filter { case (k, _) => pattern.forall(_.matcher(k).matches()) }.values.toArray.sortBy(_.key))
 
-      val entries = db.readOnly { ro =>
-        ro.get(Keys.addressId(address)).fold(Seq.empty[DataEntry[?]]) { addressId =>
-          val filteredKeys = Set.newBuilder[String]
-
-          ro.iterateOver(KeyTags.ChangedDataKeys.prefixBytes ++ addressId.toByteArray) { e =>
-            for (key <- database.readStrings(e.getValue) if !entriesFromDiff.contains(key) && pattern.forall(_.matcher(key).matches()))
-              filteredKeys += key
-          }
-
-          for {
-            key <- filteredKeys.result().toVector
-            h   <- ro.get(Keys.dataHistory(address, key)).headOption
-            e   <- ro.get(Keys.data(addressId, key)(h))
-          } yield e
-        }
+      rdb.db.resourceObservable.flatMap { dbResource =>
+        Observable
+          .fromIterator(
+            Task(new AddressDataIterator(dbResource, address, entriesFromDiff, pattern).asScala)
+          )
+          .filterNot(_.isEmpty)
       }
-      Observable.fromIterable((entriesFromDiff.values ++ entries).filterNot(_.isEmpty))
     }
 
     override def resolveAlias(alias: Alias): Either[ValidationError, Address] = blockchain.resolveAlias(alias)
 
     override def activeLeases(address: Address): Observable[LeaseInfo] =
       addressTransactions(
-        db,
-        Some(Height(blockchain.height) -> diff()),
+        rdb,
+        Some(Height(blockchain.height) -> compositeBlockchain().diff),
         address,
         None,
         Set(TransactionType.Lease, TransactionType.InvokeScript, TransactionType.InvokeExpression, TransactionType.Ethereum),
@@ -202,4 +204,60 @@ object CommonAccountsApi {
       blockchain.leaseDetails(id).exists(_.isActive)
   }
 
+  class AddressDataIterator(
+      db: DBResource,
+      address: Address,
+      entriesFromDiff: Array[DataEntry[?]],
+      pattern: Option[Pattern]
+  ) extends AbstractIterator[DataEntry[?]] {
+    val prefix: Array[Byte] = KeyTags.Data.prefixBytes ++ PBRecipients.publicKeyHash(address)
+
+    val length: Int = entriesFromDiff.length
+
+    db.withSafePrefixIterator(_.seek(prefix))()
+
+    var nextIndex                         = 0
+    var nextDbEntry: Option[DataEntry[?]] = None
+
+    def matches(key: String): Boolean = pattern.forall(_.matcher(key).matches())
+
+    final override def computeNext(): DataEntry[?] = db.withSafePrefixIterator { dbIterator =>
+      nextDbEntry match {
+        case Some(dbEntry) =>
+          if (nextIndex < length) {
+            val entryFromDiff = entriesFromDiff(nextIndex)
+            if (entryFromDiff.key < dbEntry.key) {
+              nextIndex += 1
+              entryFromDiff
+            } else if (entryFromDiff.key == dbEntry.key) {
+              nextIndex += 1
+              nextDbEntry = None
+              entryFromDiff
+            } else {
+              nextDbEntry = None
+              dbEntry
+            }
+          } else {
+            nextDbEntry = None
+            dbEntry
+          }
+        case None =>
+          if (dbIterator.isValid) {
+            val key = new String(dbIterator.key().drop(2 + Address.HashLength), Charsets.UTF_8)
+            if (matches(key)) {
+              nextDbEntry = Option(dbIterator.value()).map { arr =>
+                Keys.data(address, key).parse(arr).entry
+              }
+            }
+            dbIterator.next()
+            computeNext()
+          } else if (nextIndex < length) {
+            nextIndex += 1
+            entriesFromDiff(nextIndex - 1)
+          } else {
+            endOfData()
+          }
+      }
+    }(endOfData())
+  }
 }

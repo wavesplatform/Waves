@@ -1,8 +1,8 @@
 package com.wavesplatform.network
 
-import java.util.concurrent.TimeUnit
-
 import com.google.common.cache.{Cache, CacheBuilder}
+
+import java.util.concurrent.TimeUnit
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.MicroBlock
 import com.wavesplatform.common.state.ByteStr
@@ -26,7 +26,7 @@ object MicroBlockSynchronizer extends ScorexLogging {
       lastBlockIdEvents: Observable[ByteStr],
       microblockInvs: ChannelObservable[MicroBlockInv],
       microblockResponses: ChannelObservable[MicroBlockResponse],
-      scheduler: SchedulerService,
+      scheduler: SchedulerService
   ): (Observable[(Channel, MicroblockData)], Coeval[CacheSizes]) = {
 
     implicit val schdlr: SchedulerService = scheduler
@@ -90,48 +90,50 @@ object MicroBlockSynchronizer extends ScorexLogging {
       .subscribe()
 
     microblockInvs
-      .mapEval {
-        case (ch, mbInv @ MicroBlockInv(_, totalBlockId, reference, _)) =>
-          Task.evalAsync {
-            val sig = try mbInv.signaturesValid()
+      .mapEval { case (ch, mbInv @ MicroBlockInv(_, totalBlockId, reference, _)) =>
+        Task.evalAsync {
+          val sig =
+            try mbInv.signaturesValid()
             catch {
               case t: Throwable =>
                 log.error(s"Error validating signature", t)
                 throw t
             }
-            sig match {
-              case Left(err) =>
-                peerDatabase.blacklistAndClose(ch, err.toString)
-              case Right(_) =>
-                microBlockOwners.get(totalBlockId, () => MSet.empty) += ch
-                nextInvs.get(reference, { () =>
+          sig match {
+            case Left(err) =>
+              peerDatabase.blacklistAndClose(ch, err.toString)
+            case Right(_) =>
+              microBlockOwners.get(totalBlockId, () => MSet.empty) += ch
+              nextInvs.get(
+                reference,
+                { () =>
                   BlockStats.inv(mbInv, ch)
                   mbInv
-                })
-                lastBlockId() match {
-                  case Some(`reference`) if !alreadyRequested(totalBlockId) => tryDownloadNext(reference)
-                  case _                                                    => // either the microblock has already been requested or it does no reference the last block
                 }
-            }
-          }.logErr
+              )
+              lastBlockId() match {
+                case Some(`reference`) if !alreadyRequested(totalBlockId) => tryDownloadNext(reference)
+                case _ => // either the microblock has already been requested or it does no reference the last block
+              }
+          }
+        }.logErr
       }
       .executeOn(scheduler)
       .logErr
       .subscribe()
 
-    val observable = microblockResponses.observeOn(scheduler).flatMap {
-      case (ch, MicroBlockResponse(mb, totalRef)) =>
-        successfullyReceived.put(totalRef, dummy)
-        BlockStats.received(mb, ch, totalRef)
-        Option(awaiting.getIfPresent(totalRef)) match {
-          case None =>
-            log.trace(s"${id(ch)} Got unexpected ${mb.stringRepr(totalRef)}")
-            Observable.empty
-          case Some(mi) =>
-            log.trace(s"${id(ch)} Got ${mb.stringRepr(totalRef)}, as expected")
-            awaiting.invalidate(totalRef)
-            Observable((ch, MicroblockData(Option(mi), mb, Coeval.evalOnce(owners(totalRef)))))
-        }
+    val observable = microblockResponses.observeOn(scheduler).flatMap { case (ch, MicroBlockResponse(mb, totalRef)) =>
+      successfullyReceived.put(totalRef, dummy)
+      BlockStats.received(mb, ch, totalRef)
+      Option(awaiting.getIfPresent(totalRef)) match {
+        case None =>
+          log.trace(s"${id(ch)} Got unexpected ${mb.stringRepr(totalRef)}")
+          Observable.empty
+        case Some(mi) =>
+          log.trace(s"${id(ch)} Got ${mb.stringRepr(totalRef)}, as expected")
+          awaiting.invalidate(totalRef)
+          Observable((ch, MicroblockData(Option(mi), mb, Coeval.evalOnce(owners(totalRef)))))
+      }
     }
     (observable, cacheSizesReporter)
   }

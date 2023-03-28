@@ -91,6 +91,7 @@ object UtilsEvaluator {
         dAppPk,
         Set.empty[Address],
         limitedExecution = false,
+        enableExecutionLog = true,
         limit,
         remainingCalls = ContractLimits.MaxSyncDAppCalls(script.stdLibVersion),
         availableActions = ContractLimits.MaxCallableActionsAmountBeforeV6(script.stdLibVersion),
@@ -114,7 +115,8 @@ object UtilsEvaluator {
           script.stdLibVersion,
           correctFunctionCallScope = blockchain.checkEstimatorSumOverflow,
           newMode = blockchain.newEvaluatorMode,
-          checkConstructorArgsTypes = true
+          checkConstructorArgsTypes = true,
+          enableExecutionLog = true
         )
         .value()
         .leftMap { case (err, _, log) => InvokeRejectError(err.message, log) }
@@ -127,26 +129,29 @@ object UtilsEvaluator {
         .bimap(
           _ => Right(Diff.empty),
           r =>
-            InvokeDiffsCommon.processActions(
-              StructuredCallableActions(r.actions, blockchain),
-              ds.stdLibVersion,
-              dAppAddress,
-              dAppPk,
-              usedComplexity,
-              invoke,
-              CompositeBlockchain(blockchain, paymentsDiff),
-              System.currentTimeMillis(),
-              isSyncCall = false,
-              limitedExecution = false,
-              limit,
-              Nil,
-              log
-            ).resultE
+            InvokeDiffsCommon
+              .processActions(
+                StructuredCallableActions(r.actions, blockchain),
+                ds.stdLibVersion,
+                dAppAddress,
+                dAppPk,
+                usedComplexity,
+                invoke,
+                CompositeBlockchain(blockchain, paymentsDiff),
+                System.currentTimeMillis(),
+                isSyncCall = false,
+                limitedExecution = false,
+                limit,
+                Nil,
+                enableExecutionLog = true,
+                log
+              )
+              .resultE
         )
         .merge
       totalDiff <- diff.combineE(paymentsDiff)
-      _ <- TransactionDiffer.validateBalance(blockchain, InvokeScript, addWavesToDefaultInvoker(totalDiff))
-      _ <- TransactionDiffer.assetsVerifierDiff(blockchain, invoke, verify = true, totalDiff, Int.MaxValue).resultE
+      _         <- TransactionDiffer.validateBalance(blockchain, InvokeScript, addWavesToDefaultInvoker(totalDiff))
+      _         <- TransactionDiffer.assetsVerifierDiff(blockchain, invoke, verify = true, totalDiff, Int.MaxValue, enableExecutionLog = true).resultE
       rootScriptResult  = diff.scriptResults.headOption.map(_._2).getOrElse(InvokeScriptResult.empty)
       innerScriptResult = environment.currentDiff.scriptResults.values.fold(InvokeScriptResult.empty)(_ |+| _)
     } yield (evaluated, usedComplexity, log, innerScriptResult |+| rootScriptResult)

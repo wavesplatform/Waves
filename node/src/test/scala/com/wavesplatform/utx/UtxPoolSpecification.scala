@@ -8,7 +8,7 @@ import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.TransactionsOrdering
-import com.wavesplatform.database.{LevelDBWriter, TestStorageFactory, openDB}
+import com.wavesplatform.database.{RDB, RocksDBWriter, TestStorageFactory}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.db.WithState.AddrWithBalance
 import com.wavesplatform.events.UtxEvent
@@ -26,7 +26,7 @@ import com.wavesplatform.mining.*
 import com.wavesplatform.settings.*
 import com.wavesplatform.state.*
 import com.wavesplatform.state.diffs.{invoke as _, *}
-import com.wavesplatform.state.utils.TestLevelDB
+import com.wavesplatform.state.utils.TestRocksDB
 import com.wavesplatform.test.*
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxHelpers.*
@@ -36,32 +36,28 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.*
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.utils.Signed
-import com.wavesplatform.transaction.{Asset, Transaction, *}
+import com.wavesplatform.transaction.{Transaction, *}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPool.PackStrategy
-import monix.reactive.subjects.PublishSubject
-import org.iq80.leveldb.DB
 import org.scalacheck.Gen.*
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.EitherValues
 import org.scalatest.concurrent.Eventually
-
 import java.nio.file.{Files, Path}
+
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration.*
 import scala.util.Random
 
 private object UtxPoolSpecification {
-  private val ignoreSpendableBalanceChanged = PublishSubject[(Address, Asset)]()
-
   final case class TempDB(fs: FunctionalitySettings, dbSettings: DBSettings) {
-    val path: Path            = Files.createTempDirectory("leveldb-test")
-    val db: DB                = openDB(path.toAbsolutePath.toString)
-    val writer: LevelDBWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, fs)
+    val path: Path            = Files.createTempDirectory("rocksdb-test")
+    val rdb           = RDB.open(dbSettings.copy(directory = path.toAbsolutePath.toString))
+    val writer: RocksDBWriter = TestRocksDB.withFunctionalitySettings(rdb, fs)
 
     sys.addShutdownHook {
-      db.close()
+      rdb.close()
       TestHelpers.deleteRecursively(path)
     }
   }
@@ -95,7 +91,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
     )
 
     val dbContext = TempDB(settings.blockchainSettings.functionalitySettings, settings.dbSettings)
-    val (bcu, _)  = TestStorageFactory(settings, dbContext.db, new TestTime, ignoreSpendableBalanceChanged, ignoreBlockchainUpdateTriggers)
+    val (bcu, _)  = TestStorageFactory(settings, dbContext.rdb, new TestTime, ignoreBlockchainUpdateTriggers)
     bcu.processBlock(Block.genesis(genesisSettings, bcu.isFeatureActivated(BlockchainFeatures.RideV6)).explicitGet()) should beRight
     bcu
   }
@@ -1033,9 +1029,9 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           acc1 <- accountGen
           tx1  <- transfer(acc, ENOUGH_AMT / 3, ntpTime)
           txs  <- Gen.nonEmptyListOf(transfer(acc1, 10000000L, ntpTime).suchThat(_.fee.value < tx1.fee.value))
-        } yield (tx1, txs)
+        } yield (acc, acc1, tx1, txs)
 
-        forAll(gen) { case (tx1, rest) =>
+        forAll(gen) { case (acc, acc1, tx1, rest) =>
           val blockchain = stub[Blockchain]
           (() => blockchain.settings).when().returning(WavesSettings.default().blockchainSettings)
           (() => blockchain.height).when().returning(1)
@@ -1052,6 +1048,8 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           (blockchain.balance _).when(*, *).returning(ENOUGH_AMT).repeat((rest.length + 1) * 2)
 
           (blockchain.balance _).when(*, *).returning(ENOUGH_AMT)
+
+          (blockchain.wavesBalances _).when(*).returning(Map(acc.toAddress -> ENOUGH_AMT, acc1.toAddress -> ENOUGH_AMT))
 
           (blockchain.leaseBalance _).when(*).returning(LeaseBalance(0, 0))
           (blockchain.accountScript _).when(*).onCall { _: Address =>

@@ -34,6 +34,7 @@ object ScriptRunner {
       script: Script,
       isAssetScript: Boolean,
       scriptContainerAddress: Environment.Tthis,
+      enableExecutionLog: Boolean,
       complexityLimit: Int = Int.MaxValue,
       default: EVALUATED = TRUE
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) =
@@ -52,6 +53,7 @@ object ScriptRunner {
       blockchain.checkEstimatorSumOverflow,
       blockchain.newEvaluatorMode,
       blockchain.isFeatureActivated(RideV6),
+      enableExecutionLog,
       blockchain.isFeatureActivated(ConsensusImprovements)
     )
 
@@ -69,6 +71,7 @@ object ScriptRunner {
       checkEstimatorSumOverflow: Boolean,
       newEvaluatorMode: Boolean,
       checkWeakPk: Boolean,
+      enableExecutionLog: Boolean,
       fixBigScriptField: Boolean
   ): (Log[Id], Int, Either[ExecutionError, EVALUATED]) = {
 
@@ -131,7 +134,8 @@ object ScriptRunner {
           limit,
           correctFunctionCallScope = checkEstimatorSumOverflow,
           newMode = newEvaluatorMode,
-          onExceed
+          onExceed,
+          enableExecutionLog
         )
 
       (log, limit - unusedComplexity, result)

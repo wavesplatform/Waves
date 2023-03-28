@@ -8,16 +8,17 @@ import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.network.RxExtensionLoader.ApplierState.Buffer
 import com.wavesplatform.network.RxExtensionLoader.LoaderState.WithPeer
 import com.wavesplatform.network.RxScoreObserver.{ChannelClosedAndSyncWith, SyncWith}
+import com.wavesplatform.state.ParSignatureChecker
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.ScorexLogging
-import io.netty.channel._
+import io.netty.channel.*
 import monix.eval.{Coeval, Task}
 import monix.execution.CancelableFuture
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.subjects.{ConcurrentSubject, Subject}
 import monix.reactive.{Observable, Observer}
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 case class ExtensionBlocks(remoteScore: BigInt, blocks: Seq[Block]) {
   override def toString: String = s"ExtensionBlocks($remoteScore, ${formatSignatures(blocks.map(_.id()))}"
@@ -148,6 +149,7 @@ object RxExtensionLoader extends ScorexLogging {
       state.loaderState match {
         case LoaderState.ExpectingBlocks(c, requested, expected, recieved, _) if c.channel == ch && expected.contains(block.id()) =>
           BlockStats.received(block, BlockStats.Source.Ext, ch)
+          ParSignatureChecker.checkBlockSignature(block)
           if (expected == Set(block.id())) {
             val blockById = (recieved + block).map(b => b.id() -> b).toMap
             val ext       = ExtensionBlocks(c.score, requested.map(blockById))
@@ -225,7 +227,7 @@ object RxExtensionLoader extends ScorexLogging {
 
     Observable(
       signatures.observeOn(scheduler).map { case (ch, sigs) => stateValue = onNewSignatures(stateValue, ch, sigs) },
-      blocks.observeOn(scheduler).map { case (ch, block)    => stateValue = onBlock(stateValue, ch, block) },
+      blocks.observeOn(scheduler).map { case (ch, block) => stateValue = onBlock(stateValue, ch, block) },
       syncWithChannelClosed.observeOn(scheduler).map { ch =>
         stateValue = onNewSyncWithChannelClosed(stateValue, ch)
       },

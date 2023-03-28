@@ -2,7 +2,7 @@ package com.wavesplatform.utils
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.Diff
-import org.scalatest.matchers.{Matcher, MatchResult}
+import org.scalatest.matchers.{MatchResult, Matcher}
 
 trait DiffMatchers {
   def containAppliedTx(transactionId: ByteStr) = new DiffAppliedTxMatcher(transactionId, true)

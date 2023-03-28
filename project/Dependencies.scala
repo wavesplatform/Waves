@@ -93,16 +93,10 @@ object Dependencies {
     akkaModule("slf4j") % Runtime
   )
 
-  private def leveldbJava(module: String = "") = "org.iq80.leveldb" % s"leveldb${if (module.nonEmpty) "-" else ""}$module" % "0.12"
-
-  private[this] val levelDBJNA = {
-    val levelDbVersion = "1.23.1"
+  private[this] val dbDeps =
     Seq(
-      "com.wavesplatform.leveldb-jna" % "leveldb-jna-core"   % levelDbVersion,
-      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion,
-      leveldbJava("api")
+      "org.rocksdb" % "rocksdbjni" % "7.10.2"
     )
-  }
 
   lazy val node = Def.setting(
     Seq(
@@ -127,14 +121,16 @@ object Dependencies {
       kindProjector,
       monixModule("reactive").value,
       nettyHandler,
-      "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5",
-      "eu.timepit"                 %% "refined"       % "0.10.1",
-      "com.esaulpaugh"              % "headlong"      % "9.0.0",
+      "com.typesafe.scala-logging"            %% "scala-logging"         % "3.9.5",
+      "eu.timepit"                            %% "refined"               % "0.10.1" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
+      "eu.timepit"                            %% "refined-cats"          % "0.10.1" exclude ("org.scala-lang.modules", "scala-xml_2.13"),
+      "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-core"   % "2.13.5.2",
+      "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-macros" % "2.13.5.2" % "provided",
+      "com.esaulpaugh"                         % "headlong"              % "9.0.0",
       web3jModule("abi"),
-      akkaModule("testkit")                              % Test,
-      akkaHttpModule("akka-http-testkit")                % Test,
-      leveldbJava().exclude("com.google.guava", "guava") % Test
-    ) ++ test ++ console ++ logDeps ++ levelDBJNA ++ protobuf.value ++ langCompilerPlugins.value
+      akkaModule("testkit")               % Test,
+      akkaHttpModule("akka-http-testkit") % Test
+    ) ++ test ++ console ++ logDeps ++ dbDeps ++ protobuf.value ++ langCompilerPlugins.value
   )
 
   lazy val scalapbRuntime = Def.setting {

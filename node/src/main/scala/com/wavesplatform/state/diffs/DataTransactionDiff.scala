@@ -14,7 +14,7 @@ object DataTransactionDiff {
       _ <- DataTxValidator.payloadSizeValidation(blockchain, tx).toEither.leftMap(_.head)
     } yield Diff(
       portfolios = Map(sender -> Portfolio(-tx.fee.value)),
-      accountData = Map(sender -> AccountDataInfo(tx.data.map(item => item.key -> item).toMap)),
+      accountData = Map(sender -> tx.data.map(item => item.key -> item).toMap),
       scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
     )
   }

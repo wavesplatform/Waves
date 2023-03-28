@@ -169,6 +169,7 @@ object InvokeDiffsCommon {
       limitedExecution: Boolean,
       totalComplexityLimit: Int,
       otherIssues: Seq[Issue],
+      enableExecutionLog: Boolean,
       log: Log[Id]
   ): TracedResult[ValidationError, Diff] = {
     val verifierCount          = if (blockchain.hasPaidVerifier(tx.sender.toAddress)) 1 else 0
@@ -202,7 +203,7 @@ object InvokeDiffsCommon {
       complexityLimit =
         if (limitedExecution) ContractLimits.FailFreeInvokeComplexity - storingComplexity
         else Int.MaxValue
-      compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey)(actions.list, paymentsAndFeeDiff, complexityLimit)
+      compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey, enableExecutionLog)(actions.list, paymentsAndFeeDiff, complexityLimit)
         .leftMap {
           case failed: FailedTransactionError => failed.addComplexity(storingComplexity).withLog(log)
           case other                          => other
@@ -442,7 +443,8 @@ object InvokeDiffsCommon {
       blockTime: Long,
       tx: InvokeScriptLike,
       dAppAddress: Address,
-      pk: PublicKey
+      pk: PublicKey,
+      enableExecutionLog: Boolean
   )(
       actions: List[CallableAction],
       paymentsDiff: Diff,
@@ -513,7 +515,8 @@ object InvokeDiffsCommon {
                         assetVerifierDiff,
                         script,
                         complexity,
-                        complexityLimit
+                        complexityLimit,
+                        enableExecutionLog
                       )
                     } yield assetValidationDiff
                     val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
@@ -528,7 +531,7 @@ object InvokeDiffsCommon {
       }
 
       def applyDataItem(item: DataOp): TracedResult[FailedTransactionError, Diff] =
-        TracedResult.wrapValue(Diff(accountData = Map(dAppAddress -> AccountDataInfo(Map(item.key -> dataItemToEntry(item))))))
+        TracedResult.wrapValue(Diff(accountData = Map(dAppAddress -> Map(item.key -> dataItemToEntry(item)))))
 
       def applyIssue(itx: InvokeScriptLike, pk: PublicKey, issue: Issue): TracedResult[ValidationError, Diff] = {
         val asset = IssuedAsset(issue.id)
@@ -547,7 +550,7 @@ object InvokeDiffsCommon {
             TracedResult(Left(FailOrRejectError(error)))
           }
         } else {
-          val staticInfo = AssetStaticInfo(TransactionId @@ itx.txId, pk, issue.decimals, blockchain.isNFT(issue))
+          val staticInfo = AssetStaticInfo(asset.id, TransactionId @@ itx.txId, pk, issue.decimals, blockchain.isNFT(issue))
           val volumeInfo = AssetVolumeInfo(issue.isReissuable, BigInt(issue.quantity))
           val info       = AssetInfo(ByteString.copyFromUtf8(issue.name), ByteString.copyFromUtf8(issue.description), Height @@ blockchain.height)
           Right(
@@ -622,7 +625,8 @@ object InvokeDiffsCommon {
                 result,
                 script,
                 complexity,
-                complexityLimit
+                complexityLimit,
+                enableExecutionLog
               )
             } yield validatedResult
           val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
@@ -671,7 +675,8 @@ object InvokeDiffsCommon {
       nextDiff: Diff,
       script: Script,
       estimatedComplexity: Long,
-      complexityLimit: Int
+      complexityLimit: Int,
+      enableExecutionLog: Boolean
   ): Either[FailedTransactionError, Diff] =
     Try {
       val (log, evaluatedComplexity, result) = ScriptRunner(
@@ -682,6 +687,7 @@ object InvokeDiffsCommon {
         scriptContainerAddress =
           if (blockchain.passCorrectAssetId) Coproduct[Environment.Tthis](Environment.AssetId(assetId.arr))
           else Coproduct[Environment.Tthis](Environment.AssetId(tx.dApp.bytes)),
+        enableExecutionLog = enableExecutionLog,
         complexityLimit
       )
       val complexity = if (blockchain.storeEvaluatedComplexity) evaluatedComplexity else estimatedComplexity

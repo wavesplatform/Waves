@@ -11,7 +11,18 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.TransactionPublisher
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, Blockchain, Diff, Height, LeaseBalance, NG, TxMeta, VolumeAndFee}
+import com.wavesplatform.state.{
+  AccountScriptInfo,
+  AssetDescription,
+  AssetScriptInfo,
+  Blockchain,
+  Diff,
+  Height,
+  LeaseBalance,
+  NG,
+  TxMeta,
+  VolumeAndFee
+}
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction, TxHelpers}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -51,11 +62,15 @@ trait BlockchainStubHelpers { self: MockFactoryBase =>
     (blockchain.filledVolumeAndFee _).when(*).returns(VolumeAndFee.empty)
     (blockchain.assetDescription _).when(*).returns(None)
     (blockchain.balance _).when(TxHelpers.defaultAddress, Waves).returns(Long.MaxValue / 3)
+    (blockchain.wavesBalances _).when(Seq(TxHelpers.defaultAddress)).returns(Map(TxHelpers.defaultAddress -> Long.MaxValue / 3))
     blockchain
   }
 
-  def createTxPublisherStub(blockchain: Blockchain): TransactionPublisher = { (transaction, _) =>
-    Future.successful(TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis())(blockchain, transaction).map(_ => true))
+  def createTxPublisherStub(blockchain: Blockchain, enableExecutionLog: Boolean): TransactionPublisher = { (transaction, _) =>
+    Future.successful(
+      TransactionDiffer(blockchain.lastBlockTimestamp, System.currentTimeMillis(), enableExecutionLog = enableExecutionLog)(blockchain, transaction)
+        .map(_ => true)
+    )
   }
 
   implicit class BlockchainStubOps(blockchain: Blockchain) {
