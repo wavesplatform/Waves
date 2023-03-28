@@ -27,7 +27,7 @@ package object lang {
       while (i < s.length) {
         val c = s.charAt(i)
         if (Character.isSurrogate(c)) {
-          if (Character.codePointAt(s, i) == c) return false
+          if (s.codePointAt(i) == c) return false
           i += 1
         }
         i += 1
