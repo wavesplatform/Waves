@@ -1,8 +1,9 @@
 package com.wavesplatform.state
 import cats.data.Ior
-import cats.implicits.{catsSyntaxAlternativeSeparate, catsSyntaxSemigroup}
+import cats.implicits.catsSyntaxSemigroup
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, Alias, PublicKey}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta.Payload
@@ -21,222 +22,297 @@ object StateSnapshotOps {
   private val lastEstimator = 3
 
   implicit class DiffOps(val diff: Diff) extends AnyVal {
-    def toSnapshot: TransactionStateSnapshot = {
-      val (balances, leaseBalance) =
-        diff.portfolios.toSeq.map { case (address, Portfolio(wavesAmount, lease, assets)) =>
-          val assetBalances =
-            assets.map { case (assetId, balance) =>
-              S.Balance(address.toByteString, Some(Amount(assetId.id.toByteString, balance)))
-            }
-          val wavesBalance = S.Balance(address.toByteString, Some(Amount(ByteString.EMPTY, wavesAmount)))
-          val leaseBalance = S.LeaseBalance(address.toByteString, in = lease.in, out = lease.out)
-          (assetBalances.toSeq :+ wavesBalance, leaseBalance)
-        }.separate
-      val assetVolumes =
-        diff.issuedAssets.view.mapValues(_.volume).toMap |+|
-          diff.updatedAssets.collect {
-            case (asset, Ior.Right(volume))   => (asset, volume)
-            case (asset, Ior.Both(_, volume)) => (asset, volume)
-          }
-      val assetNamesAndDescriptions =
-        diff.issuedAssets.view.mapValues(_.dynamic).toMap ++
-          diff.updatedAssets.collect {
-            case (asset, Ior.Left(info))    => (asset, info)
-            case (asset, Ior.Both(info, _)) => (asset, info)
-          }
+    def toSnapshot: TransactionStateSnapshot =
       TransactionStateSnapshot(
-        balances.flatten,
-        leaseBalance,
-        diff.issuedAssets.map { case (asset, info) =>
-          S.AssetStatic(
-            asset.id.toByteString,
-            info.static.source.toByteString,
-            info.static.issuer.toByteString,
-            info.static.decimals,
-            info.static.nft
-          )
-        }.toSeq,
-        assetVolumes.map { case (asset, volume) =>
-          S.AssetVolume(asset.id.toByteString, volume.isReissuable, ByteString.copyFrom(volume.volume.toByteArray))
-        }.toSeq,
-        assetNamesAndDescriptions.map { case (asset, info) =>
-          S.AssetNameAndDescription(asset.id.toByteString, info.name.toStringUtf8, info.description.toStringUtf8, info.lastUpdatedAt)
-        }.toSeq,
-        diff.assetScripts.map { case (asset, script) =>
-          S.AssetScript(asset.id.toByteString, script.fold(ByteString.EMPTY)(_.script.bytes().toByteString), script.fold(0L)(_.complexity))
-        }.toSeq,
-        diff.aliases.map { case (alias, address) => S.Alias(address.toByteString, alias.name) }.toSeq,
-        diff.orderFills.map { case (orderId, VolumeAndFee(volume, fee)) => S.OrderFill(orderId.toByteString, volume, fee) }.toSeq,
-        diff.leaseState.map { case (leaseId, LeaseDetails(sender, recipient, amount, status, sourceId, height)) =>
-          val pbStatus = status match {
-            case Status.Active =>
-              S.LeaseState.Status.Active(S.LeaseState.Active())
-            case Status.Cancelled(cancelHeight, txId) =>
-              S.LeaseState.Status.Cancelled(S.LeaseState.Cancelled(cancelHeight, txId.fold(ByteString.EMPTY)(_.toByteString)))
-            case Status.Expired(expiredHeight) =>
-              S.LeaseState.Status.Cancelled(S.LeaseState.Cancelled(expiredHeight))
-          }
-          S.LeaseState(
-            leaseId.toByteString,
-            pbStatus,
-            amount,
-            sender.toByteString,
-            Some(PBRecipients.create(recipient)),
-            sourceId.toByteString,
-            height
-          )
-        }.toSeq,
-        diff.scripts.map { case (address, scriptOpt) =>
-          scriptOpt.fold(
-            S.AccountScript(
-              address.toByteString,
-              ByteString.EMPTY,
-              ByteString.EMPTY,
-              0,
-              Map[String, Long]()
-            )
-          )(script =>
-            S.AccountScript(
-              address.toByteString,
-              script.publicKey.toByteString,
-              script.script.bytes().toByteString,
-              script.verifierComplexity,
-              script.complexitiesByEstimator.getOrElse(lastEstimator, Map())
-            )
-          )
-        }.toSeq,
-        diff.accountData.map { case (address, data) =>
-          S.AccountData(address.toByteString, data.data.values.map(PBTransactions.toPBDataEntry).toSeq)
-        }.toSeq,
-        diff.sponsorship.collect { case (asset, SponsorshipValue(minFee)) =>
-          S.Sponsorship(asset.id.toByteString, minFee)
-        }.toSeq,
-        diff.scriptResults.map { case (txId, script) =>
-          S.ScriptResult(txId.toByteString, Some(InvokeScriptResult.toPB(script, addressForTransfer = true)))
-        }.toSeq,
-        diff.ethereumTransactionMeta.map { case (txId, meta) =>
-          val payload = meta.payload match {
-            case Payload.Empty =>
-              S.EthereumTransactionMeta.Payload.Empty
-            case Payload.Invocation(value) =>
-              S.EthereumTransactionMeta.Payload.Invocation(S.EthereumTransactionMeta.Invocation(value.functionCall, value.payments))
-            case Payload.Transfer(value) =>
-              S.EthereumTransactionMeta.Payload.Transfer(S.EthereumTransactionMeta.Transfer(value.publicKeyHash, value.amount))
-          }
-          S.EthereumTransactionMeta(txId.toByteString, payload)
-        }.toSeq,
+        balances,
+        leaseBalances,
+        assetStatics,
+        assetVolumes,
+        assetNamesAndDescriptions,
+        assetScripts,
+        aliases,
+        orderFills,
+        leaseStates,
+        accountScripts,
+        accountData,
+        sponsorships,
+        scriptResults,
+        ethereumTransactionMeta,
         diff.scriptsComplexity
       )
+
+    private def balances: Seq[S.Balance] =
+      diff.portfolios.flatMap { case (address, Portfolio(wavesAmount, _, assets)) =>
+        val assetBalances = assets.map { case (assetId, balance) =>
+          S.Balance(address.toByteString, Some(Amount(assetId.id.toByteString, balance)))
+        }
+        val wavesBalance = S.Balance(address.toByteString, Some(Amount(ByteString.EMPTY, wavesAmount)))
+        assetBalances.toSeq :+ wavesBalance
+      }.toSeq
+
+    private def leaseBalances: Seq[S.LeaseBalance] =
+      diff.portfolios.flatMap { case (address, Portfolio(_, lease, _)) =>
+        if (lease != LeaseBalance.empty) Seq(S.LeaseBalance(address.toByteString, in = lease.in, out = lease.out)) else Nil
+      }.toSeq
+
+    private def assetStatics: Seq[S.AssetStatic] =
+      diff.issuedAssets.map { case (asset, info) =>
+        S.AssetStatic(
+          asset.id.toByteString,
+          info.static.source.toByteString,
+          info.static.issuer.toByteString,
+          info.static.decimals,
+          info.static.nft
+        )
+      }.toSeq
+
+    private def assetVolumes: Seq[S.AssetVolume] = {
+      val issued = diff.issuedAssets.view.mapValues(_.volume).toMap
+      val updated = diff.updatedAssets.collect {
+        case (asset, Ior.Right(volume))   => (asset, volume)
+        case (asset, Ior.Both(_, volume)) => (asset, volume)
+      }
+      (issued |+| updated).map { case (asset, volume) =>
+        S.AssetVolume(asset.id.toByteString, volume.isReissuable, ByteString.copyFrom(volume.volume.toByteArray))
+      }.toSeq
     }
+
+    private def assetNamesAndDescriptions: Seq[S.AssetNameAndDescription] = {
+      val issued = diff.issuedAssets.view.mapValues(_.dynamic).toMap
+      val updated = diff.updatedAssets.collect {
+        case (asset, Ior.Left(info))    => (asset, info)
+        case (asset, Ior.Both(info, _)) => (asset, info)
+      }
+      (issued ++ updated).map { case (asset, info) =>
+        S.AssetNameAndDescription(asset.id.toByteString, info.name.toStringUtf8, info.description.toStringUtf8, info.lastUpdatedAt)
+      }.toSeq
+    }
+
+    private def assetScripts: Seq[S.AssetScript] =
+      diff.assetScripts.map { case (asset, script) =>
+        S.AssetScript(asset.id.toByteString, script.fold(ByteString.EMPTY)(_.script.bytes().toByteString), script.fold(0L)(_.complexity))
+      }.toSeq
+
+    private def aliases: Seq[S.Alias] =
+      diff.aliases.map { case (alias, address) => S.Alias(address.toByteString, alias.name) }.toSeq
+
+    private def orderFills: Seq[S.OrderFill] =
+      diff.orderFills.map { case (orderId, VolumeAndFee(volume, fee)) => S.OrderFill(orderId.toByteString, volume, fee) }.toSeq
+
+    private def leaseStates: Seq[S.LeaseState] =
+      diff.leaseState.map { case (leaseId, LeaseDetails(sender, recipient, amount, status, sourceId, height)) =>
+        val pbStatus = status match {
+          case Status.Active =>
+            S.LeaseState.Status.Active(S.LeaseState.Active())
+          case Status.Cancelled(cancelHeight, txId) =>
+            S.LeaseState.Status.Cancelled(S.LeaseState.Cancelled(cancelHeight, txId.fold(ByteString.EMPTY)(_.toByteString)))
+          case Status.Expired(expiredHeight) =>
+            S.LeaseState.Status.Cancelled(S.LeaseState.Cancelled(expiredHeight))
+        }
+        S.LeaseState(
+          leaseId.toByteString,
+          pbStatus,
+          amount,
+          sender.toByteString,
+          Some(PBRecipients.create(recipient)),
+          sourceId.toByteString,
+          height
+        )
+      }.toSeq
+
+    private def accountScripts: Seq[S.AccountScript] =
+      diff.scripts.map { case (address, scriptOpt) =>
+        scriptOpt.fold(
+          S.AccountScript(
+            address.toByteString,
+            ByteString.EMPTY,
+            ByteString.EMPTY,
+            0,
+            Map[String, Long]()
+          )
+        )(script =>
+          S.AccountScript(
+            address.toByteString,
+            script.publicKey.toByteString,
+            script.script.bytes().toByteString,
+            script.verifierComplexity,
+            script.complexitiesByEstimator.getOrElse(lastEstimator, Map())
+          )
+        )
+      }.toSeq
+
+    private def accountData: Seq[S.AccountData] =
+      diff.accountData.map { case (address, data) =>
+        S.AccountData(address.toByteString, data.data.values.map(PBTransactions.toPBDataEntry).toSeq)
+      }.toSeq
+
+    private def sponsorships: Seq[S.Sponsorship] =
+      diff.sponsorship.collect { case (asset, SponsorshipValue(minFee)) =>
+        S.Sponsorship(asset.id.toByteString, minFee)
+      }.toSeq
+
+    private def scriptResults: Seq[S.ScriptResult] =
+      diff.scriptResults.map { case (txId, script) =>
+        S.ScriptResult(txId.toByteString, Some(InvokeScriptResult.toPB(script, addressForTransfer = true)))
+      }.toSeq
+
+    private def ethereumTransactionMeta: Seq[S.EthereumTransactionMeta] =
+      diff.ethereumTransactionMeta.map { case (txId, meta) =>
+        val payload = meta.payload match {
+          case Payload.Empty =>
+            S.EthereumTransactionMeta.Payload.Empty
+          case Payload.Invocation(value) =>
+            S.EthereumTransactionMeta.Payload.Invocation(S.EthereumTransactionMeta.Invocation(value.functionCall, value.payments))
+          case Payload.Transfer(value) =>
+            S.EthereumTransactionMeta.Payload.Transfer(S.EthereumTransactionMeta.Transfer(value.publicKeyHash, value.amount))
+        }
+        S.EthereumTransactionMeta(txId.toByteString, payload)
+      }.toSeq
   }
 
   implicit class TransactionStateSnapshotOps(val s: TransactionStateSnapshot) extends AnyVal {
-    def toDiff: Diff = {
-      val balancePortfolios =
-        s.balances
-          .foldLeft(Map[Address, Portfolio]()) { (portfolios, nextBalance) =>
-            val asset =
-              if (nextBalance.getAmount.assetId.isEmpty) Waves
-              else nextBalance.getAmount.assetId.toAssetId
-            val portfolio = Portfolio.build(asset, nextBalance.getAmount.amount)
-            val address   = nextBalance.address.toAddress
-            Diff.combine(portfolios, Map(address -> portfolio)).explicitGet()
-          }
-      val leasePortfolios = s.leaseBalances.map(b => b.address.toAddress -> Portfolio(lease = LeaseBalance(in = b.in, out = b.out))).toMap
-      val assetVolumes    = s.assetVolumes.map(v => v.assetId.toAssetId -> AssetVolumeInfo(v.reissuable, BigInt(v.volume.toByteArray))).toMap
-      val assetDynamics =
-        s.assetNamesAndDescriptions.map(a => a.assetId.toAssetId -> AssetInfo(a.name, a.description, Height @@ a.lastUpdated)).toMap
-      val issuedAssets =
-        VectorMap[IssuedAsset, NewAssetInfo]() ++ s.assetStatics.map { s =>
-          val static = AssetStaticInfo(TransactionId @@ s.sourceTransactionId.toByteStr, PublicKey @@ s.issuer.toByteStr, s.decimals, s.nft)
-          val asset  = s.assetId.toAssetId
-          s.assetId.toAssetId -> NewAssetInfo(static, assetDynamics(asset), assetVolumes(asset))
-        }
-      val updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] =
-        (assetVolumes.keySet ++ assetDynamics.keySet)
-          .filterNot(issuedAssets.contains)
-          .map { asset =>
-            val info =
-              (assetDynamics.get(asset), assetVolumes.get(asset)) match {
-                case (Some(dynamic), Some(volume)) => Ior.Both(dynamic, volume)
-                case (Some(dynamic), None)         => Ior.Left(dynamic)
-                case (None, Some(volume))          => Ior.Right(volume)
-                case _                             => ???
-              }
-            asset -> info
-          }
-          .toMap
+    def toDiff: Diff =
       Diff(
-        Diff.combine(balancePortfolios, leasePortfolios).explicitGet(),
+        portfolios,
         issuedAssets,
         updatedAssets,
-        s.aliases.map(a => Alias.create(a.alias).explicitGet() -> a.address.toAddress).toMap,
-        s.orderFills.map(of => of.orderId.toByteStr -> VolumeAndFee(of.volume, of.fee)).toMap,
-        s.leaseStates
-          .map(ls =>
-            ls.leaseId.toByteStr ->
-              LeaseDetails(
-                PublicKey @@ ls.sender.toByteStr,
-                PBRecipients.toAddressOrAlias(ls.getRecipient, AddressScheme.current.chainId).explicitGet(),
-                ls.amount,
-                ls.status match {
-                  case S.LeaseState.Status.Cancelled(c) =>
-                    LeaseDetails.Status.Cancelled(c.height, if (c.transactionId.isEmpty) None else Some(c.transactionId.toByteStr))
-                  case S.LeaseState.Status.Active(_) =>
-                    LeaseDetails.Status.Active
-                  case _ =>
-                    ???
-                },
-                ls.originTransactionId.toByteStr,
-                ls.height
-              )
-          )
-          .toMap,
-        s.accountScripts.map { pbInfo =>
-          val info =
-            if (pbInfo.script.isEmpty)
-              None
-            else
-              Some(
-                AccountScriptInfo(
-                  pbInfo.senderPublicKey.toPublicKey,
-                  ScriptReader.fromBytes(pbInfo.script.toByteArray).explicitGet(),
-                  pbInfo.verifierComplexity,
-                  if (pbInfo.callableComplexities.nonEmpty) Map(lastEstimator -> pbInfo.callableComplexities) else Map()
-                )
-              )
-          pbInfo.senderAddress.toAddress -> info
-        }.toMap,
-        s.assetScripts.map { pbInfo =>
-          val info =
-            if (pbInfo.script.isEmpty)
-              None
-            else
-              Some(AssetScriptInfo(ScriptReader.fromBytes(pbInfo.script.toByteArray).explicitGet(), pbInfo.complexity))
-          pbInfo.assetId.toAssetId -> info
-        }.toMap,
-        s.accountData
-          .map(data => data.address.toAddress -> AccountDataInfo(data.entry.map(e => e.key -> PBTransactions.toVanillaDataEntry(e)).toMap))
-          .toMap,
-        s.sponsorships
-          .map(data => data.assetId.toAssetId -> SponsorshipValue(data.minFee))
-          .toMap,
+        aliases,
+        orderFills,
+        leaseStates,
+        accountScripts,
+        assetScripts,
+        accountData,
+        sponsorships,
         scriptsRun = 0,
         s.totalComplexity,
-        s.scriptResults.map(r => r.transactionId.toByteStr -> InvokeScriptResult.fromPB(r.getResult)).toMap,
-        s.ethereumTransactionMeta.map { m =>
-          val payload = m.payload match {
-            case S.EthereumTransactionMeta.Payload.Empty =>
-              Payload.Empty
-            case S.EthereumTransactionMeta.Payload.Invocation(S.EthereumTransactionMeta.Invocation(functionCall, payments, _)) =>
-              Payload.Invocation(EthereumTransactionMeta.Invocation(functionCall, payments))
-            case S.EthereumTransactionMeta.Payload.Transfer(S.EthereumTransactionMeta.Transfer(publicKeyHash, amount, _)) =>
-              Payload.Transfer(EthereumTransactionMeta.Transfer(publicKeyHash, amount))
-          }
-          m.transactionId.toByteStr -> EthereumTransactionMeta(payload)
-        }.toMap,
-        check = false
+        scriptResults,
+        ethereumTransactionMeta
       )
-    }
+
+    private def portfolios: Map[Address, Portfolio] =
+      Diff.combine(balancePortfolios, leasePortfolios).explicitGet()
+
+    private def balancePortfolios: Map[Address, Portfolio] =
+      s.balances
+        .foldLeft(Map[Address, Portfolio]()) { (portfolios, nextBalance) =>
+          val asset =
+            if (nextBalance.getAmount.assetId.isEmpty) Waves
+            else nextBalance.getAmount.assetId.toAssetId
+          val portfolio = Portfolio.build(asset, nextBalance.getAmount.amount)
+          val address   = nextBalance.address.toAddress
+          Diff.combine(portfolios, Map(address -> portfolio)).explicitGet()
+        }
+
+    private def leasePortfolios: Map[Address, Portfolio] =
+      s.leaseBalances
+        .map(b => b.address.toAddress -> Portfolio(lease = LeaseBalance(in = b.in, out = b.out)))
+        .toMap
+
+    private def issuedAssets: VectorMap[IssuedAsset, NewAssetInfo] =
+      VectorMap[IssuedAsset, NewAssetInfo]() ++ s.assetStatics.map { s =>
+        val static = AssetStaticInfo(TransactionId @@ s.sourceTransactionId.toByteStr, PublicKey @@ s.issuer.toByteStr, s.decimals, s.nft)
+        val asset  = s.assetId.toAssetId
+        s.assetId.toAssetId -> NewAssetInfo(static, assetDynamics(asset), assetVolumes(asset))
+      }
+
+    private def updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] =
+      (assetVolumes.keySet ++ assetDynamics.keySet)
+        .filterNot(issuedAssets.contains)
+        .map { asset =>
+          val info =
+            (assetDynamics.get(asset), assetVolumes.get(asset)) match {
+              case (Some(dynamic), Some(volume)) => Ior.Both(dynamic, volume)
+              case (Some(dynamic), None)         => Ior.Left(dynamic)
+              case (None, Some(volume))          => Ior.Right(volume)
+              case _                             => ???
+            }
+          asset -> info
+        }
+        .toMap
+
+    private def assetVolumes: Map[IssuedAsset, AssetVolumeInfo] =
+      s.assetVolumes.map(v => v.assetId.toAssetId -> AssetVolumeInfo(v.reissuable, BigInt(v.volume.toByteArray))).toMap
+
+    private def assetDynamics: Map[IssuedAsset, AssetInfo] =
+      s.assetNamesAndDescriptions.map(a => a.assetId.toAssetId -> AssetInfo(a.name, a.description, Height @@ a.lastUpdated)).toMap
+
+    private def aliases: Map[Alias, Address] =
+      s.aliases.map(a => Alias.create(a.alias).explicitGet() -> a.address.toAddress).toMap
+
+    private def orderFills: Map[ByteStr, VolumeAndFee] =
+      s.orderFills.map(of => of.orderId.toByteStr -> VolumeAndFee(of.volume, of.fee)).toMap
+
+    private def leaseStates: Map[ByteStr, LeaseDetails] =
+      s.leaseStates
+        .map(ls =>
+          ls.leaseId.toByteStr ->
+            LeaseDetails(
+              PublicKey @@ ls.sender.toByteStr,
+              PBRecipients.toAddressOrAlias(ls.getRecipient, AddressScheme.current.chainId).explicitGet(),
+              ls.amount,
+              ls.status match {
+                case S.LeaseState.Status.Cancelled(c) =>
+                  LeaseDetails.Status.Cancelled(c.height, if (c.transactionId.isEmpty) None else Some(c.transactionId.toByteStr))
+                case _ =>
+                  LeaseDetails.Status.Active
+              },
+              ls.originTransactionId.toByteStr,
+              ls.height
+            )
+        )
+        .toMap
+
+    private def accountScripts: Map[Address, Option[AccountScriptInfo]] =
+      s.accountScripts.map { pbInfo =>
+        val info =
+          if (pbInfo.script.isEmpty)
+            None
+          else
+            Some(
+              AccountScriptInfo(
+                pbInfo.senderPublicKey.toPublicKey,
+                ScriptReader.fromBytes(pbInfo.script.toByteArray).explicitGet(),
+                pbInfo.verifierComplexity,
+                if (pbInfo.callableComplexities.nonEmpty) Map(lastEstimator -> pbInfo.callableComplexities) else Map()
+              )
+            )
+        pbInfo.senderAddress.toAddress -> info
+      }.toMap
+
+    private def assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]] =
+      s.assetScripts.map { pbInfo =>
+        val info =
+          if (pbInfo.script.isEmpty)
+            None
+          else
+            Some(AssetScriptInfo(ScriptReader.fromBytes(pbInfo.script.toByteArray).explicitGet(), pbInfo.complexity))
+        pbInfo.assetId.toAssetId -> info
+      }.toMap
+
+    private def accountData: Map[Address, AccountDataInfo] =
+      s.accountData
+        .map(data => data.address.toAddress -> AccountDataInfo(data.entry.map(e => e.key -> PBTransactions.toVanillaDataEntry(e)).toMap))
+        .toMap
+
+    private def sponsorships: Map[IssuedAsset, SponsorshipValue] =
+      s.sponsorships
+        .map(data => data.assetId.toAssetId -> SponsorshipValue(data.minFee))
+        .toMap
+
+    private def scriptResults: Map[ByteStr, InvokeScriptResult] =
+      s.scriptResults.map(r => r.transactionId.toByteStr -> InvokeScriptResult.fromPB(r.getResult)).toMap
+
+    private def ethereumTransactionMeta: Map[ByteStr, EthereumTransactionMeta] =
+      s.ethereumTransactionMeta.map { m =>
+        val payload = m.payload match {
+          case S.EthereumTransactionMeta.Payload.Empty =>
+            Payload.Empty
+          case S.EthereumTransactionMeta.Payload.Invocation(S.EthereumTransactionMeta.Invocation(functionCall, payments, _)) =>
+            Payload.Invocation(EthereumTransactionMeta.Invocation(functionCall, payments))
+          case S.EthereumTransactionMeta.Payload.Transfer(S.EthereumTransactionMeta.Transfer(publicKeyHash, amount, _)) =>
+            Payload.Transfer(EthereumTransactionMeta.Transfer(publicKeyHash, amount))
+        }
+        m.transactionId.toByteStr -> EthereumTransactionMeta(payload)
+      }.toMap
   }
 }
