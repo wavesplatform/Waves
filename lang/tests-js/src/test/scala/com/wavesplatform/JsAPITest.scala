@@ -223,7 +223,7 @@ object JsAPITest extends JsTestBase {
       JSON.stringify(result.errorList) ==> "[]"
     }
 
-    test("xxx") {
+    test("ill-formed characters") {
       val script =
         """
           |{-# STDLIB_VERSION 6 #-}
