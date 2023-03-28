@@ -32,9 +32,6 @@ import org.scalatest.{BeforeAndAfterAll, Suite}
 trait WithState extends BeforeAndAfterAll with DBCacheSettings with Matchers with NTPTime { _: Suite =>
   protected val ignoreBlockchainUpdateTriggers: BlockchainUpdateTriggers = BlockchainUpdateTriggers.noop
 
-//  private[this] val currentDbInstance = new ThreadLocal[RDB]
-//  protected def rdb: RDB              = currentDbInstance.get()
-
   private val path  = Files.createTempDirectory("rocks-temp").toAbsolutePath
   protected val rdb = RDB.open(dbSettings.copy(directory = path.toAbsolutePath.toString))
 
