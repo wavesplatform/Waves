@@ -109,7 +109,8 @@ object RocksDBWriter extends ScorexLogging {
 class RocksDBWriter(
     rdb: RDB,
     val settings: BlockchainSettings,
-    val dbSettings: DBSettings
+    val dbSettings: DBSettings,
+    bfBlockInsertions: Int = 10000
 ) extends Caches {
   import rdb.db as writableDB
 
@@ -356,7 +357,7 @@ class RocksDBWriter(
 
   // todo: instead of fixed-size block batches, store fixed-time batches
   private val BlockStep  = 200
-  private def mkFilter() = BloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), BlockStep * 10000, 0.01f)
+  private def mkFilter() = BloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), BlockStep * bfBlockInsertions, 0.01f)
 
   private var bf0 = mkFilter()
   private var bf1 = mkFilter()
