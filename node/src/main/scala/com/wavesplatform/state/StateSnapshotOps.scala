@@ -186,7 +186,8 @@ object StateSnapshotOps {
         scriptsRun = 0,
         s.totalComplexity,
         scriptResults,
-        ethereumTransactionMeta
+        ethereumTransactionMeta,
+        check = false
       )
 
     private def portfolios: Map[Address, Portfolio] =
