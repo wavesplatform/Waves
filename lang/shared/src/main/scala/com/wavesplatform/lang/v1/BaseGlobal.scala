@@ -379,8 +379,6 @@ trait BaseGlobal {
       }
     }
   }
-
-  def isIllFormed(s: String): Boolean
 }
 
 object BaseGlobal {

@@ -222,5 +222,26 @@ object JsAPITest extends JsTestBase {
       JSON.stringify(result.exprAst.expr) ==> JSON.stringify(JSON.parse(expected))
       JSON.stringify(result.errorList) ==> "[]"
     }
+
+    test("xxx") {
+      val script =
+        """
+          |{-# STDLIB_VERSION 6 #-}
+          |{-# CONTENT_TYPE DAPP #-}
+          |{-# SCRIPT_TYPE ACCOUNT #-}
+          |
+          |func call(a: String, b: Int) = {
+          |    let zzz = "\ud87e"
+          |    ([], zzz)
+          |}
+          |
+          |@Callable(i)
+          |func call_1(a: String) = call(a, 3)
+          |
+          |@Callable(i)
+          |func call_2(a: String, b: Int) = call(a, b)
+        """.stripMargin
+      assertCompileError(script, "contains ill-formed characters")
+    }
   }
 }
