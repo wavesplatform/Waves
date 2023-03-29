@@ -9,7 +9,7 @@ on:
 
 jobs:
   check-pr:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-java@v3
@@ -27,7 +27,7 @@ jobs:
           path: ~/.cache/coursier
           key: coursier-cache
       - name: Check PR
-        run: sbt --mem 4096 --batch checkPR
+        run: sbt --mem 6144 --batch checkPR
       - uses: dorny/paths-filter@v2
         id: filter
         with:
