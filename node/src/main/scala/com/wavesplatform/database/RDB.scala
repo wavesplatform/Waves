@@ -69,7 +69,7 @@ object RDB extends StrictLogging {
       Seq(
         new ColumnFamilyDescriptor(
           RocksDB.DEFAULT_COLUMN_FAMILY,
-          newColumnFamilyOptions(12.0, 16 << 10, 512 << 20, 0.6)
+          newColumnFamilyOptions(12.0, 16 << 10, settings.rocksdbCacheSize, 0.6)
             .setCfPaths(Seq(new DbPath(new File(dbDir, "default").toPath, 0L)).asJava)
         ),
         new ColumnFamilyDescriptor(

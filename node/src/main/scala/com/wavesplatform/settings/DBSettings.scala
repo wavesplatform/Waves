@@ -1,8 +1,6 @@
 package com.wavesplatform.settings
 import scala.concurrent.duration.FiniteDuration
 
-case class InMemorySettings(batchSize: SizeInBytes, maxCacheWeight: SizeInBytes)
-
 case class DBSettings(
     directory: String,
     storeTransactionsByAddress: Boolean,
@@ -12,5 +10,5 @@ case class DBSettings(
     maxRollbackDepth: Int,
     rememberBlocks: FiniteDuration,
     useBloomFilter: Boolean,
-    inMemory: InMemorySettings
+    rocksdbCacheSize: Int
 )
