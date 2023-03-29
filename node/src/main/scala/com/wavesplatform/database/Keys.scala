@@ -181,14 +181,6 @@ object Keys {
       writeTransactionHNSeqAndType
     )
 
-  def oldAddressTransactionHN(addressId: AddressId, seqNr: Int): Key[Option[(Height, Seq[(Byte, TxNum)])]] =
-    Key.opt(
-      AddressTransactionHeightTypeAndNums,
-      hBytes(addressId.toByteArray, seqNr),
-      oldReadTransactionHNSeqAndType,
-      oldWriteTransactionHNSeqAndType
-    )
-
   def transactionMetaById(txId: TransactionId, cfh: RDB.TxMetaHandle): Key[Option[TransactionMeta]] =
     Key.opt(
       TransactionMetaById,

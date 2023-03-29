@@ -12,7 +12,7 @@ trait DBResource extends AutoCloseable {
   def multiGet[A](keys: ArrayBuffer[Key[A]], valBufferSize: Int): View[A]
   def multiGetFlat[A](keys: ArrayBuffer[Key[Option[A]]], valBufferSizes: ArrayBuffer[Int]): Seq[A]
   def prefixIterator: RocksIterator // Should have a single instance
-  def fullIterator: RocksIterator
+  def fullIterator: RocksIterator   // Should have a single instance
   def withSafePrefixIterator[A](ifNotClosed: RocksIterator => A)(ifClosed: => A = ()): A
   def withSafeFullIterator[A](ifNotClosed: RocksIterator => A)(ifClosed: => A = ()): A
 }

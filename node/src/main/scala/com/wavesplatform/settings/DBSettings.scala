@@ -10,5 +10,5 @@ case class DBSettings(
     maxRollbackDepth: Int,
     rememberBlocks: FiniteDuration,
     useBloomFilter: Boolean,
-    rocksdbCacheSize: Int
+    rocksdb: RocksDBSettings
 )

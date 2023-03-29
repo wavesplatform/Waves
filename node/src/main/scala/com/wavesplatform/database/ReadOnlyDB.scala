@@ -25,7 +25,7 @@ class ReadOnlyDB(db: RocksDB, readOptions: ReadOptions) {
     db.multiGetOpt(readOptions, keys, valBufSizes)
 
   def multiGetInts(keys: Seq[Key[Int]]): Seq[Option[Int]] =
-    db.multiGetInts(readOptions, keys.map(_.keyBytes))
+    db.multiGetInts(readOptions, keys)
 
   def has[V](key: Key[V]): Boolean = {
     val bytes = db.get(key.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily), readOptions, key.keyBytes)

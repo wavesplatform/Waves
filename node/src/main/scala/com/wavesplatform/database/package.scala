@@ -285,21 +285,6 @@ package object database {
     )
   }
 
-  def oldReadTransactionHNSeqAndType(bs: Array[Byte]): (Height, Seq[(Byte, TxNum)]) = {
-    val ndi          = newDataInput(bs)
-    val height       = Height(ndi.readInt())
-    val numSeqLength = ndi.readInt()
-
-    (
-      height,
-      List.fill(numSeqLength) {
-        val tp  = ndi.readByte()
-        val num = TxNum(ndi.readShort())
-        (tp, num)
-      }
-    )
-  }
-
   def writeTransactionHNSeqAndType(v: (Height, Seq[(Byte, TxNum, Int)])): Array[Byte] = {
     val (height, numSeq) = v
     val numSeqLength     = numSeq.length
@@ -313,23 +298,6 @@ package object database {
       ndo.writeByte(tp)
       ndo.writeShort(num)
       ndo.writeInt(size)
-    }
-
-    ndo.toByteArray
-  }
-
-  def oldWriteTransactionHNSeqAndType(v: (Height, Seq[(Byte, TxNum)])): Array[Byte] = {
-    val (height, numSeq) = v
-    val numSeqLength     = numSeq.length
-
-    val outputLength = 4 + 4 + numSeqLength * (4 + 1)
-    val ndo          = newDataOutput(outputLength)
-
-    ndo.writeInt(height)
-    ndo.writeInt(numSeqLength)
-    numSeq.foreach { case (tp, num) =>
-      ndo.writeByte(tp)
-      ndo.writeShort(num)
     }
 
     ndo.toByteArray
@@ -473,12 +441,14 @@ package object database {
       result
     }
 
-    def multiGetInts(readOptions: ReadOptions, keys: Seq[Array[Byte]]): Seq[Option[Int]] = {
-      val keyBufs = getKeyBuffers(keys)
-      val valBufs = getValueBuffers(keys.size, 4)
+    def multiGetInts(readOptions: ReadOptions, keys: Seq[Key[Int]]): Seq[Option[Int]] = {
+      val keyBytes = keys.map(_.keyBytes)
+      val keyBufs  = getKeyBuffers(keyBytes)
+      val valBufs  = getValueBuffers(keyBytes.size, 4)
 
+      val cfhs = keys.map(_.columnFamilyHandle.getOrElse(db.getDefaultColumnFamily)).asJava
       val result = db
-        .multiGetByteBuffers(readOptions, keyBufs, valBufs)
+        .multiGetByteBuffers(readOptions, cfhs, keyBufs, valBufs)
         .asScala
         .map { value =>
           if (value.status.getCode == Status.Code.Ok) {

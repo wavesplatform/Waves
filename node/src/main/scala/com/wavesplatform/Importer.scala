@@ -2,7 +2,6 @@ package com.wavesplatform
 
 import java.io.*
 import java.net.{MalformedURLException, URL}
-
 import akka.actor.ActorSystem
 import com.google.common.io.ByteStreams
 import com.google.common.primitives.Ints
@@ -27,7 +26,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.*
-import com.wavesplatform.utx.UtxPool
+import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
 import kamon.Kamon
 import monix.eval.Task
@@ -303,13 +302,15 @@ object Importer extends ScorexLogging {
     val scheduler = Schedulers.singleThread("appender")
     val time      = new NTP(settings.ntpServer)
 
-    val rdb = RDB.open(settings.dbSettings)
-    val (blockchainUpdater, rocksDb) =
+    val actorSystem = ActorSystem("wavesplatform-import")
+    val rdb         = RDB.open(settings.dbSettings)
+    val (blockchainUpdater, _) =
       StorageFactory(settings, rdb, time, BlockchainUpdateTriggers.combined(triggers))
+    val utxPool     = new UtxPoolImpl(time, blockchainUpdater, settings.utxSettings, settings.maxTxErrorLogSize, settings.minerSettings.enable)
     val pos         = PoSSelector(blockchainUpdater, settings.synchronizationSettings.maxBaseTarget)
     val extAppender = BlockAppender(blockchainUpdater, time, (_: Seq[Diff]) => {}, pos, scheduler, importOptions.verify, txSignParCheck = false) _
 
-    val extensions = Seq.empty[Extension]
+    val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, rdb, actorSystem)
     checkGenesis(settings, blockchainUpdater, Miner.Disabled)
 
     val importFileOffset =
@@ -345,6 +346,7 @@ object Importer extends ScorexLogging {
 
     sys.addShutdownHook {
       quit = true
+      Await.result(actorSystem.terminate(), 10.second)
       lock.synchronized {
         if (blockchainUpdater.isFeatureActivated(BlockchainFeatures.NG) && blockchainUpdater.liquidBlockMeta.nonEmpty) {
           // Force store liquid block in rocksdb
@@ -374,6 +376,7 @@ object Importer extends ScorexLogging {
         // Terminate extensions
         Await.ready(Future.sequence(extensions.map(_.shutdown())), settings.extensionsShutdownTimeout)
 
+        utxPool.close()
         blockchainUpdater.shutdown()
         rdb.close()
       }
