@@ -53,7 +53,7 @@ import scala.util.Random
 private object UtxPoolSpecification {
   final case class TempDB(fs: FunctionalitySettings, dbSettings: DBSettings) {
     val path: Path            = Files.createTempDirectory("rocksdb-test")
-    val rdb           = RDB.open(dbSettings.copy(directory = path.toAbsolutePath.toString))
+    val rdb                   = RDB.open(dbSettings.copy(directory = path.toAbsolutePath.toString))
     val writer: RocksDBWriter = TestRocksDB.withFunctionalitySettings(rdb, fs)
 
     sys.addShutdownHook {
