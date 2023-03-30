@@ -200,15 +200,17 @@ trait WithDomain extends WithState { _: Suite =>
         BlockchainUpdateTriggers.combined(domain.triggers),
         loadActiveLeases(rdb, _, _)
       )
-      domain = Domain(new RDB(wrapDB(rdb.db), rdb.txMetaHandle, rdb.txHandle), bcu, blockchain, settings)
-      val genesis = balances.map { case AddrWithBalance(address, amount) =>
-        TxHelpers.genesis(address, amount)
-      }
-      if (genesis.nonEmpty) {
-        domain.appendBlock(genesis*)
-      }
-      try test(domain)
-      finally bcu.shutdown()
+
+      try {
+        domain = Domain(rdb.wrapDb(wrapDB).explicitGet(), bcu, blockchain, settings)
+        val genesis = balances.map { case AddrWithBalance(address, amount) =>
+          TxHelpers.genesis(address, amount)
+        }
+        if (genesis.nonEmpty) {
+          domain.appendBlock(genesis*)
+        }
+        test(domain)
+      } finally bcu.shutdown()
     }
 
   private val allVersions = DirectiveDictionary[StdLibVersion].all

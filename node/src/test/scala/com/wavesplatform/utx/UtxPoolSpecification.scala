@@ -42,21 +42,21 @@ import com.wavesplatform.utx.UtxPool.PackStrategy
 import org.scalacheck.Gen.*
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.EitherValues
+import org.scalatest.{Assertion, EitherValues}
 import org.scalatest.concurrent.Eventually
-import java.nio.file.{Files, Path}
 
+import java.nio.file.{Files, Path}
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration.*
-import scala.util.Random
+import scala.util.{Random, Using}
 
 private object UtxPoolSpecification {
-  final case class TempDB(fs: FunctionalitySettings, dbSettings: DBSettings) {
+  final case class TempDB(fs: FunctionalitySettings, dbSettings: DBSettings) extends AutoCloseable {
     val path: Path            = Files.createTempDirectory("rocksdb-test")
     val rdb                   = RDB.open(dbSettings.copy(directory = path.toAbsolutePath.toString))
     val writer: RocksDBWriter = TestRocksDB.withFunctionalitySettings(rdb, fs)
 
-    sys.addShutdownHook {
+    override def close(): Unit = {
       rdb.close()
       TestHelpers.deleteRecursively(path)
     }
@@ -71,7 +71,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
   import FunctionalitySettings.TESTNET.maxTransactionTimeBackOffset as maxAge
   import UtxPoolSpecification.*
 
-  private def mkBlockchain(genAccounts: Map[Address, Long]) = {
+  private def withBlockchain[A](genAccounts: Map[Address, Long])(test: BlockchainUpdaterImpl => A): A = {
     val genesisSettings = TestHelpers.genesisSettings(genAccounts)
     val origSettings    = WavesSettings.default()
     val settings = origSettings.copy(
@@ -90,10 +90,11 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
       featuresSettings = origSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
     )
 
-    val dbContext = TempDB(settings.blockchainSettings.functionalitySettings, settings.dbSettings)
-    val (bcu, _)  = TestStorageFactory(settings, dbContext.rdb, new TestTime, ignoreBlockchainUpdateTriggers)
-    bcu.processBlock(Block.genesis(genesisSettings, bcu.isFeatureActivated(BlockchainFeatures.RideV6)).explicitGet()) should beRight
-    bcu
+    Using.resource(TempDB(settings.blockchainSettings.functionalitySettings, settings.dbSettings)) { dbContext =>
+      val (bcu, _) = TestStorageFactory(settings, dbContext.rdb, new TestTime, ignoreBlockchainUpdateTriggers)
+      bcu.processBlock(Block.genesis(genesisSettings, bcu.isFeatureActivated(BlockchainFeatures.RideV6)).explicitGet()) should beRight
+      test(bcu)
+    }
   }
 
   private def transfer(sender: KeyPair, maxAmount: Long, time: Time) =
@@ -105,26 +106,6 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
       .selfSigned(1.toByte, sender, recipient.toAddress, Waves, amount, Waves, fee, ByteStr.empty, time.getTimestamp())
       .explicitGet())
       .label("transferTransaction")
-
-  private def transferWithRecipient(sender: KeyPair, recipient: PublicKey, maxAmount: Long, time: Time) =
-    (for {
-      amount <- chooseNum(1, (maxAmount * 0.9).toLong)
-      fee    <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
-    } yield TransferTransaction
-      .selfSigned(1.toByte, sender, recipient.toAddress, Waves, amount, Waves, fee, ByteStr.empty, time.getTimestamp())
-      .explicitGet())
-      .label("transferWithRecipient")
-
-  private def massTransferWithRecipients(sender: KeyPair, recipients: List[PublicKey], maxAmount: Long, time: Time) = {
-    val amount    = maxAmount / (recipients.size + 1)
-    val transfers = recipients.map(r => ParsedTransfer(r.toAddress, TxNonNegativeAmount.unsafeFrom(amount)))
-    val minFee    = FeeValidation.FeeConstants(TransactionType.Transfer) + FeeValidation.FeeConstants(TransactionType.MassTransfer) * transfers.size
-    val txs =
-      for { fee <- chooseNum(minFee, amount) } yield MassTransferTransaction
-        .selfSigned(1.toByte, sender, Waves, transfers, fee, time.getTimestamp(), ByteStr.empty)
-        .explicitGet()
-    txs.label("transferWithRecipient")
-  }
 
   private def invokeScript(sender: KeyPair, dApp: Address, time: Time) =
     Gen.choose(500000L, 600000L).map { fee =>
@@ -144,144 +125,92 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
     SetScriptTransaction.selfSigned(TxVersion.V1, sender, Some(script), extraFee, time.getTimestamp()).explicitGet()
   }
 
-  private val accountsGen = for {
-    sender        <- accountGen.label("sender")
-    senderBalance <- positiveLongGen.label("senderBalance")
-    if senderBalance > 100000L
-  } yield (sender, senderBalance)
-
-  private val stateGen = for {
-    (sender, senderBalance) <- accountsGen
-  } yield {
-    val bcu = mkBlockchain(Map(sender.toAddress -> senderBalance))
-    (sender, senderBalance, bcu)
+  private def withState[A](test: (KeyPair, Long, BlockchainUpdaterImpl) => A): A = {
+    val sender        = TxHelpers.signer(1)
+    val senderBalance = ENOUGH_AMT
+    withBlockchain(Map(sender.toAddress -> senderBalance)) { bcu =>
+      test(sender, senderBalance, bcu)
+    }
   }
 
-  private val stateWithTransfer = for {
-    (sender, balance, bcu) <- stateGen
-    time = new TestTime
-    transfer <- transfer(sender, balance, time)
-  } yield (time, bcu, transfer)
-
-  private val stateWithThreeAccounts = for {
-    (sender1, senderBalance1) <- accountsGen
-    (sender2, senderBalance2) <- accountsGen
-    (sender3, senderBalance3) <- accountsGen
-  } yield {
-    val bcu = mkBlockchain(Map(sender1.toAddress -> senderBalance1, sender2.toAddress -> senderBalance2, sender3.toAddress -> senderBalance3))
-    (((sender1, senderBalance1), (sender2, senderBalance2), (sender3, senderBalance3)), bcu)
+  private def withStateWithTransfer[A](test: (TestTime, BlockchainUpdaterImpl, TransferTransaction) => A): A = {
+    withState { case (sender, _, bcu) =>
+      val time = new TestTime
+      test(time, bcu, transfer(sender, time))
+    }
   }
 
-  private val twoOutOfManyValidPayments = (for {
-    (sender, senderBalance, bcu) <- stateGen
-    recipient                    <- accountGen
-    n                            <- chooseNum(3, 10)
-    fee                          <- chooseNum(extraFee, (senderBalance * 0.01).toLong)
-    offset                       <- chooseNum(1000L, 2000L)
-  } yield {
-    val time = TestTime()
-    val utx =
-      new UtxPoolImpl(
-        time,
-        bcu,
+  private def withStateWithThreeAccounts[A](test: (((KeyPair, Long), (KeyPair, Long), (KeyPair, Long)), BlockchainUpdaterImpl) => A): A = {
+    val sender1        = TxHelpers.signer(1)
+    val senderBalance1 = ENOUGH_AMT
+    val sender2        = TxHelpers.signer(2)
+    val senderBalance2 = ENOUGH_AMT
+    val sender3        = TxHelpers.signer(3)
+    val senderBalance3 = ENOUGH_AMT
+
+    withBlockchain(Map(sender1.toAddress -> senderBalance1, sender2.toAddress -> senderBalance2, sender3.toAddress -> senderBalance3)) { bcu =>
+      test(((sender1, senderBalance1), (sender2, senderBalance2), (sender3, senderBalance3)), bcu)
+    }
+  }
+
+  private def withTwoOutOfManyValidPayments[A](test: (UtxPoolImpl, TestTime, IndexedSeq[TransferTransaction], FiniteDuration) => A): A =
+    withState { case (sender, senderBalance, bcu) =>
+      val recipient = TxHelpers.signer(2)
+
+      val time = TestTime()
+      val utx =
+        new UtxPoolImpl(
+          time,
+          bcu,
+          UtxSettings(
+            10,
+            PoolDefaultMaxBytes,
+            1000,
+            Set.empty,
+            Set.empty,
+            Set.empty,
+            allowTransactionsFromSmartAccounts = true,
+            allowSkipChecks = false,
+            forceValidateInCleanup = false,
+            alwaysUnlimitedExecution = false
+          ),
+          Int.MaxValue,
+          isMiningEnabled = true
+        )
+      val amountPart = (senderBalance - extraFee) / 2 - extraFee
+      val txs = for (_ <- 1 to 10) yield createWavesTransfer(sender, recipient.toAddress, amountPart, extraFee, time.getTimestamp()).explicitGet()
+      test(utx, time, txs, 2000.millis)
+    }
+
+  private def withBlacklisted[A](test: (KeyPair, UtxPoolImpl, Seq[TransferTransaction]) => A): A =
+    withState { case (sender, _, bcu) =>
+      val recipient = TxHelpers.signer(2)
+      val time      = TestTime()
+      val txs       = (1 to 10).map(_ => transferWithRecipient(sender, recipient.publicKey, time))
+      val settings =
         UtxSettings(
           10,
           PoolDefaultMaxBytes,
           1000,
-          Set.empty,
+          Set(sender.toAddress.toString),
           Set.empty,
           Set.empty,
           allowTransactionsFromSmartAccounts = true,
           allowSkipChecks = false,
           forceValidateInCleanup = false,
           alwaysUnlimitedExecution = false
-        ),
-        Int.MaxValue,
-        isMiningEnabled = true
-      )
-    val amountPart = (senderBalance - fee) / 2 - fee
-    val txs        = for (_ <- 1 to n) yield createWavesTransfer(sender, recipient.toAddress, amountPart, fee, time.getTimestamp()).explicitGet()
-    (utx, time, txs, (offset + 1000).millis)
-  }).label("twoOutOfManyValidPayments")
+        )
+      val utxPool = new UtxPoolImpl(time, bcu, settings, Int.MaxValue, isMiningEnabled = true)
+      test(sender, utxPool, txs)
+    }
 
-  private val withBlacklisted = (for {
-    (sender, senderBalance, bcu) <- stateGen
-    recipient                    <- accountGen
-    time = TestTime()
-    txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient.publicKey, senderBalance / 10, time)) // @TODO: Random transactions
-  } yield {
-    val settings =
-      UtxSettings(
-        10,
-        PoolDefaultMaxBytes,
-        1000,
-        Set(sender.toAddress.toString),
-        Set.empty,
-        Set.empty,
-        allowTransactionsFromSmartAccounts = true,
-        allowSkipChecks = false,
-        forceValidateInCleanup = false,
-        alwaysUnlimitedExecution = false
-      )
-    val utxPool = new UtxPoolImpl(time, bcu, settings, Int.MaxValue, isMiningEnabled = true)
-    (sender, utxPool, txs)
-  }).label("withBlacklisted")
-
-  private val withBlacklistedAndAllowedByRule = (for {
-    (sender, senderBalance, bcu) <- stateGen
-    recipient                    <- accountGen
-    time = TestTime()
-    txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient.publicKey, senderBalance / 10, time)) // @TODO: Random transactions
-  } yield {
-    val settings =
-      UtxSettings(
-        txs.length,
-        PoolDefaultMaxBytes,
-        1000,
-        Set(sender.toAddress.toString),
-        Set(recipient.toAddress.toString),
-        Set.empty,
-        allowTransactionsFromSmartAccounts = true,
-        allowSkipChecks = false,
-        forceValidateInCleanup = false,
-        alwaysUnlimitedExecution = false
-      )
-    val utxPool = new UtxPoolImpl(time, bcu, settings, Int.MaxValue, isMiningEnabled = true)
-    (sender, utxPool, txs)
-  }).label("withBlacklistedAndAllowedByRule")
-
-  private val withBlacklistedAndWhitelisted = (for {
-    (sender, senderBalance, bcu) <- stateGen
-    recipient                    <- accountGen
-    time = TestTime()
-    txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient.publicKey, senderBalance / 10, time))
-  } yield {
-    val settings =
-      UtxSettings(
-        txs.length,
-        PoolDefaultMaxBytes,
-        1000,
-        Set(sender.toAddress.toString),
-        Set.empty,
-        Set(sender.toAddress.toString),
-        allowTransactionsFromSmartAccounts = true,
-        allowSkipChecks = false,
-        forceValidateInCleanup = false,
-        alwaysUnlimitedExecution = false
-      )
-    val utxPool = new UtxPoolImpl(time, bcu, settings, Int.MaxValue, isMiningEnabled = true)
-    (sender, utxPool, txs)
-  }).label("withBlacklistedAndWhitelisted")
-
-  private def massTransferWithBlacklisted(allowRecipients: Boolean) =
-    (for {
-      (sender, senderBalance, bcu) <- stateGen
-      addressesSize                <- Gen.choose(1, MassTransferTransaction.MaxTransferCount)
-      addressGen = Gen.listOfN(addressesSize, accountGen).filter(list => if (allowRecipients) list.nonEmpty else true)
-      recipients <- addressGen.map(_.map(_.publicKey))
-      time = TestTime()
-      txs <- Gen.nonEmptyListOf(massTransferWithRecipients(sender, recipients, senderBalance / 10, time))
-    } yield {
+  private def withMassTransferWithBlacklisted[A](allowRecipients: Boolean)(test: (KeyPair, UtxPoolImpl, Seq[MassTransferTransaction]) => A): A = {
+    withState { case (sender, senderBalance, bcu) =>
+      val recipients = (1 to 10).map(idx => TxHelpers.signer(1 + idx).publicKey)
+      val time       = TestTime()
+      // @TODO: Random transactions
+      val txs = (1 to 10).map(_ => massTransferWithRecipients(sender, recipients, senderBalance / 10, time)) ++
+        (if (!allowRecipients) Seq(massTransferWithRecipients(sender, Seq.empty, senderBalance / 10, time)) else Seq.empty)
       val whitelist: Set[String] = if (allowRecipients) recipients.map(_.toAddress.toString).toSet else Set.empty
       val settings =
         UtxSettings(
@@ -297,28 +226,62 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           alwaysUnlimitedExecution = false
         )
       val utxPool = new UtxPoolImpl(time, bcu, settings, Int.MaxValue, isMiningEnabled = true)
-      (sender, utxPool, txs)
-    }).label("massTransferWithBlacklisted")
+      test(sender, utxPool, txs)
+    }
+  }
 
-  private def utxTest(utxSettings: UtxSettings, txCount: Int = 10)(f: (Seq[TransferTransaction], UtxPool, TestTime) => Unit): Unit =
-    forAll(stateGen, chooseNum(2, txCount).label("txCount")) { case ((sender, senderBalance, bcu), count) =>
-      val time = TestTime()
-
-      forAll(listOfN(count, transfer(sender, senderBalance / 2, time))) { txs =>
-        val utx = new UtxPoolImpl(time, bcu, utxSettings, Int.MaxValue, isMiningEnabled = true)
-        f(txs, utx, time)
-      }
+  private def withBlacklistedAndAllowedByRule[A](test: (KeyPair, UtxPoolImpl, Seq[TransferTransaction]) => A): A =
+    withState { case (sender, _, bcu) =>
+      val recipient = TxHelpers.signer(2)
+      val time      = TestTime()
+      val txs       = (1 to 10).map(_ => transferWithRecipient(sender, recipient.publicKey, time))
+      val settings =
+        UtxSettings(
+          txs.length,
+          PoolDefaultMaxBytes,
+          1000,
+          Set(sender.toAddress.toString),
+          Set(recipient.toAddress.toString),
+          Set.empty,
+          allowTransactionsFromSmartAccounts = true,
+          allowSkipChecks = false,
+          forceValidateInCleanup = false,
+          alwaysUnlimitedExecution = false
+        )
+      val utxPool = new UtxPoolImpl(time, bcu, settings, Int.MaxValue, isMiningEnabled = true)
+      test(sender, utxPool, txs)
     }
 
-  private val dualTxGen: Gen[(UtxPool, TestTime, Seq[Transaction], Seq[Transaction])] =
-    for {
-      (sender, senderBalance, bcu) <- stateGen
-      ts = System.currentTimeMillis()
-      count1 <- chooseNum(5, 10)
-      tx1    <- listOfN(count1, transfer(sender, senderBalance / 2, TestTime(ts)))
-      tx2    <- listOfN(count1, transfer(sender, senderBalance / 2, TestTime(ts + maxAge.toMillis + 1000)))
-    } yield {
-      val time = TestTime()
+  private def withBlacklistedAndWhitelisted[A](test: (KeyPair, UtxPoolImpl, Seq[TransferTransaction]) => A): A = {
+    withState { case (sender, _, bcu) =>
+      val recipient = TxHelpers.signer(2)
+      val time      = TestTime()
+      val txs       = (1 to 10).map(_ => transferWithRecipient(sender, recipient.publicKey, time))
+      val settings =
+        UtxSettings(
+          txs.length,
+          PoolDefaultMaxBytes,
+          1000,
+          Set(sender.toAddress.toString),
+          Set.empty,
+          Set(sender.toAddress.toString),
+          allowTransactionsFromSmartAccounts = true,
+          allowSkipChecks = false,
+          forceValidateInCleanup = false,
+          alwaysUnlimitedExecution = false
+        )
+      val utxPool = new UtxPoolImpl(time, bcu, settings, Int.MaxValue, isMiningEnabled = true)
+      test(sender, utxPool, txs)
+    }
+  }
+
+  private def withDualTxs[A](test: (UtxPool, TestTime, Seq[Transaction], Seq[Transaction]) => A): A =
+    withState { case (sender, _, bcu) =>
+      val ts    = System.currentTimeMillis()
+      val count = 5
+      val txs1  = (1 to count).map(idx => transfer(sender, TestTime(ts + idx)))
+      val txs2  = (1 to count).map(idx => transfer(sender, TestTime(ts + idx + maxAge.toMillis + 1000)))
+      val time  = TestTime()
       val utx = new UtxPoolImpl(
         time,
         bcu,
@@ -337,29 +300,13 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         Int.MaxValue,
         isMiningEnabled = true
       )
-      (utx, time, tx1, tx2)
+      test(utx, time, txs1, txs2)
     }
 
-  private def preconditionBlocks(lastBlockId: ByteStr, master: KeyPair, time: Time): Seq[Block] = {
-    val ts = time.getTimestamp()
-    val script = TestCompiler(V3).compileExpression(
-      """
-        |let x = 1
-        |let y = 2
-        |true
-      """.stripMargin
-    )
-    val setScript = SetScriptTransaction.selfSigned(1.toByte, master, Some(script), 100000L, ts + 1).explicitGet()
-    Seq(TestBlock.create(ts + 1, lastBlockId, Seq(setScript)))
-  }
-
-  private def withScriptedAccount(scEnabled: Boolean): Gen[(KeyPair, Long, UtxPoolImpl, Long)] =
-    for {
-      (sender, senderBalance, bcu) <- stateGen
-      time          = TestTime()
-      preconditions = preconditionBlocks(bcu.lastBlockId.get, sender, time)
-    } yield {
-      // val smartAccountsFs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0))
+  private def withScriptedAccount[A](scEnabled: Boolean)(test: (KeyPair, Long, UtxPoolImpl, Long) => A): A =
+    withState { case (sender, senderBalance, bcu) =>
+      val time          = TestTime()
+      val preconditions = preconditionBlocks(bcu.lastBlockId.get, sender, time)
       preconditions.foreach(b => bcu.processBlock(b) should beRight)
       val utx = new UtxPoolImpl(
         time,
@@ -380,15 +327,55 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         isMiningEnabled = true
       )
 
-      (sender, senderBalance, utx, bcu.lastBlockTimestamp.getOrElse(0L))
+      test(sender, senderBalance, utx, bcu.lastBlockTimestamp.getOrElse(0L))
     }
 
-  private def transactionV1Gen(sender: KeyPair, ts: Long, feeAmount: Long): Gen[TransferTransaction] = accountGen.map { recipient =>
-    TransferTransaction.selfSigned(1.toByte, sender, recipient.toAddress, Waves, waves(1), Waves, feeAmount, ByteStr.empty, ts).explicitGet()
+  private def transfer(sender: KeyPair, time: Time) =
+    TransferTransaction
+      .selfSigned(1.toByte, sender, TxHelpers.address(2), Waves, 1, Waves, extraFee, ByteStr.empty, time.getTimestamp())
+      .explicitGet()
+
+  private def transferWithRecipient(sender: KeyPair, recipient: PublicKey, time: Time) =
+    TransferTransaction
+      .selfSigned(1.toByte, sender, recipient.toAddress, Waves, 1, Waves, extraFee, ByteStr.empty, time.getTimestamp())
+      .explicitGet()
+
+  private def massTransferWithRecipients(sender: KeyPair, recipients: Seq[PublicKey], maxAmount: Long, time: Time) = {
+    val amount    = maxAmount / (recipients.size + 1)
+    val transfers = recipients.map(r => ParsedTransfer(r.toAddress, TxNonNegativeAmount.unsafeFrom(amount)))
+    val minFee    = FeeValidation.FeeConstants(TransactionType.Transfer) + FeeValidation.FeeConstants(TransactionType.MassTransfer) * transfers.size
+    MassTransferTransaction
+      .selfSigned(1.toByte, sender, Waves, transfers, minFee, time.getTimestamp(), ByteStr.empty)
+      .explicitGet()
   }
 
-  private def transactionV2Gen(sender: KeyPair, ts: Long, feeAmount: Long): Gen[TransferTransaction] = accountGen.map { recipient =>
-    TransferTransaction.selfSigned(2.toByte, sender, recipient.toAddress, Waves, waves(1), Waves, feeAmount, ByteStr.empty, ts).explicitGet()
+  private def transactionV1(sender: KeyPair, ts: Long, feeAmount: Long): TransferTransaction =
+    TransferTransaction.selfSigned(1.toByte, sender, TxHelpers.address(2), Waves, waves(1), Waves, feeAmount, ByteStr.empty, ts).explicitGet()
+
+  private def transactionV2(sender: KeyPair, ts: Long, feeAmount: Long): TransferTransaction =
+    TransferTransaction.selfSigned(2.toByte, sender, TxHelpers.address(2), Waves, waves(1), Waves, feeAmount, ByteStr.empty, ts).explicitGet()
+
+  private def utxTest(utxSettings: UtxSettings, txCount: Int = 10)(f: (Seq[TransferTransaction], UtxPool, TestTime) => Unit): Unit = {
+    withState { case (sender, _, bcu) =>
+      val time = TestTime()
+      val txs  = (1 to txCount).map(_ => transfer(sender, time))
+
+      val utx = new UtxPoolImpl(time, bcu, utxSettings, Int.MaxValue, isMiningEnabled = true)
+      f(txs, utx, time)
+    }
+  }
+
+  private def preconditionBlocks(lastBlockId: ByteStr, master: KeyPair, time: Time): Seq[Block] = {
+    val ts = time.getTimestamp()
+    val script = TestCompiler(V3).compileExpression(
+      """
+        |let x = 1
+        |let y = 2
+        |true
+      """.stripMargin
+    )
+    val setScript = SetScriptTransaction.selfSigned(1.toByte, master, Some(script), 100000L, ts + 1).explicitGet()
+    Seq(TestBlock.create(ts + 1, lastBlockId, Seq(setScript)))
   }
 
   "UTX Pool" - {
@@ -429,7 +416,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
     }
 
     "adds new transactions when skip checks is allowed" in {
-      forAll(stateGen) { case (sender, senderBalance, bcu) =>
+      withState { case (sender, senderBalance, bcu) =>
         val time = TestTime()
 
         val gen = for {
@@ -464,7 +451,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
     }
 
     "adds new transactions when transaction is whitelisted" in {
-      forAll(stateWithThreeAccounts) { case (((sender1, senderBalance1), (sender2, senderBalance2), (sender3, _)), bcu) =>
+      withStateWithThreeAccounts { case (((sender1, senderBalance1), (sender2, senderBalance2), (sender3, _)), bcu) =>
         val time = TestTime()
 
         val precondition = TestBlock.create(
@@ -525,7 +512,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
       utx.putIfNew(txs.head).resultE should matchPattern { case Right(false) => }
     }
 
-    "packUnconfirmed result is limited by constraint" in forAll(dualTxGen) { case (utx, _, txs, _) =>
+    "packUnconfirmed result is limited by constraint" in withDualTxs { case (utx, _, txs, _) =>
       txs.foreach(tx => utx.putIfNew(tx).resultE should beRight)
       utx.all.size shouldEqual txs.size
 
@@ -537,7 +524,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
       if (maxNumber <= utx.all.size) restUpdated.isFull shouldBe true
     }
 
-    "packUnconfirmed takes whitelisted first of all" in forAll(stateWithThreeAccounts) {
+    "packUnconfirmed takes whitelisted first of all" in withStateWithThreeAccounts {
       case (((sender1, senderBalance1), (sender2, senderBalance2), (sender3, _)), bcu) =>
         val time = TestTime()
 
@@ -582,7 +569,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
         }
     }
 
-    "evicts expired transactions when packUnconfirmed is called" in forAll(dualTxGen) { case (utx, time, txs, _) =>
+    "evicts expired transactions when packUnconfirmed is called" in withDualTxs { case (utx, time, txs, _) =>
       txs.foreach(tx => utx.putIfNew(tx).resultE should beRight)
       utx.all.size shouldEqual txs.size
 
@@ -593,16 +580,15 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
       utx.all shouldBe empty
     }
 
-    "evicts one of mutually invalid transactions when packUnconfirmed is called" in forAll(twoOutOfManyValidPayments) {
-      case (utx, time, txs, offset) =>
-        txs.foreach(tx => utx.putIfNew(tx).resultE should beRight)
-        utx.all.size shouldEqual txs.size
+    "evicts one of mutually invalid transactions when packUnconfirmed is called" in withTwoOutOfManyValidPayments { case (utx, time, txs, offset) =>
+      txs.foreach(tx => utx.putIfNew(tx).resultE should beRight)
+      utx.all.size shouldEqual txs.size
 
-        time.advance(offset)
+      time.advance(offset)
 
-        val (packed, _) = utx.packUnconfirmed(limitByNumber(100), PackStrategy.Unlimited)
-        packed.get.size shouldBe 2
-        utx.all.size shouldBe 2
+      val (packed, _) = utx.packUnconfirmed(limitByNumber(100), PackStrategy.Unlimited)
+      packed.get.size shouldBe 2
+      utx.all.size shouldBe 2
     }
 
     "correctly process constraints in packUnconfirmed" in {
@@ -693,8 +679,7 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
 
     "blacklisting" - {
       "prevent a transfer transaction from specific addresses" in {
-        val transferGen = Gen.oneOf(withBlacklisted, massTransferWithBlacklisted(allowRecipients = false))
-        forAll(transferGen) { case (_, utxPool, txs) =>
+        def test(utxPool: UtxPoolImpl, txs: Seq[Transaction]): Assertion = {
           val r = txs.forall { tx =>
             utxPool.putIfNew(tx).resultE match {
               case Left(SenderIsBlacklisted(_)) => true
@@ -705,18 +690,23 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
           r shouldBe true
           utxPool.all.size shouldEqual 0
         }
+
+        withBlacklisted { case (_, utxPool, txs) => test(utxPool, txs) }
+        withMassTransferWithBlacklisted(allowRecipients = false) { case (_, utxPool, txs) => test(utxPool, txs) }
       }
 
       "allow a transfer transaction from blacklisted address to specific addresses" in {
-        val transferGen = Gen.oneOf(withBlacklistedAndAllowedByRule, massTransferWithBlacklisted(allowRecipients = true))
-        forAll(transferGen) { case (_, utxPool, txs) =>
+        def test(utxPool: UtxPoolImpl, txs: Seq[Transaction]): Assertion = {
           txs.foreach(utxPool.putIfNew(_).resultE should beRight)
           utxPool.all.size shouldEqual txs.size
         }
+
+        withBlacklistedAndAllowedByRule { case (_, utxPool, txs) => test(utxPool, txs) }
+        withMassTransferWithBlacklisted(allowRecipients = true) { case (_, utxPool, txs) => test(utxPool, txs) }
       }
 
       "allow a transfer transaction from whitelisted address" in {
-        forAll(withBlacklistedAndWhitelisted) { case (_, utxPool, txs) =>
+        withBlacklistedAndWhitelisted { case (_, utxPool, txs) =>
           all(txs.map { t =>
             utxPool.putIfNew(t).resultE
           }) shouldBe Symbol("right")
@@ -727,41 +717,38 @@ class UtxPoolSpecification extends FreeSpec with MockFactory with BlocksTransact
 
     "smart accounts" - {
       "signed txs from scripted account is not allowed" in {
-        val enoughFeeTxWithScriptedAccount =
-          for {
-            (sender, senderBalance, utx, ts) <- withScriptedAccount(true)
-            feeAmount                        <- choose(extraFee, senderBalance / 2)
-            tx                               <- transactionV1Gen(sender, ts + 1, feeAmount)
-          } yield (utx, tx)
+        withScriptedAccount(scEnabled = true) { case (sender, _, utx, ts) =>
+          val tx = transactionV1(sender, ts + 1, extraFee)
 
-        val (utx, tx) = enoughFeeTxWithScriptedAccount.sample.getOrElse(throw new IllegalStateException("NO SAMPLE"))
-        utx.putIfNew(tx).resultE should produce("signature from scripted account")
+          utx.putIfNew(tx).resultE should produce("signature from scripted account")
+        }
       }
 
       "any transaction from scripted account is not allowed if smartAccounts disabled in utx pool" - {
 
-        def enoughFeeTxWithScriptedAccount(version: Int): Gen[(UtxPoolImpl, TransferTransaction)] =
-          for {
-            (sender, senderBalance, utx, ts) <- withScriptedAccount(false)
-            feeAmount                        <- choose(extraFee, senderBalance / 2)
-            tx <- version match {
-              case 1 => transactionV1Gen(sender, ts + 1, feeAmount)
-              case 2 => transactionV2Gen(sender, ts + 1, feeAmount)
+        def withVersion[A](version: Int)(test: (UtxPoolImpl, TransferTransaction) => A): A =
+          withScriptedAccount(scEnabled = false) { case (sender, _, utx, ts) =>
+            val tx = version match {
+              case 1 => transactionV1(sender, ts + 1, extraFee)
+              case 2 => transactionV2(sender, ts + 1, extraFee)
             }
-          } yield (utx, tx)
+            test(utx, tx)
+          }
 
         "v1" in {
-          val (utx1, tx1) = enoughFeeTxWithScriptedAccount(1).sample.getOrElse(throw new IllegalStateException("NO SAMPLE"))
-          utx1.putIfNew(tx1).resultE.left.value
+          withVersion(1) { case (utx, tx) =>
+            utx.putIfNew(tx).resultE.left.value
+          }
         }
         "v2" in {
-          val (utx2, tx2) = enoughFeeTxWithScriptedAccount(2).sample.getOrElse(throw new IllegalStateException("NO SAMPLE"))
-          utx2.putIfNew(tx2).resultE should produce("denied from UTX pool")
+          withVersion(2) { case (utx, tx) =>
+            utx.putIfNew(tx).resultE should produce("denied from UTX pool")
+          }
         }
       }
 
       "when pack time limit is exceeded" - {
-        "always packs the first transaction" in forAll(stateWithTransfer) { case (time, bcu, transfer) =>
+        "always packs the first transaction" in withStateWithTransfer { case (time, bcu, transfer) =>
           var timeSourceIsRunning = false
           def nanoTimeSource(): Long =
             if (timeSourceIsRunning) 100000L
