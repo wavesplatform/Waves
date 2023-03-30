@@ -27,7 +27,7 @@ jobs:
           path: ~/.cache/coursier
           key: coursier-cache
       - name: Check PR
-        run: sbt --mem 6144 --batch checkPR
+        run: sbt --mem 4096 --batch checkPR
       - uses: dorny/paths-filter@v2
         id: filter
         with:
