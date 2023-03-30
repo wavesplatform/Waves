@@ -74,19 +74,19 @@ object RDB extends StrictLogging {
       Seq(
         new ColumnFamilyDescriptor(
           RocksDB.DEFAULT_COLUMN_FAMILY,
-          newColumnFamilyOptions(12.0, 16 << 10, settings.rocksdb.cacheSize, 0.6)
+          newColumnFamilyOptions(12.0, 16 << 10, settings.rocksdb.mainCacheSize, 0.6)
             .setCfPaths(Seq(new DbPath(new File(dbDir, "default").toPath, 0L)).asJava)
         ),
         new ColumnFamilyDescriptor(
           "tx-meta".utf8Bytes,
-          newColumnFamilyOptions(10.0, 2 << 10, 16 << 20, 0.9)
+          newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txMetaCacheSize, 0.9)
             .optimizeForPointLookup(16 << 20)
             .setDisableAutoCompactions(true)
             .setCfPaths(Seq(new DbPath(new File(dbDir, "tx-meta").toPath, 0L)).asJava)
         ),
         new ColumnFamilyDescriptor(
           "transactions".utf8Bytes,
-          newColumnFamilyOptions(10.0, 2 << 10, 16 << 20, 0.9)
+          newColumnFamilyOptions(10.0, 2 << 10, settings.rocksdb.txCacheSize, 0.9)
             .setCfPaths(Seq(new DbPath(new File(dbDir, "transactions").toPath, 0L)).asJava)
         )
       ).asJava,
