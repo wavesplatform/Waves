@@ -693,7 +693,7 @@ class RocksDBWriter(
       carryFee: Long,
       newAddresses: Map[Address, database.AddressId.Type],
       balances: Seq[(AddressId, Amount)],
-      leaseBalances: Seq[(AddressId, S.LeaseBalance)],
+      leaseBalances: Map[AddressId, LeaseBalance],
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
       leaseStates: Seq[S.LeaseState],
       assetStatics: Map[IssuedAsset, S.AssetStatic],
@@ -758,7 +758,7 @@ class RocksDBWriter(
 
       // leases
       for ((addressId, leaseBalance) <- leaseBalances) {
-        rw.put(Keys.leaseBalance(addressId)(height), LeaseBalance(leaseBalance.in, leaseBalance.out))
+        rw.put(Keys.leaseBalance(addressId)(height), leaseBalance)
         expiredKeys ++= updateHistory(rw, Keys.leaseBalanceHistory(addressId), balanceThreshold, Keys.leaseBalance(addressId))
       }
 
