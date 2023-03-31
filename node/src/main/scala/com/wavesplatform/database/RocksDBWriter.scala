@@ -865,6 +865,7 @@ class RocksDBWriter(
 
       for ((id, (txm, tx, num)) <- transactions) {
         rw.put(Keys.transactionAt(Height(height), num), Some((txm, tx)))
+        rw.put(Keys.transactionStateSnapshotAt(Height(height), num), Some(snapshot))
         rw.put(Keys.transactionMetaById(id), Some(TransactionMeta(height, num, tx.tpe.id, !txm.succeeded)))
       }
 

@@ -5,6 +5,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.protobuf.{EthereumTransactionMeta, StaticAssetInfo, TransactionMeta, BlockMeta as PBBlockMeta}
+import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state
 import com.wavesplatform.state.*
@@ -168,6 +169,14 @@ object Keys {
       readTransaction(height),
       writeTransaction,
       Some(cfHandle.handle)
+    )
+
+  def transactionStateSnapshotAt(height: Height, n: TxNum): Key[Option[TransactionStateSnapshot]] =
+    Key.opt[TransactionStateSnapshot](
+      NthTransactionStateSnapshotAtHeight,
+      hNum(height, n),
+      TransactionStateSnapshot.parseFrom,
+      _.toByteArray
     )
 
   def addressTransactionSeqNr(addressId: AddressId): Key[Int] =
