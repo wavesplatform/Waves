@@ -17,15 +17,6 @@ final class RDB(
     val txHandle: TxHandle,
     acquiredResources: Seq[RocksObject]
 ) extends AutoCloseable {
-  def wrapDb(f: RocksDB => RocksDB): Either[String, RDB] = {
-    val wrappedDb = f(db)
-    Either.cond(
-      wrappedDb.getNativeHandle == db.getNativeHandle,
-      new RDB(wrappedDb, txMetaHandle, txHandle, acquiredResources),
-      "Failed to wrap DB: passed function results in new database instance"
-    )
-  }
-
   override def close(): Unit = {
     acquiredResources.foreach(_.close())
     db.close()
