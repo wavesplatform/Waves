@@ -16,6 +16,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
 import com.wavesplatform.lang.v1.compiler.{ContractScriptCompactor, ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.{Invocation, LogExtraInfo}
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV2, Log, ScriptResult}
+import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.Environment.Tthis
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
@@ -73,37 +74,41 @@ object UtilsEvaluator {
 
   def executeExpression(blockchain: Blockchain, script: Script, dAppAddress: Address, dAppPk: PublicKey, limit: Int)(
       invoke: InvokeScriptTransactionLike,
-      dAppToExpr: DApp => Either[ValidationError, EXPR]
+      dAppToExpr: DApp => Either[ValidationError, EXPR],
+      wrapDAppEnv: DAppEnvironment => DAppEnvironmentInterface
   ): Either[ValidationError, (EVALUATED, Int, Log[Id], InvokeScriptResult)] =
     for {
       _            <- InvokeScriptTxValidator.checkAmounts(invoke.payments).toEither.leftMap(_.head)
       ds           <- DirectiveSet(script.stdLibVersion, Account, DAppType).leftMap(GenericError(_))
       paymentsDiff <- InvokeDiffsCommon.paymentsPart(invoke, dAppAddress, Map())
-      environment = new DAppEnvironment(
-        AddressScheme.current.chainId,
-        Coeval.raiseError(new IllegalStateException("No input entity available")),
-        Coeval.evalOnce(blockchain.height),
-        blockchain,
-        Coproduct[Tthis](Recipient.Address(ByteStr(dAppAddress.bytes))),
-        ds,
-        invoke,
-        dAppAddress,
-        dAppPk,
-        Set.empty[Address],
-        limitedExecution = false,
-        limit,
-        remainingCalls = ContractLimits.MaxSyncDAppCalls(script.stdLibVersion),
-        availableActions = ContractLimits.MaxCallableActionsAmountBeforeV6(script.stdLibVersion),
-        availableBalanceActions = ContractLimits.MaxBalanceScriptActionsAmountV6,
-        availableAssetActions = ContractLimits.MaxAssetScriptActionsAmountV6,
-        availablePayments = ContractLimits.MaxTotalPaymentAmountRideV6,
-        availableData = ContractLimits.MaxWriteSetSize,
-        availableDataSize = ContractLimits.MaxTotalWriteSetSizeInBytes,
-        currentDiff = paymentsDiff,
-        invocationRoot = DAppEnvironment.InvocationTreeTracker(DAppEnvironment.DAppInvocation(dAppAddress, null, Nil))
-      )
-      ctx  = BlockchainContext.build(ds, environment, fixUnicodeFunctions = true, useNewPowPrecision = true, fixBigScriptField = true)
-      dApp = ContractScriptCompactor.decompact(script.expr.asInstanceOf[DApp])
+      underlyingEnvironment =
+        new DAppEnvironment(
+          AddressScheme.current.chainId,
+          Coeval.raiseError(new IllegalStateException("No input entity available")),
+          Coeval.evalOnce(blockchain.height),
+          blockchain,
+          Coproduct[Tthis](Recipient.Address(ByteStr(dAppAddress.bytes))),
+          ds,
+          invoke,
+          dAppAddress,
+          dAppPk,
+          Set.empty[Address],
+          limitedExecution = false,
+          limit,
+          remainingCalls = ContractLimits.MaxSyncDAppCalls(script.stdLibVersion),
+          availableActions = ContractLimits.MaxCallableActionsAmountBeforeV6(script.stdLibVersion),
+          availableBalanceActions = ContractLimits.MaxBalanceScriptActionsAmountV6,
+          availableAssetActions = ContractLimits.MaxAssetScriptActionsAmountV6,
+          availablePayments = ContractLimits.MaxTotalPaymentAmountRideV6,
+          availableData = ContractLimits.MaxWriteSetSize,
+          availableDataSize = ContractLimits.MaxTotalWriteSetSizeInBytes,
+          currentDiff = paymentsDiff,
+          invocationRoot = DAppEnvironment.InvocationTreeTracker(DAppEnvironment.DAppInvocation(dAppAddress, null, Nil)),
+          wrapDAppEnv = wrapDAppEnv
+        )
+      environment = wrapDAppEnv(underlyingEnvironment)
+      ctx         = BlockchainContext.build(ds, environment, fixUnicodeFunctions = true, useNewPowPrecision = true, fixBigScriptField = true)
+      dApp        = ContractScriptCompactor.decompact(script.expr.asInstanceOf[DApp])
       expr <- dAppToExpr(dApp)
       limitedResult <- EvaluatorV2
         .applyLimitedCoeval(
@@ -127,28 +132,30 @@ object UtilsEvaluator {
         .bimap(
           _ => Right(Diff.empty),
           r =>
-            InvokeDiffsCommon.processActions(
-              StructuredCallableActions(r.actions, blockchain),
-              ds.stdLibVersion,
-              dAppAddress,
-              dAppPk,
-              usedComplexity,
-              invoke,
-              CompositeBlockchain(blockchain, paymentsDiff),
-              System.currentTimeMillis(),
-              isSyncCall = false,
-              limitedExecution = false,
-              limit,
-              Nil,
-              log
-            ).resultE
+            InvokeDiffsCommon
+              .processActions(
+                StructuredCallableActions(r.actions, blockchain),
+                ds.stdLibVersion,
+                dAppAddress,
+                dAppPk,
+                usedComplexity,
+                invoke,
+                CompositeBlockchain(blockchain, paymentsDiff),
+                System.currentTimeMillis(),
+                isSyncCall = false,
+                limitedExecution = false,
+                limit,
+                Nil,
+                log
+              )
+              .resultE
         )
         .merge
       totalDiff <- diff.combineE(paymentsDiff)
-      _ <- TransactionDiffer.validateBalance(blockchain, InvokeScript, addWavesToDefaultInvoker(totalDiff))
-      _ <- TransactionDiffer.assetsVerifierDiff(blockchain, invoke, verify = true, totalDiff, Int.MaxValue).resultE
+      _         <- TransactionDiffer.validateBalance(blockchain, InvokeScript, addWavesToDefaultInvoker(totalDiff))
+      _         <- TransactionDiffer.assetsVerifierDiff(blockchain, invoke, verify = true, totalDiff, Int.MaxValue).resultE
       rootScriptResult  = diff.scriptResults.headOption.map(_._2).getOrElse(InvokeScriptResult.empty)
-      innerScriptResult = environment.currentDiff.scriptResults.values.fold(InvokeScriptResult.empty)(_ |+| _)
+      innerScriptResult = underlyingEnvironment.currentDiff.scriptResults.values.fold(InvokeScriptResult.empty)(_ |+| _)
     } yield (evaluated, usedComplexity, log, innerScriptResult |+| rootScriptResult)
 
   private def addWavesToDefaultInvoker(diff: Diff) =

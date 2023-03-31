@@ -1,6 +1,7 @@
 package com.wavesplatform.ride.runner.storage.persistent
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.ride.runner.db.RideDbAccess
 import com.wavesplatform.ride.runner.storage.{AccountAssetKey, RemoteData}
 import com.wavesplatform.transaction.{Asset, AssetIdLength}
 
@@ -222,7 +223,7 @@ class AccountBalancePersistentCacheTestSuite extends PersistentTestSuite {
     }
   }
 
-  private def test(f: (PersistentStorage, PersistentCache[AccountAssetKey, Long]) => Unit): Unit = withDb { db =>
+  private def test(f: (RideDbAccess, PersistentCache[AccountAssetKey, Long]) => Unit): Unit = withDb { db =>
     val caches = db.readWrite(DefaultPersistentCaches(db)(_))
     f(db, caches.accountBalances)
   }

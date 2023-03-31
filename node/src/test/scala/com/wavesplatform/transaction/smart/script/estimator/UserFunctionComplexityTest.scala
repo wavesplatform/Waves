@@ -20,7 +20,7 @@ import com.wavesplatform.utils.EmptyBlockchain
 import monix.eval.Coeval
 
 class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec {
-  private val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, null, DirectiveSet.contractDirectiveSet, ByteStr.empty)
+  private val environment = WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, null, DirectiveSet.contractDirectiveSet, ByteStr.empty)
 
   private def estimate(expr: EXPR, ctx: CTX[Environment], funcCosts: Map[FunctionHeader, Coeval[Long]]): Either[String, Long] = {
     estimator(ctx.evaluationContext(environment).letDefs.keySet, funcCosts, expr)

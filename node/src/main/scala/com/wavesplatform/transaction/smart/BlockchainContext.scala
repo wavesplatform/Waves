@@ -41,7 +41,7 @@ object BlockchainContext {
       ScriptType.isAssetScript(isTokenContext),
       ContentType.isDApp(isContract)
     ).map { ds =>
-      val environment = new WavesEnvironment(nByte, in, h, blockchain, address, ds, txId)
+      val environment = WavesEnvironment(nByte, in, h, blockchain, address, ds, txId)
       build(ds, environment, fixUnicodeFunctions, useNewPowPrecision, fixBigScriptField)
     }
 

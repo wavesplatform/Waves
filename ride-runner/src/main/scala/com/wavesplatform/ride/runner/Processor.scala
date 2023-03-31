@@ -5,6 +5,7 @@ import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.meta.getSimpleName
+import com.wavesplatform.ride.runner.requests.RequestService
 import com.wavesplatform.ride.runner.storage.{AffectedTags, ScriptRequest, SharedBlockchainStorage}
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
@@ -70,7 +71,10 @@ class BlockchainProcessor(sharedBlockchain: SharedBlockchainStorage[ScriptReques
   override def runAffectedScripts(): Task[Unit] = {
     val last = accumulatedChanges.getAndUpdate(orig => orig.withoutAffectedTags)
     if (last.isEmpty) Task(log.info(s"[${last.newHeight}] No changes"))
-    else requestsService.runAffected(last.newHeight, last.affected)
+    else {
+      log.info(s"Found ${last.affected.size} affected scripts")
+      requestsService.runAffected(last.newHeight, last.affected)
+    }
   }
 
   override def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] =

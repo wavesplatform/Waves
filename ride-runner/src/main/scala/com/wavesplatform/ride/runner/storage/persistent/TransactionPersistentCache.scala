@@ -1,7 +1,7 @@
 package com.wavesplatform.ride.runner.storage.persistent
 
+import com.wavesplatform.ride.runner.db.{ReadOnly, ReadWrite}
 import com.wavesplatform.ride.runner.storage.RemoteData
-import PersistentStorageContext.{ReadOnly, ReadWrite}
 import com.wavesplatform.state.{Height, TransactionId}
 
 trait TransactionPersistentCache {

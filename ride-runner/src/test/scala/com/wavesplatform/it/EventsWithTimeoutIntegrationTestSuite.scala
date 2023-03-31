@@ -24,7 +24,8 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
             forkNumber = 2,
             dataEntryUpdates = List(mkDataEntryUpdate(aliceAddr, "x", initX, 1))
           )
-        )
+        ),
+        WrappedEvent.Next(mkMicroBlockAppendEvent(2, 1, 2)) // Resolved a synthetic fork
       ),
       xPlusHeight = 3
     )
@@ -103,7 +104,8 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
           )
         ),
         WrappedEvent.Failed(UpstreamTimeoutException(90.seconds)), // Removes the last block, so we didn't see the data update
-        WrappedEvent.Next(mkBlockAppendEvent(2, 2))
+        WrappedEvent.Next(mkBlockAppendEvent(2, 2)),
+        WrappedEvent.Next(mkMicroBlockAppendEvent(2, 1, 2)) // Resolved a synthetic fork
       ),
       xPlusHeight = 2
     )
@@ -122,9 +124,8 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
         ),
         WrappedEvent.Next(mkMicroBlockAppendEvent(2, 2, 2)),
         WrappedEvent.Failed(UpstreamTimeoutException(90.seconds)), // Removes the last block, so we didn't see the data update
-        WrappedEvent.Next(mkBlockAppendEvent(2, 2))
-        // It's okay, that we don't wait for a micro block (as on a previous fork), because by default a timeout happens after 90s,
-        // so there is a new block probably.
+        WrappedEvent.Next(mkBlockAppendEvent(2, 2)),
+        WrappedEvent.Next(mkMicroBlockAppendEvent(2, 1, 2)) // Resolved a synthetic fork
       ),
       xPlusHeight = 2
     )
@@ -270,7 +271,9 @@ class EventsWithTimeoutIntegrationTestSuite extends BaseIntegrationTestSuite {
           WrappedEvent.Next(mkRollbackEvent(3, 1, 1)),
           WrappedEvent.Failed(UpstreamTimeoutException(90.seconds)),
           WrappedEvent.Next(mkBlockAppendEvent(3, 2)),
-          WrappedEvent.Next(mkBlockAppendEvent(4, 2))
+          WrappedEvent.Next(mkBlockAppendEvent(4, 2)),
+          // Resolves a fork, we run affected scripts after this
+          WrappedEvent.Next(mkMicroBlockAppendEvent(4, 2, 1))
         ),
         xPlusHeight = 5
       )

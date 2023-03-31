@@ -3,9 +3,9 @@ package com.wavesplatform.ride.runner.storage
 import cats.syntax.option.*
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.wavesplatform.meta.getSimpleName
+import com.wavesplatform.ride.runner.db.{ReadOnly, ReadWrite}
 import com.wavesplatform.ride.runner.stats.KamonCaffeineStats
 import com.wavesplatform.ride.runner.stats.RideRunnerStats.rideStorageKeyNumberFor
-import com.wavesplatform.ride.runner.storage.persistent.PersistentStorageContext.{ReadOnly, ReadWrite}
 import com.wavesplatform.ride.runner.storage.persistent.PersistentCache
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
@@ -42,6 +42,8 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
 
   private def tagsOf(key: KeyT): Option[Set[TagT]] = Option(tags.get(key))
 
+  def addDependent(key: KeyT, tag: TagT): Unit = tags.compute(key, (_, origTags) => Option(origTags).getOrElse(Set.empty) + tag)
+
   def getFromBlockchain(key: KeyT): Option[ValueT]
 
   def persistentCache: PersistentCache[KeyT, ValueT]
@@ -56,7 +58,7 @@ trait ExactWithHeightStorage[KeyT <: AnyRef, ValueT, TagT] extends ScorexLogging
     tag.foreach { tag =>
       // TODO if contains one value - then it wasn't before, optimize values insertion
       // TODO if there is no key - go to blockchain!
-      tags.compute(key, (_, origTags) => Option(origTags).getOrElse(Set.empty) + tag)
+      addDependent(key, tag)
     }
 
     values

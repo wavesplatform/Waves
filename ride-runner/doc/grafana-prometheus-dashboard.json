@@ -1208,7 +1208,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "builder",
-          "expr": "ride_request_number{job=\"$job\", instance=~\"$instance\"}",
+          "expr": "ride_request_total{job=\"$job\", instance=~\"$instance\"}",
           "range": true,
           "refId": "A"
         }
@@ -1270,8 +1270,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -1468,8 +1467,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -1666,8 +1664,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -1783,8 +1780,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -1979,8 +1975,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2175,8 +2170,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2371,8 +2365,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2597,8 +2590,8 @@
             "overrides": []
           },
           "gridPos": {
-            "h": 15,
-            "w": 12,
+            "h": 18,
+            "w": 10,
             "x": 0,
             "y": 9
           },
@@ -2658,6 +2651,106 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisGridShow": true,
+                "axisLabel": "",
+                "axisPlacement": "left",
+                "axisWidth": 60,
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": true,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "decimals": 1,
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              },
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 7,
+            "x": 10,
+            "y": 9
+          },
+          "id": 313,
+          "options": {
+            "legend": {
+              "calcs": [
+                "min",
+                "max",
+                "mean"
+              ],
+              "displayMode": "table",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "builder",
+              "exemplar": false,
+              "expr": "ride_affected_total{instance=~\"$instance\", job=\"$job\"}",
+              "hide": false,
+              "interval": "30s",
+              "legendFormat": "affected",
+              "range": true,
+              "refId": "E"
+            }
+          ],
+          "title": "Number of affected scripts",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
@@ -2704,9 +2797,9 @@
             "overrides": []
           },
           "gridPos": {
-            "h": 8,
-            "w": 6,
-            "x": 12,
+            "h": 11,
+            "w": 7,
+            "x": 17,
             "y": 9
           },
           "id": 18,
@@ -2767,8 +2860,10 @@
                 "mode": "palette-classic"
               },
               "custom": {
+                "axisGridShow": true,
                 "axisLabel": "",
-                "axisPlacement": "auto",
+                "axisPlacement": "left",
+                "axisWidth": 60,
                 "barAlignment": 0,
                 "drawStyle": "line",
                 "fillOpacity": 0,
@@ -2794,6 +2889,7 @@
                   "mode": "off"
                 }
               },
+              "decimals": 1,
               "mappings": [],
               "thresholds": {
                 "mode": "absolute",
@@ -2813,10 +2909,10 @@
             "overrides": []
           },
           "gridPos": {
-            "h": 8,
-            "w": 6,
-            "x": 18,
-            "y": 9
+            "h": 9,
+            "w": 7,
+            "x": 10,
+            "y": 18
           },
           "id": 68,
           "options": {
@@ -2842,14 +2938,15 @@
               },
               "editorMode": "builder",
               "exemplar": false,
-              "expr": "ride_script_run_on_height_seconds{instance=~\"$instance\", job=\"$job\"}",
+              "expr": "ride_affected_run_max_seconds{instance=~\"$instance\", job=\"$job\"}",
               "hide": false,
+              "interval": "30s",
               "legendFormat": "force={{force}}",
               "range": true,
               "refId": "E"
             }
           ],
-          "title": "Batch run script time ",
+          "title": "Affected scripts run time ",
           "type": "timeseries"
         },
         {
@@ -2940,9 +3037,9 @@
           },
           "gridPos": {
             "h": 7,
-            "w": 12,
-            "x": 12,
-            "y": 17
+            "w": 7,
+            "x": 17,
+            "y": 20
           },
           "id": 16,
           "options": {
@@ -3047,7 +3144,7 @@
             "h": 11,
             "w": 8,
             "x": 0,
-            "y": 24
+            "y": 27
           },
           "id": 22,
           "options": {
@@ -3137,7 +3234,7 @@
             "h": 11,
             "w": 8,
             "x": 8,
-            "y": 24
+            "y": 27
           },
           "id": 64,
           "options": {
@@ -3227,7 +3324,7 @@
             "h": 11,
             "w": 8,
             "x": 16,
-            "y": 24
+            "y": 27
           },
           "id": 59,
           "options": {
@@ -3319,7 +3416,7 @@
             "h": 14,
             "w": 12,
             "x": 0,
-            "y": 35
+            "y": 38
           },
           "id": 2,
           "options": {
@@ -3423,7 +3520,7 @@
             "h": 14,
             "w": 12,
             "x": 12,
-            "y": 35
+            "y": 38
           },
           "id": 55,
           "options": {
@@ -3516,7 +3613,7 @@
             "h": 16,
             "w": 24,
             "x": 0,
-            "y": 49
+            "y": 52
           },
           "id": 247,
           "options": {
@@ -3616,7 +3713,7 @@
             "h": 25,
             "w": 24,
             "x": 0,
-            "y": 65
+            "y": 68
           },
           "id": 60,
           "options": {
@@ -7486,7 +7583,7 @@
       {
         "allValue": ".*",
         "current": {
-          "selected": true,
+          "selected": false,
           "text": "ride-runner-service:9095",
           "value": "ride-runner-service:9095"
         },

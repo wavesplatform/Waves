@@ -32,6 +32,7 @@
     <logger name="com.wavesplatform.storage" level="WARN"/>
     <logger name="com.wavesplatform.blockchain" level="INFO"/>
     <logger name="com.wavesplatform.api" level="INFO"/>
+    <logger name="com.wavesplatform.api.http.CompositeHttpService" level="WARN"/>
 
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <target>System.out</target>

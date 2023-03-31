@@ -3,9 +3,10 @@ package com.wavesplatform.ride.runner.entrypoints
 import com.typesafe.config.{Config, ConfigList, ConfigRenderOptions, ConfigValue}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
-import com.wavesplatform.ride.runner.db.RideDb
+import com.wavesplatform.ride.runner.db.RideRocksDb
 import com.wavesplatform.ride.runner.storage.SharedBlockchainStorage
-import com.wavesplatform.ride.runner.{BlockchainState, DefaultRequestService}
+import com.wavesplatform.ride.runner.BlockchainState
+import com.wavesplatform.ride.runner.requests.DefaultRequestService
 import com.wavesplatform.settings.*
 import net.ceedubs.ficus.Ficus.*
 import net.ceedubs.ficus.readers.ArbitraryTypeReader.*
@@ -51,7 +52,7 @@ object RideRunnerGlobalSettings {
 }
 
 case class RideRunnerCommonSettings(
-    db: RideDb.Settings,
+    db: RideRocksDb.Settings,
     unhealthyIdleTimeout: FiniteDuration,
     rideSchedulerThreads: Option[Int],
     immutableBlockchain: BlockchainSettings,

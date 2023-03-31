@@ -5,31 +5,17 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.ride.runner.storage.SharedBlockchainStorage
-import com.wavesplatform.ride.runner.storage.persistent.PersistentStorageContext.ReadWrite
+import com.wavesplatform.ride.runner.db.ReadWrite
+import com.wavesplatform.ride.runner.storage.{ScriptRequest, SharedBlockchainStorage}
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.reader.LeaseDetails
-import com.wavesplatform.state.{
-  AccountScriptInfo,
-  AssetDescription,
-  AssetScriptInfo,
-  BalanceSnapshot,
-  Blockchain,
-  DataEntry,
-  Height,
-  LeaseBalance,
-  TransactionId,
-  TxMeta,
-  VolumeAndFee
-}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, AssetScriptInfo, BalanceSnapshot, Blockchain, DataEntry, Height, LeaseBalance, TransactionId, TxMeta, VolumeAndFee}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.transfer.TransferTransactionLike
 import com.wavesplatform.transaction.{Asset, ERC20Address, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 
-class ScriptBlockchain[TagT](sharedBlockchain: SharedBlockchainStorage[TagT], tag: TagT)(implicit ctx: ReadWrite)
-    extends Blockchain
-    with ScorexLogging {
+class ProxyBlockchain(sharedBlockchain: SharedBlockchainStorage[ScriptRequest])(implicit ctx: ReadWrite) extends Blockchain with ScorexLogging {
   override def settings: BlockchainSettings = sharedBlockchain.blockchainSettings
 
   // TODO #16 We don't support it for now, use GET /utils/script/evaluate
@@ -37,10 +23,10 @@ class ScriptBlockchain[TagT](sharedBlockchain: SharedBlockchainStorage[TagT], ta
   override def hasData(address: Address): Boolean = kill(s"hasData($address)")
 
   // Ride: get*Value (data), get* (data)
-  override def accountData(address: Address, key: String): Option[DataEntry[?]] = sharedBlockchain.data.get(Height(height), (address, key), tag)
+  override def accountData(address: Address, key: String): Option[DataEntry[?]] = sharedBlockchain.data.getUntagged(Height(height), (address, key))
 
   // Ride: scriptHash
-  override def accountScript(address: Address): Option[AccountScriptInfo] = sharedBlockchain.accountScripts.get(Height(height), address, tag)
+  override def accountScript(address: Address): Option[AccountScriptInfo] = sharedBlockchain.accountScripts.getUntagged(Height(height), address)
 
   // Indirectly
   override def hasAccountScript(address: Address): Boolean = accountScript(address).nonEmpty
@@ -57,22 +43,22 @@ class ScriptBlockchain[TagT](sharedBlockchain: SharedBlockchainStorage[TagT], ta
   override def activatedFeatures: Map[Short, Int] = sharedBlockchain.activatedFeatures
 
   // Ride: assetInfo
-  override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription] = sharedBlockchain.assets.get(Height(height), id, tag)
+  override def assetDescription(id: Asset.IssuedAsset): Option[AssetDescription] = sharedBlockchain.assets.getUntagged(Height(height), id)
 
   // Ride (indirectly): asset script validation
   override def assetScript(id: Asset.IssuedAsset): Option[AssetScriptInfo] = assetDescription(id).flatMap(_.script)
 
   // Ride: get*Value (data), get* (data), isDataStorageUntouched, balance, scriptHash, wavesBalance
   override def resolveAlias(a: Alias): Either[ValidationError, Address] =
-    sharedBlockchain.aliases.get(Height(height), a, tag).toRight(AliasDoesNotExist(a): ValidationError)
+    sharedBlockchain.aliases.getUntagged(Height(height), a).toRight(AliasDoesNotExist(a): ValidationError)
 
   // Ride: wavesBalance
   override def leaseBalance(address: Address): LeaseBalance =
-    sharedBlockchain.accountLeaseBalances.get(Height(height), address, tag).getOrElse(LeaseBalance.empty)
+    sharedBlockchain.accountLeaseBalances.getUntagged(Height(height), address).getOrElse(LeaseBalance.empty)
 
   // Ride: assetBalance, wavesBalance
   override def balance(address: Address, mayBeAssetId: Asset): Long =
-    sharedBlockchain.accountBalances.get(Height(height), (address, mayBeAssetId), tag).getOrElse(0L)
+    sharedBlockchain.accountBalances.getUntagged(Height(height), (address, mayBeAssetId)).getOrElse(0L)
 
   // Retrieves Waves balance snapshot in the [from, to] range (inclusive)
   // Ride: wavesBalance (specifies to=None), "to" always None and means "to the end"
@@ -83,7 +69,7 @@ class ScriptBlockchain[TagT](sharedBlockchain: SharedBlockchainStorage[TagT], ta
     List(BalanceSnapshot(height, wavesBalance, lb.in, lb.out))
   }
 
-  private def withTransactions(id: ByteStr): Option[Height] = sharedBlockchain.transactions.get(TransactionId(id), tag)
+  private def withTransactions(id: ByteStr): Option[Height] = sharedBlockchain.transactions.getUntagged(TransactionId(id))
 
   // Ride: transactionHeightById
   override def transactionMeta(id: ByteStr): Option[TxMeta] = {

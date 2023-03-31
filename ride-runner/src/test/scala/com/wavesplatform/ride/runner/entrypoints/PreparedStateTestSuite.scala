@@ -2,11 +2,8 @@ package com.wavesplatform.ride.runner.entrypoints
 
 import com.wavesplatform.api.http.utils.UtilsApiRoute
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.history.DefaultBlockchainSettings
-import com.wavesplatform.lang.API
-import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
+import com.wavesplatform.ride.runner.TestScript
 import com.wavesplatform.ride.runner.blockchain.ImmutableBlockchain
 import com.wavesplatform.ride.runner.input.*
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -22,17 +19,23 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
     request = Json.obj("expr" -> "foo(1)"),
     accounts = Map(
       scriptedAccAddr -> RunnerAccountState(
-        scriptInfo = Some(RunnerScriptInfo(script = mkAccountScript(hasPayments = false)))
+        scriptInfo = Some(RunnerScriptInfo(script = mkAccountScript(hasPayments = false))),
+        balance = Map(
+          Waves -> (1_300_000 + 2),
+          btc   -> 5
+        )
       ),
-      aliceAddr -> RunnerAccountState(data = Some(Map("a" -> IntegerRunnerDataEntry(11)))),
+      aliceAddr -> RunnerAccountState(
+        data = Some(Map("a" -> IntegerRunnerDataEntry(11))),
+        aliases = List("carl")
+      ),
       bobAddr -> RunnerAccountState(
         data = Some(Map.empty),
         balance = Map(
           Waves -> 2,
           btc   -> 1
         ),
-        leasing = Some(RunnerLeaseBalance(in = 10, out = 100)),
-        aliases = List("carl")
+        leasing = Some(RunnerLeaseBalance(in = 10, out = 100))
       )
     ),
     height = 3296627,
@@ -40,8 +43,7 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
       btc -> RunnerAssetInfo(
         description = "Bitcoin",
         reissuable = true,
-        quantity = 21000000,
-        script = Some(assetScript)
+        quantity = 21000000
       )
     ),
     blocks = Map(
@@ -76,24 +78,35 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
       )
 
       withClue(Json.prettyPrint(apiResult)) {
-        (apiResult \ "result" \ "value" \ "_2" \ "value").as[Long] shouldBe 9007199361030957L
+        (apiResult \ "result" \ "value" \ "_2" \ "value").as[BigInt] shouldBe 9007199361031055L
       }
     }
 
     "invoke" in {
       val input = defaultInput.copy(
-        request = Json.obj(
-          "dApp" -> scriptedAccAddr.toString,
+        request = Json.obj( // See UtilsInvocationRequest
           "call" -> Json.obj(
             "function" -> "foo",
             "args"     -> List(Json.obj("type" -> "integer", "value" -> 1))
           ),
-          "payment" -> List(Json.obj("amount" -> 1, "assetId" -> btc.toString))
+          "sender"          -> scriptedAccAddr.toString,
+          "senderPublicKey" -> scriptedAcc.publicKey.toString,
+          "payment"         -> List(Json.obj("amount" -> 1, "assetId" -> btc.toString)),
+          "fee"             -> 1_300_000
         ),
         accounts = defaultInput.accounts.updated(
           scriptedAccAddr,
           RunnerAccountState(
-            scriptInfo = Some(RunnerScriptInfo(script = mkAccountScript(hasPayments = true)))
+            scriptInfo = Some(
+              RunnerScriptInfo(
+                script = mkAccountScript(hasPayments = true),
+                publicKey = scriptedAcc.publicKey
+              )
+            ),
+            balance = Map(
+              Waves -> (5 * 1_700_000 + 2),
+              btc   -> 5
+            )
           )
         )
       )
@@ -110,12 +123,12 @@ class PreparedStateTestSuite extends BaseTestSuite with HasTestAccounts {
       )
 
       withClue(Json.prettyPrint(apiResult)) {
-        (apiResult \ "result" \ "value" \ "_2" \ "value").as[Long] shouldBe 9007199361030958L
+        (apiResult \ "result" \ "value" \ "_2" \ "value").as[BigInt] shouldBe 9007199361031056L
       }
     }
   }
 
-  private def mkAccountScript(hasPayments: Boolean) = scriptFrom(s"""
+  private def mkAccountScript(hasPayments: Boolean) = TestScript.scriptFrom(s"""
 {-#STDLIB_VERSION 6 #-}
 {-#SCRIPT_TYPE ACCOUNT #-}
 {-#CONTENT_TYPE DAPP #-}
@@ -127,7 +140,7 @@ func foo(x: Int) = {
   let bob = Address(base58'$bobAddr')
 
   let asset = base58'$btc'
-  let txId = base58'8rc5Asw43qbq7LMZ6tu2aVbVkw72XmBt7tTnwMSNfaNq'
+  let txId = base58'$txId'
 
   # Functions
   let x1 = getIntegerValue(alice, "a")
@@ -146,7 +159,7 @@ func foo(x: Int) = {
   let y2 = lastBlock.height
   let y3 = size(inv.payments)
 
-  ([ScriptTransfer(bob, 1, asset)], x + x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8 + x9 + x10 + y1 + y2 ${if (hasPayments) "+ y3" else ""} + 9007199254740991)
+  ([ScriptTransfer(bob, 1, asset)], x + x1 + x2 + x3 + x4 + x5 +  x6 + x7     + x8    + x9 + x10 + y1 + y2 ${if (hasPayments) "+ y3" else ""} + 9007199254740991)
 }
 
 @Callable(inv)
@@ -155,16 +168,4 @@ func bar() = {
   ([], x1)
 }""")
 
-  private lazy val assetScript = scriptFrom(""" 
-{-# STDLIB_VERSION 5 #-}
-{-# CONTENT_TYPE EXPRESSION #-}
-height > 0
-""")
-
-  private lazy val estimatorV3 = ScriptEstimatorV3(fixOverflow = true, overhead = false)
-  private def scriptFrom(src: String): Script =
-    API
-      .compile(input = src, estimatorV3)
-      .flatMap(x => Script.fromBase64String(Base64.encode(x.bytes)))
-      .explicitGet()
 }

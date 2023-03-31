@@ -8,9 +8,9 @@ import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.block.PBBlocks
+import com.wavesplatform.ride.runner.db.ReadWrite
 import com.wavesplatform.ride.runner.storage.BlockHeaderStorage.BlockInfo
 import com.wavesplatform.ride.runner.storage.persistent.BlockPersistentCache
-import com.wavesplatform.ride.runner.storage.persistent.PersistentStorageContext.ReadWrite
 import com.wavesplatform.utils.{OptimisticLockable, ScorexLogging}
 
 import scala.util.chaining.scalaUtilChainingOps
@@ -22,6 +22,8 @@ class BlockHeaderStorage private (
 ) extends OptimisticLockable
     with ScorexLogging {
 
+//  def addDependent(atHeight: Int, tag: TagT): Unit = tags.compute(key, (_, origTags) => Option(origTags).getOrElse(Set.empty) + tag)
+//
   /** @return
     *   None if there is no stored blocks
     */

@@ -5,12 +5,13 @@ import akka.http.scaladsl.Http
 import com.google.common.io.MoreFiles
 import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
-import com.wavesplatform.ride.runner.db.RideDb
+import com.wavesplatform.ride.runner.db.RideRocksDb
 import com.wavesplatform.ride.runner.http.{EvaluateApiRoute, HttpServiceStatus, ServiceApiRoute}
+import com.wavesplatform.ride.runner.requests.DefaultRequestService
 import com.wavesplatform.ride.runner.stats.RideRunnerStats
-import com.wavesplatform.ride.runner.storage.persistent.{DefaultPersistentCaches, PersistentStorage}
+import com.wavesplatform.ride.runner.storage.persistent.DefaultPersistentCaches
 import com.wavesplatform.ride.runner.storage.{DefaultRequestsStorage, ScriptRequest, SharedBlockchainStorage}
-import com.wavesplatform.ride.runner.{BlockchainProcessor, BlockchainState, DefaultRequestService}
+import com.wavesplatform.ride.runner.{BlockchainProcessor, BlockchainState}
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.ManagedChannel
@@ -138,29 +139,28 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
     }
 
     log.info("Opening a DB with caches...")
-    val rideDb          = RideDb.open(settings.rideRunner.db)
+    val rideDb          = RideRocksDb.open(settings.rideRunner.db)
     val sendDbStatsTask = blockchainEventsStreamScheduler.scheduleAtFixedRate(30.seconds, 30.seconds) { rideDb.sendStats() }
     cs.cleanup(CustomShutdownPhase.Db) {
       sendDbStatsTask.cancel()
-      rideDb.db.close()
+      rideDb.close()
     }
 
     log.info("Loading data from caches...")
-    val storage = PersistentStorage.rocksDb(rideDb.db)
-    val sharedBlockchain = storage.readWrite { implicit rw =>
-      val dbCaches = DefaultPersistentCaches(storage)
-      SharedBlockchainStorage[ScriptRequest](settings.rideRunner.sharedBlockchain, storage, dbCaches, blockchainApi)
+    val sharedBlockchain = rideDb.access.readWrite { implicit rw =>
+      val dbCaches = DefaultPersistentCaches(rideDb.access)
+      SharedBlockchainStorage[ScriptRequest](settings.rideRunner.sharedBlockchain, rideDb.access, dbCaches, blockchainApi)
     }
 
     val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
     log.info(s"Current height: shared (local or network)=${sharedBlockchain.height}, network=$lastHeightAtStart")
 
-    val requestsStorage = new DefaultRequestsStorage(storage)
+    val requestsStorage = new DefaultRequestsStorage(rideDb.access)
     log.info(s"There are ${requestsStorage.size} scripts")
 
     val requestService = new DefaultRequestService(
       settings.rideRunner.requestsService,
-      storage,
+      rideDb.access,
       sharedBlockchain,
       requestsStorage,
       rideScheduler
@@ -233,11 +233,11 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
     val http = Await.result(httpFuture, 20.seconds)
     cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream) { http.terminate(5.seconds) }
 
-    val gc = blockchainEventsStreamScheduler.scheduleAtFixedRate(20.minutes, 20.minutes) {
-      log.info("Running GC...")
-      System.gc()
-    }
-    cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream) { gc.cancel() }
+//    val gc = blockchainEventsStreamScheduler.scheduleAtFixedRate(20.minutes, 20.minutes) {
+//      log.info("Running GC...")
+//      System.gc()
+//    }
+//    cs.cleanup(CustomShutdownPhase.BlockchainUpdatesStream) { gc.cancel() }
 
     log.info("Initialization completed")
     Await.result(events, Duration.Inf)

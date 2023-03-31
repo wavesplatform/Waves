@@ -4,15 +4,18 @@ import cats.syntax.option.*
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.DefaultBlockchainApi.*
 import com.wavesplatform.api.HasGrpc
+import com.wavesplatform.api.grpc.BalanceResponse
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.ride.runner.requests.DefaultRequestService
 import com.wavesplatform.ride.runner.storage.persistent.HasDb.TestDb
 import com.wavesplatform.ride.runner.storage.persistent.{DefaultPersistentCaches, HasDb}
 import com.wavesplatform.ride.runner.storage.{RequestsStorage, ScriptRequest, SharedBlockchainStorage}
-import com.wavesplatform.ride.runner.{BlockchainProcessor, BlockchainState, DefaultRequestService}
+import com.wavesplatform.ride.runner.{BlockchainProcessor, BlockchainState}
 import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.{BaseTestSuite, HasMonixHelpers}
 import monix.eval.Task
 import monix.execution.schedulers.TestScheduler
@@ -40,11 +43,16 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
 
       override def getAccountScript(address: Address): Option[Script] =
         if (address == aliceAddr) aliceScript.some
-        else super.getAccountScript(address)
+        else None
 
       override def getAccountDataEntry(address: Address, key: String): Option[DataEntry[?]] =
         if (address == aliceAddr && key == "x") IntegerDataEntry("x", initX).some
         else super.getAccountDataEntry(address, key)
+
+      override def getBalance(address: Address, asset: Asset): Long = Long.MaxValue / 3
+
+      override def getLeaseBalance(address: Address): BalanceResponse.WavesBalances =
+        BalanceResponse.WavesBalances(getBalance(address, Asset.Waves))
     }
 
     val testDb = use(TestDb.mk())
@@ -60,7 +68,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
     val request = ScriptRequest(aliceAddr, Json.obj("expr" -> "foo()"))
     val requestService = new DefaultRequestService(
       settings = DefaultRequestService.Settings(enableTraces = true, Int.MaxValue, 0, 3, 0.seconds),
-      storage = testDb.storage,
+      db = testDb.storage,
       sharedBlockchain = sharedBlockchain,
       requestsStorage = new RequestsStorage {
         override def size: Int                      = 1
@@ -120,7 +128,7 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
 
     val after = getScriptResult
     withClue(s"result.value._2.value at ${Json.prettyPrint(after)}") {
-      (after \ "result" \ "value" \ "_2" \ "value").as[Int] shouldBe xPlusHeight
+      (after \ "result" \ "value" \ "_2" \ "value").as[BigInt] shouldBe xPlusHeight
     }
   }.get
 

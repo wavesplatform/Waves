@@ -1,6 +1,6 @@
 package com.wavesplatform.ride.runner.storage
 
-import com.wavesplatform.ride.runner.storage.persistent.PersistentStorageContext.ReadWrite
+import com.wavesplatform.ride.runner.db.ReadWrite
 import com.wavesplatform.ride.runner.storage.persistent.{HasDb, InMemWithoutHeightPersistentCache, PersistentCache}
 import com.wavesplatform.state.Height
 import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
@@ -8,7 +8,7 @@ import com.wavesplatform.{BaseTestSuite, HasTestAccounts}
 import java.util.concurrent.atomic.AtomicInteger
 
 class ExactWithHeightStorageTestSuite extends BaseTestSuite with HasDb with HasTestAccounts {
-  private implicit val ctx = new ReadWrite(null)
+  private implicit val ctx = new ReadWrite(null, null, null)
 
   "ExactWithHeightStorage" - {
     "loading from a blockchain" - {

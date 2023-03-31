@@ -3,6 +3,7 @@ package com.wavesplatform.ride.runner.storage.persistent
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.ride.runner.db.RideDbAccess
 import com.wavesplatform.state.AccountScriptInfo
 
 class AccountScriptPersistentCacheTestSuite extends PersistentCacheTestSuite[Address, AccountScriptInfo] {
@@ -14,7 +15,7 @@ class AccountScriptPersistentCacheTestSuite extends PersistentCacheTestSuite[Add
     complexitiesByEstimator = Map.empty
   )
 
-  protected override def test(f: (PersistentStorage, PersistentCache[Address, AccountScriptInfo]) => Unit): Unit = withDb { db =>
+  protected override def test(f: (RideDbAccess, PersistentCache[Address, AccountScriptInfo]) => Unit): Unit = withDb { db =>
     val caches = db.readOnly(DefaultPersistentCaches(db)(_))
     f(db, caches.accountScripts)
   }

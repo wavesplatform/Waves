@@ -1,37 +1,42 @@
 package com.wavesplatform.ride.runner.storage
 
 import cats.syntax.option.*
+import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.features.EstimatorProvider
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.transaction.SignedTransaction.Transaction
 import com.wavesplatform.protobuf.transaction.Transaction.Data
+import com.wavesplatform.ride.runner.db.{ReadWrite, RideDbAccess}
 import com.wavesplatform.ride.runner.estimate
 import com.wavesplatform.ride.runner.stats.RideRunnerStats.*
 import com.wavesplatform.ride.runner.storage.SharedBlockchainStorage.Settings
-import com.wavesplatform.ride.runner.storage.persistent.PersistentStorageContext.ReadWrite
-import com.wavesplatform.ride.runner.storage.persistent.{PersistentCaches, PersistentStorage}
+import com.wavesplatform.ride.runner.storage.persistent.PersistentCaches
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.Height
+import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.utils.ScorexLogging
 
 import scala.util.chaining.scalaUtilChainingOps
 
 class SharedBlockchainStorage[TagT] private (
     settings: Settings,
-    storage: PersistentStorage,
+    db: RideDbAccess,
     persistentCaches: PersistentCaches,
     blockchainApi: BlockchainApi,
     val blockHeaders: BlockHeaderStorage
 ) extends ScorexLogging {
   val blockchainSettings: BlockchainSettings = settings.blockchain
 
-  private val chainId = blockchainSettings.addressSchemeCharacter.toByte
+  val maxRollbackSize = 100
+
+  val chainId = blockchainSettings.addressSchemeCharacter.toByte
 
   val data = new AccountDataStorage[TagT](settings.caches.accountData, chainId, blockchainApi, persistentCaches.accountDataEntries)
 
@@ -45,11 +50,13 @@ class SharedBlockchainStorage[TagT] private (
 
   val vrf = new VrfStorage(settings.caches.vrf, blockchainApi, persistentCaches.vrf, height)
 
+  val heightS = new HeightTagsStorage[TagT](height)
+
   // Ride: wavesBalance, height, lastBlock
   def height: Int = blockHeaders.latestHeight.getOrElse(blockchainApi.getCurrentBlockchainHeight())
 
   def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] =
-    storage.readWrite { implicit ctx =>
+    db.readWrite { implicit ctx =>
       blockHeaders.getLocal(height).map(_.id() == id)
     }
 
@@ -65,6 +72,12 @@ class SharedBlockchainStorage[TagT] private (
   val assets = new AssetStorage[TagT](settings.caches.asset, blockchainApi, persistentCaches.assetDescriptions)
 
   val aliases = new AliasStorage[TagT](settings.caches.alias, chainId, blockchainApi, persistentCaches.aliases)
+
+  def resolveAlias(a: Alias): Either[ValidationError, Address] =
+    // TODO Remove readWrite!
+    db.readWrite { implicit rw =>
+      aliases.getUntagged(Height(height), a).toRight(AliasDoesNotExist(a): ValidationError)
+    }
 
   val accountBalances = new AccountBalanceStorage[TagT](settings.caches.accountBalance, chainId, blockchainApi, persistentCaches.accountBalances)
 
@@ -84,14 +97,14 @@ class SharedBlockchainStorage[TagT] private (
       .orElse(RemoteData.loaded(fromBlockchain(key)).tap(updateCache(key, _)))
       .mayBeValue
 
-  def removeAllFrom(height: Height): Unit = storage.readWrite { implicit ctx =>
+  def removeAllFrom(height: Height): Unit = db.readWrite { implicit ctx =>
     // TODO #99 Remove all keys from height
     blockHeaders.removeFrom(height)
   }
 
   private val empty = AffectedTags[TagT](Set.empty)
   def process(event: BlockchainUpdated): AffectedTags[TagT] =
-    storage.readWrite { implicit ctx =>
+    db.readWrite { implicit ctx =>
       val toHeight = Height(event.height)
       val affected = event.update match {
         case Update.Empty         => AffectedTags.empty[TagT] // Ignore
@@ -115,17 +128,17 @@ class SharedBlockchainStorage[TagT] private (
         val stateUpdate = (evt.getStateUpdate +: evt.transactionStateUpdates).view
         val txsView     = txs.view.map(_.transaction)
 
-        stateUpdate.flatMap(_.assets).foldLeft(empty) { case (r, x) =>
-          r ++ assets.append(atHeight, x)
+        stateUpdate.flatMap(_.assets).foldLeft(heightS.affectedTags.logDep("height")) { case (r, x) =>
+          r ++ assets.append(atHeight, x).logDep("assets")
         } ++
           stateUpdate.flatMap(_.balances).foldLeft(empty) { case (r, x) =>
-            r ++ accountBalances.append(atHeight, x)
+            r ++ accountBalances.append(atHeight, x).logDep("accountBalances")
           } ++
           stateUpdate.flatMap(_.leasingForAddress).foldLeft(empty) { case (r, x) =>
-            r ++ accountLeaseBalances.append(atHeight, x)
+            r ++ accountLeaseBalances.append(atHeight, x).logDep("accountLeaseBalances")
           } ++
           stateUpdate.flatMap(_.dataEntries).foldLeft(empty) { case (r, x) =>
-            r ++ data.append(atHeight, x)
+            r ++ data.append(atHeight, x).logDep("data")
           } ++
           txsView
             .flatMap {
@@ -137,7 +150,7 @@ class SharedBlockchainStorage[TagT] private (
               case _ => none
             }
             .foldLeft(empty) { case (r, (pk, script)) =>
-              r ++ accountScripts.append(atHeight, pk, script)
+              r ++ accountScripts.append(atHeight, pk, script).logDep("accountScript")
             } ++
           txsView
             .flatMap {
@@ -149,14 +162,14 @@ class SharedBlockchainStorage[TagT] private (
               case _ => none
             }
             .foldLeft(empty) { case (r, (alias, pk)) =>
-              r ++ aliases.append(atHeight, alias, pk)
+              r ++ aliases.append(atHeight, alias, pk).logDep("alias")
             } ++
           // We have to do this, otherwise:
           // 1. A transaction could be moved to a new block during NG process
           // 2. We couldn't observe it, e.g. comes in a next micro block or even a block
           // 3. So a script returns a wrong result until the next height, when we re-evaluate all scripts forcefully
           evt.transactionIds.foldLeft(empty) { case (r, txId) =>
-            r ++ transactions.setHeight(txId, atHeight)
+            r ++ transactions.setHeight(txId, atHeight).logDep("transactionHeight")
           }
       }
     }
@@ -193,7 +206,7 @@ class SharedBlockchainStorage[TagT] private (
     }
 
   def undo(events: List[BlockchainUpdated]): AffectedTags[TagT] =
-    storage.readWrite { implicit ctx =>
+    db.readWrite { implicit ctx =>
       events.foldLeft(empty) { case (r, event) =>
         val rollbackToHeight = Height(event.height - 1)
         val updates = event.update match {
@@ -261,18 +274,25 @@ class SharedBlockchainStorage[TagT] private (
       }
     }
   }
+
+  private final implicit class AffectedTagsOps(self: AffectedTags[TagT]) {
+    def logDep(name: String): AffectedTags[TagT] = {
+      // if (!self.isEmpty) log.trace(s"$name deps: ${self.xs.toList.map(_.toString).sorted.mkString("; ")}")
+      self
+    }
+  }
 }
 
 object SharedBlockchainStorage {
   def apply[TagT](
       settings: Settings,
-      storage: PersistentStorage,
+      db: RideDbAccess,
       persistentCaches: PersistentCaches,
       blockchainApi: BlockchainApi
   )(implicit ctx: ReadWrite): SharedBlockchainStorage[TagT] =
     new SharedBlockchainStorage[TagT](
       settings,
-      storage,
+      db,
       persistentCaches,
       blockchainApi,
       BlockHeaderStorage(blockchainApi, persistentCaches.blockHeaders)

@@ -1,7 +1,7 @@
 package com.wavesplatform.ride.runner.storage.persistent
 
+import com.wavesplatform.ride.runner.db.{ReadOnly, ReadWrite}
 import com.wavesplatform.ride.runner.storage.RemoteData
-import com.wavesplatform.ride.runner.storage.persistent.PersistentStorageContext.{ReadOnly, ReadWrite}
 
 import scala.collection.concurrent.TrieMap
 

@@ -4,8 +4,8 @@ import com.github.benmanes.caffeine.cache.Caffeine
 import com.google.protobuf.ByteString
 import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.protobuf.ByteStringExt
+import com.wavesplatform.ride.runner.db.ReadWrite
 import com.wavesplatform.ride.runner.stats.KamonCaffeineStats
-import com.wavesplatform.ride.runner.storage.persistent.PersistentStorageContext.ReadWrite
 import com.wavesplatform.ride.runner.storage.persistent.TransactionPersistentCache
 import com.wavesplatform.state.{Height, TransactionId}
 import com.wavesplatform.utils.ScorexLogging
@@ -20,6 +20,7 @@ class TransactionStorage[TagT](
 ) extends ScorexLogging {
   storage =>
 
+  // TODO ConcurrentHashMap? Should be this unloaded?
   protected val tags = Caffeine
     .newBuilder()
     .recordStats(() => new KamonCaffeineStats("TransactionStorage.tags"))
@@ -32,13 +33,26 @@ class TransactionStorage[TagT](
     .recordStats(() => new KamonCaffeineStats("TransactionStorage.values"))
     .build[TransactionId, RemoteData[Height]]()
 
+  // TODO concurrency issue
+  def addDependent(key: TransactionId, tag: TagT): Unit = {
+    val origTags = tagsOf(key)
+    if (!origTags.contains(tag)) tags.put(key, origTags + tag)
+  }
+
   private def tagsOf(key: TransactionId): Set[TagT] = Option(tags.getIfPresent(key)).getOrElse(Set.empty)
 
   def getFromBlockchain(key: TransactionId): Option[Height] = blockchainApi.getTransactionHeight(key)
 
-  def get(txId: TransactionId, tag: TagT)(implicit ctx: ReadWrite): Option[Height] = {
+  def getUntagged(txId: TransactionId)(implicit ctx: ReadWrite): Option[Height] = get(txId, None)
+
+  def get(txId: TransactionId, tag: TagT)(implicit ctx: ReadWrite): Option[Height] = get(txId, Some(tag))
+
+  def get(txId: TransactionId, tag: Option[TagT])(implicit ctx: ReadWrite): Option[Height] = {
+    // TODO here too
     val origTags = tagsOf(txId)
-    if (!origTags.contains(tag)) tags.put(txId, origTags + tag)
+    tag.foreach { tag =>
+      if (!origTags.contains(tag)) tags.put(txId, origTags + tag)
+    }
 
     values
       .get(

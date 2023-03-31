@@ -5,14 +5,17 @@ import com.wavesplatform.BaseTestSuite
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.DefaultBlockchainApi.toVanilla
 import com.wavesplatform.api.HasGrpc
+import com.wavesplatform.api.grpc.BalanceResponse
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.it.TestBlockchainApi
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.ride.runner.requests.{DefaultRequestService, RequestService}
 import com.wavesplatform.ride.runner.storage.persistent.HasDb.TestDb
 import com.wavesplatform.ride.runner.storage.persistent.{DefaultPersistentCaches, HasDb}
 import com.wavesplatform.ride.runner.storage.{RequestsStorage, ScriptRequest, SharedBlockchainStorage}
 import com.wavesplatform.state.{DataEntry, Height, IntegerDataEntry}
+import com.wavesplatform.transaction.Asset
 import monix.eval.Task
 import monix.execution.schedulers.TestScheduler
 import play.api.libs.json.Json
@@ -85,7 +88,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
       scheduler.tick()
       val r = Await.result(task, 5.seconds)
       withClue(s"$r:") {
-        (r \ "result" \ "value" \ "_2" \ "value").as[Int]
+        (r \ "result" \ "value" \ "_2" \ "value").as[BigInt].toInt
       }
     }
   }
@@ -97,10 +100,14 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
       override def getCurrentBlockchainHeight(): Int                      = 2
       override def getBlockHeader(height: Int): Option[SignedBlockHeader] = toVanilla(mkPbBlock(height)).some
       override def getActivatedFeatures(height: Int): Map[Short, Int]     = blockchainSettings.functionalitySettings.preActivatedFeatures
-      override def getAccountScript(address: Address): Option[Script]     = accountScripts.get(address).orElse(super.getAccountScript(address))
+      override def getAccountScript(address: Address): Option[Script]     = accountScripts.get(address)
       override def getAccountDataEntry(address: Address, key: String): Option[DataEntry[?]] =
         if (address == aliceAddr && key == "x") IntegerDataEntry("x", 0).some
         else super.getAccountDataEntry(address, key)
+
+      override def getBalance(address: Address, asset: Asset): Long = Long.MaxValue / 3
+      override def getLeaseBalance(address: Address): BalanceResponse.WavesBalances =
+        BalanceResponse.WavesBalances(getBalance(address, Asset.Waves))
     }
 
     val testDb = use(TestDb.mk())
@@ -115,7 +122,7 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
 
     val requestsService = new DefaultRequestService(
       settings = DefaultRequestService.Settings(enableTraces = false, Int.MaxValue, 0, 3, 0.seconds),
-      storage = testDb.storage,
+      db = testDb.storage,
       sharedBlockchain = sharedBlockchain,
       requestsStorage = requestsStorage,
       runScriptsScheduler = testScheduler

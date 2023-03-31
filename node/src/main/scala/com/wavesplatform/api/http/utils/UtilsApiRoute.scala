@@ -26,6 +26,7 @@ import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.TxValidationError.{GenericError, InvokeRejectError}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.script.trace.TraceStep
+import com.wavesplatform.transaction.smart.{DAppEnvironment, DAppEnvironmentInterface}
 import com.wavesplatform.utils.Time
 import monix.execution.Scheduler
 import play.api.libs.json.*
@@ -296,7 +297,8 @@ object UtilsApiRoute {
       request: JsObject,
       trace: Boolean,
       maxTxErrorLogSize: Int,
-      intAsString: Boolean
+      intAsString: Boolean,
+      wrapDAppEnv: DAppEnvironment => DAppEnvironmentInterface = identity
   ): JsObject = {
     val scriptInfo = blockchain.accountScript(address).getOrElse(throw new RuntimeException(s"There is no script on '$address'"))
     val pk         = scriptInfo.publicKey
@@ -310,14 +312,16 @@ object UtilsApiRoute {
         parseCall(exprRequest, script.stdLibVersion).flatMap(expr =>
           UtilsEvaluator.executeExpression(blockchain, script, address, pk, limit)(
             UtilsEvaluator.emptyInvokeScriptLike(address),
-            dApp => Right(ContractEvaluator.buildSyntheticCall(dApp, expr, ByteStr(DefaultAddress.bytes), DefaultPublicKey))
+            dApp => Right(ContractEvaluator.buildSyntheticCall(dApp, expr, ByteStr(DefaultAddress.bytes), DefaultPublicKey)),
+            wrapDAppEnv
           )
         )
       case (None, Some(invocationRequest)) =>
         invocationRequest.toInvocation.flatMap(invocation =>
           UtilsEvaluator.executeExpression(blockchain, script, address, pk, limit)(
             UtilsEvaluator.toInvokeScriptLike(invocation, address),
-            ContractEvaluator.buildExprFromInvocation(_, invocation, script.stdLibVersion).bimap(e => GenericError(e.message), _.expr)
+            ContractEvaluator.buildExprFromInvocation(_, invocation, script.stdLibVersion).bimap(e => GenericError(e.message), _.expr),
+            wrapDAppEnv
           )
         )
     }

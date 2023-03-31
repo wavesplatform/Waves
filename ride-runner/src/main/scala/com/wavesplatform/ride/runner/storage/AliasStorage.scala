@@ -3,7 +3,7 @@ package com.wavesplatform.ride.runner.storage
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.ride.runner.storage.persistent.PersistentStorageContext.ReadWrite
+import com.wavesplatform.ride.runner.db.ReadWrite
 import com.wavesplatform.ride.runner.storage.persistent.PersistentCache
 import com.wavesplatform.state.Height
 

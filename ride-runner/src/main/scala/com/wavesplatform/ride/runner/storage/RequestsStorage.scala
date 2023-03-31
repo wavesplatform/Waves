@@ -2,8 +2,9 @@ package com.wavesplatform.ride.runner.storage
 
 import cats.syntax.contravariantSemigroupal.*
 import com.wavesplatform.account.Address
+import com.wavesplatform.ride.runner.db.RideDbAccess
 import com.wavesplatform.ride.runner.stats.RideRunnerStats.rideRequestTotalNumber
-import com.wavesplatform.ride.runner.storage.persistent.{CacheKeys, PersistentStorage}
+import com.wavesplatform.ride.runner.storage.persistent.CacheKeys
 import com.wavesplatform.ride.runner.storage.persistent.CacheKeys.{Requests, RequestsLastIndex}
 import play.api.libs.json.*
 
@@ -41,26 +42,26 @@ object ScriptRequest {
   }
 }
 
-class DefaultRequestsStorage(storage: PersistentStorage) extends RequestsStorage {
+class DefaultRequestsStorage(db: RideDbAccess) extends RequestsStorage {
   private val lastIndexKey = RequestsLastIndex.mkKey(())
-  private val lastIndex    = new AtomicInteger(storage.readOnly(_.db.getOpt(lastIndexKey).getOrElse(-1)))
+  private val lastIndex    = new AtomicInteger(db.readOnly(_.getOpt(lastIndexKey).getOrElse(-1)))
   refreshCounter()
 
   override def size: Int = lastIndex.get() + 1
 
-  override def all(): List[ScriptRequest] = storage.readOnly { ro =>
+  override def all(): List[ScriptRequest] = db.readOnly { ro =>
     var r = List.empty[ScriptRequest]
-    ro.db.iterateOver(Requests.prefixBytes) { entry =>
+    ro.iterateOver(Requests.prefixBytes) { entry =>
       r = CacheKeys.Requests.parseValue(entry.getValue) :: r
     }
     r // .reverse the order doesn't matter
   }
 
-  override def append(x: ScriptRequest): Unit = storage.readWrite { rw =>
+  override def append(x: ScriptRequest): Unit = db.readWrite { rw =>
     val newIndex = lastIndex.incrementAndGet()
     val key      = CacheKeys.Requests.mkKey(newIndex)
-    rw.db.put(lastIndexKey, newIndex)
-    rw.db.put(key, x)
+    rw.put(lastIndexKey, newIndex)
+    rw.put(key, x)
     refreshCounter()
   }
 

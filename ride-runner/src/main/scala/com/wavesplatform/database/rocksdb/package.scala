@@ -18,14 +18,7 @@ import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
 import com.wavesplatform.state.*
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction
-import com.wavesplatform.transaction.{
-  EthereumTransaction,
-  GenesisTransaction,
-  PBSince,
-  PaymentTransaction,
-  Transaction,
-  TransactionParsers
-}
+import com.wavesplatform.transaction.{EthereumTransaction, GenesisTransaction, PBSince, PaymentTransaction, Transaction, TransactionParsers}
 import com.wavesplatform.utils.*
 import monix.eval.Task
 import monix.reactive.Observable
@@ -374,24 +367,26 @@ package object rocksdb {
         Using.resource(new ReadOptions().setSnapshot(s).setVerifyChecksums(false)) { ro =>
           f(new ReadOnlyDB(db, ro))
         }
-      }
+      }((resource: Snapshot) => db.releaseSnapshot(resource))
     }
 
     /** @note
       *   Runs operations in batch, so keep in mind, that previous changes don't appear lately in f
       */
     def readWrite[A](f: RW => A): A = {
-      val snapshot    = db.getSnapshot
-      val readOptions = new ReadOptions().setSnapshot(snapshot).setVerifyChecksums(false)
-      val batch       = new WriteBatch()
-      val rw          = new RW(db, readOptions, batch)
-      try {
-        val r = f(rw)
-        db.write(new WriteOptions().setSync(false).setDisableWAL(true), batch)
-        r
-      } finally {
-        batch.close()
-        snapshot.close()
+      Using.resource(db.getSnapshot) { s =>
+        Using.resource(new ReadOptions().setSnapshot(s).setVerifyChecksums(false)) { ro =>
+          Using.resource(new WriteOptions().setSync(false).setDisableWAL(true)) { wo =>
+            Using.resource(new WriteBatch()) { wb =>
+              val r = f(new RW(db, ro, wb))
+              db.write(wo, wb)
+              r
+            }
+          }
+        }
+      } { (resource: Snapshot) =>
+        db.releaseSnapshot(resource)
+        resource.close()
       }
     }
 

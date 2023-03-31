@@ -4,7 +4,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.BlockchainApi
 import com.wavesplatform.events.protobuf.StateUpdate
 import com.wavesplatform.protobuf.ByteStringExt
-import com.wavesplatform.ride.runner.storage.persistent.PersistentStorageContext.ReadWrite
+import com.wavesplatform.ride.runner.db.ReadWrite
 import com.wavesplatform.ride.runner.storage.persistent.PersistentCache
 import com.wavesplatform.state.{Height, LeaseBalance}
 

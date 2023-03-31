@@ -1,6 +1,7 @@
 package com.wavesplatform.ride.runner.storage.persistent
 
 import com.wavesplatform.meta.getSimpleName
+import com.wavesplatform.ride.runner.db.RideDbAccess
 import com.wavesplatform.ride.runner.storage.RemoteData
 
 abstract class PersistentCacheTestSuite[KeyT, ValueT] extends PersistentTestSuite {
@@ -217,5 +218,5 @@ abstract class PersistentCacheTestSuite[KeyT, ValueT] extends PersistentTestSuit
 
   protected def defaultKey: KeyT
   protected def defaultValue: ValueT
-  protected def test(f: (PersistentStorage, PersistentCache[KeyT, ValueT]) => Unit): Unit
+  protected def test(f: (RideDbAccess, PersistentCache[KeyT, ValueT]) => Unit): Unit
 }

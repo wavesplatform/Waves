@@ -3,11 +3,12 @@ package com.wavesplatform.ride.runner.entrypoints
 import akka.actor.ActorSystem
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.events.WrappedEvent
-import com.wavesplatform.ride.runner.db.RideDb
+import com.wavesplatform.ride.runner.db.RideRocksDb
+import com.wavesplatform.ride.runner.requests.DefaultRequestService
 import com.wavesplatform.ride.runner.stats.RideRunnerStats
-import com.wavesplatform.ride.runner.storage.persistent.{DefaultPersistentCaches, PersistentStorage}
+import com.wavesplatform.ride.runner.storage.persistent.DefaultPersistentCaches
 import com.wavesplatform.ride.runner.storage.{RequestsStorage, ScriptRequest, SharedBlockchainStorage}
-import com.wavesplatform.ride.runner.{BlockchainProcessor, BlockchainState, DefaultRequestService}
+import com.wavesplatform.ride.runner.{BlockchainProcessor, BlockchainState}
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
 import io.grpc.ManagedChannel
@@ -116,13 +117,12 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
     )
 
     log.info("Opening a caches DB...")
-    val db = RideDb.open(settings.rideRunner.db).db
+    val db = RideRocksDb.open(settings.rideRunner.db)
     cs.cleanup(CustomShutdownPhase.Db) { db.close() }
 
-    val storage = PersistentStorage.rocksDb(db)
-    val sharedBlockchain = storage.readWrite { implicit rw =>
-      val dbCaches = DefaultPersistentCaches(storage)
-      SharedBlockchainStorage[ScriptRequest](settings.rideRunner.sharedBlockchain, storage, dbCaches, blockchainApi)
+    val sharedBlockchain = db.access.readWrite { implicit rw =>
+      val dbCaches = DefaultPersistentCaches(db.access)
+      SharedBlockchainStorage[ScriptRequest](settings.rideRunner.sharedBlockchain, db.access, dbCaches, blockchainApi)
     }
 
     val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
@@ -130,7 +130,7 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
 
     val requestsService = new DefaultRequestService(
       settings.rideRunner.requestsService,
-      storage,
+      db.access,
       sharedBlockchain,
       new RequestsStorage {
         override def size: Int                      = scripts.size
@@ -147,7 +147,7 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
     // TODO #100 Settings?
     val lastSafeKnownHeight = Height(math.max(1, sharedBlockchain.height - 100 - 1)) // A rollback is not possible
     val workingHeight       = Height(math.max(sharedBlockchain.height, lastHeightAtStart))
-    val endHeight           = Height(workingHeight + 1)       // 101 // lastHeightAtStart
+    val endHeight           = Height(workingHeight + 1)                              // 101 // lastHeightAtStart
 
     log.info(s"Watching blockchain updates...")
     val blockchainUpdates = blockchainApi.mkBlockchainUpdatesStream(blockchainEventsStreamScheduler)

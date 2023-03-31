@@ -789,7 +789,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
         CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
         WavesContext.build(Global, DirectiveSet(V2, AssetType, Expression).explicitGet(), fixBigScriptField = true)
 
-    val environment = new WavesEnvironment(
+    val environment = WavesEnvironment(
       chainId,
       Coeval(???),
       null,
@@ -820,7 +820,7 @@ class TransactionBindingsTest extends PropSpec with PathMockFactory with EitherV
         CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
         WavesContext.build(Global, directives, fixBigScriptField = true)
 
-    val env = new WavesEnvironment(
+    val env = WavesEnvironment(
       chainId,
       Coeval(buildThisValue(t, blockchain, directives, Coproduct[Environment.Tthis](Environment.AssetId(Array()))).explicitGet()),
       null,
