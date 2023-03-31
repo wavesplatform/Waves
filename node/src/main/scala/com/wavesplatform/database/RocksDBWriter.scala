@@ -692,7 +692,7 @@ class RocksDBWriter(
       block: Block,
       carryFee: Long,
       snapshot: TransactionStateSnapshot,
-      tx: NewTransactionInfo,
+      transaction: NewTransactionInfo,
       newAddresses: Map[Address, database.AddressId.Type],
       leaseBalances: Map[AddressId, LeaseBalance],
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
@@ -716,9 +716,9 @@ class RocksDBWriter(
         rw.put(Keys.safeRollbackHeight, newSafeRollbackHeight)
       }
 
-      val txMeta = TxMeta(Height(height), tx.applied, tx.spentComplexity)
+      val txMeta = TxMeta(Height(height), transaction.applied, transaction.spentComplexity)
       val transactions: Map[TransactionId, (TxMeta, Transaction, TxNum)] =
-        Map(TransactionId(tx.transaction.id()) -> ((txMeta, tx.transaction, TxNum(0.toShort)))) // TODO correct numeration
+        Map(TransactionId(transaction.transaction.id()) -> ((txMeta, transaction.transaction, TxNum(0.toShort)))) // TODO correct numeration
 
       rw.put(
         Keys.blockMetaAt(Height(height)),

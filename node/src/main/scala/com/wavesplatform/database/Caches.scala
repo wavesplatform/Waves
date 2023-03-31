@@ -414,7 +414,7 @@ abstract class Caches extends Blockchain with Storage {
   ): Unit
 
   def appendSnapshot(
-      tx: NewTransactionInfo,
+      transaction: NewTransactionInfo,
       snapshot: TransactionStateSnapshot,
       carryFee: Long,
       totalFee: Long,
@@ -431,7 +431,7 @@ abstract class Caches extends Blockchain with Storage {
       (snapshot.balances.map(_.address.toAddress) ++ snapshot.leaseBalances.map(_.address.toAddress))
         .filter(addressIdCache.get(_).isEmpty)
 
-    for (address <- tx.affected if addressIdCache.get(address).isEmpty)
+    for (address <- transaction.affected if addressIdCache.get(address).isEmpty)
       newAddresses += address
 
     val newAddressIds = (for {
@@ -441,9 +441,9 @@ abstract class Caches extends Blockchain with Storage {
     lastAddressId += newAddressIds.size
 
     val addressTransactions = ArrayListMultimap.create[AddressId, TransactionId]()
-    transactionIds.put(tx.transaction.id(), newHeight)
-    for (addr <- tx.affected)
-      addressTransactions.put(addressIdWithFallback(addr, newAddressIds), TransactionId(tx.transaction.id()))
+    transactionIds.put(transaction.transaction.id(), newHeight)
+    for (addr <- transaction.affected)
+      addressTransactions.put(addressIdWithFallback(addr, newAddressIds), TransactionId(transaction.transaction.id()))
 
     current = (newHeight, current._2 + block.blockScore(), Some(block))
 
@@ -496,9 +496,7 @@ abstract class Caches extends Blockchain with Storage {
       }.toMap
 
     val leaseBalances =
-      snapshot.leaseBalances
-        .map { lease => lease.address.toAddress -> LeaseBalance(in = lease.in, out = lease.out) }
-        .toMap
+      snapshot.leaseBalances.map { lease => lease.address.toAddress -> LeaseBalance(in = lease.in, out = lease.out) }.toMap
 
     for {
       (address, value) <- accountScripts
@@ -518,7 +516,7 @@ abstract class Caches extends Blockchain with Storage {
       block,
       carryFee,
       snapshot,
-      tx,
+      transaction,
       newAddressIds,
       leaseBalances.map { case (address, balance) => addressIdWithFallback(address, newAddressIds) -> balance },
       addressTransactions.asMap(),
