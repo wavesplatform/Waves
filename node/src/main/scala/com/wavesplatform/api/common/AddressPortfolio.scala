@@ -32,6 +32,8 @@ class NFTIterator(addressId: AddressId, maybeAfter: Option[IssuedAsset], resourc
       while (dbIterator.isValid && skipEntry(dbIterator.key())) {
         dbIterator.next()
       }
+      if (dbIterator.isValid && !skipEntry(dbIterator.key()))
+        dbIterator.next()
     }
   }(())
 

@@ -347,7 +347,7 @@ object Explorer extends ScorexLogging {
           val bf = GBloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), 200_000_000L)
           log.info("Counting transactions")
           var count = 0L
-          rdb.db.iterateOver(KeyTags.TransactionMetaById) { e =>
+          rdb.db.iterateOver(KeyTags.TransactionMetaById, Some(rdb.txMetaHandle.handle)) { e =>
             bf.put(e.getKey.drop(2))
             count += 1
           }

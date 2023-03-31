@@ -302,7 +302,7 @@ final case class TransactionJsonSerializer(blockchain: Blockchain, commonApi: Co
     new OnlyEncodeJsonValueCodec[TxMetaEnriched] {
       override def encodeValue(txMeta: TxMetaEnriched, out: JsonWriter): Unit = {
         txMeta.meta match {
-          case TransactionMeta.Invoke(height, tx, succeeded, spentComplexity, invokeScriptResult) =>
+          case TransactionMeta.Invoke(height, tx: InvokeScriptTransaction, succeeded, spentComplexity, invokeScriptResult) =>
             out.writeObjectStart()
             out.writeKeyValue("type", tx.tpe.id, numbersAsString)
             out.writeKeyValue("id", tx.id().toString)

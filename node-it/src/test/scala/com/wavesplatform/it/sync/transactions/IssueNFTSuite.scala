@@ -19,9 +19,9 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
   override def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.raw("""waves {
-          |  miner.quorum = 0
-          |  blockchain.custom.functionality.pre-activated-features.13 = 10
-          |}""".stripMargin))
+                            |  miner.quorum = 0
+                            |  blockchain.custom.functionality.pre-activated-features.13 = 10
+                            |}""".stripMargin))
       .withDefault(1)
       .withSpecial(_.nonMiner)
       .buildNonConflicting()
@@ -156,20 +156,19 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
     val assetName        = "NFTAsset"
     val assetDescription = "my asset description"
 
-    (1 to n).map(
-      i =>
-        secondNode
-          .issue(
-            secondNode.keyPair,
-            assetName + i,
-            assetDescription + i,
-            quantity = 1,
-            decimals = 0,
-            reissuable = false,
-            fee = 0.001.waves,
-            script = None
-          )
-          .id
+    (1 to n).map(i =>
+      secondNode
+        .issue(
+          secondNode.keyPair,
+          assetName + i,
+          assetDescription + i,
+          quantity = 1,
+          decimals = 0,
+          reissuable = false,
+          fee = 0.001.waves,
+          script = None
+        )
+        .id
     )
   }
 }

@@ -358,9 +358,26 @@ class RocksDBWriter(
   // todo: instead of fixed-size block batches, store fixed-time batches
   private val BlockStep  = 200
   private def mkFilter() = BloomFilter.create[Array[Byte]](Funnels.byteArrayFunnel(), BlockStep * bfBlockInsertions, 0.01f)
+  private def initFilters(): (BloomFilter[Array[Byte]], BloomFilter[Array[Byte]]) = {
+    def loadFilter(heights: Seq[Int]): BloomFilter[Array[Byte]] = {
+      val filter = mkFilter()
+      heights.filter(_ > 0).foreach { h =>
+        loadTransactions(Height(h), rdb).foreach { case (_, tx) => filter.put(tx.id().arr) }
+      }
+      filter
+    }
 
-  private var bf0 = mkFilter()
-  private var bf1 = mkFilter()
+    val lastFilterStart = (height / BlockStep) * BlockStep + 1
+    val prevFilterStart = lastFilterStart - BlockStep
+    val (bf0Heights, bf1Heights) = if ((height / BlockStep) % 2 == 0) {
+      (lastFilterStart to height, prevFilterStart until lastFilterStart)
+    } else {
+      (prevFilterStart until lastFilterStart, lastFilterStart to height)
+    }
+    (loadFilter(bf0Heights), loadFilter(bf1Heights))
+  }
+
+  private var (bf0, bf1) = initFilters()
 
   override def containsTransaction(tx: Transaction): Boolean =
     (bf0.mightContain(tx.id().arr) || bf1.mightContain(tx.id().arr)) && {

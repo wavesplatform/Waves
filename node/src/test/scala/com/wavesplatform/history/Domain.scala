@@ -125,7 +125,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
 
   def solidStateSnapshot(): SortedMap[String, String] = {
     val builder = SortedMap.newBuilder[String, String]
-    rdb.db.iterateOver(Array.emptyByteArray)(e =>
+    rdb.db.iterateOver(Array.emptyByteArray, None)(e =>
       builder.addOne(EthEncoding.toHexString(e.getKey).drop(2) -> EthEncoding.toHexString(e.getValue).drop(2))
     )
     builder.result()
@@ -233,7 +233,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
   }
 
   def appendBlock(txs: Transaction*): Block =
-    appendBlock(Block.PlainBlockVersion, txs *)
+    appendBlock(Block.PlainBlockVersion, txs*)
 
   def appendKeyBlock(ref: Option[ByteStr] = None): Block = {
     val block          = createBlock(Block.NgBlockVersion, Nil, ref.orElse(Some(lastBlockId)))
@@ -265,7 +265,7 @@ case class Domain(rdb: RDB, blockchainUpdater: BlockchainUpdaterImpl, rocksDBWri
   }
 
   def appendMicroBlock(txs: Transaction*): BlockId = {
-    val mb = createMicroBlock(txs *)
+    val mb = createMicroBlock(txs*)
     blockchainUpdater.processMicroBlock(mb).explicitGet()
   }
 

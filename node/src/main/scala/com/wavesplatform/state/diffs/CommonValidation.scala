@@ -109,7 +109,7 @@ object CommonValidation {
     } else Right(tx)
 
   def disallowDuplicateIds[T <: Transaction](blockchain: Blockchain, tx: T): Either[ValidationError, T] = tx match {
-    case _: PaymentTransaction => Right(tx)
+    case _: PaymentTransaction                                                          => Right(tx)
     case _: CreateAliasTransaction if blockchain.height < DisableHijackedAliases.height => Right(tx)
     case _ =>
       val id = tx.id()
