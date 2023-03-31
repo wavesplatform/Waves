@@ -408,8 +408,8 @@ abstract class Caches extends Blockchain with Storage {
       assetVolumes: Seq[TransactionStateSnapshot.AssetVolume],
       assetNamesAndDescriptions: Seq[TransactionStateSnapshot.AssetNameAndDescription],
       orderFills: Seq[TransactionStateSnapshot.OrderFill],
-      accountScripts: Seq[(AddressId, TransactionStateSnapshot.AccountScript)],
-      assetScripts: Seq[TransactionStateSnapshot.AssetScript],
+      accountScripts: Map[AddressId, Option[AccountScriptInfo]],
+      assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]],
       accountData: Seq[TransactionStateSnapshot.AccountData],
       aliases: Seq[(Alias, AddressId)],
       sponsorships: Seq[TransactionStateSnapshot.Sponsorship],
@@ -480,19 +480,41 @@ abstract class Caches extends Blockchain with Storage {
       stateHash.addAlias(alias.address.toAddress, alias.alias)
     }
 
-    for {
-      accountScript <- snapshot.accountScripts
-      script =
-        if (accountScript.script.isEmpty) None
-        else Some(ScriptReader.fromBytes(accountScript.script.toByteArray).explicitGet())
-    } stateHash.addAccountScript(accountScript.senderAddress.toAddress, script)
+    val accountScripts =
+      snapshot.accountScripts.map { pbInfo =>
+        val info =
+          if (pbInfo.script.isEmpty)
+            None
+          else
+            Some(
+              AccountScriptInfo(
+                pbInfo.senderPublicKey.toPublicKey,
+                ScriptReader.fromBytes(pbInfo.script.toByteArray).explicitGet(),
+                pbInfo.verifierComplexity,
+                if (pbInfo.callableComplexities.nonEmpty) Map(3 -> pbInfo.callableComplexities)
+                else Map()
+              )
+            )
+        pbInfo.senderAddress.toAddress -> info
+      }.toMap
+
+    val assetScripts =
+      snapshot.assetScripts.map { pbInfo =>
+        val info =
+          if (pbInfo.script.isEmpty)
+            None
+          else
+            Some(AssetScriptInfo(ScriptReader.fromBytes(pbInfo.script.toByteArray).explicitGet(), pbInfo.complexity))
+        pbInfo.assetId.toAssetId -> info
+      }.toMap
 
     for {
-      assetScript <- snapshot.assetScripts
-      script =
-        if (assetScript.script.isEmpty) None
-        else Some(ScriptReader.fromBytes(assetScript.script.toByteArray).explicitGet())
-    } stateHash.addAssetScript(assetScript.assetId.toAssetId, script)
+      (address, value) <- accountScripts
+    } stateHash.addAccountScript(address, value.map(_.script))
+
+    for {
+      (address, value) <- assetScripts
+    } stateHash.addAssetScript(address, value.map(_.script))
 
     snapshot.leaseStates.foreach { leaseState =>
       stateHash.addLeaseStatus(TransactionId @@ leaseState.leaseId.toByteStr, leaseState.status.isActive)
@@ -512,8 +534,8 @@ abstract class Caches extends Blockchain with Storage {
       snapshot.assetVolumes,
       snapshot.assetNamesAndDescriptions,
       snapshot.orderFills,
-      snapshot.accountScripts.map { script => addressIdWithFallback(script.senderAddress.toAddress, newAddressIds) -> script },
-      snapshot.assetScripts,
+      accountScripts.map { case (address, s) => addressIdWithFallback(address, newAddressIds) -> s },
+      assetScripts,
       snapshot.accountData,
       snapshot.aliases.map { alias => Alias.create(alias.alias).explicitGet() -> addressIdWithFallback(alias.address.toAddress, newAddressIds) },
       snapshot.sponsorships,
@@ -552,40 +574,6 @@ abstract class Caches extends Blockchain with Storage {
       )
     }
 
-    val accountScripts =
-      snapshot.accountScripts
-        .map { pbInfo =>
-          val info =
-            if (pbInfo.script.isEmpty)
-              None
-            else
-              Some(
-                AccountScriptInfo(
-                  pbInfo.senderPublicKey.toPublicKey,
-                  ScriptReader.fromBytes(pbInfo.script.toByteArray).explicitGet(),
-                  pbInfo.verifierComplexity,
-                  if (pbInfo.callableComplexities.nonEmpty) Map(3 -> pbInfo.callableComplexities)
-                  else Map()
-                )
-              )
-          pbInfo.senderAddress.toAddress -> info
-        }
-        .toMap
-        .asJava
-
-    val assetScripts =
-      snapshot.assetScripts
-        .map { pbInfo =>
-          val info =
-            if (pbInfo.script.isEmpty)
-              None
-            else
-              Some(AssetScriptInfo(ScriptReader.fromBytes(pbInfo.script.toByteArray).explicitGet(), pbInfo.complexity))
-          pbInfo.assetId.toAssetId -> info
-        }
-        .toMap
-        .asJava
-
     val leasesJava =
       snapshot.leaseBalances
         .map { lease => lease.address.toAddress -> LeaseBalance(in = lease.in, out = lease.out) }
@@ -593,8 +581,8 @@ abstract class Caches extends Blockchain with Storage {
         .asJava
 
     leaseBalanceCache.putAll(leasesJava)
-    scriptCache.putAll(accountScripts)
-    assetScriptCache.putAll(assetScripts)
+    scriptCache.putAll(accountScripts.asJava)
+    assetScriptCache.putAll(assetScripts.asJava)
     blocksTs.put(newHeight, block.header.timestamp)
 
     accountDataCache.putAll(newData.asJava)

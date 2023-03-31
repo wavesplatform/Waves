@@ -700,8 +700,8 @@ class RocksDBWriter(
       assetVolumes: Seq[S.AssetVolume],
       assetNamesAndDescriptions: Seq[S.AssetNameAndDescription],
       orderFills: Seq[S.OrderFill],
-      accountScripts: Seq[(AddressId, S.AccountScript)],
-      assetScripts: Seq[S.AssetScript],
+      accountScripts: Map[AddressId, Option[AccountScriptInfo]],
+      assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]],
       accountData: Seq[S.AccountData],
       aliases: Seq[(Alias, AddressId)],
       sponsorships: Seq[S.Sponsorship],
@@ -828,35 +828,17 @@ class RocksDBWriter(
         expiredKeys ++= updateHistory(rw, Keys.leaseDetailsHistory(id), threshold, Keys.leaseDetails(id))
       }
 
-      for ((addressId, pbInfo) <- accountScripts) {
-        val newInfo =
-          if (pbInfo.script.isEmpty)
-            None
-          else
-            Some(
-              AccountScriptInfo(
-                pbInfo.senderPublicKey.toPublicKey,
-                ScriptReader.fromBytes(pbInfo.script.toByteArray).explicitGet(),
-                pbInfo.verifierComplexity,
-                if (pbInfo.callableComplexities.nonEmpty) Map(3 -> pbInfo.callableComplexities) else Map()
-              )
-            )
+        for ((addressId, script) <- accountScripts) {
         expiredKeys ++= updateHistory(rw, Keys.addressScriptHistory(addressId), threshold, Keys.addressScript(addressId))
-        if (newInfo.isDefined) rw.put(Keys.addressScript(addressId)(height), newInfo)
+        if (script.isDefined) rw.put(Keys.addressScript(addressId)(height), script)
       }
 
-      for (pbInfo <- assetScripts) {
-        val asset = pbInfo.assetId.toAssetId
-        val newInfo =
-          if (pbInfo.script.isEmpty)
-            None
-          else
-            Some(AssetScriptInfo(ScriptReader.fromBytes(pbInfo.script.toByteArray).explicitGet(), pbInfo.complexity))
+        for ((asset, script) <- assetScripts) {
         expiredKeys ++= updateHistory(rw, Keys.assetScriptHistory(asset), threshold, Keys.assetScript(asset))
-        if (newInfo.isDefined) rw.put(Keys.assetScript(asset)(height), newInfo)
+        if (script.isDefined) rw.put(Keys.assetScript(asset)(height), script)
       }
 
-      for (pbData <- accountData) {
+        for (pbData <- accountData) {
         val address   = pbData.address.toAddress
         val addressId = addressIdWithFallback(address, newAddresses)
         rw.put(Keys.changedDataKeys(height, addressId), pbData.entry.map(_.key))
