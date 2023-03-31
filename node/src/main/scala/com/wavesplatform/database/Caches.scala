@@ -14,6 +14,7 @@ import com.wavesplatform.database
 import com.wavesplatform.database.protobuf.EthereumTransactionMeta
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.metrics.LevelDBStats
+import com.wavesplatform.protobuf.ByteStringExt
 import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.protobuf.{Amount, ByteStringExt}
@@ -36,7 +37,6 @@ import scala.reflect.ClassTag
 
 abstract class Caches extends Blockchain with Storage {
   import Caches.*
-  import com.wavesplatform.protobuf.snapshot.TransactionStateSnapshot as S
 
   val dbSettings: DBSettings
 
@@ -400,27 +400,17 @@ abstract class Caches extends Blockchain with Storage {
   protected def doAppendSnapshot(
       block: Block,
       carryFee: Long,
+      snapshot: TransactionStateSnapshot,
+      tx: NewTransactionInfo,
       newAddressIds: Map[Address, database.AddressId.Type],
-      balances: Seq[(AddressId, Amount)],
       leaseBalances: Map[AddressId, LeaseBalance],
       addressTransactions: util.Map[AddressId, util.Collection[TransactionId]],
-      leaseStates: Seq[S.LeaseState],
-      assetStatics: Map[IssuedAsset, S.AssetStatic],
-      assetVolumes: Seq[S.AssetVolume],
-      assetNamesAndDescriptions: Seq[S.AssetNameAndDescription],
-      orderFills: Seq[S.OrderFill],
       accountScripts: Map[AddressId, Option[AccountScriptInfo]],
       assetScripts: Map[IssuedAsset, Option[AssetScriptInfo]],
-      accountData: Seq[S.AccountData],
-      aliases: Seq[(Alias, AddressId)],
-      sponsorships: Seq[S.Sponsorship],
       totalFee: Long,
       reward: Option[Long],
       hitSource: ByteStr,
-      scriptResults: Seq[S.ScriptResult],
-      transactionMeta: Seq[(TxMeta, Transaction)],
-      stateHash: StateHashBuilder.Result,
-      ethereumTransactionMeta: Seq[S.EthereumTransactionMeta]
+      stateHash: StateHashBuilder.Result
   ): Unit
 
   def appendSnapshot(
@@ -450,10 +440,8 @@ abstract class Caches extends Blockchain with Storage {
 
     lastAddressId += newAddressIds.size
 
-    val transactionMeta     = Seq.newBuilder[(TxMeta, Transaction)]
     val addressTransactions = ArrayListMultimap.create[AddressId, TransactionId]()
     transactionIds.put(tx.transaction.id(), newHeight)
-    transactionMeta += (TxMeta(Height(newHeight), tx.applied, tx.spentComplexity) -> tx.transaction)
     for (addr <- tx.affected)
       addressTransactions.put(addressIdWithFallback(addr, newAddressIds), TransactionId(tx.transaction.id()))
 
@@ -529,27 +517,17 @@ abstract class Caches extends Blockchain with Storage {
     doAppendSnapshot(
       block,
       carryFee,
+      snapshot,
+      tx,
       newAddressIds,
-      snapshot.balances.map { balance => addressIdWithFallback(balance.address.toAddress, newAddressIds) -> balance.getAmount },
       leaseBalances.map { case (address, balance) => addressIdWithFallback(address, newAddressIds) -> balance },
       addressTransactions.asMap(),
-      snapshot.leaseStates,
-      snapshot.assetStatics.map(static => (static.assetId.toAssetId, static)).toMap,
-      snapshot.assetVolumes,
-      snapshot.assetNamesAndDescriptions,
-      snapshot.orderFills,
       accountScripts.map { case (address, s) => addressIdWithFallback(address, newAddressIds) -> s },
       assetScripts,
-      snapshot.accountData,
-      snapshot.aliases.map { alias => Alias.create(alias.alias).explicitGet() -> addressIdWithFallback(alias.address.toAddress, newAddressIds) },
-      snapshot.sponsorships,
       totalFee,
       reward,
       hitSource,
-      snapshot.scriptResults,
-      transactionMeta.result(),
-      stateHash.result(),
-      snapshot.ethereumTransactionMeta
+      stateHash.result()
     )
 
     val emptyData = Map.empty[(Address, String), Option[DataEntry[?]]]
