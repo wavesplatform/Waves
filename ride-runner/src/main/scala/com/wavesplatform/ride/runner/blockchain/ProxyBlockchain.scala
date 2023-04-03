@@ -38,7 +38,7 @@ class ProxyBlockchain(sharedBlockchain: SharedBlockchainStorage[ScriptRequest])(
   override def hitSource(height: Int): Option[ByteStr] = sharedBlockchain.vrf.get(height) // TODO #?, tag)
 
   // Ride: wavesBalance, height, lastBlock
-  override def height: Int = sharedBlockchain.height
+  override def height: Int = sharedBlockchain.heightUntagged
 
   override def activatedFeatures: Map[Short, Int] = sharedBlockchain.activatedFeatures
 

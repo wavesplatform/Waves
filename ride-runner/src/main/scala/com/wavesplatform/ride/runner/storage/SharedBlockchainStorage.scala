@@ -43,18 +43,17 @@ class SharedBlockchainStorage[TagT] private (
   val accountScripts = new AccountScriptStorage[TagT](
     settings.caches.accountScript,
     chainId,
-    script => Map(estimator.version -> estimate(height, activatedFeatures, estimator, script, isAsset = false)),
+    script => Map(estimator.version -> estimate(heightUntagged, activatedFeatures, estimator, script, isAsset = false)),
     blockchainApi,
     persistentCaches.accountScripts
   )
 
-  val vrf = new VrfStorage(settings.caches.vrf, blockchainApi, persistentCaches.vrf, height)
+  val vrf = new VrfStorage(settings.caches.vrf, blockchainApi, persistentCaches.vrf, heightUntagged)
 
-  val heightS = new HeightTagsStorage[TagT](height)
+  val height = new HeightTagsStorage[TagT](heightUntagged)
 
   // Ride: wavesBalance, height, lastBlock
-  // TODO heightUntagged
-  def height: Int = blockHeaders.latestHeight.getOrElse(blockchainApi.getCurrentBlockchainHeight())
+  def heightUntagged: Int = blockHeaders.latestHeight.getOrElse(blockchainApi.getCurrentBlockchainHeight())
 
   def hasLocalBlockAt(height: Height, id: ByteStr): Option[Boolean] =
     db.readWrite { implicit ctx =>
@@ -65,7 +64,7 @@ class SharedBlockchainStorage[TagT] private (
   var activatedFeatures =
     load[Unit, Map[Short, Int]](
       _ => persistentCaches.getActivatedFeatures(),
-      _ => blockchainApi.getActivatedFeatures(height).some,
+      _ => blockchainApi.getActivatedFeatures(heightUntagged).some,
       (_, xs) => xs.mayBeValue.foreach(persistentCaches.setActivatedFeatures)
     )(())
       .getOrElse(throw new RuntimeException("Impossible: activated features are empty"))
@@ -77,7 +76,7 @@ class SharedBlockchainStorage[TagT] private (
   def resolveAlias(a: Alias): Either[ValidationError, Address] =
     // TODO Remove readWrite!
     db.readWrite { implicit rw =>
-      aliases.getUntagged(Height(height), a).toRight(AliasDoesNotExist(a): ValidationError)
+      aliases.getUntagged(Height(heightUntagged), a).toRight(AliasDoesNotExist(a): ValidationError)
     }
 
   val accountBalances = new AccountBalanceStorage[TagT](settings.caches.accountBalance, chainId, blockchainApi, persistentCaches.accountBalances)
@@ -87,7 +86,8 @@ class SharedBlockchainStorage[TagT] private (
 
   val transactions = new TransactionStorage[TagT](settings.caches.transaction, blockchainApi, persistentCaches.transactions)
 
-  private def estimator: ScriptEstimator = EstimatorProvider.byActivatedFeatures(blockchainSettings.functionalitySettings, activatedFeatures, height)
+  private def estimator: ScriptEstimator =
+    EstimatorProvider.byActivatedFeatures(blockchainSettings.functionalitySettings, activatedFeatures, heightUntagged)
 
   private def load[KeyT, ValueT](
       fromCache: KeyT => RemoteData[ValueT],
@@ -110,7 +110,7 @@ class SharedBlockchainStorage[TagT] private (
       val affected = event.update match {
         case Update.Empty         => AffectedTags.empty[TagT] // Ignore
         case Update.Append(evt)   => append(toHeight, evt)
-        case Update.Rollback(evt) => rollback(Height(height), toHeight, evt)
+        case Update.Rollback(evt) => rollback(Height(heightUntagged), toHeight, evt)
       }
 
       blockHeaders.update(event)
@@ -129,7 +129,7 @@ class SharedBlockchainStorage[TagT] private (
         val stateUpdate = (evt.getStateUpdate +: evt.transactionStateUpdates).view
         val txsView     = txs.view.map(_.transaction)
 
-        stateUpdate.flatMap(_.assets).foldLeft(heightS.affectedTags.logDep("height")) { case (r, x) =>
+        stateUpdate.flatMap(_.assets).foldLeft(height.affectedTags.logDep("height")) { case (r, x) =>
           r ++ assets.append(atHeight, x).logDep("assets")
         } ++
           stateUpdate.flatMap(_.balances).foldLeft(empty) { case (r, x) =>

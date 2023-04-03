@@ -85,7 +85,7 @@ class DefaultRequestService(
                     // We don't need to cache an empty value, so we use getOrElse here
                     val origEnv = Option(requests.getIfPresent(toRun)).getOrElse(RideScriptRunEnvironment(toRun))
                     db.asyncReadWrite { implicit ctx =>
-                      runOne(sharedBlockchain.height, origEnv, hasCaches = true).tapEval { r =>
+                      runOne(sharedBlockchain.heightUntagged, origEnv, hasCaches = true).tapEval { r =>
                         Task {
                           requests.put(r.key, r)
                           updated.result.trySuccess(r.lastResult)
@@ -127,7 +127,7 @@ class DefaultRequestService(
   }
 
   override def trackAndRun(request: ScriptRequest): Task[JsObject] = {
-    val currentHeight = Height(sharedBlockchain.height)
+    val currentHeight = Height(sharedBlockchain.heightUntagged)
     val cache         = Option(requests.getIfPresent(request))
     cache match {
       case Some(cache) =>

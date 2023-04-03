@@ -31,12 +31,12 @@ class DefaultDAppEnvironmentTracker[TagT](sharedBlockchain: SharedBlockchainStor
     with ScorexLogging {
   override def height(): Unit = {
     // log.trace(s"[$tag] height")
-    sharedBlockchain.heightS.addDependent(tag)
+    sharedBlockchain.height.addDependent(tag)
   }
 
   override def lastBlockOpt(): Unit = {
     log.trace(s"[$tag] lastBlockOpt")
-    sharedBlockchain.heightS.addDependent(tag)
+    sharedBlockchain.height.addDependent(tag)
   }
 
   // TODO A: this won't change

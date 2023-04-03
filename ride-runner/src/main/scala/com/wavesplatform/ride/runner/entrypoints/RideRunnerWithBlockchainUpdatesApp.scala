@@ -126,7 +126,7 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
     }
 
     val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
-    log.info(s"Current height: shared (local or network)=${sharedBlockchain.height}, network=$lastHeightAtStart")
+    log.info(s"Current height: shared (local or network)=${sharedBlockchain.heightUntagged}, network=$lastHeightAtStart")
 
     val requestsService = new DefaultRequestService(
       settings.rideRunner.requestsService,
@@ -141,8 +141,8 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
     // Await.result(requestsService.runAll().runToFuture(rideScheduler), Duration.Inf)
 
     // TODO #100 Settings?
-    val lastSafeKnownHeight = Height(math.max(1, sharedBlockchain.height - 100 - 1)) // A rollback is not possible
-    val workingHeight       = Height(math.max(sharedBlockchain.height, lastHeightAtStart))
+    val lastSafeKnownHeight = Height(math.max(1, sharedBlockchain.heightUntagged - 100 - 1)) // A rollback is not possible
+    val workingHeight       = Height(math.max(sharedBlockchain.heightUntagged, lastHeightAtStart))
     val endHeight           = Height(workingHeight + 1)                              // 101 // lastHeightAtStart
 
     log.info(s"Watching blockchain updates...")
