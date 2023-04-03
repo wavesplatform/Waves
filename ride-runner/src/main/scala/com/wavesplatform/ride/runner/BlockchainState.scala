@@ -1,9 +1,9 @@
 package com.wavesplatform.ride.runner
 
 import com.wavesplatform.api.BlockchainApi.BlockchainUpdatesStream
+import com.wavesplatform.api.UpdateType
 import com.wavesplatform.events.WrappedEvent
 import com.wavesplatform.events.api.grpc.protobuf.SubscribeEvent
-import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.meta.getSimpleName
@@ -141,7 +141,8 @@ object BlockchainState extends ScorexLogging {
     RideRunnerStats.lastKnownHeight.update(h)
 
     val currBlockId = event.getUpdate.id.toByteStr
-    log.info(s"$orig + ${getUpdateType(update)}(id=$currBlockId, h=$h)")
+    val updateType = UpdateType.from(update)
+    log.info(s"$orig + $updateType(id=$currBlockId, h=$h)")
     def logStatusChanged(updated: BlockchainState): Unit =
       log.info(s"Status changed: ${getSimpleName(orig)} -> ${getSimpleName(updated)}")
 
@@ -165,6 +166,7 @@ object BlockchainState extends ScorexLogging {
               log.info(s"[$h] Reached the current height")
               val r = Working(h)
               logStatusChanged(r)
+              processor.startScripts()
               Task.now(r)
             } else Task.now(comparedBlocks.copy(processedHeight = h))
 
@@ -182,7 +184,7 @@ object BlockchainState extends ScorexLogging {
           case update: Update.Append =>
             processor.process(event.getUpdate)
             log.info("Running affected scripts...")
-            processor.runAffectedScripts().as(orig.withHeight(h))
+            processor.runAffectedScripts(updateType).as(orig.withHeight(h))
 
           case _: Update.Rollback =>
             processor.removeAllFrom(Height(h + 1))
@@ -202,7 +204,7 @@ object BlockchainState extends ScorexLogging {
             if (updated.isRollbackResolved) {
               val r = Working(updated.processedHeight)
               log.info("Running affected scripts...")
-              processor.runAffectedScripts().as {
+              processor.runAffectedScripts(updateType).as {
                 logStatusChanged(r)
                 r
               }
@@ -216,16 +218,5 @@ object BlockchainState extends ScorexLogging {
           case Update.Empty => Task.now(orig.withProcessedHeight(h))
         }
     }
-  }
-
-  private def getUpdateType(update: BlockchainUpdated.Update): String = update match {
-    case Update.Append(append) =>
-      append.body match {
-        case Body.Empty         => "unknown body"
-        case _: Body.Block      => "append b"
-        case _: Body.MicroBlock => "append mb"
-      }
-    case _: Update.Rollback => "rollback to"
-    case Update.Empty       => "unknown append"
   }
 }

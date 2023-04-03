@@ -70,12 +70,13 @@ abstract class BaseIntegrationTestSuite extends BaseTestSuite with HasGrpc with 
       settings = DefaultRequestService.Settings(enableTraces = true, Int.MaxValue, 0, 3, 0.seconds),
       db = testDb.storage,
       sharedBlockchain = sharedBlockchain,
-      requestsStorage = new RequestsStorage {
-        override def size: Int                      = 1
-        override def append(x: ScriptRequest): Unit = {} // Ignore, because no way to evaluate a new expr
-        override def all(): List[ScriptRequest]     = List(request)
-      },
-      runScriptsScheduler = testScheduler
+//      requestsStorage = new RequestsStorage {
+//        override def size: Int                      = 1
+//        override def append(x: ScriptRequest): Unit = {} // Ignore, because no way to evaluate a new expr
+//        override def all(): List[ScriptRequest]     = List(request)
+//      },
+      null, // TODO
+      runScriptScheduler = testScheduler
     )
     val processor = new BlockchainProcessor(sharedBlockchain, requestService)
 

@@ -7,10 +7,10 @@ import com.wavesplatform.api.http.CompositeHttpService
 import com.wavesplatform.api.{DefaultBlockchainApi, GrpcChannelSettings, GrpcConnector}
 import com.wavesplatform.ride.runner.db.RideRocksDb
 import com.wavesplatform.ride.runner.http.{EvaluateApiRoute, HttpServiceStatus, ServiceApiRoute}
-import com.wavesplatform.ride.runner.requests.DefaultRequestService
+import com.wavesplatform.ride.runner.requests.{DefaultRequestService, SynchronizedJobScheduler}
 import com.wavesplatform.ride.runner.stats.RideRunnerStats
 import com.wavesplatform.ride.runner.storage.persistent.DefaultPersistentCaches
-import com.wavesplatform.ride.runner.storage.{DefaultRequestsStorage, ScriptRequest, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.storage.{ScriptRequest, SharedBlockchainStorage}
 import com.wavesplatform.ride.runner.{BlockchainProcessor, BlockchainState}
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
@@ -155,14 +155,11 @@ object RideRunnerWithBlockchainUpdatesService extends ScorexLogging {
     val lastHeightAtStart = Height(blockchainApi.getCurrentBlockchainHeight())
     log.info(s"Current height: shared (local or network)=${sharedBlockchain.height}, network=$lastHeightAtStart")
 
-    val requestsStorage = new DefaultRequestsStorage(rideDb.access)
-    log.info(s"There are ${requestsStorage.size} scripts")
-
     val requestService = new DefaultRequestService(
       settings.rideRunner.requestsService,
       rideDb.access,
       sharedBlockchain,
-      requestsStorage,
+      SynchronizedJobScheduler(50),
       rideScheduler
     )
 

@@ -1,10 +1,11 @@
 package com.wavesplatform.ride.runner.stats
 
 import com.typesafe.config.Config
+import com.wavesplatform.api.UpdateType
 import com.wavesplatform.metrics.TimerExt
 import com.wavesplatform.utils.ScorexLogging
 import kamon.Kamon
-import kamon.metric.{MeasurementUnit, Timer}
+import kamon.metric.Timer
 
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
@@ -24,14 +25,19 @@ class RideRunnerStats(globalConfig: Config) extends AutoCloseable with ScorexLog
 object RideRunnerStats {
   val lastKnownHeight = Kamon.gauge("ride.height", "The last known blockchain height").withoutTags()
 
-  val rideRequestAffectedNumber = Kamon.gauge("ride.affected.total", "Affected unique RIDE requests").withoutTags()
-  private val rideScriptRunOnHeightTime_ = Kamon.timer("ride.affected.run", "Affected scripts run time")
+  private val rideRequestAffectedNumberByTypes = {
+    val stat = Kamon.gauge("ride.affected.total", "Affected unique RIDE requests")
+    UpdateType.All.map { x => x -> stat.withTag("tpe", x.toString) }.toMap
+  }
+  def rideRequestAffectedNumber(tpe: UpdateType) = rideRequestAffectedNumberByTypes(tpe)
+
+  private val rideScriptRunOnHeightTime_        = Kamon.timer("ride.affected.run", "Affected scripts run time")
   def rideScriptRunOnHeightTime(force: Boolean) = rideScriptRunOnHeightTime_.withTag("force", force)
 
-  val rideRequestTotalNumber    = Kamon.gauge("ride.request.total", "Total registered unique RIDE requests").withoutTags()
-  val rideRequestCacheHits      = Kamon.counter("ride.request.cache.hit", "Cache hits for whole request").withoutTags()
-  val rideRequestCacheMisses    = Kamon.counter("ride.request.cache.miss", "Cache misses for whole request").withoutTags()
-  val rideRequestRunTime        = Kamon.timer("ride.request.run", "Request running time")
+  val rideRequestTotalNumber = Kamon.gauge("ride.request.total", "Total registered unique RIDE requests").withoutTags()
+  val rideRequestCacheHits   = Kamon.counter("ride.request.cache.hit", "Cache hits for whole request").withoutTags()
+  val rideRequestCacheMisses = Kamon.counter("ride.request.cache.miss", "Cache misses for whole request").withoutTags()
+  val rideRequestRunTime     = Kamon.timer("ride.request.run", "Request running time")
 
   private val rideStorageKeyNumber          = Kamon.counter("ride.storage.number", "Number of unique keys in storage")
   def rideStorageKeyNumberFor(name: String) = rideStorageKeyNumber.withTag("name", name)
@@ -49,10 +55,9 @@ object RideRunnerStats {
   private val grpcCallTimer                              = Kamon.timer("grpc.call", "gRPC calls time")
   def grpcCallTimerFor(methodName: String, raw: Boolean) = grpcCallTimer.withTag("method", methodName).withTag("raw", raw)
 
-  private val workSchedulerSize = Kamon.gauge("work-scheduler.size", "A size of queues in a work scheduler")
+  private val workSchedulerSize = Kamon.gauge("job-scheduler.size", "A size of queues in a work scheduler")
   val prioritizedWorkSize       = workSchedulerSize.withTag("tpe", "prioritized")
-  // TODO duplicates ride.script.number
-  val allWorkSize = workSchedulerSize.withTag("tpe", "all")
+  val regularWorkSize           = workSchedulerSize.withTag("tpe", "regular")
 
   private val jobSchedulerTime       = Kamon.timer("job-scheduler.time")
   val jobSchedulerPrioritizeTime     = jobSchedulerTime.withTag("op", "prioritize")

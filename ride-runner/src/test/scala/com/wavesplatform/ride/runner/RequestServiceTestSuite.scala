@@ -124,8 +124,9 @@ class RequestServiceTestSuite extends BaseTestSuite with HasGrpc with HasDb {
       settings = DefaultRequestService.Settings(enableTraces = false, Int.MaxValue, 0, 3, 0.seconds),
       db = testDb.storage,
       sharedBlockchain = sharedBlockchain,
-      requestsStorage = requestsStorage,
-      runScriptsScheduler = testScheduler
+//      requestsStorage = requestsStorage,
+      null, // TODO
+      runScriptScheduler = testScheduler
     )
     val processor               = new BlockchainProcessor(sharedBlockchain, requestsService)
     val blockchainUpdatesStream = use(blockchainApi.mkBlockchainUpdatesStream(testScheduler))

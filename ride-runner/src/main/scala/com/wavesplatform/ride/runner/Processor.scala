@@ -1,11 +1,13 @@
 package com.wavesplatform.ride.runner
 
+import com.wavesplatform.api.UpdateType
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.BlockchainUpdated
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Append.Body
 import com.wavesplatform.events.protobuf.BlockchainUpdated.Update
 import com.wavesplatform.meta.getSimpleName
 import com.wavesplatform.ride.runner.requests.RequestService
+import com.wavesplatform.ride.runner.stats.RideRunnerStats
 import com.wavesplatform.ride.runner.storage.{AffectedTags, ScriptRequest, SharedBlockchainStorage}
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
@@ -27,9 +29,11 @@ trait Processor {
     */
   def forceRollbackLiquid(): Unit
 
+  def startScripts(): Unit
+
   def process(event: BlockchainUpdated): Unit
 
-  def runAffectedScripts(): Task[Unit]
+  def runAffectedScripts(updateType: UpdateType): Task[Unit]
 }
 
 class BlockchainProcessor(sharedBlockchain: SharedBlockchainStorage[ScriptRequest], requestsService: RequestService)
@@ -38,6 +42,8 @@ class BlockchainProcessor(sharedBlockchain: SharedBlockchainStorage[ScriptReques
 
   private val accumulatedChanges   = new AtomicReference(new ProcessResult[ScriptRequest]())
   @volatile private var lastEvents = List.empty[BlockchainUpdated]
+
+  override def startScripts(): Unit = requestsService.start()
 
   override def process(event: BlockchainUpdated): Unit = {
     val height = Height(event.height)
@@ -68,11 +74,11 @@ class BlockchainProcessor(sharedBlockchain: SharedBlockchainStorage[ScriptReques
     log.info(s"Processed $height")
   }
 
-  override def runAffectedScripts(): Task[Unit] = {
+  override def runAffectedScripts(updateType: UpdateType): Task[Unit] = {
     val last = accumulatedChanges.getAndUpdate(orig => orig.withoutAffectedTags)
     if (last.isEmpty) Task(log.info(s"[${last.newHeight}] No changes"))
     else {
-      log.info(s"Found ${last.affected.size} affected scripts")
+      RideRunnerStats.rideRequestAffectedNumber(updateType).update(last.affected.size.toDouble)
       requestsService.runAffected(last.newHeight, last.affected)
     }
   }

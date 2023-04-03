@@ -19,7 +19,10 @@ trait RequestsStorage {
   def append(x: ScriptRequest): Unit
 }
 
-final case class ScriptRequest(address: Address, requestBody: JsObject)
+final case class ScriptRequest(address: Address, requestBody: JsObject) {
+  val logPrefix: String = s"[$address, $requestBody]"
+}
+
 object ScriptRequest {
   implicit val requestsKeyReads: Reads[ScriptRequest] = Reads {
     case JsArray(rawAddress +: rawRequestBody +: xs) if xs.isEmpty =>

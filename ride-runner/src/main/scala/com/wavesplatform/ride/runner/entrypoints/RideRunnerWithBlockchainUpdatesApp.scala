@@ -7,7 +7,7 @@ import com.wavesplatform.ride.runner.db.RideRocksDb
 import com.wavesplatform.ride.runner.requests.DefaultRequestService
 import com.wavesplatform.ride.runner.stats.RideRunnerStats
 import com.wavesplatform.ride.runner.storage.persistent.DefaultPersistentCaches
-import com.wavesplatform.ride.runner.storage.{RequestsStorage, ScriptRequest, SharedBlockchainStorage}
+import com.wavesplatform.ride.runner.storage.{ScriptRequest, SharedBlockchainStorage}
 import com.wavesplatform.ride.runner.{BlockchainProcessor, BlockchainState}
 import com.wavesplatform.state.Height
 import com.wavesplatform.utils.ScorexLogging
@@ -132,11 +132,7 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
       settings.rideRunner.requestsService,
       db.access,
       sharedBlockchain,
-      new RequestsStorage {
-        override def size: Int                      = scripts.size
-        override def all(): List[ScriptRequest]     = scripts
-        override def append(x: ScriptRequest): Unit = {} // Ignore, because no way to evaluate a new expr
-      },
+      null, // TODO
       rideScheduler
     )
 
@@ -177,6 +173,10 @@ object RideRunnerWithBlockchainUpdatesApp extends ScorexLogging {
       .runToFuture(blockchainEventsStreamScheduler)
 
     blockchainUpdates.start(lastSafeKnownHeight + 1, endHeight)
+
+    // TODO
+    val task = Task.parTraverseUnordered(scripts)(requestsService.trackAndRun).runToFuture(rideScheduler)
+    Await.result(task, Duration.Inf)
 
     log.info("Initialization completed")
     Await.result(events, Duration.Inf)

@@ -90,7 +90,15 @@ object RideCompareService extends ScorexLogging {
             val id = s"[$address, $request]"
             log.info(s"Running $id")
             val r = x.rideRunner == x.node
-            if (!r) log.warn(s"Different $id:\nride: ${x.rideRunner}\nnode: ${x.node}")
+            if (!r) {
+              val rideRunner = x.rideRunner.map { x =>
+                (x \ "result" \ "value" \ "_2" \ "value").getOrElse(x)
+              }
+              val node = x.node.map { x =>
+                (x \ "result" \ "value" \ "_2" \ "value").getOrElse(x)
+              }
+              log.warn(s"Different $id:\nride: $rideRunner\nnode: $node")
+            }
             r
           }
       }
